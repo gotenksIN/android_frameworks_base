@@ -24,6 +24,10 @@
     <!-- Whether to use Richtap vibration -->
     <java-symbol type="bool" name="config_usesRichtapVibration" />
 
+    <!-- Device key handlers -->
+    <java-symbol type="array" name="config_deviceKeyHandlerLibs" />
+    <java-symbol type="array" name="config_deviceKeyHandlerClasses" />
+
     <!-- DC Dimming -->
     <java-symbol type="string" name="config_deviceDcDimmingSysfsNode" />
     <java-symbol type="string" name="config_deviceDcDimmingEnableValue" />

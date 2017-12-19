@@ -96,6 +96,13 @@ public class ImageExporterTest extends SysuiTestCase {
     }
 
     @Test
+    public void testImageFilename_withAppName() {
+        assertEquals("image file name", "Screenshot_20201215-131500_Settings.png",
+                ImageExporter.createFilename(CAPTURE_TIME, CompressFormat.PNG,
+                    Display.DEFAULT_DISPLAY, "Settings"));
+    }
+
+    @Test
     public void testImageFilename_secondaryDisplay1() {
         assertEquals("image file name", "Screenshot_20201215-131500-display-1.png",
                 ImageExporter.createFilename(CAPTURE_TIME, CompressFormat.PNG, /* displayId= */ 1));

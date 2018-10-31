@@ -63,6 +63,8 @@ class FakeBluetoothController : BluetoothController {
 
     override fun canConfigBluetooth(): Boolean = false
 
+    override fun getBatteryLevel(): Int = 0
+
     override fun getConnectedDevices(): MutableList<CachedBluetoothDevice> = Collections.emptyList()
 
     override fun addOnMetadataChangedListener(

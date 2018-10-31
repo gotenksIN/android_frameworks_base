@@ -20,6 +20,7 @@ import android.testing.LeakCheck;
 import androidx.annotation.Nullable;
 
 import com.android.internal.statusbar.StatusBarIcon;
+import com.android.systemui.statusbar.phone.PhoneStatusBarPolicy.BluetoothIconState;
 import com.android.systemui.statusbar.phone.ui.IconManager;
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController;
 
@@ -77,6 +78,10 @@ public class FakeStatusBarIconController extends BaseLeakChecker<IconManager>
 
     @Override
     public void setNewWifiIcon() {
+    }
+
+    @Override
+    public void setBluetoothIcon(String slot, BluetoothIconState state) {
     }
 
     @Override

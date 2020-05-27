@@ -16,8 +16,14 @@
 
 package com.android.systemui.screenshot
 
+import android.content.Context
+import android.media.AudioManager
 import android.media.MediaActionSound
 import android.media.MediaPlayer
+import android.os.UserHandle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.provider.Settings
 import android.util.Log
 import com.android.app.tracing.coroutines.asyncTraced as async
 import com.android.app.tracing.coroutines.launchTraced as launch
@@ -56,11 +62,15 @@ interface ScreenshotSoundController {
 class ScreenshotSoundControllerImpl
 @Inject
 constructor(
+    @Application private val context: Context,
     private val soundProvider: ScreenshotSoundProvider,
     private val soundPolicy: ScreenshotSoundPolicy,
     @Application private val coroutineScope: CoroutineScope,
     @Background private val bgDispatcher: CoroutineDispatcher,
 ) : ScreenshotSoundController {
+
+    private val audioManager = context.getSystemService(AudioManager::class.java)
+    private val vibrator = context.getSystemService(Vibrator::class.java)
 
     private val player: Deferred<MediaPlayer?> =
         coroutineScope.async("loadScreenshotSound", bgDispatcher) {
@@ -84,10 +94,38 @@ constructor(
     override suspend fun playScreenshotSound() {
         withContext(bgDispatcher) {
             try {
-                if (soundPolicy.shouldForceShutterSound()) {
-                    forcedShutterSound.await()?.play(MediaActionSound.SHUTTER_CLICK)
-                } else {
-                    player.await()?.start()
+                val isSoundForced = soundPolicy.shouldForceShutterSound()
+                var playSound = isSoundForced
+                when (audioManager?.ringerMode) {
+                    AudioManager.RINGER_MODE_SILENT -> {
+                        // do nothing
+                    }
+                    AudioManager.RINGER_MODE_VIBRATE -> {
+                        if (vibrator != null && vibrator.hasVibrator()) {
+                            vibrator.vibrate(
+                                VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
+                            )
+                        }
+                    }
+                    AudioManager.RINGER_MODE_NORMAL -> {
+                        // in this case we want to play sound even if not forced on
+                        playSound = true
+                    }
+                }
+                if (
+                    playSound &&
+                        Settings.System.getIntForUser(
+                            context.contentResolver,
+                            Settings.System.SCREENSHOT_SHUTTER_SOUND,
+                            1,
+                            UserHandle.USER_CURRENT,
+                        ) == 1
+                ) {
+                    if (isSoundForced) {
+                        forcedShutterSound.await()?.play(MediaActionSound.SHUTTER_CLICK)
+                    } else {
+                        player.await()?.start()
+                    }
                 }
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "Screenshot sound failed to play", e)

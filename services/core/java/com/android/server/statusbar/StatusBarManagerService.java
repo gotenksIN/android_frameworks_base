@@ -1104,6 +1104,12 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         return mTracingEnabled;
     }
 
+    @Override
+    public void toggleCameraFlash() {
+        enforceStatusBar();
+        runWithStatusBarIfPresent(IStatusBar::toggleCameraFlash);
+    }
+
     /**
      * Disable status bar features. Pass the bitwise-or of the {@code #DISABLE_*} flags.
      * To re-enable everything, pass {@code #DISABLE_NONE}.

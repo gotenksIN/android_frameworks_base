@@ -153,3 +153,17 @@ flag {
     description: "Android Advanced Protection Mode Feature: Usb Data Protection"
     bug: "389958463"
 }
+
+flag {
+    name: "enable_intent_firewall_extra_key_value_filter"
+    namespace: "responsible_apis"
+    description: "Flag for enable ExtraKeyValueFilter in IntentFirewall"
+    bug: "428733109"
+}
+
+flag {
+    name: "enable_intent_firewall_component_class_filter"
+    namespace: "responsible_apis"
+    description: "Flag for enabling component-class-filter in IntentFirewall"
+    bug: "428733109"
+}

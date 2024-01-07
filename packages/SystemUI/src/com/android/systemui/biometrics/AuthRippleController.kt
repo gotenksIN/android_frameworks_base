@@ -44,6 +44,7 @@ import com.android.systemui.statusbar.LightRevealEffect
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.commandline.Command
 import com.android.systemui.statusbar.commandline.CommandRegistry
+import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.util.ViewController
@@ -74,6 +75,7 @@ constructor(
     private val statusBarStateController: StatusBarStateController,
     private val displayMetrics: DisplayMetrics,
     private val logger: KeyguardLogger,
+    private val biometricUnlockController: BiometricUnlockController,
     private val authRippleInteractor: AuthRippleInteractor,
     private val facePropertyRepository: FacePropertyRepository,
     rippleView: AuthRippleView?,
@@ -85,6 +87,9 @@ constructor(
 
     private var udfpsController: UdfpsController? = null
     private var udfpsRadius: Float = -1f
+
+    private val isRippleEnabled: Boolean
+        get() = !biometricUnlockController.isWakeAndUnlock
 
     override fun start() {
         init()
@@ -174,6 +179,8 @@ constructor(
     }
 
     private fun showUnlockedRipple() {
+        if (!isRippleEnabled) return
+
         notificationShadeWindowController.setForcePluginOpen(true, this)
 
         mView.startUnlockedRipple(

@@ -21,6 +21,7 @@ import android.media.AudioManager
 import android.media.MediaActionSound
 import android.media.MediaPlayer
 import android.os.UserHandle
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
@@ -94,38 +95,21 @@ constructor(
     override suspend fun playScreenshotSound() {
         withContext(bgDispatcher) {
             try {
-                val isSoundForced = soundPolicy.shouldForceShutterSound()
-                var playSound = isSoundForced
-                when (audioManager?.ringerMode) {
-                    AudioManager.RINGER_MODE_SILENT -> {
-                        // do nothing
-                    }
-                    AudioManager.RINGER_MODE_VIBRATE -> {
-                        if (vibrator != null && vibrator.hasVibrator()) {
-                            vibrator.vibrate(
-                                VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
-                            )
-                        }
-                    }
-                    AudioManager.RINGER_MODE_NORMAL -> {
-                        // in this case we want to play sound even if not forced on
-                        playSound = true
-                    }
-                }
-                if (
-                    playSound &&
-                        Settings.System.getIntForUser(
-                            context.contentResolver,
-                            Settings.System.SCREENSHOT_SHUTTER_SOUND,
-                            1,
-                            UserHandle.USER_CURRENT,
-                        ) == 1
-                ) {
-                    if (isSoundForced) {
-                        forcedShutterSound.await()?.play(MediaActionSound.SHUTTER_CLICK)
-                    } else {
-                        player.await()?.start()
-                    }
+                val playSound =
+                    Settings.System.getIntForUser(
+                        context.contentResolver,
+                        Settings.System.SCREENSHOT_SHUTTER_SOUND,
+                        1,
+                        UserHandle.USER_CURRENT,
+                    ) == 1 && audioManager?.ringerMode == AudioManager.RINGER_MODE_NORMAL
+                val playSoundForced = soundPolicy.shouldForceShutterSound()
+
+                if (playSoundForced) {
+                    forcedShutterSound.await()?.play(MediaActionSound.SHUTTER_CLICK)
+                } else if (playSound) {
+                    player.await()?.start()
+                } else if (vibrator != null && vibrator.hasVibrator()) {
+                    vibrator.vibrate(VIBRATION_EFFECT, VIBRATION_ATTRS)
                 }
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "Screenshot sound failed to play", e)
@@ -161,5 +145,11 @@ constructor(
 
     private companion object {
         const val TAG = "ScreenshotSoundControllerImpl"
+
+        val VIBRATION_EFFECT: VibrationEffect =
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
+
+        val VIBRATION_ATTRS: VibrationAttributes =
+            VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH)
     }
 }

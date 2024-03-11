@@ -44,6 +44,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 import com.android.systemui.statusbar.pipeline.shared.data.repository.ConnectivityRepository
 import com.android.systemui.statusbar.policy.data.repository.UserSetupRepository
 import com.android.systemui.util.CarrierConfigTracker
+import com.android.systemui.util.CarrierNameCustomization
 import java.lang.ref.WeakReference
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -156,6 +157,7 @@ constructor(
     @Application private val scope: CoroutineScope,
     private val context: Context,
     private val featureFlagsClassic: FeatureFlagsClassic,
+    val carrierNameCustomization: CarrierNameCustomization,
 ) : MobileIconsInteractor {
 
     // Weak reference lookup for created interactors
@@ -468,6 +470,7 @@ constructor(
                 mobileConnectionsRepo.defaultDataSubId,
                 ddsIcon,
                 crossSimdisplaySingnalLevel,
+                carrierNameCustomization,
             )
             .also { reuseCache[subId] = WeakReference(it) }
 

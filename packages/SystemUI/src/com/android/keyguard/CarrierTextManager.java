@@ -51,7 +51,6 @@ import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.pipeline.wifi.data.repository.WifiRepository;
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
-import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
 import com.android.systemui.telephony.TelephonyListenerManager;
 import com.android.systemui.util.CarrierNameCustomization;
 
@@ -286,6 +285,7 @@ public class CarrierTextManager {
                 mMainExecutor.execute(() -> {
                     mKeyguardUpdateMonitor.registerCallback(mCallback);
                     mWakefulnessLifecycle.addObserver(mWakefulnessObserver);
+                    mCarrierNameCustomization.registerCallback(mCallback);
                 });
                 mTelephonyListenerManager.addActiveDataSubscriptionIdListener(mPhoneStateListener);
             } else {
@@ -299,6 +299,7 @@ public class CarrierTextManager {
             mMainExecutor.execute(() -> {
                 mKeyguardUpdateMonitor.removeCallback(mCallback);
                 mWakefulnessLifecycle.removeObserver(mWakefulnessObserver);
+                mCarrierNameCustomization.removeCallback(mCallback);
             });
             mTelephonyListenerManager.removeActiveDataSubscriptionIdListener(mPhoneStateListener);
         }
@@ -352,7 +353,8 @@ public class CarrierTextManager {
                         && mCarrierNameCustomization.isRoaming(subId)) {
                     carrierName = mCarrierNameCustomization.getRoamingCarrierName(subId);
                 } else {
-                    carrierName = getCustomizeCarrierName(carrierName, subs.get(i));
+                    carrierName = mCarrierNameCustomization.
+                            getCustomizeCarrierNameOld(carrierName, subs.get(i));
                 }
             }
             CharSequence carrierTextForSimState = getCarrierTextForSimState(simState, carrierName);
@@ -767,121 +769,6 @@ public class CarrierTextManager {
          * Notifies the View that the device finished waking up
          */
         default void finishedWakingUp() {};
-    }
-
-    private String getCustomizeCarrierName(CharSequence originCarrierName,
-                                           SubscriptionInfo sub) {
-        StringBuilder newCarrierName = new StringBuilder();
-        int networkType = getNetworkType(sub.getSubscriptionId());
-        String networkClass = networkTypeToString(networkType);
-
-        String fiveGNetworkClass = get5GNetworkClass(sub, networkType);
-        if ( fiveGNetworkClass != null ) {
-            networkClass = fiveGNetworkClass;
-        }
-
-        if (!TextUtils.isEmpty(originCarrierName)) {
-            String[] names = originCarrierName.toString().split(mSeparator.toString(), 2);
-            for (int j = 0; j < names.length; j++) {
-                names[j] = getLocalString(
-                        names[j], com.android.settingslib.R.array.origin_carrier_names,
-                        com.android.settingslib.R.array.locale_carrier_names);
-                if (!TextUtils.isEmpty(names[j])) {
-                    if (!TextUtils.isEmpty(networkClass)) {
-                        names[j] = new StringBuilder().append(names[j]).append(" ")
-                                .append(networkClass).toString();
-                    }
-                    if (j > 0 && names[j].equals(names[j - 1])) {
-                        continue;
-                    }
-                    if (j > 0) {
-                        newCarrierName.append(mSeparator);
-                    }
-                    newCarrierName.append(names[j]);
-                }
-            }
-        }
-        return newCarrierName.toString();
-    }
-
-    /**
-     * parse the string to current language.
-     *
-     * @param originalString original string
-     * @param originNamesId the id of the original string array.
-     * @param localNamesId the id of the local string keys.
-     * @return local language string
-     */
-    private String getLocalString(String originalString,
-            int originNamesId, int localNamesId) {
-        String[] origNames = getContext().getResources().getStringArray(originNamesId);
-        String[] localNames = getContext().getResources().getStringArray(localNamesId);
-        for (int i = 0; i < origNames.length; i++) {
-            if (origNames[i].equalsIgnoreCase(originalString)) {
-                return localNames[i];
-            }
-        }
-        return originalString;
-    }
-
-    private int getNetworkType(int subId) {
-        int networkType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
-        ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(subId);
-        if (ss != null && (ss.getDataRegState() == ServiceState.STATE_IN_SERVICE
-                || ss.getVoiceRegState() == ServiceState.STATE_IN_SERVICE)) {
-            networkType = ss.getDataNetworkType();
-            if (networkType == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
-                networkType = ss.getVoiceNetworkType();
-            }
-        }
-        return networkType;
-    }
-
-    private String networkTypeToString(int networkType) {
-        int classId = com.android.settingslib.R.string.config_rat_unknown;
-        long mask = TelephonyManager.getBitMaskForNetworkType(networkType);
-        if ((mask & TelephonyManager.NETWORK_CLASS_BITMASK_2G) != 0) {
-          classId = com.android.settingslib.R.string.config_rat_2g;
-        } else if ((mask & TelephonyManager.NETWORK_CLASS_BITMASK_3G) != 0) {
-          classId = com.android.settingslib.R.string.config_rat_3g;
-        } else if ((mask & TelephonyManager.NETWORK_CLASS_BITMASK_4G) != 0) {
-          classId = com.android.settingslib.R.string.config_rat_4g;
-        }
-        return getContext().getResources().getString(classId);
-    }
-
-
-    private String get5GNetworkClass(SubscriptionInfo sub, int networkType) {
-        if ( networkType == TelephonyManager.NETWORK_TYPE_NR ) {
-            return mContext.getResources().getString(com.android.settingslib.R.string.data_connection_5g);
-        }
-
-        int slotIndex = sub.getSimSlotIndex();
-        int subId = sub.getSubscriptionId();
-
-        if ( mFiveGServiceClient == null ) {
-            mFiveGServiceClient = FiveGServiceClient.getInstance(mContext);
-            mFiveGServiceClient.registerCallback(mCallback);
-        }
-        FiveGServiceState fiveGServiceState =
-                mFiveGServiceClient.getCurrentServiceState(slotIndex);
-        if ( fiveGServiceState.isNrIconTypeValid() && isDataRegisteredOnLte(subId)) {
-            return mContext.getResources().getString(com.android.settingslib.R.string.data_connection_5g);
-        }
-
-        return null;
-    }
-
-    private boolean isDataRegisteredOnLte(int subId) {
-        TelephonyManager telephonyManager = (TelephonyManager)
-                mContext.getSystemService(Context.TELEPHONY_SERVICE);
-        int dataType = telephonyManager.getDataNetworkType(subId);
-        if (  dataType == TelephonyManager.NETWORK_TYPE_LTE ||
-                dataType == TelephonyManager.NETWORK_TYPE_LTE_CA) {
-            return true;
-        }else{
-            return false;
-        }
     }
 
     public void loadCarrierMap() {

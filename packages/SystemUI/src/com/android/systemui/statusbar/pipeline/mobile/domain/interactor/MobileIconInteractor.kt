@@ -51,6 +51,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 import com.android.systemui.statusbar.pipeline.satellite.ui.model.SatelliteIconModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState
+import com.android.systemui.util.CarrierNameCustomization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -166,6 +167,10 @@ interface MobileIconInteractor {
     val voWifiAvailable: StateFlow<Boolean>
 
     val customizedIcon: StateFlow<SignalIconModel?>
+
+    val customizedCarrierName: StateFlow<String>
+
+    val customizedNetworkName: StateFlow<NetworkNameModel>
 }
 
 /** Interactor for a single mobile connection. This connection _should_ have one subscription ID */
@@ -192,6 +197,7 @@ class MobileIconInteractorImpl(
     private val defaultDataSubId: StateFlow<Int>,
     ddsIcon: StateFlow<SignalIconModel?>,
     crossSimdisplaySingnalLevel: StateFlow<Boolean>,
+    carrierNameCustomization: CarrierNameCustomization,
     val carrierIdOverrides: MobileIconCarrierIdOverrides = MobileIconCarrierIdOverridesImpl()
 ) : MobileIconInteractor {
     override val tableLogBuffer: TableLogBuffer = connectionRepository.tableLogBuffer
@@ -259,6 +265,36 @@ class MobileIconInteractorImpl(
             )
         }
         .stateIn(scope, SharingStarted.WhileSubscribed(), MobileIconCustomizationMode())
+
+    override val customizedCarrierName =
+        combine(
+            carrierName,
+            connectionRepository.nrIconType,
+            connectionRepository.dataNetworkType,
+            connectionRepository.voiceNetworkType,
+            connectionRepository.isInService,
+        ) { carrierName, nrIconType, dataNetworkType, voiceNetworkType, isInService ->
+            carrierNameCustomization.getCustomizeCarrierNameModern(connectionRepository.subId,
+                carrierName, true, nrIconType, dataNetworkType, voiceNetworkType, isInService)
+        }
+        .stateIn(
+            scope,
+            SharingStarted.WhileSubscribed(),
+            connectionRepository.carrierName.value.name
+        )
+
+    override val customizedNetworkName =
+        networkName
+            .map {
+                val customizationName = carrierNameCustomization.getCustomizeCarrierNameModern(
+                    connectionRepository.subId, it.name, false, 0, 0, 0, false)
+                NetworkNameModel.IntentDerived(customizationName)
+            }
+            .stateIn(
+                scope,
+                SharingStarted.WhileSubscribed(),
+                connectionRepository.networkName.value
+            )
 
     override val isRoaming: StateFlow<Boolean> =
         combine(

@@ -52,6 +52,7 @@ import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityMod
 import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
 import com.android.systemui.statusbar.policy.data.repository.FakeUserSetupRepository
 import com.android.systemui.util.CarrierConfigTracker
+import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -131,6 +132,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
+                mock(),
             )
 
         interactor =
@@ -155,6 +157,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 MutableStateFlow(0),
                 MutableStateFlow(null),
                 MutableStateFlow(false),
+                iconsInteractor.carrierNameCustomization,
                 MobileIconCarrierIdOverridesFake()
             )
         createAndSetViewModel()

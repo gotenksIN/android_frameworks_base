@@ -44,6 +44,7 @@ import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.StatusBarIconView.STATE_HIDDEN
+import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.LocationBasedMobileViewModel
@@ -172,7 +173,9 @@ object MobileIconBinder {
                             dataTypeId?.let { IconViewBinder.bind(dataTypeId, networkTypeView) }
                             val prevVis = networkTypeContainer.visibility
                             networkTypeContainer.visibility =
-                                if (dataTypeId != null) VISIBLE else GONE
+                                if (dataTypeId != null
+                                    && viewModel.location != StatusBarLocation.SHADE_CARRIER_GROUP)
+                                    VISIBLE else GONE
 
                             if (prevVis != networkTypeContainer.visibility) {
                                 view.requestLayout()
@@ -262,7 +265,8 @@ object MobileIconBinder {
 
                     launch {
                         viewModel.volteId.distinctUntilChanged().collect { volteId ->
-                            if (volteId != 0) {
+                            if (volteId != 0 &&
+                                viewModel.location != StatusBarLocation.SHADE_CARRIER_GROUP) {
                                 volteView.visibility = VISIBLE
                                 volteView.setImageResource(volteId)
                             } else {

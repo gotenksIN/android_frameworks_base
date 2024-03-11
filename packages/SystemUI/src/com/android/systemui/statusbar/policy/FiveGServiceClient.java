@@ -168,8 +168,16 @@ public class FiveGServiceClient {
     }
 
     public void registerCallback(KeyguardUpdateMonitorCallback callback) {
-        mKeyguardUpdateMonitorCallbacks.add(
-                new WeakReference<KeyguardUpdateMonitorCallback>(callback));
+        for (int i = 0; i < mKeyguardUpdateMonitorCallbacks.size(); i++) {
+            if (mKeyguardUpdateMonitorCallbacks.get(i).get() == callback) {
+                return;
+            }
+        }
+        mKeyguardUpdateMonitorCallbacks.add(new WeakReference<>(callback));
+    }
+
+    public void removeCallback(KeyguardUpdateMonitorCallback callback) {
+        mKeyguardUpdateMonitorCallbacks.removeIf(el -> el.get() == callback);
     }
 
     public void registerListener(int phoneId, IFiveGStateListener listener) {

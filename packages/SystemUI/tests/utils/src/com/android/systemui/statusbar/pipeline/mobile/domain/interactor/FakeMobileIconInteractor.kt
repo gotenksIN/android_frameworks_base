@@ -98,6 +98,10 @@ class FakeMobileIconInteractor(
     private val _customizedIcon = MutableStateFlow(null)
     override val customizedIcon = _customizedIcon
 
+    override val customizedNetworkName = MutableStateFlow(NetworkNameModel.IntentDerived("demo mode"))
+
+    override val customizedCarrierName = MutableStateFlow("demo mode")
+
     private val _isConnectionFailed = MutableStateFlow(false)
     override val isConnectionFailed = _isConnectionFailed
 

@@ -110,6 +110,7 @@ class MobileIconsInteractorTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
+                mock(),
             )
     }
 

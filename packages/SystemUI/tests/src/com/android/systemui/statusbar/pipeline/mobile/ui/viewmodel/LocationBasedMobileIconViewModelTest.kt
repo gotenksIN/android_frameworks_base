@@ -121,6 +121,7 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
+                mock(),
             )
 
         interactor =
@@ -145,6 +146,7 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 MutableStateFlow(0),
                 MutableStateFlow(null),
                 MutableStateFlow(false),
+                mock(),
                 MobileIconCarrierIdOverridesFake()
             )
 

@@ -737,6 +737,7 @@ class MobileIconInteractorTest : SysuiTestCase() {
             MutableStateFlow(0),
             MutableStateFlow(null),
             MutableStateFlow(false),
+            mock(),
             overrides,
         )
 

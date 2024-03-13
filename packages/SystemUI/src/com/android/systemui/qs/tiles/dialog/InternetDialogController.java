@@ -243,6 +243,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     private boolean mHasDualDataCapability = false;
     private ContentObserver mDualDataContentObserver;
     private int mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+    private boolean mIsNddsDataEnabled = false;
 
     private ServiceCallback mExtTelServiceCallback = new ServiceCallback() {
         @Override
@@ -382,6 +383,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         } else {
             notifyDualDataEnabledStateChanged();
         }
+        mIsNddsDataEnabled = mTelephonyManager.createForSubscriptionId(mNddsSubId).isDataEnabled();
     }
 
     void onStop() {
@@ -591,6 +593,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         final SignalStrength strength = tm.getSignalStrength();
         int level = (strength == null) ? 0 : strength.getLevel();
         int numLevels = SignalStrength.NUM_SIGNAL_STRENGTH_BINS;
+        boolean hideNoInternetState = mConfig.hideNoInternetState;
         if (isCarrierNetworkActive) {
             level = getCarrierNetworkLevel();
             numLevels = WifiEntry.WIFI_LEVEL_MAX + 1;
@@ -598,8 +601,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             level += 1;
             numLevels += 1;
         }
+        Log.i(TAG, "hideNoInternetState:" + hideNoInternetState);
         return getSignalStrengthIcon(subId, mContext, level, numLevels, NO_CELL_DATA_TYPE_ICON,
-                !isMobileDataEnabled(subId));
+                !hideNoInternetState && !isMobileDataEnabledWithNddsOverrideConsidered(subId));
     }
 
     Drawable getSignalStrengthIcon(int subId, Context context, int level, int numLevels,
@@ -1019,6 +1023,14 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         return mTelephonyManager.createForSubscriptionId(subId).isDataEnabled();
     }
 
+    boolean isMobileDataEnabledWithNddsOverrideConsidered(int subId) {
+        if (subId != getDefaultDataSubscriptionId()) {
+            Log.i(TAG, "isMobileDataEnabled：mIsNddsDataEnabled = " + mIsNddsDataEnabled);
+            return mIsNddsDataEnabled;
+        }
+        return isMobileDataEnabled(subId);
+    }
+
     /**
      * Set whether to enable data for {@code subId}, also whether to disable data for other
      * subscription
@@ -1272,7 +1284,8 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     }
 
     private class NonDdsCallStateCallback extends TelephonyCallback implements
-            TelephonyCallback.CallStateListener {
+            TelephonyCallback.CallStateListener,
+            TelephonyCallback.DataEnabledListener {
 
         @Override
         public void onCallStateChanged(int callState) {
@@ -1280,10 +1293,18 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             mNonDdsCallState = callState;
             mCallback.onNonDdsCallStateChanged(callState);
         }
+
+        @Override
+        public void onDataEnabledChanged(boolean enabled,
+                @TelephonyManager.DataEnabledChangedReason int reason) {
+            mIsNddsDataEnabled = enabled;
+            Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
+       }
     }
 
     private class NonDdsInternetTelephonyCallback extends InternetTelephonyCallback
-            implements TelephonyCallback.CallStateListener {
+            implements TelephonyCallback.CallStateListener,
+            TelephonyCallback.DataEnabledListener {
         private NonDdsInternetTelephonyCallback(int subId) {
             super(subId);
         }
@@ -1294,6 +1315,13 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             mNonDdsCallState = callState;
             mCallback.onNonDdsCallStateChanged(callState);
         }
+
+        @Override
+        public void onDataEnabledChanged(boolean enabled,
+                @TelephonyManager.DataEnabledChangedReason int reason) {
+            mIsNddsDataEnabled = enabled;
+            Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
+       }
     }
 
     @Override

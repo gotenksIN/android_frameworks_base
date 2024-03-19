@@ -3544,8 +3544,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (firstDown && event.isMetaPressed() && event.isCtrlPressed()) {
                     StatusBarManagerInternal statusbar = getStatusBarManagerInternal();
                     if (statusbar != null) {
-                        statusbar.goToFullscreenFromSplit();
-                        logKeyboardSystemsEvent(event, KeyboardLogEvent.SPLIT_SCREEN_NAVIGATION);
+                        statusbar.moveFocusedTaskToFullscreen(event.getDisplayId());
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.MULTI_WINDOW_NAVIGATION);
                         return true;
                     }
                 }
@@ -6452,7 +6452,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private boolean performHapticFeedback(int effectId, boolean always, String reason) {
         return performHapticFeedback(Process.myUid(), mContext.getOpPackageName(),
-            effectId, always, reason);
+            effectId, always, reason, false /* fromIme */);
     }
 
     @Override
@@ -6462,7 +6462,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     @Override
     public boolean performHapticFeedback(int uid, String packageName, int effectId,
-            boolean always, String reason) {
+            boolean always, String reason, boolean fromIme) {
         if (!mVibrator.hasVibrator()) {
             return false;
         }
@@ -6473,7 +6473,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
         VibrationAttributes attrs =
                 mHapticFeedbackVibrationProvider.getVibrationAttributesForHapticFeedback(
-                        effectId, /* bypassVibrationIntensitySetting= */ always);
+                        effectId, /* bypassVibrationIntensitySetting= */ always, fromIme);
         VibratorFrameworkStatsLogger.logPerformHapticsFeedbackIfKeyboard(uid, effectId);
         mVibrator.vibrate(uid, packageName, effect, reason, attrs);
         return true;

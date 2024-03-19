@@ -51,6 +51,7 @@ import com.android.systemui.complication.dagger.ComplicationComponent;
 import com.android.systemui.controls.dagger.ControlsModule;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.SystemUser;
+import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.demomode.dagger.DemoModeModule;
 import com.android.systemui.deviceentry.DeviceEntryModule;
 import com.android.systemui.display.DisplayModule;
@@ -126,6 +127,7 @@ import com.android.systemui.statusbar.pipeline.dagger.StatusBarPipelineModule;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.PolicyModule;
+import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.statusbar.policy.dagger.SmartRepliesInflationModule;
 import com.android.systemui.statusbar.policy.dagger.StatusBarPolicyModule;
@@ -358,12 +360,14 @@ public abstract class SystemUIModule {
             VisualInterruptionDecisionProvider visualInterruptionDecisionProvider,
             ZenModeController zenModeController,
             NotificationLockscreenUserManager notifUserManager,
+            SensitiveNotificationProtectionController sensitiveNotificationProtectionController,
             CommonNotifCollection notifCollection,
             NotifPipeline notifPipeline,
             SysUiState sysUiState,
             FeatureFlags featureFlags,
             NotifPipelineFlags notifPipelineFlags,
-            @Main Executor sysuiMainExecutor) {
+            @Main Executor sysuiMainExecutor,
+            @UiBackground Executor sysuiUiBgExecutor) {
         return Optional.ofNullable(BubblesManager.create(context,
                 bubblesOptional,
                 notificationShadeWindowController,
@@ -376,12 +380,14 @@ public abstract class SystemUIModule {
                 visualInterruptionDecisionProvider,
                 zenModeController,
                 notifUserManager,
+                sensitiveNotificationProtectionController,
                 notifCollection,
                 notifPipeline,
                 sysUiState,
                 featureFlags,
                 notifPipelineFlags,
-                sysuiMainExecutor));
+                sysuiMainExecutor,
+                sysuiUiBgExecutor));
     }
 
     @Binds

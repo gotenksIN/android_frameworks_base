@@ -67,6 +67,8 @@ class FakeMobileIconInteractor(
 
     override val isInService = MutableStateFlow(true)
 
+    override val isEmergencyOnly = MutableStateFlow(true)
+
     override val isNonTerrestrial = MutableStateFlow(false)
 
     private val _isDataEnabled = MutableStateFlow(true)

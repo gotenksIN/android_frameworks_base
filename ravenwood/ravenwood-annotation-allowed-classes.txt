@@ -186,6 +186,7 @@ android.os.WorkSource
 android.content.ClipData
 android.content.ClipData$Item
 android.content.ClipDescription
+android.content.ClipboardManager
 android.content.ComponentName
 android.content.ContentUris
 android.content.ContentValues
@@ -255,6 +256,7 @@ android.view.Display
 android.view.Display$HdrCapabilities
 android.view.Display$Mode
 android.view.DisplayInfo
+android.view.inputmethod.InputBinding
 
 android.hardware.SerialManager
 android.hardware.SerialManagerInternal

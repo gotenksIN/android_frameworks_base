@@ -2525,6 +2525,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         userId = handleIncomingUser(Binder.getCallingPid(), callingUid, userId, "getRecentTasks");
         final boolean allowed = isGetTasksAllowed("getRecentTasks", Binder.getCallingPid(),
                 callingUid);
+        if (!mAmInternal.isUserRunning(userId, ActivityManager.FLAG_AND_UNLOCKED)) {
+            Slog.i(TAG, "User " + userId + " is locked. Cannot load recents");
+            return ParceledListSlice.emptyList();
+        }
+        mRecentTasks.loadRecentTasksIfNeeded(userId);
         synchronized (mGlobalLock) {
             return mRecentTasks.getRecentTasks(maxNum, flags, allowed, userId, callingUid);
         }
@@ -6055,6 +6060,28 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     false /*validateIncomingUser*/);
         }
 
+        @Override
+        public int startActivityWithScreenshot(@NonNull Intent intent,
+                @NonNull String callingPackage, int callingUid, int callingPid,
+                @Nullable IBinder resultTo, @Nullable Bundle options, int userId) {
+            userId = getActivityStartController().checkTargetUser(userId,
+                    false /* validateIncomingUser */, Binder.getCallingPid(),
+                    Binder.getCallingUid(), "startActivityWithScreenshot");
+
+            return getActivityStartController()
+                    .obtainStarter(intent, "startActivityWithScreenshot")
+                    .setCallingUid(callingUid)
+                    .setCallingPid(callingPid)
+                    .setCallingPackage(callingPackage)
+                    .setResultTo(resultTo)
+                    .setActivityOptions(createSafeActivityOptionsWithBalAllowed(options))
+                    .setRealCallingUid(Binder.getCallingUid())
+                    .setUserId(userId)
+                    .setBackgroundStartPrivileges(BackgroundStartPrivileges.ALLOW_BAL)
+                    .setFreezeScreen(true)
+                    .execute();
+        }
+
         /**
          * Called after virtual display Id is updated by
          * {@link com.android.server.vr.Vr2dDisplay} with a specific
@@ -7079,11 +7106,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
         @Override
         public void loadRecentTasksForUser(int userId) {
-            synchronized (mGlobalLock) {
-                mRecentTasks.loadUserRecentsLocked(userId);
-                // TODO renaming the methods(?)
-                mPackageConfigPersister.loadUserPackages(userId);
-            }
+            // This runs on android.fg thread when the user is unlocking.
+            mRecentTasks.loadRecentTasksIfNeeded(userId);
+            mPackageConfigPersister.loadUserPackages(userId);
         }
 
         @Override
@@ -7366,6 +7391,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         public void unregisterCompatScaleProvider(
                 @CompatScaleProvider.CompatScaleModeOrderId int id) {
             ActivityTaskManagerService.this.unregisterCompatScaleProvider(id);
+        }
+
+        @Override
+        public boolean isAssistDataAllowed() {
+            return ActivityTaskManagerService.this.isAssistDataAllowed();
         }
     }
 

@@ -9116,6 +9116,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         Slog.wtf(TAG, "Uid " + uid + " sent too many Binders to uid "
                                 + Process.myUid());
                         BinderProxy.dumpProxyDebugInfo();
+                        CriticalEventLog.getInstance().logExcessiveBinderCalls(uid);
                         if (uid == Process.SYSTEM_UID) {
                             Slog.i(TAG, "Skipping kill (uid is SYSTEM)");
                         } else {
@@ -18577,7 +18578,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                             (WindowProcessController) procsToKill.get(i);
                     final ProcessRecord pr = (ProcessRecord) wpc.mOwner;
                     if (ActivityManager.isProcStateBackground(pr.mState.getSetProcState())
-                            && pr.mReceivers.numberOfCurReceivers() == 0) {
+                            && pr.mReceivers.numberOfCurReceivers() == 0
+                            && !pr.mState.hasStartedServices()) {
                         pr.killLocked("remove task", ApplicationExitInfo.REASON_USER_REQUESTED,
                                 ApplicationExitInfo.SUBREASON_REMOVE_TASK, true);
                     } else {

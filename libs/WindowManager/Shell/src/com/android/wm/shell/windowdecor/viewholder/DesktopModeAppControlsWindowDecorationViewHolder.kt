@@ -8,8 +8,6 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.view.View
 import android.view.View.OnLongClickListener
-import android.view.WindowInsetsController.APPEARANCE_LIGHT_CAPTION_BARS
-import android.view.WindowInsetsController.APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -21,6 +19,9 @@ import com.android.internal.R.attr.materialColorSurfaceContainerHigh
 import com.android.internal.R.attr.materialColorSurfaceContainerLow
 import com.android.internal.R.attr.materialColorSurfaceDim
 import com.android.wm.shell.R
+import com.android.wm.shell.windowdecor.MaximizeButtonView
+import com.android.wm.shell.windowdecor.extension.isLightCaptionBarAppearance
+import com.android.wm.shell.windowdecor.extension.isTransparentCaptionBarAppearance
 
 /**
  * A desktop mode window decoration used when the window is floating (i.e. freeform). It hosts
@@ -32,8 +33,10 @@ internal class DesktopModeAppControlsWindowDecorationViewHolder(
         onCaptionTouchListener: View.OnTouchListener,
         onCaptionButtonClickListener: View.OnClickListener,
         onLongClickListener: OnLongClickListener,
+        onCaptionGenericMotionListener: View.OnGenericMotionListener,
         appName: CharSequence,
-        appIconBitmap: Bitmap
+        appIconBitmap: Bitmap,
+        onMaximizeHoverAnimationFinishedListener: () -> Unit
 ) : DesktopModeWindowDecorationViewHolder(rootView) {
 
     private val captionView: View = rootView.requireViewById(R.id.desktop_mode_caption)
@@ -41,6 +44,8 @@ internal class DesktopModeAppControlsWindowDecorationViewHolder(
     private val openMenuButton: View = rootView.requireViewById(R.id.open_menu_button)
     private val closeWindowButton: ImageButton = rootView.requireViewById(R.id.close_window)
     private val expandMenuButton: ImageButton = rootView.requireViewById(R.id.expand_menu_button)
+    private val maximizeButtonView: MaximizeButtonView =
+            rootView.requireViewById(R.id.maximize_button_view)
     private val maximizeWindowButton: ImageButton = rootView.requireViewById(R.id.maximize_window)
     private val appNameTextView: TextView = rootView.requireViewById(R.id.application_name)
     private val appIconImageView: ImageView = rootView.requireViewById(R.id.application_icon)
@@ -55,10 +60,13 @@ internal class DesktopModeAppControlsWindowDecorationViewHolder(
         closeWindowButton.setOnClickListener(onCaptionButtonClickListener)
         maximizeWindowButton.setOnClickListener(onCaptionButtonClickListener)
         maximizeWindowButton.setOnTouchListener(onCaptionTouchListener)
+        maximizeWindowButton.setOnGenericMotionListener(onCaptionGenericMotionListener)
         maximizeWindowButton.onLongClickListener = onLongClickListener
         closeWindowButton.setOnTouchListener(onCaptionTouchListener)
         appNameTextView.text = appName
         appIconImageView.setImageBitmap(appIconBitmap)
+        maximizeButtonView.onHoverAnimationFinishedListener =
+                onMaximizeHoverAnimationFinishedListener
     }
 
     override fun bindData(taskInfo: RunningTaskInfo) {
@@ -73,15 +81,33 @@ internal class DesktopModeAppControlsWindowDecorationViewHolder(
         maximizeWindowButton.imageAlpha = alpha
         closeWindowButton.imageAlpha = alpha
         expandMenuButton.imageAlpha = alpha
+
+        maximizeButtonView.setAnimationTints(isDarkMode())
     }
 
     override fun onHandleMenuOpened() {}
 
     override fun onHandleMenuClosed() {}
 
+    fun setAnimatingTaskResize(animatingTaskResize: Boolean) {
+        // If animating a task resize, cancel any running hover animations
+        if (animatingTaskResize) {
+            maximizeButtonView.cancelHoverAnimation()
+        }
+        maximizeButtonView.hoverDisabled = animatingTaskResize
+    }
+
+    fun onMaximizeWindowHoverExit() {
+        maximizeButtonView.cancelHoverAnimation()
+    }
+
+    fun onMaximizeWindowHoverEnter() {
+        maximizeButtonView.startHoverAnimation()
+    }
+
     @ColorInt
     private fun getCaptionBackgroundColor(taskInfo: RunningTaskInfo): Int {
-        if (isTransparentBackgroundRequested(taskInfo)) {
+        if (taskInfo.isTransparentCaptionBarAppearance) {
             return Color.TRANSPARENT
         }
         val materialColorAttr: Int =
@@ -107,10 +133,10 @@ internal class DesktopModeAppControlsWindowDecorationViewHolder(
     @ColorInt
     private fun getAppNameAndButtonColor(taskInfo: RunningTaskInfo): Int {
         val materialColorAttr = when {
-            isTransparentBackgroundRequested(taskInfo) &&
-                    isLightCaptionBar(taskInfo) -> materialColorOnSecondaryContainer
-            isTransparentBackgroundRequested(taskInfo) &&
-                    !isLightCaptionBar(taskInfo) -> materialColorOnSurface
+            taskInfo.isTransparentCaptionBarAppearance &&
+                    taskInfo.isLightCaptionBarAppearance -> materialColorOnSecondaryContainer
+            taskInfo.isTransparentCaptionBarAppearance &&
+                    !taskInfo.isLightCaptionBarAppearance -> materialColorOnSurface
             isDarkMode() -> materialColorOnSurface
             else -> materialColorOnSecondaryContainer
         }
@@ -139,16 +165,6 @@ internal class DesktopModeAppControlsWindowDecorationViewHolder(
         return context.resources.configuration.uiMode and
                 Configuration.UI_MODE_NIGHT_MASK ==
                 Configuration.UI_MODE_NIGHT_YES
-    }
-
-    private fun isTransparentBackgroundRequested(taskInfo: RunningTaskInfo): Boolean {
-        val appearance = taskInfo.taskDescription?.statusBarAppearance ?: 0
-        return (appearance and APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND) != 0
-    }
-
-    private fun isLightCaptionBar(taskInfo: RunningTaskInfo): Boolean {
-        val appearance = taskInfo.taskDescription?.statusBarAppearance ?: 0
-        return (appearance and APPEARANCE_LIGHT_CAPTION_BARS) != 0
     }
 
     companion object {

@@ -1209,7 +1209,12 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // Primary bouncer->Gone (ensures lockscreen content is not visible on successful auth)
         if (!migrateClocksToBlueprint()) {
             collectFlow(mView, mPrimaryBouncerToGoneTransitionViewModel.getLockscreenAlpha(),
-                    setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
+                    setTransitionAlpha(mNotificationStackScrollLayoutController,
+                            /* excludeNotifications=*/ true), mMainDispatcher);
+            collectFlow(mView, mPrimaryBouncerToGoneTransitionViewModel.getNotificationAlpha(),
+                    (Float alpha) -> {
+                        mNotificationStackScrollLayoutController.setMaxAlphaForExpansion(alpha);
+                    }, mMainDispatcher);
         }
     }
 
@@ -1551,6 +1556,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     @Override
     public void setOpenCloseListener(OpenCloseListener openCloseListener) {
+        SceneContainerFlag.assertInLegacyMode();
         mOpenCloseListener = openCloseListener;
     }
 
@@ -3080,7 +3086,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     private void onClosingFinished() {
-        mOpenCloseListener.onClosingFinished();
+        if (mOpenCloseListener != null) {
+            mOpenCloseListener.onClosingFinished();
+        }
         setClosingWithAlphaFadeout(false);
         mMediaHierarchyManager.closeGuts();
     }
@@ -4711,7 +4719,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             if (mSplitShadeEnabled && !isKeyguardShowing()) {
                 mQsController.setExpandImmediate(true);
             }
-            mOpenCloseListener.onOpenStarted();
+            if (mOpenCloseListener != null) {
+                mOpenCloseListener.onOpenStarted();
+            }
         }
         if (state == STATE_CLOSED) {
             mQsController.setExpandImmediate(false);
@@ -4736,9 +4746,17 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     private Consumer<Float> setTransitionAlpha(
             NotificationStackScrollLayoutController stackScroller) {
+        return setTransitionAlpha(stackScroller, /* excludeNotifications= */ false);
+    }
+
+    private Consumer<Float> setTransitionAlpha(
+            NotificationStackScrollLayoutController stackScroller,
+            boolean excludeNotifications) {
         return (Float alpha) -> {
             mKeyguardStatusViewController.setAlpha(alpha);
-            stackScroller.setMaxAlphaForExpansion(alpha);
+            if (!excludeNotifications) {
+                stackScroller.setMaxAlphaForExpansion(alpha);
+            }
 
             if (keyguardBottomAreaRefactor()) {
                 mKeyguardInteractor.setAlpha(alpha);

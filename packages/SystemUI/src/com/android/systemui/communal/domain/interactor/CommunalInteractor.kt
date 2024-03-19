@@ -24,11 +24,13 @@ import com.android.systemui.communal.data.repository.CommunalPrefsRepository
 import com.android.systemui.communal.data.repository.CommunalRepository
 import com.android.systemui.communal.data.repository.CommunalWidgetRepository
 import com.android.systemui.communal.domain.model.CommunalContentModel
+import com.android.systemui.communal.domain.model.CommunalContentModel.WidgetContent
 import com.android.systemui.communal.shared.model.CommunalContentSize
 import com.android.systemui.communal.shared.model.CommunalContentSize.FULL
 import com.android.systemui.communal.shared.model.CommunalContentSize.HALF
 import com.android.systemui.communal.shared.model.CommunalContentSize.THIRD
 import com.android.systemui.communal.shared.model.CommunalSceneKey
+import com.android.systemui.communal.shared.model.CommunalWidgetContentModel
 import com.android.systemui.communal.shared.model.ObservableCommunalTransitionState
 import com.android.systemui.communal.widgets.CommunalAppWidgetHost
 import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
@@ -45,6 +47,7 @@ import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.model.SceneKey
+import com.android.systemui.settings.UserTracker
 import com.android.systemui.smartspace.data.repository.SmartspaceRepository
 import com.android.systemui.util.kotlin.BooleanFlowOperators.and
 import com.android.systemui.util.kotlin.BooleanFlowOperators.not
@@ -59,6 +62,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -82,6 +86,7 @@ constructor(
     communalSettingsInteractor: CommunalSettingsInteractor,
     private val appWidgetHost: CommunalAppWidgetHost,
     private val editWidgetsActivityStarter: EditWidgetsActivityStarter,
+    private val userTracker: UserTracker,
     sceneInteractor: SceneInteractor,
     sceneContainerFlags: SceneContainerFlags,
     @CommunalLog logBuffer: LogBuffer,
@@ -125,8 +130,13 @@ constructor(
     /**
      * Target scene as requested by the underlying [SceneTransitionLayout] or through
      * [onSceneChanged].
+     *
+     * If [isCommunalAvailable] is false, will return [CommunalSceneKey.Blank]
      */
-    val desiredScene: StateFlow<CommunalSceneKey> = communalRepository.desiredScene
+    val desiredScene: Flow<CommunalSceneKey> =
+        communalRepository.desiredScene.combine(isCommunalAvailable) { scene, available ->
+            if (available) scene else CommunalSceneKey.Blank
+        }
 
     /** Transition state of the hub mode. */
     val transitionState: StateFlow<ObservableCommunalTransitionState> =
@@ -262,15 +272,32 @@ constructor(
     fun updateWidgetOrder(widgetIdToPriorityMap: Map<Int, Int>) =
         widgetRepository.updateWidgetOrder(widgetIdToPriorityMap)
 
+    /** All widgets present in db. */
+    val communalWidgets: Flow<List<CommunalWidgetContentModel>> =
+        isCommunalAvailable.flatMapLatest { available ->
+            if (!available) emptyFlow() else widgetRepository.communalWidgets
+        }
+
     /** A list of widget content to be displayed in the communal hub. */
-    val widgetContent: Flow<List<CommunalContentModel.Widget>> =
-        widgetRepository.communalWidgets.map { widgets ->
-            widgets.map Widget@{ widget ->
-                return@Widget CommunalContentModel.Widget(
-                    appWidgetId = widget.appWidgetId,
-                    providerInfo = widget.providerInfo,
-                    appWidgetHost = appWidgetHost,
-                )
+    val widgetContent: Flow<List<WidgetContent>> =
+        combine(
+            widgetRepository.communalWidgets.map { filterWidgetsByExistingUsers(it) },
+            communalSettingsInteractor.communalWidgetCategories
+        ) { widgets, allowedCategories ->
+            widgets.map { widget ->
+                if (widget.providerInfo.widgetCategory and allowedCategories != 0) {
+                    // At least one category this widget specified is allowed, so show it
+                    WidgetContent.Widget(
+                        appWidgetId = widget.appWidgetId,
+                        providerInfo = widget.providerInfo,
+                        appWidgetHost = appWidgetHost,
+                    )
+                } else {
+                    WidgetContent.DisabledWidget(
+                        appWidgetId = widget.appWidgetId,
+                        providerInfo = widget.providerInfo,
+                    )
+                }
             }
         }
 
@@ -344,6 +371,19 @@ constructor(
 
             return@combine ongoingContent
         }
+
+    /**
+     * Filter and retain widgets associated with an existing user, safeguarding against displaying
+     * stale data following user deletion.
+     */
+    private fun filterWidgetsByExistingUsers(
+        list: List<CommunalWidgetContentModel>,
+    ): List<CommunalWidgetContentModel> {
+        val currentUserIds = userTracker.userProfiles.map { it.id }.toSet()
+        return list.filter { widget ->
+            currentUserIds.contains(widget.providerInfo.profile?.identifier)
+        }
+    }
 
     companion object {
         /**

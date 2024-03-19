@@ -4307,7 +4307,7 @@ public final class ActiveServices {
                         || (callerApp.mState.getCurProcState() <= PROCESS_STATE_TOP
                             && c.hasFlag(Context.BIND_TREAT_LIKE_ACTIVITY)),
                         b.client);
-                if ((serviceBindingOomAdjPolicy
+                if (!s.mOomAdjBumpedInExec && (serviceBindingOomAdjPolicy
                         & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) == 0) {
                     needOomAdj = true;
                     mAm.enqueueOomAdjTargetLocked(s.app);
@@ -4451,7 +4451,7 @@ public final class ActiveServices {
                 }
 
                 serviceDoneExecutingLocked(r, mDestroyingServices.contains(r), false, false,
-                        !Flags.serviceBindingOomAdjPolicy() || b == null || !b.mSkippedOomAdj
+                        !Flags.serviceBindingOomAdjPolicy() || r.mOomAdjBumpedInExec
                         ? OOM_ADJ_REASON_EXECUTING_SERVICE : OOM_ADJ_REASON_NONE);
             }
         } finally {
@@ -4595,7 +4595,6 @@ public final class ActiveServices {
                         + (b != null ? b.apps.size() : 0));
 
                 boolean inDestroying = mDestroyingServices.contains(r);
-                boolean skipOomAdj = false;
                 if (b != null) {
                     if (b.apps.size() > 0 && !inDestroying) {
                         // Applications have already bound since the last
@@ -4620,11 +4619,11 @@ public final class ActiveServices {
                         // a new client.
                         b.doRebind = true;
                     }
-                    skipOomAdj = Flags.serviceBindingOomAdjPolicy() && b.mSkippedOomAdj;
                 }
 
                 serviceDoneExecutingLocked(r, inDestroying, false, false,
-                        skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE);
+                        !Flags.serviceBindingOomAdjPolicy() || r.mOomAdjBumpedInExec
+                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
             }
         } finally {
             mAm.mInjector.restoreCallingIdentity(origId);
@@ -5102,9 +5101,8 @@ public final class ActiveServices {
      * Bump the given service record into executing state.
      * @param oomAdjReason The caller requests it to perform the oomAdjUpdate not {@link
      *         ActivityManagerInternal#OOM_ADJ_REASON_NONE}.
-     * @return {@code true} if it performed oomAdjUpdate.
      */
-    private boolean bumpServiceExecutingLocked(
+    private void bumpServiceExecutingLocked(
             ServiceRecord r, boolean fg, String why, @OomAdjReason int oomAdjReason,
             boolean skipTimeoutIfPossible) {
         if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, ">>> EXECUTING "
@@ -5169,19 +5167,17 @@ public final class ActiveServices {
                 }
             }
         }
-        boolean oomAdjusted = false;
         if (oomAdjReason != OOM_ADJ_REASON_NONE && r.app != null
                 && r.app.mState.getCurProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
             // Force an immediate oomAdjUpdate, so the client app could be in the correct process
             // state before doing any service related transactions
             mAm.enqueueOomAdjTargetLocked(r.app);
             mAm.updateOomAdjPendingTargetsLocked(oomAdjReason);
-            oomAdjusted = true;
+            r.mOomAdjBumpedInExec = true;
         }
         r.executeFg |= fg;
         r.executeNesting++;
         r.executingStart = SystemClock.uptimeMillis();
-        return oomAdjusted;
     }
 
     private final boolean requestServiceBindingLocked(ServiceRecord r, IntentBindRecord i,
@@ -5198,7 +5194,7 @@ public final class ActiveServices {
                 & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_BIND) != 0;
         if ((!i.requested || rebind) && i.apps.size() > 0) {
             try {
-                i.mSkippedOomAdj = !bumpServiceExecutingLocked(r, execInFg, "bind",
+                bumpServiceExecutingLocked(r, execInFg, "bind",
                         skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_BIND_SERVICE,
                         skipOomAdj /* skipTimeoutIfPossible */);
                 if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
@@ -5217,14 +5213,16 @@ public final class ActiveServices {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while binding " + r, e);
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE);
+                        !Flags.serviceBindingOomAdjPolicy() || r.mOomAdjBumpedInExec
+                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
                 throw e;
             } catch (RemoteException e) {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while binding " + r);
                 // Keep the executeNesting count accurate.
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE);
+                        !Flags.serviceBindingOomAdjPolicy() || r.mOomAdjBumpedInExec
+                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
                 return false;
             }
         }
@@ -6081,6 +6079,7 @@ public final class ActiveServices {
             // process state before doing any service related transactions
             mAm.enqueueOomAdjTargetLocked(app);
             mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+            r.mOomAdjBumpedInExec = true;
         } else {
             // Since we skipped the oom adj update, the Service#onCreate() might be running in
             // the cached state, if the service process drops into the cached state after the call.
@@ -6141,7 +6140,8 @@ public final class ActiveServices {
                 // Keep the executeNesting count accurate.
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_STOP_SERVICE);
+                        !Flags.serviceBindingOomAdjPolicy() || r.mOomAdjBumpedInExec
+                        ? OOM_ADJ_REASON_STOP_SERVICE : OOM_ADJ_REASON_NONE);
 
                 // Cleanup.
                 if (newService) {
@@ -6181,7 +6181,7 @@ public final class ActiveServices {
                     null, null, 0, null, null, ActivityManager.PROCESS_STATE_UNKNOWN));
         }
 
-        sendServiceArgsLocked(r, execInFg, true);
+        sendServiceArgsLocked(r, execInFg, r.mOomAdjBumpedInExec);
 
         if (r.delayed) {
             if (DEBUG_DELAYED_STARTS) Slog.v(TAG_SERVICE, "REM FR DELAY LIST (new proc): " + r);
@@ -6386,7 +6386,8 @@ public final class ActiveServices {
             }
         }
 
-        boolean oomAdjusted = false;
+        boolean oomAdjusted = Flags.serviceBindingOomAdjPolicy() && r.mOomAdjBumpedInExec;
+
         // Tell the service that it has been unbound.
         if (r.app != null && r.app.isThreadReady()) {
             for (int i = r.bindings.size() - 1; i >= 0; i--) {
@@ -6395,9 +6396,10 @@ public final class ActiveServices {
                         + ": hasBound=" + ibr.hasBound);
                 if (ibr.hasBound) {
                     try {
-                        oomAdjusted |= bumpServiceExecutingLocked(r, false, "bring down unbind",
-                                OOM_ADJ_REASON_UNBIND_SERVICE,
-                                false /* skipTimeoutIfPossible */);
+                        bumpServiceExecutingLocked(r, false, "bring down unbind",
+                                oomAdjusted ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
+                                oomAdjusted /* skipTimeoutIfPossible */);
+                        oomAdjusted |= r.mOomAdjBumpedInExec;
                         ibr.hasBound = false;
                         ibr.requested = false;
                         r.app.getThread().scheduleUnbindService(r,
@@ -6553,10 +6555,11 @@ public final class ActiveServices {
                     }
                 } else {
                     try {
-                        oomAdjusted |= bumpServiceExecutingLocked(r, false, "destroy",
-                                oomAdjusted ? 0 : OOM_ADJ_REASON_STOP_SERVICE,
-                                false /* skipTimeoutIfPossible */);
+                        bumpServiceExecutingLocked(r, false, "destroy",
+                                oomAdjusted ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
+                                oomAdjusted /* skipTimeoutIfPossible */);
                         mDestroyingServices.add(r);
+                        oomAdjusted |= r.mOomAdjBumpedInExec;
                         r.destroying = true;
                         r.app.getThread().scheduleStopService(r);
                     } catch (Exception e) {
@@ -6712,7 +6715,7 @@ public final class ActiveServices {
                 final boolean skipOomAdj = (serviceBindingOomAdjPolicy
                         & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) != 0;
                 try {
-                    b.intent.mSkippedOomAdj = !bumpServiceExecutingLocked(s, false, "unbind",
+                    bumpServiceExecutingLocked(s, false, "unbind",
                             skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
                             skipOomAdj /* skipTimeoutIfPossible */);
                     if (b.client != s.app && c.notHasFlag(Context.BIND_WAIVE_PRIORITY)
@@ -6762,6 +6765,7 @@ public final class ActiveServices {
         boolean inDestroying = mDestroyingServices.contains(r);
         if (r != null) {
             boolean skipOomAdj = false;
+            boolean needOomAdj = false;
             if (type == ActivityThread.SERVICE_DONE_EXECUTING_START) {
                 // This is a call from a service start...  take care of
                 // book-keeping.
@@ -6837,15 +6841,13 @@ public final class ActiveServices {
                     // Fake it to keep from ANR due to orphaned entry.
                     r.executeNesting = 1;
                 }
-            } else if (type == ActivityThread.SERVICE_DONE_EXECUTING_REBIND
-                    || type == ActivityThread.SERVICE_DONE_EXECUTING_UNBIND) {
-                final Intent.FilterComparison filter = new Intent.FilterComparison(intent);
-                final IntentBindRecord b = r.bindings.get(filter);
-                skipOomAdj = Flags.serviceBindingOomAdjPolicy() && b != null && b.mSkippedOomAdj;
+                // The service is done, force an oom adj update.
+                needOomAdj = true;
             }
             final long origId = mAm.mInjector.clearCallingIdentity();
             serviceDoneExecutingLocked(r, inDestroying, inDestroying, enqueueOomAdj,
-                    skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_EXECUTING_SERVICE);
+                    !Flags.serviceBindingOomAdjPolicy() || r.mOomAdjBumpedInExec || needOomAdj
+                    ? OOM_ADJ_REASON_EXECUTING_SERVICE : OOM_ADJ_REASON_NONE);
             mAm.mInjector.restoreCallingIdentity(origId);
         } else {
             Slog.w(TAG, "Done executing unknown service from pid "
@@ -6901,18 +6903,16 @@ public final class ActiveServices {
                     mDestroyingServices.remove(r);
                     r.bindings.clear();
                 }
-                boolean oomAdjusted = false;
                 if (oomAdjReason != OOM_ADJ_REASON_NONE) {
                     if (enqueueOomAdj) {
                         mAm.enqueueOomAdjTargetLocked(r.app);
                     } else {
                         mAm.updateOomAdjLocked(r.app, oomAdjReason);
                     }
-                    oomAdjusted = true;
                 } else {
                     // Skip oom adj if it wasn't bumped during the bumpServiceExecutingLocked()
-                    oomAdjusted = false;
                 }
+                r.mOomAdjBumpedInExec = false;
             }
             r.executeFg = false;
             if (r.tracker != null) {
@@ -7308,6 +7308,7 @@ public final class ActiveServices {
             sr.setProcess(null, null, 0, null);
             sr.isolationHostProc = null;
             sr.executeNesting = 0;
+            sr.mOomAdjBumpedInExec = false;
             synchronized (mAm.mProcessStats.mLock) {
                 sr.forceClearTracker();
             }

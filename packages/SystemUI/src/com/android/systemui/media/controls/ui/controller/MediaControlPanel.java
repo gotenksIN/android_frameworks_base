@@ -18,7 +18,7 @@ package com.android.systemui.media.controls.ui.controller;
 
 import static android.provider.Settings.ACTION_MEDIA_CONTROLS_SETTINGS;
 
-import static com.android.systemui.Flags.legacyLeAudioSharing;
+import static com.android.settingslib.flags.Flags.legacyLeAudioSharing;
 import static com.android.systemui.media.controls.shared.model.SmartspaceMediaDataKt.NUM_REQUIRED_RECOMMENDATIONS;
 
 import android.animation.Animator;
@@ -260,7 +260,6 @@ public class MediaControlPanel {
     private TurbulenceNoiseController mTurbulenceNoiseController;
     private LoadingEffect mLoadingEffect;
     private final GlobalSettings mGlobalSettings;
-    private final Random mRandom = new Random();
     private TurbulenceNoiseAnimationConfig mTurbulenceNoiseAnimationConfig;
     private boolean mWasPlaying = false;
     private boolean mButtonClicked = false;
@@ -1294,13 +1293,14 @@ public class MediaControlPanel {
                 mMediaViewHolder.getTurbulenceNoiseView();
         int width = targetView.getWidth();
         int height = targetView.getHeight();
+        Random random = new Random();
 
         return new TurbulenceNoiseAnimationConfig(
                 /* gridCount= */ 2.14f,
                 TurbulenceNoiseAnimationConfig.DEFAULT_LUMINOSITY_MULTIPLIER,
-                /* noiseOffsetX= */ mRandom.nextFloat(),
-                /* noiseOffsetY= */ mRandom.nextFloat(),
-                /* noiseOffsetZ= */ mRandom.nextFloat(),
+                /* noiseOffsetX= */ random.nextFloat(),
+                /* noiseOffsetY= */ random.nextFloat(),
+                /* noiseOffsetZ= */ random.nextFloat(),
                 /* noiseMoveSpeedX= */ 0.42f,
                 /* noiseMoveSpeedY= */ 0f,
                 TurbulenceNoiseAnimationConfig.DEFAULT_NOISE_SPEED_Z,

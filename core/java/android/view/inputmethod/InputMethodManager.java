@@ -468,8 +468,8 @@ public final class InputMethodManager {
      * Flag indicating that views from the default home screen ({@link Intent#CATEGORY_HOME}) may
      * act as a handwriting delegator for the delegate editor view. If set, views from the home
      * screen package will be trusted for handwriting delegation, in addition to views in the {@code
-     * delegatorPackageName} passed to {@link #acceptStylusHandwritingDelegation(View, String,
-     * int)}.
+     * delegatorPackageName} passed to
+     * {@link #acceptStylusHandwritingDelegation(View, String, int, Executor, Consumer)} .
      */
     @FlaggedApi(FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR)
     public static final int HANDWRITING_DELEGATE_FLAG_HOME_DELEGATOR_ALLOWED = 0x0001;
@@ -1159,6 +1159,7 @@ public final class InputMethodManager {
                     }
                     final boolean startInput;
                     synchronized (mH) {
+                        mImeDispatcher.clear();
                         if (getBindSequenceLocked() != sequence) {
                             return;
                         }
@@ -2334,7 +2335,7 @@ public final class InputMethodManager {
         synchronized (mH) {
             final ImeTracker.Token statsToken = ImeTracker.forLogging().onRequestShow(
                     null /* component */, Process.myUid(), ImeTracker.ORIGIN_CLIENT_SHOW_SOFT_INPUT,
-                    SoftInputShowHideReason.SHOW_SOFT_INPUT);
+                    SoftInputShowHideReason.SHOW_SOFT_INPUT, false /* fromUser */);
 
             Log.w(TAG, "showSoftInputUnchecked() is a hidden method, which will be"
                     + " removed soon. If you are using androidx.appcompat.widget.SearchView,"
@@ -2902,6 +2903,8 @@ public final class InputMethodManager {
      * @param delegateView delegate view capable of receiving input via {@link InputConnection}
      * @param delegatorPackageName package name of the delegator that handled initial stylus stroke.
      * @param flags {@link #HANDWRITING_DELEGATE_FLAG_HOME_DELEGATOR_ALLOWED} or {@code 0}
+     * @param executor The executor to run the callback on.
+     * @param callback {@code true>} would be received if delegation was accepted.
      * @return {@code true} if view belongs to allowed delegate package declared in {@link
      *     #prepareStylusHandwritingDelegation(View, String)} and delegation is accepted
      * @see #prepareStylusHandwritingDelegation(View, String)
@@ -2914,13 +2917,16 @@ public final class InputMethodManager {
     // session to the delegate view.
     // @see #startConnectionlessStylusHandwritingForDelegation(View, ResultReceiver,
     //     CursorAnchorInfo, String)
+    //
     @FlaggedApi(FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR)
-    public boolean acceptStylusHandwritingDelegation(
+    public void acceptStylusHandwritingDelegation(
             @NonNull View delegateView, @NonNull String delegatorPackageName,
-            @HandwritingDelegateFlags int flags) {
+            @HandwritingDelegateFlags int flags, @NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<Boolean> callback) {
         Objects.requireNonNull(delegatorPackageName);
 
-        return startStylusHandwritingInternal(delegateView, delegatorPackageName, flags);
+        startStylusHandwritingInternal(
+                delegateView, delegatorPackageName, flags, executor, callback);
     }
 
     /**
@@ -3491,8 +3497,7 @@ public final class InputMethodManager {
             return false;
         }
         mServedView = mNextServedView;
-        if (initiationWithoutInputConnection() && mServedView.onCheckIsTextEditor()
-                && mServedView.isHandwritingDelegate()) {
+        if (initiationWithoutInputConnection() && mServedView.isHandwritingDelegate()) {
             mServedView.getViewRootImpl().getHandwritingInitiator().onDelegateViewFocused(
                     mServedView);
         }
@@ -3540,7 +3545,7 @@ public final class InputMethodManager {
     void closeCurrentInput() {
         final ImeTracker.Token statsToken = ImeTracker.forLogging().onRequestHide(
                 null /* component */, Process.myUid(), ImeTracker.ORIGIN_CLIENT_HIDE_SOFT_INPUT,
-                SoftInputShowHideReason.HIDE_CLOSE_CURRENT_SESSION);
+                SoftInputShowHideReason.HIDE_CLOSE_CURRENT_SESSION, false /* fromUser */);
         ImeTracker.forLatency().onRequestHide(statsToken, ImeTracker.ORIGIN_CLIENT_HIDE_SOFT_INPUT,
                 SoftInputShowHideReason.HIDE_CLOSE_CURRENT_SESSION,
                 ActivityThread::currentApplication);
@@ -3640,7 +3645,7 @@ public final class InputMethodManager {
         if (statsToken == null) {
             statsToken = ImeTracker.forLogging().onRequestHide(null /* component */,
                     Process.myUid(), ImeTracker.ORIGIN_CLIENT_HIDE_SOFT_INPUT,
-                    SoftInputShowHideReason.HIDE_SOFT_INPUT_BY_INSETS_API);
+                    SoftInputShowHideReason.HIDE_SOFT_INPUT_BY_INSETS_API, false /* fromUser */);
         }
         ImeTracker.forLatency().onRequestHide(statsToken, ImeTracker.ORIGIN_CLIENT_HIDE_SOFT_INPUT,
                 SoftInputShowHideReason.HIDE_SOFT_INPUT_BY_INSETS_API,

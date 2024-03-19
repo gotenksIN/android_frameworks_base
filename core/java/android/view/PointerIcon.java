@@ -428,13 +428,11 @@ public final class PointerIcon implements Parcelable {
 
     private BitmapDrawable getBitmapDrawableFromVectorDrawable(Resources resources,
             VectorDrawable vectorDrawable) {
-        Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(),
-                vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-        // BitmapDrawables and Bitmap have a default density of DisplayMetrics.DENSITY_DEVICE,
-        // (which is deprecated in favor of DENSITY_DEVICE_STABLE/resources.densityDpi). In
-        // rare cases when device density differs from the resource density, the bitmap will
-        // scale as the BitmapDrawable is created. Avoid by explicitly setting density here.
-        bitmap.setDensity(resources.getDisplayMetrics().densityDpi);
+        // Ensure we pass the display metrics into the Bitmap constructor so that it is initialized
+        // with the correct density.
+        Bitmap bitmap = Bitmap.createBitmap(resources.getDisplayMetrics(),
+                vectorDrawable.getIntrinsicWidth(),
+                vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888, true /* hasAlpha */);
         Canvas canvas = new Canvas(bitmap);
         vectorDrawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
         vectorDrawable.draw(canvas);
@@ -480,11 +478,19 @@ public final class PointerIcon implements Parcelable {
                 mBitmapFrames = new Bitmap[frames - 1];
                 final int width = drawable.getIntrinsicWidth();
                 final int height = drawable.getIntrinsicHeight();
+                final boolean isVectorAnimation = drawable instanceof VectorDrawable;
+                mDrawNativeDropShadow = isVectorAnimation;
                 for (int i = 1; i < frames; ++i) {
                     Drawable drawableFrame = animationDrawable.getFrame(i);
-                    if (!(drawableFrame instanceof BitmapDrawable)) {
+                    if (!(drawableFrame instanceof BitmapDrawable)
+                            && !(drawableFrame instanceof VectorDrawable)) {
                         throw new IllegalArgumentException("Frame of an animated pointer icon "
-                                + "must refer to a bitmap drawable.");
+                                + "must refer to a bitmap drawable or vector drawable.");
+                    }
+                    if (isVectorAnimation != (drawableFrame instanceof VectorDrawable)) {
+                        throw new IllegalArgumentException("The drawable of the " + i + "-th frame "
+                                + "is a different type from the others. All frames should be the "
+                                + "same type.");
                     }
                     if (drawableFrame.getIntrinsicWidth() != width ||
                         drawableFrame.getIntrinsicHeight() != height) {
@@ -492,8 +498,11 @@ public final class PointerIcon implements Parcelable {
                                 + "is different. All frames should have the exact same size and "
                                 + "share the same hotspot.");
                     }
-                    BitmapDrawable bitmapDrawableFrame = (BitmapDrawable) drawableFrame;
-                    mBitmapFrames[i - 1] = getBitmapFromDrawable(bitmapDrawableFrame);
+                    if (isVectorAnimation) {
+                        drawableFrame = getBitmapDrawableFromVectorDrawable(resources,
+                                (VectorDrawable) drawableFrame);
+                    }
+                    mBitmapFrames[i - 1] = getBitmapFromDrawable((BitmapDrawable) drawableFrame);
                 }
             }
         }

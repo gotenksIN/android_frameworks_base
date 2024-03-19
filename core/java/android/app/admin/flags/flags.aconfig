@@ -117,6 +117,9 @@ flag {
     namespace: "enterprise"
     description: "Exempt the default sms app of the context user for suspension when calling setPersonalAppsSuspended"
     bug: "309183330"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -145,4 +148,11 @@ flag {
   namespace: "enterprise"
   description: "Allow to query whether MTE is enabled or not to check for compliance for enterprise policy"
   bug: "322777918"
+}
+
+flag {
+  name: "esim_management_ux_enabled"
+  namespace: "enterprise"
+  description: "Enable UX changes for esim management"
+  bug: "295301164"
 }

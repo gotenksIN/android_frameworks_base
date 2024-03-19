@@ -471,6 +471,21 @@ public final class Settings {
             "android.settings.ACCESSIBILITY_COLOR_MOTION_SETTINGS";
 
     /**
+     * Activity Action: Show settings to allow configuration of accessibility color contrast.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_ACCESSIBILITY_COLOR_CONTRAST_SETTINGS =
+            "android.settings.ACCESSIBILITY_COLOR_CONTRAST_SETTINGS";
+
+    /**
      * Activity Action: Show settings to allow configuration of Reduce Bright Colors.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -11980,6 +11995,16 @@ public final class Settings {
                 "accessibility_pinch_to_zoom_anywhere_enabled";
 
         /**
+         * For magnification feature where panning can be controlled with a single finger.
+         *
+         * If true, you can pan using a single finger gesture.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_SINGLE_FINGER_PANNING_ENABLED =
+                "accessibility_single_finger_panning_enabled";
+
+        /**
          * Controls magnification capability. Accessibility magnification is capable of at least one
          * of the magnification modes.
          *
@@ -12492,6 +12517,24 @@ public final class Settings {
         public static void setLocationProviderEnabled(ContentResolver cr,
                 String provider, boolean enabled) {
         }
+
+        /**
+         * List of system components that support restore in a  V-> U OS downgrade but do not have
+         * RestoreAnyVersion set to true. Value set before system restore.
+         * This setting is not B&Rd
+         * List is stored as a comma-separated string of package names e.g. "a,b,c"
+         * @hide
+         */
+        public static final String V_TO_U_RESTORE_ALLOWLIST = "v_to_u_restore_allowlist";
+
+        /**
+         * List of system components that have RestoreAnyVersion set to true but do not support
+         * restore in a  V-> U OS downgrade. Value set before system restore.
+         * This setting is not B&Rd
+         * List is stored as a comma-separated string of package names e.g. "a,b,c"
+         * @hide
+         */
+        public static final String V_TO_U_RESTORE_DENYLIST = "v_to_u_restore_denylist";
     }
 
     /**

@@ -116,6 +116,13 @@ class BrailleDisplayConnection extends IBrailleDisplayConnection.Stub {
     }
 
     /**
+     * Used for `cmd accessibility` to check hidraw access.
+     */
+    static BrailleDisplayScanner createScannerForShell() {
+        return getDefaultNativeScanner(new DefaultNativeInterface());
+    }
+
+    /**
      * Interface to scan for properties of connected Braille displays.
      *
      * <p>Helps simplify testing Braille Display APIs using test data without requiring
@@ -125,7 +132,6 @@ class BrailleDisplayConnection extends IBrailleDisplayConnection.Stub {
      * @see #getDefaultNativeScanner
      * @see #setTestData
      */
-    @VisibleForTesting
     interface BrailleDisplayScanner {
         Collection<Path> getHidrawNodePaths(@NonNull Path directory);
 
@@ -232,9 +238,63 @@ class BrailleDisplayConnection extends IBrailleDisplayConnection.Stub {
     }
 
     /** Returns true if this descriptor includes usages for the Braille display usage page 0x41. */
-    private static boolean isBrailleDisplay(byte[] descriptor) {
-        // TODO: b/316036493 - Check that descriptor includes 0x41 reports.
-        return true;
+    @VisibleForTesting
+    static boolean isBrailleDisplay(byte[] descriptor) {
+        boolean foundMatch = false;
+        for (int i = 0; i < descriptor.length; i++) {
+            // HID Spec "6.2.2.2 Short Items" defines that the report descriptor is a collection of
+            // items: each item is a collection of bytes where the first byte defines info about
+            // the type of item and the following 0, 1, 2, or 4 bytes are data bytes for that item.
+            // All items in the HID descriptor are expected to be Short Items.
+            final byte itemInfo = descriptor[i];
+            if (!isHidItemShort(itemInfo)) {
+                Slog.w(LOG_TAG, "Item " + itemInfo + " declares unsupported long type");
+                return false;
+            }
+            final int dataSize = getHidItemDataSize(itemInfo);
+            if (i + dataSize >= descriptor.length) {
+                Slog.w(LOG_TAG, "Item " + itemInfo + " specifies size past the remaining bytes");
+                return false;
+            }
+            // The item we're looking for (usage page declaration) should have size 1.
+            if (dataSize == 1) {
+                final byte itemData = descriptor[i + 1];
+                if (isHidItemBrailleDisplayUsagePage(itemInfo, itemData)) {
+                    foundMatch = true;
+                }
+            }
+            // Move to the next item by skipping past all data bytes in this item.
+            i += dataSize;
+        }
+        return foundMatch;
+    }
+
+    private static boolean isHidItemShort(byte itemInfo) {
+        // Info bits 7-4 describe the item type, and HID Spec "6.2.2.3 Long Items" says that long
+        // items always have type bits 1111. Otherwise, the item is a short item.
+        return (itemInfo & 0b1111_0000) != 0b1111_0000;
+    }
+
+    private static int getHidItemDataSize(byte itemInfo) {
+        // HID Spec "6.2.2.2 Short Items" says that info bits 0-1 specify the optional data size:
+        // 0, 1, 2, or 4 bytes.
+        return switch (itemInfo & 0b0000_0011) {
+            case 0b00 -> 0;
+            case 0b01 -> 1;
+            case 0b10 -> 2;
+            default -> 4;
+        };
+    }
+
+    private static boolean isHidItemBrailleDisplayUsagePage(byte itemInfo, byte itemData) {
+        // From HID Spec "6.2.2.7 Global Items"
+        final byte usagePageType = 0b0000_0100;
+        // From HID Usage Tables version 1.2.
+        final byte brailleDisplayUsagePage = 0x41;
+        // HID Spec "6.2.2.2 Short Items" says item info bits 2-7 describe the type and
+        // function of the item.
+        final byte itemType = (byte) (itemInfo & 0b1111_1100);
+        return itemType == usagePageType && itemData == brailleDisplayUsagePage;
     }
 
     /**
@@ -387,7 +447,7 @@ class BrailleDisplayConnection extends IBrailleDisplayConnection.Stub {
      * from HIDRAW nodes and perform ioctls using the provided {@link NativeInterface}.
      */
     @VisibleForTesting
-    BrailleDisplayScanner getDefaultNativeScanner(@NonNull NativeInterface nativeInterface) {
+    static BrailleDisplayScanner getDefaultNativeScanner(@NonNull NativeInterface nativeInterface) {
         Objects.requireNonNull(nativeInterface);
         return new BrailleDisplayScanner() {
             private static final String HIDRAW_DEVICE_GLOB = "hidraw*";
@@ -522,7 +582,7 @@ class BrailleDisplayConnection extends IBrailleDisplayConnection.Stub {
     }
 
     /** Native interface that actually calls native HIDRAW ioctls. */
-    private class DefaultNativeInterface implements NativeInterface {
+    private static class DefaultNativeInterface implements NativeInterface {
         @Override
         public int getHidrawDescSize(int fd) {
             return nativeGetHidrawDescSize(fd);
@@ -544,11 +604,11 @@ class BrailleDisplayConnection extends IBrailleDisplayConnection.Stub {
         }
     }
 
-    private native int nativeGetHidrawDescSize(int fd);
+    private static native int nativeGetHidrawDescSize(int fd);
 
-    private native byte[] nativeGetHidrawDesc(int fd, int descSize);
+    private static native byte[] nativeGetHidrawDesc(int fd, int descSize);
 
-    private native String nativeGetHidrawUniq(int fd);
+    private static native String nativeGetHidrawUniq(int fd);
 
-    private native int nativeGetHidrawBusType(int fd);
+    private static native int nativeGetHidrawBusType(int fd);
 }

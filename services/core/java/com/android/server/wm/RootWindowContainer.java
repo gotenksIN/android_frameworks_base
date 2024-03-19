@@ -2167,7 +2167,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     organizedTf.mClearedTaskFragmentForPip = true;
                 }
 
-                transitionController.collect(rootTask);
+                if (isPip2ExperimentEnabled()) {
+                    transitionController.collectExistenceChange(rootTask);
+                } else {
+                    transitionController.collect(rootTask);
+                }
 
                 if (transitionController.isShellTransitionsEnabled()) {
                     // set mode NOW so that when we reparent the activity, it won't be resumed.

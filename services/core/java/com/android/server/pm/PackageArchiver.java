@@ -21,7 +21,7 @@ import static android.app.ActivityManager.START_CLASS_NOT_FOUND;
 import static android.app.ActivityManager.START_PERMISSION_DENIED;
 import static android.app.AppOpsManager.MODE_ALLOWED;
 import static android.app.AppOpsManager.MODE_IGNORED;
-import static android.app.ComponentOptions.MODE_BACKGROUND_ACTIVITY_START_DENIED;
+import static android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_DENIED;
 import static android.content.pm.ArchivedActivityInfo.bytesFromBitmap;
 import static android.content.pm.ArchivedActivityInfo.drawableToBitmap;
 import static android.content.pm.PackageInstaller.EXTRA_UNARCHIVE_STATUS;
@@ -356,19 +356,34 @@ public class PackageArchiver {
     }
 
     void clearArchiveState(String packageName, int userId) {
+        final PackageSetting ps;
         synchronized (mPm.mLock) {
-            PackageSetting ps = mPm.mSettings.getPackageLPr(packageName);
-            if (ps != null) {
-                ps.setArchiveState(/* archiveState= */ null, userId);
-            }
+            ps = mPm.mSettings.getPackageLPr(packageName);
         }
-        File iconsDir = getIconsDir(packageName, userId);
+        clearArchiveState(ps, userId);
+    }
+
+    void clearArchiveState(PackageSetting ps, int userId) {
+        synchronized (mPm.mLock) {
+            if (ps == null || ps.getUserStateOrDefault(userId).getArchiveState() == null) {
+                // No archive states to clear
+                return;
+            }
+            if (DEBUG) {
+                Slog.e(TAG, "Clearing archive states for " + ps.getPackageName());
+            }
+            ps.setArchiveState(/* archiveState= */ null, userId);
+        }
+        File iconsDir = getIconsDir(ps.getPackageName(), userId);
         if (!iconsDir.exists()) {
+            if (DEBUG) {
+                Slog.e(TAG, "Icons are already deleted at " + iconsDir.getAbsolutePath());
+            }
             return;
         }
         // TODO(b/319238030) Move this into installd.
         if (!FileUtils.deleteContentsAndDir(iconsDir)) {
-            Slog.e(TAG, "Failed to clean up archive files for " + packageName);
+            Slog.e(TAG, "Failed to clean up archive files for " + ps.getPackageName());
         } else {
             if (DEBUG) {
                 Slog.e(TAG, "Deleted icons at " + iconsDir.getAbsolutePath());

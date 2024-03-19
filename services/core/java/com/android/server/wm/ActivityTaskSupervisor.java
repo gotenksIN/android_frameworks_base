@@ -42,6 +42,7 @@ import static android.content.pm.PackageManager.NOTIFY_PACKAGE_USE_ACTIVITY;
 import static android.content.pm.PackageManager.PERMISSION_DENIED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.os.PowerManager.PARTIAL_WAKE_LOCK;
+import static android.os.Process.INVALID_PID;
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
@@ -142,6 +143,7 @@ import android.util.SparseIntArray;
 import android.util.BoostFramework;
 import com.android.internal.app.procstats.ProcessStats;
 import android.view.Display;
+import android.window.ActivityWindowInfo;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -948,6 +950,9 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 final Configuration overrideConfig = r.getMergedOverrideConfiguration();
                 r.setLastReportedConfiguration(procConfig, overrideConfig);
 
+                final ActivityWindowInfo activityWindowInfo = r.getActivityWindowInfo();
+                r.setLastReportedActivityWindowInfo(activityWindowInfo);
+
                 logIfTransactionTooLarge(r.intent, r.getSavedState());
 
                 final TaskFragment organizedTaskFragment = r.getOrganizedTaskFragment();
@@ -970,7 +975,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                         results, newIntents, r.takeSceneTransitionInfo(), isTransitionForward,
                         proc.createProfilerInfoIfNeeded(), r.assistToken, activityClientController,
                         r.shareableActivityToken, r.getLaunchedFromBubble(), fragmentToken,
-                        r.initialCallerInfoAccessToken);
+                        r.initialCallerInfoAccessToken, activityWindowInfo);
 
                 // Set desired final state.
                 final ActivityLifecycleItem lifecycleItem;
@@ -1701,11 +1706,11 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
      * @return Returns true if the given task was found and removed.
      */
     boolean removeTaskById(int taskId, boolean killProcess, boolean removeFromRecents,
-            String reason, int callingUid) {
+            String reason, int callingUid, int callingPid) {
         final Task task =
                 mRootWindowContainer.anyTaskForId(taskId, MATCH_ATTACHED_TASK_OR_RECENT_TASKS);
         if (task != null) {
-            removeTask(task, killProcess, removeFromRecents, reason, callingUid, null);
+            removeTask(task, killProcess, removeFromRecents, reason, callingUid, callingPid, null);
             return true;
         }
         Slog.w(TAG, "Request to remove task ignored for non-existent task " + taskId);
@@ -1713,11 +1718,11 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     void removeTask(Task task, boolean killProcess, boolean removeFromRecents, String reason) {
-        removeTask(task, killProcess, removeFromRecents, reason, SYSTEM_UID, null);
+        removeTask(task, killProcess, removeFromRecents, reason, SYSTEM_UID, INVALID_PID, null);
     }
 
     void removeTask(Task task, boolean killProcess, boolean removeFromRecents, String reason,
-            int callingUid, String callerActivityClassName) {
+            int callingUid, int callingPid, String callerActivityClassName) {
         if (task.mInRemoveTask) {
             // Prevent recursion.
             return;
@@ -1755,7 +1760,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 mService.notifyTaskPersisterLocked(null, true);
             }
             mBalController
-                    .checkActivityAllowedToClearTask(task, callingUid, callerActivityClassName);
+                .checkActivityAllowedToClearTask(task, callingUid, callingPid, callerActivityClassName);
 
             // Device Integration: Intercept task remove event and notify remote task handler manager.
             // If current task to be removed is hold and managed by RemoteTaskManager
@@ -1941,7 +1946,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             // Task was trimmed from the recent tasks list -- remove the active task record as well
             // since the user won't really be able to go back to it
             removeTaskById(task.mTaskId, killProcess, false /* removeFromRecents */,
-                    "recent-task-trimmed", SYSTEM_UID);
+                    "recent-task-trimmed", SYSTEM_UID, INVALID_PID);
         }
         task.removedFromRecents();
     }
@@ -1960,7 +1965,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         // Check that we aren't reparenting to the same root task that the task is already in
         if (prevRootTask != null && prevRootTask.mTaskId == rootTaskId) {
             Slog.w(TAG, "Can not reparent to same root task, task=" + task
-                    + " already in rootTaskId=" + rootTaskId);
+                    + " already in rootTaskId=" + rootTaskId + " by " + Debug.getCallers(8));
             return prevRootTask;
         }
 

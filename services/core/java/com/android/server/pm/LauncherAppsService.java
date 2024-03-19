@@ -22,8 +22,8 @@ import static android.app.AppOpsManager.MODE_ALLOWED;
 import static android.app.AppOpsManager.MODE_IGNORED;
 import static android.app.AppOpsManager.OP_ARCHIVE_ICON_OVERLAY;
 import static android.app.AppOpsManager.OP_UNARCHIVAL_CONFIRMATION;
-import static android.app.ComponentOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
-import static android.app.ComponentOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED;
+import static android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
+import static android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED;
 import static android.app.PendingIntent.FLAG_IMMUTABLE;
 import static android.app.PendingIntent.FLAG_MUTABLE;
 import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
@@ -2209,8 +2209,10 @@ public class LauncherAppsService extends SystemService {
             for (UserHandle user : users) {
                 mPackageManagerInternal.forEachInstalledPackage(pkg -> {
                     final String packageName = pkg.getPackageName();
-                    if (mPackageManagerInternal.getIncrementalStatesInfo(packageName,
-                            Process.myUid(), user.getIdentifier()).isLoading()) {
+                    final IncrementalStatesInfo info =
+                            mPackageManagerInternal.getIncrementalStatesInfo(packageName,
+                                    Process.myUid(), user.getIdentifier());
+                    if (info != null && info.isLoading()) {
                         mPackageManagerInternal.registerInstalledLoadingProgressCallback(
                                 packageName, new PackageLoadingProgressCallback(packageName, user),
                                 user.getIdentifier());

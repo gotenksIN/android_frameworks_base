@@ -33,8 +33,9 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
 import com.android.systemui.keyguard.ui.composable.LockscreenLongPress
 import com.android.systemui.keyguard.ui.composable.section.AmbientIndicationSection
 import com.android.systemui.keyguard.ui.composable.section.BottomAreaSection
-import com.android.systemui.keyguard.ui.composable.section.ClockSection
+import com.android.systemui.keyguard.ui.composable.section.DefaultClockSection
 import com.android.systemui.keyguard.ui.composable.section.LockSection
+import com.android.systemui.keyguard.ui.composable.section.MediaCarouselSection
 import com.android.systemui.keyguard.ui.composable.section.NotificationSection
 import com.android.systemui.keyguard.ui.composable.section.SettingsMenuSection
 import com.android.systemui.keyguard.ui.composable.section.SmartSpaceSection
@@ -56,13 +57,14 @@ class ShortcutsBesideUdfpsBlueprint
 constructor(
     private val viewModel: LockscreenContentViewModel,
     private val statusBarSection: StatusBarSection,
-    private val clockSection: ClockSection,
+    private val clockSection: DefaultClockSection,
     private val smartSpaceSection: SmartSpaceSection,
     private val notificationSection: NotificationSection,
     private val lockSection: LockSection,
     private val ambientIndicationSectionOptional: Optional<AmbientIndicationSection>,
     private val bottomAreaSection: BottomAreaSection,
     private val settingsMenuSection: SettingsMenuSection,
+    private val mediaCarouselSection: MediaCarouselSection,
     private val clockInteractor: KeyguardClockInteractor,
 ) : ComposableLockscreenSceneBlueprint {
 
@@ -115,7 +117,9 @@ constructor(
                             with(clockSection) { LargeClock(modifier = Modifier.fillMaxWidth()) }
                         }
 
-                        if (viewModel.areNotificationsVisible) {
+                        with(mediaCarouselSection) { MediaCarousel() }
+
+                        if (viewModel.areNotificationsVisible(resources = resources)) {
                             with(notificationSection) {
                                 Notifications(
                                     modifier = Modifier.fillMaxWidth().weight(weight = 1f)

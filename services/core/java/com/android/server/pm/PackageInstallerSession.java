@@ -359,7 +359,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     /** Default byte size limit for app metadata */
     private static final long DEFAULT_APP_METADATA_BYTE_SIZE_LIMIT = 32000;
 
-    private static final int APP_METADATA_FILE_ACCESS_MODE = 0640;
+    static final int APP_METADATA_FILE_ACCESS_MODE = 0640;
 
     /**
      * Throws IllegalArgumentException if the {@link IntentSender} from an immutable
@@ -972,7 +972,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     private boolean isEmergencyInstallerEnabled(String packageName, Computer snapshot) {
         final PackageStateInternal ps = snapshot.getPackageStateInternal(packageName);
-        if (ps == null || ps.getPkg() == null || !ps.isSystem()) {
+        if (ps == null || ps.getPkg() == null) {
             return false;
         }
         String emergencyInstaller = ps.getPkg().getEmergencyInstaller();
@@ -1790,8 +1790,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     private File getStagedAppMetadataFile() {
-        File file = new File(stageDir, APP_METADATA_FILE_NAME);
-        return file.exists() ? file : null;
+        return new File(stageDir, APP_METADATA_FILE_NAME);
     }
 
     private static boolean isAppMetadata(String name) {
@@ -1807,7 +1806,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         assertCallerIsOwnerOrRoot();
         synchronized (mLock) {
             assertPreparedAndNotCommittedOrDestroyedLocked("getAppMetadataFd");
-            if (getStagedAppMetadataFile() == null) {
+            if (!getStagedAppMetadataFile().exists()) {
                 return null;
             }
             try {
@@ -1821,12 +1820,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @Override
     public void removeAppMetadata() {
         File file = getStagedAppMetadataFile();
-        if (file != null) {
+        if (file.exists()) {
             file.delete();
         }
     }
 
-    private static long getAppMetadataSizeLimit() {
+    static long getAppMetadataSizeLimit() {
         final long token = Binder.clearCallingIdentity();
         try {
             return DeviceConfig.getLong(NAMESPACE_PACKAGE_MANAGER_SERVICE,
@@ -2151,7 +2150,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         }
 
         File appMetadataFile = getStagedAppMetadataFile();
-        if (appMetadataFile != null) {
+        if (appMetadataFile.exists()) {
             long sizeLimit = getAppMetadataSizeLimit();
             if (appMetadataFile.length() > sizeLimit) {
                 appMetadataFile.delete();
@@ -3439,7 +3438,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
         final List<ApkLite> addedFiles = getAddedApkLitesLocked();
         if (addedFiles.isEmpty()
-                && (removeSplitList.size() == 0 || getStagedAppMetadataFile() != null)) {
+                && (removeSplitList.size() == 0 || getStagedAppMetadataFile().exists())) {
             throw new PackageManagerException(INSTALL_FAILED_INVALID_APK,
                     TextUtils.formatSimple("Session: %d. No packages staged in %s", sessionId,
                           stageDir.getAbsolutePath()));

@@ -47,12 +47,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** ViewModel for BiometricPrompt. */
@@ -122,6 +124,9 @@ constructor(
     /** The kind of credential the user has. */
     val credentialKind: Flow<PromptKind> = promptSelectorInteractor.credentialKind
 
+    val showBpWithoutIconForCredential: StateFlow<Boolean> =
+        promptSelectorInteractor.showBpWithoutIconForCredential
+
     /** The label to use for the cancel button. */
     val negativeButtonText: Flow<String> =
         promptSelectorInteractor.prompt.map { it?.negativeButtonText ?: "" }
@@ -144,9 +149,10 @@ constructor(
     private val _forceLargeSize = MutableStateFlow(false)
     private val _forceMediumSize = MutableStateFlow(false)
 
-    private val _hapticsToPlay = MutableStateFlow(HapticFeedbackConstants.NO_HAPTICS)
+    private val _hapticsToPlay =
+        MutableStateFlow(HapticsToPlay(HapticFeedbackConstants.NO_HAPTICS, /* flag= */ null))
 
-    /** Event fired to the view indicating a [HapticFeedbackConstants] to be played */
+    /** Event fired to the view indicating a [HapticsToPlay] */
     val hapticsToPlay = _hapticsToPlay.asStateFlow()
 
     /** The current position of the prompt */
@@ -686,16 +692,26 @@ constructor(
     }
 
     private fun vibrateOnSuccess() {
-        _hapticsToPlay.value = HapticFeedbackConstants.CONFIRM
+        _hapticsToPlay.value =
+            HapticsToPlay(
+                HapticFeedbackConstants.CONFIRM,
+                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
+            )
     }
 
     private fun vibrateOnError() {
-        _hapticsToPlay.value = HapticFeedbackConstants.REJECT
+        _hapticsToPlay.value =
+            HapticsToPlay(
+                HapticFeedbackConstants.REJECT,
+                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
+            )
     }
 
-    /** Clears the [hapticsToPlay] variable by setting it to the NO_HAPTICS default. */
+    /** Clears the [hapticsToPlay] variable by setting its constant to the NO_HAPTICS default. */
     fun clearHaptics() {
-        _hapticsToPlay.value = HapticFeedbackConstants.NO_HAPTICS
+        _hapticsToPlay.update { previous ->
+            HapticsToPlay(HapticFeedbackConstants.NO_HAPTICS, previous.flag)
+        }
     }
 
     companion object {
@@ -724,3 +740,9 @@ enum class FingerprintStartMode {
     val isStarted: Boolean
         get() = this == Normal || this == Delayed
 }
+
+/**
+ * The state of haptic feedback to play. It is composed by a [HapticFeedbackConstants] and a
+ * [HapticFeedbackConstants] flag.
+ */
+data class HapticsToPlay(val hapticFeedbackConstant: Int, val flag: Int?)

@@ -147,7 +147,7 @@ public class AnrTimerTest {
             final int n = 4;
             StackTraceElement[] stack = Thread.currentThread().getStackTrace();
             if (stack.length < n+1) return "test";
-            return stack[n].getMethodName();
+            return stack[n].getClassName() + "." + stack[n].getMethodName();
         }
     }
 
@@ -312,12 +312,17 @@ public class AnrTimerTest {
     }
 
     /**
-     * Verify the dump output.
+     * Verify the dump output.  This only applies when native timers are supported.
      */
     @Test
     public void testDumpOutput() throws Exception {
+        if (!AnrTimer.nativeTimersSupported()) return;
+
+        // The timers in this class are named "class.method".
+        final String timerName = "timer: com.android.server.utils.AnrTimerTest";
+
         String r1 = getDumpOutput();
-        assertThat(r1).doesNotContain("timer:");
+        assertThat(r1).doesNotContain(timerName);
 
         Helper helper = new Helper(2);
         TestArg t1 = new TestArg(1, 1);
@@ -331,14 +336,14 @@ public class AnrTimerTest {
             String r2 = getDumpOutput();
             // There are timers in the list if and only if the feature is enabled.
             if (mEnabled) {
-              assertThat(r2).contains("timer:");
+                assertThat(r2).contains(timerName);
             } else {
-              assertThat(r2).doesNotContain("timer:");
+                assertThat(r2).doesNotContain(timerName);
             }
         }
 
         String r3 = getDumpOutput();
-        assertThat(r3).doesNotContain("timer:");
+        assertThat(r3).doesNotContain(timerName);
     }
 
     /**

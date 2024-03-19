@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,14 +35,13 @@ import static org.mockito.Mockito.when;
 import android.content.ComponentName;
 import android.content.pm.PackageManagerInternal;
 import android.frameworks.vibrator.ScaleParam;
-import android.frameworks.vibrator.VibrationParam;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.os.test.TestLooper;
 import android.util.SparseArray;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.core.app.ApplicationProvider;
 
 import com.android.internal.util.ArrayUtils;
@@ -55,8 +54,6 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -70,6 +67,7 @@ public class VibratorControlServiceTest {
     @Mock
     private PackageManagerInternal mPackageManagerInternalMock;
 
+    private TestLooper mTestLooper;
     private FakeVibratorController mFakeVibratorController;
     private VibratorControlService mVibratorControlService;
     private VibrationSettings mVibrationSettings;
@@ -77,6 +75,7 @@ public class VibratorControlServiceTest {
 
     @Before
     public void setUp() throws Exception {
+        mTestLooper = new TestLooper();
         when(mPackageManagerInternalMock.getSystemUiServiceComponent())
                 .thenReturn(new ComponentName("", ""));
         LocalServices.removeServiceForTest(PackageManagerInternal.class);
@@ -86,21 +85,21 @@ public class VibratorControlServiceTest {
         mVibrationSettings = new VibrationSettings(
                 ApplicationProvider.getApplicationContext(), new Handler(testLooper.getLooper()));
 
-        mFakeVibratorController = new FakeVibratorController();
-        mVibratorControlService = new VibratorControlService(new VibratorControllerHolder(),
+        mFakeVibratorController = new FakeVibratorController(mTestLooper.getLooper());
+        mVibratorControlService = new VibratorControlService(
+                InstrumentationRegistry.getContext(), new VibratorControllerHolder(),
                 mMockVibrationScaler, mVibrationSettings, mLock);
     }
 
     @Test
-    public void testRegisterVibratorController() throws RemoteException {
+    public void testRegisterVibratorController() {
         mVibratorControlService.registerVibratorController(mFakeVibratorController);
 
         assertThat(mFakeVibratorController.isLinkedToDeath).isTrue();
     }
 
     @Test
-    public void testUnregisterVibratorController_providingTheRegisteredController_performsRequest()
-            throws RemoteException {
+    public void testUnregisterVibratorController_providingRegisteredController_performsRequest() {
         mVibratorControlService.registerVibratorController(mFakeVibratorController);
         mVibratorControlService.unregisterVibratorController(mFakeVibratorController);
 
@@ -109,20 +108,18 @@ public class VibratorControlServiceTest {
     }
 
     @Test
-    public void testUnregisterVibratorController_providingAnInvalidController_ignoresRequest()
-            throws RemoteException {
-        FakeVibratorController fakeController1 = new FakeVibratorController();
-        FakeVibratorController fakeController2 = new FakeVibratorController();
-        mVibratorControlService.registerVibratorController(fakeController1);
-        mVibratorControlService.unregisterVibratorController(fakeController2);
+    public void testUnregisterVibratorController_providingAnInvalidController_ignoresRequest() {
+        FakeVibratorController controller1 = new FakeVibratorController(mTestLooper.getLooper());
+        FakeVibratorController controller2 = new FakeVibratorController(mTestLooper.getLooper());
+        mVibratorControlService.registerVibratorController(controller1);
+        mVibratorControlService.unregisterVibratorController(controller2);
 
         verifyZeroInteractions(mMockVibrationScaler);
-        assertThat(fakeController1.isLinkedToDeath).isTrue();
+        assertThat(controller1.isLinkedToDeath).isTrue();
     }
 
     @Test
-    public void testOnRequestVibrationParamsComplete_cachesAdaptiveHapticsScalesCorrectly()
-            throws RemoteException {
+    public void testOnRequestVibrationParamsComplete_cachesAdaptiveHapticsScalesCorrectly() {
         mVibratorControlService.registerVibratorController(mFakeVibratorController);
         int timeoutInMillis = 10;
         CompletableFuture<Void> future =
@@ -135,7 +132,7 @@ public class VibratorControlServiceTest {
         vibrationScales.put(ScaleParam.TYPE_NOTIFICATION, 0.4f);
 
         mVibratorControlService.onRequestVibrationParamsComplete(token,
-                generateVibrationParams(vibrationScales));
+                VibrationParamGenerator.generateVibrationParams(vibrationScales));
 
         verify(mMockVibrationScaler).updateAdaptiveHapticsScale(USAGE_ALARM, 0.7f);
         verify(mMockVibrationScaler).updateAdaptiveHapticsScale(USAGE_NOTIFICATION, 0.4f);
@@ -149,8 +146,7 @@ public class VibratorControlServiceTest {
     }
 
     @Test
-    public void testOnRequestVibrationParamsComplete_withIncorrectToken_ignoresRequest()
-            throws RemoteException, InterruptedException {
+    public void testOnRequestVibrationParamsComplete_withIncorrectToken_ignoresRequest() {
         mVibratorControlService.registerVibratorController(mFakeVibratorController);
         int timeoutInMillis = 10;
         CompletableFuture<Void> unusedFuture =
@@ -162,20 +158,20 @@ public class VibratorControlServiceTest {
         vibrationScales.put(ScaleParam.TYPE_NOTIFICATION, 0.4f);
 
         mVibratorControlService.onRequestVibrationParamsComplete(new Binder(),
-                generateVibrationParams(vibrationScales));
+                VibrationParamGenerator.generateVibrationParams(vibrationScales));
 
         verifyZeroInteractions(mMockVibrationScaler);
     }
 
     @Test
-    public void testSetVibrationParams_cachesAdaptiveHapticsScalesCorrectly()
-            throws RemoteException {
+    public void testSetVibrationParams_cachesAdaptiveHapticsScalesCorrectly() {
         mVibratorControlService.registerVibratorController(mFakeVibratorController);
         SparseArray<Float> vibrationScales = new SparseArray<>();
         vibrationScales.put(ScaleParam.TYPE_ALARM, 0.7f);
         vibrationScales.put(ScaleParam.TYPE_NOTIFICATION, 0.4f);
 
-        mVibratorControlService.setVibrationParams(generateVibrationParams(vibrationScales),
+        mVibratorControlService.setVibrationParams(
+                VibrationParamGenerator.generateVibrationParams(vibrationScales),
                 mFakeVibratorController);
 
         verify(mMockVibrationScaler).updateAdaptiveHapticsScale(USAGE_ALARM, 0.7f);
@@ -187,21 +183,20 @@ public class VibratorControlServiceTest {
     }
 
     @Test
-    public void testSetVibrationParams_withUnregisteredController_ignoresRequest()
-            throws RemoteException {
+    public void testSetVibrationParams_withUnregisteredController_ignoresRequest() {
         SparseArray<Float> vibrationScales = new SparseArray<>();
         vibrationScales.put(ScaleParam.TYPE_ALARM, 0.7f);
         vibrationScales.put(ScaleParam.TYPE_NOTIFICATION, 0.4f);
 
-        mVibratorControlService.setVibrationParams(generateVibrationParams(vibrationScales),
+        mVibratorControlService.setVibrationParams(
+                VibrationParamGenerator.generateVibrationParams(vibrationScales),
                 mFakeVibratorController);
 
         verifyZeroInteractions(mMockVibrationScaler);
     }
 
     @Test
-    public void testClearVibrationParams_clearsCachedAdaptiveHapticsScales()
-            throws RemoteException {
+    public void testClearVibrationParams_clearsCachedAdaptiveHapticsScales() {
         mVibratorControlService.registerVibratorController(mFakeVibratorController);
         int types = buildVibrationTypesMask(ScaleParam.TYPE_ALARM, ScaleParam.TYPE_NOTIFICATION);
 
@@ -215,8 +210,7 @@ public class VibratorControlServiceTest {
     }
 
     @Test
-    public void testClearVibrationParams_withUnregisteredController_ignoresRequest()
-            throws RemoteException {
+    public void testClearVibrationParams_withUnregisteredController_ignoresRequest() {
         mVibratorControlService.clearVibrationParams(ScaleParam.TYPE_ALARM,
                 mFakeVibratorController);
 
@@ -224,8 +218,7 @@ public class VibratorControlServiceTest {
     }
 
     @Test
-    public void testRequestVibrationParams_createsFutureRequestProperly()
-            throws RemoteException {
+    public void testRequestVibrationParams_createsFutureRequestProperly() {
         int timeoutInMillis = 10;
         mVibratorControlService.registerVibratorController(mFakeVibratorController);
         CompletableFuture<Void> future =
@@ -242,8 +235,7 @@ public class VibratorControlServiceTest {
     }
 
     @Test
-    public void testShouldRequestVibrationParams_returnsTrueForVibrationsThatShouldRequestParams()
-            throws RemoteException {
+    public void testShouldRequestVibrationParams_returnsTrueForVibrationsThatShouldRequestParams() {
         int[] vibrations =
                 new int[]{USAGE_ALARM, USAGE_RINGTONE, USAGE_MEDIA, USAGE_TOUCH, USAGE_NOTIFICATION,
                         USAGE_HARDWARE_FEEDBACK, USAGE_UNKNOWN, USAGE_COMMUNICATION_REQUEST};
@@ -257,8 +249,7 @@ public class VibratorControlServiceTest {
     }
 
     @Test
-    public void testShouldRequestVibrationParams_unregisteredVibratorController_returnsFalse()
-            throws RemoteException {
+    public void testShouldRequestVibrationParams_unregisteredVibratorController_returnsFalse() {
         int[] vibrations =
                 new int[]{USAGE_ALARM, USAGE_RINGTONE, USAGE_MEDIA, USAGE_TOUCH, USAGE_NOTIFICATION,
                         USAGE_HARDWARE_FEEDBACK, USAGE_UNKNOWN, USAGE_COMMUNICATION_REQUEST};
@@ -268,29 +259,7 @@ public class VibratorControlServiceTest {
         }
     }
 
-    private VibrationParam[] generateVibrationParams(SparseArray<Float> vibrationScales) {
-        List<VibrationParam> vibrationParamList = new ArrayList<>();
-        for (int i = 0; i < vibrationScales.size(); i++) {
-            int type = vibrationScales.keyAt(i);
-            float scale = vibrationScales.valueAt(i);
-
-            vibrationParamList.add(generateVibrationParam(type, scale));
-        }
-
-        return vibrationParamList.toArray(new VibrationParam[0]);
-    }
-
-    private VibrationParam generateVibrationParam(int type, float scale) {
-        ScaleParam scaleParam = new ScaleParam();
-        scaleParam.typesMask = type;
-        scaleParam.scale = scale;
-        VibrationParam vibrationParam = new VibrationParam();
-        vibrationParam.setScale(scaleParam);
-
-        return vibrationParam;
-    }
-
-    private int buildVibrationTypesMask(int... types) {
+    private static int buildVibrationTypesMask(int... types) {
         int typesMask = 0;
         for (int type : types) {
             typesMask |= type;

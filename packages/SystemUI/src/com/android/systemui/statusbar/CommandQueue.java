@@ -169,7 +169,7 @@ public class CommandQueue extends IStatusBar.Stub implements
     private static final int MSG_UNREGISTER_NEARBY_MEDIA_DEVICE_PROVIDER = 67 << MSG_SHIFT;
     private static final int MSG_TILE_SERVICE_REQUEST_LISTENING_STATE = 68 << MSG_SHIFT;
     private static final int MSG_SHOW_REAR_DISPLAY_DIALOG = 69 << MSG_SHIFT;
-    private static final int MSG_GO_TO_FULLSCREEN_FROM_SPLIT = 70 << MSG_SHIFT;
+    private static final int MSG_MOVE_FOCUSED_TASK_TO_FULLSCREEN = 70 << MSG_SHIFT;
     private static final int MSG_ENTER_STAGE_SPLIT_FROM_RUNNING_APP = 71 << MSG_SHIFT;
     private static final int MSG_SHOW_MEDIA_OUTPUT_SWITCHER = 72 << MSG_SHIFT;
     private static final int MSG_TOGGLE_TASKBAR = 73 << MSG_SHIFT;
@@ -501,9 +501,9 @@ public class CommandQueue extends IStatusBar.Stub implements
         default void showRearDisplayDialog(int currentBaseState) {}
 
         /**
-         * @see IStatusBar#goToFullscreenFromSplit
+         * @see IStatusBar#moveFocusedTaskToFullscreen
          */
-        default void goToFullscreenFromSplit() {}
+        default void moveFocusedTaskToFullscreen(int displayId) {}
 
         /**
          * @see IStatusBar#enterStageSplitFromRunningApp
@@ -624,7 +624,14 @@ public class CommandQueue extends IStatusBar.Stub implements
             args.argi2 = state1;
             args.argi3 = state2;
             args.argi4 = animate ? 1 : 0;
-            mHandler.obtainMessage(msgType, args).sendToTarget();
+            Message msg = mHandler.obtainMessage(msgType, args);
+            if (Looper.myLooper() == mHandler.getLooper()) {
+                // If its the right looper execute immediately so hides can be handled quickly.
+                mHandler.handleMessage(msg);
+                msg.recycle();
+            } else {
+                msg.sendToTarget();
+            }
         }
     }
 
@@ -1424,8 +1431,10 @@ public class CommandQueue extends IStatusBar.Stub implements
     }
 
     @Override
-    public void goToFullscreenFromSplit() {
-        mHandler.obtainMessage(MSG_GO_TO_FULLSCREEN_FROM_SPLIT).sendToTarget();
+    public void moveFocusedTaskToFullscreen(int displayId) {
+        SomeArgs args = SomeArgs.obtain();
+        args.arg1 = displayId;
+        mHandler.obtainMessage(MSG_MOVE_FOCUSED_TASK_TO_FULLSCREEN, args).sendToTarget();
     }
 
     @Override
@@ -1900,11 +1909,14 @@ public class CommandQueue extends IStatusBar.Stub implements
                         mCallbacks.get(i).showRearDisplayDialog((Integer) msg.obj);
                     }
                     break;
-                case MSG_GO_TO_FULLSCREEN_FROM_SPLIT:
+                case MSG_MOVE_FOCUSED_TASK_TO_FULLSCREEN: {
+                    args = (SomeArgs) msg.obj;
+                    int displayId = args.argi1;
                     for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).goToFullscreenFromSplit();
+                        mCallbacks.get(i).moveFocusedTaskToFullscreen(displayId);
                     }
                     break;
+                }
                 case MSG_ENTER_STAGE_SPLIT_FROM_RUNNING_APP:
                     for (int i = 0; i < mCallbacks.size(); i++) {
                         mCallbacks.get(i).enterStageSplitFromRunningApp((Boolean) msg.obj);
@@ -1930,13 +1942,14 @@ public class CommandQueue extends IStatusBar.Stub implements
                         mCallbacks.get(i).immersiveModeChanged(rootDisplayAreaId, isImmersiveMode);
                     }
                     break;
-                case MSG_ENTER_DESKTOP:
+                case MSG_ENTER_DESKTOP: {
                     args = (SomeArgs) msg.obj;
                     int displayId = args.argi1;
                     for (int i = 0; i < mCallbacks.size(); i++) {
                         mCallbacks.get(i).enterDesktop(displayId);
                     }
                     break;
+                }
             }
         }
     }

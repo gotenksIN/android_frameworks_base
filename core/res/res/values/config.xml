@@ -4107,6 +4107,13 @@
     <!-- How close vibration request should be when they're aggregated for dumpsys, in ms. -->
     <integer name="config_previousVibrationsDumpAggregationTimeMillisLimit">1000</integer>
 
+    <!-- How long history of vibration control service should be kept for the dumpsys. -->
+    <integer name="config_vibratorControlServiceDumpSizeLimit">50</integer>
+
+    <!-- How close requests to vibration control service should be when they're aggregated for
+         dumpsys, in ms. -->
+    <integer name="config_vibratorControlServiceDumpAggregationTimeMillisLimit">60000</integer>
+
     <!-- The default vibration strength, must be between 1 and 255 inclusive. -->
     <integer name="config_defaultVibrationAmplitude">255</integer>
 
@@ -6991,4 +6998,16 @@
 
     <!-- Whether to use file hashes cache in watchlist-->
     <bool name="config_watchlistUseFileHashesCache">false</bool>
+
+    <!-- Name of the package responsible to handle Contextual Search. -->
+    <string name="config_defaultContextualSearchPackageName" translatable="false" />
+
+    <!-- The key containing the entrypoint for Contextual Search. -->
+    <string name="config_defaultContextualSearchKey" translatable="false" />
+
+    <!-- The key containing the branching boolean for Contextual Search. -->
+    <string name="config_defaultContextualSearchEnabled" translatable="false" />
+
+    <!-- The key containing the branching boolean for legacy Search. -->
+    <string name="config_defaultContextualSearchLegacyEnabled" translatable="false" />
 </resources>

@@ -16,6 +16,8 @@
 
 package com.android.systemui.media.dialog;
 
+import static com.android.settingslib.flags.Flags.legacyLeAudioSharing;
+
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothLeBroadcastAssistant;
@@ -497,6 +499,7 @@ public class MediaOutputBroadcastDialog extends MediaOutputBaseDialog {
 
     @Override
     public boolean isBroadcastSupported() {
+        if (!legacyLeAudioSharing()) return false;
         return mMediaOutputController.isBroadcastSupported();
     }
 

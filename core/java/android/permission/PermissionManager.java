@@ -247,8 +247,6 @@ public final class PermissionManager {
 
     private final LegacyPermissionManager mLegacyPermissionManager;
 
-    private final VirtualDeviceManager mVirtualDeviceManager;
-
     private final ArrayMap<PackageManager.OnPermissionsChangedListener,
             IOnPermissionsChangeListener> mPermissionListeners = new ArrayMap<>();
     private PermissionUsageHelper mUsageHelper;
@@ -269,7 +267,6 @@ public final class PermissionManager {
         mPermissionManager = IPermissionManager.Stub.asInterface(ServiceManager.getServiceOrThrow(
                 "permissionmgr"));
         mLegacyPermissionManager = context.getSystemService(LegacyPermissionManager.class);
-        mVirtualDeviceManager = context.getSystemService(VirtualDeviceManager.class);
     }
 
     /**
@@ -1918,14 +1915,18 @@ public final class PermissionManager {
         if (deviceId == Context.DEVICE_ID_DEFAULT) {
             persistentDeviceId = VirtualDeviceManager.PERSISTENT_DEVICE_ID_DEFAULT;
         } else if (android.companion.virtual.flags.Flags.vdmPublicApis()) {
-            VirtualDevice virtualDevice = mVirtualDeviceManager.getVirtualDevice(deviceId);
-            if (virtualDevice == null) {
-                Slog.e(LOG_TAG, "Virtual device is not found with device Id " + deviceId);
-                return null;
-            }
-            persistentDeviceId = virtualDevice.getPersistentDeviceId();
-            if (persistentDeviceId == null) {
-                Slog.e(LOG_TAG, "Cannot find persistent device Id for " + deviceId);
+            VirtualDeviceManager virtualDeviceManager = mContext.getSystemService(
+                    VirtualDeviceManager.class);
+            if (virtualDeviceManager != null) {
+                VirtualDevice virtualDevice = virtualDeviceManager.getVirtualDevice(deviceId);
+                if (virtualDevice == null) {
+                    Slog.e(LOG_TAG, "Virtual device is not found with device Id " + deviceId);
+                    return null;
+                }
+                persistentDeviceId = virtualDevice.getPersistentDeviceId();
+                if (persistentDeviceId == null) {
+                    Slog.e(LOG_TAG, "Cannot find persistent device Id for " + deviceId);
+                }
             }
         } else {
             Slog.e(LOG_TAG, "vdmPublicApis flag is not enabled when device Id " + deviceId
@@ -1944,25 +1945,27 @@ public final class PermissionManager {
      *
      * @param permissionName The name of the permission you are checking for.
      * @param packageName The name of the package you are checking against.
-     * @param persistentDeviceId The persistent device id you are checking against.
-     * @param userId The user Id associated with context.
+     * @param persistentDeviceId The id of the physical device that you are checking permission
+     *                           against.
      *
      * @return If the package has the permission on the device, PERMISSION_GRANTED is
      * returned.  If it does not have the permission on the device, PERMISSION_DENIED
      * is returned.
      *
+     * @see VirtualDevice#getPersistentDeviceId()
      * @see PackageManager#PERMISSION_GRANTED
      * @see PackageManager#PERMISSION_DENIED
      *
      * @hide
      */
     @SystemApi
+    @PermissionResult
     @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
-    public static int checkPermission(@NonNull String permissionName, @NonNull String packageName,
-            @NonNull String persistentDeviceId, @UserIdInt int userId) {
+    public int checkPermission(@NonNull String permissionName, @NonNull String packageName,
+            @NonNull String persistentDeviceId) {
         return sPackageNamePermissionCache.query(
                 new PackageNamePermissionQuery(permissionName, packageName, persistentDeviceId,
-                        userId));
+                        mContext.getUserId()));
     }
 
     /**

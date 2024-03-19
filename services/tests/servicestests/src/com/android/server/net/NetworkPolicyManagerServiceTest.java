@@ -149,6 +149,7 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkPolicy;
+import android.net.NetworkPolicyManager;
 import android.net.NetworkStateSnapshot;
 import android.net.NetworkTemplate;
 import android.net.TelephonyNetworkSpecifier;
@@ -1619,6 +1620,12 @@ public class NetworkPolicyManagerServiceTest {
         verify(mActivityManagerInternal).notifyNetworkPolicyRulesUpdated(UID_A, procStateSeq);
     }
 
+    private void callAndWaitOnUidGone(int uid) throws Exception {
+        // The disabled argument is used only for ephemeral apps and does not matter here.
+        mUidObserver.onUidGone(uid, false /* disabled */);
+        waitForUidEventHandlerIdle();
+    }
+
     private void callAndWaitOnUidStateChanged(int uid, int procState, long procStateSeq)
             throws Exception {
         callAndWaitOnUidStateChanged(uid, procState, procStateSeq,
@@ -2245,6 +2252,15 @@ public class NetworkPolicyManagerServiceTest {
         assertTrue(mService.isUidNetworkingBlocked(UID_A, false));
     }
 
+    private boolean isUidState(int uid, int procState, int procStateSeq, int capability) {
+        final NetworkPolicyManager.UidState uidState = mService.getUidStateForTest(uid);
+        if (uidState == null) {
+            return false;
+        }
+        return uidState.uid == uid && uidState.procStateSeq == procStateSeq
+                && uidState.procState == procState && uidState.capability == capability;
+    }
+
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_NETWORK_BLOCKED_FOR_TOP_SLEEPING_AND_ABOVE)
     public void testUidObserverFiltersProcStateChanges() throws Exception {
@@ -2360,6 +2376,31 @@ public class NetworkPolicyManagerServiceTest {
             assertFalse(mService.mUidEventHandler.hasMessages(UID_MSG_STATE_CHANGED));
         }
         waitForUidEventHandlerIdle();
+    }
+
+    @Test
+    public void testUidStateChangeAfterUidGone() throws Exception {
+        final int testProcStateSeq = 51;
+        final int testProcState = PROCESS_STATE_IMPORTANT_FOREGROUND;
+
+        try (SyncBarrier b = new SyncBarrier(mService.mUidEventHandler)) {
+            // First callback for uid.
+            callOnUidStatechanged(UID_B, testProcState, testProcStateSeq, PROCESS_CAPABILITY_NONE);
+            assertTrue(mService.mUidEventHandler.hasMessages(UID_MSG_STATE_CHANGED));
+        }
+        waitForUidEventHandlerIdle();
+        assertTrue(isUidState(UID_B, testProcState, testProcStateSeq, PROCESS_CAPABILITY_NONE));
+
+        callAndWaitOnUidGone(UID_B);
+        try (SyncBarrier b = new SyncBarrier(mService.mUidEventHandler)) {
+            // Even though the procState is the same, the uid had exited - so this should be
+            // processed as a fresh callback.
+            callOnUidStatechanged(UID_B, testProcState, testProcStateSeq + 1,
+                    PROCESS_CAPABILITY_NONE);
+            assertTrue(mService.mUidEventHandler.hasMessages(UID_MSG_STATE_CHANGED));
+        }
+        waitForUidEventHandlerIdle();
+        assertTrue(isUidState(UID_B, testProcState, testProcStateSeq + 1, PROCESS_CAPABILITY_NONE));
     }
 
     @Test

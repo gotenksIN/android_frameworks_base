@@ -113,6 +113,7 @@ data class WifiIndicators(
     @JvmField val description: String?,
     @JvmField val isTransient: Boolean,
     @JvmField val statusLabel: String?,
+    @JvmField val isDefault: Boolean
 ) {
     override fun toString(): String {
         return StringBuilder("WifiIndicators[")
@@ -132,6 +133,8 @@ data class WifiIndicators(
             .append(isTransient)
             .append(",statusLabel=")
             .append(statusLabel)
+            .append(",isDefault=")
+	    .append(isDefault)
             .append(']')
             .toString()
     }
@@ -152,6 +155,8 @@ data class MobileDataIndicators(
     @JvmField val subId: Int,
     @JvmField val roaming: Boolean,
     @JvmField val showTriangle: Boolean,
+    @JvmField val isDefault: Boolean
+
 ) {
     override fun toString(): String {
         return java.lang
@@ -182,6 +187,8 @@ data class MobileDataIndicators(
             .append(roaming)
             .append(",showTriangle=")
             .append(showTriangle)
+	    .append(",isDefault=")
+	    .append(isDefault)
             .append(']')
             .toString()
     }

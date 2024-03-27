@@ -51,7 +51,7 @@ import com.android.systemui.util.EmergencyDialerConstants;
 import com.android.systemui.util.ViewController;
 
 import java.util.concurrent.Executor;
-import java.util.List;
+import java.util.HashMap;
 
 import javax.inject.Inject;
 
@@ -73,7 +73,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
     private final SelectedUserInteractor mSelectedUserInteractor;
 
     private EmergencyButtonCallback mEmergencyButtonCallback;
-    private ServiceState mServiceState;
+    private HashMap<Integer, ServiceState> mServiceStates = new HashMap<>();
 
     private final KeyguardUpdateMonitorCallback mInfoCallback =
             new KeyguardUpdateMonitorCallback() {
@@ -89,7 +89,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
 
         @Override
         public void onServiceStateChanged(int subId, ServiceState state) {
-            mServiceState = state;
+            mServiceStates.put(subId, state);
             updateEmergencyCallButton();
         }
     };
@@ -216,8 +216,18 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
     }
 
     private boolean isEmergencyCapable() {
-        return (!mKeyguardUpdateMonitor.isOOS()
-                || (mServiceState !=null && mServiceState.isEmergencyOnly()));
+        if (!mKeyguardUpdateMonitor.isOOS()){
+            return true;
+        }
+        for (int subId : mServiceStates.keySet()) {
+            ServiceState ss = mServiceStates.get(subId);
+            if (ss != null) {
+                if (ss.isEmergencyOnly()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** */

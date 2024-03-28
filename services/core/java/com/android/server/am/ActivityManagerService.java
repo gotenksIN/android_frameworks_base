@@ -141,7 +141,6 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ALLOWLISTS;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BACKGROUND_CHECK;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BACKUP;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BROADCAST;
-import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BROADCAST_BACKGROUND;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BROADCAST_LIGHT;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_MU;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_NETWORK;
@@ -740,29 +739,13 @@ public class ActivityManagerService extends IActivityManager.Stub
     // Whether we should use SCHED_FIFO for UI and RenderThreads.
     final boolean mUseFifoUiScheduling;
 
-    // Use an offload queue for long broadcasts, e.g. BOOT_COMPLETED.
-    // For simplicity, since we statically declare the size of the array of BroadcastQueues,
-    // we still create this new offload queue, but never ever put anything on it.
-    final boolean mEnableOffloadQueue;
-
-    /**
-     * Flag indicating if we should use {@link BroadcastQueueModernImpl} instead
-     * of the default {@link BroadcastQueueImpl}.
-     */
-    final boolean mEnableModernQueue;
-
-    static final int BROADCAST_QUEUE_FG = 0;
-    static final int BROADCAST_QUEUE_BG = 1;
-    static final int BROADCAST_QUEUE_BG_OFFLOAD = 2;
-    static final int BROADCAST_QUEUE_FG_OFFLOAD = 3;
-
     @GuardedBy("this")
     private final SparseArray<IUnsafeIntentStrictModeCallback>
             mStrictModeCallbacks = new SparseArray<>();
 
     // Convenient for easy iteration over the queues. Foreground is first
     // so that dispatch of foreground broadcasts gets precedence.
-    final BroadcastQueue[] mBroadcastQueues;
+    private BroadcastQueue mBroadcastQueue;
 
     @GuardedBy("this")
     BroadcastStats mLastBroadcastStats;
@@ -771,43 +754,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     BroadcastStats mCurBroadcastStats;
 
     TraceErrorLogger mTraceErrorLogger;
-
-    BroadcastQueue broadcastQueueForIntent(Intent intent) {
-        return broadcastQueueForFlags(intent.getFlags(), intent);
-    }
-
-    BroadcastQueue broadcastQueueForFlags(int flags) {
-        return broadcastQueueForFlags(flags, null);
-    }
-
-    BroadcastQueue broadcastQueueForFlags(int flags, Object cookie) {
-        if (mEnableModernQueue) {
-            return mBroadcastQueues[0];
-        }
-
-        if (isOnFgOffloadQueue(flags)) {
-            if (DEBUG_BROADCAST_BACKGROUND) {
-                Slog.i(TAG_BROADCAST,
-                        "Broadcast intent " + cookie + " on foreground offload queue");
-            }
-            return mBroadcastQueues[BROADCAST_QUEUE_FG_OFFLOAD];
-        }
-
-        if (isOnBgOffloadQueue(flags)) {
-            if (DEBUG_BROADCAST_BACKGROUND) {
-                Slog.i(TAG_BROADCAST,
-                        "Broadcast intent " + cookie + " on background offload queue");
-            }
-            return mBroadcastQueues[BROADCAST_QUEUE_BG_OFFLOAD];
-        }
-
-        final boolean isFg = (flags & Intent.FLAG_RECEIVER_FOREGROUND) != 0;
-        if (DEBUG_BROADCAST_BACKGROUND) Slog.i(TAG_BROADCAST,
-                "Broadcast intent " + cookie + " on "
-                + (isFg ? "foreground" : "background") + " queue");
-        return (isFg) ? mBroadcastQueues[BROADCAST_QUEUE_FG]
-                : mBroadcastQueues[BROADCAST_QUEUE_BG];
-    }
 
     private volatile int mDeviceOwnerUid = INVALID_UID;
 
@@ -2578,9 +2524,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mInternal = new LocalService();
         mPendingStartActivityUids = new PendingStartActivityUids();
         mUseFifoUiScheduling = false;
-        mEnableOffloadQueue = false;
-        mEnableModernQueue = false;
-        mBroadcastQueues = injector.getBroadcastQueues(this);
+        mBroadcastQueue = injector.getBroadcastQueue(this);
         mComponentAliasResolver = new ComponentAliasResolver(this);
     }
 
@@ -2621,12 +2565,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 ? new OomAdjusterModernImpl(this, mProcessList, activeUids)
                 : new OomAdjuster(this, mProcessList, activeUids);
 
-        mEnableOffloadQueue = SystemProperties.getBoolean(
-                "persist.device_config.activity_manager_native_boot.offload_queue_enabled", true);
-        mEnableModernQueue = new BroadcastConstants(
-                Settings.Global.BROADCAST_FG_CONSTANTS).MODERN_QUEUE_ENABLED;
-
-        mBroadcastQueues = mInjector.getBroadcastQueues(this);
+        mBroadcastQueue = mInjector.getBroadcastQueue(this);
 
         mServices = new ActiveServices(this);
         mCpHelper = new ContentProviderHelper(this, true);
@@ -2692,6 +2631,14 @@ public class ActivityManagerService extends IActivityManager.Stub
         mPendingStartActivityUids = new PendingStartActivityUids();
         mTraceErrorLogger = new TraceErrorLogger();
         mComponentAliasResolver = new ComponentAliasResolver(this);
+    }
+
+    void setBroadcastQueueForTest(BroadcastQueue broadcastQueue) {
+        mBroadcastQueue = broadcastQueue;
+    }
+
+    BroadcastQueue getBroadcastQueue() {
+        return mBroadcastQueue;
     }
 
     public void setSystemServiceManager(SystemServiceManager mgr) {
@@ -4352,19 +4299,14 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         // Clean-up disabled broadcast receivers.
-        for (int i = mBroadcastQueues.length - 1; i >= 0; i--) {
-            mBroadcastQueues[i].cleanupDisabledPackageReceiversLocked(
-                    packageName, disabledClasses, userId);
-        }
+        mBroadcastQueue.cleanupDisabledPackageReceiversLocked(
+                packageName, disabledClasses, userId);
 
     }
 
     final boolean clearBroadcastQueueForUserLocked(int userId) {
-        boolean didSomething = false;
-        for (int i = mBroadcastQueues.length - 1; i >= 0; i--) {
-            didSomething |= mBroadcastQueues[i].cleanupDisabledPackageReceiversLocked(
-                    null, null, userId);
-        }
+        boolean didSomething = mBroadcastQueue.cleanupDisabledPackageReceiversLocked(
+                null, null, userId);
         return didSomething;
     }
 
@@ -4519,10 +4461,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         mUgmInternal.removeUriPermissionsForPackage(packageName, userId, false, false);
 
         if (doit) {
-            for (i = mBroadcastQueues.length - 1; i >= 0; i--) {
-                didSomething |= mBroadcastQueues[i].cleanupDisabledPackageReceiversLocked(
+            didSomething |= mBroadcastQueue.cleanupDisabledPackageReceiversLocked(
                         packageName, null, userId);
-            }
         }
 
         if (packageName == null || uninstalling || packageStateStopped) {
@@ -4589,9 +4529,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 // Take care of any services that are waiting for the process.
                 mServices.processStartTimedOutLocked(app);
                 // Take care of any broadcasts waiting for the process.
-                for (BroadcastQueue queue : mBroadcastQueues) {
-                    queue.onApplicationTimeoutLocked(app);
-                }
+                mBroadcastQueue.onApplicationTimeoutLocked(app);
                 if (!isKillTimeout) {
                     mBatteryStatsService.noteProcessFinish(app.processName, app.info.uid);
                     app.killLocked("start timeout",
@@ -4866,36 +4804,48 @@ public class ActivityManagerService extends IActivityManager.Stub
                 // being bound to an application.
                 thread.runIsolatedEntryPoint(
                         app.getIsolatedEntryPoint(), app.getIsolatedEntryPointArgs());
-            } else if (instr2 != null) {
-                thread.bindApplication(processName, appInfo,
-                        app.sdkSandboxClientAppVolumeUuid, app.sdkSandboxClientAppPackage,
-                        instr2.mIsSdkInSandbox,
-                        providerList,
-                        instr2.mClass,
-                        profilerInfo, instr2.mArguments,
-                        instr2.mWatcher,
-                        instr2.mUiAutomationConnection, testMode,
-                        mBinderTransactionTrackingEnabled, enableTrackAllocation,
-                        isRestrictedBackupMode || !normalMode, app.isPersistent(),
-                        new Configuration(app.getWindowProcessController().getConfiguration()),
-                        app.getCompat(), getCommonServicesLocked(app.isolated),
-                        mCoreSettingsObserver.getCoreSettingsLocked(),
-                        buildSerial, autofillOptions, contentCaptureOptions,
-                        app.getDisabledCompatChanges(), serializedSystemFontMap,
-                        app.getStartElapsedTime(), app.getStartUptime());
             } else {
-                thread.bindApplication(processName, appInfo,
-                        app.sdkSandboxClientAppVolumeUuid, app.sdkSandboxClientAppPackage,
-                        /* isSdkInSandbox= */ false,
-                        providerList, null, profilerInfo, null, null, null, testMode,
-                        mBinderTransactionTrackingEnabled, enableTrackAllocation,
-                        isRestrictedBackupMode || !normalMode, app.isPersistent(),
+                boolean isSdkInSandbox = false;
+                ComponentName instrumentationName = null;
+                Bundle instrumentationArgs = null;
+                IInstrumentationWatcher instrumentationWatcher = null;
+                IUiAutomationConnection instrumentationUiConnection = null;
+                if (instr2 != null) {
+                    isSdkInSandbox = instr2.mIsSdkInSandbox;
+                    instrumentationName = instr2.mClass;
+                    instrumentationArgs = instr2.mArguments;
+                    instrumentationWatcher = instr2.mWatcher;
+                    instrumentationUiConnection = instr2.mUiAutomationConnection;
+                }
+                thread.bindApplication(
+                        processName,
+                        appInfo,
+                        app.sdkSandboxClientAppVolumeUuid,
+                        app.sdkSandboxClientAppPackage,
+                        isSdkInSandbox,
+                        providerList,
+                        instrumentationName,
+                        profilerInfo,
+                        instrumentationArgs,
+                        instrumentationWatcher,
+                        instrumentationUiConnection,
+                        testMode,
+                        mBinderTransactionTrackingEnabled,
+                        enableTrackAllocation,
+                        isRestrictedBackupMode || !normalMode,
+                        app.isPersistent(),
                         new Configuration(app.getWindowProcessController().getConfiguration()),
-                        app.getCompat(), getCommonServicesLocked(app.isolated),
+                        app.getCompat(),
+                        getCommonServicesLocked(app.isolated),
                         mCoreSettingsObserver.getCoreSettingsLocked(),
-                        buildSerial, autofillOptions, contentCaptureOptions,
-                        app.getDisabledCompatChanges(), serializedSystemFontMap,
-                        app.getStartElapsedTime(), app.getStartUptime());
+                        buildSerial,
+                        autofillOptions,
+                        contentCaptureOptions,
+                        app.getDisabledCompatChanges(),
+                        app.getLoggableCompatChanges(),
+                        serializedSystemFontMap,
+                        app.getStartElapsedTime(),
+                        app.getStartUptime());
             }
 
             Message msg = mHandler.obtainMessage(BIND_APPLICATION_TIMEOUT_SOFT_MSG);
@@ -5035,9 +4985,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             // Check if a next-broadcast receiver is in this process...
             if (!badApp) {
                 try {
-                    for (BroadcastQueue queue : mBroadcastQueues) {
-                        didSomething |= queue.onApplicationAttachedLocked(app);
-                    }
+                    didSomething |= mBroadcastQueue.onApplicationAttachedLocked(app);
                     checkTime(startTime, "finishAttachApplicationInner: "
                             + "after dispatching broadcasts");
                 } catch (BroadcastDeliveryFailedException e) {
@@ -5176,8 +5124,11 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Send LOCKED_BOOT_COMPLETED and BOOT_COMPLETED to the package explicitly when unstopped
      */
     private void maybeSendBootCompletedLocked(ProcessRecord app) {
+        if (!android.content.pm.Flags.stayStopped()) return;
         // Nothing to do if it wasn't previously stopped
-        if (!android.content.pm.Flags.stayStopped() || !app.wasForceStopped()) return;
+        if (!app.wasForceStopped() && !app.getWindowProcessController().wasForceStopped()) {
+            return;
+        }
 
         // Send LOCKED_BOOT_COMPLETED, if necessary
         if (app.getApplicationInfo().isEncryptionAware()) {
@@ -5189,7 +5140,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             sendBootBroadcastToAppLocked(app, new Intent(Intent.ACTION_BOOT_COMPLETED),
                     REASON_BOOT_COMPLETED);
         }
-        app.setWasForceStopped(false);
+        // The stopped state is reset in ProcessRecord when the pid changes, to deal with
+        // any re-use of the ProcessRecord.
     }
 
     /** Send a boot_completed broadcast to app */
@@ -6973,6 +6925,17 @@ public class ActivityManagerService extends IActivityManager.Stub
                     LocalServices.getService(PermissionManagerServiceInternal.class);
         }
         return mPermissionManagerInt;
+    }
+
+    /** Returns whether the given package was ever launched since install */
+    boolean wasPackageEverLaunched(String packageName, @UserIdInt int userId) {
+        boolean wasLaunched = false;
+        try {
+            wasLaunched = getPackageManagerInternal().wasPackageEverLaunched(packageName, userId);
+        } catch (Exception e) {
+            // If the package state record doesn't exist yet, assume it was never launched
+        }
+        return wasLaunched;
     }
 
     private TestUtilityService getTestUtilityServiceLocked() {
@@ -9136,7 +9099,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                             // cleaning up the old proxies.
                             VMRuntime.getRuntime().requestConcurrentGC();
                         }
-                    }, BackgroundThread.getHandler());
+                    }, mHandler);
             t.traceEnd(); // setBinderProxies
 
             t.traceEnd(); // ActivityManagerStartApps
@@ -9178,9 +9141,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     private void startBroadcastObservers() {
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            queue.start(mContext.getContentResolver());
-        }
+        mBroadcastQueue.start(mContext.getContentResolver());
     }
 
     private void updateForceBackgroundCheck(boolean enabled) {
@@ -9451,7 +9412,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                 sb.append("Animations-Running: ").append(info.numAnimationsRunning).append("\n");
             }
             if (info.broadcastIntentAction != null) {
-                sb.append("Broadcast-Intent-Action: ").append(info.broadcastIntentAction).append("\n");
+                sb.append("Broadcast-Intent-Action: ")
+                        .append(info.broadcastIntentAction)
+                        .append("\n");
             }
             if (info.durationMillis != -1) {
                 sb.append("Duration-Millis: ").append(info.durationMillis).append("\n");
@@ -9811,82 +9774,126 @@ public class ActivityManagerService extends IActivityManager.Stub
         // If process is null, we are being called from some internal code
         // and may be about to die -- run this synchronously.
         final boolean runSynchronously = process == null;
-        Thread worker = new Thread("Error dump: " + dropboxTag) {
-            @Override
-            public void run() {
-                if (report != null) {
-                    sb.append(report);
-                }
-
-                String logcatSetting = Settings.Global.ERROR_LOGCAT_PREFIX + dropboxTag;
-                String maxBytesSetting = Settings.Global.MAX_ERROR_BYTES_PREFIX + dropboxTag;
-                int lines = Build.IS_USER
-                        ? 0
-                        : Settings.Global.getInt(mContext.getContentResolver(), logcatSetting, 0);
-                int dropboxMaxSize = Settings.Global.getInt(
-                        mContext.getContentResolver(), maxBytesSetting, DROPBOX_DEFAULT_MAX_SIZE);
-
-                if (dataFile != null) {
-                    // Attach the stack traces file to the report so collectors can load them
-                    // by file if they have access.
-                    sb.append(DATA_FILE_PATH_HEADER)
-                            .append(dataFile.getAbsolutePath()).append('\n');
-
-                    int maxDataFileSize = dropboxMaxSize
-                            - sb.length()
-                            - lines * RESERVED_BYTES_PER_LOGCAT_LINE
-                            - DATA_FILE_PATH_FOOTER.length();
-
-                    if (maxDataFileSize > 0) {
-                        // Inline dataFile contents if there is room.
-                        try {
-                            sb.append(FileUtils.readTextFile(dataFile, maxDataFileSize,
-                                    "\n\n[[TRUNCATED]]\n"));
-                        } catch (IOException e) {
-                            Slog.e(TAG, "Error reading " + dataFile, e);
+        Thread worker =
+                new Thread("Error dump: " + dropboxTag) {
+                    @Override
+                    public void run() {
+                        if (report != null) {
+                            sb.append(report);
                         }
+
+                        String logcatSetting = Settings.Global.ERROR_LOGCAT_PREFIX + dropboxTag;
+                        String maxBytesSetting =
+                                Settings.Global.MAX_ERROR_BYTES_PREFIX + dropboxTag;
+                        int lines =
+                                Build.IS_USER
+                                        ? 0
+                                        : Settings.Global.getInt(
+                                                mContext.getContentResolver(), logcatSetting, 0);
+                        int dropboxMaxSize =
+                                Settings.Global.getInt(
+                                        mContext.getContentResolver(),
+                                        maxBytesSetting,
+                                        DROPBOX_DEFAULT_MAX_SIZE);
+
+                        if (dataFile != null) {
+                            // Attach the stack traces file to the report so collectors can load
+                            // them
+                            // by file if they have access.
+                            sb.append(DATA_FILE_PATH_HEADER)
+                                    .append(dataFile.getAbsolutePath())
+                                    .append('\n');
+
+                            int maxDataFileSize =
+                                    dropboxMaxSize
+                                            - sb.length()
+                                            - lines * RESERVED_BYTES_PER_LOGCAT_LINE
+                                            - DATA_FILE_PATH_FOOTER.length();
+
+                            if (maxDataFileSize > 0) {
+                                // Inline dataFile contents if there is room.
+                                try {
+                                    sb.append(
+                                            FileUtils.readTextFile(
+                                                    dataFile,
+                                                    maxDataFileSize,
+                                                    "\n\n[[TRUNCATED]]\n"));
+                                } catch (IOException e) {
+                                    Slog.e(TAG, "Error reading " + dataFile, e);
+                                }
+                            }
+
+                            // Always append the footer, even there wasn't enough space to inline
+                            // the
+                            // dataFile contents.
+                            sb.append(DATA_FILE_PATH_FOOTER);
+                        }
+
+                        if (crashInfo != null && crashInfo.stackTrace != null) {
+                            sb.append(crashInfo.stackTrace);
+                        }
+
+                        if (lines > 0 && !runSynchronously) {
+                            sb.append("\n");
+
+                            InputStreamReader input = null;
+                            try {
+                                java.lang.Process logcat =
+                                        new ProcessBuilder(
+                                                        // Time out after 10s of inactivity, but
+                                                        // kill logcat with SEGV
+                                                        // so we can investigate why it didn't
+                                                        // finish.
+                                                        "/system/bin/timeout",
+                                                        "-i",
+                                                        "-s",
+                                                        "SEGV",
+                                                        "10s",
+                                                        // Merge several logcat streams, and take
+                                                        // the last N lines.
+                                                        "/system/bin/logcat",
+                                                        "-v",
+                                                        "threadtime",
+                                                        "-b",
+                                                        "events",
+                                                        "-b",
+                                                        "system",
+                                                        "-b",
+                                                        "main",
+                                                        "-b",
+                                                        "crash",
+                                                        "-t",
+                                                        String.valueOf(lines))
+                                                .redirectErrorStream(true)
+                                                .start();
+
+                                try {
+                                    logcat.getOutputStream().close();
+                                } catch (IOException e) {
+                                }
+                                try {
+                                    logcat.getErrorStream().close();
+                                } catch (IOException e) {
+                                }
+                                input = new InputStreamReader(logcat.getInputStream());
+
+                                int num;
+                                char[] buf = new char[8192];
+                                while ((num = input.read(buf)) > 0) sb.append(buf, 0, num);
+                            } catch (IOException e) {
+                                Slog.e(TAG, "Error running logcat", e);
+                            } finally {
+                                if (input != null)
+                                    try {
+                                        input.close();
+                                    } catch (IOException e) {
+                                    }
+                            }
+                        }
+
+                        dbox.addText(dropboxTag, sb.toString());
                     }
-
-                    // Always append the footer, even there wasn't enough space to inline the
-                    // dataFile contents.
-                    sb.append(DATA_FILE_PATH_FOOTER);
-                }
-
-                if (crashInfo != null && crashInfo.stackTrace != null) {
-                    sb.append(crashInfo.stackTrace);
-                }
-
-                if (lines > 0 && !runSynchronously) {
-                    sb.append("\n");
-
-                    InputStreamReader input = null;
-                    try {
-                        java.lang.Process logcat = new ProcessBuilder(
-                                // Time out after 10s of inactivity, but kill logcat with SEGV
-                                // so we can investigate why it didn't finish.
-                                "/system/bin/timeout", "-i", "-s", "SEGV", "10s",
-                                // Merge several logcat streams, and take the last N lines.
-                                "/system/bin/logcat", "-v", "threadtime", "-b", "events", "-b", "system",
-                                "-b", "main", "-b", "crash", "-t", String.valueOf(lines))
-                                        .redirectErrorStream(true).start();
-
-                        try { logcat.getOutputStream().close(); } catch (IOException e) {}
-                        try { logcat.getErrorStream().close(); } catch (IOException e) {}
-                        input = new InputStreamReader(logcat.getInputStream());
-
-                        int num;
-                        char[] buf = new char[8192];
-                        while ((num = input.read(buf)) > 0) sb.append(buf, 0, num);
-                    } catch (IOException e) {
-                        Slog.e(TAG, "Error running logcat", e);
-                    } finally {
-                        if (input != null) try { input.close(); } catch (IOException e) {}
-                    }
-                }
-
-                dbox.addText(dropboxTag, sb.toString());
-            }
-        };
+                };
 
         if (runSynchronously) {
             final int oldMask = StrictMode.allowThreadDiskWritesMask();
@@ -10254,43 +10261,48 @@ public class ActivityManagerService extends IActivityManager.Stub
             mOomAdjuster.dumpCacheOomRankerSettings(pw);
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
-
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             dumpAllowedAssociationsLocked(fd, pw, args, opti, dumpAll, dumpPackage);
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
-
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             mPendingIntentController.dumpPendingIntents(pw, dumpAll, dumpPackage);
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             dumpBroadcastsLocked(fd, pw, args, opti, dumpAll, dumpPackage);
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             if (dumpAll || dumpPackage != null) {
                 dumpBroadcastStatsLocked(fd, pw, args, opti, dumpAll, dumpPackage);
                 pw.println();
                 if (dumpAll) {
-                    pw.println("-------------------------------------------------------------------------------");
+                    pw.println(
+                            "-------------------------------------------------------------------------------");
                 }
             }
             mCpHelper.dumpProvidersLocked(fd, pw, args, opti, dumpAll, dumpPackage);
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             dumpPermissions(fd, pw, args, opti, dumpAll, dumpPackage);
             pw.println();
             sdumper = mServices.newServiceDumperLocked(fd, pw, args, opti, dumpAll, dumpPackage);
             if (!dumpClient) {
                 if (dumpAll) {
-                    pw.println("-------------------------------------------------------------------------------");
+                    pw.println(
+                            "-------------------------------------------------------------------------------");
                 }
                 sdumper.dumpLocked();
             }
@@ -10305,7 +10317,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         // method with the lock held.
         if (dumpClient) {
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             sdumper.dumpWithClient();
         }
@@ -10318,33 +10331,38 @@ public class ActivityManagerService extends IActivityManager.Stub
             // proxies in the first place.
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             dumpBinderProxies(pw, BINDER_PROXY_HIGH_WATERMARK /* minToDump */);
         }
         synchronized(this) {
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             mAtmInternal.dump(DUMP_RECENTS_CMD, fd, pw, args, opti, dumpAll, dumpClient,
                     dumpPackage, displayIdFilter);
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             mAtmInternal.dump(DUMP_LASTANR_CMD, fd, pw, args, opti, dumpAll, dumpClient,
                     dumpPackage, displayIdFilter);
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             mAtmInternal.dump(DUMP_STARTER_CMD, fd, pw, args, opti, dumpAll, dumpClient,
                     dumpPackage, displayIdFilter);
             if (dumpPackage == null) {
                 pw.println();
                 if (dumpAll) {
-                    pw.println("-------------------------------------------------------------------------------");
+                    pw.println(
+                            "-------------------------------------------------------------------------------");
                 }
                 mAtmInternal.dump(DUMP_CONTAINERS_CMD, fd, pw, args, opti, dumpAll, dumpClient,
                         dumpPackage, displayIdFilter);
@@ -10354,7 +10372,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (!dumpNormalPriority) {
                 pw.println();
                 if (dumpAll) {
-                    pw.println("-------------------------------------------------------------------------------");
+                    pw.println(
+                            "-------------------------------------------------------------------------------");
                 }
                 mAtmInternal.dump(DUMP_ACTIVITIES_CMD, fd, pw, args, opti, dumpAll, dumpClient,
                         dumpPackage, displayIdFilter);
@@ -10362,45 +10381,53 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (mAssociations.size() > 0) {
                 pw.println();
                 if (dumpAll) {
-                    pw.println("-------------------------------------------------------------------------------");
+                    pw.println(
+                            "-------------------------------------------------------------------------------");
                 }
                 dumpAssociationsLocked(fd, pw, args, opti, dumpAll, dumpClient, dumpPackage);
             }
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
                 mProcessList.getAppStartInfoTracker().dumpHistoryProcessStartInfo(pw, dumpPackage);
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
                 mProcessList.mAppExitInfoTracker.dumpHistoryProcessExitInfo(pw, dumpPackage);
             }
             if (dumpPackage == null) {
                 pw.println();
                 if (dumpAll) {
-                    pw.println("-------------------------------------------------------------------------------");
+                    pw.println(
+                            "-------------------------------------------------------------------------------");
                 }
                 mOomAdjProfiler.dump(pw);
                 pw.println();
                 if (dumpAll) {
-                    pw.println("-------------------------------------------------------------------------------");
+                    pw.println(
+                            "-------------------------------------------------------------------------------");
                 }
                 dumpLmkLocked(pw);
             }
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             synchronized (mProcLock) {
                 mProcessList.dumpProcessesLSP(fd, pw, args, opti, dumpAll, dumpPackage, dumpAppId);
             }
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             dumpUsers(pw);
 
             pw.println();
             if (dumpAll) {
-                pw.println("-------------------------------------------------------------------------------");
+                pw.println(
+                        "-------------------------------------------------------------------------------");
             }
             mComponentAliasResolver.dump(pw);
         }
@@ -10410,7 +10437,8 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Dump the app restriction controller, it's required not to hold the global lock here.
      */
     private void dumpAppRestrictionController(PrintWriter pw) {
-        pw.println("-------------------------------------------------------------------------------");
+        pw.println(
+                "-------------------------------------------------------------------------------");
         mAppRestrictionController.dump(pw, "");
     }
 
@@ -11519,9 +11547,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
         mReceiverResolver.dumpDebug(proto, ActivityManagerServiceDumpBroadcastsProto.RECEIVER_RESOLVER);
-        for (BroadcastQueue q : mBroadcastQueues) {
-            q.dumpDebug(proto, ActivityManagerServiceDumpBroadcastsProto.BROADCAST_QUEUE);
-        }
+        mBroadcastQueue.dumpDebug(proto, ActivityManagerServiceDumpBroadcastsProto.BROADCAST_QUEUE);
         synchronized (mStickyBroadcasts) {
             for (int user = 0; user < mStickyBroadcasts.size(); user++) {
                 long token = proto.start(
@@ -11550,7 +11576,9 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     void dumpAllowedAssociationsLocked(FileDescriptor fd, PrintWriter pw, String[] args,
             int opti, boolean dumpAll, String dumpPackage) {
-        pw.println("ACTIVITY MANAGER ALLOWED ASSOCIATION STATE (dumpsys activity allowed-associations)");
+        pw.println(
+                "ACTIVITY MANAGER ALLOWED ASSOCIATION STATE (dumpsys activity"
+                    + " allowed-associations)");
         boolean printed = false;
         if (mAllowedAssociations != null) {
             for (int i = 0; i < mAllowedAssociations.size(); i++) {
@@ -11669,11 +11697,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         if (!onlyReceivers) {
-            for (BroadcastQueue q : mBroadcastQueues) {
-                needSep = q.dumpLocked(fd, pw, args, opti,
-                        dumpConstants, dumpHistory, dumpAll, dumpPackage, needSep);
-                printedAnything |= needSep;
-            }
+            needSep = mBroadcastQueue.dumpLocked(fd, pw, args, opti,
+                    dumpConstants, dumpHistory, dumpAll, dumpPackage, needSep);
+            printedAnything |= needSep;
         }
 
         needSep = true;
@@ -11729,9 +11755,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         if (!onlyHistory && !onlyReceivers && dumpAll) {
             pw.println();
-            for (BroadcastQueue queue : mBroadcastQueues) {
-                pw.println("  Queue " + queue.toString() + ": " + queue.describeStateLocked());
-            }
+            pw.println("  Queue " + mBroadcastQueue.toString() + ": "
+                    + mBroadcastQueue.describeStateLocked());
             pw.println("  mHandler:");
             mHandler.dump(new PrintWriterPrinter(pw), "    ");
             needSep = true;
@@ -12904,7 +12929,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (!opts.isCompact) {
                 pw.print(" Used RAM: "); pw.print(stringifyKBSize(ss[INDEX_TOTAL_PSS] - cachedPss
                         + kernelUsed)); pw.print(" (");
-                pw.print(stringifyKBSize(ss[INDEX_TOTAL_PSS] - cachedPss)); pw.print(" used pss + ");
+                pw.print(stringifyKBSize(ss[INDEX_TOTAL_PSS] - cachedPss));
+                pw.print(" used pss + ");
                 pw.print(stringifyKBSize(kernelUsed)); pw.print(" kernel)\n");
                 pw.print(" Lost RAM: "); pw.println(stringifyKBSize(lostRAM));
             } else {
@@ -13578,9 +13604,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             mOomAdjuster.mCachedAppOptimizer.onCleanupApplicationRecordLocked(app);
         }
         mAppProfiler.onCleanupApplicationRecordLocked(app);
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            queue.onApplicationCleanupLocked(app);
-        }
+        mBroadcastQueue.onApplicationCleanupLocked(app);
         clearProcessForegroundLocked(app);
         mServices.killServicesLocked(app, allowRestart);
         mPhantomProcessList.onAppDied(pid);
@@ -13796,8 +13820,15 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
         validateServiceInstanceName(instanceName);
 
-        if (DEBUG_SERVICE) Slog.v(TAG_SERVICE,
-                "*** startService: " + service + " type=" + resolvedType + " fg=" + requireForeground);
+        if (DEBUG_SERVICE)
+            Slog.v(
+                    TAG_SERVICE,
+                    "*** startService: "
+                            + service
+                            + " type="
+                            + resolvedType
+                            + " fg="
+                            + requireForeground);
         final int callingPid = Binder.getCallingPid();
         final int callingUid = Binder.getCallingUid();
         final long origId = Binder.clearCallingIdentity();
@@ -14709,7 +14740,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                             originalStickyCallingUid))) {
                         sticky = broadcast.intent;
                     }
-                    BroadcastQueue queue = broadcastQueueForIntent(broadcast.intent);
+                    BroadcastQueue queue = mBroadcastQueue;
                     BroadcastRecord r = new BroadcastRecord(queue, broadcast.intent, null,
                             null, null, -1, -1, false, null, null, null, null, OP_NONE,
                             BroadcastOptions.makeWithDeferUntilActive(broadcast.deferUntilActive),
@@ -15095,9 +15126,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                         + " ordered=" + ordered + " userid=" + userId
                         + " options=" + (brOptions == null ? "null" : brOptions.toBundle()));
         if ((resultTo != null) && !ordered) {
-            if (!mEnableModernQueue) {
-                Slog.w(TAG, "Broadcast " + intent + " not ordered but result callback requested!");
-            }
             if (!UserHandle.isCore(callingUid)) {
                 String msg = "Unauthorized unordered resultTo broadcast "
                              + intent + " sent from uid " + callingUid;
@@ -15558,9 +15586,14 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (checkPermission(android.Manifest.permission.BROADCAST_STICKY,
                     callingPid, callingUid)
                     != PackageManager.PERMISSION_GRANTED) {
-                String msg = "Permission Denial: broadcastIntent() requesting a sticky broadcast from pid="
-                        + callingPid + ", uid=" + callingUid
-                        + " requires " + android.Manifest.permission.BROADCAST_STICKY;
+                String msg =
+                        "Permission Denial: broadcastIntent() requesting a sticky broadcast from"
+                            + " pid="
+                                + callingPid
+                                + ", uid="
+                                + callingUid
+                                + " requires "
+                                + android.Manifest.permission.BROADCAST_STICKY;
                 Slog.w(TAG, msg);
                 throw new SecurityException(msg);
             }
@@ -15693,29 +15726,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         filterNonExportedComponents(intent, callingUid, callingPid, registeredReceivers,
                 mPlatformCompat, callerPackage, resolvedType);
         int NR = registeredReceivers != null ? registeredReceivers.size() : 0;
-        if (!ordered && NR > 0 && !mEnableModernQueue) {
-            // If we are not serializing this broadcast, then send the
-            // registered receivers separately so they don't wait for the
-            // components to be launched. We don't do this split for the modern
-            // queue because delivery to registered receivers isn't blocked
-            // behind manifest receivers.
-            if (isCallerSystem) {
-                checkBroadcastFromSystem(intent, callerApp, callerPackage, callingUid,
-                        isProtectedBroadcast, registeredReceivers);
-            }
-            final BroadcastQueue queue = broadcastQueueForIntent(intent);
-            BroadcastRecord r = new BroadcastRecord(queue, intent, callerApp, callerPackage,
-                    callerFeatureId, callingPid, callingUid, callerInstantApp, resolvedType,
-                    requiredPermissions, excludedPermissions, excludedPackages, appOp, brOptions,
-                    registeredReceivers, resultToApp, resultTo, resultCode, resultData,
-                    resultExtras, ordered, sticky, false, userId,
-                    backgroundStartPrivileges, timeoutExempt, filterExtrasForReceiver,
-                    callerAppProcessState);
-            if (DEBUG_BROADCAST) Slog.v(TAG_BROADCAST, "Enqueueing parallel broadcast " + r);
-            queue.enqueueBroadcastLocked(r);
-            registeredReceivers = null;
-            NR = 0;
-        }
 
         // Merge into one list.
         int ir = 0;
@@ -15796,7 +15806,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         if ((receivers != null && receivers.size() > 0)
                 || resultTo != null) {
-            BroadcastQueue queue = broadcastQueueForIntent(intent);
+            BroadcastQueue queue = mBroadcastQueue;
             filterNonExportedComponents(intent, callingUid, callingPid, receivers,
                     mPlatformCompat, callerPackage, resolvedType);
             BroadcastRecord r = new BroadcastRecord(queue, intent, callerApp, callerPackage,
@@ -16084,9 +16094,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     void backgroundServicesFinishedLocked(int userId) {
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            queue.backgroundServicesFinishedLocked(userId);
-        }
+        mBroadcastQueue.backgroundServicesFinishedLocked(userId);
     }
 
     public void finishReceiver(IBinder caller, int resultCode, String resultData,
@@ -16107,8 +16115,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     return;
                 }
 
-                final BroadcastQueue queue = broadcastQueueForFlags(flags);
-                queue.finishReceiverLocked(callerApp, resultCode,
+                mBroadcastQueue.finishReceiverLocked(callerApp, resultCode,
                         resultData, resultExtras, resultAbort, true);
                 // updateOomAdjLocked() will be done here
                 trimApplicationsLocked(false, OOM_ADJ_REASON_FINISH_RECEIVER);
@@ -16699,10 +16706,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     // =========================================================
 
     boolean isReceivingBroadcastLocked(ProcessRecord app, int[] outSchedGroup) {
-        int res = ProcessList.SCHED_GROUP_UNDEFINED;
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            res = Math.max(res, queue.getPreferredSchedulingGroupLocked(app));
-        }
+        final int res = mBroadcastQueue.getPreferredSchedulingGroupLocked(app);
         outSchedGroup[0] = res;
         return res != ProcessList.SCHED_GROUP_UNDEFINED;
     }
@@ -16826,10 +16830,8 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     @GuardedBy("this")
     final boolean canGcNowLocked() {
-        for (BroadcastQueue q : mBroadcastQueues) {
-            if (!q.isIdleLocked()) {
-                return false;
-            }
+        if (!mBroadcastQueue.isIdleLocked()) {
+            return false;
         }
         return mAtmInternal.canGcNow();
     }
@@ -18039,9 +18041,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     void onProcessFreezableChangedLocked(ProcessRecord app) {
-        if (mEnableModernQueue) {
-            mBroadcastQueues[0].onProcessFreezableChangedLocked(app);
-        }
+        mBroadcastQueue.onProcessFreezableChangedLocked(app);
     }
 
     @VisibleForTesting
@@ -18379,11 +18379,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         public boolean isSystemReady() {
             // no need to synchronize(this) just to read & return the value
             return mSystemReady;
-        }
-
-        @Override
-        public boolean isModernQueueEnabled() {
-            return mEnableModernQueue;
         }
 
         @Override
@@ -18815,7 +18810,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                     Binder.restoreCallingIdentity(origId);
                 }
             }
-
         }
 
         @Override
@@ -18825,12 +18819,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 int userId, int[] appIdAllowList,
                 @Nullable BiFunction<Integer, Bundle, Bundle> filterExtrasForReceiver,
                 @Nullable Bundle bOptions) {
-            // Sending broadcasts with a finish callback without the need for the broadcasts
-            // delivery to be serialized is only supported by modern queue. So, when modern
-            // queue is disabled, we continue to send broadcasts in a serialized fashion.
-            final boolean serialized = !isModernQueueEnabled();
-            return broadcastIntent(intent, resultTo, requiredPermissions, serialized, userId,
-                    appIdAllowList, filterExtrasForReceiver, bOptions);
+            return broadcastIntent(intent, resultTo, requiredPermissions, false /* serialized */,
+                    userId, appIdAllowList, filterExtrasForReceiver, bOptions);
         }
 
         @Override
@@ -19737,9 +19727,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (flushBroadcastLoopers) {
             BroadcastLoopers.waitForIdle(pw);
         }
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            queue.waitForIdle(pw);
-        }
+        mBroadcastQueue.waitForIdle(pw);
         pw.println("All broadcast queues are idle!");
         pw.flush();
     }
@@ -19755,9 +19743,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (flushBroadcastLoopers) {
             BroadcastLoopers.waitForBarrier(pw);
         }
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            queue.waitForBarrier(pw);
-        }
+        mBroadcastQueue.waitForBarrier(pw);
         if (flushApplicationThreads) {
             waitForApplicationBarrier(pw);
         }
@@ -19833,9 +19819,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     void waitForBroadcastDispatch(@NonNull PrintWriter pw, @NonNull Intent intent) {
         enforceCallingPermission(permission.DUMP, "waitForBroadcastDispatch");
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            queue.waitForDispatched(intent, pw);
-        }
+        mBroadcastQueue.waitForDispatched(intent, pw);
     }
 
     void setIgnoreDeliveryGroupPolicy(@NonNull String broadcastAction) {
@@ -19875,20 +19859,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         Objects.requireNonNull(targetPackage);
         Preconditions.checkArgumentNonnegative(delayedDurationMs);
         enforceCallingPermission(permission.DUMP, "forceDelayBroadcastDelivery()");
-        // Ignore request if modern queue is not enabled
-        if (!mEnableModernQueue) {
-            return;
-        }
 
-        for (BroadcastQueue queue : mBroadcastQueues) {
-            queue.forceDelayBroadcastDelivery(targetPackage, delayedDurationMs);
-        }
-    }
-
-    @Override
-    public boolean isModernBroadcastQueueEnabled() {
-        enforceCallingPermission(permission.DUMP, "isModernBroadcastQueueEnabled()");
-        return mEnableModernQueue;
+        mBroadcastQueue.forceDelayBroadcastDelivery(targetPackage, delayedDurationMs);
     }
 
     @Override
@@ -20436,7 +20408,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             return mNmi != null;
         }
 
-        public BroadcastQueue[] getBroadcastQueues(ActivityManagerService service) {
+        public BroadcastQueue getBroadcastQueue(ActivityManagerService service) {
             // Broadcast policy parameters
             final BroadcastConstants foreConstants = new BroadcastConstants(
                     Settings.Global.BROADCAST_FG_CONSTANTS);
@@ -20452,26 +20424,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             // by default, no "slow" policy in this queue
             offloadConstants.SLOW_TIME = Integer.MAX_VALUE;
 
-            final BroadcastQueue[] broadcastQueues;
-            final Handler handler = service.mHandler;
-            if (service.mEnableModernQueue) {
-                broadcastQueues = new BroadcastQueue[1];
-                broadcastQueues[0] = new BroadcastQueueModernImpl(service, handler,
+            return new BroadcastQueueModernImpl(service, service.mHandler,
                         foreConstants, backConstants);
-            } else {
-                broadcastQueues = new BroadcastQueue[4];
-                broadcastQueues[BROADCAST_QUEUE_FG] = new BroadcastQueueImpl(service, handler,
-                        "foreground", foreConstants, false, ProcessList.SCHED_GROUP_DEFAULT);
-                broadcastQueues[BROADCAST_QUEUE_BG] = new BroadcastQueueImpl(service, handler,
-                        "background", backConstants, true, ProcessList.SCHED_GROUP_BACKGROUND);
-                broadcastQueues[BROADCAST_QUEUE_BG_OFFLOAD] = new BroadcastQueueImpl(service,
-                        handler, "offload_bg", offloadConstants, true,
-                        ProcessList.SCHED_GROUP_BACKGROUND);
-                broadcastQueues[BROADCAST_QUEUE_FG_OFFLOAD] = new BroadcastQueueImpl(service,
-                        handler, "offload_fg", foreConstants, true,
-                        ProcessList.SCHED_GROUP_BACKGROUND);
-            }
-            return broadcastQueues;
         }
 
         /** @see Binder#getCallingUid */
@@ -20791,14 +20745,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             }
         }
-    }
-
-    private boolean isOnFgOffloadQueue(int flags) {
-        return ((flags & Intent.FLAG_RECEIVER_OFFLOAD_FOREGROUND) != 0);
-    }
-
-    private boolean isOnBgOffloadQueue(int flags) {
-        return (mEnableOffloadQueue && ((flags & Intent.FLAG_RECEIVER_OFFLOAD) != 0));
     }
 
     @Override

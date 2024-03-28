@@ -60,7 +60,6 @@ import com.android.internal.widget.CachingIconView;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.SysuiTestableContext;
 import com.android.systemui.flags.FakeFeatureFlags;
-import com.android.systemui.flags.Flags;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.notification.AboveShelfChangedListener;
@@ -69,6 +68,7 @@ import com.android.systemui.statusbar.notification.SourceType;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.row.ExpandableView.OnHeightChangedListener;
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationViewWrapper;
+import com.android.systemui.statusbar.notification.shared.NotificationContentAlphaOptimization;
 import com.android.systemui.statusbar.notification.stack.NotificationChildrenContainer;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 
@@ -103,7 +103,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
                 TestableLooper.get(this),
                 mFeatureFlags);
         mNotificationTestHelper.setDefaultInflationFlags(FLAG_CONTENT_VIEW_ALL);
-        mFeatureFlags.setDefault(Flags.SENSITIVE_REVEAL_ANIM);
     }
 
     @Test
@@ -185,14 +184,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
     }
 
     @Test
-    public void testSetSensitiveOnNotifRowNotifiesOfHeightChange_withOtherFlagValue()
-            throws Exception {
-        FakeFeatureFlags flags = mFeatureFlags;
-        flags.set(Flags.SENSITIVE_REVEAL_ANIM, !flags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM));
-        testSetSensitiveOnNotifRowNotifiesOfHeightChange();
-    }
-
-    @Test
     public void testSetSensitiveOnNotifRowNotifiesOfHeightChange() throws Exception {
         // GIVEN a sensitive notification row that's currently redacted
         ExpandableNotificationRow row = mNotificationTestHelper.createRow();
@@ -209,19 +200,10 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         // WHEN the row is set to no longer be sensitive
         row.setSensitive(false, true);
 
-        boolean expectAnimation = mFeatureFlags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM);
         // VERIFY that the height change listener is invoked
         assertThat(row.getShowingLayout()).isSameInstanceAs(row.getPrivateLayout());
         assertThat(row.getIntrinsicHeight()).isGreaterThan(0);
-        verify(listener).onHeightChanged(eq(row), eq(expectAnimation));
-    }
-
-    @Test
-    public void testSetSensitiveOnGroupRowNotifiesOfHeightChange_withOtherFlagValue()
-            throws Exception {
-        FakeFeatureFlags flags = mFeatureFlags;
-        flags.set(Flags.SENSITIVE_REVEAL_ANIM, !flags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM));
-        testSetSensitiveOnGroupRowNotifiesOfHeightChange();
+        verify(listener).onHeightChanged(eq(row), eq(true));
     }
 
     @Test
@@ -241,19 +223,10 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         // WHEN the row is set to no longer be sensitive
         group.setSensitive(false, true);
 
-        boolean expectAnimation = mFeatureFlags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM);
         // VERIFY that the height change listener is invoked
         assertThat(group.getShowingLayout()).isSameInstanceAs(group.getPrivateLayout());
         assertThat(group.getIntrinsicHeight()).isGreaterThan(0);
-        verify(listener).onHeightChanged(eq(group), eq(expectAnimation));
-    }
-
-    @Test
-    public void testSetSensitiveOnPublicRowDoesNotNotifyOfHeightChange_withOtherFlagValue()
-            throws Exception {
-        FakeFeatureFlags flags = mFeatureFlags;
-        flags.set(Flags.SENSITIVE_REVEAL_ANIM, !flags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM));
-        testSetSensitiveOnPublicRowDoesNotNotifyOfHeightChange();
+        verify(listener).onHeightChanged(eq(group), eq(true));
     }
 
     @Test
@@ -327,6 +300,61 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         group.setUserLocked(false);
         assertFalse("The childrencontainer should not be userlocked but is, the state "
                 + "seems out of sync.", group.getChildrenContainer().isUserLocked());
+    }
+
+    @Test
+    @EnableFlags(NotificationContentAlphaOptimization.FLAG_NAME)
+    public void setHideSensitive_shouldNotDisturbAnimation() throws Exception {
+        //Given: A row that is during alpha animation
+        ExpandableNotificationRow row = mNotificationTestHelper.createRow();
+
+        assertEquals(row.getPrivateLayout(), row.getContentView());
+        row.setContentAlpha(0.5f);
+
+        //When: Set its hideSensitive without changing the content view to show
+        row.setHideSensitive(
+                /* hideSensitive= */ false,
+                /* animated= */ false,
+                /* delay=  */ 0L,
+                /* duration=  */ 0L
+        );
+        assertEquals(row.getPrivateLayout(), row.getContentView());
+
+        //Then: The alpha value should not be reset
+        assertEquals(0.5f, row.getPrivateLayout().getAlpha(), 0);
+    }
+
+    @Test
+    @EnableFlags(NotificationContentAlphaOptimization.FLAG_NAME)
+    public void setHideSensitive_changeContent_shouldNotDisturbAnimation() throws Exception {
+
+        // Given: A sensitive row that has public version but is not hiding sensitive,
+        // and is during an animation that sets its alpha value to be 0.5f
+        Notification publicNotif = mNotificationTestHelper.createNotification();
+        publicNotif.publicVersion = mNotificationTestHelper.createNotification();
+        ExpandableNotificationRow row = mNotificationTestHelper.createRow(publicNotif);
+        row.setSensitive(true, false);
+        row.setContentAlpha(0.5f);
+
+        assertEquals(0.5f, row.getPrivateLayout().getAlpha(), 0);
+        assertEquals(View.VISIBLE, row.getPrivateLayout().getVisibility());
+
+        // When: Change its hideSensitive and changes the content view to show the public version
+        row.setHideSensitive(
+                /* hideSensitive= */ true,
+                /* animated= */ false,
+                /* delay=  */ 0L,
+                /* duration=  */ 0L
+        );
+
+        // Then: The alpha value of private layout should be reset to 1, private layout be
+        // INVISIBLE;
+        // The alpha value of public layout should be 0.5 to preserve the animation state, public
+        // layout should be VISIBLE
+        assertEquals(View.INVISIBLE, row.getPrivateLayout().getVisibility());
+        assertEquals(1f, row.getPrivateLayout().getAlpha(), 0);
+        assertEquals(View.VISIBLE, row.getPublicLayout().getVisibility());
+        assertEquals(0.5f, row.getPublicLayout().getAlpha(), 0);
     }
 
     @Test

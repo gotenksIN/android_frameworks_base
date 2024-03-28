@@ -20,6 +20,7 @@ package com.android.compose.animation.scene
 
 import android.util.Log
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.runtime.getValue
@@ -30,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
+import com.android.compose.animation.scene.TransitionState.HasOverscrollProperties.Companion.DistanceUnspecified
 import com.android.compose.nestedscroll.PriorityNestedScrollConnection
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.CoroutineScope
@@ -96,9 +98,15 @@ internal class DraggableHandlerImpl(
             return false
         }
 
+        val swipeTransition = dragController.swipeTransition
+
+        // Don't intercept a transition that is finishing.
+        if (swipeTransition.isFinishing) {
+            return false
+        }
+
         // Only intercept the current transition if one of the 2 swipes results is also a transition
         // between the same pair of scenes.
-        val swipeTransition = dragController.swipeTransition
         val fromScene = swipeTransition._currentScene
         val swipes = computeSwipes(fromScene, startedPosition, pointersDown = 1)
         val (upOrLeft, downOrRight) = swipes.computeSwipesResults(fromScene)
@@ -149,15 +157,24 @@ internal class DraggableHandlerImpl(
 
         val fromScene = layoutImpl.scene(transitionState.currentScene)
         val swipes = computeSwipes(fromScene, startedPosition, pointersDown)
-        val result = swipes.findUserActionResult(fromScene, overSlop, true)
-
-        // As we were unable to locate a valid target scene, the initial SwipeTransition cannot be
-        // defined. Consequently, a simple NoOp Controller will be returned.
-        if (result == null) return NoOpDragController
+        val result =
+            swipes.findUserActionResult(fromScene, overSlop, true)
+            // As we were unable to locate a valid target scene, the initial SwipeTransition
+            // cannot be defined. Consequently, a simple NoOp Controller will be returned.
+            ?: return NoOpDragController
 
         return updateDragController(
             swipes = swipes,
-            swipeTransition = SwipeTransition(fromScene, result, swipes, layoutImpl, orientation)
+            swipeTransition =
+                SwipeTransition(
+                    layoutImpl.state,
+                    coroutineScope,
+                    fromScene,
+                    result,
+                    swipes,
+                    layoutImpl,
+                    orientation,
+                )
         )
     }
 
@@ -277,7 +294,7 @@ private class DragControllerImpl(
      * @return the consumed delta
      */
     override fun onDrag(delta: Float) {
-        if (delta == 0f || !isDrivingTransition) return
+        if (delta == 0f || !isDrivingTransition || swipeTransition.isFinishing) return
         swipeTransition.dragOffset += delta
 
         val (fromScene, acceleratedOffset) =
@@ -305,6 +322,8 @@ private class DragControllerImpl(
         ) {
             val swipeTransition =
                 SwipeTransition(
+                        layoutState = layoutState,
+                        coroutineScope = draggableHandler.coroutineScope,
                         fromScene = fromScene,
                         result = result,
                         swipes = swipes,
@@ -335,10 +354,7 @@ private class DragControllerImpl(
 
         // If the swipe was not committed or if the swipe distance is not computed yet, don't do
         // anything.
-        if (
-            swipeTransition._currentScene != toScene ||
-                distance == SwipeTransition.DistanceUnspecified
-        ) {
+        if (swipeTransition._currentScene != toScene || distance == DistanceUnspecified) {
             return fromScene to 0f
         }
 
@@ -355,15 +371,9 @@ private class DragControllerImpl(
         }
     }
 
-    private fun snapToScene(scene: SceneKey) {
-        if (!isDrivingTransition) return
-        swipeTransition.cancelOffsetAnimation()
-        layoutState.finishTransition(swipeTransition, idleScene = scene)
-    }
-
     override fun onStop(velocity: Float, canChangeScene: Boolean) {
         // The state was changed since the drag started; don't do anything.
-        if (!isDrivingTransition) {
+        if (!isDrivingTransition || swipeTransition.isFinishing) {
             return
         }
 
@@ -389,7 +399,7 @@ private class DragControllerImpl(
                 coroutineScope = draggableHandler.coroutineScope,
                 initialVelocity = velocity,
                 targetOffset = targetOffset,
-                onAnimationCompleted = { snapToScene(targetScene.key) }
+                targetScene = targetScene.key,
             )
         }
 
@@ -406,7 +416,7 @@ private class DragControllerImpl(
             var targetScene: Scene
             var targetOffset: Float
             if (
-                distance != SwipeTransition.DistanceUnspecified &&
+                distance != DistanceUnspecified &&
                     shouldCommitSwipe(
                         offset,
                         distance,
@@ -432,8 +442,8 @@ private class DragControllerImpl(
                     if (targetScene == fromScene) {
                         0f
                     } else {
-                        check(distance != SwipeTransition.DistanceUnspecified) {
-                            "distance is equal to ${SwipeTransition.DistanceUnspecified}"
+                        check(distance != DistanceUnspecified) {
+                            "distance is equal to $DistanceUnspecified"
                         }
                         distance
                     }
@@ -451,12 +461,14 @@ private class DragControllerImpl(
                 val result = swipes.findUserActionResultStrict(velocity)
                 if (result == null) {
                     // We will not animate
-                    snapToScene(fromScene.key)
+                    swipeTransition.snapToScene(fromScene.key)
                     return
                 }
 
                 val newSwipeTransition =
                     SwipeTransition(
+                            layoutState = layoutState,
+                            coroutineScope = draggableHandler.coroutineScope,
                             fromScene = fromScene,
                             result = result,
                             swipes = swipes,
@@ -514,6 +526,8 @@ private class DragControllerImpl(
 }
 
 private fun SwipeTransition(
+    layoutState: BaseSceneTransitionLayoutState,
+    coroutineScope: CoroutineScope,
     fromScene: Scene,
     result: UserActionResult,
     swipes: Swipes,
@@ -530,6 +544,8 @@ private fun SwipeTransition(
         }
 
     return SwipeTransition(
+        layoutState = layoutState,
+        coroutineScope = coroutineScope,
         key = result.transitionKey,
         _fromScene = fromScene,
         _toScene = layoutImpl.scene(result.toScene),
@@ -541,6 +557,8 @@ private fun SwipeTransition(
 
 private fun SwipeTransition(old: SwipeTransition): SwipeTransition {
     return SwipeTransition(
+            layoutState = old.layoutState,
+            coroutineScope = old.coroutineScope,
             key = old.key,
             _fromScene = old._fromScene,
             _toScene = old._toScene,
@@ -555,6 +573,8 @@ private fun SwipeTransition(old: SwipeTransition): SwipeTransition {
 }
 
 private class SwipeTransition(
+    val layoutState: BaseSceneTransitionLayoutState,
+    val coroutineScope: CoroutineScope,
     val key: TransitionKey?,
     val _fromScene: Scene,
     val _toScene: Scene,
@@ -573,7 +593,7 @@ private class SwipeTransition(
             // Important: If we are going to return early because distance is equal to 0, we should
             // still make sure we read the offset before returning so that the calling code still
             // subscribes to the offset value.
-            val offset = if (isAnimatingOffset) offsetAnimatable.value else dragOffset
+            val offset = offsetAnimation?.animatable?.value ?: dragOffset
 
             val distance = distance()
             if (distance == DistanceUnspecified) {
@@ -588,20 +608,11 @@ private class SwipeTransition(
     /** The current offset caused by the drag gesture. */
     var dragOffset by mutableFloatStateOf(0f)
 
-    /**
-     * Whether the offset is animated (the user lifted their finger) or if it is driven by gesture.
-     */
-    var isAnimatingOffset by mutableStateOf(false)
+    /** The offset animation that animates the offset once the user lifts their finger. */
+    private var offsetAnimation: OffsetAnimation? by mutableStateOf(null)
 
-    // If we are not animating offset, it means the offset is being driven by the user's finger.
     override val isUserInputOngoing: Boolean
-        get() = !isAnimatingOffset
-
-    /** The animatable used to animate the offset once the user lifted its finger. */
-    val offsetAnimatable = Animatable(0f, OffsetVisibilityThreshold)
-
-    /** Job to check that there is at most one offset animation in progress. */
-    private var offsetAnimationJob: Job? = null
+        get() = offsetAnimation == null
 
     /**
      * The [TransformationSpecImpl] associated to this transition.
@@ -615,7 +626,17 @@ private class SwipeTransition(
     /** The spec to use when animating this transition to either [fromScene] or [toScene]. */
     lateinit var swipeSpec: SpringSpec<Float>
 
+    override val overscrollScope: OverscrollScope =
+        object : OverscrollScope {
+            override val absoluteDistance: Float
+                get() = distance().absoluteValue
+        }
+
     private var lastDistance = DistanceUnspecified
+
+    /** Whether [TransitionState.Transition.finish] was called on this transition. */
+    var isFinishing = false
+        private set
 
     /**
      * The signed distance between [fromScene] and [toScene]. It is negative if [fromScene] is above
@@ -647,25 +668,21 @@ private class SwipeTransition(
         return distance
     }
 
-    /** Ends any previous [offsetAnimationJob] and runs the new [job]. */
-    private fun startOffsetAnimation(job: () -> Job) {
+    /** Ends any previous [offsetAnimation] and runs the new [animation]. */
+    private fun startOffsetAnimation(animation: () -> OffsetAnimation): OffsetAnimation {
         cancelOffsetAnimation()
-        offsetAnimationJob = job()
+        return animation().also { offsetAnimation = it }
     }
 
     /** Cancel any ongoing offset animation. */
     // TODO(b/317063114) This should be a suspended function to avoid multiple jobs running at
     // the same time.
     fun cancelOffsetAnimation() {
-        offsetAnimationJob?.cancel()
-        finishOffsetAnimation()
-    }
+        val animation = offsetAnimation ?: return
+        offsetAnimation = null
 
-    fun finishOffsetAnimation() {
-        if (isAnimatingOffset) {
-            isAnimatingOffset = false
-            dragOffset = offsetAnimatable.value
-        }
+        dragOffset = animation.animatable.value
+        animation.job.cancel()
     }
 
     fun animateOffset(
@@ -673,35 +690,73 @@ private class SwipeTransition(
         coroutineScope: CoroutineScope,
         initialVelocity: Float,
         targetOffset: Float,
-        onAnimationCompleted: () -> Unit,
-    ) {
-        startOffsetAnimation {
-            coroutineScope.launch {
-                animateOffset(targetOffset, initialVelocity)
-                onAnimationCompleted()
+        targetScene: SceneKey,
+    ): OffsetAnimation {
+        return startOffsetAnimation {
+            val animatable = Animatable(dragOffset, OffsetVisibilityThreshold)
+            val job =
+                coroutineScope
+                    .launch {
+                        animatable.animateTo(
+                            targetValue = targetOffset,
+                            animationSpec = swipeSpec,
+                            initialVelocity = initialVelocity,
+                        )
+                    }
+                    // Make sure that we settle to target scene at the end of the animation or if
+                    // the animation is cancelled.
+                    .apply { invokeOnCompletion { snapToScene(targetScene) } }
+
+            OffsetAnimation(animatable, job)
+        }
+    }
+
+    fun snapToScene(scene: SceneKey) {
+        if (layoutState.transitionState != this) return
+        cancelOffsetAnimation()
+        layoutState.finishTransition(this, idleScene = scene)
+    }
+
+    override fun finish(): Job {
+        if (isFinishing) return requireNotNull(offsetAnimation).job
+        isFinishing = true
+
+        // If we were already animating the offset, simply return the job.
+        offsetAnimation?.let {
+            return it.job
+        }
+
+        // Animate to the current scene.
+        val targetScene = currentScene
+        val targetOffset =
+            if (targetScene == fromScene) {
+                0f
+            } else {
+                val distance = distance()
+                check(distance != DistanceUnspecified) {
+                    "targetScene != fromScene but distance is unspecified"
+                }
+                distance
             }
-        }
+
+        val animation =
+            animateOffset(
+                coroutineScope = coroutineScope,
+                initialVelocity = 0f,
+                targetOffset = targetOffset,
+                targetScene = currentScene,
+            )
+        check(offsetAnimation == animation)
+        return animation.job
     }
 
-    private suspend fun animateOffset(targetOffset: Float, initialVelocity: Float) {
-        if (!isAnimatingOffset) {
-            offsetAnimatable.snapTo(dragOffset)
-        }
-        isAnimatingOffset = true
+    internal class OffsetAnimation(
+        /** The animatable used to animate the offset. */
+        val animatable: Animatable<Float, AnimationVector1D>,
 
-        val animationSpec = transformationSpec
-        offsetAnimatable.animateTo(
-            targetValue = targetOffset,
-            animationSpec = swipeSpec,
-            initialVelocity = initialVelocity,
-        )
-
-        finishOffsetAnimation()
-    }
-
-    companion object {
-        const val DistanceUnspecified = 0f
-    }
+        /** The job in which [animatable] is animated. */
+        val job: Job,
+    )
 }
 
 private object DefaultSwipeDistance : UserActionDistance {

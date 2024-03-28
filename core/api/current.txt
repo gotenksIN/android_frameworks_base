@@ -4446,7 +4446,7 @@ package android.app {
     method public final android.media.session.MediaController getMediaController();
     method @NonNull public android.view.MenuInflater getMenuInflater();
     method @NonNull public android.window.OnBackInvokedDispatcher getOnBackInvokedDispatcher();
-    method public final android.app.Activity getParent();
+    method @Deprecated public final android.app.Activity getParent();
     method @Nullable public android.content.Intent getParentActivityIntent();
     method public android.content.SharedPreferences getPreferences(int);
     method @Nullable public android.net.Uri getReferrer();
@@ -4464,7 +4464,7 @@ package android.app {
     method public void invalidateOptionsMenu();
     method public boolean isActivityTransitionRunning();
     method public boolean isChangingConfigurations();
-    method public final boolean isChild();
+    method @Deprecated public final boolean isChild();
     method public boolean isDestroyed();
     method public boolean isFinishing();
     method public boolean isImmersive();
@@ -4483,7 +4483,7 @@ package android.app {
     method @CallSuper public void onActionModeStarted(android.view.ActionMode);
     method public void onActivityReenter(int, android.content.Intent);
     method protected void onActivityResult(int, int, android.content.Intent);
-    method @FlaggedApi("android.security.content_uri_permission_apis") public void onActivityResult(int, int, @NonNull android.content.Intent, @NonNull android.app.ComponentCaller);
+    method @FlaggedApi("android.security.content_uri_permission_apis") public void onActivityResult(int, int, @Nullable android.content.Intent, @NonNull android.app.ComponentCaller);
     method @Deprecated public void onAttachFragment(android.app.Fragment);
     method public void onAttachedToWindow();
     method @Deprecated public void onBackPressed();
@@ -6099,7 +6099,7 @@ package android.app {
 
   public class GrammaticalInflectionManager {
     method public int getApplicationGrammaticalGender();
-    method @FlaggedApi("android.app.system_terms_of_address_enabled") public int getSystemGrammaticalGender();
+    method @FlaggedApi("android.app.system_terms_of_address_enabled") @RequiresPermission("android.permission.READ_SYSTEM_GRAMMATICAL_GENDER") public int getSystemGrammaticalGender();
     method public void setRequestedApplicationGrammaticalGender(int);
   }
 
@@ -6688,9 +6688,9 @@ package android.app {
     method @Deprecated public android.app.Notification.Builder addPerson(String);
     method @NonNull public android.app.Notification.Builder addPerson(android.app.Person);
     method @NonNull public android.app.Notification build();
-    method public android.widget.RemoteViews createBigContentView();
-    method public android.widget.RemoteViews createContentView();
-    method public android.widget.RemoteViews createHeadsUpContentView();
+    method @Deprecated public android.widget.RemoteViews createBigContentView();
+    method @Deprecated public android.widget.RemoteViews createContentView();
+    method @Deprecated public android.widget.RemoteViews createHeadsUpContentView();
     method @NonNull public android.app.Notification.Builder extend(android.app.Notification.Extender);
     method public android.os.Bundle getExtras();
     method @Deprecated public android.app.Notification getNotification();
@@ -8167,7 +8167,7 @@ package android.app.admin {
     method public CharSequence getStartUserSessionMessage(@NonNull android.content.ComponentName);
     method @Deprecated public boolean getStorageEncryption(@Nullable android.content.ComponentName);
     method public int getStorageEncryptionStatus();
-    method @FlaggedApi("android.app.admin.flags.esim_management_enabled") @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS) public java.util.Set<java.lang.Integer> getSubscriptionsIds();
+    method @FlaggedApi("android.app.admin.flags.esim_management_enabled") @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS) public java.util.Set<java.lang.Integer> getSubscriptionIds();
     method @Nullable public android.app.admin.SystemUpdatePolicy getSystemUpdatePolicy();
     method @Nullable public android.os.PersistableBundle getTransferOwnershipBundle();
     method @Nullable public java.util.List<android.os.PersistableBundle> getTrustAgentConfiguration(@Nullable android.content.ComponentName, @NonNull android.content.ComponentName);
@@ -9685,13 +9685,13 @@ package android.appwidget {
     method public static android.appwidget.AppWidgetManager getInstance(android.content.Context);
     method @FlaggedApi("android.appwidget.flags.generated_previews") @Nullable public android.widget.RemoteViews getWidgetPreview(@NonNull android.content.ComponentName, @Nullable android.os.UserHandle, int);
     method public boolean isRequestPinAppWidgetSupported();
-    method public void notifyAppWidgetViewDataChanged(int[], int);
-    method public void notifyAppWidgetViewDataChanged(int, int);
+    method @Deprecated public void notifyAppWidgetViewDataChanged(int[], int);
+    method @Deprecated public void notifyAppWidgetViewDataChanged(int, int);
     method public void partiallyUpdateAppWidget(int[], android.widget.RemoteViews);
     method public void partiallyUpdateAppWidget(int, android.widget.RemoteViews);
     method @FlaggedApi("android.appwidget.flags.generated_previews") public void removeWidgetPreview(@NonNull android.content.ComponentName, int);
     method public boolean requestPinAppWidget(@NonNull android.content.ComponentName, @Nullable android.os.Bundle, @Nullable android.app.PendingIntent);
-    method @FlaggedApi("android.appwidget.flags.generated_previews") public void setWidgetPreview(@NonNull android.content.ComponentName, int, @NonNull android.widget.RemoteViews);
+    method @FlaggedApi("android.appwidget.flags.generated_previews") public boolean setWidgetPreview(@NonNull android.content.ComponentName, int, @NonNull android.widget.RemoteViews);
     method public void updateAppWidget(int[], android.widget.RemoteViews);
     method public void updateAppWidget(int, android.widget.RemoteViews);
     method public void updateAppWidget(android.content.ComponentName, android.widget.RemoteViews);
@@ -10814,7 +10814,6 @@ package android.content {
     field public static final String DROPBOX_SERVICE = "dropbox";
     field public static final String EUICC_SERVICE = "euicc";
     field public static final String FILE_INTEGRITY_SERVICE = "file_integrity";
-    field public static final String FINGERPRINT_SERVICE = "fingerprint";
     field public static final String GAME_SERVICE = "game";
     field public static final String GRAMMATICAL_INFLECTION_SERVICE = "grammatical_inflection";
     field public static final String HARDWARE_PROPERTIES_SERVICE = "hardware_properties";
@@ -13202,7 +13201,6 @@ package android.content.pm {
     field public static final String FEATURE_CAMERA_LEVEL_FULL = "android.hardware.camera.level.full";
     field public static final String FEATURE_CANT_SAVE_STATE = "android.software.cant_save_state";
     field public static final String FEATURE_COMPANION_DEVICE_SETUP = "android.software.companion_device_setup";
-    field @FlaggedApi("android.view.inputmethod.concurrent_input_methods") public static final String FEATURE_CONCURRENT_INPUT_METHODS = "android.software.concurrent_input_methods";
     field @Deprecated public static final String FEATURE_CONNECTION_SERVICE = "android.software.connectionservice";
     field public static final String FEATURE_CONSUMER_IR = "android.hardware.consumerir";
     field public static final String FEATURE_CONTROLS = "android.software.controls";
@@ -15792,7 +15790,7 @@ package android.graphics {
     method public boolean clipRect(int, int, int, int);
     method @FlaggedApi("com.android.graphics.hwui.flags.clip_shader") public void clipShader(@NonNull android.graphics.Shader);
     method public void concat(@Nullable android.graphics.Matrix);
-    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void concat44(@Nullable android.graphics.Matrix44);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void concat(@Nullable android.graphics.Matrix44);
     method public void disableZ();
     method public void drawARGB(int, int, int, int);
     method public void drawArc(@NonNull android.graphics.RectF, float, float, boolean, @NonNull android.graphics.Paint);
@@ -15835,6 +15833,7 @@ package android.graphics {
     method public void drawRect(@NonNull android.graphics.RectF, @NonNull android.graphics.Paint);
     method public void drawRect(@NonNull android.graphics.Rect, @NonNull android.graphics.Paint);
     method public void drawRect(float, float, float, float, @NonNull android.graphics.Paint);
+    method @FlaggedApi("com.android.graphics.hwui.flags.draw_region") public void drawRegion(@NonNull android.graphics.Region, @NonNull android.graphics.Paint);
     method public void drawRenderNode(@NonNull android.graphics.RenderNode);
     method public void drawRoundRect(@NonNull android.graphics.RectF, float, float, @NonNull android.graphics.Paint);
     method public void drawRoundRect(float, float, float, float, float, float, @NonNull android.graphics.Paint);
@@ -16445,7 +16444,7 @@ package android.graphics {
     ctor @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public Matrix44();
     ctor @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public Matrix44(@NonNull android.graphics.Matrix);
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 concat(@NonNull android.graphics.Matrix44);
-    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public float get(int, int);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public float get(@IntRange(from=0, to=3) int, @IntRange(from=0, to=3) int);
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void getValues(@NonNull float[]);
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public boolean invert();
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public boolean isIdentity();
@@ -16454,7 +16453,7 @@ package android.graphics {
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void reset();
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 rotate(float, float, float, float);
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 scale(float, float, float);
-    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void set(int, int, float);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void set(@IntRange(from=0, to=3) int, @IntRange(from=0, to=3) int, float);
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void setValues(@NonNull float[]);
     method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 translate(float, float, float);
   }
@@ -18135,24 +18134,6 @@ package android.graphics.pdf {
     method public android.graphics.pdf.PdfDocument.PageInfo.Builder setContentRect(android.graphics.Rect);
   }
 
-  public final class PdfRenderer implements java.lang.AutoCloseable {
-    ctor public PdfRenderer(@NonNull android.os.ParcelFileDescriptor) throws java.io.IOException;
-    method public void close();
-    method public int getPageCount();
-    method public android.graphics.pdf.PdfRenderer.Page openPage(int);
-    method public boolean shouldScaleForPrinting();
-  }
-
-  public final class PdfRenderer.Page implements java.lang.AutoCloseable {
-    method public void close();
-    method public int getHeight();
-    method public int getIndex();
-    method public int getWidth();
-    method public void render(@NonNull android.graphics.Bitmap, @Nullable android.graphics.Rect, @Nullable android.graphics.Matrix, int);
-    field public static final int RENDER_MODE_FOR_DISPLAY = 1; // 0x1
-    field public static final int RENDER_MODE_FOR_PRINT = 2; // 0x2
-  }
-
 }
 
 package android.graphics.text {
@@ -19778,6 +19759,7 @@ package android.hardware.camera2 {
 
   public final class CaptureRequest extends android.hardware.camera2.CameraMetadata<android.hardware.camera2.CaptureRequest.Key<?>> implements android.os.Parcelable {
     method public int describeContents();
+    method @FlaggedApi("com.android.internal.camera.flags.surface_leak_fix") protected void finalize();
     method @Nullable public <T> T get(android.hardware.camera2.CaptureRequest.Key<T>);
     method @NonNull public java.util.List<android.hardware.camera2.CaptureRequest.Key<?>> getKeys();
     method @Nullable public Object getTag();
@@ -20459,54 +20441,6 @@ package android.hardware.display {
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setFlags(int);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setRequestedRefreshRate(@FloatRange(from=0.0f) float);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setSurface(@Nullable android.view.Surface);
-  }
-
-}
-
-package android.hardware.fingerprint {
-
-  @Deprecated public class FingerprintManager {
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.USE_BIOMETRIC, android.Manifest.permission.USE_FINGERPRINT}) public void authenticate(@Nullable android.hardware.fingerprint.FingerprintManager.CryptoObject, @Nullable android.os.CancellationSignal, int, @NonNull android.hardware.fingerprint.FingerprintManager.AuthenticationCallback, @Nullable android.os.Handler);
-    method @Deprecated @RequiresPermission(android.Manifest.permission.USE_FINGERPRINT) public boolean hasEnrolledFingerprints();
-    method @Deprecated @RequiresPermission(android.Manifest.permission.USE_FINGERPRINT) public boolean isHardwareDetected();
-    field public static final int FINGERPRINT_ACQUIRED_GOOD = 0; // 0x0
-    field public static final int FINGERPRINT_ACQUIRED_IMAGER_DIRTY = 3; // 0x3
-    field public static final int FINGERPRINT_ACQUIRED_INSUFFICIENT = 2; // 0x2
-    field public static final int FINGERPRINT_ACQUIRED_PARTIAL = 1; // 0x1
-    field public static final int FINGERPRINT_ACQUIRED_TOO_FAST = 5; // 0x5
-    field public static final int FINGERPRINT_ACQUIRED_TOO_SLOW = 4; // 0x4
-    field public static final int FINGERPRINT_ERROR_CANCELED = 5; // 0x5
-    field public static final int FINGERPRINT_ERROR_HW_NOT_PRESENT = 12; // 0xc
-    field public static final int FINGERPRINT_ERROR_HW_UNAVAILABLE = 1; // 0x1
-    field public static final int FINGERPRINT_ERROR_LOCKOUT = 7; // 0x7
-    field public static final int FINGERPRINT_ERROR_LOCKOUT_PERMANENT = 9; // 0x9
-    field public static final int FINGERPRINT_ERROR_NO_FINGERPRINTS = 11; // 0xb
-    field public static final int FINGERPRINT_ERROR_NO_SPACE = 4; // 0x4
-    field public static final int FINGERPRINT_ERROR_TIMEOUT = 3; // 0x3
-    field public static final int FINGERPRINT_ERROR_UNABLE_TO_PROCESS = 2; // 0x2
-    field public static final int FINGERPRINT_ERROR_USER_CANCELED = 10; // 0xa
-    field public static final int FINGERPRINT_ERROR_VENDOR = 8; // 0x8
-  }
-
-  @Deprecated public abstract static class FingerprintManager.AuthenticationCallback {
-    ctor @Deprecated public FingerprintManager.AuthenticationCallback();
-    method @Deprecated public void onAuthenticationError(int, CharSequence);
-    method @Deprecated public void onAuthenticationFailed();
-    method @Deprecated public void onAuthenticationHelp(int, CharSequence);
-    method @Deprecated public void onAuthenticationSucceeded(android.hardware.fingerprint.FingerprintManager.AuthenticationResult);
-  }
-
-  @Deprecated public static class FingerprintManager.AuthenticationResult {
-    method @Deprecated public android.hardware.fingerprint.FingerprintManager.CryptoObject getCryptoObject();
-  }
-
-  @Deprecated public static final class FingerprintManager.CryptoObject {
-    ctor @Deprecated public FingerprintManager.CryptoObject(@NonNull java.security.Signature);
-    ctor @Deprecated public FingerprintManager.CryptoObject(@NonNull javax.crypto.Cipher);
-    ctor @Deprecated public FingerprintManager.CryptoObject(@NonNull javax.crypto.Mac);
-    method @Deprecated public javax.crypto.Cipher getCipher();
-    method @Deprecated public javax.crypto.Mac getMac();
-    method @Deprecated public java.security.Signature getSignature();
   }
 
 }
@@ -28204,7 +28138,7 @@ package android.media.tv.ad {
     method public void sendSigningResult(@NonNull String, @NonNull byte[]);
     method public void sendTrackInfoList(@Nullable java.util.List<android.media.tv.TvTrackInfo>);
     method public void setCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.tv.ad.TvAdView.TvAdCallback);
-    method public void setOnUnhandledInputEventListener(@NonNull java.util.concurrent.Executor, @NonNull android.media.tv.ad.TvAdView.OnUnhandledInputEventListener);
+    method public void setOnUnhandledInputEventListener(@NonNull android.media.tv.ad.TvAdView.OnUnhandledInputEventListener);
     method public boolean setTvView(@Nullable android.media.tv.TvView);
     method public void startAdService();
     method public void stopAdService();
@@ -41238,19 +41172,19 @@ package android.service.notification {
     method public final android.service.notification.StatusBarNotification[] getSnoozedNotifications();
     method public final void migrateNotificationFilter(int, @Nullable java.util.List<java.lang.String>);
     method public android.os.IBinder onBind(android.content.Intent);
-    method public void onInterruptionFilterChanged(int);
-    method public void onListenerConnected();
-    method public void onListenerDisconnected();
-    method public void onListenerHintsChanged(int);
-    method public void onNotificationChannelGroupModified(String, android.os.UserHandle, android.app.NotificationChannelGroup, int);
-    method public void onNotificationChannelModified(String, android.os.UserHandle, android.app.NotificationChannel, int);
-    method public void onNotificationPosted(android.service.notification.StatusBarNotification);
-    method public void onNotificationPosted(android.service.notification.StatusBarNotification, android.service.notification.NotificationListenerService.RankingMap);
-    method public void onNotificationRankingUpdate(android.service.notification.NotificationListenerService.RankingMap);
-    method public void onNotificationRemoved(android.service.notification.StatusBarNotification);
-    method public void onNotificationRemoved(android.service.notification.StatusBarNotification, android.service.notification.NotificationListenerService.RankingMap);
-    method public void onNotificationRemoved(android.service.notification.StatusBarNotification, android.service.notification.NotificationListenerService.RankingMap, int);
-    method public void onSilentStatusBarIconsVisibilityChanged(boolean);
+    method @UiThread public void onInterruptionFilterChanged(int);
+    method @UiThread public void onListenerConnected();
+    method @UiThread public void onListenerDisconnected();
+    method @UiThread public void onListenerHintsChanged(int);
+    method @UiThread public void onNotificationChannelGroupModified(String, android.os.UserHandle, android.app.NotificationChannelGroup, int);
+    method @UiThread public void onNotificationChannelModified(String, android.os.UserHandle, android.app.NotificationChannel, int);
+    method @UiThread public void onNotificationPosted(android.service.notification.StatusBarNotification);
+    method @UiThread public void onNotificationPosted(android.service.notification.StatusBarNotification, android.service.notification.NotificationListenerService.RankingMap);
+    method @UiThread public void onNotificationRankingUpdate(android.service.notification.NotificationListenerService.RankingMap);
+    method @UiThread public void onNotificationRemoved(android.service.notification.StatusBarNotification);
+    method @UiThread public void onNotificationRemoved(android.service.notification.StatusBarNotification, android.service.notification.NotificationListenerService.RankingMap);
+    method @UiThread public void onNotificationRemoved(android.service.notification.StatusBarNotification, android.service.notification.NotificationListenerService.RankingMap, int);
+    method @UiThread public void onSilentStatusBarIconsVisibilityChanged(boolean);
     method public final void requestInterruptionFilter(int);
     method public final void requestListenerHints(int);
     method public static void requestRebind(android.content.ComponentName);
@@ -52597,8 +52531,8 @@ package android.view {
     method public final void cancelPendingInputEvents();
     method public boolean checkInputConnectionProxy(android.view.View);
     method public void clearAnimation();
-    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") public void clearCredentialManagerRequest();
     method public void clearFocus();
+    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") public void clearPendingCredentialRequest();
     method public void clearViewTranslationCallback();
     method public static int combineMeasuredStates(int, int);
     method protected int computeHorizontalScrollExtent();
@@ -52707,8 +52641,6 @@ package android.view {
     method @FlaggedApi("android.view.flags.sensitive_content_app_protection_api") public final int getContentSensitivity();
     method @UiContext public final android.content.Context getContext();
     method protected android.view.ContextMenu.ContextMenuInfo getContextMenuInfo();
-    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public final android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException> getCredentialManagerCallback();
-    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public final android.credentials.GetCredentialRequest getCredentialManagerRequest();
     method public final boolean getDefaultFocusHighlightEnabled();
     method public static int getDefaultSize(int, int);
     method public android.view.Display getDisplay();
@@ -52793,6 +52725,8 @@ package android.view {
     method public int getPaddingTop();
     method public final android.view.ViewParent getParent();
     method public android.view.ViewParent getParentForAccessibility();
+    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public final android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException> getPendingCredentialCallback();
+    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public final android.credentials.GetCredentialRequest getPendingCredentialRequest();
     method public float getPivotX();
     method public float getPivotY();
     method public android.view.PointerIcon getPointerIcon();
@@ -53093,7 +53027,6 @@ package android.view {
     method public void setContentDescription(CharSequence);
     method @FlaggedApi("android.view.flags.sensitive_content_app_protection_api") public final void setContentSensitivity(int);
     method public void setContextClickable(boolean);
-    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") public void setCredentialManagerRequest(@NonNull android.credentials.GetCredentialRequest, @NonNull android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException>);
     method public void setDefaultFocusHighlightEnabled(boolean);
     method @Deprecated public void setDrawingCacheBackgroundColor(@ColorInt int);
     method @Deprecated public void setDrawingCacheEnabled(boolean);
@@ -53172,6 +53105,7 @@ package android.view {
     method public void setOverScrollMode(int);
     method public void setPadding(int, int, int, int);
     method public void setPaddingRelative(int, int, int, int);
+    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") public void setPendingCredentialRequest(@NonNull android.credentials.GetCredentialRequest, @NonNull android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException>);
     method public void setPivotX(float);
     method public void setPivotY(float);
     method public void setPointerIcon(android.view.PointerIcon);
@@ -53975,10 +53909,10 @@ package android.view {
     method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") public void clearCredentialManagerRequest();
     method @Nullable public abstract android.view.autofill.AutofillId getAutofillId();
     method public abstract int getChildCount();
-    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException> getCredentialManagerCallback();
-    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public android.credentials.GetCredentialRequest getCredentialManagerRequest();
     method public abstract android.os.Bundle getExtras();
     method public abstract CharSequence getHint();
+    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException> getPendingCredentialCallback();
+    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") @Nullable public android.credentials.GetCredentialRequest getPendingCredentialRequest();
     method public abstract CharSequence getText();
     method public abstract int getTextSelectionEnd();
     method public abstract int getTextSelectionStart();
@@ -54001,7 +53935,6 @@ package android.view {
     method public abstract void setClickable(boolean);
     method public abstract void setContentDescription(CharSequence);
     method public abstract void setContextClickable(boolean);
-    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") public void setCredentialManagerRequest(@NonNull android.credentials.GetCredentialRequest, @NonNull android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException>);
     method public abstract void setDataIsSensitive(boolean);
     method public abstract void setDimens(int, int, int, int, int, int);
     method public abstract void setElevation(float);
@@ -54020,6 +53953,7 @@ package android.view {
     method public void setMaxTextLength(int);
     method public void setMinTextEms(int);
     method public abstract void setOpaque(boolean);
+    method @FlaggedApi("android.service.autofill.autofill_credman_dev_integration") public void setPendingCredentialRequest(@NonNull android.credentials.GetCredentialRequest, @NonNull android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException>);
     method public void setReceiveContentMimeTypes(@Nullable String[]);
     method public abstract void setSelected(boolean);
     method public abstract void setText(CharSequence);
@@ -58065,7 +57999,7 @@ package android.webkit {
     method public abstract boolean getBuiltInZoomControls();
     method public abstract int getCacheMode();
     method public abstract String getCursiveFontFamily();
-    method public abstract boolean getDatabaseEnabled();
+    method @Deprecated public abstract boolean getDatabaseEnabled();
     method @Deprecated public abstract String getDatabasePath();
     method public abstract int getDefaultFixedFontSize();
     method public abstract int getDefaultFontSize();
@@ -58111,7 +58045,7 @@ package android.webkit {
     method public abstract void setBuiltInZoomControls(boolean);
     method public abstract void setCacheMode(int);
     method public abstract void setCursiveFontFamily(String);
-    method public abstract void setDatabaseEnabled(boolean);
+    method @Deprecated public abstract void setDatabaseEnabled(boolean);
     method @Deprecated public abstract void setDatabasePath(String);
     method public abstract void setDefaultFixedFontSize(int);
     method public abstract void setDefaultFontSize(int);
@@ -60307,7 +60241,7 @@ package android.widget {
     method public void setRadioGroupChecked(@IdRes int, @IdRes int);
     method public void setRelativeScrollPosition(@IdRes int, int);
     method @Deprecated public void setRemoteAdapter(int, @IdRes int, android.content.Intent);
-    method public void setRemoteAdapter(@IdRes int, android.content.Intent);
+    method @Deprecated public void setRemoteAdapter(@IdRes int, android.content.Intent);
     method public void setRemoteAdapter(@IdRes int, @NonNull android.widget.RemoteViews.RemoteCollectionItems);
     method public void setScrollPosition(@IdRes int, int);
     method public void setShort(@IdRes int, String, short);

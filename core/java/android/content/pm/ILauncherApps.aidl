@@ -67,6 +67,7 @@ interface ILauncherApps {
     List<String> getPreInstalledSystemPackages(in UserHandle user);
     IntentSender getAppMarketActivityIntent(String callingPackage, String packageName,
             in UserHandle user);
+    IntentSender getPrivateSpaceSettingsIntent();
     void showAppDetailsAsUser(in IApplicationThread caller, String callingPackage,
             String callingFeatureId, in ComponentName component, in Rect sourceBounds,
             in Bundle opts, in UserHandle user);
@@ -132,4 +133,7 @@ interface ILauncherApps {
     void setArchiveCompatibilityOptions(boolean enableIconOverlay, boolean enableUnarchivalConfirmation);
 
     List<UserHandle> getUserProfiles();
+
+    /** Saves view capture data to the wm trace directory. */
+    void saveViewCaptureData();
 }

@@ -38,6 +38,7 @@ java_sdk_library {
     name: "framework-nfc",
     libs: [
         "unsupportedappusage", // for android.compat.annotation.UnsupportedAppUsage
+        "framework-permission-s",
     ],
     static_libs: [
         "android.nfc.flags-aconfig-java",
@@ -75,6 +76,9 @@ java_sdk_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.nfcservices",
+    ],
+    aconfig_declarations: [
+        "android.nfc.flags-aconfig",
     ],
 }
 

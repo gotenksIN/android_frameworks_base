@@ -288,6 +288,8 @@ public final class DisplayManagerService extends SystemService {
 
     // Display mode chosen by user.
     private Display.Mode mUserPreferredMode;
+    @HdrConversionMode.ConversionMode
+    private final int mDefaultHdrConversionMode;
     // HDR conversion mode chosen by user
     @GuardedBy("mSyncRoot")
     private HdrConversionMode mHdrConversionMode = null;
@@ -593,6 +595,10 @@ public final class DisplayManagerService extends SystemService {
         mDefaultDisplayDefaultColorMode = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_defaultDisplayDefaultColorMode);
         mDefaultDisplayTopInset = SystemProperties.getInt(PROP_DEFAULT_DISPLAY_TOP_INSET, -1);
+        mDefaultHdrConversionMode = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_enableDefaultHdrConversionPassthrough)
+                        ? HdrConversionMode.HDR_CONVERSION_PASSTHROUGH
+                        : HdrConversionMode.HDR_CONVERSION_SYSTEM;
         float[] lux = getFloatArray(resources.obtainTypedArray(
                 com.android.internal.R.array.config_minimumBrightnessCurveLux));
         float[] nits = getFloatArray(resources.obtainTypedArray(
@@ -2253,7 +2259,7 @@ public final class DisplayManagerService extends SystemService {
     @GuardedBy("mSyncRoot")
     void updateHdrConversionModeSettingsLocked() {
         final int conversionMode = Settings.Global.getInt(mContext.getContentResolver(),
-                Settings.Global.HDR_CONVERSION_MODE, HdrConversionMode.HDR_CONVERSION_SYSTEM);
+                Settings.Global.HDR_CONVERSION_MODE, mDefaultHdrConversionMode);
         final int preferredHdrOutputType = conversionMode == HdrConversionMode.HDR_CONVERSION_FORCE
                 ? Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.HDR_FORCE_CONVERSION_TYPE,
@@ -2478,7 +2484,7 @@ public final class DisplayManagerService extends SystemService {
                 return mHdrConversionMode;
             }
         }
-        return new HdrConversionMode(HdrConversionMode.HDR_CONVERSION_SYSTEM);
+        return new HdrConversionMode(mDefaultHdrConversionMode);
     }
 
     HdrConversionMode getHdrConversionModeInternal() {
@@ -2490,6 +2496,14 @@ public final class DisplayManagerService extends SystemService {
             mode = mOverrideHdrConversionMode != null
                     ? mOverrideHdrConversionMode
                     : mHdrConversionMode;
+            // Handle default: PASSTHROUGH. Don't include the system-preferred type.
+            if (mode == null
+                    && mDefaultHdrConversionMode == HdrConversionMode.HDR_CONVERSION_PASSTHROUGH) {
+                return new HdrConversionMode(HdrConversionMode.HDR_CONVERSION_PASSTHROUGH);
+            }
+            // Handle default or current mode: SYSTEM. Include the system preferred type.
+            // mOverrideHdrConversionMode and mHdrConversionMode do not include the system
+            // preferred type, it is kept separately in mSystemPreferredHdrOutputType.
             if (mode == null
                     || mode.getConversionMode() == HdrConversionMode.HDR_CONVERSION_SYSTEM) {
                 return new HdrConversionMode(
@@ -5049,7 +5063,7 @@ public final class DisplayManagerService extends SystemService {
      */
     class DeviceStateListener implements DeviceStateManager.DeviceStateCallback {
         // Base state corresponds to the physical state of the device
-        private int mBaseState = DeviceStateManager.INVALID_DEVICE_STATE;
+        private int mBaseState = DeviceStateManager.INVALID_DEVICE_STATE_IDENTIFIER;
 
         @Override
         public void onStateChanged(int deviceState) {

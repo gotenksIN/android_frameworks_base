@@ -626,9 +626,6 @@ public class SettingsBackupTest {
                     Settings.Global.Wearable.BEDTIME_MODE,
                     Settings.Global.Wearable.BEDTIME_HARD_MODE,
                     Settings.Global.Wearable.LOCK_SCREEN_STATE,
-                    Settings.Global.Wearable.ACCESSIBILITY_VIBRATION_WATCH_ENABLED,
-                    Settings.Global.Wearable.ACCESSIBILITY_VIBRATION_WATCH_TYPE,
-                    Settings.Global.Wearable.ACCESSIBILITY_VIBRATION_WATCH_SPEED,
                     Settings.Global.Wearable.DISABLE_AOD_WHILE_PLUGGED,
                     Settings.Global.Wearable.NETWORK_LOCATION_OPT_IN,
                     Settings.Global.Wearable.CUSTOM_COLOR_FOREGROUND,
@@ -673,7 +670,6 @@ public class SettingsBackupTest {
                  Settings.Secure.AUTOMATIC_STORAGE_MANAGER_ENABLED,
                  Settings.Secure.AUTOMATIC_STORAGE_MANAGER_LAST_RUN,
                  Settings.Secure.AUTOMATIC_STORAGE_MANAGER_TURNED_OFF_BY_POLICY,
-                 Settings.Secure.AUDIO_DEVICE_INVENTORY, // not controllable by user
                  Settings.Secure.AUDIO_SAFE_CSD_AS_A_FEATURE_ENABLED, // not controllable by user
                  Settings.Secure.BACKUP_AUTO_RESTORE,
                  Settings.Secure.BACKUP_ENABLED,
@@ -705,7 +701,6 @@ public class SettingsBackupTest {
                  Settings.Secure.ENABLED_PRINT_SERVICES,
                  Settings.Secure.GLOBAL_ACTIONS_PANEL_AVAILABLE,
                  Settings.Secure.GLOBAL_ACTIONS_PANEL_DEBUG_ENABLED,
-                 Settings.Secure.IMMERSIVE_MODE_CONFIRMATIONS,
                  Settings.Secure.INCALL_BACK_BUTTON_BEHAVIOR,
                  Settings.Secure.INPUT_METHOD_SELECTOR_VISIBILITY,
                  Settings.Secure.INPUT_METHODS_SUBTYPE_HISTORY,

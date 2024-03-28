@@ -10,7 +10,14 @@ flag {
 flag {
   name: "device_policy_size_tracking_enabled"
   namespace: "enterprise"
-  description: "Add feature to track the total policy size and have a max threshold."
+  description: "Add feature to track the total policy size and have a max threshold - public API changes"
+  bug: "281543351"
+}
+
+flag {
+  name: "device_policy_size_tracking_internal_enabled"
+  namespace: "enterprise"
+  description: "Add feature to track the total policy size and have a max threshold - internal changes"
   bug: "281543351"
 }
 
@@ -155,4 +162,14 @@ flag {
   namespace: "enterprise"
   description: "Enable UX changes for esim management"
   bug: "295301164"
+}
+
+flag {
+  name: "headless_device_owner_provisioning_fix_enabled"
+  namespace: "enterprise"
+  description: "Fix provisioning for single-user headless DO"
+  bug: "289515470"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

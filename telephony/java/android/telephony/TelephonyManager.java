@@ -15121,7 +15121,7 @@ public class TelephonyManager {
     @FlaggedApi(android.permission.flags.Flags.FLAG_GET_EMERGENCY_ROLE_HOLDER_API_ENABLED)
     @NonNull
     @SystemApi
-    public String getEmergencyAssistancePackage() {
+    public String getEmergencyAssistancePackageName() {
         if (!isEmergencyAssistanceEnabled() || !isVoiceCapable()) {
             throw new IllegalStateException("isEmergencyAssistanceEnabled() is false or device"
                 + " not voice capable.");
@@ -18950,7 +18950,7 @@ public class TelephonyManager {
      */
     @SystemApi
     @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_TELECOM_RESOLVE_HIDDEN_DEPENDENCIES)
-    @RequiresPermission(android.Manifest.permission.DUMP)
+    @RequiresPermission(android.Manifest.permission.READ_DROPBOX_DATA)
     public void persistEmergencyCallDiagnosticData(@NonNull String dropboxTag,
             @NonNull EmergencyCallDiagnosticData data) {
         try {

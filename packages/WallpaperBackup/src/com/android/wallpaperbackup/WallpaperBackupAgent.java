@@ -124,7 +124,7 @@ public class WallpaperBackupAgent extends BackupAgent {
     /**
      * An approximate area threshold to compare device dimension similarity
      */
-    static final int AREA_THRESHOLD = 50; // TODO: determine appropriate threshold
+    static final int AREA_THRESHOLD = 50; // TODO (b/327637867): determine appropriate threshold
 
     // If this file exists, it means we exceeded our quota last time
     private File mQuotaFile;
@@ -195,10 +195,11 @@ public class WallpaperBackupAgent extends BackupAgent {
             mSystemHasLiveComponent = mWallpaperManager.getWallpaperInfo(FLAG_SYSTEM) != null;
             mLockHasLiveComponent = mWallpaperManager.getWallpaperInfo(FLAG_LOCK) != null;
 
-            backupDeviceInfoFile(data);
+            // performing backup of each file based on order of importance
             backupWallpaperInfoFile(/* sysOrLockChanged= */ sysChanged || lockChanged, data);
             backupSystemWallpaperFile(sharedPrefs, sysChanged, sysGeneration, data);
             backupLockWallpaperFileIfItExists(sharedPrefs, lockChanged, lockGeneration, data);
+            backupDeviceInfoFile(data);
         } catch (Exception e) {
             Slog.e(TAG, "Unable to back up wallpaper", e);
             mEventLogger.onBackupException(e);
@@ -222,7 +223,9 @@ public class WallpaperBackupAgent extends BackupAgent {
 
         // save the dimensions of the device with xml formatting
         Point dimensions = getScreenDimensions();
-        Point secondaryDimensions = getRealSize(getSmallerDisplay());
+        Display smallerDisplay = getSmallerDisplayIfExists();
+        Point secondaryDimensions = smallerDisplay != null ? getRealSize(smallerDisplay) :
+                new Point(0, 0);
 
         deviceInfoStage.createNewFile();
         FileOutputStream fstream = new FileOutputStream(deviceInfoStage, false);
@@ -238,13 +241,15 @@ public class WallpaperBackupAgent extends BackupAgent {
         out.text(String.valueOf(dimensions.y));
         out.endTag(null, "height");
 
-        out.startTag(null, "secondarywidth");
-        out.text(String.valueOf(secondaryDimensions != null ? secondaryDimensions.x : 0));
-        out.endTag(null, "secondarywidth");
+        if (smallerDisplay != null) {
+            out.startTag(null, "secondarywidth");
+            out.text(String.valueOf(secondaryDimensions.x));
+            out.endTag(null, "secondarywidth");
 
-        out.startTag(null, "secondaryheight");
-        out.text(String.valueOf(secondaryDimensions != null ? secondaryDimensions.y : 0));
-        out.endTag(null, "secondaryheight");
+            out.startTag(null, "secondaryheight");
+            out.text(String.valueOf(secondaryDimensions.y));
+            out.endTag(null, "secondaryheight");
+        }
 
         out.endTag(null, "dimensions");
         out.endDocument();
@@ -439,7 +444,7 @@ public class WallpaperBackupAgent extends BackupAgent {
                     deviceDimensionsStage);
 
             Point targetDeviceDimensions = getScreenDimensions();
-            if (sourceDeviceDimensions != null
+            if (sourceDeviceDimensions != null && targetDeviceDimensions != null
                     && isSourceDeviceSignificantlySmallerThanTarget(sourceDeviceDimensions.first,
                     targetDeviceDimensions)) {
                 Slog.d(TAG, "The source device is significantly smaller than target");
@@ -639,7 +644,6 @@ public class WallpaperBackupAgent extends BackupAgent {
             mEventLogger.onLockImageWallpaperRestoreFailed(error);
         }
     }
-
     private Rect parseCropHint(File wallpaperInfo, String sectionTag) {
         Rect cropHint = new Rect();
         try (FileInputStream stream = new FileInputStream(wallpaperInfo)) {
@@ -677,7 +681,7 @@ public class WallpaperBackupAgent extends BackupAgent {
                 if (type != XmlPullParser.START_TAG) continue;
                 String tag = parser.getName();
                 if (!sectionTag.equals(tag)) continue;
-                for (Pair<Integer, String> pair : List.of(
+                for (Pair<Integer, String> pair: List.of(
                         new Pair<>(WallpaperManager.PORTRAIT, "Portrait"),
                         new Pair<>(WallpaperManager.LANDSCAPE, "Landscape"),
                         new Pair<>(WallpaperManager.SQUARE_PORTRAIT, "SquarePortrait"),
@@ -868,7 +872,7 @@ public class WallpaperBackupAgent extends BackupAgent {
      * @return Display that corresponds to the smaller display on a device or null if ther is only
      * one Display on a device
      */
-    private Display getSmallerDisplay() {
+    private Display getSmallerDisplayIfExists() {
         List<Display> internalDisplays = getInternalDisplays();
         Point largestDisplaySize = getScreenDimensions();
 

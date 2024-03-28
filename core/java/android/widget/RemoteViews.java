@@ -4299,7 +4299,7 @@ public class RemoteViews implements Parcelable, Filter {
         }
 
         if (mode == MODE_NORMAL) {
-            mApplication = ApplicationInfo.CREATOR.createFromParcel(parcel);
+            mApplication = parcel.readTypedObject(ApplicationInfo.CREATOR);
             mIdealSize = parcel.readInt() == 0 ? null : SizeF.CREATOR.createFromParcel(parcel);
             mLayoutId = parcel.readInt();
             mViewId = parcel.readInt();
@@ -5127,7 +5127,10 @@ public class RemoteViews implements Parcelable, Filter {
      * @param viewId The id of the {@link AdapterView}
      * @param intent The intent of the service which will be
      *            providing data to the RemoteViewsAdapter
+     * @deprecated use
+     * {@link #setRemoteAdapter(int, android.widget.RemoteViews.RemoteCollectionItems)} instead
      */
+    @Deprecated
     public void setRemoteAdapter(@IdRes int viewId, Intent intent) {
         if (remoteAdapterConversion()) {
             addAction(new SetRemoteCollectionItemListAdapterAction(viewId, intent));
@@ -6805,7 +6808,7 @@ public class RemoteViews implements Parcelable, Filter {
                 mBitmapCache.writeBitmapsToParcel(dest, flags);
                 mCollectionCache.writeToParcel(dest, flags, intentsToIgnore);
             }
-            mApplication.writeToParcel(dest, flags);
+            dest.writeTypedObject(mApplication, flags);
             if (mIsRoot || mIdealSize == null) {
                 dest.writeInt(0);
             } else {
@@ -6893,7 +6896,8 @@ public class RemoteViews implements Parcelable, Filter {
      * @hide
      */
     public boolean hasSameAppInfo(ApplicationInfo info) {
-        return mApplication.packageName.equals(info.packageName) && mApplication.uid == info.uid;
+        return mApplication == null || mApplication.packageName.equals(info.packageName)
+                && mApplication.uid == info.uid;
     }
 
     /**
@@ -7672,8 +7676,7 @@ public class RemoteViews implements Parcelable, Filter {
             byte[] instruction;
             final List<byte[]> instructions = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
-                instruction = new byte[in.readInt()];
-                in.readByteArray(instruction);
+                instruction = in.readBlob();
                 instructions.add(instruction);
             }
             return new DrawInstructions(instructions);
@@ -7688,8 +7691,7 @@ public class RemoteViews implements Parcelable, Filter {
             final List<byte[]> instructions = drawInstructions.mInstructions;
             dest.writeInt(instructions.size());
             for (byte[] instruction : instructions) {
-                dest.writeInt(instruction.length);
-                dest.writeByteArray(instruction);
+                dest.writeBlob(instruction);
             }
         }
 

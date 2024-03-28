@@ -222,6 +222,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     Dimmer mDimmer = Dimmer.DIMMER_REFACTOR
             ? new SmoothDimmer(this) : new LegacyDimmer(this);
 
+    /** {@code true} if the dimmer surface is boosted. {@code false} otherwise. */
+    boolean mDimmerSurfaceBoosted;
+
     /** Apply the dim layer on the embedded TaskFragment. */
     static final int EMBEDDED_DIM_AREA_TASK_FRAGMENT = 0;
 
@@ -1566,10 +1569,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
             next.setState(RESUMED, "resumeTopActivity");
 
-            // Have the window manager re-evaluate the orientation of
-            // the screen based on the new activity order.
-            boolean notUpdated = true;
-
             // Activity should also be visible if set mLaunchTaskBehind to true (see
             // ActivityRecord#shouldBeVisibleIgnoringKeyguard()).
             if (shouldBeVisible(next)) {
@@ -1581,28 +1580,15 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 // result of invisible window resize.
                 // TODO: Remove this once visibilities are set correctly immediately when
                 // starting an activity.
-                notUpdated = !mRootWindowContainer.ensureVisibilityAndConfig(next, getDisplayId(),
+                final int originalRelaunchingCount = next.mPendingRelaunchCount;
+                mRootWindowContainer.ensureVisibilityAndConfig(next, mDisplayContent,
                         false /* deferResume */);
-            }
-
-            if (notUpdated) {
-                // The configuration update wasn't able to keep the existing
-                // instance of the activity, and instead started a new one.
-                // We should be all done, but let's just make sure our activity
-                // is still at the top and schedule another run if something
-                // weird happened.
-                ActivityRecord nextNext = topRunningActivity();
-                ProtoLog.i(WM_DEBUG_STATES, "Activity config changed during resume: "
-                        + "%s, new next: %s", next, nextNext);
-                if (nextNext != next) {
-                    // Do over!
-                    mTaskSupervisor.scheduleResumeTopActivities();
+                if (next.mPendingRelaunchCount > originalRelaunchingCount) {
+                    // The activity is scheduled to relaunch, then ResumeActivityItem will be also
+                    // included (see ActivityRecord#relaunchActivityLocked) if it should resume.
+                    next.completeResumeLocked();
+                    return true;
                 }
-                if (!next.isVisibleRequested() || next.mAppStopped) {
-                    next.setVisibility(true);
-                }
-                next.completeResumeLocked();
-                return true;
             }
 
             try {
@@ -1685,17 +1671,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 return true;
             }
 
-            // From this point on, if something goes wrong there is no way
-            // to recover the activity.
-            try {
-                next.completeResumeLocked();
-            } catch (Exception e) {
-                // If any exception gets thrown, toss away this
-                // activity and try the next one.
-                Slog.w(TAG, "Exception thrown during resume of " + next, e);
-                next.finishIfPossible("resume-exception", true /* oomAdj */);
-                return true;
-            }
+            next.completeResumeLocked();
         } else {
             // Whoops, need to restart this activity!
             if (!next.hasBeenLaunched) {
@@ -1926,7 +1902,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
             mAtmService.getLifecycleManager().scheduleTransactionItem(prev.app.getThread(),
                     PauseActivityItem.obtain(prev.token, prev.finishing, userLeaving,
-                            prev.configChangeFlags, pauseImmediately, autoEnteringPip));
+                            pauseImmediately, autoEnteringPip));
         } catch (Exception e) {
             // Ignore exception, if process died other code will cleanup.
             Slog.w(TAG, "Exception thrown during pause", e);
@@ -2376,7 +2352,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 // area, i.e. the screen area without the system bars.
                 // The non decor inset are areas that could never be removed in Honeycomb. See
                 // {@link WindowManagerPolicy#getNonDecorInsetsLw}.
-                calculateInsetFrames(mTmpNonDecorBounds, mTmpStableBounds, mTmpFullBounds, di);
+                calculateInsetFrames(mTmpNonDecorBounds, mTmpStableBounds, mTmpFullBounds, di,
+                        false /* useLegacyInsetsForStableBounds */);
             } else {
                 // Apply the given non-decor and stable insets to calculate the corresponding bounds
                 // for screen size of configuration.
@@ -2474,9 +2451,11 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      * @param outNonDecorBounds where to place bounds with non-decor insets applied.
      * @param outStableBounds where to place bounds with stable insets applied.
      * @param bounds the bounds to inset.
+     * @param useLegacyInsetsForStableBounds {@code true} if we need to use the legacy insets frame
+     *                for apps targeting U or before when calculating stable bounds.
      */
     void calculateInsetFrames(Rect outNonDecorBounds, Rect outStableBounds, Rect bounds,
-            DisplayInfo displayInfo) {
+            DisplayInfo displayInfo, boolean useLegacyInsetsForStableBounds) {
         outNonDecorBounds.set(bounds);
         outStableBounds.set(bounds);
         if (mDisplayContent == null) {
@@ -2488,7 +2467,11 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         final DisplayPolicy.DecorInsets.Info info = policy.getDecorInsetsInfo(
                 displayInfo.rotation, displayInfo.logicalWidth, displayInfo.logicalHeight);
         intersectWithInsetsIfFits(outNonDecorBounds, mTmpBounds, info.mNonDecorInsets);
-        intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mConfigInsets);
+        if (!useLegacyInsetsForStableBounds) {
+            intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mConfigInsets);
+        } else {
+            intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mLegacyConfigInsets);
+        }
     }
 
     /**

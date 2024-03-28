@@ -697,7 +697,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     private boolean mDrawnStateEvaluated;
 
-    private final Point mSurfacePosition = new Point();
+    /** The surface position relative to the parent container. */
+    final Point mSurfacePosition = new Point();
 
     /**
      * A region inside of this window to be excluded from touch.
@@ -1349,7 +1350,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // This window doesn't provide any insets.
             return;
         }
-        if (mGivenInsetsPending && mAttrs.providedInsets == null) {
+        if (mGivenInsetsPending) {
             // The given insets are pending, and they are not reliable for now. The source frame
             // should be updated after the new given insets are sent to window manager.
             return;

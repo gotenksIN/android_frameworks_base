@@ -63,6 +63,12 @@ class AppIdPermissionPolicy : SchemePolicy() {
 
     private val privilegedPermissionAllowlistViolations = MutableIndexedSet<String>()
 
+    /**
+     * Test-only switch to enforce signature permission allowlist even on debuggable builds.
+     */
+    @Volatile
+    var isSignaturePermissionAllowlistForceEnforced = false
+
     override val subjectScheme: String
         get() = UidUri.SCHEME
 
@@ -227,23 +233,57 @@ class AppIdPermissionPolicy : SchemePolicy() {
             if (isRequestedBySystemPackage) {
                 return@forEach
             }
-            val oldFlags = getPermissionFlags(appId, userId, permissionName)
-            var newFlags = oldFlags andInv PermissionFlags.UPGRADE_EXEMPT
-            val isExempt = newFlags.hasAnyBit(PermissionFlags.MASK_EXEMPT)
-            newFlags =
-                if (permission.isHardRestricted && !isExempt) {
-                    newFlags or PermissionFlags.RESTRICTION_REVOKED
-                } else {
-                    newFlags andInv PermissionFlags.RESTRICTION_REVOKED
-                }
-            newFlags =
-                if (permission.isSoftRestricted && !isExempt) {
-                    newFlags or PermissionFlags.SOFT_RESTRICTED
-                } else {
-                    newFlags andInv PermissionFlags.SOFT_RESTRICTED
-                }
-            setPermissionFlags(appId, userId, permissionName, newFlags)
+            updatePermissionExemptFlags(
+                appId,
+                userId,
+                permission,
+                PermissionFlags.UPGRADE_EXEMPT,
+                0
+            )
         }
+    }
+
+    fun MutateStateScope.updatePermissionExemptFlags(
+        appId: Int,
+        userId: Int,
+        permission: Permission,
+        exemptFlagMask: Int,
+        exemptFlagValues: Int
+    ) {
+        val permissionName = permission.name
+        val oldFlags = getPermissionFlags(appId, userId, permissionName)
+        var newFlags = (oldFlags andInv exemptFlagMask) or (exemptFlagValues and exemptFlagMask)
+        if (oldFlags == newFlags) {
+            return
+        }
+        val isExempt = newFlags.hasAnyBit(PermissionFlags.MASK_EXEMPT)
+        if (permission.isHardRestricted && !isExempt) {
+            newFlags = newFlags or PermissionFlags.RESTRICTION_REVOKED
+            // If the permission was policy fixed as granted but it is no longer on any of the
+            // allowlists we need to clear the policy fixed flag as allowlisting trumps policy i.e.
+            // policy cannot grant a non grantable permission.
+            if (PermissionFlags.isPermissionGranted(oldFlags)) {
+                newFlags = newFlags andInv PermissionFlags.POLICY_FIXED
+            }
+        } else {
+            newFlags = newFlags andInv PermissionFlags.RESTRICTION_REVOKED
+        }
+        newFlags =
+            if (
+                permission.isSoftRestricted && !isExempt &&
+                    !anyPackageInAppId(appId) {
+                        permissionName in it.androidPackage!!.requestedPermissions &&
+                            isSoftRestrictedPermissionExemptForPackage(it, permissionName)
+                    }
+            ) {
+                newFlags or PermissionFlags.SOFT_RESTRICTED
+            } else {
+                newFlags andInv PermissionFlags.SOFT_RESTRICTED
+            }
+        if (oldFlags == newFlags) {
+            return
+        }
+        setPermissionFlags(appId, userId, permissionName, newFlags)
     }
 
     override fun MutateStateScope.onPackageUninstalled(
@@ -1118,7 +1158,12 @@ class AppIdPermissionPolicy : SchemePolicy() {
                     newFlags andInv PermissionFlags.RESTRICTION_REVOKED
                 }
             newFlags =
-                if (permission.isSoftRestricted && !isExempt) {
+                if (
+                    permission.isSoftRestricted && !isExempt &&
+                        !requestingPackageStates.anyIndexed { _, it ->
+                            isSoftRestrictedPermissionExemptForPackage(it, permissionName)
+                        }
+                ) {
                     newFlags or PermissionFlags.SOFT_RESTRICTED
                 } else {
                     newFlags andInv PermissionFlags.SOFT_RESTRICTED
@@ -1235,7 +1280,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
                     SigningDetails.CertCapabilities.PERMISSION
                 )
         if (!Flags.signaturePermissionAllowlistEnabled()) {
-            return hasCommonSigner;
+            return hasCommonSigner
         }
         if (!hasCommonSigner) {
             return false
@@ -1269,7 +1314,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
                         " ${packageState.packageName} (${packageState.path}) not in" +
                         " signature permission allowlist"
                 )
-                if (!Build.isDebuggable()) {
+                if (!Build.isDebuggable() || isSignaturePermissionAllowlistForceEnforced) {
                     return false
                 }
             }
@@ -1397,6 +1442,17 @@ class AppIdPermissionPolicy : SchemePolicy() {
             else -> permissionAllowlist.getPrivilegedAppAllowlistState(packageName, permissionName)
         }
     }
+
+    // See also SoftRestrictedPermissionPolicy.mayGrantPermission()
+    private fun isSoftRestrictedPermissionExemptForPackage(
+        packageState: PackageState,
+        permissionName: String
+    ): Boolean =
+        when (permissionName) {
+            Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE ->
+                packageState.androidPackage!!.targetSdkVersion >= Build.VERSION_CODES.Q
+            else -> false
+        }
 
     private inline fun MutateStateScope.anyPackageInAppId(
         appId: Int,

@@ -16,8 +16,10 @@
 
 package android.app;
 
+import android.Manifest;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.RequiresPermission;
 import android.annotation.SystemService;
 import android.content.Context;
 import android.content.res.Configuration;
@@ -123,10 +125,14 @@ public class GrammaticalInflectionManager {
     /**
      * Get the current grammatical gender of privileged application from the encrypted file.
      *
-     * @return the value of grammatical gender
+     * @return the value of system grammatical gender only if the calling app has the permission,
+     * otherwise throwing an exception.
+     *
+     * @throws SecurityException if the caller does not have the required permission.
      *
      * @see Configuration#getGrammaticalGender
      */
+    @RequiresPermission(Manifest.permission.READ_SYSTEM_GRAMMATICAL_GENDER)
     @FlaggedApi(Flags.FLAG_SYSTEM_TERMS_OF_ADDRESS_ENABLED)
     @Configuration.GrammaticalGender
     public int getSystemGrammaticalGender() {

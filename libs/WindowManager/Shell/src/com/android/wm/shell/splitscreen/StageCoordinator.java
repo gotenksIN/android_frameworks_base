@@ -29,6 +29,7 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.RemoteAnimationTarget.MODE_OPENING;
 import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
 import static android.view.WindowManager.TRANSIT_CHANGE;
+import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_KEYGUARD_OCCLUDE;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
@@ -55,6 +56,7 @@ import static com.android.wm.shell.splitscreen.SplitScreenController.ENTER_REASO
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_APP_DOES_NOT_SUPPORT_MULTIWINDOW;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_APP_FINISHED;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_CHILD_TASK_ENTER_PIP;
+import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_DESKTOP_MODE;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_DEVICE_FOLDED;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_DRAG_DIVIDER;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_FULLSCREEN_SHORTCUT;
@@ -820,14 +822,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
     void startIntents(PendingIntent pendingIntent1, Intent fillInIntent1,
             @Nullable ShortcutInfo shortcutInfo1, @Nullable Bundle options1,
-            PendingIntent pendingIntent2, Intent fillInIntent2,
+            @Nullable PendingIntent pendingIntent2, Intent fillInIntent2,
             @Nullable ShortcutInfo shortcutInfo2, @Nullable Bundle options2,
             @SplitPosition int splitPosition, @PersistentSnapPosition int snapPosition,
             @Nullable RemoteTransition remoteTransition, InstanceId instanceId) {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
                 "startIntents: intent1=%s intent2=%s position=%d snapPosition=%d",
-                pendingIntent1.getIntent(), pendingIntent2.getIntent(), splitPosition,
-                snapPosition);
+                pendingIntent1.getIntent(),
+                (pendingIntent2 != null ? pendingIntent2.getIntent() : "null"),
+                splitPosition, snapPosition);
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (pendingIntent2 == null) {
             options1 = options1 != null ? options1 : new Bundle();
@@ -1449,6 +1452,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mExitSplitScreenOnHide = exitSplitScreenOnHide;
     }
 
+    /** Exits split screen with legacy transition */
     void exitSplitScreen(int toTopTaskId, @ExitReason int exitReason) {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "exitSplitScreen: topTaskId=%d reason=%s active=%b",
                 toTopTaskId, exitReasonToString(exitReason), mMainStage.isActive());
@@ -1468,6 +1472,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         applyExitSplitScreen(childrenToTop, wct, exitReason);
     }
 
+    /** Exits split screen with legacy transition */
     private void exitSplitScreen(@Nullable StageTaskListener childrenToTop,
             @ExitReason int exitReason) {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "exitSplitScreen: mainStageToTop=%b reason=%s active=%b",
@@ -1545,6 +1550,14 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
     }
 
+    void dismissSplitScreen(int toTopTaskId, @ExitReason int exitReason) {
+        if (!mMainStage.isActive()) return;
+        final int stage = getStageOfTask(toTopTaskId);
+        final WindowContainerTransaction wct = new WindowContainerTransaction();
+        prepareExitSplitScreen(stage, wct);
+        mSplitTransitions.startDismissTransition(wct, this, stage, exitReason);
+    }
+
     /**
      * Overridden by child classes.
      */
@@ -1608,6 +1621,10 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 // The device is folded
             case EXIT_REASON_FULLSCREEN_SHORTCUT:
                 // User has used a keyboard shortcut to go back to fullscreen from split
+            case EXIT_REASON_DESKTOP_MODE:
+                // One of the children enters desktop mode
+            case EXIT_REASON_UNKNOWN:
+                // Unknown reason
                 return true;
             default:
                 return false;
@@ -2309,10 +2326,10 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         if (ENABLE_SHELL_TRANSITIONS) {
             mSplitLayout.setDividerInteractive(false, false, "onSplitResizeStart");
             mSplitTransitions.startResizeTransition(wct, this, (aborted) -> {
-                mSplitLayout.setDividerInteractive(true, false, "onSplitResizeConsumed");
-            }, (finishWct, t) -> {
-                mSplitLayout.setDividerInteractive(true, false, "onSplitResizeFinish");
-            });
+                        mSplitLayout.setDividerInteractive(true, false, "onSplitResizeConsumed");
+                    }, (finishWct, t) -> {
+                        mSplitLayout.setDividerInteractive(true, false, "onSplitResizeFinish");
+                    }, mMainStage.getSplitDecorManager(), mSideStage.getSplitDecorManager());
         } else {
             // Only need screenshot for legacy case because shell transition should screenshot
             // itself during transition.
@@ -2773,7 +2790,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                                 + " with " + taskInfo.taskId + " before startAnimation().");
                         record.addRecord(stage, true, taskInfo.taskId);
                     }
-                } else if (isClosingType(change.getMode())) {
+                } else if (change.getMode() == TRANSIT_CLOSE) {
                     if (stage.containsTask(taskInfo.taskId)) {
                         record.addRecord(stage, false, taskInfo.taskId);
                         Log.w(TAG, "Expected onTaskVanished on " + stage + " to have been called"
@@ -3516,7 +3533,13 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     return;
                 }
 
-                final int stageType = isMainStage ? STAGE_TYPE_MAIN : STAGE_TYPE_SIDE;
+                // If visible, we preserve the app and keep it running. If an app becomes
+                // unsupported in the bg, break split without putting anything on top
+                boolean splitScreenVisible = isSplitScreenVisible();
+                int stageType = STAGE_TYPE_UNDEFINED;
+                if (splitScreenVisible) {
+                    stageType = isMainStage ? STAGE_TYPE_MAIN : STAGE_TYPE_SIDE;
+                }
                 final WindowContainerTransaction wct = new WindowContainerTransaction();
                 prepareExitSplitScreen(stageType, wct);
                 clearSplitPairedInRecents(EXIT_REASON_APP_DOES_NOT_SUPPORT_MULTIWINDOW);
@@ -3525,7 +3548,9 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 Log.w(TAG, splitFailureMessage("onNoLongerSupportMultiWindow",
                         "app package " + taskInfo.baseActivity.getPackageName()
                         + " does not support splitscreen, or is a controlled activity type"));
-                mSplitUnsupportedToast.show();
+                if (splitScreenVisible) {
+                    mSplitUnsupportedToast.show();
+                }
             }
         }
 

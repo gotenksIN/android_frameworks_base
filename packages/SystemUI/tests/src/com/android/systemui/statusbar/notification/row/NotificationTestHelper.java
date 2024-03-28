@@ -53,12 +53,13 @@ import androidx.annotation.NonNull;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.statusbar.IStatusBarService;
+import com.android.keyguard.TestScopeProvider;
 import com.android.systemui.TestableDependency;
 import com.android.systemui.classifier.FalsingManagerFake;
 import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.media.controls.util.MediaFeatureFlag;
-import com.android.systemui.media.dialog.MediaOutputDialogFactory;
+import com.android.systemui.media.dialog.MediaOutputDialogManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.NotificationMediaManager;
@@ -89,6 +90,8 @@ import com.android.systemui.statusbar.policy.InflatedSmartReplyViewHolder;
 import com.android.systemui.statusbar.policy.SmartReplyConstants;
 import com.android.systemui.statusbar.policy.SmartReplyStateInflater;
 import com.android.systemui.statusbar.policy.dagger.RemoteInputViewSubcomponent;
+import com.android.systemui.util.time.SystemClock;
+import com.android.systemui.util.time.SystemClockImpl;
 import com.android.systemui.wmshell.BubblesManager;
 import com.android.systemui.wmshell.BubblesTestActivity;
 
@@ -99,6 +102,9 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+
+import kotlin.coroutines.CoroutineContext;
+import kotlinx.coroutines.test.TestScope;
 
 /**
  * A helper class to create {@link ExpandableNotificationRow} (for both individual and group
@@ -136,6 +142,12 @@ public class NotificationTestHelper {
     public final Runnable mFutureDismissalRunnable;
     private @InflationFlag int mDefaultInflationFlags;
     private final FakeFeatureFlags mFeatureFlags;
+    private final SystemClock mSystemClock;
+    private final RowInflaterTaskLogger mRowInflaterTaskLogger;
+    private final TestScope mTestScope = TestScopeProvider.getTestScope();
+    private final CoroutineContext mBgCoroutineContext =
+            mTestScope.getBackgroundScope().getCoroutineContext();
+    private final CoroutineContext mMainCoroutineContext = mTestScope.getCoroutineContext();
 
     public NotificationTestHelper(
             Context context,
@@ -155,7 +167,7 @@ public class NotificationTestHelper {
         dependency.injectTestDependency(FeatureFlags.class, mFeatureFlags);
         dependency.injectMockDependency(NotificationMediaManager.class);
         dependency.injectMockDependency(NotificationShadeWindowController.class);
-        dependency.injectMockDependency(MediaOutputDialogFactory.class);
+        dependency.injectMockDependency(MediaOutputDialogManager.class);
         mMockLogger = mock(ExpandableNotificationRowLogger.class);
         mStatusBarStateController = mock(StatusBarStateController.class);
         mKeyguardBypassController = mock(KeyguardBypassController.class);
@@ -165,7 +177,10 @@ public class NotificationTestHelper {
         mIconManager = new IconManager(
                 mock(CommonNotifCollection.class),
                 mock(LauncherApps.class),
-                new IconBuilder(mContext));
+                new IconBuilder(mContext),
+                mTestScope,
+                mBgCoroutineContext,
+                mMainCoroutineContext);
 
         NotificationContentInflater contentBinder = new NotificationContentInflater(
                 mock(NotifRemoteViewCache.class),
@@ -199,6 +214,9 @@ public class NotificationTestHelper {
         mFutureDismissalRunnable = mock(Runnable.class);
         when(mOnUserInteractionCallback.registerFutureDismissal(any(), anyInt()))
                 .thenReturn(mFutureDismissalRunnable);
+
+        mSystemClock = new SystemClockImpl();
+        mRowInflaterTaskLogger = mock(RowInflaterTaskLogger.class);
     }
 
     public void setDefaultInflationFlags(@InflationFlag int defaultInflationFlags) {
@@ -572,7 +590,8 @@ public class NotificationTestHelper {
         LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(
                 Context.LAYOUT_INFLATER_SERVICE);
         if (com.android.systemui.Flags.notificationRowUserContext()) {
-            inflater.setFactory2(new RowInflaterTask.RowAsyncLayoutInflater(entry));
+            inflater.setFactory2(new RowInflaterTask.RowAsyncLayoutInflater(entry, mSystemClock,
+                    mRowInflaterTaskLogger));
         }
         mRow = (ExpandableNotificationRow) inflater.inflate(
                 R.layout.status_bar_notification_row,

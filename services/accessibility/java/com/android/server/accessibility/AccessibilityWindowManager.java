@@ -2040,8 +2040,11 @@ public class AccessibilityWindowManager {
      * @param windowId The windowId
      * @return The display ID
      */
-    public int getDisplayIdByUserIdAndWindowIdLocked(int userId, int windowId) {
-        final IBinder windowToken = getWindowTokenForUserAndWindowIdLocked(userId, windowId);
+    public int getDisplayIdByUserIdAndWindowId(int userId, int windowId) {
+        final IBinder windowToken;
+        synchronized (mLock) {
+            windowToken = getWindowTokenForUserAndWindowIdLocked(userId, windowId);
+        }
         if (traceWMEnabled()) {
             logTraceWM("getDisplayIdForWindow", "token=" + windowToken);
         }

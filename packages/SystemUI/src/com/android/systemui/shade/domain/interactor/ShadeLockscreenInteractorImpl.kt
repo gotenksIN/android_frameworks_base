@@ -19,7 +19,7 @@ package com.android.systemui.shade.domain.interactor
 import com.android.keyguard.LockIconViewController
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.scene.domain.interactor.SceneInteractor
-import com.android.systemui.scene.shared.model.SceneKey
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ShadeLockscreenInteractor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -37,8 +37,6 @@ constructor(
     override fun expandToNotifications() {
         changeToShadeScene()
     }
-
-    override val isExpandingOrCollapsing = shadeInteractor.isUserInteracting.value
 
     override val isExpanded = shadeInteractor.isAnyExpanded.value
 
@@ -87,7 +85,7 @@ constructor(
 
     private fun changeToShadeScene() {
         sceneInteractor.changeScene(
-            SceneKey.Shade,
+            Scenes.Shade,
             "ShadeLockscreenInteractorImpl.expandToNotifications",
         )
     }

@@ -25,6 +25,7 @@ import static android.view.Surface.FRAME_RATE_CATEGORY_LOW;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NORMAL;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NO_PREFERENCE;
 import static android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
+import static android.view.Surface.FRAME_RATE_COMPATIBILITY_GTE;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED;
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_INVALID_BOUNDS;
@@ -2370,6 +2371,39 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @see #WINDOW_FOCUSED_STATE_SET
      */
     protected static final int[] PRESSED_ENABLED_FOCUSED_SELECTED_WINDOW_FOCUSED_STATE_SET;
+
+    /**
+     * This indicates that the frame rate category was chosen because it was a small area update.
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_SMALL = 0x0100_0000;
+
+    /**
+     * This indicates that the frame rate category was chosen because it was an intermittent update.
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_INTERMITTENT = 0x0200_0000;
+
+    /**
+     * This indicates that the frame rate category was chosen because it was a large View.
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_LARGE = 0x03000000;
+
+    /**
+     * This indicates that the frame rate category was chosen because it was requested.
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_REQUESTED = 0x0400_0000;
+
+    /**
+     * This indicates that the frame rate category was chosen because an invalid frame rate was
+     * requested.
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_INVALID = 0x0500_0000;
+
+    private static final int FRAME_RATE_CATEGORY_REASON_MASK = 0xFFFF_0000;
 
     private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
     private static boolean sToolkitMetricsForFrameRateDecisionFlagValue;
@@ -5630,17 +5664,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @Nullable
     private ViewTranslationCallback mViewTranslationCallback;
 
-    private float mFrameContentVelocity = 0;
+    private float mFrameContentVelocity = -1;
 
     @Nullable
 
     private ViewTranslationResponse mViewTranslationResponse;
 
     /**
-     * A threshold value to determine the frame rate category of the View based on the size.
+     * Threshold size for something to be considered a small area update (in DP).
+     * This is the dimension for both width and height.
      */
-    private static final float FRAME_RATE_SIZE_PERCENTAGE_THRESHOLD = 0.07f;
+    private static final float FRAME_RATE_SMALL_SIZE_THRESHOLD = 40f;
 
+    /**
+     * Threshold size for something to be considered a small area update (in DP) if
+     * it is narrow. This is for either width OR height. For example, a narrow progress
+     * bar could be considered a small area.
+     */
+    private static final float FRAME_RATE_NARROW_THRESHOLD = 10f;
 
     private static final long INFREQUENT_UPDATE_INTERVAL_MILLIS = 100;
     private static final int INFREQUENT_UPDATE_COUNTS = 2;
@@ -5660,6 +5701,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     protected long mMinusTwoFrameIntervalMillis = 0;
     private int mLastFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
+
+    private float mLastFrameX = Float.NaN;
+    private float mLastFrameY = Float.NaN;
 
     @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
     public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = Float.NaN;
@@ -7014,16 +7058,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Clears the request and callback previously set
-     * through {@link View#setCredentialManagerRequest}.
+     * through {@link View#setPendingCredentialRequest}.
      * Once this API is invoked, there will be no request fired to {@link CredentialManager}
      * on future view focus events.
      *
-     * @see #setCredentialManagerRequest
+     * @see #setPendingCredentialRequest
      */
     @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
-    public void clearCredentialManagerRequest() {
+    public void clearPendingCredentialRequest() {
         if (Log.isLoggable(AUTOFILL_LOG_TAG, Log.VERBOSE)) {
-            Log.v(AUTOFILL_LOG_TAG, "clearCredentialManagerRequest called");
+            Log.v(AUTOFILL_LOG_TAG, "clearPendingCredentialRequest called");
         }
         mViewCredentialHandler = null;
     }
@@ -7053,7 +7097,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *                 propagated for the given view
      */
     @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
-    public void setCredentialManagerRequest(@NonNull GetCredentialRequest request,
+    public void setPendingCredentialRequest(@NonNull GetCredentialRequest request,
             @NonNull OutcomeReceiver<GetCredentialResponse, GetCredentialException> callback) {
         Preconditions.checkNotNull(request, "request must not be null");
         Preconditions.checkNotNull(callback, "request must not be null");
@@ -8579,6 +8623,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @CallSuper
     protected void onFocusChanged(boolean gainFocus, @FocusDirection int direction,
             @Nullable Rect previouslyFocusedRect) {
+        if (DBG) {
+            Log.d(VIEW_LOG_TAG, "onFocusChanged() entered. gainFocus: "
+                    + gainFocus);
+        }
         if (gainFocus) {
             sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED);
         } else {
@@ -8643,6 +8691,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (canNotifyAutofillEnterExitEvent()) {
             AutofillManager afm = getAutofillManager();
             if (afm != null) {
+                if (DBG) {
+                    Log.d(VIEW_LOG_TAG, this + " afm is not null");
+                }
                 if (enter) {
                     // We have not been laid out yet, hence cannot evaluate
                     // whether this view is visible to the user, we will do
@@ -8654,6 +8705,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                     // animation beginning. On the time, the view is not visible
                     // to the user. And then as the animation progresses, the view
                     // becomes visible to the user.
+                    if (DBG) {
+                        Log.d(VIEW_LOG_TAG,
+                                "notifyEnterOrExitForAutoFillIfNeeded:"
+                                + " isLaidOut(): " + isLaidOut()
+                                + " isVisibleToUser(): " + isVisibleToUser()
+                                + " isFocused(): " + isFocused());
+                    }
                     if (!isLaidOut() || !isVisibleToUser()) {
                         mPrivateFlags3 |= PFLAG3_NOTIFY_AUTOFILL_ENTER_ON_LAYOUT;
                     } else if (isVisibleToUser()) {
@@ -9547,7 +9605,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 structure.setIsCredential(isCredential());
             }
             if (getViewCredentialHandler() != null) {
-                structure.setCredentialManagerRequest(
+                structure.setPendingCredentialRequest(
                         getViewCredentialHandler().getRequest(),
                         getViewCredentialHandler().getCallback());
             }
@@ -9952,22 +10010,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @hide
      */
     public void onGetCredentialResponse(GetCredentialResponse response) {
-        if (getCredentialManagerCallback() == null) {
+        if (getPendingCredentialCallback() == null) {
             Log.w(AUTOFILL_LOG_TAG, "onGetCredentialResponse called but no callback found");
             return;
         }
-        getCredentialManagerCallback().onResult(response);
+        getPendingCredentialCallback().onResult(response);
     }
 
     /**
      * @hide
      */
     public void onGetCredentialException(String errorType, String errorMsg) {
-        if (getCredentialManagerCallback() == null) {
+        if (getPendingCredentialCallback() == null) {
             Log.w(AUTOFILL_LOG_TAG, "onGetCredentialException called but no callback found");
             return;
         }
-        getCredentialManagerCallback().onError(new GetCredentialException(errorType, errorMsg));
+        getPendingCredentialCallback().onError(new GetCredentialException(errorType, errorMsg));
     }
 
     /**
@@ -9998,13 +10056,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * the active {@link android.service.autofill.AutofillService} on
      * the device.
      *
-     * <p>See {@link #setCredentialManagerRequest} for more info.
+     * <p>See {@link #setPendingCredentialRequest} for more info.
      *
      * @return The credential request associated with this View.
      */
     @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
     @Nullable
-    public final GetCredentialRequest getCredentialManagerRequest() {
+    public final GetCredentialRequest getPendingCredentialRequest() {
         if (mViewCredentialHandler == null) {
             return null;
         }
@@ -10014,14 +10072,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Returns the callback that has previously been set up on this view through
-     * the {@link #setCredentialManagerRequest} API.
+     * the {@link #setPendingCredentialRequest} API.
      * If the return value is null, that means no callback, or request, has been set
      * on the view and no {@link CredentialManager} flow will be invoked
      * when this view is focused. Traditioanl autofill flows will still
      * work, and autofillable content will still be returned through the
      * {@link #autofill(AutofillValue)} )} API.
      *
-     * <p>See {@link #setCredentialManagerRequest} for more info.
+     * <p>See {@link #setPendingCredentialRequest} for more info.
      *
      * @return The callback associated with this view that will be invoked on a response from
      * {@link CredentialManager} .
@@ -10029,7 +10087,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
     @Nullable
     public final OutcomeReceiver<GetCredentialResponse,
-            GetCredentialException> getCredentialManagerCallback() {
+            GetCredentialException> getPendingCredentialCallback() {
         if (mViewCredentialHandler == null) {
             return null;
         }
@@ -10406,7 +10464,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Sets content sensitivity mode to determine whether this view displays sensitive content.
+     * Sets content sensitivity mode to determine whether this view displays sensitive content
+     * (e.g. username, password etc.). The system may improve user privacy i.e. hide content
+     * drawn by a sensitive view from screen sharing and recording.
      *
      * @param mode {@link #CONTENT_SENSITIVITY_AUTO}, {@link #CONTENT_SENSITIVITY_NOT_SENSITIVE}
      *                                            or {@link #CONTENT_SENSITIVITY_SENSITIVE}
@@ -10875,10 +10935,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     private boolean isAutofillable() {
-        if (getAutofillType() == AUTOFILL_TYPE_NONE) return false;
+        if (DBG) {
+            Log.d(VIEW_LOG_TAG, "isAutofillable() entered.");
+        }
+        if (getAutofillType() == AUTOFILL_TYPE_NONE) {
+            if (DBG) {
+                Log.d(VIEW_LOG_TAG, "getAutofillType() returns AUTOFILL_TYPE_NONE");
+            }
+            return false;
+        }
 
         final AutofillManager afm = getAutofillManager();
         if (afm == null) {
+            if (DBG) {
+                Log.d(VIEW_LOG_TAG, "AutofillManager is null");
+            }
             return false;
         }
 
@@ -10889,6 +10960,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         // Check whether view is not part of an activity. If it's not, return false.
         if (getAutofillViewId() <= LAST_APP_AUTOFILL_ID) {
+            if (DBG) {
+                Log.d(VIEW_LOG_TAG, "getAutofillViewId()<=LAST_APP_AUTOFILL_ID");
+            }
             return false;
         }
 
@@ -10898,11 +10972,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if ((isImportantForAutofill() && afm.isTriggerFillRequestOnFilteredImportantViewsEnabled())
                 || (!isImportantForAutofill()
                     && afm.isTriggerFillRequestOnUnimportantViewEnabled())) {
+            if (DBG) {
+                Log.d(VIEW_LOG_TAG, "isImportantForAutofill(): " + isImportantForAutofill()
+                        + "afm.isAutofillable(): " + afm.isAutofillable(this));
+            }
             return afm.isAutofillable(this) ? true : notifyAugmentedAutofillIfNeeded(afm);
         }
 
         // If the previous condition is not met, fall back to the previous way to trigger fill
         // request based on autofill importance instead.
+        if (DBG) {
+            Log.d(VIEW_LOG_TAG, "isImportantForAutofill(): " + isImportantForAutofill());
+        }
         return isImportantForAutofill() ? true : notifyAugmentedAutofillIfNeeded(afm);
     }
 
@@ -10917,6 +10998,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /** @hide */
     public boolean canNotifyAutofillEnterExitEvent() {
+        if (DBG) {
+            Log.d(VIEW_LOG_TAG, "canNotifyAutofillEnterExitEvent() entered. "
+                    + " isAutofillable(): " + isAutofillable()
+                    + " isAttachedToWindow(): " + isAttachedToWindow());
+        }
         return isAutofillable() && isAttachedToWindow();
     }
 
@@ -10962,7 +11048,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                     AccessibilityNodeInfo.getVirtualDescendantId(info.getSourceNodeId())));
         }
         if (getViewCredentialHandler() != null) {
-            structure.setCredentialManagerRequest(
+            structure.setPendingCredentialRequest(
                     getViewCredentialHandler().getRequest(),
                     getViewCredentialHandler().getCallback());
         }
@@ -24609,7 +24695,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void draw(@NonNull Canvas canvas) {
         final int privateFlags = mPrivateFlags;
         mPrivateFlags = (privateFlags & ~PFLAG_DIRTY_MASK) | PFLAG_DRAWN;
-        mFrameContentVelocity = 0;
+
+        mFrameContentVelocity = -1;
+        mLastFrameX = mLeft + mRenderNode.getTranslationX();
+        mLastFrameY = mTop + mRenderNode.getTranslationY();
 
         /*
          * Draw traversal performs several drawing steps which must be executed
@@ -33660,18 +33749,28 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @hide
      */
-    protected int calculateFrameRateCategory(float sizePercentage) {
+    protected int calculateFrameRateCategory(int width, int height) {
         if (mMinusTwoFrameIntervalMillis + mMinusOneFrameIntervalMillis
                 < INFREQUENT_UPDATE_INTERVAL_MILLIS) {
-            if (sizePercentage <= FRAME_RATE_SIZE_PERCENTAGE_THRESHOLD) {
-                return FRAME_RATE_CATEGORY_NORMAL;
+            DisplayMetrics displayMetrics = mResources.getDisplayMetrics();
+            float density = displayMetrics.density;
+            if (density == 0f) {
+                density = 1f;
+            }
+            float widthDp = width / density;
+            float heightDp = height / density;
+            if (widthDp <= FRAME_RATE_NARROW_THRESHOLD
+                    || heightDp <= FRAME_RATE_NARROW_THRESHOLD
+                    || (widthDp <= FRAME_RATE_SMALL_SIZE_THRESHOLD
+                    && heightDp <= FRAME_RATE_SMALL_SIZE_THRESHOLD)) {
+                return FRAME_RATE_CATEGORY_NORMAL | FRAME_RATE_CATEGORY_REASON_SMALL;
             } else {
-                return FRAME_RATE_CATEGORY_HIGH;
+                return FRAME_RATE_CATEGORY_HIGH | FRAME_RATE_CATEGORY_REASON_LARGE;
             }
         }
 
         if (mInfrequentUpdateCount == INFREQUENT_UPDATE_COUNTS) {
-            return FRAME_RATE_CATEGORY_NORMAL;
+            return FRAME_RATE_CATEGORY_NORMAL | FRAME_RATE_CATEGORY_REASON_INTERMITTENT;
         }
         return mLastFrameRateCategory;
     }
@@ -33679,32 +33778,72 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private void votePreferredFrameRate() {
         // use toolkitSetFrameRate flag to gate the change
         ViewRootImpl viewRootImpl = getViewRootImpl();
-        float sizePercentage = getSizePercentage();
-        int frameRateCateogry = calculateFrameRateCategory(sizePercentage);
-        if (viewRootImpl != null && sizePercentage > 0) {
-            if (sToolkitMetricsForFrameRateDecisionFlagValue) {
-                viewRootImpl.recordViewPercentage(sizePercentage);
-            }
-            if (!Float.isNaN(mPreferredFrameRate)) {
-                if (mPreferredFrameRate < 0) {
-                    if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE) {
-                        frameRateCateogry = FRAME_RATE_CATEGORY_NO_PREFERENCE;
-                    } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_LOW) {
-                        frameRateCateogry = FRAME_RATE_CATEGORY_LOW;
-                    } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_NORMAL) {
-                        frameRateCateogry = FRAME_RATE_CATEGORY_NORMAL;
-                    } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_HIGH) {
-                        frameRateCateogry = FRAME_RATE_CATEGORY_HIGH;
-                    }
-                } else {
-                    viewRootImpl.votePreferredFrameRate(mPreferredFrameRate,
-                            mFrameRateCompatibility);
+        int width = mRight - mLeft;
+        int height = mBottom - mTop;
+        if (viewRootImpl != null && (width != 0 && height != 0)) {
+            if (viewVelocityApi()) {
+                float velocity = mFrameContentVelocity;
+                if (velocity < 0f) {
+                    velocity = calculateVelocity();
+                }
+                if (velocity > 0f) {
+                    float frameRate = convertVelocityToFrameRate(velocity);
+                    viewRootImpl.votePreferredFrameRate(frameRate, FRAME_RATE_COMPATIBILITY_GTE);
                     return;
                 }
             }
-            viewRootImpl.votePreferredFrameRateCategory(frameRateCateogry);
-            mLastFrameRateCategory = frameRateCateogry;
+            int frameRateCategory;
+            if (Float.isNaN(mPreferredFrameRate)) {
+                frameRateCategory = calculateFrameRateCategory(width, height);
+            } else if (mPreferredFrameRate < 0) {
+                if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE) {
+                    frameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE
+                            | FRAME_RATE_CATEGORY_REASON_REQUESTED;
+                } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_LOW) {
+                    frameRateCategory = FRAME_RATE_CATEGORY_LOW
+                            | FRAME_RATE_CATEGORY_REASON_REQUESTED;
+                } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_NORMAL) {
+                    frameRateCategory = FRAME_RATE_CATEGORY_NORMAL
+                            | FRAME_RATE_CATEGORY_REASON_REQUESTED;
+                } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_HIGH) {
+                    frameRateCategory = FRAME_RATE_CATEGORY_HIGH
+                            | FRAME_RATE_CATEGORY_REASON_REQUESTED;
+                } else {
+                    // invalid frame rate, default to HIGH
+                    frameRateCategory = FRAME_RATE_CATEGORY_HIGH
+                            | FRAME_RATE_CATEGORY_REASON_INVALID;
+                }
+            } else {
+                viewRootImpl.votePreferredFrameRate(mPreferredFrameRate,
+                        mFrameRateCompatibility);
+                return;
+            }
+
+            int category = frameRateCategory & ~FRAME_RATE_CATEGORY_REASON_MASK;
+            if (sToolkitMetricsForFrameRateDecisionFlagValue) {
+                int reason = frameRateCategory & FRAME_RATE_CATEGORY_REASON_MASK;
+                viewRootImpl.recordCategory(category, reason, this);
+            }
+            viewRootImpl.votePreferredFrameRateCategory(category);
+            mLastFrameRateCategory = frameRateCategory;
         }
+    }
+
+    private float convertVelocityToFrameRate(float velocityPps) {
+        float density = getResources().getDisplayMetrics().density;
+        float velocityDps = velocityPps / density;
+        // Choose a frame rate in increments of 10fps
+        return Math.min(140f, 60f + (10f * (float) Math.floor(velocityDps / 300f)));
+    }
+
+    private float calculateVelocity() {
+        // This current calculation is very simple. If something on the screen moved, then
+        // it votes for the highest velocity. If it doesn't move, then return 0.
+        float x = mLeft + mRenderNode.getTranslationX();
+        float y = mTop + mRenderNode.getTranslationY();
+
+        return (!Float.isNaN(mLastFrameX) && (x != mLastFrameX || y != mLastFrameY))
+                ? 100_000f : 0f;
     }
 
     /**
@@ -33737,7 +33876,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @FlaggedApi(FLAG_VIEW_VELOCITY_API)
     public float getFrameContentVelocity() {
         if (viewVelocityApi()) {
-            return mFrameContentVelocity;
+            return (mFrameContentVelocity < 0f) ? 0f : mFrameContentVelocity;
         }
         return 0;
     }
@@ -33789,13 +33928,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * - otherwise, use the previous category value.
      */
     private void updateInfrequentCount() {
-        long currentTimeMillis = AnimationUtils.currentAnimationTimeMillis();
+        long currentTimeMillis = getDrawingTime();
         long timeIntervalMillis = currentTimeMillis - mLastUpdateTimeMillis;
         mMinusTwoFrameIntervalMillis = mMinusOneFrameIntervalMillis;
         mMinusOneFrameIntervalMillis = timeIntervalMillis;
 
-        if (mMinusOneFrameIntervalMillis - mMinusTwoFrameIntervalMillis >= 30
-                && timeIntervalMillis < 2) {
+        mLastUpdateTimeMillis = currentTimeMillis;
+        if (mMinusTwoFrameIntervalMillis >= 30 && timeIntervalMillis < 2) {
             return;
         }
         if (timeIntervalMillis >= INFREQUENT_UPDATE_INTERVAL_MILLIS) {

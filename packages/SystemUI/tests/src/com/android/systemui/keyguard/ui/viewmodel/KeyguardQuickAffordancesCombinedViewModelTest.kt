@@ -62,6 +62,7 @@ import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.settings.FakeSettings
 import com.google.common.truth.Truth
 import kotlin.math.min
+import kotlin.test.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -77,7 +78,6 @@ import org.mockito.ArgumentMatchers
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
-import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
@@ -134,7 +134,12 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
     private lateinit var lockscreenToPrimaryBouncerTransitionViewModel:
         LockscreenToPrimaryBouncerTransitionViewModel
     @Mock
-    private lateinit var transitionInteractor: KeyguardTransitionInteractor
+    private lateinit var lockscreenToGlanceableHubTransitionViewModel:
+        LockscreenToGlanceableHubTransitionViewModel
+    @Mock
+    private lateinit var glanceableHubToLockscreenTransitionViewModel:
+        GlanceableHubToLockscreenTransitionViewModel
+    @Mock private lateinit var transitionInteractor: KeyguardTransitionInteractor
 
     private lateinit var underTest: KeyguardQuickAffordancesCombinedViewModel
 
@@ -271,6 +276,10 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
         whenever(lockscreenToOccludedTransitionViewModel.shortcutsAlpha).thenReturn(emptyFlow())
         whenever(lockscreenToPrimaryBouncerTransitionViewModel.shortcutsAlpha)
             .thenReturn(emptyFlow())
+        whenever(lockscreenToGlanceableHubTransitionViewModel.shortcutsAlpha)
+            .thenReturn(emptyFlow())
+        whenever(glanceableHubToLockscreenTransitionViewModel.shortcutsAlpha)
+            .thenReturn(emptyFlow())
         whenever(shadeInteractor.anyExpansion).thenReturn(intendedShadeAlphaMutableStateFlow)
         whenever(transitionInteractor.finishedKeyguardState)
             .thenReturn(intendedFinishedKeyguardStateFlow)
@@ -280,6 +289,7 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                 quickAffordanceInteractor =
                     KeyguardQuickAffordanceInteractor(
                         keyguardInteractor = keyguardInteractor,
+                        shadeInteractor = shadeInteractor,
                         lockPatternUtils = lockPatternUtils,
                         keyguardStateController = keyguardStateController,
                         userTracker = userTracker,
@@ -306,6 +316,8 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                 offToLockscreenTransitionViewModel = offToLockscreenTransitionViewModel,
                 primaryBouncerToLockscreenTransitionViewModel =
                     primaryBouncerToLockscreenTransitionViewModel,
+                glanceableHubToLockscreenTransitionViewModel =
+                    glanceableHubToLockscreenTransitionViewModel,
                 lockscreenToAodTransitionViewModel = lockscreenToAodTransitionViewModel,
                 lockscreenToDozingTransitionViewModel = lockscreenToDozingTransitionViewModel,
                 lockscreenToDreamingHostedTransitionViewModel =
@@ -315,6 +327,8 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                 lockscreenToOccludedTransitionViewModel = lockscreenToOccludedTransitionViewModel,
                 lockscreenToPrimaryBouncerTransitionViewModel =
                     lockscreenToPrimaryBouncerTransitionViewModel,
+                lockscreenToGlanceableHubTransitionViewModel =
+                    lockscreenToGlanceableHubTransitionViewModel,
                 transitionInteractor = transitionInteractor,
             )
     }
@@ -643,7 +657,7 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
 
             val testConfig =
                 TestConfig(
-                    isVisible = true,
+                    isVisible = false,
                     isClickable = false,
                     icon = mock(),
                     canShowWhileLocked = false,
@@ -673,7 +687,7 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
 
             val testConfig =
                 TestConfig(
-                    isVisible = true,
+                    isVisible = false,
                     isClickable = false,
                     icon = mock(),
                     canShowWhileLocked = false,

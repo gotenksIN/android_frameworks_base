@@ -173,10 +173,10 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void updateRelayoutParams_freeformAndTransparent_allowsInputFallthrough() {
+    public void updateRelayoutParams_freeformAndTransparentAppearance_allowsInputFallthrough() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
         taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FREEFORM);
-        taskInfo.taskDescription.setStatusBarAppearance(
+        taskInfo.taskDescription.setSystemBarsAppearance(
                 APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND);
         final RelayoutParams relayoutParams = new RelayoutParams();
 
@@ -191,10 +191,10 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void updateRelayoutParams_freeformButOpaque_disallowsInputFallthrough() {
+    public void updateRelayoutParams_freeformButOpaqueAppearance_disallowsInputFallthrough() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
         taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FREEFORM);
-        taskInfo.taskDescription.setStatusBarAppearance(0);
+        taskInfo.taskDescription.setSystemBarsAppearance(0);
         final RelayoutParams relayoutParams = new RelayoutParams();
 
         DesktopModeWindowDecoration.updateRelayoutParams(

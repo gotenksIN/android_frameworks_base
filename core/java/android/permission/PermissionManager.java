@@ -1788,6 +1788,9 @@ public final class PermissionManager {
 
     /**
      * Gets the permission states for requested package and persistent device.
+     * <p>
+     * <strong>Note: </strong>Default device permissions are not inherited in this API. Returns the
+     * exact permission states for the requested device.
      *
      * @param packageName name of the package you are checking against
      * @param persistentDeviceId id of the persistent device you are checking against
@@ -1797,7 +1800,11 @@ public final class PermissionManager {
      */
     @SystemApi
     @NonNull
-    @RequiresPermission(android.Manifest.permission.GET_RUNTIME_PERMISSIONS)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS,
+            android.Manifest.permission.REVOKE_RUNTIME_PERMISSIONS,
+            android.Manifest.permission.GET_RUNTIME_PERMISSIONS
+    })
     @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
     public Map<String, PermissionState> getAllPermissionStates(@NonNull String packageName,
             @NonNull String persistentDeviceId) {
@@ -2073,5 +2080,29 @@ public final class PermissionManager {
                 return new PermissionState[size];
             }
         };
+
+        /** @hide */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            PermissionState that = (PermissionState) o;
+            return mGranted == that.mGranted && mFlags == that.mFlags;
+        }
+
+        /** @hide */
+        @Override
+        public int hashCode() {
+            return Objects.hash(mGranted, mFlags);
+        }
+
+        /** @hide */
+        @Override
+        public String toString() {
+            return "PermissionState{"
+                    + "mGranted=" + mGranted
+                    + ", mFlags=" + mFlags
+                    + '}';
+        }
     }
 }

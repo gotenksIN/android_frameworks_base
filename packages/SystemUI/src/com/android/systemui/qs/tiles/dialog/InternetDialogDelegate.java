@@ -658,7 +658,8 @@ public class InternetDialogDelegate implements
                 mSecondaryMobileTitleText.setTextAppearance(
                         R.style.TextAppearance_InternetDialog_Active);
 
-                TextView mSecondaryMobileSummaryText = mDialogView.requireViewById(R.id.secondary_mobile_summary);
+                TextView mSecondaryMobileSummaryText =
+                        mDialogView.requireViewById(R.id.secondary_mobile_summary);
                 summary = getMobileNetworkSummary(autoSwitchNonDdsSubId);
                 if (!TextUtils.isEmpty(summary)) {
                     mSecondaryMobileSummaryText.setText(

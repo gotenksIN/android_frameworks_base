@@ -113,8 +113,10 @@ public class DeferredDisplayUpdater implements DisplayUpdater {
 
         // Apply whole display info immediately as is if either:
         // * it is the first display update
+        // * the display doesn't have visible content
         // * shell transitions are disabled or temporary unavailable
         if (displayInfoDiff == DIFF_EVERYTHING
+                || !mDisplayContent.getLastHasContent()
                 || !mDisplayContent.mTransitionController.isShellTransitionsEnabled()) {
             ProtoLog.d(WM_DEBUG_WINDOW_TRANSITIONS,
                     "DeferredDisplayUpdater: applying DisplayInfo immediately");
@@ -171,18 +173,25 @@ public class DeferredDisplayUpdater implements DisplayUpdater {
                     mDisplayContent.mInitialDisplayHeight);
             final int fromRotation = mDisplayContent.getRotation();
 
-            onStartCollect.run();
+            mDisplayContent.mAtmService.deferWindowLayout();
+            try {
+                onStartCollect.run();
 
-            ProtoLog.d(WM_DEBUG_WINDOW_TRANSITIONS,
-                    "DeferredDisplayUpdater: applied DisplayInfo after deferring");
+                ProtoLog.d(WM_DEBUG_WINDOW_TRANSITIONS,
+                        "DeferredDisplayUpdater: applied DisplayInfo after deferring");
 
-            if (physicalDisplayUpdated) {
-                onDisplayUpdated(transition, fromRotation, startBounds);
-            } else {
-                final TransitionRequestInfo.DisplayChange displayChange =
-                        getCurrentDisplayChange(fromRotation, startBounds);
-                mDisplayContent.mTransitionController.requestStartTransition(transition,
-                        /* startTask= */ null, /* remoteTransition= */ null, displayChange);
+                if (physicalDisplayUpdated) {
+                    onDisplayUpdated(transition, fromRotation, startBounds);
+                } else {
+                    final TransitionRequestInfo.DisplayChange displayChange =
+                            getCurrentDisplayChange(fromRotation, startBounds);
+                    mDisplayContent.mTransitionController.requestStartTransition(transition,
+                            /* startTask= */ null, /* remoteTransition= */ null, displayChange);
+                }
+            } finally {
+                // Run surface placement after requestStartTransition, so shell side can receive
+                // the transition request before handling task info changes.
+                mDisplayContent.mAtmService.continueWindowLayout();
             }
         });
     }

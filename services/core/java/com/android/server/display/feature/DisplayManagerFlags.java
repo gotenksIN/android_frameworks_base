@@ -121,10 +121,22 @@ public class DisplayManagerFlags {
             Flags::refreshRateVotingTelemetry
     );
 
+    private final FlagState mPixelAnisotropyCorrectionEnabled = new FlagState(
+            Flags.FLAG_ENABLE_PIXEL_ANISOTROPY_CORRECTION,
+            Flags::enablePixelAnisotropyCorrection
+    );
+
     private final FlagState mSensorBasedBrightnessThrottling = new FlagState(
             Flags.FLAG_SENSOR_BASED_BRIGHTNESS_THROTTLING,
             Flags::sensorBasedBrightnessThrottling
     );
+
+
+    private final FlagState mRefactorDisplayPowerController = new FlagState(
+            Flags.FLAG_REFACTOR_DISPLAY_POWER_CONTROLLER,
+            Flags::refactorDisplayPowerController
+    );
+
 
     /**
      * @return {@code true} if 'port' is allowed in display layout configuration file.
@@ -252,8 +264,16 @@ public class DisplayManagerFlags {
         return mRefreshRateVotingTelemetry.isEnabled();
     }
 
+    public boolean isPixelAnisotropyCorrectionInLogicalDisplayEnabled() {
+        return mPixelAnisotropyCorrectionEnabled.isEnabled();
+    }
+
     public boolean isSensorBasedBrightnessThrottlingEnabled() {
         return mSensorBasedBrightnessThrottling.isEnabled();
+    }
+
+    public boolean isRefactorDisplayPowerControllerEnabled() {
+        return mRefactorDisplayPowerController.isEnabled();
     }
 
     /**
@@ -279,7 +299,9 @@ public class DisplayManagerFlags {
         pw.println(" " + mAutoBrightnessModesFlagState);
         pw.println(" " + mFastHdrTransitions);
         pw.println(" " + mRefreshRateVotingTelemetry);
+        pw.println(" " + mPixelAnisotropyCorrectionEnabled);
         pw.println(" " + mSensorBasedBrightnessThrottling);
+        pw.println(" " + mRefactorDisplayPowerController);
     }
 
     private static class FlagState {

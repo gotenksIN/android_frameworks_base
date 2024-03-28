@@ -164,7 +164,7 @@ public class AudioDeviceInventory {
      * corresponding peers in case of BLE
      */
     void addAudioDeviceInInventoryIfNeeded(int deviceType, String address, String peerAddress,
-            @AudioDeviceCategory int category) {
+            @AudioDeviceCategory int category, boolean userDefined) {
         if (!isBluetoothOutDevice(deviceType)) {
             return;
         }
@@ -174,7 +174,11 @@ public class AudioDeviceInventory {
                 ads = findBtDeviceStateForAddress(peerAddress, deviceType);
             }
             if (ads != null) {
-                if (ads.getAudioDeviceCategory() != category) {
+                // if category is user defined allow to change back to unknown otherwise
+                // do not reset the category back to unknown since it might have been set
+                // before by the user
+                if (ads.getAudioDeviceCategory() != category && (userDefined
+                        || category != AUDIO_DEVICE_CATEGORY_UNKNOWN)) {
                     ads.setAudioDeviceCategory(category);
                     mDeviceBroker.postUpdatedAdiDeviceState(ads);
                     mDeviceBroker.postPersistAudioDeviceSettings();
@@ -227,9 +231,9 @@ public class AudioDeviceInventory {
     void addAudioDeviceWithCategoryInInventoryIfNeeded(@NonNull String address,
             @AudioDeviceCategory int btAudioDeviceCategory) {
         addAudioDeviceInInventoryIfNeeded(DEVICE_OUT_BLE_HEADSET,
-                address, "", btAudioDeviceCategory);
+                address, "", btAudioDeviceCategory, /*userDefined=*/true);
         addAudioDeviceInInventoryIfNeeded(DEVICE_OUT_BLUETOOTH_A2DP,
-                address, "", btAudioDeviceCategory);
+                address, "", btAudioDeviceCategory, /*userDefined=*/true);
 
     }
     @AudioDeviceCategory
@@ -1775,7 +1779,7 @@ public class AudioDeviceInventory {
                         purgeDevicesRoles_l();
                     } else {
                         addAudioDeviceInInventoryIfNeeded(device, address, "",
-                                BtHelper.getBtDeviceCategory(address));
+                                BtHelper.getBtDeviceCategory(address), /*userDefined=*/false);
                     }
                     AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
                             "SCO " + (AudioSystem.isInputDevice(device) ? "source" : "sink")
@@ -2128,7 +2132,7 @@ public class AudioDeviceInventory {
         updateBluetoothPreferredModes_l(btInfo.mDevice /*connectedDevice*/);
 
         addAudioDeviceInInventoryIfNeeded(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, address, "",
-                BtHelper.getBtDeviceCategory(address));
+                BtHelper.getBtDeviceCategory(address), /*userDefined=*/false);
     }
 
     static final int[] CAPTURE_PRESETS = new int[] {AudioSource.MIC, AudioSource.CAMCORDER,
@@ -2476,7 +2480,7 @@ public class AudioDeviceInventory {
                 DEVICE_OUT_HEARING_AID, "makeHearingAidDeviceAvailable");
         setCurrentAudioRouteNameIfPossible(name, false /*fromA2dp*/);
         addAudioDeviceInInventoryIfNeeded(DEVICE_OUT_HEARING_AID, address, "",
-                BtHelper.getBtDeviceCategory(address));
+                BtHelper.getBtDeviceCategory(address), /*userDefined=*/false);
         new MediaMetrics.Item(mMetricsId + "makeHearingAidDeviceAvailable")
                 .set(MediaMetrics.Property.ADDRESS, address != null ? address : "")
                 .set(MediaMetrics.Property.DEVICE,
@@ -2607,7 +2611,7 @@ public class AudioDeviceInventory {
             mDeviceBroker.postAccessoryPlugMediaUnmute(device);
             setCurrentAudioRouteNameIfPossible(name, /*fromA2dp=*/false);
             addAudioDeviceInInventoryIfNeeded(device, address, peerAddress,
-                    BtHelper.getBtDeviceCategory(address));
+                    BtHelper.getBtDeviceCategory(address), /*userDefined=*/false);
         }
 
         if (streamType == AudioSystem.STREAM_DEFAULT) {

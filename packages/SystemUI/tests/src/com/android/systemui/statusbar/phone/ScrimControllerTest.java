@@ -747,14 +747,16 @@ public class ScrimControllerTest extends SysuiTestCase {
 
         // Open the bouncer.
         mScrimController.setRawPanelExpansionFraction(0f);
+        when(mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit()).thenReturn(true);
         mScrimController.setBouncerHiddenFraction(KeyguardBouncerConstants.EXPANSION_VISIBLE);
         finishAnimationsImmediately();
 
-        // Only behind widget is visible.
+        // Only behind scrim is visible.
         assertScrimAlpha(Map.of(
                 mScrimInFront, TRANSPARENT,
                 mNotificationsScrim, TRANSPARENT,
                 mScrimBehind, OPAQUE));
+        assertScrimTint(mScrimBehind, mSurfaceColor);
 
         // Bouncer is closed.
         mScrimController.setBouncerHiddenFraction(KeyguardBouncerConstants.EXPANSION_HIDDEN);
@@ -773,8 +775,9 @@ public class ScrimControllerTest extends SysuiTestCase {
         mScrimController.transitionTo(ScrimState.GLANCEABLE_HUB);
 
         // Open the shade.
-        mScrimController.transitionTo(SHADE_LOCKED);
         mScrimController.setQsPosition(1f, 0);
+        mScrimController.setRawPanelExpansionFraction(1);
+        mScrimController.setTransitionToFullShadeProgress(1, 0);
         finishAnimationsImmediately();
 
         // Shade scrims are visible.
@@ -782,8 +785,81 @@ public class ScrimControllerTest extends SysuiTestCase {
                 mNotificationsScrim, OPAQUE,
                 mScrimInFront, TRANSPARENT,
                 mScrimBehind, OPAQUE));
+        assertScrimTint(mScrimBehind, Color.BLACK);
+        assertScrimTint(mNotificationsScrim, Color.TRANSPARENT);
 
-        mScrimController.transitionTo(ScrimState.GLANCEABLE_HUB);
+        mScrimController.setTransitionToFullShadeProgress(0, 0);
+        finishAnimationsImmediately();
+
+        // All scrims are transparent.
+        assertScrimAlpha(Map.of(
+                mScrimInFront, TRANSPARENT,
+                mNotificationsScrim, TRANSPARENT,
+                mScrimBehind, TRANSPARENT));
+    }
+
+    @Test
+    public void transitionToHubOverDream() {
+        mScrimController.setRawPanelExpansionFraction(0f);
+        mScrimController.setBouncerHiddenFraction(KeyguardBouncerConstants.EXPANSION_HIDDEN);
+        mScrimController.transitionTo(ScrimState.GLANCEABLE_HUB_OVER_DREAM);
+        finishAnimationsImmediately();
+
+        // All scrims transparent on the hub.
+        assertScrimAlpha(Map.of(
+                mScrimInFront, TRANSPARENT,
+                mNotificationsScrim, TRANSPARENT,
+                mScrimBehind, TRANSPARENT));
+    }
+
+    @Test
+    public void openBouncerOnHubOverDream() {
+        mScrimController.transitionTo(ScrimState.GLANCEABLE_HUB_OVER_DREAM);
+
+        // Open the bouncer.
+        mScrimController.setRawPanelExpansionFraction(0f);
+        when(mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit()).thenReturn(true);
+        mScrimController.setBouncerHiddenFraction(KeyguardBouncerConstants.EXPANSION_VISIBLE);
+        finishAnimationsImmediately();
+
+        // Only behind scrim is visible.
+        assertScrimAlpha(Map.of(
+                mScrimInFront, TRANSPARENT,
+                mNotificationsScrim, TRANSPARENT,
+                mScrimBehind, OPAQUE));
+        assertScrimTint(mScrimBehind, mSurfaceColor);
+
+        // Bouncer is closed.
+        mScrimController.setBouncerHiddenFraction(KeyguardBouncerConstants.EXPANSION_HIDDEN);
+        mScrimController.transitionTo(ScrimState.GLANCEABLE_HUB_OVER_DREAM);
+        finishAnimationsImmediately();
+
+        // All scrims are transparent.
+        assertScrimAlpha(Map.of(
+                mScrimInFront, TRANSPARENT,
+                mNotificationsScrim, TRANSPARENT,
+                mScrimBehind, TRANSPARENT));
+    }
+
+    @Test
+    public void openShadeOnHubOverDream() {
+        mScrimController.transitionTo(ScrimState.GLANCEABLE_HUB_OVER_DREAM);
+
+        // Open the shade.
+        mScrimController.setQsPosition(1f, 0);
+        mScrimController.setRawPanelExpansionFraction(1f);
+        finishAnimationsImmediately();
+
+        // Shade scrims are visible.
+        assertScrimAlpha(Map.of(
+                mNotificationsScrim, OPAQUE,
+                mScrimInFront, TRANSPARENT,
+                mScrimBehind, OPAQUE));
+        assertScrimTint(mScrimBehind, Color.BLACK);
+        assertScrimTint(mNotificationsScrim, Color.TRANSPARENT);
+
+        mScrimController.setQsPosition(0f, 0);
+        mScrimController.setRawPanelExpansionFraction(0f);
         finishAnimationsImmediately();
 
         // All scrims are transparent.
@@ -1432,7 +1508,8 @@ public class ScrimControllerTest extends SysuiTestCase {
                 ScrimState.UNINITIALIZED, ScrimState.KEYGUARD, BOUNCER,
                 ScrimState.DREAMING, ScrimState.BOUNCER_SCRIMMED, ScrimState.BRIGHTNESS_MIRROR,
                 ScrimState.UNLOCKED, SHADE_LOCKED, ScrimState.AUTH_SCRIMMED,
-                ScrimState.AUTH_SCRIMMED_SHADE, ScrimState.GLANCEABLE_HUB));
+                ScrimState.AUTH_SCRIMMED_SHADE, ScrimState.GLANCEABLE_HUB,
+                ScrimState.GLANCEABLE_HUB_OVER_DREAM));
 
         for (ScrimState state : ScrimState.values()) {
             if (!lowPowerModeStates.contains(state) && !regularStates.contains(state)) {

@@ -86,6 +86,7 @@ import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.navigationbar.TaskbarDelegate;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.shade.NotificationShadeWindowView;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeExpansionChangeEvent;
@@ -94,6 +95,7 @@ import com.android.systemui.shade.ShadeLockscreenInteractor;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
+import com.android.systemui.statusbar.domain.interactor.StatusBarKeyguardViewManagerInteractor;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.unfold.SysUIUnfoldComponent;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
@@ -224,7 +226,9 @@ public class StatusBarKeyguardViewManagerTest extends SysuiTestCase {
                         () -> mock(KeyguardDismissActionInteractor.class),
                         mSelectedUserInteractor,
                         () -> mock(KeyguardSurfaceBehindInteractor.class),
-                        mock(JavaAdapter.class)) {
+                        mock(JavaAdapter.class),
+                        () -> mock(SceneInteractor.class),
+                        mock(StatusBarKeyguardViewManagerInteractor.class)) {
                     @Override
                     public ViewRootImpl getViewRootImpl() {
                         return mViewRootImpl;
@@ -733,7 +737,9 @@ public class StatusBarKeyguardViewManagerTest extends SysuiTestCase {
                         () -> mock(KeyguardDismissActionInteractor.class),
                         mSelectedUserInteractor,
                         () -> mock(KeyguardSurfaceBehindInteractor.class),
-                        mock(JavaAdapter.class)) {
+                        mock(JavaAdapter.class),
+                        () -> mock(SceneInteractor.class),
+                        mock(StatusBarKeyguardViewManagerInteractor.class)) {
                     @Override
                     public ViewRootImpl getViewRootImpl() {
                         return mViewRootImpl;

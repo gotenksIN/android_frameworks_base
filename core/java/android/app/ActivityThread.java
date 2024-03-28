@@ -40,6 +40,7 @@ import static android.window.ConfigurationHelper.shouldUpdateResources;
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.internal.os.SafeZipPathValidatorCallback.VALIDATE_ZIP_PATH_FOR_PATH_TRAVERSAL;
 import static com.android.sdksandbox.flags.Flags.sandboxActivitySdkBasedContext;
+import static com.android.window.flags.Flags.activityWindowInfoFlag;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -63,6 +64,7 @@ import android.app.servertransaction.ActivityLifecycleItem.LifecycleState;
 import android.app.servertransaction.ActivityRelaunchItem;
 import android.app.servertransaction.ActivityResultItem;
 import android.app.servertransaction.ClientTransaction;
+import android.app.servertransaction.ClientTransactionListenerController;
 import android.app.servertransaction.DestroyActivityItem;
 import android.app.servertransaction.PauseActivityItem;
 import android.app.servertransaction.PendingTransactionActions;
@@ -607,6 +609,8 @@ public final class ActivityThread extends ClientTransactionHandler
         Configuration overrideConfig;
         @NonNull
         private ActivityWindowInfo mActivityWindowInfo;
+        @Nullable
+        private ActivityWindowInfo mLastReportedActivityWindowInfo;
 
         // Used for consolidating configs before sending on to Activity.
         private final Configuration tmpConfig = new Configuration();
@@ -971,6 +975,7 @@ public final class ActivityThread extends ClientTransactionHandler
         ContentCaptureOptions contentCaptureOptions;
 
         long[] disabledCompatChanges;
+        long[] mLoggableCompatChanges;
 
         SharedMemory mSerializedSystemFontMap;
 
@@ -1280,6 +1285,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 AutofillOptions autofillOptions,
                 ContentCaptureOptions contentCaptureOptions,
                 long[] disabledCompatChanges,
+                long[] loggableCompatChanges,
                 SharedMemory serializedSystemFontMap,
                 long startRequestedElapsedTime,
                 long startRequestedUptime) {
@@ -1334,6 +1340,7 @@ public final class ActivityThread extends ClientTransactionHandler
             data.autofillOptions = autofillOptions;
             data.contentCaptureOptions = contentCaptureOptions;
             data.disabledCompatChanges = disabledCompatChanges;
+            data.mLoggableCompatChanges = loggableCompatChanges;
             data.mSerializedSystemFontMap = serializedSystemFontMap;
             data.startRequestedElapsedTime = startRequestedElapsedTime;
             data.startRequestedUptime = startRequestedUptime;
@@ -4070,6 +4077,13 @@ public final class ActivityThread extends ClientTransactionHandler
                     ActivityManager.getService().waitForNetworkStateUpdate(mNetworkBlockSeq);
                     mNetworkBlockSeq = INVALID_PROC_STATE_SEQ;
                 } catch (RemoteException ignored) {}
+                if (Flags.clearDnsCacheOnNetworkRulesUpdate()) {
+                    // InetAddress will cache UnknownHostException failures. If the rules got
+                    // updated and the app has network access now, we need to clear the negative
+                    // cache to ensure valid dns queries can work immediately.
+                    // TODO: b/329133769 - Clear only the negative cache once it is available.
+                    InetAddress.clearDnsCache();
+                }
             }
         }
     }
@@ -4181,6 +4195,9 @@ public final class ActivityThread extends ClientTransactionHandler
                 pendingActions.setRestoreInstanceState(true);
                 pendingActions.setCallOnPostCreate(true);
             }
+
+            // Trigger ActivityWindowInfo callback if first launch or change from relaunch.
+            handleActivityWindowInfoChanged(r);
         } else {
             // If there was an error, for any reason, tell the activity manager to stop us.
             ActivityClient.getInstance().finishActivity(r.token, Activity.RESULT_CANCELED,
@@ -4559,7 +4576,7 @@ public final class ActivityThread extends ClientTransactionHandler
     private void schedulePauseWithUserLeavingHint(ActivityClientRecord r) {
         final ClientTransaction transaction = ClientTransaction.obtain(mAppThread);
         final PauseActivityItem pauseActivityItem = PauseActivityItem.obtain(r.token,
-                r.activity.isFinishing(), /* userLeaving */ true, r.activity.mConfigChangeFlags,
+                r.activity.isFinishing(), /* userLeaving */ true,
                 /* dontReport */ false, /* autoEnteringPip */ false);
         transaction.addTransactionItem(pauseActivityItem);
         executeTransaction(transaction);
@@ -5433,13 +5450,12 @@ public final class ActivityThread extends ClientTransactionHandler
 
     @Override
     public void handlePauseActivity(ActivityClientRecord r, boolean finished, boolean userLeaving,
-            int configChanges, boolean autoEnteringPip, PendingTransactionActions pendingActions,
+            boolean autoEnteringPip, PendingTransactionActions pendingActions,
             String reason) {
         if (userLeaving) {
             performUserLeavingActivity(r);
         }
 
-        r.activity.mConfigChangeFlags |= configChanges;
         if (autoEnteringPip) {
             // Set mIsInPictureInPictureMode earlier in case of auto-enter-pip, see also
             // {@link Activity#enterPictureInPictureMode(PictureInPictureParams)}.
@@ -5688,9 +5704,8 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @Override
-    public void handleStopActivity(ActivityClientRecord r, int configChanges,
+    public void handleStopActivity(ActivityClientRecord r,
             PendingTransactionActions pendingActions, boolean finalStateRequest, String reason) {
-        r.activity.mConfigChangeFlags |= configChanges;
 
         final StopInfo stopInfo = new StopInfo();
         performStopActivityInner(r, stopInfo, true /* saveState */, finalStateRequest,
@@ -5860,11 +5875,10 @@ public final class ActivityThread extends ClientTransactionHandler
 
     /** Core implementation of activity destroy call. */
     void performDestroyActivity(ActivityClientRecord r, boolean finishing,
-            int configChanges, boolean getNonConfigInstance, String reason) {
+            boolean getNonConfigInstance, String reason) {
         Class<? extends Activity> activityClass;
         if (localLOGV) Slog.v(TAG, "Performing finish of " + r);
         activityClass = r.activity.getClass();
-        r.activity.mConfigChangeFlags |= configChanges;
         if (finishing) {
             r.activity.mFinished = true;
         }
@@ -5929,9 +5943,9 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @Override
-    public void handleDestroyActivity(ActivityClientRecord r, boolean finishing, int configChanges,
+    public void handleDestroyActivity(ActivityClientRecord r, boolean finishing,
             boolean getNonConfigInstance, String reason) {
-        performDestroyActivity(r, finishing, configChanges, getNonConfigInstance, reason);
+        performDestroyActivity(r, finishing, getNonConfigInstance, reason);
         cleanUpPendingRemoveWindows(r, finishing);
         WindowManager wm = r.activity.getWindowManager();
         View v = r.activity.mDecor;
@@ -6131,7 +6145,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
         r.activity.mChangingConfigurations = true;
 
-        handleRelaunchActivityInner(r, configChanges, tmp.pendingResults, tmp.pendingIntents,
+        handleRelaunchActivityInner(r, tmp.pendingResults, tmp.pendingIntents,
                 pendingActions, tmp.startsNotResumed, tmp.overrideConfig, tmp.mActivityWindowInfo,
                 "handleRelaunchActivity");
     }
@@ -6200,7 +6214,7 @@ public final class ActivityThread extends ClientTransactionHandler
         executeTransaction(transaction);
     }
 
-    private void handleRelaunchActivityInner(@NonNull ActivityClientRecord r, int configChanges,
+    private void handleRelaunchActivityInner(@NonNull ActivityClientRecord r,
             @Nullable List<ResultInfo> pendingResults,
             @Nullable List<ReferrerIntent> pendingIntents,
             @NonNull PendingTransactionActions pendingActions, boolean startsNotResumed,
@@ -6216,7 +6230,7 @@ public final class ActivityThread extends ClientTransactionHandler
             callActivityOnStop(r, true /* saveState */, reason);
         }
 
-        handleDestroyActivity(r, false, configChanges, true, reason);
+        handleDestroyActivity(r, false /* finishing */, true /* getNonConfigInstance */, reason);
 
         r.activity = null;
         r.window = null;
@@ -6741,7 +6755,7 @@ public final class ActivityThread extends ClientTransactionHandler
         // Perform updates.
         r.overrideConfig = overrideConfig;
         r.mActivityWindowInfo = activityWindowInfo;
-        // TODO(b/287582673): notify on ActivityWindowInfo change
+
         final ViewRootImpl viewRoot = r.activity.mDecor != null
             ? r.activity.mDecor.getViewRootImpl() : null;
 
@@ -6764,6 +6778,22 @@ public final class ActivityThread extends ClientTransactionHandler
             viewRoot.updateConfiguration(displayId);
         }
         mSomeActivitiesChanged = true;
+
+        // Trigger ActivityWindowInfo callback if changed.
+        handleActivityWindowInfoChanged(r);
+    }
+
+    private void handleActivityWindowInfoChanged(@NonNull ActivityClientRecord r) {
+        if (!activityWindowInfoFlag()) {
+            return;
+        }
+        if (r.mActivityWindowInfo == null
+                || r.mActivityWindowInfo.equals(r.mLastReportedActivityWindowInfo)) {
+            return;
+        }
+        r.mLastReportedActivityWindowInfo = r.mActivityWindowInfo;
+        ClientTransactionListenerController.getInstance().onActivityWindowInfoChanged(r.token,
+                r.mActivityWindowInfo);
     }
 
     final void handleProfilerControl(boolean start, ProfilerInfo profilerInfo, int profileType) {
@@ -7106,7 +7136,7 @@ public final class ActivityThread extends ClientTransactionHandler
         Process.setStartTimes(SystemClock.elapsedRealtime(), SystemClock.uptimeMillis(),
                 data.startRequestedElapsedTime, data.startRequestedUptime);
 
-        AppCompatCallbacks.install(data.disabledCompatChanges);
+        AppCompatCallbacks.install(data.disabledCompatChanges, data.mLoggableCompatChanges);
         // Let libcore handle any compat changes after installing the list of compat changes.
         AppSpecializationHooks.handleCompatChangesBeforeBindingApplication();
 

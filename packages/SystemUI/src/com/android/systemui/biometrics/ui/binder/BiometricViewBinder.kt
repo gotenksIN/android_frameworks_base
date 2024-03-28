@@ -22,6 +22,7 @@ import android.content.Context
 import android.hardware.biometrics.BiometricAuthenticator
 import android.hardware.biometrics.BiometricConstants
 import android.hardware.biometrics.BiometricPrompt
+import android.hardware.biometrics.Flags
 import android.hardware.face.FaceManager
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
@@ -32,7 +33,7 @@ import android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
 import android.widget.ImageView
-import android.widget.ScrollView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
@@ -100,7 +101,7 @@ object BiometricViewBinder {
         val subtitleView = view.requireViewById<TextView>(R.id.subtitle)
         val descriptionView = view.requireViewById<TextView>(R.id.description)
         val customizedViewContainer =
-            view.requireViewById<ScrollView>(R.id.customized_view_container)
+            view.requireViewById<LinearLayout>(R.id.customized_view_container)
 
         // set selected to enable marquee unless a screen reader is enabled
         logoView.isSelected =
@@ -118,7 +119,7 @@ object BiometricViewBinder {
 
         val iconSizeOverride =
             if (constraintBp()) {
-                viewModel.fingerprintAffordanceSize
+                null
             } else {
                 (view as BiometricPromptLayout).updatedFingerprintAffordanceSize
             }
@@ -166,11 +167,14 @@ object BiometricViewBinder {
             titleView.text = viewModel.title.first()
             subtitleView.text = viewModel.subtitle.first()
             descriptionView.text = viewModel.description.first()
-            BiometricCustomizedViewBinder.bind(
-                customizedViewContainer,
-                view.requireViewById(R.id.space_above_content),
-                viewModel
-            )
+
+            if (Flags.customBiometricPrompt() && constraintBp()) {
+                BiometricCustomizedViewBinder.bind(
+                    customizedViewContainer,
+                    view.requireViewById(R.id.space_above_content),
+                    viewModel
+                )
+            }
 
             // set button listeners
             negativeButton.setOnClickListener { legacyCallback.onButtonNegative() }
@@ -651,6 +655,8 @@ class Spaghetti(
     }
 
     fun isCoex() = modalities.hasFaceAndFingerprint
+
+    fun isFaceOnly() = modalities.hasFaceOnly
 
     fun asView() = view
 }

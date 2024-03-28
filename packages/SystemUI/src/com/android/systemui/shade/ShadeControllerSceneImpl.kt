@@ -17,6 +17,7 @@
 package com.android.systemui.shade
 
 import android.view.MotionEvent
+import com.android.compose.animation.scene.SceneKey
 import com.android.systemui.assist.AssistManager
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
@@ -25,7 +26,7 @@ import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.dagger.ShadeTouchLog
 import com.android.systemui.scene.domain.interactor.SceneInteractor
-import com.android.systemui.scene.shared.model.SceneKey
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.TransitionKeys.CollapseShadeInstantly
 import com.android.systemui.scene.shared.model.TransitionKeys.SlightlyFasterShadeCollapse
 import com.android.systemui.shade.ShadeController.ShadeVisibilityListener
@@ -88,15 +89,14 @@ constructor(
 
     override fun isShadeFullyOpen(): Boolean = shadeInteractor.isAnyFullyExpanded.value
 
-    override fun isExpandingOrCollapsing(): Boolean =
-        shadeInteractor.anyExpansion.value > 0f && shadeInteractor.anyExpansion.value < 1f
+    override fun isExpandingOrCollapsing(): Boolean = shadeInteractor.isUserInteracting.value
 
     override fun instantExpandShade() {
         // Do nothing
     }
 
     override fun instantCollapseShade() {
-        // TODO(b/315921512) add support for instant transition
+        // TODO(b/325602936) add support for instant transition
         sceneInteractor.changeScene(
             getCollapseDestinationScene(),
             "hide shade",
@@ -121,7 +121,7 @@ constructor(
             // release focus immediately to kick off focus change transition
             notificationShadeWindowController.setNotificationShadeFocusable(false)
             notificationStackScrollLayout.cancelExpandHelper()
-            sceneInteractor.changeScene(SceneKey.Shade, "ShadeController.animateExpandShade")
+            sceneInteractor.changeScene(Scenes.Shade, "ShadeController.animateExpandShade")
             if (delayed) {
                 scope.launch {
                     delay(125)
@@ -131,6 +131,11 @@ constructor(
                 animateCollapseShadeInternal()
             }
         }
+    }
+
+    override fun collapseWithDuration(animationDuration: Int) {
+        // TODO(b/300258424) inline this. The only caller uses the default duration.
+        animateCollapseShade()
     }
 
     private fun animateCollapseShadeInternal() {
@@ -143,9 +148,9 @@ constructor(
 
     private fun getCollapseDestinationScene(): SceneKey {
         return if (deviceEntryInteractor.isDeviceEntered.value) {
-            SceneKey.Gone
+            Scenes.Gone
         } else {
-            SceneKey.Lockscreen
+            Scenes.Lockscreen
         }
     }
 
@@ -183,11 +188,11 @@ constructor(
     }
 
     override fun expandToNotifications() {
-        sceneInteractor.changeScene(SceneKey.Shade, "ShadeController.animateExpandShade")
+        sceneInteractor.changeScene(Scenes.Shade, "ShadeController.animateExpandShade")
     }
 
     override fun expandToQs() {
-        sceneInteractor.changeScene(SceneKey.QuickSettings, "ShadeController.animateExpandQs")
+        sceneInteractor.changeScene(Scenes.QuickSettings, "ShadeController.animateExpandQs")
     }
 
     override fun setVisibilityListener(listener: ShadeVisibilityListener) {
@@ -237,7 +242,7 @@ constructor(
     }
 
     override fun isExpandedVisible(): Boolean {
-        return sceneInteractor.currentScene.value != SceneKey.Gone
+        return sceneInteractor.currentScene.value != Scenes.Gone
     }
 
     override fun onStatusBarTouch(event: MotionEvent) {

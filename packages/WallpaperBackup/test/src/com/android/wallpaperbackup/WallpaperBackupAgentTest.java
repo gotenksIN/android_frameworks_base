@@ -677,7 +677,7 @@ public class WallpaperBackupAgentTest {
 
         mWallpaperBackupAgent.onRestoreFinished();
 
-        for (String wallpaper : List.of(WALLPAPER_IMG_LOCK, WALLPAPER_IMG_SYSTEM)) {
+        for (String wallpaper: List.of(WALLPAPER_IMG_LOCK, WALLPAPER_IMG_SYSTEM)) {
             DataTypeResult result = getLoggingResult(wallpaper,
                     mWallpaperBackupAgent.getBackupRestoreEventLogger().getLoggingResults());
             assertThat(result).isNotNull();
@@ -955,7 +955,7 @@ public class WallpaperBackupAgentTest {
         TypedXmlSerializer out = Xml.resolveSerializer(fstream);
         out.startDocument(null, true);
         out.startTag(null, "wp");
-        for (Map.Entry<Integer, Rect> entry : crops.entrySet()) {
+        for (Map.Entry<Integer, Rect> entry: crops.entrySet()) {
             String orientation = switch (entry.getKey()) {
                 case WallpaperManager.PORTRAIT -> "Portrait";
                 case WallpaperManager.LANDSCAPE -> "Landscape";

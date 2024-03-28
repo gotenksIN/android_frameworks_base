@@ -53,13 +53,14 @@ class GetCredScreenshotTest(emulationSpec: DeviceEmulationSpec) {
                 preferImmediatelyAvailableCredentials = false,
                 preferIdentityDocUi = false,
                 preferTopBrandingContent = null,
+                typePriorityMap = emptyMap(),
         )
     }
 
     @get:Rule
     val screenshotRule = ComposeScreenshotTestRule(
             emulationSpec,
-            CredentialManagerGoldenImagePathManager(getEmulatedDevicePathConfig(emulationSpec))
+            CredentialManagerGoldenPathManager(getEmulatedDevicePathConfig(emulationSpec))
     )
 
     @get:Rule val setFlagsRule: SetFlagsRule = SetFlagsRule()
@@ -68,7 +69,7 @@ class GetCredScreenshotTest(emulationSpec: DeviceEmulationSpec) {
     fun singleCredentialScreen_M3BottomSheetDisabled() {
         setFlagsRule.disableFlags(Flags.FLAG_SELECTOR_UI_IMPROVEMENTS_ENABLED)
         val providerInfoList = buildProviderInfoList()
-        val providerDisplayInfo = toProviderDisplayInfo(providerInfoList)
+        val providerDisplayInfo = toProviderDisplayInfo(providerInfoList, emptyMap())
         val activeEntry = toActiveEntry(providerDisplayInfo)
         screenshotRule.screenshotTest("singleCredentialScreen") {
             ModalBottomSheet(
@@ -96,7 +97,7 @@ class GetCredScreenshotTest(emulationSpec: DeviceEmulationSpec) {
     fun singleCredentialScreen_M3BottomSheetEnabled() {
         setFlagsRule.enableFlags(Flags.FLAG_SELECTOR_UI_IMPROVEMENTS_ENABLED)
         val providerInfoList = buildProviderInfoList()
-        val providerDisplayInfo = toProviderDisplayInfo(providerInfoList)
+        val providerDisplayInfo = toProviderDisplayInfo(providerInfoList, emptyMap())
         val activeEntry = toActiveEntry(providerDisplayInfo)
         screenshotRule.screenshotTest(
                 "singleCredentialScreen_newM3BottomSheet",
@@ -148,6 +149,9 @@ class GetCredScreenshotTest(emulationSpec: DeviceEmulationSpec) {
                                 lastUsedTimeMillis = null,
                                 isAutoSelectable = false,
                                 entryGroupId = "username",
+                                isDefaultIconPreferredAsSingleProvider = false,
+                                rawCredentialType = "unknown-type",
+                                affiliatedDomain = null,
                         )
                 ),
                 authenticationEntryList = emptyList(),

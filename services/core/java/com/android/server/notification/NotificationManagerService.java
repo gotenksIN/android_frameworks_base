@@ -1204,6 +1204,10 @@ public class NotificationManagerService extends SystemService {
         }
     }
 
+    private static boolean privateSpaceFlagsEnabled() {
+        return allowPrivateProfile() && android.multiuser.Flags.enablePrivateSpaceFeatures();
+    }
+
     private final class SavePolicyFileRunnable implements Runnable {
         @Override
         public void run() {
@@ -2142,7 +2146,7 @@ public class NotificationManagerService extends SystemService {
         }
 
         private boolean isProfileUnavailable(String action) {
-            return allowPrivateProfile() ?
+            return privateSpaceFlagsEnabled() ?
                     action.equals(Intent.ACTION_PROFILE_UNAVAILABLE) :
                     action.equals(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
         }
@@ -2744,7 +2748,7 @@ public class NotificationManagerService extends SystemService {
         filter.addAction(Intent.ACTION_USER_REMOVED);
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
-        if (allowPrivateProfile()){
+        if (privateSpaceFlagsEnabled()){
             filter.addAction(Intent.ACTION_PROFILE_UNAVAILABLE);
         }
         getContext().registerReceiverAsUser(mIntentReceiver, UserHandle.ALL, filter, null, null);
@@ -8206,7 +8210,7 @@ public class NotificationManagerService extends SystemService {
                 try {
                     return mTelecomManager.isInManagedCall()
                             || mTelecomManager.isInSelfManagedCall(pkg,
-                            /* hasCrossUserAccess */ true);
+                            UserHandle.ALL);
                 } catch (IllegalStateException ise) {
                     // Telecom is not ready (this is likely early boot), so there are no calls.
                     return false;
@@ -12052,9 +12056,17 @@ public class NotificationManagerService extends SystemService {
             if (lifetimeExtensionRefactor()) {
                 // Generally, only System or System UI should have the permissions to call
                 // registerSystemService.
-                // isCallerSystemorPhone tells us whether the caller is System. Then, if it's not
-                // the system, we know it's system UI.
-                info.isSystemUi = !isCallerSystemOrPhone();
+                // isCallerSystemOrPhone tells us whether the caller is System. We negate this,
+                // to eliminate cases where the service was added by the system. This leaves
+                // services registered by system server.
+                // To identify system UI, we explicitly check the status bar permission for the
+                // uid in the info object.
+                // We can't use the calling uid here because it belongs to system server.
+                // Note that this will also return true for the shell, but we deem this
+                // acceptable, for the purposes of testing.
+                info.isSystemUi = !isCallerSystemOrPhone() && getContext().checkPermission(
+                        android.Manifest.permission.STATUS_BAR_SERVICE, -1, info.uid)
+                        == PERMISSION_GRANTED;
             }
             final INotificationListener listener = (INotificationListener) info.service;
             final NotificationRankingUpdate update;

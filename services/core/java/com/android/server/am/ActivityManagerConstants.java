@@ -867,6 +867,7 @@ final class ActivityManagerConstants extends ContentObserver {
     public static BoostFramework mPerf = new BoostFramework();
 
     static boolean USE_TRIM_SETTINGS = true;
+    static int COMPACTION_DELAY_MS = 300 * 1000;
     static int EMPTY_APP_PERCENT = 50;
     static int TRIM_EMPTY_PERCENT = 100;
     static int TRIM_CACHE_PERCENT = 100;
@@ -1447,6 +1448,9 @@ final class ActivityManagerConstants extends ContentObserver {
           // Maximum number of cached processes we will allow.
             DEFAULT_MAX_CACHED_PROCESSES = MAX_CACHED_PROCESSES = CUR_MAX_CACHED_PROCESSES = Integer.valueOf(
                                                  mPerf.perfGetProp("ro.vendor.qti.sys.fw.bg_apps_limit", "32"));
+
+            // Wait time after bootup to trigger system compaction
+            COMPACTION_DELAY_MS = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.compaction_delay_sec", "300")) * 1000;
 
             //Trim Settings
             USE_TRIM_SETTINGS = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.sys.fw.use_trim_settings", "true"));

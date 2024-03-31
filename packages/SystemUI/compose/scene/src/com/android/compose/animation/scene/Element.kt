@@ -203,7 +203,7 @@ internal class ElementNode(
         measurable: Measurable,
         constraints: Constraints,
     ): MeasureResult {
-        val overscrollScene = layoutImpl.state.currentOverscrollSpec?.scene
+        val overscrollScene = layoutImpl.state.currentTransition?.currentOverscrollSpec?.scene
         if (overscrollScene != null && overscrollScene != scene.key) {
             // There is an overscroll in progress on another scene
             // By measuring composable elements, Compose can cache relevant information.
@@ -269,13 +269,12 @@ private fun shouldDrawElement(
         transition == null ||
             transition.fromScene !in element.sceneStates ||
             transition.toScene !in element.sceneStates ||
-            layoutImpl.state.currentOverscrollSpec?.scene == scene.key
+            transition.currentOverscrollSpec?.scene == scene.key
     ) {
         return true
     }
 
-    val sharedTransformation =
-        sharedElementTransformation(layoutImpl.state, transition, element.key)
+    val sharedTransformation = sharedElementTransformation(transition, element.key)
     if (sharedTransformation?.enabled == false) {
         return true
     }
@@ -305,23 +304,21 @@ internal fun shouldDrawOrComposeSharedElement(
             fromSceneZIndex = layoutImpl.scenes.getValue(fromScene).zIndex,
             toSceneZIndex = layoutImpl.scenes.getValue(toScene).zIndex,
         ) == scene
-    return chosenByPicker || layoutImpl.state.currentOverscrollSpec?.scene == scene
+    return chosenByPicker || transition.currentOverscrollSpec?.scene == scene
 }
 
 private fun isSharedElementEnabled(
-    layoutState: BaseSceneTransitionLayoutState,
     transition: TransitionState.Transition,
     element: ElementKey,
 ): Boolean {
-    return sharedElementTransformation(layoutState, transition, element)?.enabled ?: true
+    return sharedElementTransformation(transition, element)?.enabled ?: true
 }
 
 internal fun sharedElementTransformation(
-    layoutState: BaseSceneTransitionLayoutState,
     transition: TransitionState.Transition,
     element: ElementKey,
 ): SharedElementTransformation? {
-    val transformationSpec = layoutState.transformationSpec
+    val transformationSpec = transition.transformationSpec
     val sharedInFromScene = transformationSpec.transformations(element, transition.fromScene).shared
     val sharedInToScene = transformationSpec.transformations(element, transition.toScene).shared
 
@@ -360,11 +357,11 @@ private fun isElementOpaque(
     }
 
     val isSharedElement = fromState != null && toState != null
-    if (isSharedElement && isSharedElementEnabled(layoutImpl.state, transition, element.key)) {
+    if (isSharedElement && isSharedElementEnabled(transition, element.key)) {
         return true
     }
 
-    return layoutImpl.state.transformationSpec.transformations(element.key, scene.key).alpha == null
+    return transition.transformationSpec.transformations(element.key, scene.key).alpha == null
 }
 
 /**
@@ -388,7 +385,6 @@ private fun elementAlpha(
             transformation = { it.alpha },
             idleValue = 1f,
             currentValue = { 1f },
-            isSpecified = { true },
             ::lerp,
         )
         .fastCoerceIn(0f, 1f)
@@ -426,7 +422,6 @@ private fun ApproachMeasureScope.measure(
             transformation = { it.size },
             idleValue = lookaheadSize,
             currentValue = { measurable.measure(constraints).also { maybePlaceable = it }.size() },
-            isSpecified = { it != Element.SizeUnspecified },
             ::lerp,
         )
 
@@ -452,7 +447,6 @@ private fun getDrawScale(
         transformation = { it.drawScale },
         idleValue = Scale.Default,
         currentValue = { Scale.Default },
-        isSpecified = { true },
         ::lerp,
     )
 }
@@ -493,7 +487,6 @@ private fun ApproachMeasureScope.place(
                 transformation = { it.offset },
                 idleValue = targetOffsetInScene,
                 currentValue = { currentOffset },
-                isSpecified = { it != Offset.Unspecified },
                 ::lerp,
             )
 
@@ -540,7 +533,6 @@ private inline fun <T> computeValue(
     transformation: (ElementTransformations) -> PropertyTransformation<T>?,
     idleValue: T,
     currentValue: () -> T,
-    isSpecified: (T) -> Boolean,
     lerp: (T, T, Float) -> T,
 ): T {
     val transition =
@@ -564,7 +556,7 @@ private inline fun <T> computeValue(
     }
 
     if (transition is TransitionState.HasOverscrollProperties) {
-        val overscroll = layoutImpl.state.currentOverscrollSpec
+        val overscroll = transition.currentOverscrollSpec
         if (overscroll?.scene == scene.key) {
             val elementSpec = overscroll.transformationSpec.transformations(element.key, scene.key)
             val propertySpec = transformation(elementSpec) ?: return currentValue()
@@ -588,7 +580,8 @@ private inline fun <T> computeValue(
             // TODO(b/290184746): Make sure that we don't overflow transformations associated to a
             // range.
             val directionSign = if (transition.isUpOrLeft) -1 else 1
-            val overscrollProgress = transition.progress.let { if (it > 1f) it - 1f else it }
+            val isToScene = overscroll.scene == transition.toScene
+            val overscrollProgress = transition.progress.let { if (isToScene) it - 1f else it }
             val progress = directionSign * overscrollProgress
             val rangeProgress = propertySpec.range?.progress(progress) ?: progress
 
@@ -601,14 +594,9 @@ private inline fun <T> computeValue(
     // TODO(b/290184746): Support non linear shared paths as well as a way to make sure that shared
     // elements follow the finger direction.
     val isSharedElement = fromState != null && toState != null
-    if (isSharedElement && isSharedElementEnabled(layoutImpl.state, transition, element.key)) {
+    if (isSharedElement && isSharedElementEnabled(transition, element.key)) {
         val start = sceneValue(fromState!!)
         val end = sceneValue(toState!!)
-
-        // TODO(b/316901148): Remove checks to isSpecified() once the lookahead pass runs for all
-        // nodes before the intermediate layout pass.
-        if (!isSpecified(start)) return end
-        if (!isSpecified(end)) return start
 
         // Make sure we don't read progress if values are the same and we don't need to interpolate,
         // so we don't invalidate the phase where this is read.
@@ -616,7 +604,7 @@ private inline fun <T> computeValue(
     }
 
     val transformation =
-        transformation(layoutImpl.state.transformationSpec.transformations(element.key, scene.key))
+        transformation(transition.transformationSpec.transformations(element.key, scene.key))
         // If there is no transformation explicitly associated to this element value, let's use
         // the value given by the system (like the current position and size given by the layout
         // pass).

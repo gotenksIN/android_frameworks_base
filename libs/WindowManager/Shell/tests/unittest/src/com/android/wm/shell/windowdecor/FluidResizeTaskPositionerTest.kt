@@ -2,6 +2,7 @@ package com.android.wm.shell.windowdecor
 
 import android.app.ActivityManager
 import android.app.WindowConfiguration
+import android.graphics.Point
 import android.graphics.Rect
 import android.os.IBinder
 import android.testing.AndroidTestingRunner
@@ -11,6 +12,7 @@ import android.view.Surface.ROTATION_270
 import android.view.Surface.ROTATION_90
 import android.view.SurfaceControl
 import android.view.WindowManager
+import android.window.TransitionInfo
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import android.window.WindowContainerTransaction.Change.CHANGE_DRAG_RESIZING
@@ -41,6 +43,8 @@ import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.doReturn
 import java.util.function.Supplier
+import org.mockito.Mockito.eq
+import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when` as whenever
 
 /**
@@ -125,8 +129,7 @@ class FluidResizeTaskPositionerTest : ShellTestCase() {
                 mockWindowDecoration,
                 mockDisplayController,
                 mockDragStartListener,
-                mockTransactionFactory,
-                DISALLOWED_AREA_FOR_END_BOUNDS_HEIGHT
+                mockTransactionFactory
         )
     }
 
@@ -577,28 +580,29 @@ class FluidResizeTaskPositionerTest : ShellTestCase() {
     }
 
     @Test
-    fun testDragResize_drag_setBoundsNotRunIfDragEndsInDisallowedEndArea() {
-        taskPositioner.onDragPositioningStart(
-                CTRL_TYPE_UNDEFINED, // drag
-                STARTING_BOUNDS.right.toFloat(),
-                STARTING_BOUNDS.top.toFloat()
-        )
+    fun testStartAnimation_useEndRelOffset() {
+        val mockTransitionInfo = mock(TransitionInfo::class.java)
+        val changeMock = mock(TransitionInfo.Change::class.java)
+        val startTransaction = mock(SurfaceControl.Transaction::class.java)
+        val finishTransaction = mock(SurfaceControl.Transaction::class.java)
+        val point = Point(10, 20)
+        val bounds = Rect(1, 2, 3, 4)
+        `when`(changeMock.endRelOffset).thenReturn(point)
+        `when`(changeMock.endAbsBounds).thenReturn(bounds)
+        `when`(mockTransitionInfo.changes).thenReturn(listOf(changeMock))
+        `when`(startTransaction.setWindowCrop(any(),
+            eq(bounds.width()),
+            eq(bounds.height()))).thenReturn(startTransaction)
+        `when`(finishTransaction.setWindowCrop(any(),
+            eq(bounds.width()),
+            eq(bounds.height()))).thenReturn(finishTransaction)
 
-        val newX = STARTING_BOUNDS.right.toFloat() + 5
-        val newY = DISALLOWED_AREA_FOR_END_BOUNDS_HEIGHT.toFloat() - 1
-        taskPositioner.onDragPositioningMove(
-                newX,
-                newY
-        )
+        taskPositioner.startAnimation(mockTransitionBinder, mockTransitionInfo, startTransaction,
+            finishTransaction, { _ -> })
 
-        taskPositioner.onDragPositioningEnd(newX, newY)
-
-        verify(mockTransitions, never()).startTransition(
-                eq(WindowManager.TRANSIT_CHANGE), argThat { wct ->
-            return@argThat wct.changes.any { (token, change) ->
-                token == taskBinder &&
-                        ((change.windowSetMask and WindowConfiguration.WINDOW_CONFIG_BOUNDS) != 0)
-            }}, eq(taskPositioner))
+        verify(startTransaction).setPosition(any(), eq(point.x.toFloat()), eq(point.y.toFloat()))
+        verify(finishTransaction).setPosition(any(), eq(point.x.toFloat()), eq(point.y.toFloat()))
+        verify(changeMock).endRelOffset
     }
 
     private fun WindowContainerTransaction.Change.ofBounds(bounds: Rect): Boolean {
@@ -653,70 +657,6 @@ class FluidResizeTaskPositionerTest : ShellTestCase() {
             return@argThat wct.hierarchyOps.any { hierarchyOps ->
                 hierarchyOps.container == taskBinder && hierarchyOps.toTop }
         })
-    }
-
-    @Test
-    fun testDragResize_drag_taskPositionedInStableBounds() {
-        taskPositioner.onDragPositioningStart(
-                CTRL_TYPE_UNDEFINED, // drag
-                STARTING_BOUNDS.left.toFloat(),
-                STARTING_BOUNDS.top.toFloat()
-        )
-
-        val newX = STARTING_BOUNDS.left.toFloat()
-        val newY = STABLE_BOUNDS_LANDSCAPE.top.toFloat() - 5
-        taskPositioner.onDragPositioningMove(
-                newX,
-                newY
-        )
-        verify(mockTransaction).setPosition(any(), eq(newX), eq(newY))
-
-        taskPositioner.onDragPositioningEnd(
-                newX,
-                newY
-        )
-        // Verify task's top bound is set to stable bounds top since dragged outside stable bounds
-        // but not in disallowed end bounds area.
-        verify(mockTransitions).startTransition(
-                eq(WindowManager.TRANSIT_CHANGE), argThat { wct ->
-            return@argThat wct.changes.any { (token, change) ->
-                token == taskBinder &&
-                        (change.windowSetMask and WindowConfiguration.WINDOW_CONFIG_BOUNDS) != 0 &&
-                        change.configuration.windowConfiguration.bounds.top ==
-                        STABLE_BOUNDS_LANDSCAPE.top
-            }}, eq(taskPositioner))
-    }
-
-    @Test
-    fun testDragResize_drag_taskPositionedInValidDragArea() {
-        taskPositioner.onDragPositioningStart(
-            CTRL_TYPE_UNDEFINED, // drag
-            STARTING_BOUNDS.left.toFloat(),
-            STARTING_BOUNDS.top.toFloat()
-        )
-
-        val newX = VALID_DRAG_AREA.left - 500f
-        val newY = VALID_DRAG_AREA.bottom + 500f
-        taskPositioner.onDragPositioningMove(
-            newX,
-            newY
-        )
-        verify(mockTransaction).setPosition(any(), eq(newX), eq(newY))
-
-        taskPositioner.onDragPositioningEnd(
-            newX,
-            newY
-        )
-        verify(mockTransitions).startTransition(
-                eq(WindowManager.TRANSIT_CHANGE), argThat { wct ->
-            return@argThat wct.changes.any { (token, change) ->
-                token == taskBinder &&
-                        (change.windowSetMask and WindowConfiguration.WINDOW_CONFIG_BOUNDS) != 0 &&
-                        change.configuration.windowConfiguration.bounds.top ==
-                        VALID_DRAG_AREA.bottom &&
-                        change.configuration.windowConfiguration.bounds.left ==
-                        VALID_DRAG_AREA.left
-            }}, eq(taskPositioner))
     }
 
     @Test

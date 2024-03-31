@@ -39,12 +39,15 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.row.NotificationRowContentBinder.InflationFlag;
+import com.android.systemui.statusbar.notification.shared.NotificationsHeadsUpRefactor;
 import com.android.systemui.util.ListenerSet;
 import com.android.systemui.util.concurrency.DelayableExecutor;
 import com.android.systemui.util.settings.GlobalSettings;
 import com.android.systemui.util.time.SystemClock;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 /**
@@ -68,6 +71,7 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
     private final AccessibilityManagerWrapper mAccessibilityMgr;
 
     private final UiEventLogger mUiEventLogger;
+    private final AvalancheController mAvalancheController;
 
     protected final SystemClock mSystemClock;
     protected final ArrayMap<String, HeadsUpEntry> mHeadsUpEntryMap = new ArrayMap<>();
@@ -100,13 +104,15 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
             SystemClock systemClock,
             @Main DelayableExecutor executor,
             AccessibilityManagerWrapper accessibilityManagerWrapper,
-            UiEventLogger uiEventLogger) {
+            UiEventLogger uiEventLogger,
+            AvalancheController avalancheController) {
         mLogger = logger;
         mExecutor = executor;
         mSystemClock = systemClock;
         mContext = context;
         mAccessibilityMgr = accessibilityManagerWrapper;
         mUiEventLogger = uiEventLogger;
+        mAvalancheController = avalancheController;
         Resources resources = context.getResources();
         mMinimumDisplayTime = resources.getInteger(R.integer.heads_up_notification_minimum_time);
         mStickyForSomeTimeAutoDismissTime = resources.getInteger(
@@ -157,18 +163,23 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
      */
     @Override
     public void showNotification(@NonNull NotificationEntry entry) {
-        mLogger.logShowNotification(entry);
+        HeadsUpEntry headsUpEntry = createHeadsUpEntry(entry);
 
-        // Add new entry and begin managing it
-        HeadsUpEntry headsUpEntry = createHeadsUpEntry();
-        headsUpEntry.setEntry(entry);
-        mHeadsUpEntryMap.put(entry.getKey(), headsUpEntry);
-        onEntryAdded(headsUpEntry);
-        entry.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
-        entry.setIsHeadsUpEntry(true);
+        Runnable runnable = () -> {
+            // TODO(b/315362456) log outside runnable too
+            mLogger.logShowNotification(entry);
 
-        updateNotification(entry.getKey(), true /* shouldHeadsUpAgain */);
-        entry.setInterruption();
+            // Add new entry and begin managing it
+            mHeadsUpEntryMap.put(entry.getKey(), headsUpEntry);
+            onEntryAdded(headsUpEntry);
+            // TODO(b/328390331) move accessibility events to the view layer
+            entry.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
+            entry.setIsHeadsUpEntry(true);
+
+            updateNotificationInternal(entry.getKey(), true /* shouldHeadsUpAgain */);
+            entry.setInterruption();
+        };
+        mAvalancheController.update(headsUpEntry, runnable, "showNotification");
     }
 
     /**
@@ -181,6 +192,11 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
     @Override
     public boolean removeNotification(@NonNull String key, boolean releaseImmediately) {
         mLogger.logRemoveNotification(key, releaseImmediately);
+
+        if (mAvalancheController.isWaiting(key)) {
+            removeEntry(key);
+            return true;
+        }
         HeadsUpEntry headsUpEntry = mHeadsUpEntryMap.get(key);
         if (headsUpEntry == null) {
             return true;
@@ -203,13 +219,21 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
      */
     public void updateNotification(@NonNull String key, boolean shouldHeadsUpAgain) {
         HeadsUpEntry headsUpEntry = mHeadsUpEntryMap.get(key);
+        Runnable runnable = () -> {
+            updateNotificationInternal(key, shouldHeadsUpAgain);
+        };
+        mAvalancheController.update(headsUpEntry, runnable, "updateNotification");
+    }
+
+    private void updateNotificationInternal(@NonNull String key, boolean shouldHeadsUpAgain) {
+        HeadsUpEntry headsUpEntry = mHeadsUpEntryMap.get(key);
         mLogger.logUpdateNotification(key, shouldHeadsUpAgain, headsUpEntry != null);
         if (headsUpEntry == null) {
             // the entry was released before this update (i.e by a listener) This can happen
             // with the groupmanager
             return;
         }
-
+        // TODO(b/328390331) move accessibility events to the view layer
         headsUpEntry.mEntry.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
 
         if (shouldHeadsUpAgain) {
@@ -231,12 +255,16 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
         for (String key : keysToRemove) {
             removeEntry(key);
         }
+        for (String key : mAvalancheController.getWaitingKeys()) {
+            removeEntry(key);
+        }
     }
 
     /**
      * Returns the entry if it is managed by this manager.
      * @param key key of notification
      * @return the entry
+     * TODO(b/315362456) See if caller needs to check AvalancheController waiting entries
      */
     @Nullable
     public NotificationEntry getEntry(@NonNull String key) {
@@ -251,6 +279,7 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
     @NonNull
     @Override
     public Stream<NotificationEntry> getAllEntries() {
+        // TODO(b/315362456) See if callers need to check AvalancheController
         return mHeadsUpEntryMap.values().stream().map(headsUpEntry -> headsUpEntry.mEntry);
     }
 
@@ -267,7 +296,7 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
      * @return true if the notification is managed by this manager
      */
     public boolean isHeadsUpEntry(@NonNull String key) {
-        return mHeadsUpEntryMap.containsKey(key);
+        return mHeadsUpEntryMap.containsKey(key) || mAvalancheController.isWaiting(key);
     }
 
     /**
@@ -304,15 +333,15 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
         if (!isPinned) {
             headsUpEntry.mWasUnpinned = true;
         }
-        if (headsUpEntry.isPinned() != isPinned) {
-            headsUpEntry.setPinned(isPinned);
+        if (headsUpEntry.isRowPinned() != isPinned) {
+            headsUpEntry.setRowPinned(isPinned);
             updatePinnedMode();
             if (isPinned && entry.getSbn() != null) {
                mUiEventLogger.logWithInstanceId(
                         NotificationPeekEvent.NOTIFICATION_PEEK, entry.getSbn().getUid(),
                         entry.getSbn().getPackageName(), entry.getSbn().getInstanceId());
             }
-            // TODO(b/325936094) convert these listeners to collecting a flow
+        // TODO(b/325936094) use the isPinned Flow instead
             for (OnHeadsUpChangedListener listener : mListeners) {
                 if (isPinned) {
                     listener.onHeadsUpPinned(entry);
@@ -344,25 +373,34 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
     }
 
     /**
-     * Remove a notification and reset the entry.
+     * Remove a notification from the alerting entries.
      * @param key key of notification to remove
      */
     protected final void removeEntry(@NonNull String key) {
         HeadsUpEntry headsUpEntry = mHeadsUpEntryMap.get(key);
-        if (headsUpEntry == null) {
-            return;
-        }
-        NotificationEntry entry = headsUpEntry.mEntry;
 
-        // If the notification is animating, we will remove it at the end of the animation.
-        if (entry != null && entry.isExpandAnimationRunning()) {
-            return;
-        }
-        entry.demoteStickyHun();
-        mHeadsUpEntryMap.remove(key);
-        onEntryRemoved(headsUpEntry);
-        entry.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
-        headsUpEntry.reset();
+        Runnable runnable = () -> {
+            if (headsUpEntry == null) {
+                return;
+            }
+            NotificationEntry entry = headsUpEntry.mEntry;
+
+            // If the notification is animating, we will remove it at the end of the animation.
+            if (entry != null && entry.isExpandAnimationRunning()) {
+                return;
+            }
+            entry.demoteStickyHun();
+            mHeadsUpEntryMap.remove(key);
+            onEntryRemoved(headsUpEntry);
+            // TODO(b/328390331) move accessibility events to the view layer
+            entry.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
+            if (NotificationsHeadsUpRefactor.isEnabled()) {
+                headsUpEntry.cancelAutoRemovalCallbacks("removeEntry");
+            } else {
+                headsUpEntry.reset();
+            }
+        };
+        mAvalancheController.delete(headsUpEntry, runnable, "removeEntry");
     }
 
     /**
@@ -378,6 +416,15 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
         for (OnHeadsUpChangedListener listener : mListeners) {
             listener.onHeadsUpStateChanged(entry, false);
         }
+    }
+
+    /**
+     * Manager-specific logic, that should occur, when the entry is updated, and its posted time has
+     * changed.
+     *
+     * @param headsUpEntry entry updated
+     */
+    protected void onEntryUpdated(HeadsUpEntry headsUpEntry) {
     }
 
     protected void updatePinnedMode() {
@@ -416,7 +463,9 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
      * Snoozes all current Heads Up Notifications.
      */
     public void snooze() {
-        for (String key : mHeadsUpEntryMap.keySet()) {
+        List<String> keySet = new ArrayList<>(mHeadsUpEntryMap.keySet());
+        keySet.addAll(mAvalancheController.getWaitingKeys());
+        for (String key : keySet) {
             HeadsUpEntry entry = getHeadsUpEntry(key);
             String packageName = entry.mEntry.getSbn().getPackageName();
             String snoozeKey = snoozeKey(packageName, mUser);
@@ -432,7 +481,8 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
 
     @Nullable
     protected HeadsUpEntry getHeadsUpEntry(@NonNull String key) {
-        return (HeadsUpEntry) mHeadsUpEntryMap.get(key);
+        // TODO(b/315362456) See if callers need to check AvalancheController
+        return mHeadsUpEntryMap.get(key);
     }
 
     /**
@@ -452,7 +502,7 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
         HeadsUpEntry topEntry = null;
         for (HeadsUpEntry entry: mHeadsUpEntryMap.values()) {
             if (topEntry == null || entry.compareTo(topEntry) < 0) {
-                topEntry = (HeadsUpEntry) entry;
+                topEntry = entry;
             }
         }
         return topEntry;
@@ -515,18 +565,22 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
      */
     public void unpinAll(boolean userUnPinned) {
         for (String key : mHeadsUpEntryMap.keySet()) {
-            HeadsUpEntry entry = getHeadsUpEntry(key);
-            setEntryPinned(entry, false /* isPinned */);
-            // maybe it got un sticky
-            entry.updateEntry(false /* updatePostTime */, "unpinAll");
+            HeadsUpEntry headsUpEntry = getHeadsUpEntry(key);
 
-            // when the user unpinned all of HUNs by moving one HUN, all of HUNs should not stay
-            // on the screen.
-            if (userUnPinned && entry.mEntry != null) {
-                if (entry.mEntry.mustStayOnScreen()) {
-                    entry.mEntry.setHeadsUpIsVisible();
+            Runnable runnable = () -> {
+                setEntryPinned(headsUpEntry, false /* isPinned */);
+                // maybe it got un sticky
+                headsUpEntry.updateEntry(false /* updatePostTime */, "unpinAll");
+
+                // when the user unpinned all of HUNs by moving one HUN, all of HUNs should not stay
+                // on the screen.
+                if (userUnPinned && headsUpEntry.mEntry != null) {
+                    if (headsUpEntry.mEntry.mustStayOnScreen()) {
+                        headsUpEntry.mEntry.setHeadsUpIsVisible();
+                    }
                 }
-            }
+            };
+            mAvalancheController.delete(headsUpEntry, runnable, "unpinAll");
         }
     }
 
@@ -606,6 +660,7 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
      */
     @Override
     public boolean isSticky(String key) {
+        // TODO(b/315362456) See if callers need to check AvalancheController
         HeadsUpEntry headsUpEntry = mHeadsUpEntryMap.get(key);
         if (headsUpEntry != null) {
             return headsUpEntry.isSticky();
@@ -614,8 +669,8 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
     }
 
     @NonNull
-    protected HeadsUpEntry createHeadsUpEntry() {
-        return new HeadsUpEntry();
+    protected HeadsUpEntry createHeadsUpEntry(NotificationEntry entry) {
+        return new HeadsUpEntry(entry);
     }
 
     /**
@@ -633,9 +688,10 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
 
     /**
      * This represents a notification and how long it is in a heads up mode. It also manages its
-     * lifecycle automatically when created.
+     * lifecycle automatically when created. This class is public because it is exposed by methods
+     * of AvalancheController that take it as param.
      */
-    protected class HeadsUpEntry implements Comparable<HeadsUpEntry> {
+    public class HeadsUpEntry implements Comparable<HeadsUpEntry> {
         public boolean mRemoteInputActive;
         public boolean mUserActionMayIndirectlyRemove;
 
@@ -650,11 +706,23 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
 
         @Nullable private Runnable mCancelRemoveRunnable;
 
-        public void setEntry(@NonNull final NotificationEntry entry) {
-            setEntry(entry, () -> removeEntry(entry.getKey()));
+        public HeadsUpEntry() {
+            NotificationsHeadsUpRefactor.assertInLegacyMode();
         }
 
-        public void setEntry(@NonNull final NotificationEntry entry,
+        public HeadsUpEntry(NotificationEntry entry) {
+            // Attach NotificationEntry for AvalancheController to log key and
+            // record mPostTime for AvalancheController sorting
+            setEntry(entry, createRemoveRunnable(entry));
+        }
+
+        /** Attach a NotificationEntry. */
+        public void setEntry(@NonNull final NotificationEntry entry) {
+            NotificationsHeadsUpRefactor.assertInLegacyMode();
+            setEntry(entry, createRemoveRunnable(entry));
+        }
+
+        private void setEntry(@NonNull final NotificationEntry entry,
                 @Nullable Runnable removeRunnable) {
             mEntry = entry;
             mRemoveRunnable = removeRunnable;
@@ -663,12 +731,19 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
             updateEntry(true /* updatePostTime */, "setEntry");
         }
 
-        public boolean isPinned() {
+        protected boolean isRowPinned() {
             return mEntry != null && mEntry.isRowPinned();
         }
 
-        public void setPinned(boolean pinned) {
+        protected void setRowPinned(boolean pinned) {
             if (mEntry != null) mEntry.setRowPinned(pinned);
+        }
+
+        /**
+         * An interface that returns the amount of time left this HUN should show.
+         */
+        interface FinishTimeUpdater {
+            long updateAndGetTimeRemaining();
         }
 
         /**
@@ -676,23 +751,33 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
          * @param updatePostTime whether or not to refresh the post time
          */
         public void updateEntry(boolean updatePostTime, @Nullable String reason) {
-            mLogger.logUpdateEntry(mEntry, updatePostTime, reason);
+            Runnable runnable = () -> {
+                mLogger.logUpdateEntry(mEntry, updatePostTime, reason);
 
-            final long now = mSystemClock.elapsedRealtime();
-            mEarliestRemovalTime = now + mMinimumDisplayTime;
+                final long now = mSystemClock.elapsedRealtime();
+                mEarliestRemovalTime = now + mMinimumDisplayTime;
 
-            if (updatePostTime) {
-                mPostTime = Math.max(mPostTime, now);
-            }
+                if (updatePostTime) {
+                    mPostTime = Math.max(mPostTime, now);
+                }
+            };
+            mAvalancheController.update(this, runnable, "updateEntry (updatePostTime)");
 
             if (isSticky()) {
-                removeAutoRemovalCallbacks("updateEntry (sticky)");
+                cancelAutoRemovalCallbacks("updateEntry (sticky)");
                 return;
             }
 
-            final long finishTime = calculateFinishTime();
-            final long timeLeft = Math.max(finishTime - now, mMinimumDisplayTime);
-            scheduleAutoRemovalCallback(timeLeft, "updateEntry (not sticky)");
+            FinishTimeUpdater finishTimeCalculator = () -> {
+                final long finishTime = calculateFinishTime();
+                final long now = mSystemClock.elapsedRealtime();
+                final long timeLeft = Math.max(finishTime - now, mMinimumDisplayTime);
+                return timeLeft;
+            };
+            scheduleAutoRemovalCallback(finishTimeCalculator, "updateEntry (not sticky)");
+
+            // Notify the manager, that the posted time has changed.
+            onEntryUpdated(this);
         }
 
         /**
@@ -718,7 +803,7 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
             return mEarliestRemovalTime < mSystemClock.elapsedRealtime();
         }
 
-        public int compareTo(@NonNull HeadsUpEntry headsUpEntry) {
+        public int compareNonTimeFields(HeadsUpEntry headsUpEntry) {
             boolean isPinned = mEntry.isRowPinned();
             boolean otherPinned = headsUpEntry.mEntry.isRowPinned();
             if (isPinned && !otherPinned) {
@@ -748,7 +833,14 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
             } else if (!mRemoteInputActive && headsUpEntry.mRemoteInputActive) {
                 return 1;
             }
+            return 0;
+        }
 
+        public int compareTo(@NonNull HeadsUpEntry headsUpEntry) {
+            int nonTimeCompareResult = compareNonTimeFields(headsUpEntry);
+            if (nonTimeCompareResult != 0) {
+                return nonTimeCompareResult;
+            }
             if (mPostTime > headsUpEntry.mPostTime) {
                 return -1;
             } else if (mPostTime == headsUpEntry.mPostTime) {
@@ -758,12 +850,32 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
             }
         }
 
+        @Override
+        public int hashCode() {
+            if (mEntry == null) return super.hashCode();
+            int result = mEntry.getKey().hashCode();
+            result = 31 * result;
+            return result;
+        }
+
+        @Override
+        public boolean equals(@Nullable Object o) {
+            if (this == o) return true;
+            if (o == null || !(o instanceof HeadsUpEntry)) return false;
+            HeadsUpEntry otherHeadsUpEntry = (HeadsUpEntry) o;
+            if (mEntry != null && otherHeadsUpEntry.mEntry != null) {
+                return mEntry.getKey().equals(otherHeadsUpEntry.mEntry.getKey());
+            }
+            return false;
+        }
+
         public void setExpanded(boolean expanded) {
             this.mExpanded = expanded;
         }
 
         public void reset() {
-            removeAutoRemovalCallbacks("reset()");
+            NotificationsHeadsUpRefactor.assertInLegacyMode();
+            cancelAutoRemovalCallbacks("reset()");
             mEntry = null;
             mRemoveRunnable = null;
             mExpanded = false;
@@ -773,37 +885,48 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
         /**
          * Clear any pending removal runnables.
          */
-        public void removeAutoRemovalCallbacks(@Nullable String reason) {
-            final boolean removed = removeAutoRemovalCallbackInternal();
+        public void cancelAutoRemovalCallbacks(@Nullable String reason) {
+            Runnable runnable = () -> {
+                final boolean removed = cancelAutoRemovalCallbackInternal();
 
-            if (removed) {
-                mLogger.logAutoRemoveCanceled(mEntry, reason);
-            }
+                if (removed) {
+                    mLogger.logAutoRemoveCanceled(mEntry, reason);
+                }
+            };
+            mAvalancheController.update(this, runnable,
+                    reason + " removeAutoRemovalCallbacks");
         }
 
-        public void scheduleAutoRemovalCallback(long delayMillis, @NonNull String reason) {
-            if (mRemoveRunnable == null) {
-                Log.wtf(TAG, "scheduleAutoRemovalCallback with no callback set");
-                return;
-            }
+        public void scheduleAutoRemovalCallback(FinishTimeUpdater finishTimeCalculator,
+                @NonNull String reason) {
 
-            final boolean removed = removeAutoRemovalCallbackInternal();
+            Runnable runnable = () -> {
+                long delayMs = finishTimeCalculator.updateAndGetTimeRemaining();
 
-            if (removed) {
-                mLogger.logAutoRemoveRescheduled(mEntry, delayMillis, reason);
-            } else {
-                mLogger.logAutoRemoveScheduled(mEntry, delayMillis, reason);
-            }
+                if (mRemoveRunnable == null) {
+                    Log.wtf(TAG, "scheduleAutoRemovalCallback with no callback set");
+                    return;
+                }
 
-            mCancelRemoveRunnable = mExecutor.executeDelayed(mRemoveRunnable,
-                    delayMillis);
+                final boolean deletedExistingRemovalRunnable = cancelAutoRemovalCallbackInternal();
+                mCancelRemoveRunnable = mExecutor.executeDelayed(mRemoveRunnable,
+                        delayMs);
+
+                if (deletedExistingRemovalRunnable) {
+                    mLogger.logAutoRemoveRescheduled(mEntry, delayMs, reason);
+                } else {
+                    mLogger.logAutoRemoveScheduled(mEntry, delayMs, reason);
+                }
+            };
+            mAvalancheController.update(this, runnable,
+                    reason + " scheduleAutoRemovalCallback");
         }
 
-        public boolean removeAutoRemovalCallbackInternal() {
+        public boolean cancelAutoRemovalCallbackInternal() {
             final boolean scheduled = (mCancelRemoveRunnable != null);
 
             if (scheduled) {
-                mCancelRemoveRunnable.run();
+                mCancelRemoveRunnable.run();  // Delete removal runnable from Executor queue
                 mCancelRemoveRunnable = null;
             }
 
@@ -815,9 +938,18 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
          */
         public void removeAsSoonAsPossible() {
             if (mRemoveRunnable != null) {
-                final long timeLeft = mEarliestRemovalTime - mSystemClock.elapsedRealtime();
-                scheduleAutoRemovalCallback(timeLeft, "removeAsSoonAsPossible");
+
+                FinishTimeUpdater finishTimeCalculator = () -> {
+                    final long timeLeft = mEarliestRemovalTime - mSystemClock.elapsedRealtime();
+                    return timeLeft;
+                };
+                scheduleAutoRemovalCallback(finishTimeCalculator, "removeAsSoonAsPossible");
             }
+        }
+
+        /** Creates a runnable to remove this notification from the alerting entries. */
+        protected Runnable createRemoveRunnable(NotificationEntry entry) {
+            return () -> removeEntry(entry.getKey());
         }
 
         /**
@@ -834,9 +966,13 @@ public abstract class BaseHeadsUpManager implements HeadsUpManager {
          * {@link SystemClock#elapsedRealtime()}
          */
         protected long calculateFinishTime() {
-            final long duration = getRecommendedHeadsUpTimeoutMs(
-                    isStickyForSomeTime() ? mStickyForSomeTimeAutoDismissTime : mAutoDismissTime);
-
+            int requestedTimeOutMs;
+            if (isStickyForSomeTime()) {
+                requestedTimeOutMs = mStickyForSomeTimeAutoDismissTime;
+            } else {
+                requestedTimeOutMs = mAvalancheController.getDurationMs(this, mAutoDismissTime);
+            }
+            final long duration = getRecommendedHeadsUpTimeoutMs(requestedTimeOutMs);
             return mPostTime + duration;
         }
 

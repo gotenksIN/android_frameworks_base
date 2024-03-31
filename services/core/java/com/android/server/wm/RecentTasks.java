@@ -60,7 +60,6 @@ import android.content.pm.ParceledListSlice;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
-import android.os.DeviceIntegrationUtils;
 import android.os.Environment;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -367,11 +366,6 @@ class RecentTasks {
                     com.android.internal.R.integer.config_minNumVisibleRecentTasks_lowRam);
             mMaxNumVisibleTasks = res.getInteger(
                     com.android.internal.R.integer.config_maxNumVisibleRecentTasks_lowRam);
-        } else if (SystemProperties.getBoolean("ro.recents.grid", false)) {
-            mMinNumVisibleTasks = res.getInteger(
-                    com.android.internal.R.integer.config_minNumVisibleRecentTasks_grid);
-            mMaxNumVisibleTasks = res.getInteger(
-                    com.android.internal.R.integer.config_maxNumVisibleRecentTasks_grid);
         } else {
             mMinNumVisibleTasks = res.getInteger(
                     com.android.internal.R.integer.config_minNumVisibleRecentTasks);
@@ -1261,6 +1255,11 @@ class RecentTasks {
                 continue;
             }
 
+            if (otherTask.topRunningActivity() == null) {
+                // Skip if there's no running activity in the Task.
+                continue;
+            }
+
             // Stop searching if the task has higher z-ordering, or increase the index and
             // continue the search.
             if (task.compareTo(otherTask) > 0) {
@@ -1585,12 +1584,6 @@ class RecentTasks {
                 // The task may be reachable from the back stack of other windowing mode or it is
                 // currently in use. Keep the task in the hidden list to avoid losing track, e.g.
                 // after dismissing primary split screen.
-                continue;
-            }
-            // Device Integration: We don't want to system remove our remote task while in home Activity idle scenario,
-            // skip this.
-            if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION
-                && mService.getRemoteTaskManager().anyTaskExist(hiddenTask)) {
                 continue;
             }
             mHiddenTasks.remove(i);

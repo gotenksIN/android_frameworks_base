@@ -831,14 +831,25 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
         @Override
-        public void enterDesktop(int displayId) {
+        public void setSplitscreenFocus(boolean leftOrTop) {
             IStatusBar bar = mBar;
             if (bar != null) {
                 try {
-                    bar.enterDesktop(displayId);
+                    bar.setSplitscreenFocus(leftOrTop);
                 } catch (RemoteException ex) { }
             }
         }
+
+        @Override
+        public void moveFocusedTaskToDesktop(int displayId) {
+            IStatusBar bar = mBar;
+            if (bar != null) {
+                try {
+                    bar.moveFocusedTaskToDesktop(displayId);
+                } catch (RemoteException ex) { }
+            }
+        }
+
         @Override
         public void showMediaOutputSwitcher(String packageName) {
             IStatusBar bar = mBar;

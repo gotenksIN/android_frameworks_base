@@ -18,6 +18,7 @@
 
 package com.android.compose
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -62,6 +63,7 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -69,7 +71,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastFirst
 import androidx.compose.ui.util.fastFirstOrNull
-import com.android.compose.theme.LocalAndroidColorScheme
 
 /**
  * Platform slider implementation that displays a slider with an [icon] and a [label] at the start.
@@ -143,12 +144,14 @@ fun PlatformSlider(
             thumb = { Spacer(Modifier.size(thumbSize)) },
         )
 
-        Spacer(
-            Modifier.padding(8.dp)
-                .size(4.dp)
-                .align(Alignment.CenterEnd)
-                .background(color = colors.indicatorColor, shape = CircleShape)
-        )
+        if (enabled) {
+            Spacer(
+                Modifier.padding(8.dp)
+                    .size(4.dp)
+                    .align(Alignment.CenterEnd)
+                    .background(color = colors.indicatorColor, shape = CircleShape)
+            )
+        }
     }
 }
 
@@ -219,9 +222,9 @@ private fun Track(
                     )
                 Box(
                     modifier =
-                        Modifier.layoutId(TrackComponent.Label).offset {
-                            IntOffset(offsetX.toInt(), 0)
-                        },
+                        Modifier.layoutId(TrackComponent.Label)
+                            .offset { IntOffset(offsetX.toInt(), 0) }
+                            .padding(end = 16.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     CompositionLocalProvider(
@@ -239,6 +242,7 @@ private fun Track(
         measurePolicy =
             TrackMeasurePolicy(
                 sliderState = sliderState,
+                enabled = enabled,
                 thumbSize = LocalDensity.current.run { thumbSize.roundToPx() },
                 isRtl = isRtl,
                 onDrawingStateMeasured = { drawingState = it }
@@ -263,8 +267,17 @@ private fun TrackBackground(
             label = "PlatformSliderCornersAnimation",
         )
 
-    val trackColor = colors.getTrackColor(enabled)
-    val indicatorColor = colors.getIndicatorColor(enabled)
+    val trackColor by
+        animateColorAsState(
+            colors.getTrackColor(enabled),
+            label = "PlatformSliderTrackColorAnimation",
+        )
+
+    val indicatorColor by
+        animateColorAsState(
+            colors.getIndicatorColor(enabled),
+            label = "PlatformSliderIndicatorColorAnimation",
+        )
     Canvas(modifier.fillMaxSize()) {
         val trackCornerRadius = CornerRadius(size.height / 2, size.height / 2)
         val trackPath = Path()
@@ -302,6 +315,7 @@ private fun TrackBackground(
 /** Measures track components sizes and calls [onDrawingStateMeasured] when it's done. */
 private class TrackMeasurePolicy(
     private val sliderState: SliderState,
+    private val enabled: Boolean,
     private val thumbSize: Int,
     private val isRtl: Boolean,
     private val onDrawingStateMeasured: (DrawingState) -> Unit,
@@ -332,7 +346,7 @@ private class TrackMeasurePolicy(
                 )
 
         val iconSize = iconPlaceable?.width ?: 0
-        val labelMaxWidth = (desiredWidth - iconSize) / 2
+        val labelMaxWidth = if (enabled) (desiredWidth - iconSize) / 2 else desiredWidth - iconSize
         val labelPlaceable: Placeable? =
             measurables
                 .fastFirstOrNull { it.layoutId == TrackComponent.Label }
@@ -452,11 +466,11 @@ object PlatformSliderDefaults {
 @Composable
 private fun lightThemePlatformSliderColors() =
     PlatformSliderColors(
-        trackColor = LocalAndroidColorScheme.current.tertiaryFixedDim,
+        trackColor = colorResource(android.R.color.system_accent3_200),
         indicatorColor = MaterialTheme.colorScheme.tertiary,
         iconColor = MaterialTheme.colorScheme.onTertiary,
         labelColorOnIndicator = MaterialTheme.colorScheme.onTertiary,
-        labelColorOnTrack = LocalAndroidColorScheme.current.onTertiaryFixed,
+        labelColorOnTrack = MaterialTheme.colorScheme.onTertiaryContainer,
         disabledTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         disabledIndicatorColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         disabledIconColor = MaterialTheme.colorScheme.outline,
@@ -467,11 +481,11 @@ private fun lightThemePlatformSliderColors() =
 @Composable
 private fun darkThemePlatformSliderColors() =
     PlatformSliderColors(
-        trackColor = MaterialTheme.colorScheme.tertiary,
+        trackColor = colorResource(android.R.color.system_accent3_600),
         indicatorColor = MaterialTheme.colorScheme.tertiary,
-        iconColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        iconColor = MaterialTheme.colorScheme.onTertiary,
         labelColorOnIndicator = MaterialTheme.colorScheme.onTertiary,
-        labelColorOnTrack = LocalAndroidColorScheme.current.onTertiaryFixed,
+        labelColorOnTrack = colorResource(android.R.color.system_accent3_900),
         disabledTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         disabledIndicatorColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         disabledIconColor = MaterialTheme.colorScheme.outline,

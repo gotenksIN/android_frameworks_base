@@ -2634,7 +2634,10 @@ public final class SurfaceControl implements Parcelable {
      * Threshold values that are sent with
      * {@link Transaction#setTrustedPresentationCallback(SurfaceControl,
      * TrustedPresentationThresholds, Executor, Consumer)}
+     *
+     * @deprecated Use {@link android.window.TrustedPresentationThresholds} instead.
      */
+    @Deprecated
     public static final class TrustedPresentationThresholds {
         private final float mMinAlpha;
         private final float mMinFractionRendered;
@@ -4454,8 +4457,7 @@ public final class SurfaceControl implements Parcelable {
          *   <tr><td>o</td><td>x</td><td>x</td><td>x</td></tr>
          * </table>
          * </blockquote>
-         *
-         *<p>
+         * <p>
          * We first start by computing fr=xscale*yscale=0.9*0.9=0.81, indicating
          * that "81%" of the pixels were rendered. This corresponds to what was 100
          * pixels being displayed in 81 pixels. This is somewhat of an abuse of
@@ -4472,6 +4474,7 @@ public final class SurfaceControl implements Parcelable {
          * be somewhat arbitrary, and so there are some somewhat arbitrary decisions in
          * this API as well.
          * <p>
+         *
          * @param sc         The {@link SurfaceControl} to set the callback on
          * @param thresholds The {@link TrustedPresentationThresholds} that will specify when the to
          *                   invoke the callback.
@@ -4480,7 +4483,11 @@ public final class SurfaceControl implements Parcelable {
          *                   exited the threshold.
          * @return This transaction
          * @see TrustedPresentationThresholds
+         * @deprecated Use
+         * {@link WindowManager#registerTrustedPresentationListener(IBinder,
+         * android.window.TrustedPresentationThresholds, Executor, Consumer)} instead.
          */
+        @Deprecated
         @NonNull
         public Transaction setTrustedPresentationCallback(@NonNull SurfaceControl sc,
                 @NonNull TrustedPresentationThresholds thresholds, @NonNull Executor executor,
@@ -4509,7 +4516,10 @@ public final class SurfaceControl implements Parcelable {
          *
          * @param sc The SurfaceControl that the callback should be cleared from
          * @return This transaction
+         * @deprecated Use {@link WindowManager#unregisterTrustedPresentationListener(Consumer)}
+         * instead.
          */
+        @Deprecated
         @NonNull
         public Transaction clearTrustedPresentationCallback(@NonNull SurfaceControl sc) {
             checkPreconditions(sc);

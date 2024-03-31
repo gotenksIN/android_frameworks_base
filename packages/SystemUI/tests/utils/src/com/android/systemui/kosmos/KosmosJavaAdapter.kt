@@ -19,6 +19,7 @@
 package com.android.systemui.kosmos
 
 import android.content.applicationContext
+import android.os.fakeExecutorHandler
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.bouncer.data.repository.bouncerRepository
 import com.android.systemui.bouncer.domain.interactor.simBouncerInteractor
@@ -27,6 +28,7 @@ import com.android.systemui.common.ui.data.repository.fakeConfigurationRepositor
 import com.android.systemui.common.ui.domain.interactor.configurationInteractor
 import com.android.systemui.communal.data.repository.fakeCommunalRepository
 import com.android.systemui.communal.domain.interactor.communalInteractor
+import com.android.systemui.concurrency.fakeExecutor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.flags.fakeFeatureFlagsClassic
@@ -34,6 +36,7 @@ import com.android.systemui.globalactions.domain.interactor.globalActionsInterac
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
+import com.android.systemui.keyguard.domain.interactor.fromGoneTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.fromLockscreenTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.fromPrimaryBouncerTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
@@ -64,6 +67,8 @@ class KosmosJavaAdapter(
     val testScope by lazy { kosmos.testScope }
     val fakeFeatureFlags by lazy { kosmos.fakeFeatureFlagsClassic }
     val fakeSceneContainerFlags by lazy { kosmos.fakeSceneContainerFlags }
+    val fakeExecutor by lazy { kosmos.fakeExecutor }
+    val fakeExecutorHandler by lazy { kosmos.fakeExecutorHandler }
     val configurationRepository by lazy { kosmos.fakeConfigurationRepository }
     val configurationInteractor by lazy { kosmos.configurationInteractor }
     val bouncerRepository by lazy { kosmos.bouncerRepository }
@@ -92,6 +97,7 @@ class KosmosJavaAdapter(
     val fromPrimaryBouncerTransitionInteractor by lazy {
         kosmos.fromPrimaryBouncerTransitionInteractor
     }
+    val fromGoneTransitionInteractor by lazy { kosmos.fromGoneTransitionInteractor }
     val globalActionsInteractor by lazy { kosmos.globalActionsInteractor }
     val sceneDataSource by lazy { kosmos.sceneDataSource }
 

@@ -222,9 +222,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     Dimmer mDimmer = Dimmer.DIMMER_REFACTOR
             ? new SmoothDimmer(this) : new LegacyDimmer(this);
 
-    /** {@code true} if the dimmer surface is boosted. {@code false} otherwise. */
-    boolean mDimmerSurfaceBoosted;
-
     /** Apply the dim layer on the embedded TaskFragment. */
     static final int EMBEDDED_DIM_AREA_TASK_FRAGMENT = 0;
 
@@ -1002,8 +999,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             } else {
                 // Still have something resumed; can't sleep until it is paused.
                 ProtoLog.v(WM_DEBUG_STATES, "Sleep needs to pause %s", mResumedActivity);
-                startPausing(false /* userLeaving */, true /* uiSleeping */, null /* resuming */,
-                        "sleep");
+                startPausing(true /* uiSleeping */, null /* resuming */, "sleep");
             }
             shouldSleep = false;
         } else if (mPausingActivity != null) {

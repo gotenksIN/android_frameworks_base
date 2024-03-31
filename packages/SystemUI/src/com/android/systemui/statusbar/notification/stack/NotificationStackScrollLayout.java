@@ -49,6 +49,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.os.Trace;
 import android.provider.Settings;
 import android.util.AttributeSet;
@@ -208,6 +209,9 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private float mQsExpansionFraction;
     private final int mSplitShadeMinContentHeight;
     private String mLastUpdateSidePaddingDumpString;
+    private long mLastUpdateSidePaddingElapsedRealtime;
+    private String mLastInitViewDumpString;
+    private long mLastInitViewElapsedRealtime;
 
     /**
      * The algorithm which calculates the properties for our children
@@ -808,6 +812,10 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         } else {
             mDebugTextUsedYPositions.clear();
         }
+
+        mDebugPaint.setColor(Color.DKGRAY);
+        canvas.drawPath(mRoundedClipPath, mDebugPaint);
+
         int y = 0;
         drawDebugInfo(canvas, y, Color.RED, /* label= */ "y = " + y);
 
@@ -839,13 +847,13 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         drawDebugInfo(canvas, y, Color.LTGRAY,
                 /* label= */ "mAmbientState.getStackY() + mAmbientState.getStackHeight() = " + y);
 
-        y = (int) mAmbientState.getStackY() + mContentHeight;
-        drawDebugInfo(canvas, y, Color.MAGENTA,
-                /* label= */ "mAmbientState.getStackY() + mContentHeight = " + y);
-
         y = (int) (mAmbientState.getStackY() + mIntrinsicContentHeight);
         drawDebugInfo(canvas, y, Color.YELLOW,
                 /* label= */ "mAmbientState.getStackY() + mIntrinsicContentHeight = " + y);
+
+        y = mContentHeight;
+        drawDebugInfo(canvas, y, Color.MAGENTA,
+                /* label= */ "mContentHeight = " + y);
 
         drawDebugInfo(canvas, mRoundedRectClippingBottom, Color.DKGRAY,
                 /* label= */ "mRoundedRectClippingBottom) = " + y);
@@ -887,17 +895,34 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mOverflingDistance = configuration.getScaledOverflingDistance();
 
         Resources res = context.getResources();
+        final boolean isSmallScreenLandscape = res.getBoolean(R.bool.is_small_screen_landscape);
         boolean useSmallLandscapeLockscreenResources = mIsSmallLandscapeLockscreenEnabled
-                && res.getBoolean(R.bool.is_small_screen_landscape);
+                && isSmallScreenLandscape;
         // TODO (b/293252410) remove condition here when flag is launched
         //  Instead update the config_skinnyNotifsInLandscape to be false whenever
         //  is_small_screen_landscape is true. Then, only use the config_skinnyNotifsInLandscape.
+        final boolean configSkinnyNotifsInLandscape = res.getBoolean(
+                R.bool.config_skinnyNotifsInLandscape);
         if (useSmallLandscapeLockscreenResources) {
             mSkinnyNotifsInLandscape = false;
         } else {
-            mSkinnyNotifsInLandscape = res.getBoolean(
-                    R.bool.config_skinnyNotifsInLandscape);
+            mSkinnyNotifsInLandscape = configSkinnyNotifsInLandscape;
         }
+
+        mLastInitViewDumpString =
+                "mIsSmallLandscapeLockscreenEnabled=" + mIsSmallLandscapeLockscreenEnabled
+                        + " isSmallScreenLandscape=" + isSmallScreenLandscape
+                        + " useSmallLandscapeLockscreenResources="
+                        + useSmallLandscapeLockscreenResources
+                        + " skinnyNotifsInLandscape=" + configSkinnyNotifsInLandscape
+                        + " mSkinnyNotifsInLandscape=" + mSkinnyNotifsInLandscape;
+        mLastInitViewElapsedRealtime = SystemClock.elapsedRealtime();
+
+        if (DEBUG_UPDATE_SIDE_PADDING) {
+            Log.v(TAG, "initView @ elapsedRealtime " + mLastInitViewElapsedRealtime + ": "
+                    + mLastInitViewDumpString);
+        }
+
         mGapHeight = res.getDimensionPixelSize(R.dimen.notification_section_divider_height);
         mStackScrollAlgorithm.initView(context);
         mStateAnimator.initView(context);
@@ -925,18 +950,29 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mLastUpdateSidePaddingDumpString = "viewWidth=" + viewWidth
                 + " skinnyNotifsInLandscape=" + mSkinnyNotifsInLandscape
                 + " orientation=" + orientation;
+        mLastUpdateSidePaddingElapsedRealtime = SystemClock.elapsedRealtime();
 
         if (DEBUG_UPDATE_SIDE_PADDING) {
-            Log.v(TAG, "updateSidePadding: " + mLastUpdateSidePaddingDumpString);
+            Log.v(TAG,
+                    "updateSidePadding @ elapsedRealtime " + mLastUpdateSidePaddingElapsedRealtime
+                            + ": " + mLastUpdateSidePaddingDumpString);
         }
 
-        if (viewWidth == 0 || !mSkinnyNotifsInLandscape) {
+        if (viewWidth == 0) {
+            Log.e(TAG, "updateSidePadding: viewWidth is zero");
             mSidePaddings = mMinimumPaddings;
             return;
         }
 
-        // Portrait is easy, just use the dimen for paddings
         if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+            mSidePaddings = mMinimumPaddings;
+            return;
+        }
+
+        if (mShouldUseSplitNotificationShade) {
+            if (mSkinnyNotifsInLandscape) {
+                Log.e(TAG, "updateSidePadding: mSkinnyNotifsInLandscape has betrayed us!");
+            }
             mSidePaddings = mMinimumPaddings;
             return;
         }
@@ -4884,6 +4920,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     public void dump(PrintWriter pwOriginal, String[] args) {
         IndentingPrintWriter pw = DumpUtilsKt.asIndenting(pwOriginal);
+        final long elapsedRealtime = SystemClock.elapsedRealtime();
         pw.println("Internal state:");
         DumpUtilsKt.withIncreasedIndent(pw, () -> {
             println(pw, "pulsing", mPulsing);
@@ -4907,6 +4944,9 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             println(pw, "intrinsicPadding", mIntrinsicPadding);
             println(pw, "topPadding", mTopPadding);
             println(pw, "bottomPadding", mBottomPadding);
+            dumpRoundedRectClipping(pw);
+            println(pw, "requestedClipBounds", mRequestedClipBounds);
+            println(pw, "isClipped", mIsClipped);
             println(pw, "translationX", getTranslationX());
             println(pw, "translationY", getTranslationY());
             println(pw, "translationZ", getTranslationZ());
@@ -4914,7 +4954,17 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             println(pw, "minimumPaddings", mMinimumPaddings);
             println(pw, "qsTilePadding", mQsTilePadding);
             println(pw, "sidePaddings", mSidePaddings);
+            println(pw, "elapsedRealtime", elapsedRealtime);
+            println(pw, "lastInitView", mLastInitViewDumpString);
+            println(pw, "lastInitViewElapsedRealtime", mLastInitViewElapsedRealtime);
+            println(pw, "lastInitViewMillisAgo", elapsedRealtime - mLastInitViewElapsedRealtime);
+            println(pw, "shouldUseSplitNotificationShade", mShouldUseSplitNotificationShade);
             println(pw, "lastUpdateSidePadding", mLastUpdateSidePaddingDumpString);
+            println(pw, "lastUpdateSidePaddingElapsedRealtime",
+                    mLastUpdateSidePaddingElapsedRealtime);
+            println(pw, "lastUpdateSidePaddingMillisAgo",
+                    elapsedRealtime - mLastUpdateSidePaddingElapsedRealtime);
+            println(pw, "isSmallLandscapeLockscreenEnabled", mIsSmallLandscapeLockscreenEnabled);
             mNotificationStackSizeCalculator.dump(pw, args);
         });
         pw.println();
@@ -4949,6 +4999,15 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
                         expandableView.dump(pw, args);
                     }
                 });
+    }
+
+    private void dumpRoundedRectClipping(IndentingPrintWriter pw) {
+        pw.append("roundedRectClipping{l=").print(mRoundedRectClippingLeft);
+        pw.append(" t=").print(mRoundedRectClippingTop);
+        pw.append(" r=").print(mRoundedRectClippingRight);
+        pw.append(" b=").print(mRoundedRectClippingBottom);
+        pw.append("} topRadius=").print(mBgCornerRadii[0]);
+        pw.append(" bottomRadius=").println(mBgCornerRadii[4]);
     }
 
     private void dumpFooterViewVisibility(IndentingPrintWriter pw) {
@@ -5346,7 +5405,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     /**
      * @param topHeadsUpRow the first headsUp row in z-order.
      */
-    public void setTopHeadsUpRow(ExpandableNotificationRow topHeadsUpRow) {
+    public void setTopHeadsUpRow(@Nullable ExpandableNotificationRow topHeadsUpRow) {
         mTopHeadsUpRow = topHeadsUpRow;
     }
 
@@ -5482,6 +5541,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             mAmbientState.setUseSplitShade(split);
             updateDismissBehavior();
             updateUseRoundedRectClipping();
+            requestLayout();
         }
     }
 

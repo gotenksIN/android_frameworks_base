@@ -30,6 +30,7 @@ import static android.view.WindowInsets.Type.statusBars;
 
 import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT;
+import static com.android.wm.shell.compatui.AppCompatUtils.isSingleTopActivityTranslucent;
 import static com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR;
 import static com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.IndicatorType.TO_FULLSCREEN_INDICATOR;
 import static com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.IndicatorType.TO_SPLIT_LEFT_INDICATOR;
@@ -75,6 +76,7 @@ import android.window.WindowContainerTransaction;
 import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.window.flags.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
@@ -639,7 +641,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                             e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx));
                     mDesktopTasksController.onDragPositioningEnd(taskInfo, position,
                             new PointF(e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx)),
-                            newTaskBounds);
+                            newTaskBounds, decoration.calculateValidDragArea());
                     if (touchingButton && !mHasLongClicked) {
                         // We need the input event to not be consumed here to end the ripple
                         // effect on the touched button. We will reset drag state in the ensuing
@@ -867,8 +869,9 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                 }
                 if (mTransitionDragActive) {
                     // Do not create an indicator at all if we're not past transition height.
-                    if (ev.getRawY() < mContext.getResources().getDimensionPixelSize(com.android
-                            .wm.shell.R.dimen.desktop_mode_fullscreen_from_desktop_height)
+                    DisplayLayout layout = mDisplayController
+                            .getDisplayLayout(relevantDecor.mTaskInfo.displayId);
+                    if (ev.getRawY() < 2 * layout.stableInsets().top
                             && mMoveToDesktopAnimator == null) {
                         return;
                     }
@@ -1054,6 +1057,10 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                 && taskInfo.isFocused) {
             return false;
         }
+        if (Flags.enableDesktopWindowingModalsPolicy()
+                && isSingleTopActivityTranslucent(taskInfo)) {
+            return false;
+        }
         return DesktopModeStatus.isEnabled()
                 && taskInfo.getWindowingMode() != WINDOWING_MODE_PINNED
                 && taskInfo.getActivityType() == ACTIVITY_TYPE_STANDARD
@@ -1086,18 +1093,16 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
         windowDecoration.createResizeVeil();
 
         final DragPositioningCallback dragPositioningCallback;
-        final int transitionAreaHeight = mContext.getResources().getDimensionPixelSize(
-                R.dimen.desktop_mode_fullscreen_from_desktop_height);
         if (!DesktopModeStatus.isVeiledResizeEnabled()) {
             dragPositioningCallback =  new FluidResizeTaskPositioner(
                     mTaskOrganizer, mTransitions, windowDecoration, mDisplayController,
-                    mDragStartListener, mTransactionFactory, transitionAreaHeight);
+                    mDragStartListener, mTransactionFactory);
             windowDecoration.setTaskDragResizer(
                     (FluidResizeTaskPositioner) dragPositioningCallback);
         } else {
             dragPositioningCallback =  new VeiledResizeTaskPositioner(
                     mTaskOrganizer, windowDecoration, mDisplayController,
-                    mDragStartListener, mTransitions, transitionAreaHeight);
+                    mDragStartListener, mTransitions);
             windowDecoration.setTaskDragResizer(
                     (VeiledResizeTaskPositioner) dragPositioningCallback);
         }

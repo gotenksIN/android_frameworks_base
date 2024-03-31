@@ -16,86 +16,116 @@
 
 package com.android.systemui.qs.tiles.dialog.bluetooth
 
-import android.os.UserHandle
+import android.bluetooth.BluetoothAdapter
 import android.util.Log
+import com.android.settingslib.bluetooth.BluetoothCallback
+import com.android.settingslib.bluetooth.LocalBluetoothManager
+import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
+import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.user.data.repository.UserRepository
-import com.android.systemui.util.settings.SecureSettings
-import com.android.systemui.util.settings.SettingsProxyExt.observerFlow
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
 
-/** Repository class responsible for managing the Bluetooth Auto-On feature settings. */
-// TODO(b/316822488): Handle multi-user
+/**
+ * Repository class responsible for managing the Bluetooth Auto-On feature settings for the current
+ * user.
+ */
 @SysUISingleton
 class BluetoothAutoOnRepository
 @Inject
 constructor(
-    private val secureSettings: SecureSettings,
-    private val userRepository: UserRepository,
+    localBluetoothManager: LocalBluetoothManager?,
+    private val bluetoothAdapter: BluetoothAdapter?,
     @Application private val coroutineScope: CoroutineScope,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
 ) {
-    // Flow representing the auto on setting value
-    internal val getValue: Flow<Int> =
-        secureSettings
-            .observerFlow(UserHandle.USER_SYSTEM, SETTING_NAME)
-            .onStart { emit(Unit) }
-            .map {
-                if (userRepository.getSelectedUserInfo().id != UserHandle.USER_SYSTEM) {
-                    Log.i(TAG, "Current user is not USER_SYSTEM. Multi-user is not supported")
-                    return@map UNSET
+
+    // Flow representing the auto on state for the current user
+    internal val isAutoOn: Flow<Boolean> =
+        localBluetoothManager?.eventManager?.let { eventManager ->
+            conflatedCallbackFlow {
+                    val listener =
+                        object : BluetoothCallback {
+                            override fun onAutoOnStateChanged(autoOnState: Int) {
+                                super.onAutoOnStateChanged(autoOnState)
+                                if (
+                                    autoOnState == BluetoothAdapter.AUTO_ON_STATE_ENABLED ||
+                                        autoOnState == BluetoothAdapter.AUTO_ON_STATE_DISABLED
+                                ) {
+                                    trySendWithFailureLogging(
+                                        autoOnState == BluetoothAdapter.AUTO_ON_STATE_ENABLED,
+                                        TAG,
+                                        "onAutoOnStateChanged"
+                                    )
+                                }
+                            }
+                        }
+                    eventManager.registerCallback(listener)
+                    awaitClose { eventManager.unregisterCallback(listener) }
                 }
-                secureSettings.getIntForUser(SETTING_NAME, UNSET, UserHandle.USER_SYSTEM)
-            }
-            .distinctUntilChanged()
-            .flowOn(backgroundDispatcher)
-            .shareIn(coroutineScope, SharingStarted.WhileSubscribed(replayExpirationMillis = 0))
+                .onStart { emit(isAutoOnEnabled()) }
+                .flowOn(backgroundDispatcher)
+                .stateIn(
+                    coroutineScope,
+                    SharingStarted.WhileSubscribed(replayExpirationMillis = 0),
+                    initialValue = false
+                )
+        }
+            ?: flowOf(false)
 
     /**
-     * Checks if the auto on setting value is ever set for the current user.
+     * Checks if the auto on feature is supported for the current user.
      *
-     * @return `true` if the setting value is not UNSET, `false` otherwise.
+     * @throws Exception if an error occurs while checking auto-on support.
      */
-    suspend fun isValuePresent(): Boolean =
+    suspend fun isAutoOnSupported(): Boolean =
         withContext(backgroundDispatcher) {
-            if (userRepository.getSelectedUserInfo().id != UserHandle.USER_SYSTEM) {
-                Log.i(TAG, "Current user is not USER_SYSTEM. Multi-user is not supported")
+            try {
+                bluetoothAdapter?.isAutoOnSupported ?: false
+            } catch (e: Exception) {
+                // Server could throw TimeoutException, InterruptedException or ExecutionException
+                Log.e(TAG, "Error calling isAutoOnSupported", e)
                 false
-            } else {
-                secureSettings.getIntForUser(SETTING_NAME, UNSET, UserHandle.USER_SYSTEM) != UNSET
             }
         }
 
-    /**
-     * Sets the Bluetooth Auto-On setting value for the current user.
-     *
-     * @param value The new setting value to be applied.
-     */
-    suspend fun setValue(value: Int) {
+    /** Sets the Bluetooth Auto-On for the current user. */
+    suspend fun setAutoOn(value: Boolean) {
         withContext(backgroundDispatcher) {
-            if (userRepository.getSelectedUserInfo().id != UserHandle.USER_SYSTEM) {
-                Log.i(TAG, "Current user is not USER_SYSTEM. Multi-user is not supported")
-            } else {
-                secureSettings.putIntForUser(SETTING_NAME, value, UserHandle.USER_SYSTEM)
+            try {
+                bluetoothAdapter?.setAutoOnEnabled(value)
+            } catch (e: Exception) {
+                // Server could throw IllegalStateException, TimeoutException, InterruptedException
+                // or ExecutionException
+                Log.e(TAG, "Error calling setAutoOnEnabled", e)
             }
         }
     }
 
-    companion object {
-        private const val TAG = "BluetoothAutoOnRepository"
-        const val SETTING_NAME = "bluetooth_automatic_turn_on"
-        const val UNSET = -1
+    private suspend fun isAutoOnEnabled() =
+        withContext(backgroundDispatcher) {
+            try {
+                bluetoothAdapter?.isAutoOnEnabled ?: false
+            } catch (e: Exception) {
+                // Server could throw IllegalStateException, TimeoutException, InterruptedException
+                // or ExecutionException
+                Log.e(TAG, "Error calling isAutoOnEnabled", e)
+                false
+            }
+        }
+
+    private companion object {
+        const val TAG = "BluetoothAutoOnRepository"
     }
 }

@@ -1965,7 +1965,9 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
      * be passed from the host process to the client process.
      *
      * @return The token
+     * @deprecated Use {@link AttachedSurfaceControl#getInputTransferToken()} instead.
      */
+    @Deprecated
     public @Nullable IBinder getHostToken() {
         final ViewRootImpl viewRoot = getViewRootImpl();
         if (viewRoot == null) {

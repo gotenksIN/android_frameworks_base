@@ -119,24 +119,7 @@ class KeyguardTransitionRepositoryImpl @Inject constructor() : KeyguardTransitio
     init {
         // Seed with transitions signaling a boot into lockscreen state. If updating this, please
         // also update FakeKeyguardTransitionRepository.
-        emitTransition(
-            TransitionStep(
-                KeyguardState.OFF,
-                KeyguardState.LOCKSCREEN,
-                0f,
-                TransitionState.STARTED,
-                KeyguardTransitionRepositoryImpl::class.simpleName!!,
-            )
-        )
-        emitTransition(
-            TransitionStep(
-                KeyguardState.OFF,
-                KeyguardState.LOCKSCREEN,
-                1f,
-                TransitionState.FINISHED,
-                KeyguardTransitionRepositoryImpl::class.simpleName!!,
-            )
-        )
+        initialTransitionSteps.forEach(::emitTransition)
     }
 
     override fun startTransition(info: TransitionInfo): UUID? {
@@ -158,6 +141,11 @@ class KeyguardTransitionRepositoryImpl @Inject constructor() : KeyguardTransitio
 
         lastAnimator?.cancel()
         lastAnimator = info.animator
+
+        // Cancel any existing manual transitions
+        updateTransitionId?.let { uuid ->
+            updateTransition(uuid, lastStep.value, TransitionState.CANCELED)
+        }
 
         info.animator?.let { animator ->
             // An animator was provided, so use it to run the transition
@@ -251,5 +239,31 @@ class KeyguardTransitionRepositoryImpl @Inject constructor() : KeyguardTransitio
 
     companion object {
         private const val TAG = "KeyguardTransitionRepository"
+
+        /**
+         * Transition steps to seed the repository with, so that all of the transition interactor
+         * flows emit reasonable initial values.
+         */
+        val initialTransitionSteps: List<TransitionStep> =
+            listOf(
+                TransitionStep(
+                    KeyguardState.OFF,
+                    KeyguardState.OFF,
+                    1f,
+                    TransitionState.FINISHED,
+                ),
+                TransitionStep(
+                    KeyguardState.OFF,
+                    KeyguardState.LOCKSCREEN,
+                    0f,
+                    TransitionState.STARTED,
+                ),
+                TransitionStep(
+                    KeyguardState.OFF,
+                    KeyguardState.LOCKSCREEN,
+                    1f,
+                    TransitionState.FINISHED,
+                ),
+            )
     }
 }

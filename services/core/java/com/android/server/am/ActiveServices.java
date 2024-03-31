@@ -204,6 +204,7 @@ import android.os.TransactionTooLargeException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
+import android.service.ondeviceintelligence.OnDeviceSandboxedInferenceService;
 import android.service.voice.HotwordDetectionService;
 import android.service.voice.VisualQueryDetectionService;
 import android.service.wearable.WearableSensingService;
@@ -4715,13 +4716,14 @@ public final class ActiveServices {
     }
 
     // TODO(b/265746493): Special case for HotwordDetectionService,
-    // VisualQueryDetectionService and WearableSensingService.
+    // VisualQueryDetectionService, WearableSensingService and OnDeviceSandboxedInferenceService
     // Need a cleaner way to append this seInfo.
     private String generateAdditionalSeInfoFromService(Intent service) {
         if (service != null && service.getAction() != null
                 && (service.getAction().equals(HotwordDetectionService.SERVICE_INTERFACE)
                 || service.getAction().equals(VisualQueryDetectionService.SERVICE_INTERFACE)
-                || service.getAction().equals(WearableSensingService.SERVICE_INTERFACE))) {
+                || service.getAction().equals(WearableSensingService.SERVICE_INTERFACE)
+            || service.getAction().equals(OnDeviceSandboxedInferenceService.SERVICE_INTERFACE))) {
             return ":isolatedComputeApp";
         }
         return "";
@@ -4853,6 +4855,8 @@ public final class ActiveServices {
                         INVALID_UID /* sdkSandboxClientAppUid */,
                         null /* sdkSandboxClientAppPackage */,
                         false /* inSharedIsolatedProcess */);
+                r.foregroundId = fgsDelegateOptions.mClientNotificationId;
+                r.foregroundNoti = fgsDelegateOptions.mClientNotification;
                 res.setService(r);
                 smap.mServicesByInstanceName.put(cn, r);
                 smap.mServicesByIntent.put(filter, r);
@@ -8482,7 +8486,7 @@ public final class ActiveServices {
      * @param targetProcess  the process of the service to start.
      * @return {@link ReasonCode}
      */
-    private @ReasonCode int shouldAllowFgsWhileInUsePermissionLocked(String callingPackage,
+    @ReasonCode int shouldAllowFgsWhileInUsePermissionLocked(String callingPackage,
             int callingPid, int callingUid, @Nullable ProcessRecord targetProcess,
             BackgroundStartPrivileges backgroundStartPrivileges) {
         int ret = REASON_DENIED;
@@ -9357,6 +9361,10 @@ public final class ActiveServices {
             });
         }
         signalForegroundServiceObserversLocked(r);
+        if (r.foregroundId != 0 && r.foregroundNoti != null) {
+            r.foregroundNoti.flags |= Notification.FLAG_FOREGROUND_SERVICE;
+            r.postNotification(true);
+        }
         return true;
     }
 

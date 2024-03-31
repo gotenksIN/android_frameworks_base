@@ -1581,6 +1581,10 @@ public class AppOpsManager {
      * Allows an app to access location without the traditional location permissions and while the
      * user location setting is off, but only during pre-defined emergency sessions.
      *
+     * <p>This op is only used for tracking, not for permissions, so it is still the client's
+     * responsibility to check the {@link Manifest.permission.LOCATION_BYPASS} permission
+     * appropriately.
+     *
      * @hide
      */
     public static final int OP_EMERGENCY_LOCATION = AppProtoEnums.APP_OP_EMERGENCY_LOCATION;
@@ -2459,6 +2463,10 @@ public class AppOpsManager {
      * Allows an app to access location without the traditional location permissions and while the
      * user location setting is off, but only during pre-defined emergency sessions.
      *
+     * <p>This op is only used for tracking, not for permissions, so it is still the client's
+     * responsibility to check the {@link Manifest.permission.LOCATION_BYPASS} permission
+     * appropriately.
+     *
      * @hide
      */
     @SystemApi
@@ -2951,7 +2959,9 @@ public class AppOpsManager {
         new AppOpInfo.Builder(OP_ESTABLISH_VPN_MANAGER, OPSTR_ESTABLISH_VPN_MANAGER,
                 "ESTABLISH_VPN_MANAGER").setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_ACCESS_RESTRICTED_SETTINGS, OPSTR_ACCESS_RESTRICTED_SETTINGS,
-                "ACCESS_RESTRICTED_SETTINGS").setDefaultMode(AppOpsManager.MODE_ALLOWED)
+                "ACCESS_RESTRICTED_SETTINGS").setDefaultMode(
+                        android.permission.flags.Flags.enhancedConfirmationModeApisEnabled()
+                                ? MODE_DEFAULT : MODE_ALLOWED)
             .setDisableReset(true).setRestrictRead(true).build(),
         new AppOpInfo.Builder(OP_RECEIVE_AMBIENT_TRIGGER_AUDIO, OPSTR_RECEIVE_AMBIENT_TRIGGER_AUDIO,
                 "RECEIVE_SOUNDTRIGGER_AUDIO").setDefaultMode(AppOpsManager.MODE_ALLOWED)
@@ -3045,8 +3055,10 @@ public class AppOpsManager {
         new AppOpInfo.Builder(OP_UNARCHIVAL_CONFIRMATION, OPSTR_UNARCHIVAL_CONFIRMATION,
                 "UNARCHIVAL_CONFIRMATION")
                 .setDefaultMode(MODE_ALLOWED).build(),
-        // TODO(b/301150056): STOPSHIP determine how this appop should work with the permission
         new AppOpInfo.Builder(OP_EMERGENCY_LOCATION, OPSTR_EMERGENCY_LOCATION, "EMERGENCY_LOCATION")
+                .setDefaultMode(MODE_ALLOWED)
+                // even though this has a permission associated, this op is only used for tracking,
+                // and the client is responsible for checking the LOCATION_BYPASS permission.
                 .setPermission(Manifest.permission.LOCATION_BYPASS).build(),
     };
 

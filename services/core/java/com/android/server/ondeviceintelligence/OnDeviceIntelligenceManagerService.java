@@ -16,12 +16,11 @@
 
 package com.android.server.ondeviceintelligence;
 
-import static android.service.ondeviceintelligence.OnDeviceIntelligenceService.OnDeviceUpdateProcessingException.PROCESSING_UPDATE_STATUS_CONNECTION_FAILED;
-
 import android.Manifest;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.app.AppGlobals;
-import android.app.ondeviceintelligence.Content;
 import android.app.ondeviceintelligence.DownloadCallback;
 import android.app.ondeviceintelligence.Feature;
 import android.app.ondeviceintelligence.IDownloadCallback;
@@ -33,25 +32,32 @@ import android.app.ondeviceintelligence.IProcessingSignal;
 import android.app.ondeviceintelligence.IResponseCallback;
 import android.app.ondeviceintelligence.IStreamingResponseCallback;
 import android.app.ondeviceintelligence.ITokenInfoCallback;
-import android.app.ondeviceintelligence.OnDeviceIntelligenceManager;
+import android.app.ondeviceintelligence.OnDeviceIntelligenceException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.content.res.Resources;
 import android.os.Binder;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
 import android.os.ICancellationSignal;
+import android.os.Looper;
+import android.os.Message;
 import android.os.ParcelFileDescriptor;
 import android.os.PersistableBundle;
 import android.os.RemoteCallback;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
+import android.os.ShellCallback;
 import android.os.UserHandle;
 import android.provider.DeviceConfig;
 import android.service.ondeviceintelligence.IOnDeviceIntelligenceService;
 import android.service.ondeviceintelligence.IOnDeviceSandboxedInferenceService;
+import android.service.ondeviceintelligence.IProcessingUpdateStatusCallback;
 import android.service.ondeviceintelligence.IRemoteProcessingService;
 import android.service.ondeviceintelligence.IRemoteStorageService;
-import android.service.ondeviceintelligence.IProcessingUpdateStatusCallback;
 import android.service.ondeviceintelligence.OnDeviceIntelligenceService;
 import android.service.ondeviceintelligence.OnDeviceSandboxedInferenceService;
 import android.text.TextUtils;
@@ -62,8 +68,10 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.infra.AndroidFuture;
 import com.android.internal.infra.ServiceConnector;
 import com.android.internal.os.BackgroundThread;
+import com.android.server.LocalServices;
 import com.android.server.SystemService;
 
+import java.io.FileDescriptor;
 import java.util.Objects;
 import java.util.Set;
 
@@ -84,6 +92,9 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
     private static final String TAG = OnDeviceIntelligenceManagerService.class.getSimpleName();
     private static final String KEY_SERVICE_ENABLED = "service_enabled";
 
+    /** Handler message to {@link #resetTemporaryServices()} */
+    private static final int MSG_RESET_TEMPORARY_SERVICE = 0;
+
     /** Default value in absence of {@link DeviceConfig} override. */
     private static final boolean DEFAULT_SERVICE_ENABLED = true;
     private static final String NAMESPACE_ON_DEVICE_INTELLIGENCE = "ondeviceintelligence";
@@ -96,18 +107,29 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
     private RemoteOnDeviceIntelligenceService mRemoteOnDeviceIntelligenceService;
     volatile boolean mIsServiceEnabled;
 
+    @GuardedBy("mLock")
+    private String[] mTemporaryServiceNames;
+
+    /**
+     * Handler used to reset the temporary service names.
+     */
+    @GuardedBy("mLock")
+    private Handler mTemporaryHandler;
+
     public OnDeviceIntelligenceManagerService(Context context) {
         super(context);
         mContext = context;
+        mTemporaryServiceNames = new String[0];
     }
 
     @Override
     public void onStart() {
         publishBinderService(
-                Context.ON_DEVICE_INTELLIGENCE_SERVICE, new OnDeviceIntelligenceManagerInternal(),
+                Context.ON_DEVICE_INTELLIGENCE_SERVICE, getOnDeviceIntelligenceManagerService(),
                 /* allowIsolated = */true);
+        LocalServices.addService(OnDeviceIntelligenceManagerInternal.class,
+                OnDeviceIntelligenceManagerService.this::getRemoteConfiguredPackageName);
     }
-
 
     @Override
     public void onBootPhase(int phase) {
@@ -133,196 +155,214 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
                 KEY_SERVICE_ENABLED, DEFAULT_SERVICE_ENABLED);
     }
 
-    private final class OnDeviceIntelligenceManagerInternal extends
-            IOnDeviceIntelligenceManager.Stub {
-        @Override
-        public void getVersion(RemoteCallback remoteCallback) throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getVersion");
-            Objects.requireNonNull(remoteCallback);
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                remoteCallback.sendResult(null);
-                return;
+    private IBinder getOnDeviceIntelligenceManagerService() {
+        return new IOnDeviceIntelligenceManager.Stub() {
+            @Override
+            public String getRemoteServicePackageName() {
+                return OnDeviceIntelligenceManagerService.this.getRemoteConfiguredPackageName();
             }
-            ensureRemoteIntelligenceServiceInitialized();
-            mRemoteOnDeviceIntelligenceService.post(
-                    service -> service.getVersion(remoteCallback));
-        }
 
-        @Override
-        public void getFeature(int id, IFeatureCallback featureCallback) throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getFeatures");
-            Objects.requireNonNull(featureCallback);
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                featureCallback.onFailure(
-                        OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
-                        "OnDeviceIntelligenceManagerService is unavailable",
-                        new PersistableBundle());
-                return;
+            @Override
+            public void getVersion(RemoteCallback remoteCallback) {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getVersion");
+                Objects.requireNonNull(remoteCallback);
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    remoteCallback.sendResult(null);
+                    return;
+                }
+                ensureRemoteIntelligenceServiceInitialized();
+                mRemoteOnDeviceIntelligenceService.run(
+                        service -> service.getVersion(remoteCallback));
             }
-            ensureRemoteIntelligenceServiceInitialized();
-            mRemoteOnDeviceIntelligenceService.post(
-                    service -> service.getFeature(Binder.getCallingUid(), id, featureCallback));
-        }
 
-        @Override
-        public void listFeatures(IListFeaturesCallback listFeaturesCallback)
-                throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getFeatures");
-            Objects.requireNonNull(listFeaturesCallback);
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                listFeaturesCallback.onFailure(
-                        OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
-                        "OnDeviceIntelligenceManagerService is unavailable",
-                        new PersistableBundle());
-                return;
+            @Override
+            public void getFeature(int id, IFeatureCallback featureCallback)
+                    throws RemoteException {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getFeatures");
+                Objects.requireNonNull(featureCallback);
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    featureCallback.onFailure(
+                            OnDeviceIntelligenceException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
+                            "OnDeviceIntelligenceManagerService is unavailable",
+                            PersistableBundle.EMPTY);
+                    return;
+                }
+                ensureRemoteIntelligenceServiceInitialized();
+                mRemoteOnDeviceIntelligenceService.run(
+                        service -> service.getFeature(Binder.getCallingUid(), id, featureCallback));
             }
-            ensureRemoteIntelligenceServiceInitialized();
-            mRemoteOnDeviceIntelligenceService.post(
-                    service -> service.listFeatures(Binder.getCallingUid(), listFeaturesCallback));
-        }
 
-        @Override
-        public void getFeatureDetails(Feature feature,
-                IFeatureDetailsCallback featureDetailsCallback)
-                throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getFeatureStatus");
-            Objects.requireNonNull(feature);
-            Objects.requireNonNull(featureDetailsCallback);
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                featureDetailsCallback.onFailure(
-                        OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
-                        "OnDeviceIntelligenceManagerService is unavailable",
-                        new PersistableBundle());
-                return;
+            @Override
+            public void listFeatures(IListFeaturesCallback listFeaturesCallback)
+                    throws RemoteException {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getFeatures");
+                Objects.requireNonNull(listFeaturesCallback);
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    listFeaturesCallback.onFailure(
+                            OnDeviceIntelligenceException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
+                            "OnDeviceIntelligenceManagerService is unavailable",
+                            PersistableBundle.EMPTY);
+                    return;
+                }
+                ensureRemoteIntelligenceServiceInitialized();
+                mRemoteOnDeviceIntelligenceService.run(
+                        service -> service.listFeatures(Binder.getCallingUid(),
+                                listFeaturesCallback));
             }
-            ensureRemoteIntelligenceServiceInitialized();
-            mRemoteOnDeviceIntelligenceService.post(
-                    service -> service.getFeatureDetails(Binder.getCallingUid(), feature,
-                            featureDetailsCallback));
-        }
 
-        @Override
-        public void requestFeatureDownload(Feature feature, ICancellationSignal cancellationSignal,
-                IDownloadCallback downloadCallback) throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal requestFeatureDownload");
-            Objects.requireNonNull(feature);
-            Objects.requireNonNull(downloadCallback);
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                downloadCallback.onDownloadFailed(
-                        DownloadCallback.DOWNLOAD_FAILURE_STATUS_UNAVAILABLE,
-                        "OnDeviceIntelligenceManagerService is unavailable",
-                        new PersistableBundle());
+            @Override
+            public void getFeatureDetails(Feature feature,
+                    IFeatureDetailsCallback featureDetailsCallback)
+                    throws RemoteException {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal getFeatureStatus");
+                Objects.requireNonNull(feature);
+                Objects.requireNonNull(featureDetailsCallback);
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    featureDetailsCallback.onFailure(
+                            OnDeviceIntelligenceException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
+                            "OnDeviceIntelligenceManagerService is unavailable",
+                            PersistableBundle.EMPTY);
+                    return;
+                }
+                ensureRemoteIntelligenceServiceInitialized();
+                mRemoteOnDeviceIntelligenceService.run(
+                        service -> service.getFeatureDetails(Binder.getCallingUid(), feature,
+                                featureDetailsCallback));
             }
-            ensureRemoteIntelligenceServiceInitialized();
-            mRemoteOnDeviceIntelligenceService.post(
-                    service -> service.requestFeatureDownload(Binder.getCallingUid(), feature,
-                            cancellationSignal,
-                            downloadCallback));
-        }
 
-
-        @Override
-        public void requestTokenInfo(Feature feature,
-                Content request, ICancellationSignal cancellationSignal,
-                ITokenInfoCallback tokenInfoCallback) throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal prepareFeatureProcessing");
-            Objects.requireNonNull(feature);
-            Objects.requireNonNull(request);
-            Objects.requireNonNull(tokenInfoCallback);
-
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                tokenInfoCallback.onFailure(
-                        OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
-                        "OnDeviceIntelligenceManagerService is unavailable",
-                        new PersistableBundle());
+            @Override
+            public void requestFeatureDownload(Feature feature,
+                    AndroidFuture cancellationSignalFuture,
+                    IDownloadCallback downloadCallback) throws RemoteException {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal requestFeatureDownload");
+                Objects.requireNonNull(feature);
+                Objects.requireNonNull(downloadCallback);
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    downloadCallback.onDownloadFailed(
+                            DownloadCallback.DOWNLOAD_FAILURE_STATUS_UNAVAILABLE,
+                            "OnDeviceIntelligenceManagerService is unavailable",
+                            PersistableBundle.EMPTY);
+                }
+                ensureRemoteIntelligenceServiceInitialized();
+                mRemoteOnDeviceIntelligenceService.run(
+                        service -> service.requestFeatureDownload(Binder.getCallingUid(), feature,
+                                cancellationSignalFuture,
+                                downloadCallback));
             }
-            ensureRemoteInferenceServiceInitialized();
-            mRemoteInferenceService.post(
-                    service -> service.requestTokenInfo(Binder.getCallingUid(), feature, request,
-                            cancellationSignal,
-                            tokenInfoCallback));
-        }
 
-        @Override
-        public void processRequest(Feature feature,
-                Content request,
-                int requestType,
-                ICancellationSignal cancellationSignal,
-                IProcessingSignal processingSignal,
-                IResponseCallback responseCallback)
-                throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal processRequest");
-            Objects.requireNonNull(feature);
-            Objects.requireNonNull(responseCallback);
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                responseCallback.onFailure(
-                        OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerProcessingException.PROCESSING_ERROR_SERVICE_UNAVAILABLE,
-                        "OnDeviceIntelligenceManagerService is unavailable",
-                        new PersistableBundle());
-            }
-            ensureRemoteInferenceServiceInitialized();
-            mRemoteInferenceService.post(
-                    service -> service.processRequest(Binder.getCallingUid(), feature, request,
-                            requestType,
-                            cancellationSignal, processingSignal,
-                            responseCallback));
-        }
 
-        @Override
-        public void processRequestStreaming(Feature feature,
-                Content request,
-                int requestType,
-                ICancellationSignal cancellationSignal,
-                IProcessingSignal processingSignal,
-                IStreamingResponseCallback streamingCallback) throws RemoteException {
-            Slog.i(TAG, "OnDeviceIntelligenceManagerInternal processRequestStreaming");
-            Objects.requireNonNull(feature);
-            Objects.requireNonNull(streamingCallback);
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
-            if (!mIsServiceEnabled) {
-                Slog.w(TAG, "Service not available");
-                streamingCallback.onFailure(
-                        OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerProcessingException.PROCESSING_ERROR_SERVICE_UNAVAILABLE,
-                        "OnDeviceIntelligenceManagerService is unavailable",
-                        new PersistableBundle());
+            @Override
+            public void requestTokenInfo(Feature feature,
+                    Bundle request,
+                    AndroidFuture cancellationSignalFuture,
+                    ITokenInfoCallback tokenInfoCallback) throws RemoteException {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal requestTokenInfo");
+                Objects.requireNonNull(feature);
+                Objects.requireNonNull(request);
+                Objects.requireNonNull(tokenInfoCallback);
+
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    tokenInfoCallback.onFailure(
+                            OnDeviceIntelligenceException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE,
+                            "OnDeviceIntelligenceManagerService is unavailable",
+                            PersistableBundle.EMPTY);
+                }
+                ensureRemoteInferenceServiceInitialized();
+
+                mRemoteInferenceService.run(
+                        service -> service.requestTokenInfo(Binder.getCallingUid(), feature,
+                                request,
+                                cancellationSignalFuture,
+                                tokenInfoCallback));
             }
-            ensureRemoteInferenceServiceInitialized();
-            mRemoteInferenceService.post(
-                    service -> service.processRequestStreaming(Binder.getCallingUid(), feature,
-                            request, requestType,
-                            cancellationSignal, processingSignal,
-                            streamingCallback));
-        }
+
+            @Override
+            public void processRequest(Feature feature,
+                    Bundle request,
+                    int requestType,
+                    AndroidFuture cancellationSignalFuture,
+                    AndroidFuture processingSignalFuture,
+                    IResponseCallback responseCallback)
+                    throws RemoteException {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal processRequest");
+                Objects.requireNonNull(feature);
+                Objects.requireNonNull(responseCallback);
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    responseCallback.onFailure(
+                            OnDeviceIntelligenceException.PROCESSING_ERROR_SERVICE_UNAVAILABLE,
+                            "OnDeviceIntelligenceManagerService is unavailable",
+                            PersistableBundle.EMPTY);
+                }
+                ensureRemoteInferenceServiceInitialized();
+                mRemoteInferenceService.run(
+                        service -> service.processRequest(Binder.getCallingUid(), feature, request,
+                                requestType,
+                                cancellationSignalFuture, processingSignalFuture,
+                                responseCallback));
+            }
+
+            @Override
+            public void processRequestStreaming(Feature feature,
+                    Bundle request,
+                    int requestType,
+                    AndroidFuture cancellationSignalFuture,
+                    AndroidFuture processingSignalFuture,
+                    IStreamingResponseCallback streamingCallback) throws RemoteException {
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal processRequestStreaming");
+                Objects.requireNonNull(feature);
+                Objects.requireNonNull(streamingCallback);
+                mContext.enforceCallingOrSelfPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                if (!mIsServiceEnabled) {
+                    Slog.w(TAG, "Service not available");
+                    streamingCallback.onFailure(
+                            OnDeviceIntelligenceException.PROCESSING_ERROR_SERVICE_UNAVAILABLE,
+                            "OnDeviceIntelligenceManagerService is unavailable",
+                            PersistableBundle.EMPTY);
+                }
+                ensureRemoteInferenceServiceInitialized();
+                mRemoteInferenceService.run(
+                        service -> service.processRequestStreaming(Binder.getCallingUid(), feature,
+                                request, requestType,
+                                cancellationSignalFuture, processingSignalFuture,
+                                streamingCallback));
+            }
+
+            @Override
+            public void onShellCommand(FileDescriptor in, FileDescriptor out, FileDescriptor err,
+                    String[] args, ShellCallback callback, ResultReceiver resultReceiver) {
+                new OnDeviceIntelligenceShellCommand(OnDeviceIntelligenceManagerService.this).exec(
+                        this, in, out, err, args, callback, resultReceiver);
+            }
+        };
     }
 
-    private void ensureRemoteIntelligenceServiceInitialized() throws RemoteException {
+    private void ensureRemoteIntelligenceServiceInitialized() {
         synchronized (mLock) {
             if (mRemoteOnDeviceIntelligenceService == null) {
-                String serviceName = mContext.getResources().getString(
-                        R.string.config_defaultOnDeviceIntelligenceService);
-                validateService(serviceName, false);
+                String serviceName = getServiceNames()[0];
+                Binder.withCleanCallingIdentity(() -> validateServiceElevated(serviceName, false));
                 mRemoteOnDeviceIntelligenceService = new RemoteOnDeviceIntelligenceService(mContext,
                         ComponentName.unflattenFromString(serviceName),
                         UserHandle.SYSTEM.getIdentifier());
@@ -350,30 +390,19 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
             public void updateProcessingState(
                     Bundle processingState,
                     IProcessingUpdateStatusCallback callback) {
-                try {
-                    ensureRemoteInferenceServiceInitialized();
-                    mRemoteInferenceService.post(
-                            service -> service.updateProcessingState(
-                                    processingState, callback));
-                } catch (RemoteException unused) {
-                    try {
-                        callback.onFailure(
-                                PROCESSING_UPDATE_STATUS_CONNECTION_FAILED,
-                                "Received failure invoking the remote processing service.");
-                    } catch (RemoteException ex) {
-                        Slog.w(TAG, "Failed to send failure status.", ex);
-                    }
-                }
+                ensureRemoteInferenceServiceInitialized();
+                mRemoteInferenceService.run(
+                        service -> service.updateProcessingState(
+                                processingState, callback));
             }
         };
     }
 
-    private void ensureRemoteInferenceServiceInitialized() throws RemoteException {
+    private void ensureRemoteInferenceServiceInitialized() {
         synchronized (mLock) {
             if (mRemoteInferenceService == null) {
-                String serviceName = mContext.getResources().getString(
-                        R.string.config_defaultOnDeviceSandboxedInferenceService);
-                validateService(serviceName, true);
+                String serviceName = getServiceNames()[1];
+                Binder.withCleanCallingIdentity(() -> validateServiceElevated(serviceName, true));
                 mRemoteInferenceService = new RemoteOnDeviceSandboxedInferenceService(mContext,
                         ComponentName.unflattenFromString(serviceName),
                         UserHandle.SYSTEM.getIdentifier());
@@ -384,7 +413,7 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
                                     @NonNull IOnDeviceSandboxedInferenceService service) {
                                 try {
                                     ensureRemoteIntelligenceServiceInitialized();
-                                    mRemoteOnDeviceIntelligenceService.post(
+                                    mRemoteOnDeviceIntelligenceService.run(
                                             intelligenceService -> intelligenceService.notifyInferenceServiceConnected());
                                     service.registerRemoteStorageService(
                                             getIRemoteStorageService());
@@ -404,7 +433,7 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
             public void getReadOnlyFileDescriptor(
                     String filePath,
                     AndroidFuture<ParcelFileDescriptor> future) {
-                mRemoteOnDeviceIntelligenceService.post(
+                mRemoteOnDeviceIntelligenceService.run(
                         service -> service.getReadOnlyFileDescriptor(
                                 filePath, future));
             }
@@ -413,42 +442,45 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
             public void getReadOnlyFeatureFileDescriptorMap(
                     Feature feature,
                     RemoteCallback remoteCallback) {
-                mRemoteOnDeviceIntelligenceService.post(
+                mRemoteOnDeviceIntelligenceService.run(
                         service -> service.getReadOnlyFeatureFileDescriptorMap(
                                 feature, remoteCallback));
             }
         };
     }
 
-    @GuardedBy("mLock")
-    private void validateService(String serviceName, boolean checkIsolated)
-            throws RemoteException {
-        if (TextUtils.isEmpty(serviceName)) {
-            throw new RuntimeException("");
-        }
-        ComponentName serviceComponent = ComponentName.unflattenFromString(
-                serviceName);
-        ServiceInfo serviceInfo = AppGlobals.getPackageManager().getServiceInfo(
-                serviceComponent,
-                PackageManager.MATCH_DIRECT_BOOT_AWARE
-                        | PackageManager.MATCH_DIRECT_BOOT_UNAWARE, 0);
-        if (serviceInfo != null) {
-            if (!checkIsolated) {
-                checkServiceRequiresPermission(serviceInfo,
-                        Manifest.permission.BIND_ON_DEVICE_INTELLIGENCE_SERVICE);
-                return;
+    private void validateServiceElevated(String serviceName, boolean checkIsolated) {
+        try {
+            if (TextUtils.isEmpty(serviceName)) {
+                throw new IllegalStateException(
+                        "Remote service is not configured to complete the request");
             }
+            ComponentName serviceComponent = ComponentName.unflattenFromString(
+                    serviceName);
+            ServiceInfo serviceInfo = AppGlobals.getPackageManager().getServiceInfo(
+                    serviceComponent,
+                    PackageManager.MATCH_DIRECT_BOOT_AWARE
+                            | PackageManager.MATCH_DIRECT_BOOT_UNAWARE, 0);
+            if (serviceInfo != null) {
+                if (!checkIsolated) {
+                    checkServiceRequiresPermission(serviceInfo,
+                            Manifest.permission.BIND_ON_DEVICE_INTELLIGENCE_SERVICE);
+                    return;
+                }
 
-            checkServiceRequiresPermission(serviceInfo,
-                    Manifest.permission.BIND_ON_DEVICE_SANDBOXED_INFERENCE_SERVICE);
-            if (!isIsolatedService(serviceInfo)) {
-                throw new SecurityException(
-                        "Call required an isolated service, but the configured service: "
-                                + serviceName + ", is not isolated");
+                checkServiceRequiresPermission(serviceInfo,
+                        Manifest.permission.BIND_ON_DEVICE_SANDBOXED_INFERENCE_SERVICE);
+                if (!isIsolatedService(serviceInfo)) {
+                    throw new SecurityException(
+                            "Call required an isolated service, but the configured service: "
+                                    + serviceName + ", is not isolated");
+                }
+            } else {
+                throw new IllegalStateException(
+                        "Remote service is not configured to complete the request.");
             }
-        } else {
-            throw new RuntimeException(
-                    "Could not find service info for serviceName: " + serviceName);
+        } catch (RemoteException e) {
+            throw new IllegalStateException("Could not fetch service info for remote services", e);
         }
     }
 
@@ -464,9 +496,97 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
         }
     }
 
-    @GuardedBy("mLock")
-    private boolean isIsolatedService(@NonNull ServiceInfo serviceInfo) {
+    private static boolean isIsolatedService(@NonNull ServiceInfo serviceInfo) {
         return (serviceInfo.flags & ServiceInfo.FLAG_ISOLATED_PROCESS) != 0
                 && (serviceInfo.flags & ServiceInfo.FLAG_EXTERNAL_SERVICE) == 0;
+    }
+
+    @Nullable
+    public String getRemoteConfiguredPackageName() {
+        try {
+            String[] serviceNames = getServiceNames();
+            ComponentName componentName = ComponentName.unflattenFromString(serviceNames[1]);
+            if (componentName != null) {
+                return componentName.getPackageName();
+            }
+        } catch (Resources.NotFoundException e) {
+            Slog.e(TAG, "Could not find resource", e);
+        }
+
+        return null;
+    }
+
+
+    protected String[] getServiceNames() throws Resources.NotFoundException {
+        // TODO 329240495 : Consider a small class with explicit field names for the two services
+        synchronized (mLock) {
+            if (mTemporaryServiceNames != null && mTemporaryServiceNames.length == 2) {
+                return mTemporaryServiceNames;
+            }
+        }
+        return new String[]{mContext.getResources().getString(
+                R.string.config_defaultOnDeviceIntelligenceService),
+                mContext.getResources().getString(
+                        R.string.config_defaultOnDeviceSandboxedInferenceService)};
+    }
+
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    public void setTemporaryServices(@NonNull String[] componentNames, int durationMs) {
+        Objects.requireNonNull(componentNames);
+        enforceShellOnly(Binder.getCallingUid(), "setTemporaryServices");
+        mContext.enforceCallingPermission(
+                Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+        synchronized (mLock) {
+            mTemporaryServiceNames = componentNames;
+            mRemoteOnDeviceIntelligenceService = null;
+            mRemoteInferenceService = null;
+            if (mTemporaryHandler == null) {
+                mTemporaryHandler = new Handler(Looper.getMainLooper(), null, true) {
+                    @Override
+                    public void handleMessage(Message msg) {
+                        if (msg.what == MSG_RESET_TEMPORARY_SERVICE) {
+                            synchronized (mLock) {
+                                resetTemporaryServices();
+                            }
+                        } else {
+                            Slog.wtf(TAG, "invalid handler msg: " + msg);
+                        }
+                    }
+                };
+            } else {
+                mTemporaryHandler.removeMessages(MSG_RESET_TEMPORARY_SERVICE);
+            }
+
+            if (durationMs != -1) {
+                mTemporaryHandler.sendEmptyMessageDelayed(MSG_RESET_TEMPORARY_SERVICE, durationMs);
+            }
+        }
+    }
+
+    public void resetTemporaryServices() {
+        synchronized (mLock) {
+            if (mTemporaryHandler != null) {
+                mTemporaryHandler.removeMessages(MSG_RESET_TEMPORARY_SERVICE);
+                mTemporaryHandler = null;
+            }
+
+            mRemoteInferenceService = null;
+            mRemoteOnDeviceIntelligenceService = null;
+            mTemporaryServiceNames = new String[0];
+        }
+    }
+
+    /**
+     * Throws if the caller is not of a shell (or root) UID.
+     *
+     * @param callingUid pass Binder.callingUid().
+     */
+    public static void enforceShellOnly(int callingUid, String message) {
+        if (callingUid == android.os.Process.SHELL_UID
+                || callingUid == android.os.Process.ROOT_UID) {
+            return; // okay
+        }
+
+        throw new SecurityException(message + ": Only shell user can call it");
     }
 }

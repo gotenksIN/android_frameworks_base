@@ -84,7 +84,6 @@ import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE
 import static com.android.server.wm.WindowManagerService.WINDOWS_FREEZING_SCREENS_NONE;
 import static com.android.server.wm.WindowSurfacePlacer.SET_UPDATE_ROTATION;
 import static com.android.server.wm.WindowSurfacePlacer.SET_WALLPAPER_ACTION_PENDING;
-import static com.android.systemui.shared.Flags.enableHomeDelay;
 
 import static java.lang.Integer.MAX_VALUE;
 
@@ -112,7 +111,6 @@ import android.hardware.power.Mode;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Debug;
-import android.os.DeviceIntegrationUtils;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
@@ -1461,8 +1459,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             return false;
         }
 
-        if (enableHomeDelay() && !mService.mAmInternal.isThemeOverlayReady(userId)) {
-            Slog.d(TAG, "ThemeHomeDelay: Home launch was deferred.");
+        if (mService.mAmInternal.shouldDelayHomeLaunch(userId)) {
+            Slog.d(TAG, "ThemeHomeDelay: Home launch was deferred with user " + userId);
             return false;
         }
 
@@ -2429,14 +2427,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             mTmpFindTaskResult.process(taskDisplayArea);
             if (mTmpFindTaskResult.mIdealRecord != null) {
                 return mTmpFindTaskResult.mIdealRecord;
-            } else if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION
-                       && mTmpFindTaskResult.mCandidateRecord != null
-                       && mService.getRemoteTaskManager().
-                            findTaskOnlyForLaunch(
-                                    intent,
-                                    taskAffinity,
-                                    mTmpFindTaskResult.mCandidateRecord.getTask().mTaskId)) {
-                return mTmpFindTaskResult.mCandidateRecord;
             }
             return null;
         });

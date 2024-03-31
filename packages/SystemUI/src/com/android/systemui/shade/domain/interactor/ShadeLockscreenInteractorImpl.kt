@@ -20,7 +20,6 @@ import com.android.keyguard.LockIconViewController
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.shade.ShadeLockscreenInteractor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -30,7 +29,7 @@ class ShadeLockscreenInteractorImpl
 @Inject
 constructor(
     @Background private val scope: CoroutineScope,
-    shadeInteractor: ShadeInteractor,
+    private val shadeInteractor: ShadeInteractor,
     private val sceneInteractor: SceneInteractor,
     private val lockIconViewController: LockIconViewController,
 ) : ShadeLockscreenInteractor {
@@ -38,7 +37,8 @@ constructor(
         changeToShadeScene()
     }
 
-    override val isExpanded = shadeInteractor.isAnyExpanded.value
+    override val isExpanded
+        get() = shadeInteractor.isAnyExpanded.value
 
     override fun startBouncerPreHideAnimation() {
         // TODO("b/324280998") Implement replacement or delete
@@ -81,6 +81,11 @@ constructor(
 
     override fun setKeyguardStatusBarAlpha(alpha: Float) {
         // TODO(b/325072511) delete this
+    }
+
+    override fun showAodUi() {
+        sceneInteractor.changeScene(Scenes.Lockscreen, "showAodUi")
+        // TODO(b/330311871) implement transition to AOD
     }
 
     private fun changeToShadeScene() {

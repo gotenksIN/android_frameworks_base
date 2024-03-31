@@ -396,8 +396,6 @@
   <java-symbol type="string" name="config_hdmiCecSetMenuLanguageActivity" />
   <java-symbol type="integer" name="config_minNumVisibleRecentTasks_lowRam" />
   <java-symbol type="integer" name="config_maxNumVisibleRecentTasks_lowRam" />
-  <java-symbol type="integer" name="config_minNumVisibleRecentTasks_grid" />
-  <java-symbol type="integer" name="config_maxNumVisibleRecentTasks_grid" />
   <java-symbol type="integer" name="config_minNumVisibleRecentTasks" />
   <java-symbol type="integer" name="config_maxNumVisibleRecentTasks" />
   <java-symbol type="integer" name="config_activeTaskDurationHours" />
@@ -961,6 +959,7 @@
   <java-symbol type="string" name="roamingTextSearching" />
   <java-symbol type="string" name="scCellularNetworkSecuritySummary" />
   <java-symbol type="string" name="scCellularNetworkSecurityTitle" />
+  <java-symbol type="string" name="scCellularNetworkSecurityLearnMore" />
   <java-symbol type="string" name="scIdentifierDisclosureIssueSummary" />
   <java-symbol type="string" name="scIdentifierDisclosureIssueTitle" />
   <java-symbol type="string" name="scNullCipherIssueActionLearnMore" />
@@ -2104,6 +2103,7 @@
   <java-symbol type="integer" name="config_notificationsBatteryMediumARGB" />
   <java-symbol type="integer" name="config_notificationsBatteryNearlyFullLevel" />
   <java-symbol type="integer" name="config_notificationServiceArchiveSize" />
+  <java-symbol type="integer" name="config_notificationLongTextMaxLineCount" />
   <java-symbol type="dimen" name="config_rotaryEncoderAxisScrollTickInterval" />
   <java-symbol type="integer" name="config_recentVibrationsDumpSizeLimit" />
   <java-symbol type="integer" name="config_previousVibrationsDumpSizeLimit" />
@@ -3149,6 +3149,8 @@
   <!-- TextView -->
   <java-symbol type="bool" name="config_textShareSupported" />
   <java-symbol type="string" name="failed_to_copy_to_clipboard" />
+  <java-symbol type="string" name="error_handwriting_unsupported" />
+  <java-symbol type="string" name="error_handwriting_unsupported_password" />
 
   <java-symbol type="id" name="notification_material_reply_container" />
   <java-symbol type="id" name="notification_material_reply_text_1" />
@@ -5053,8 +5055,7 @@
   <java-symbol type="bool" name="config_assistLongPressHomeEnabledDefault" />
   <java-symbol type="bool" name="config_assistTouchGestureEnabledDefault" />
 
-  <java-symbol type="bool" name="config_searchPressHoldNavHandleEnabledDefault" />
-  <java-symbol type="bool" name="config_searchLongPressHomeEnabledDefault" />
+  <java-symbol type="bool" name="config_searchAllEntrypointsEnabledDefault" />
 
   <java-symbol type="integer" name="config_hotwordDetectedResultMaxBundleSize" />
 
@@ -5373,6 +5374,11 @@
 
   <java-symbol type="raw" name="default_ringtone_vibration_effect" />
 
+  <!-- For activity embedding divider -->
+  <java-symbol type="drawable" name="activity_embedding_divider_handle" />
+  <java-symbol type="dimen" name="activity_embedding_divider_touch_target_width" />
+  <java-symbol type="dimen" name="activity_embedding_divider_touch_target_height" />
+
   <!-- Whether we order unlocking and waking -->
   <java-symbol type="bool" name="config_orderUnlockAndWake" />
 
@@ -5413,4 +5419,7 @@
   <java-symbol type="string" name="config_defaultContextualSearchLegacyEnabled" />
 
   <java-symbol type="string" name="unarchival_session_app_label" />
+
+  <!-- Whether WM DisplayContent supports high performance transitions -->
+  <java-symbol type="bool" name="config_deviceSupportsHighPerfTransitions" />
 </resources>

@@ -1593,6 +1593,16 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
     }
 
+    protected void grantFocusToPosition(boolean leftOrTop) {
+        int stageToFocus;
+        if (mSideStagePosition == SPLIT_POSITION_BOTTOM_OR_RIGHT) {
+            stageToFocus = leftOrTop ? getMainStagePosition() : getSideStagePosition();
+        } else {
+            stageToFocus = leftOrTop ? getSideStagePosition() : getMainStagePosition();
+        }
+        grantFocusToStage(stageToFocus);
+    }
+
     private void clearRequestIfPresented() {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "clearRequestIfPresented");
         if (mSideStageListener.mVisible && mSideStageListener.mHasChildren

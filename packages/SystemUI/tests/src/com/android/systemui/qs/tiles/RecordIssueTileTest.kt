@@ -30,6 +30,8 @@ import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.qs.QSHost
 import com.android.systemui.qs.QsEventLogger
 import com.android.systemui.qs.logging.QSLogger
+import com.android.systemui.qs.pipeline.domain.interactor.PanelInteractor
+import com.android.systemui.recordissue.IssueRecordingState
 import com.android.systemui.recordissue.RecordIssueDialogDelegate
 import com.android.systemui.res.R
 import com.android.systemui.settings.UserContextProvider
@@ -66,12 +68,14 @@ class RecordIssueTileTest : SysuiTestCase() {
     @Mock private lateinit var keyguardDismissUtil: KeyguardDismissUtil
     @Mock private lateinit var keyguardStateController: KeyguardStateController
     @Mock private lateinit var dialogLauncherAnimator: DialogTransitionAnimator
+    @Mock private lateinit var panelInteractor: PanelInteractor
     @Mock private lateinit var userContextProvider: UserContextProvider
     @Mock private lateinit var delegateFactory: RecordIssueDialogDelegate.Factory
     @Mock private lateinit var dialogDelegate: RecordIssueDialogDelegate
     @Mock private lateinit var dialog: SystemUIDialog
 
     private lateinit var testableLooper: TestableLooper
+    private val issueRecordingState = IssueRecordingState()
     private lateinit var tile: RecordIssueTile
 
     @Before
@@ -96,14 +100,16 @@ class RecordIssueTileTest : SysuiTestCase() {
                 keyguardDismissUtil,
                 keyguardStateController,
                 dialogLauncherAnimator,
+                panelInteractor,
                 userContextProvider,
+                issueRecordingState,
                 delegateFactory,
             )
     }
 
     @Test
     fun qsTileUi_shouldLookCorrect_whenInactive() {
-        tile.isRecording = false
+        issueRecordingState.isRecording = false
 
         val testState = tile.newTileState()
         tile.handleUpdateState(testState, null)
@@ -115,8 +121,7 @@ class RecordIssueTileTest : SysuiTestCase() {
 
     @Test
     fun qsTileUi_shouldLookCorrect_whenRecording() {
-        tile.isRecording = true
-
+        issueRecordingState.isRecording = true
         val testState = tile.newTileState()
         tile.handleUpdateState(testState, null)
 
@@ -127,7 +132,7 @@ class RecordIssueTileTest : SysuiTestCase() {
 
     @Test
     fun inActiveQsTile_switchesToActive_whenClicked() {
-        tile.isRecording = false
+        issueRecordingState.isRecording = false
 
         val testState = tile.newTileState()
         tile.handleUpdateState(testState, null)
@@ -137,7 +142,7 @@ class RecordIssueTileTest : SysuiTestCase() {
 
     @Test
     fun activeQsTile_switchesToInActive_whenClicked() {
-        tile.isRecording = true
+        issueRecordingState.isRecording = true
 
         val testState = tile.newTileState()
         tile.handleUpdateState(testState, null)
@@ -147,7 +152,8 @@ class RecordIssueTileTest : SysuiTestCase() {
 
     @Test
     fun showPrompt_shouldUseKeyguardDismissUtil_ToShowDialog() {
-        tile.isRecording = false
+        issueRecordingState.isRecording = false
+
         tile.handleClick(null)
         testableLooper.processAllMessages()
 

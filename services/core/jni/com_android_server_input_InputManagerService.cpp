@@ -143,6 +143,7 @@ static struct {
     jmethodID getTouchCalibrationForInputDevice;
     jmethodID notifyDropWindow;
     jmethodID getParentSurfaceForPointers;
+    jmethodID getPackageUid;
 } gServiceClassInfo;
 
 static struct {
@@ -362,6 +363,7 @@ public:
     void notifyDropWindow(const sp<IBinder>& token, float x, float y) override;
     void notifyDeviceInteraction(int32_t deviceId, nsecs_t timestamp,
                                  const std::set<gui::Uid>& uids) override;
+    gui::Uid getPackageUid(std::string package) override;
 
     /* --- PointerControllerPolicyInterface implementation --- */
 
@@ -502,7 +504,7 @@ void NativeInputManager::dump(std::string& dump) {
                 toString(mLocked.pointerGesturesEnabled));
         dump += StringPrintf(INDENT "Show Touches: %s\n", toString(mLocked.showTouches));
         dump += StringPrintf(INDENT "Pointer Capture: %s, seq=%" PRIu32 "\n",
-                             mLocked.pointerCaptureRequest.enable ? "Enabled" : "Disabled",
+                             mLocked.pointerCaptureRequest.isEnable() ? "Enabled" : "Disabled",
                              mLocked.pointerCaptureRequest.seq);
         if (auto pc = mLocked.legacyPointerController.lock(); pc) {
             dump += pc->dump();
@@ -1116,6 +1118,21 @@ void NativeInputManager::notifyDeviceInteraction(int32_t deviceId, nsecs_t times
     mInputManager->getMetricsCollector().notifyDeviceInteraction(deviceId, timestamp, uids);
 }
 
+gui::Uid NativeInputManager::getPackageUid(std::string package) {
+    ATRACE_CALL();
+    JNIEnv* env = jniEnv();
+    ScopedLocalFrame localFrame(env);
+
+    ScopedLocalRef<jstring> javaPackage(env, env->NewStringUTF(package.c_str()));
+    const jint uid =
+            env->CallIntMethod(mServiceObj, gServiceClassInfo.getPackageUid, javaPackage.get());
+    if (checkAndClearExceptionFromCallback(env, "getPackageUid")) {
+        LOG(FATAL) << __func__ << ": Failed to get UID for package: " << package;
+    }
+
+    return gui::Uid{static_cast<uint32_t>(uid)};
+}
+
 void NativeInputManager::notifySensorEvent(int32_t deviceId, InputDeviceSensorType sensorType,
                                            InputDeviceSensorAccuracy accuracy, nsecs_t timestamp,
                                            const std::vector<float>& values) {
@@ -1717,7 +1734,7 @@ void NativeInputManager::setPointerCapture(const PointerCaptureRequest& request)
             return;
         }
 
-        ALOGV("%s pointer capture.", request.enable ? "Enabling" : "Disabling");
+        ALOGV("%s pointer capture.", request.isEnable() ? "Enabling" : "Disabling");
         mLocked.pointerCaptureRequest = request;
     } // release lock
 
@@ -3100,6 +3117,8 @@ int register_android_server_InputManager(JNIEnv* env) {
 
     GET_METHOD_ID(gServiceClassInfo.getParentSurfaceForPointers, clazz,
                   "getParentSurfaceForPointers", "(I)J");
+
+    GET_METHOD_ID(gServiceClassInfo.getPackageUid, clazz, "getPackageUid", "(Ljava/lang/String;)I");
 
     // InputDevice
 

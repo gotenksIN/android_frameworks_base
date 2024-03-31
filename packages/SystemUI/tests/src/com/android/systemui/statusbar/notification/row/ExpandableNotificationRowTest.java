@@ -741,7 +741,7 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         when(mockViewWrapper.getIcon()).thenReturn(mockIcon);
 
         NotificationViewWrapper mockLowPriorityViewWrapper = mock(NotificationViewWrapper.class);
-        when(mockContainer.getLowPriorityViewWrapper()).thenReturn(mockLowPriorityViewWrapper);
+        when(mockContainer.getMinimizedGroupHeaderWrapper()).thenReturn(mockLowPriorityViewWrapper);
         CachingIconView mockLowPriorityIcon = mock(CachingIconView.class);
         when(mockLowPriorityViewWrapper.getIcon()).thenReturn(mockLowPriorityIcon);
 
@@ -845,7 +845,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(com.android.systemui.Flags.FLAG_NOTIFICATION_ROW_USER_CONTEXT)
     public void imageResolver_differentNotificationUser_createsUserContext() throws Exception {
         UserHandle user = new UserHandle(33);
         Context userContext = new SysuiTestableContext(mContext);

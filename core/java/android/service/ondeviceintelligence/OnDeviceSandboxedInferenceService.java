@@ -27,16 +27,17 @@ import android.annotation.SdkConstant;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.app.Service;
-import android.app.ondeviceintelligence.Content;
 import android.app.ondeviceintelligence.Feature;
 import android.app.ondeviceintelligence.IProcessingSignal;
 import android.app.ondeviceintelligence.IResponseCallback;
 import android.app.ondeviceintelligence.IStreamingResponseCallback;
 import android.app.ondeviceintelligence.ITokenInfoCallback;
+import android.app.ondeviceintelligence.OnDeviceIntelligenceException;
 import android.app.ondeviceintelligence.OnDeviceIntelligenceManager;
+import android.app.ondeviceintelligence.OnDeviceIntelligenceManager.InferenceParams;
+import android.app.ondeviceintelligence.ProcessingCallback;
 import android.app.ondeviceintelligence.ProcessingSignal;
-import android.app.ondeviceintelligence.ProcessingOutcomeReceiver;
-import android.app.ondeviceintelligence.StreamedProcessingOutcomeReceiver;
+import android.app.ondeviceintelligence.StreamingProcessingCallback;
 import android.app.ondeviceintelligence.TokenInfo;
 import android.content.Context;
 import android.content.Intent;
@@ -51,7 +52,6 @@ import android.os.ParcelFileDescriptor;
 import android.os.PersistableBundle;
 import android.os.RemoteCallback;
 import android.os.RemoteException;
-import android.service.ondeviceintelligence.OnDeviceIntelligenceService.OnDeviceUpdateProcessingException;
 import android.util.Log;
 import android.util.Slog;
 
@@ -121,47 +121,73 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
                 }
 
                 @Override
-                public void requestTokenInfo(int callerUid, Feature feature, Content request,
-                        ICancellationSignal cancellationSignal,
+                public void requestTokenInfo(int callerUid, Feature feature, Bundle request,
+                        AndroidFuture cancellationSignalFuture,
                         ITokenInfoCallback tokenInfoCallback) {
                     Objects.requireNonNull(feature);
                     Objects.requireNonNull(tokenInfoCallback);
+                    ICancellationSignal transport = null;
+                    if (cancellationSignalFuture != null) {
+                        transport = CancellationSignal.createTransport();
+                        cancellationSignalFuture.complete(transport);
+                    }
                     OnDeviceSandboxedInferenceService.this.onTokenInfoRequest(callerUid,
                             feature,
                             request,
-                            CancellationSignal.fromTransport(cancellationSignal),
+                            CancellationSignal.fromTransport(transport),
                             wrapTokenInfoCallback(tokenInfoCallback));
                 }
 
                 @Override
-                public void processRequestStreaming(int callerUid, Feature feature, Content request,
-                        int requestType, ICancellationSignal cancellationSignal,
-                        IProcessingSignal processingSignal,
+                public void processRequestStreaming(int callerUid, Feature feature, Bundle request,
+                        int requestType,
+                        AndroidFuture cancellationSignalFuture,
+                        AndroidFuture processingSignalFuture,
                         IStreamingResponseCallback callback) {
                     Objects.requireNonNull(feature);
                     Objects.requireNonNull(callback);
 
+                    ICancellationSignal transport = null;
+                    if (cancellationSignalFuture != null) {
+                        transport = CancellationSignal.createTransport();
+                        cancellationSignalFuture.complete(transport);
+                    }
+                    IProcessingSignal processingSignalTransport = null;
+                    if (processingSignalFuture != null) {
+                        processingSignalTransport = ProcessingSignal.createTransport();
+                        processingSignalFuture.complete(processingSignalTransport);
+                    }
                     OnDeviceSandboxedInferenceService.this.onProcessRequestStreaming(callerUid,
                             feature,
                             request,
                             requestType,
-                            CancellationSignal.fromTransport(cancellationSignal),
-                            ProcessingSignal.fromTransport(processingSignal),
+                            CancellationSignal.fromTransport(transport),
+                            ProcessingSignal.fromTransport(processingSignalTransport),
                             wrapStreamingResponseCallback(callback));
                 }
 
                 @Override
-                public void processRequest(int callerUid, Feature feature, Content request,
-                        int requestType, ICancellationSignal cancellationSignal,
-                        IProcessingSignal processingSignal,
+                public void processRequest(int callerUid, Feature feature, Bundle request,
+                        int requestType,
+                        AndroidFuture cancellationSignalFuture,
+                        AndroidFuture processingSignalFuture,
                         IResponseCallback callback) {
                     Objects.requireNonNull(feature);
                     Objects.requireNonNull(callback);
-
+                    ICancellationSignal transport = null;
+                    if (cancellationSignalFuture != null) {
+                        transport = CancellationSignal.createTransport();
+                        cancellationSignalFuture.complete(transport);
+                    }
+                    IProcessingSignal processingSignalTransport = null;
+                    if (processingSignalFuture != null) {
+                        processingSignalTransport = ProcessingSignal.createTransport();
+                        processingSignalFuture.complete(processingSignalTransport);
+                    }
                     OnDeviceSandboxedInferenceService.this.onProcessRequest(callerUid, feature,
                             request, requestType,
-                            CancellationSignal.fromTransport(cancellationSignal),
-                            ProcessingSignal.fromTransport(processingSignal),
+                            CancellationSignal.fromTransport(transport),
+                            ProcessingSignal.fromTransport(processingSignalTransport),
                             wrapResponseCallback(callback));
                 }
 
@@ -198,18 +224,18 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
     @NonNull
     public abstract void onTokenInfoRequest(
             int callerUid, @NonNull Feature feature,
-            @NonNull Content request,
+            @NonNull @InferenceParams Bundle request,
             @Nullable CancellationSignal cancellationSignal,
-            @NonNull OutcomeReceiver<TokenInfo,
-                    OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerProcessingException> callback);
+            @NonNull OutcomeReceiver<TokenInfo, OnDeviceIntelligenceException> callback);
 
     /**
      * Invoked when caller provides a request for a particular feature to be processed in a
      * streaming manner. The expectation from the implementation is that when processing the
      * request,
-     * it periodically populates the {@link StreamedProcessingOutcomeReceiver#onNewContent} to continuously
-     * provide partial Content results for the caller to utilize. Optionally the implementation can
-     * provide the complete response in the {@link StreamedProcessingOutcomeReceiver#onResult} upon
+     * it periodically populates the {@link StreamingProcessingCallback#onPartialResult} to
+     * continuously
+     * provide partial Bundle results for the caller to utilize. Optionally the implementation can
+     * provide the complete response in the {@link StreamingProcessingCallback#onResult} upon
      * processing completion.
      *
      * @param callerUid          UID of the caller that initiated this call chain.
@@ -225,11 +251,11 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
     @NonNull
     public abstract void onProcessRequestStreaming(
             int callerUid, @NonNull Feature feature,
-            @Nullable Content request,
+            @NonNull @InferenceParams Bundle request,
             @OnDeviceIntelligenceManager.RequestType int requestType,
             @Nullable CancellationSignal cancellationSignal,
             @Nullable ProcessingSignal processingSignal,
-            @NonNull StreamedProcessingOutcomeReceiver callback);
+            @NonNull StreamingProcessingCallback callback);
 
     /**
      * Invoked when caller provides a request for a particular feature to be processed in one shot
@@ -251,11 +277,11 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
     @NonNull
     public abstract void onProcessRequest(
             int callerUid, @NonNull Feature feature,
-            @Nullable Content request,
+            @NonNull @InferenceParams Bundle request,
             @OnDeviceIntelligenceManager.RequestType int requestType,
             @Nullable CancellationSignal cancellationSignal,
             @Nullable ProcessingSignal processingSignal,
-            @NonNull ProcessingOutcomeReceiver callback);
+            @NonNull ProcessingCallback callback);
 
 
     /**
@@ -267,9 +293,9 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
      * @param callback        callback to populate the update status and if there are params
      *                        associated with the status.
      */
-    public abstract void onUpdateProcessingState(@NonNull Bundle processingState,
+    public abstract void onUpdateProcessingState(@NonNull @InferenceParams Bundle processingState,
             @NonNull OutcomeReceiver<PersistableBundle,
-                    OnDeviceUpdateProcessingException> callback);
+                    OnDeviceIntelligenceException> callback);
 
 
     /**
@@ -293,15 +319,15 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
 
     /**
      * Provides read-only access to the internal app storage via the
-     * {@link OnDeviceIntelligenceService}. This is an asynchronous implementation for
+     * {@link OnDeviceIntelligenceService}. This is an asynchronous alternative for
      * {@link #openFileInput(String)}.
      *
      * @param fileName       File name relative to the {@link Context#getFilesDir()}.
-     * @param resultConsumer Consumer to populate the corresponding file stream in.
+     * @param resultConsumer Consumer to populate the corresponding file descriptor in.
      */
-    public final void openFileInputAsync(@NonNull String fileName,
+    public final void getReadOnlyFileDescriptor(@NonNull String fileName,
             @NonNull @CallbackExecutor Executor executor,
-            @NonNull Consumer<FileInputStream> resultConsumer) throws FileNotFoundException {
+            @NonNull Consumer<ParcelFileDescriptor> resultConsumer) throws FileNotFoundException {
         AndroidFuture<ParcelFileDescriptor> future = new AndroidFuture<>();
         try {
             mRemoteStorageService.getReadOnlyFileDescriptor(fileName, future);
@@ -315,7 +341,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
                 executor.execute(() -> resultConsumer.accept(null));
             } else {
                 executor.execute(
-                        () -> resultConsumer.accept(new FileInputStream(pfd.getFileDescriptor())));
+                        () -> resultConsumer.accept(pfd));
             }
         }, executor);
     }
@@ -329,12 +355,12 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
      * @param resultConsumer Consumer to receive a map of filePath to the corresponding file input
      *                       stream.
      */
-    public final void fetchFeatureFileInputStreamMap(@NonNull Feature feature,
+    public final void fetchFeatureFileDescriptorMap(@NonNull Feature feature,
             @NonNull @CallbackExecutor Executor executor,
-            @NonNull Consumer<Map<String, FileInputStream>> resultConsumer) {
+            @NonNull Consumer<Map<String, ParcelFileDescriptor>> resultConsumer) {
         try {
             mRemoteStorageService.getReadOnlyFeatureFileDescriptorMap(feature,
-                    wrapResultReceiverAsReadOnly(resultConsumer, executor));
+                    wrapAsRemoteCallback(resultConsumer, executor));
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
@@ -344,7 +370,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
     /**
      * Returns the {@link Executor} to use for incoming IPC from request sender into your service
      * implementation. For e.g. see
-     * {@link ProcessingOutcomeReceiver#onDataAugmentRequest(Content,
+     * {@link ProcessingCallback#onDataAugmentRequest(Bundle,
      * Consumer)} where we use the executor to populate the consumer.
      * <p>
      * Override this method in your {@link OnDeviceSandboxedInferenceService} implementation to
@@ -360,33 +386,29 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
     }
 
 
-    private RemoteCallback wrapResultReceiverAsReadOnly(
-            @NonNull Consumer<Map<String, FileInputStream>> resultConsumer,
+    private RemoteCallback wrapAsRemoteCallback(
+            @NonNull Consumer<Map<String, ParcelFileDescriptor>> resultConsumer,
             @NonNull Executor executor) {
         return new RemoteCallback(result -> {
             if (result == null) {
                 executor.execute(() -> resultConsumer.accept(new HashMap<>()));
             } else {
-                Map<String, FileInputStream> bundleMap = new HashMap<>();
-                result.keySet().forEach(key -> {
-                    ParcelFileDescriptor pfd = result.getParcelable(key,
-                            ParcelFileDescriptor.class);
-                    if (pfd != null) {
-                        bundleMap.put(key, new FileInputStream(pfd.getFileDescriptor()));
-                    }
-                });
-                executor.execute(() -> resultConsumer.accept(bundleMap));
+                Map<String, ParcelFileDescriptor> pfdMap = new HashMap<>();
+                result.keySet().forEach(key ->
+                        pfdMap.put(key, result.getParcelable(key,
+                                ParcelFileDescriptor.class)));
+                executor.execute(() -> resultConsumer.accept(pfdMap));
             }
         });
     }
 
-    private ProcessingOutcomeReceiver wrapResponseCallback(
+    private ProcessingCallback wrapResponseCallback(
             IResponseCallback callback) {
-        return new ProcessingOutcomeReceiver() {
+        return new ProcessingCallback() {
             @Override
-            public void onResult(@androidx.annotation.NonNull Content response) {
+            public void onResult(@androidx.annotation.NonNull Bundle result) {
                 try {
-                    callback.onSuccess(response);
+                    callback.onSuccess(result);
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Error sending result: " + e);
                 }
@@ -394,7 +416,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
 
             @Override
             public void onError(
-                    OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerProcessingException exception) {
+                    OnDeviceIntelligenceException exception) {
                 try {
                     callback.onFailure(exception.getErrorCode(), exception.getMessage(),
                             exception.getErrorParams());
@@ -404,8 +426,8 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
             }
 
             @Override
-            public void onDataAugmentRequest(@NonNull Content content,
-                    @NonNull Consumer<Content> contentCallback) {
+            public void onDataAugmentRequest(@NonNull Bundle content,
+                    @NonNull Consumer<Bundle> contentCallback) {
                 try {
                     callback.onDataAugmentRequest(content, wrapRemoteCallback(contentCallback));
 
@@ -416,22 +438,22 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
         };
     }
 
-    private StreamedProcessingOutcomeReceiver wrapStreamingResponseCallback(
+    private StreamingProcessingCallback wrapStreamingResponseCallback(
             IStreamingResponseCallback callback) {
-        return new StreamedProcessingOutcomeReceiver() {
+        return new StreamingProcessingCallback() {
             @Override
-            public void onNewContent(@androidx.annotation.NonNull Content content) {
+            public void onPartialResult(@androidx.annotation.NonNull Bundle partialResult) {
                 try {
-                    callback.onNewContent(content);
+                    callback.onNewContent(partialResult);
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Error sending result: " + e);
                 }
             }
 
             @Override
-            public void onResult(@androidx.annotation.NonNull Content response) {
+            public void onResult(@androidx.annotation.NonNull Bundle result) {
                 try {
-                    callback.onSuccess(response);
+                    callback.onSuccess(result);
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Error sending result: " + e);
                 }
@@ -439,7 +461,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
 
             @Override
             public void onError(
-                    OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerProcessingException exception) {
+                    OnDeviceIntelligenceException exception) {
                 try {
                     callback.onFailure(exception.getErrorCode(), exception.getMessage(),
                             exception.getErrorParams());
@@ -449,8 +471,8 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
             }
 
             @Override
-            public void onDataAugmentRequest(@NonNull Content content,
-                    @NonNull Consumer<Content> contentCallback) {
+            public void onDataAugmentRequest(@NonNull Bundle content,
+                    @NonNull Consumer<Bundle> contentCallback) {
                 try {
                     callback.onDataAugmentRequest(content, wrapRemoteCallback(contentCallback));
 
@@ -462,13 +484,13 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
     }
 
     private RemoteCallback wrapRemoteCallback(
-            @androidx.annotation.NonNull Consumer<Content> contentCallback) {
+            @androidx.annotation.NonNull Consumer<Bundle> contentCallback) {
         return new RemoteCallback(
                 result -> {
                     if (result != null) {
                         getCallbackExecutor().execute(() -> contentCallback.accept(
                                 result.getParcelable(AUGMENT_REQUEST_CONTENT_BUNDLE_KEY,
-                                        Content.class)));
+                                        Bundle.class)));
                     } else {
                         getCallbackExecutor().execute(
                                 () -> contentCallback.accept(null));
@@ -476,8 +498,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
                 });
     }
 
-    private OutcomeReceiver<TokenInfo,
-            OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerProcessingException> wrapTokenInfoCallback(
+    private OutcomeReceiver<TokenInfo, OnDeviceIntelligenceException> wrapTokenInfoCallback(
             ITokenInfoCallback tokenInfoCallback) {
         return new OutcomeReceiver<>() {
             @Override
@@ -491,7 +512,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
 
             @Override
             public void onError(
-                    OnDeviceIntelligenceManager.OnDeviceIntelligenceManagerProcessingException exception) {
+                    OnDeviceIntelligenceException exception) {
                 try {
                     tokenInfoCallback.onFailure(exception.getErrorCode(), exception.getMessage(),
                             exception.getErrorParams());
@@ -503,7 +524,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
     }
 
     @NonNull
-    private static OutcomeReceiver<PersistableBundle, OnDeviceUpdateProcessingException> wrapOutcomeReceiver(
+    private static OutcomeReceiver<PersistableBundle, OnDeviceIntelligenceException> wrapOutcomeReceiver(
             IProcessingUpdateStatusCallback callback) {
         return new OutcomeReceiver<>() {
             @Override
@@ -518,7 +539,7 @@ public abstract class OnDeviceSandboxedInferenceService extends Service {
 
             @Override
             public void onError(
-                    @androidx.annotation.NonNull OnDeviceUpdateProcessingException error) {
+                    @androidx.annotation.NonNull OnDeviceIntelligenceException error) {
                 try {
                     callback.onFailure(error.getErrorCode(), error.getMessage());
                 } catch (RemoteException e) {

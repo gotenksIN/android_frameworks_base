@@ -25,6 +25,16 @@ flag {
 }
 
 flag {
+   name: "notification_minimalism_prototype"
+   namespace: "systemui"
+   description: "Prototype of notification minimalism; the new 'Intermediate' lockscreen customization proposal."
+   bug: "330387368"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
    name: "notification_view_flipper_pausing"
    namespace: "systemui"
    description: "Pause ViewFlippers inside Notification custom layouts when the shade is closed."
@@ -101,6 +111,13 @@ flag {
     description: "Replaces NotifLiveDataStore with ActiveNotificationListRepository, and updates consumers. "
         "Should not bring any behavior changes."
     bug: "308623704"
+}
+
+flag {
+    name: "notifications_heads_up_refactor"
+    namespace: "systemui"
+    description: "Use HeadsUpInteractor to feed HUN updates to the NSSL."
+    bug: "325936094"
 }
 
 flag {
@@ -345,6 +362,16 @@ flag {
 }
 
 flag {
+   name: "activity_transition_use_largest_window"
+   namespace: "systemui"
+   description: "Target largest opening window during activity transitions."
+   bug: "323294573"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
    name: "centralized_status_bar_height_fix"
    namespace: "systemui"
    description: "Refactors shade header and keyguard status bar to read status bar dimens from a"
@@ -407,6 +434,20 @@ flag {
 }
 
 flag {
+    name: "screenshot_private_profile"
+    namespace: "systemui"
+    description: "Private profile support for screenshots"
+    bug: "327613051"
+}
+
+flag {
+    name: "screenshot_shelf_ui"
+    namespace: "systemui"
+    description: "Use new shelf UI flow for screenshots"
+    bug: "329659738"
+}
+
+flag {
    name: "run_fingerprint_detect_on_dismissible_keyguard"
    namespace: "systemui"
    description: "Run fingerprint detect instead of authenticate if the keyguard is dismissible."
@@ -459,6 +500,34 @@ flag {
    name: "enable_contextual_tip_for_take_screenshot"
    namespace: "systemui"
    description: "Enables on-screen contextual tip about how to take screenshot."
+   bug: "322891421"
+}
+
+flag {
+   name: "enable_contextual_tips_frequency_cap"
+   description: "Enables frequency capping for contextual tips, e.g. 1x/day, 2x/week, 3x/lifetime."
+   namespace: "systemui"
+   bug: "322891421"
+}
+
+flag {
+   name: "disable_contextual_tips_frequency_check"
+   description: "Disables frequency capping check for contextual tips."
+   namespace: "systemui"
+   bug: "322891421"
+}
+
+flag {
+   name: "disable_contextual_tips_ios_switcher_check"
+   description: "Disables iOS switcher check which guard the tips designed only for iOS switchers."
+   namespace: "systemui"
+   bug: "322891421"
+}
+
+flag {
+   name: "disable_contextual_tips_first_30d_check"
+   description: "Disables condition check which only show tips within 30 days after phone setup."
+   namespace: "systemui"
    bug: "322891421"
 }
 
@@ -627,4 +696,12 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "qs_ui_refactor"
+    namespace: "systemui"
+    description: "Enables the new QS UI pipeline that follows recommended architecture and uses"
+      " Compose for the UI."
+    bug: "325099249"
 }

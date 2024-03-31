@@ -443,7 +443,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
         mVirtualDeviceDisplayMapping.put(displayDevice.getUniqueId(), virtualDeviceUniqueId);
     }
 
-    void setDeviceStateLocked(int state, boolean isOverrideActive) {
+    void setDeviceStateLocked(int state) {
         if (!mBootCompleted) {
             // The boot animation might still be in progress, we do not want to switch states now
             // as the boot animation would end up with an incorrect size.
@@ -467,7 +467,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
         final boolean wakeDevice = shouldDeviceBeWoken(mPendingDeviceState, mDeviceState,
                 mInteractive, mBootCompleted);
         final boolean sleepDevice = shouldDeviceBePutToSleep(mPendingDeviceState, mDeviceState,
-                isOverrideActive, mInteractive, mBootCompleted);
+                mInteractive, mBootCompleted);
 
         // If all displays are off already, we can just transition here, unless we are trying to
         // wake or sleep the device as part of this transition. In that case defer the final
@@ -515,8 +515,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             mBootCompleted = true;
             if (mDeviceStateToBeAppliedAfterBoot
                     != DeviceStateManager.INVALID_DEVICE_STATE_IDENTIFIER) {
-                setDeviceStateLocked(mDeviceStateToBeAppliedAfterBoot,
-                        /* isOverrideActive= */ false);
+                setDeviceStateLocked(mDeviceStateToBeAppliedAfterBoot);
             }
         }
     }
@@ -562,7 +561,6 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
      *
      * @param pendingState device state we are moving to
      * @param currentState device state we are currently in
-     * @param isOverrideActive if a device state override is currently active or not
      * @param isInteractive if the device is in an interactive state
      * @param isBootCompleted is the device fully booted
      *
@@ -570,13 +568,13 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
      * @see #setDeviceStateLocked
      */
     @VisibleForTesting
-    boolean shouldDeviceBePutToSleep(int pendingState, int currentState, boolean isOverrideActive,
-            boolean isInteractive, boolean isBootCompleted) {
+    boolean shouldDeviceBePutToSleep(int pendingState, int currentState, boolean isInteractive,
+            boolean isBootCompleted) {
         return currentState != DeviceStateManager.INVALID_DEVICE_STATE_IDENTIFIER
                 && mDeviceStatesOnWhichToSleep.get(pendingState)
                 && !mDeviceStatesOnWhichToSleep.get(currentState)
-                && !isOverrideActive
-                && isInteractive && isBootCompleted
+                && isInteractive
+                && isBootCompleted
                 && !mFoldSettingProvider.shouldStayAwakeOnFold();
     }
 
@@ -1154,7 +1152,8 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     private LogicalDisplay createNewLogicalDisplayLocked(DisplayDevice device, int displayId) {
         final int layerStack = assignLayerStackLocked(displayId);
         final LogicalDisplay display = new LogicalDisplay(displayId, layerStack, device,
-                mFlags.isPixelAnisotropyCorrectionInLogicalDisplayEnabled());
+                mFlags.isPixelAnisotropyCorrectionInLogicalDisplayEnabled(),
+                mFlags.isAlwaysRotateDisplayDeviceEnabled());
         display.updateLocked(mDisplayDeviceRepo);
 
         final DisplayInfo info = display.getDisplayInfoLocked();

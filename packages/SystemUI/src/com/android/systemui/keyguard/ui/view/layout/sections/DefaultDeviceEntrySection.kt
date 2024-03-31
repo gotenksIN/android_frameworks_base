@@ -28,12 +28,12 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.android.keyguard.LockIconView
 import com.android.keyguard.LockIconViewController
-import com.android.systemui.Flags.keyguardBottomAreaRefactor
 import com.android.systemui.biometrics.AuthController
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.keyguard.KeyguardBottomAreaRefactor
 import com.android.systemui.keyguard.shared.model.KeyguardSection
 import com.android.systemui.keyguard.ui.binder.DeviceEntryIconViewBinder
 import com.android.systemui.keyguard.ui.view.DeviceEntryIconView
@@ -70,7 +70,11 @@ constructor(
     private val deviceEntryIconViewId = R.id.device_entry_icon_view
 
     override fun addViews(constraintLayout: ConstraintLayout) {
-        if (!keyguardBottomAreaRefactor() && !DeviceEntryUdfpsRefactor.isEnabled) {
+        if (
+            !KeyguardBottomAreaRefactor.isEnabled &&
+                !DeviceEntryUdfpsRefactor.isEnabled &&
+                !DeviceEntryUdfpsRefactor.isEnabled
+        ) {
             return
         }
 
@@ -82,7 +86,7 @@ constructor(
             if (DeviceEntryUdfpsRefactor.isEnabled) {
                 DeviceEntryIconView(context, null).apply { id = deviceEntryIconViewId }
             } else {
-                // keyguardBottomAreaRefactor()
+                // KeyguardBottomAreaRefactor.isEnabled or MigrateClocksToBlueprint.isEnabled
                 LockIconView(context, null).apply { id = R.id.lock_icon_view }
             }
         constraintLayout.addView(view)

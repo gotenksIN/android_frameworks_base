@@ -227,6 +227,8 @@ class DemoMobileConnectionRepository(
 
     override val hasPrioritizedNetworkCapabilities = MutableStateFlow(false)
 
+    override val satelliteConnectionHysteresisSeconds = MutableStateFlow(0)
+
     override suspend fun isInEcmMode(): Boolean = false
 
     /**

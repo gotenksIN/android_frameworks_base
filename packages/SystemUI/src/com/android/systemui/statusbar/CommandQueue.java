@@ -42,7 +42,6 @@ import android.media.INearbyMediaDevicesProvider;
 import android.media.MediaRoute2Info;
 import android.os.Binder;
 import android.os.Bundle;
-import android.os.DeviceIntegrationUtils;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.IBinder;
@@ -179,8 +178,7 @@ public class CommandQueue extends IStatusBar.Stub implements
     private static final int MSG_IMMERSIVE_CHANGED = 78 << MSG_SHIFT;
     private static final int MSG_SET_QS_TILES = 79 << MSG_SHIFT;
     private static final int MSG_ENTER_DESKTOP = 80 << MSG_SHIFT;
-    // Device Integration: new case to handler disable message from VirtualDisplay
-    private static final int MSG_DISABLE_VD = 100 << MSG_SHIFT;
+    private static final int MSG_SET_SPLITSCREEN_FOCUS = 81 << MSG_SHIFT;
     public static final int FLAG_EXCLUDE_NONE = 0;
     public static final int FLAG_EXCLUDE_SEARCH_PANEL = 1 << 0;
     public static final int FLAG_EXCLUDE_RECENTS_PANEL = 1 << 1;
@@ -511,6 +509,11 @@ public class CommandQueue extends IStatusBar.Stub implements
         default void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop) {}
 
         /**
+         * @see IStatusBar#setSplitscreenFocus
+         */
+        default void setSplitscreenFocus(boolean leftOrTop) {}
+
+        /**
          * @see IStatusBar#showMediaOutputSwitcher
          */
         default void showMediaOutputSwitcher(String packageName) {}
@@ -526,9 +529,9 @@ public class CommandQueue extends IStatusBar.Stub implements
         default void immersiveModeChanged(int rootDisplayAreaId, boolean isImmersiveMode) {}
 
         /**
-         * @see IStatusBar#enterDesktop(int)
+         * @see IStatusBar#moveFocusedTaskToDesktop(int)
          */
-        default void enterDesktop(int displayId) {}
+        default void moveFocusedTaskToDesktop(int displayId) {}
     }
 
     @VisibleForTesting
@@ -612,19 +615,13 @@ public class CommandQueue extends IStatusBar.Stub implements
             boolean animate) {
         synchronized (mLock) {
             setDisabled(displayId, state1, state2);
-
-            int msgType = MSG_DISABLE;
-            if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION && displayId != mDisplayTracker.getDefaultDisplayId()){
-                msgType = MSG_DISABLE_VD;
-            }
-
-            mHandler.removeMessages(msgType);
+            mHandler.removeMessages(MSG_DISABLE);
             final SomeArgs args = SomeArgs.obtain();
             args.argi1 = displayId;
             args.argi2 = state1;
             args.argi3 = state2;
             args.argi4 = animate ? 1 : 0;
-            Message msg = mHandler.obtainMessage(msgType, args);
+            Message msg = mHandler.obtainMessage(MSG_DISABLE, args);
             if (Looper.myLooper() == mHandler.getLooper()) {
                 // If its the right looper execute immediately so hides can be handled quickly.
                 mHandler.handleMessage(msg);
@@ -1358,6 +1355,12 @@ public class CommandQueue extends IStatusBar.Stub implements
     }
 
     @Override
+    public void setSplitscreenFocus(boolean leftOrTop) {
+        synchronized (mLock) {
+            mHandler.obtainMessage(MSG_SET_SPLITSCREEN_FOCUS, leftOrTop).sendToTarget();
+        }
+    }
+    @Override
     public void showMediaOutputSwitcher(String packageName) {
         int callingUid = Binder.getCallingUid();
         if (callingUid != 0 && callingUid != Process.SYSTEM_UID) {
@@ -1441,7 +1444,7 @@ public class CommandQueue extends IStatusBar.Stub implements
     }
 
     @Override
-    public void enterDesktop(int displayId) {
+    public void moveFocusedTaskToDesktop(int displayId) {
         SomeArgs args = SomeArgs.obtain();
         args.arg1 = displayId;
         mHandler.obtainMessage(MSG_ENTER_DESKTOP, args).sendToTarget();
@@ -1473,7 +1476,6 @@ public class CommandQueue extends IStatusBar.Stub implements
                     break;
                 }
                 case MSG_DISABLE:
-                case MSG_DISABLE_VD:
                     SomeArgs args = (SomeArgs) msg.obj;
                     for (int i = 0; i < mCallbacks.size(); i++) {
                         mCallbacks.get(i).disable(args.argi1, args.argi2, args.argi3,
@@ -1929,6 +1931,11 @@ public class CommandQueue extends IStatusBar.Stub implements
                     }
                     break;
                 }
+                case MSG_SET_SPLITSCREEN_FOCUS:
+                    for (int i = 0; i < mCallbacks.size(); i++) {
+                        mCallbacks.get(i).setSplitscreenFocus((Boolean) msg.obj);
+                    }
+                    break;
                 case MSG_SHOW_MEDIA_OUTPUT_SWITCHER:
                     args = (SomeArgs) msg.obj;
                     String clientPackageName = (String) args.arg1;
@@ -1953,7 +1960,7 @@ public class CommandQueue extends IStatusBar.Stub implements
                     args = (SomeArgs) msg.obj;
                     int displayId = args.argi1;
                     for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).enterDesktop(displayId);
+                        mCallbacks.get(i).moveFocusedTaskToDesktop(displayId);
                     }
                     break;
                 }

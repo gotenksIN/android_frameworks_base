@@ -1756,7 +1756,8 @@ public final class CameraExtensionSessionImpl extends CameraExtensionSession {
                                 mCallbacks, result.getSequenceId());
                     }
                     if ((!mSingleCapture) && (mPreviewProcessorType ==
-                            IPreviewExtenderImpl.PROCESSOR_TYPE_REQUEST_UPDATE_ONLY)) {
+                            IPreviewExtenderImpl.PROCESSOR_TYPE_REQUEST_UPDATE_ONLY)
+                            && mInitialized) {
                         CaptureStageImpl captureStage = null;
                         try {
                             captureStage = mPreviewRequestUpdateProcessor.process(
@@ -1779,8 +1780,8 @@ public final class CameraExtensionSessionImpl extends CameraExtensionSession {
                         } else {
                             mRequestUpdatedNeeded = false;
                         }
-                    } else if (mPreviewProcessorType ==
-                            IPreviewExtenderImpl.PROCESSOR_TYPE_IMAGE_PROCESSOR) {
+                    } else if ((mPreviewProcessorType ==
+                            IPreviewExtenderImpl.PROCESSOR_TYPE_IMAGE_PROCESSOR) && mInitialized) {
                         int idx = mPendingResultMap.indexOfKey(timestamp);
 
                         if ((idx >= 0) && (mPendingResultMap.get(timestamp).first == null)) {
@@ -1827,7 +1828,7 @@ public final class CameraExtensionSessionImpl extends CameraExtensionSession {
                     } else {
                         // No special handling for PROCESSOR_TYPE_NONE
                     }
-                    if (notifyClient) {
+                    if (notifyClient && mInitialized) {
                         final long ident = Binder.clearCallingIdentity();
                         try {
                             if (processStatus) {

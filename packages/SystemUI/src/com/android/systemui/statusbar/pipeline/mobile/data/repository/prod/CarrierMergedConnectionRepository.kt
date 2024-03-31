@@ -194,6 +194,9 @@ class CarrierMergedConnectionRepository(
      */
     override val hasPrioritizedNetworkCapabilities = MutableStateFlow(false).asStateFlow()
 
+    /** Non-applicable to carrier merged connections. */
+    override val satelliteConnectionHysteresisSeconds = MutableStateFlow(0).asStateFlow()
+
     override val dataEnabled: StateFlow<Boolean> = wifiRepository.isWifiEnabled
 
     override val lteRsrpLevel = MutableStateFlow(SIGNAL_STRENGTH_NONE_OR_UNKNOWN)

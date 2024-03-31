@@ -41,7 +41,6 @@ import android.content.res.Resources;
 import android.graphics.Point;
 import android.media.projection.MediaProjection;
 import android.os.Build;
-import android.os.DeviceIntegrationUtils;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.Looper;
@@ -1651,6 +1650,22 @@ public final class DisplayManager {
         }
         return DisplayManagerGlobal.getInstance().createVirtualDisplayWrapper(virtualDisplayConfig,
                 callbackWrapper, displayId);
+    }
+
+    /**
+     * Allows internal application to restrict display modes to specified modeIds
+     *
+     * @param displayId display that restrictions will be applied to
+     * @param modeIds allowed mode ids
+     *
+     * @hide
+     */
+    @RequiresPermission("android.permission.RESTRICT_DISPLAY_MODES")
+    public void requestDisplayModes(int displayId, @Nullable int[] modeIds) {
+        if (modeIds != null && modeIds.length == 0) {
+            throw new IllegalArgumentException("requestDisplayModes: modesIds can't be empty");
+        }
+        mGlobal.requestDisplayModes(displayId, modeIds);
     }
 
     /**

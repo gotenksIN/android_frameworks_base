@@ -935,34 +935,11 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     }
                     final AccessibilityUserState userState = getUserStateLocked(userId);
 
-                    if (Flags.disableContinuousShortcutOnForceStop()) {
-                        if (doit && onPackagesForceStoppedLocked(packages, userState)) {
-                            onUserStateChangedLocked(userState);
-                            return false;
-                        } else {
-                            return true;
-                        }
-                    } else {
-                        final Iterator<ComponentName> it = userState.mEnabledServices.iterator();
-                        while (it.hasNext()) {
-                            final ComponentName comp = it.next();
-                            final String compPkg = comp.getPackageName();
-                            for (String pkg : packages) {
-                                if (compPkg.equals(pkg)) {
-                                    if (!doit) {
-                                        return true;
-                                    }
-                                    it.remove();
-                                    userState.getBindingServicesLocked().remove(comp);
-                                    userState.getCrashedServicesLocked().remove(comp);
-                                    persistComponentNamesToSettingLocked(
-                                            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-                                            userState.mEnabledServices, userId);
-                                    onUserStateChangedLocked(userState);
-                                }
-                            }
-                        }
+                    if (doit && onPackagesForceStoppedLocked(packages, userState)) {
+                        onUserStateChangedLocked(userState);
                         return false;
+                    } else {
+                        return true;
                     }
                 }
             }
@@ -1016,6 +993,12 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                                     intent.getStringExtra(Intent.EXTRA_SETTING_PREVIOUS_VALUE),
                                     intent.getStringExtra(Intent.EXTRA_SETTING_NEW_VALUE));
                         }
+                    } else if (Settings.Secure.ACCESSIBILITY_QS_TARGETS.equals(which)) {
+                        if (!android.view.accessibility.Flags.a11yQsShortcut()) {
+                            return;
+                        }
+                        restoreAccessibilityQsTargets(
+                                    intent.getStringExtra(Intent.EXTRA_SETTING_NEW_VALUE));
                     }
                 }
             }
@@ -1706,20 +1689,101 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     }
 
     @Override
-    @RequiresPermission(Manifest.permission.STATUS_BAR_SERVICE)
+    @RequiresPermission(allOf = {
+            Manifest.permission.STATUS_BAR_SERVICE,
+            Manifest.permission.MANAGE_ACCESSIBILITY
+    })
     public void notifyQuickSettingsTilesChanged(
-            @UserIdInt int userId, List<ComponentName> tileComponentNames) {
-        mSecurityPolicy.enforceCallingPermission(
+            @UserIdInt int userId, @NonNull List<ComponentName> tileComponentNames) {
+        if (!android.view.accessibility.Flags.a11yQsShortcut()) {
+            return;
+        }
+
+        mContext.enforceCallingPermission(
                 Manifest.permission.STATUS_BAR_SERVICE,
                 /* function= */ "notifyQuickSettingsTilesChanged");
+        mContext.enforceCallingPermission(
+                Manifest.permission.MANAGE_ACCESSIBILITY,
+                /* function= */ "notifyQuickSettingsTilesChanged");
 
-        Slog.d(LOG_TAG, TextUtils.formatSimple(
-                "notifyQuickSettingsTilesChanged userId: %d, tileComponentNames: %s",
-                        userId, tileComponentNames));
-        // TODO (b/314843909): in the follow up cl
+        if (DEBUG) {
+            Slog.d(LOG_TAG, TextUtils.formatSimple(
+                    "notifyQuickSettingsTilesChanged userId: %d, tileComponentNames: %s",
+                    userId, tileComponentNames));
+        }
+        final Set<ComponentName> newTileComponentNames = new ArraySet<>(tileComponentNames);
+        final Set<ComponentName> addedTiles;
+        final Set<ComponentName> removedTiles;
+        final Map<ComponentName, AccessibilityServiceInfo> tileServiceToA11yServiceInfo;
+        final Map<ComponentName, ComponentName> a11yFeatureToTileService;
+
         // update in-memory copy of QS_TILES in AccessibilityManager
-        // update Settings.Secure.ACCESSIBILITY_QS_TARGETS and its in-memory copy
-        // show full device control warning if needed (b/314850435)
+        synchronized (mLock) {
+            AccessibilityUserState userState = getUserStateLocked(userId);
+
+            tileServiceToA11yServiceInfo = userState.getTileServiceToA11yServiceInfoMapLocked();
+            a11yFeatureToTileService = userState.getA11yFeatureToTileService();
+
+            ArraySet<ComponentName> currentTiles = userState.getA11yQsTilesInQsPanel();
+            // Find newly added tiles
+            addedTiles = newTileComponentNames
+                    .stream()
+                    .filter(tileComponentName -> !currentTiles.contains(tileComponentName))
+                    .collect(Collectors.toSet());
+            // Find newly removed tiles
+            removedTiles = currentTiles
+                    .stream()
+                    .filter(tileComponentName -> !newTileComponentNames.contains(tileComponentName))
+                    .collect(Collectors.toSet());
+
+            if (addedTiles.isEmpty() && removedTiles.isEmpty()) {
+                return;
+            }
+
+            userState.updateA11yTilesInQsPanelLocked(newTileComponentNames);
+        }
+
+        List<String> a11yFeaturesToEnable = new ArrayList<>();
+        List<String> a11yFeaturesToRemove = new ArrayList<>();
+        // Find the framework features to configure the qs shortcut on/off
+        for (Map.Entry<ComponentName, ComponentName> frameworkFeatureWithTile :
+                ShortcutConstants.A11Y_FEATURE_TO_FRAMEWORK_TILE.entrySet()) {
+            String a11yFeature = frameworkFeatureWithTile.getKey().flattenToString();
+            ComponentName tile = frameworkFeatureWithTile.getValue();
+            if (addedTiles.contains(tile)) {
+                a11yFeaturesToEnable.add(a11yFeature);
+            } else if (removedTiles.contains(tile)) {
+                a11yFeaturesToRemove.add(a11yFeature);
+            }
+        }
+        // Find the accessibility service/activity to configure the qs shortcut on/off
+        for (Map.Entry<ComponentName, ComponentName> a11yFeatureWithTileService :
+                a11yFeatureToTileService.entrySet()) {
+            String a11yFeature = a11yFeatureWithTileService.getKey().flattenToString();
+            ComponentName tileService = a11yFeatureWithTileService.getValue();
+            if (addedTiles.contains(tileService)) {
+                AccessibilityServiceInfo serviceInfo = tileServiceToA11yServiceInfo.getOrDefault(
+                        tileService, null);
+                if (serviceInfo != null && isAccessibilityServiceWarningRequired(serviceInfo)) {
+                    // TODO(b/314850435): show full device control warning if needed after
+                    // SysUI QS Panel can update live
+                    continue;
+                }
+                a11yFeaturesToEnable.add(a11yFeature);
+            } else if (removedTiles.contains(tileService)) {
+                a11yFeaturesToRemove.add(a11yFeature);
+            }
+        }
+        // Turn on/off a11y qs shortcut for the a11y features based on the change in QS Panel
+        if (!a11yFeaturesToEnable.isEmpty()) {
+            enableShortcutForTargets(/* enable= */ true, UserShortcutType.QUICK_SETTINGS,
+                    a11yFeaturesToEnable, userId);
+        }
+
+        if (!a11yFeaturesToRemove.isEmpty()) {
+            enableShortcutForTargets(/* enable= */ false, UserShortcutType.QUICK_SETTINGS,
+                    a11yFeaturesToRemove, userId);
+        }
     }
 
     /**
@@ -2071,6 +2135,29 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         scheduleNotifyClientsOfServicesStateChangeLocked(userState);
         onUserStateChangedLocked(userState);
+    }
+
+    /**
+     * User could configure accessibility shortcut during the SUW before restoring user data.
+     * Merges the current value and the new value to make sure we don't lost the setting the user's
+     * preferences of accessibility qs shortcut updated in SUW are not lost.
+     *
+     * Called only during settings restore; currently supports only the owner user
+     * TODO: http://b/22388012
+     */
+    private void restoreAccessibilityQsTargets(String newValue) {
+        synchronized (mLock) {
+            final AccessibilityUserState userState = getUserStateLocked(UserHandle.USER_SYSTEM);
+            final Set<String> mergedTargets = userState.getA11yQsTargets();
+            readColonDelimitedStringToSet(newValue, str -> str, mergedTargets,
+                    /* doMerge = */ true);
+
+            userState.updateA11yQsTargetLocked(mergedTargets);
+            persistColonDelimitedSetToSettingLocked(Settings.Secure.ACCESSIBILITY_QS_TARGETS,
+                    UserHandle.USER_SYSTEM, mergedTargets, str -> str);
+            scheduleNotifyClientsOfServicesStateChangeLocked(userState);
+            onUserStateChangedLocked(userState);
+        }
     }
 
     private int getClientStateLocked(AccessibilityUserState userState) {
@@ -3661,18 +3748,35 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     /**
      * Update the Settings.Secure.ACCESSIBILITY_QS_TARGETS so that it only contains valid content,
      * and a side loaded service can't spoof the package name of the default service.
+     * <p>
+     * 1. Remove the target if the target is no longer installed on the device <br/>
+     * 2. Add the target if the target is enabled and the target's tile is in the QS Panel <br/>
+     * </p>
      */
     private void updateAccessibilityQsTargetsLocked(AccessibilityUserState userState) {
-        final Set<String> targets =
-                userState.getShortcutTargetsLocked(UserShortcutType.QUICK_SETTINGS);
-        final int lastSize = targets.size();
-        if (lastSize == 0) {
+        if (!android.view.accessibility.Flags.a11yQsShortcut()) {
             return;
         }
+
+        final Set<String> targets =
+                userState.getShortcutTargetsLocked(UserShortcutType.QUICK_SETTINGS);
 
         // Removes the targets that are no longer installed on the device.
         boolean somethingChanged = targets.removeIf(
                 name -> !userState.isShortcutTargetInstalledLocked(name));
+        // Add the target if the a11y service is enabled and the tile exist in QS panel
+        Set<ComponentName> enabledServices = userState.getEnabledServicesLocked();
+        Map<ComponentName, ComponentName> a11yFeatureToTileService =
+                userState.getA11yFeatureToTileService();
+        Set<ComponentName> currentA11yTilesInQsPanel = userState.getA11yQsTilesInQsPanel();
+        for (ComponentName enabledService : enabledServices) {
+            ComponentName tileService =
+                    a11yFeatureToTileService.getOrDefault(enabledService, null);
+            if (tileService != null && currentA11yTilesInQsPanel.contains(tileService)) {
+                somethingChanged |= targets.add(enabledService.flattenToString());
+            }
+        }
+
         if (!somethingChanged) {
             return;
         }
@@ -3700,14 +3804,18 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             return;
         }
 
-        final List<Pair<Integer, String>> shortcutTypeAndShortcutSetting = List.of(
+        final List<Pair<Integer, String>> shortcutTypeAndShortcutSetting = new ArrayList<>(3);
+        shortcutTypeAndShortcutSetting.add(
                 new Pair<>(ACCESSIBILITY_SHORTCUT_KEY,
-                        Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE),
+                        Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE));
+        shortcutTypeAndShortcutSetting.add(
                 new Pair<>(ACCESSIBILITY_BUTTON,
-                        Settings.Secure.ACCESSIBILITY_BUTTON_TARGETS),
-                new Pair<>(UserShortcutType.QUICK_SETTINGS,
-                        Settings.Secure.ACCESSIBILITY_QS_TARGETS)
-        );
+                        Settings.Secure.ACCESSIBILITY_BUTTON_TARGETS));
+        if (android.view.accessibility.Flags.a11yQsShortcut()) {
+            shortcutTypeAndShortcutSetting.add(
+                    new Pair<>(UserShortcutType.QUICK_SETTINGS,
+                            Settings.Secure.ACCESSIBILITY_QS_TARGETS));
+        }
 
         final ComponentName serviceName = service.getComponentName();
         for (Pair<Integer, String> shortcutTypePair : shortcutTypeAndShortcutSetting) {
@@ -5123,18 +5231,16 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         private int mSystemUiUid = 0;
 
         AccessibilityDisplayListener(Context context, Handler handler) {
-            if (Flags.addWindowTokenWithoutLock()) {
-                // Avoid concerns about one thread adding displays while another thread removes
-                // them by ensuring the looper is the main looper and the DisplayListener
-                // callbacks are always executed on the one main thread.
-                final boolean isMainHandler = handler.getLooper() == Looper.getMainLooper();
-                final String errorMessage =
-                        "AccessibilityDisplayListener must use the main handler";
-                if (Build.IS_USERDEBUG || Build.IS_ENG) {
-                    Preconditions.checkArgument(isMainHandler, errorMessage);
-                } else if (!isMainHandler) {
-                    Slog.e(LOG_TAG, errorMessage);
-                }
+            // Avoid concerns about one thread adding displays while another thread removes
+            // them by ensuring the looper is the main looper and the DisplayListener
+            // callbacks are always executed on the one main thread.
+            final boolean isMainHandler = handler.getLooper() == Looper.getMainLooper();
+            final String errorMessage =
+                    "AccessibilityDisplayListener must use the main handler";
+            if (Build.IS_USERDEBUG || Build.IS_ENG) {
+                Preconditions.checkArgument(isMainHandler, errorMessage);
+            } else if (!isMainHandler) {
+                Slog.e(LOG_TAG, errorMessage);
             }
 
             mDisplayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
@@ -5178,14 +5284,12 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         @Override
         public void onDisplayAdded(int displayId) {
-            if (Flags.addWindowTokenWithoutLock()) {
-                final boolean isMainThread = Looper.getMainLooper().isCurrentThread();
-                final String errorMessage = "onDisplayAdded must be called from the main thread";
-                if (Build.IS_USERDEBUG || Build.IS_ENG) {
-                    Preconditions.checkArgument(isMainThread, errorMessage);
-                } else if (!isMainThread) {
-                    Slog.e(LOG_TAG, errorMessage);
-                }
+            final boolean isMainThread = Looper.getMainLooper().isCurrentThread();
+            final String errorMessage = "onDisplayAdded must be called from the main thread";
+            if (Build.IS_USERDEBUG || Build.IS_ENG) {
+                Preconditions.checkArgument(isMainThread, errorMessage);
+            } else if (!isMainThread) {
+                Slog.e(LOG_TAG, errorMessage);
             }
             final Display display = mDisplayManager.getDisplay(displayId);
             if (!isValidDisplay(display)) {
@@ -5201,41 +5305,27 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     mInputFilter.onDisplayAdded(display);
                 }
                 AccessibilityUserState userState = getCurrentUserStateLocked();
-                if (Flags.addWindowTokenWithoutLock()) {
-                    services = new ArrayList<>(userState.mBoundServices);
-                } else {
-                    services = userState.mBoundServices;
-                    if (displayId != Display.DEFAULT_DISPLAY) {
-                        for (int i = 0; i < services.size(); i++) {
-                            AccessibilityServiceConnection boundClient = services.get(i);
-                            boundClient.addWindowTokenForDisplay(displayId);
-                        }
-                    }
-                }
+                services = new ArrayList<>(userState.mBoundServices);
                 updateMagnificationLocked(userState);
                 updateWindowsForAccessibilityCallbackLocked(userState);
                 notifyClearAccessibilityCacheLocked();
             }
-            if (Flags.addWindowTokenWithoutLock()) {
-                if (displayId != Display.DEFAULT_DISPLAY) {
-                    for (int i = 0; i < services.size(); i++) {
-                        AccessibilityServiceConnection boundClient = services.get(i);
-                        boundClient.addWindowTokenForDisplay(displayId);
-                    }
+            if (displayId != Display.DEFAULT_DISPLAY) {
+                for (int i = 0; i < services.size(); i++) {
+                    AccessibilityServiceConnection boundClient = services.get(i);
+                    boundClient.addWindowTokenForDisplay(displayId);
                 }
             }
         }
 
         @Override
         public void onDisplayRemoved(int displayId) {
-            if (Flags.addWindowTokenWithoutLock()) {
-                final boolean isMainThread = Looper.getMainLooper().isCurrentThread();
-                final String errorMessage = "onDisplayRemoved must be called from the main thread";
-                if (Build.IS_USERDEBUG || Build.IS_ENG) {
-                    Preconditions.checkArgument(isMainThread, errorMessage);
-                } else if (!isMainThread) {
-                    Slog.e(LOG_TAG, errorMessage);
-                }
+            final boolean isMainThread = Looper.getMainLooper().isCurrentThread();
+            final String errorMessage = "onDisplayRemoved must be called from the main thread";
+            if (Build.IS_USERDEBUG || Build.IS_ENG) {
+                Preconditions.checkArgument(isMainThread, errorMessage);
+            } else if (!isMainThread) {
+                Slog.e(LOG_TAG, errorMessage);
             }
             synchronized (mLock) {
                 if (!removeDisplayFromList(displayId)) {

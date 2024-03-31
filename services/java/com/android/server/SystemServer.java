@@ -61,7 +61,6 @@ import android.os.BaseBundle;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Debug;
-import android.os.DeviceIntegrationUtils;
 import android.os.Environment;
 import android.os.FactoryTest;
 import android.os.FileUtils;
@@ -163,6 +162,7 @@ import com.android.server.net.watchlist.NetworkWatchlistService;
 import com.android.server.notification.NotificationManagerService;
 import com.android.server.oemlock.OemLockService;
 import com.android.server.om.OverlayManagerService;
+import com.android.server.ondeviceintelligence.OnDeviceIntelligenceManagerService;
 import com.android.server.os.BugreportManagerService;
 import com.android.server.os.DeviceIdentifiersPolicyService;
 import com.android.server.os.NativeTombstoneManagerService;
@@ -235,7 +235,6 @@ import com.android.server.vr.VrManagerService;
 import com.android.server.wearable.WearableSensingManagerService;
 import com.android.server.webkit.WebViewUpdateService;
 import com.android.server.wm.ActivityTaskManagerService;
-import com.android.server.wm.CrossDeviceService;
 import com.android.server.wm.WindowManagerGlobalLock;
 import com.android.server.wm.WindowManagerService;
 
@@ -413,6 +412,8 @@ public final class SystemServer implements Dumpable {
             "com.android.server.searchui.SearchUiManagerService";
     private static final String SMARTSPACE_MANAGER_SERVICE_CLASS =
             "com.android.server.smartspace.SmartspaceManagerService";
+    private static final String CONTEXTUAL_SEARCH_MANAGER_SERVICE_CLASS =
+            "com.android.server.contextualsearch.ContextualSearchManagerService";
     private static final String DEVICE_IDLE_CONTROLLER_CLASS =
             "com.android.server.DeviceIdleController";
     private static final String BLOB_STORE_MANAGER_SERVICE_CLASS =
@@ -1233,10 +1234,6 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(ThermalManagerService.class);
         t.traceEnd();
 
-        t.traceBegin("StartHintManager");
-        mSystemServiceManager.startService(HintManagerService.class);
-        t.traceEnd();
-
         // Now that the power manager has been started, let the activity manager
         // initialize power management features.
         t.traceBegin("InitPowerManagement");
@@ -1621,6 +1618,10 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
+            t.traceBegin("StartHintManager");
+            mSystemServiceManager.startService(HintManagerService.class);
+            t.traceEnd();
+
             // Grants default permissions and defines roles
             t.traceBegin("StartRoleManagerService");
             LocalManagerRegistry.addManager(RoleServicePlatformHelper.class,
@@ -1977,6 +1978,7 @@ public final class SystemServer implements Dumpable {
             startSystemCaptionsManagerService(context, t);
             startTextToSpeechManagerService(context, t);
             startWearableSensingService(t);
+            startOnDeviceIntelligenceService(t);
 
             if (deviceHasConfigString(
                     context, R.string.config_defaultAmbientContextDetectionService)) {
@@ -2024,6 +2026,16 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             } else {
                 Slog.d(TAG, "SmartspaceManagerService not defined by OEM or disabled by flag");
+            }
+
+            // Contextual search manager service
+            if (deviceHasConfigString(context,
+                    R.string.config_defaultContextualSearchPackageName)) {
+                t.traceBegin("StartContextualSearchService");
+                mSystemServiceManager.startService(CONTEXTUAL_SEARCH_MANAGER_SERVICE_CLASS);
+                t.traceEnd();
+            } else {
+                Slog.d(TAG, "ContextualSearchManagerService not defined or disabled by flag");
             }
 
             t.traceBegin("InitConnectivityModuleConnector");
@@ -3005,12 +3017,6 @@ public final class SystemServer implements Dumpable {
         mPackageManagerService.systemReady();
         t.traceEnd();
 
-        if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION) {
-            t.traceBegin("StartCrossDeviceService");
-            ServiceManager.addService(Context.CROSS_DEVICE_SERVICE, new CrossDeviceService(mSystemContext, mActivityManagerService.mActivityTaskManager));
-            t.traceEnd();
-        }
-
         t.traceBegin("MakeDisplayManagerServiceReady");
         try {
             // TODO: use boot phase and communicate this flag some other way
@@ -3398,6 +3404,12 @@ public final class SystemServer implements Dumpable {
         t.traceEnd();
 
         t.traceEnd(); // startOtherServices
+    }
+
+    private void startOnDeviceIntelligenceService(TimingsTraceAndSlog t) {
+        t.traceBegin("startOnDeviceIntelligenceManagerService");
+        mSystemServiceManager.startService(OnDeviceIntelligenceManagerService.class);
+        t.traceEnd();
     }
 
     /**

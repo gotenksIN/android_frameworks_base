@@ -27,6 +27,8 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.WakefulnessLifecycle
 import com.android.systemui.shade.ShadeViewController
+import com.android.systemui.shade.domain.interactor.PanelExpansionInteractor
+import com.android.systemui.shade.domain.interactor.ShadeLockscreenInteractor
 import com.android.systemui.statusbar.LightRevealScrim
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.StatusBarStateControllerImpl
@@ -67,6 +69,10 @@ class UnlockedScreenOffAnimationControllerTest : SysuiTestCase() {
     @Mock
     private lateinit var shadeViewController: ShadeViewController
     @Mock
+    private lateinit var shadeLockscreenInteractor: ShadeLockscreenInteractor
+    @Mock
+    private lateinit var panelExpansionInteractor: PanelExpansionInteractor
+    @Mock
     private lateinit var notifShadeWindowController: NotificationShadeWindowController
     @Mock
     private lateinit var lightRevealScrim: LightRevealScrim
@@ -87,23 +93,21 @@ class UnlockedScreenOffAnimationControllerTest : SysuiTestCase() {
     fun setUp() {
         MockitoAnnotations.initMocks(this)
         controller = UnlockedScreenOffAnimationController(
-                context,
-                wakefulnessLifecycle,
-                statusBarStateController,
-                { keyguardViewMediator },
-                keyguardStateController,
-                { dozeParameters },
-                globalSettings,
-                { notifShadeWindowController },
-                interactionJankMonitor,
-                powerManager,
-                handler = handler
+            context,
+            wakefulnessLifecycle,
+            statusBarStateController,
+            { keyguardViewMediator },
+            keyguardStateController,
+            { dozeParameters },
+            globalSettings,
+            { notifShadeWindowController },
+            interactionJankMonitor,
+            powerManager,
+            { shadeLockscreenInteractor },
+            { panelExpansionInteractor },
+            handler,
         )
         controller.initialize(centralSurfaces, shadeViewController, lightRevealScrim)
-
-        // Screen off does not run if the panel is expanded, so we should say it's collapsed to test
-        // screen off.
-        `when`(shadeViewController.isFullyCollapsed).thenReturn(true)
     }
 
     @After
@@ -133,7 +137,7 @@ class UnlockedScreenOffAnimationControllerTest : SysuiTestCase() {
 
         callbackCaptor.value.run()
 
-        verify(shadeViewController, times(1)).showAodUi()
+        verify(shadeLockscreenInteractor, times(1)).showAodUi()
     }
 
     @Test
@@ -149,7 +153,7 @@ class UnlockedScreenOffAnimationControllerTest : SysuiTestCase() {
 
         callbackCaptor.value.run()
 
-        verify(shadeViewController, never()).showAodUi()
+        verify(shadeLockscreenInteractor, never()).showAodUi()
     }
 
     /**
@@ -171,7 +175,7 @@ class UnlockedScreenOffAnimationControllerTest : SysuiTestCase() {
         verify(handler).postDelayed(callbackCaptor.capture(), anyLong())
         callbackCaptor.value.run()
 
-        verify(shadeViewController, never()).showAodUi()
+        verify(shadeLockscreenInteractor, never()).showAodUi()
     }
 
     @Test
@@ -186,7 +190,7 @@ class UnlockedScreenOffAnimationControllerTest : SysuiTestCase() {
         verify(handler).postDelayed(callbackCaptor.capture(), anyLong())
         callbackCaptor.value.run()
 
-        verify(shadeViewController).showAodUi()
+        verify(shadeLockscreenInteractor).showAodUi()
     }
 
     @Test

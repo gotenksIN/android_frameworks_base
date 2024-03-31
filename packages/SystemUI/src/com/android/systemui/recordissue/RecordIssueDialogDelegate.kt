@@ -17,6 +17,7 @@
 package com.android.systemui.recordissue
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -28,8 +29,8 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.PopupMenu
 import android.widget.Switch
-import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
+import androidx.annotation.WorkerThread
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlagsClassic
@@ -82,15 +83,19 @@ constructor(
             setTitle(context.getString(R.string.qs_record_issue_label))
             setIcon(R.drawable.qs_record_issue_icon_off)
             setNegativeButton(R.string.cancel) { _, _ -> dismiss() }
-            setPositiveButton(R.string.qs_record_issue_start) { _, _ ->
-                onStarted.accept(
-                    IssueRecordingConfig(
-                        screenRecordSwitch.isChecked,
-                        true /* TODO: Base this on issueType selected */
+            setPositiveButton(
+                R.string.qs_record_issue_start,
+                { _, _ ->
+                    onStarted.accept(
+                        IssueRecordingConfig(
+                            screenRecordSwitch.isChecked,
+                            true /* TODO: Base this on issueType selected */
+                        )
                     )
-                )
-                dismiss()
-            }
+                    dismiss()
+                },
+                false
+            )
         }
     }
 
@@ -104,49 +109,51 @@ constructor(
 
             screenRecordSwitch = requireViewById(R.id.screenrecord_switch)
             screenRecordSwitch.setOnCheckedChangeListener { _, isEnabled ->
-                onScreenRecordSwitchClicked(context, isEnabled)
+                if (isEnabled) {
+                    bgExecutor.execute { onScreenRecordSwitchClicked() }
+                }
             }
+            val startButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             issueTypeButton = requireViewById(R.id.issue_type_button)
-            issueTypeButton.setOnClickListener { onIssueTypeClicked(context) }
+            issueTypeButton.setOnClickListener {
+                onIssueTypeClicked(context) { startButton.isEnabled = true }
+            }
+            startButton.isEnabled = false
         }
     }
 
-    @AnyThread
-    private fun onScreenRecordSwitchClicked(context: Context, isEnabled: Boolean) {
-        if (!isEnabled) return
-
-        bgExecutor.execute {
-            if (
-                flags.isEnabled(WM_ENABLE_PARTIAL_SCREEN_SHARING_ENTERPRISE_POLICIES) &&
-                    devicePolicyResolver
-                        .get()
-                        .isScreenCaptureCompletelyDisabled(UserHandle.of(userTracker.userId))
-            ) {
-                mainExecutor.execute {
-                    screenCaptureDisabledDialogDelegate.createDialog().show()
-                    screenRecordSwitch.isChecked = false
-                }
-                return@execute
+    @WorkerThread
+    private fun onScreenRecordSwitchClicked() {
+        if (
+            flags.isEnabled(WM_ENABLE_PARTIAL_SCREEN_SHARING_ENTERPRISE_POLICIES) &&
+                devicePolicyResolver
+                    .get()
+                    .isScreenCaptureCompletelyDisabled(UserHandle.of(userTracker.userId))
+        ) {
+            mainExecutor.execute {
+                screenCaptureDisabledDialogDelegate.createDialog().show()
+                screenRecordSwitch.isChecked = false
             }
+            return
+        }
 
-            mediaProjectionMetricsLogger.notifyProjectionInitiated(
-                userTracker.userId,
-                SessionCreationSource.SYSTEM_UI_SCREEN_RECORDER
-            )
+        mediaProjectionMetricsLogger.notifyProjectionInitiated(
+            userTracker.userId,
+            SessionCreationSource.SYSTEM_UI_SCREEN_RECORDER
+        )
 
-            if (flags.isEnabled(Flags.WM_ENABLE_PARTIAL_SCREEN_SHARING)) {
-                val prefs =
-                    userFileManager.getSharedPreferences(
-                        RecordIssueTile.TILE_SPEC,
-                        Context.MODE_PRIVATE,
-                        userTracker.userId
-                    )
-                if (!prefs.getBoolean(HAS_APPROVED_SCREEN_RECORDING, false)) {
-                    mainExecutor.execute {
-                        ScreenCapturePermissionDialogDelegate(factory, prefs).createDialog().apply {
-                            setOnCancelListener { screenRecordSwitch.isChecked = false }
-                            show()
-                        }
+        if (flags.isEnabled(Flags.WM_ENABLE_PARTIAL_SCREEN_SHARING)) {
+            val prefs =
+                userFileManager.getSharedPreferences(
+                    RecordIssueTile.TILE_SPEC,
+                    Context.MODE_PRIVATE,
+                    userTracker.userId
+                )
+            if (!prefs.getBoolean(HAS_APPROVED_SCREEN_RECORDING, false)) {
+                mainExecutor.execute {
+                    ScreenCapturePermissionDialogDelegate(factory, prefs).createDialog().apply {
+                        setOnCancelListener { screenRecordSwitch.isChecked = false }
+                        show()
                     }
                 }
             }
@@ -154,7 +161,7 @@ constructor(
     }
 
     @MainThread
-    private fun onIssueTypeClicked(context: Context) {
+    private fun onIssueTypeClicked(context: Context, onIssueTypeSelected: Runnable) {
         val selectedCategory = issueTypeButton.text.toString()
         val popupMenu = PopupMenu(context, issueTypeButton)
 
@@ -169,6 +176,7 @@ constructor(
         popupMenu.apply {
             setOnMenuItemClickListener {
                 issueTypeButton.text = it.title
+                onIssueTypeSelected.run()
                 true
             }
             setForceShowIcon(true)

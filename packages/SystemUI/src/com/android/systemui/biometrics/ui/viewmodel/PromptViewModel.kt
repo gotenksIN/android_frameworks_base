@@ -86,13 +86,23 @@ constructor(
     val faceIconHeight: Int =
         context.resources.getDimensionPixelSize(R.dimen.biometric_dialog_face_icon_size)
 
-    val fingerprintSensorDiameter: Flow<Int> =
+    val fingerprintSensorWidth: Flow<Int> =
         combine(modalities, udfpsOverlayInteractor.udfpsOverlayParams) { modalities, overlayParams
             ->
             if (modalities.hasUdfps) {
                 overlayParams.sensorBounds.width()
             } else {
                 fingerprintIconWidth
+            }
+        }
+
+    val fingerprintSensorHeight: Flow<Int> =
+        combine(modalities, udfpsOverlayInteractor.udfpsOverlayParams) { modalities, overlayParams
+            ->
+            if (modalities.hasUdfps) {
+                overlayParams.sensorBounds.height()
+            } else {
+                fingerprintIconHeight
             }
         }
 
@@ -218,18 +228,12 @@ constructor(
      */
     val faceMode: Flow<Boolean> =
         combine(modalities, isConfirmationRequired, fingerprintStartMode) {
-                modalities: BiometricModalities,
-                isConfirmationRequired: Boolean,
-                fingerprintStartMode: FingerprintStartMode ->
-                if (modalities.hasFaceAndFingerprint) {
-                    if (isConfirmationRequired) {
-                        false
-                    } else {
-                        !fingerprintStartMode.isStarted
-                    }
-                } else {
-                    false
-                }
+                modalities,
+                isConfirmationRequired,
+                fingerprintStartMode ->
+                modalities.hasFaceAndFingerprint &&
+                    !isConfirmationRequired &&
+                    fingerprintStartMode == FingerprintStartMode.Pending
             }
             .distinctUntilChanged()
 
@@ -249,14 +253,11 @@ constructor(
      * asset to be loaded before determining the prompt size.
      */
     val isIconViewLoaded: Flow<Boolean> =
-        combine(credentialKind, _isIconViewLoaded.asStateFlow()) { credentialKind, isIconViewLoaded
-            ->
-            if (credentialKind is PromptKind.Biometric) {
-                isIconViewLoaded
-            } else {
-                true
+        combine(modalities, _isIconViewLoaded.asStateFlow()) { modalities, isIconViewLoaded ->
+                val noIcon = modalities.isEmpty
+                noIcon || isIconViewLoaded
             }
-        }
+            .distinctUntilChanged()
 
     // Sets whether the prompt's iconView animation has been loaded in the view yet.
     fun setIsIconViewLoaded(iconViewLoaded: Boolean) {
@@ -351,7 +352,7 @@ constructor(
             position,
             message,
         ) { size, _, message ->
-            size.isNotSmall && message.message.isNotBlank()
+            size.isMedium && message.message.isNotBlank()
         }
 
     /** If the auth is pending confirmation and the confirm button should be shown. */

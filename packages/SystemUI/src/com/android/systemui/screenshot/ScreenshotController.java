@@ -19,6 +19,7 @@ package com.android.systemui.screenshot;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.view.WindowManager.LayoutParams.TYPE_SCREENSHOT;
 
+import static com.android.systemui.Flags.screenshotShelfUi;
 import static com.android.systemui.screenshot.LogConfig.DEBUG_ANIM;
 import static com.android.systemui.screenshot.LogConfig.DEBUG_CALLBACK;
 import static com.android.systemui.screenshot.LogConfig.DEBUG_INPUT;
@@ -87,6 +88,10 @@ import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.res.R;
 import com.android.systemui.screenshot.TakeScreenshotService.RequestCallback;
+import com.android.systemui.screenshot.scroll.LongScreenshotActivity;
+import com.android.systemui.screenshot.scroll.LongScreenshotData;
+import com.android.systemui.screenshot.scroll.ScrollCaptureClient;
+import com.android.systemui.screenshot.scroll.ScrollCaptureController;
 import com.android.systemui.util.Assert;
 
 import com.google.common.util.concurrent.ListenableFuture;
@@ -200,7 +205,7 @@ public class ScreenshotController {
         void onActionsReady(ScreenshotController.QuickShareData quickShareData);
     }
 
-    interface TransitionDestination {
+    public interface TransitionDestination {
         /**
          * Allows the long screenshot activity to call back with a destination location (the bounds
          * on screen of the destination for the transitioning view) and a Runnable to be run once
@@ -233,6 +238,7 @@ public class ScreenshotController {
     private final WindowContext mContext;
     private final FeatureFlags mFlags;
     private final ScreenshotViewProxy mViewProxy;
+    private final ScreenshotActionsProvider.Factory mActionsProviderFactory;
     private final ScreenshotNotificationsController mNotificationsController;
     private final ScreenshotSmartActions mScreenshotSmartActions;
     private final UiEventLogger mUiEventLogger;
@@ -267,6 +273,8 @@ public class ScreenshotController {
     private boolean mScreenshotTakenInPortrait;
     private boolean mBlockAttach;
 
+    private ScreenshotActionsProvider mActionsProvider;
+
     private Animator mScreenshotAnimation;
     private RequestCallback mCurrentRequestCallback;
     private String mPackageName = "";
@@ -294,6 +302,7 @@ public class ScreenshotController {
             Context context,
             FeatureFlags flags,
             ScreenshotViewProxy.Factory viewProxyFactory,
+            ScreenshotActionsProvider.Factory actionsProviderFactory,
             ScreenshotSmartActions screenshotSmartActions,
             ScreenshotNotificationsController.Factory screenshotNotificationsControllerFactory,
             ScrollCaptureClient scrollCaptureClient,
@@ -345,6 +354,7 @@ public class ScreenshotController {
         mAssistContentRequester = assistContentRequester;
 
         mViewProxy = viewProxyFactory.getProxy(mContext, mDisplayId);
+        mActionsProviderFactory = actionsProviderFactory;
 
         mScreenshotHandler.setOnTimeoutRunnable(() -> {
             if (DEBUG_UI) {
@@ -389,6 +399,7 @@ public class ScreenshotController {
     void handleScreenshot(ScreenshotData screenshot, Consumer<Uri> finisher,
             RequestCallback requestCallback) {
         Assert.isMainThread();
+
         mCurrentRequestCallback = requestCallback;
         if (screenshot.getType() == WindowManager.TAKE_SCREENSHOT_FULLSCREEN) {
             Rect bounds = getFullScreenRect();
@@ -492,7 +503,7 @@ public class ScreenshotController {
         return mDisplayId == Display.DEFAULT_DISPLAY || mShowUIOnExternalDisplay;
     }
 
-    void prepareViewForNewScreenshot(ScreenshotData screenshot, String oldPackageName) {
+    void prepareViewForNewScreenshot(@NonNull ScreenshotData screenshot, String oldPackageName) {
         withWindowAttached(() -> {
             if (mUserManager.isManagedProfile(screenshot.getUserHandle().getIdentifier())) {
                 mViewProxy.announceForAccessibility(mContext.getResources().getString(
@@ -504,6 +515,11 @@ public class ScreenshotController {
         });
 
         mViewProxy.reset();
+
+        if (screenshotShelfUi()) {
+            mActionsProvider = mActionsProviderFactory.create(mContext, screenshot.getUserHandle(),
+                    ((ScreenshotActionsProvider.ScreenshotActionsCallback) mViewProxy));
+        }
 
         if (mViewProxy.isAttachedToWindow()) {
             // if we didn't already dismiss for another reason
@@ -979,18 +995,14 @@ public class ScreenshotController {
                         @Override
                         public void onAnimationEnd(Animator animation) {
                             super.onAnimationEnd(animation);
-                            doPostAnimation(imageData);
+                            mViewProxy.setChipIntents(imageData);
                         }
                     });
                 } else {
-                    doPostAnimation(imageData);
+                    mViewProxy.setChipIntents(imageData);
                 }
             });
         }
-    }
-
-    private void doPostAnimation(ScreenshotController.SavedImageData imageData) {
-        mViewProxy.setChipIntents(imageData);
     }
 
     /**

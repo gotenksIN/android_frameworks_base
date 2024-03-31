@@ -316,7 +316,7 @@ interface IDevicePolicyManager {
     int getLockTaskFeatures(in ComponentName who, String callerPackageName);
 
     void setGlobalSetting(in ComponentName who, in String setting, in String value);
-    void setSystemSetting(in ComponentName who, in String setting, in String value);
+    void setSystemSetting(in ComponentName who, in String setting, in String value, boolean parent);
     void setSecureSetting(in ComponentName who, in String setting, in String value);
 
     void setConfiguredNetworksLockdownState(in ComponentName who, String callerPackageName, boolean lockdown);
@@ -581,7 +581,7 @@ interface IDevicePolicyManager {
     void setWifiSsidPolicy(String callerPackageName, in WifiSsidPolicy policy);
     WifiSsidPolicy getWifiSsidPolicy(String callerPackageName);
 
-    boolean isTheftDetectionTriggered(String callerPackageName);
+    boolean isDevicePotentiallyStolen(String callerPackageName);
 
     List<UserHandle> listForegroundAffiliatedUsers();
     void setDrawables(in List<DevicePolicyDrawableResource> drawables);

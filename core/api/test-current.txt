@@ -1625,23 +1625,35 @@ package android.hardware.camera2.params {
 package android.hardware.devicestate {
 
   @FlaggedApi("android.hardware.devicestate.feature.flags.device_state_property_api") public final class DeviceState {
+    ctor public DeviceState(@NonNull android.hardware.devicestate.DeviceState.Configuration);
     field public static final int PROPERTY_POLICY_AVAILABLE_FOR_APP_REQUEST = 8; // 0x8
+  }
+
+  public static final class DeviceState.Configuration implements android.os.Parcelable {
+    method public int describeContents();
+    method public int getIdentifier();
+    method @NonNull public String getName();
+    method @NonNull public java.util.Set<java.lang.Integer> getPhysicalProperties();
+    method @NonNull public java.util.Set<java.lang.Integer> getSystemProperties();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.hardware.devicestate.DeviceState.Configuration> CREATOR;
+  }
+
+  public static final class DeviceState.Configuration.Builder {
+    ctor public DeviceState.Configuration.Builder(int, @NonNull String);
+    method @NonNull public android.hardware.devicestate.DeviceState.Configuration build();
+    method @NonNull public android.hardware.devicestate.DeviceState.Configuration.Builder setPhysicalProperties(@NonNull java.util.Set<java.lang.Integer>);
+    method @NonNull public android.hardware.devicestate.DeviceState.Configuration.Builder setSystemProperties(@NonNull java.util.Set<java.lang.Integer>);
   }
 
   @FlaggedApi("android.hardware.devicestate.feature.flags.device_state_property_api") public final class DeviceStateManager {
     method @RequiresPermission(android.Manifest.permission.CONTROL_DEVICE_STATE) public void cancelBaseStateOverride();
     method @RequiresPermission(value=android.Manifest.permission.CONTROL_DEVICE_STATE, conditional=true) public void cancelStateRequest();
-    method @Deprecated @NonNull public int[] getSupportedStates();
     method @RequiresPermission(android.Manifest.permission.CONTROL_DEVICE_STATE) public void requestBaseStateOverride(@NonNull android.hardware.devicestate.DeviceStateRequest, @Nullable java.util.concurrent.Executor, @Nullable android.hardware.devicestate.DeviceStateRequest.Callback);
     method @RequiresPermission(value=android.Manifest.permission.CONTROL_DEVICE_STATE, conditional=true) public void requestState(@NonNull android.hardware.devicestate.DeviceStateRequest, @Nullable java.util.concurrent.Executor, @Nullable android.hardware.devicestate.DeviceStateRequest.Callback);
+    field public static final int INVALID_DEVICE_STATE_IDENTIFIER = -1; // 0xffffffff
     field public static final int MAXIMUM_DEVICE_STATE_IDENTIFIER = 10000; // 0x2710
     field public static final int MINIMUM_DEVICE_STATE_IDENTIFIER = 0; // 0x0
-  }
-
-  public static interface DeviceStateManager.DeviceStateCallback {
-    method @Deprecated public default void onBaseStateChanged(int);
-    method @Deprecated public void onStateChanged(int);
-    method @Deprecated public default void onSupportedStatesChanged(@NonNull int[]);
   }
 
   public final class DeviceStateRequest {
@@ -1705,6 +1717,15 @@ package android.hardware.display {
     field public static final int VIRTUAL_DISPLAY_FLAG_OWN_FOCUS = 16384; // 0x4000
     field public static final int VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS = 512; // 0x200
     field public static final int VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH = 64; // 0x40
+  }
+
+}
+
+package android.hardware.fingerprint {
+
+  @Deprecated public class FingerprintManager {
+    method @Deprecated @NonNull @RequiresPermission(android.Manifest.permission.TEST_BIOMETRIC) public android.hardware.biometrics.BiometricTestSession createTestSession(int);
+    method @Deprecated @NonNull @RequiresPermission(android.Manifest.permission.TEST_BIOMETRIC) public java.util.List<android.hardware.biometrics.SensorProperties> getSensorProperties();
   }
 
 }
@@ -2448,6 +2469,7 @@ package android.os {
   }
 
   public class UserManager {
+    method @FlaggedApi("android.os.allow_private_profile") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}, conditional=true) public boolean canAddPrivateProfile();
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createProfileForUser(@Nullable String, @NonNull String, int, int, @Nullable String[]);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createRestrictedProfile(@Nullable String);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createUser(@Nullable String, @NonNull String, int);
@@ -3053,6 +3075,7 @@ package android.service.dreams {
   }
 
   public static final class DreamService.DreamMetadata {
+    field @FlaggedApi("android.service.controls.flags.home_panel_dream") @NonNull public final int dreamCategory;
     field @Nullable public final android.graphics.drawable.Drawable previewImage;
     field @Nullable public final android.content.ComponentName settingsActivity;
     field @NonNull public final boolean showComplications;

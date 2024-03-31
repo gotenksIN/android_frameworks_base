@@ -315,6 +315,23 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    public void testUserLeaving() {
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final Task task = activity.getTask();
+        mSupervisor.mUserLeaving = true;
+        activity.setState(ActivityRecord.State.RESUMED, "test");
+        task.sleepIfPossible(false /* shuttingDown */);
+        verify(task).startPausing(eq(true) /* userLeaving */, anyBoolean(), any(), any());
+
+        clearInvocations(task);
+        activity.setState(ActivityRecord.State.RESUMED, "test");
+        task.setPausingActivity(null);
+        doReturn(false).when(task).canBeResumed(any());
+        task.pauseActivityIfNeeded(null /* resuming */, "test");
+        verify(task).startPausing(eq(true) /* userLeaving */, anyBoolean(), any(), any());
+    }
+
+    @Test
     public void testSwitchUser() {
         final Task rootTask = createTask(mDisplayContent);
         final Task childTask = createTaskInRootTask(rootTask, 0 /* userId */);
@@ -604,6 +621,23 @@ public class TaskTests extends WindowTestsBase {
         assertFalse(task.getTaskInfo()
                 .appCompatTaskInfo.topActivityEligibleForUserAspectRatioButton);
         doReturn(true).when(root).fillsParent();
+    }
+
+    @Test
+    public void testIsTopActivityTranslucent() {
+        DisplayContent display = mAtm.mRootWindowContainer.getDefaultDisplay();
+        final Task rootTask = new TaskBuilder(mSupervisor).setCreateActivity(true)
+                .setWindowingMode(WINDOWING_MODE_FULLSCREEN).setDisplay(display).build();
+        final Task task = rootTask.getBottomMostTask();
+        final ActivityRecord root = task.getTopNonFinishingActivity();
+        spyOn(mWm.mLetterboxConfiguration);
+        spyOn(root);
+
+        doReturn(false).when(root).fillsParent();
+        assertTrue(task.getTaskInfo().isTopActivityTransparent);
+
+        doReturn(true).when(root).fillsParent();
+        assertFalse(task.getTaskInfo().isTopActivityTransparent);
     }
 
     /**
@@ -1823,6 +1857,66 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    public void testAssignChildLayers_boostedDecorSurfacePlacement() {
+        final TaskFragmentOrganizer organizer = new TaskFragmentOrganizer(Runnable::run);
+        final Task task =  new TaskBuilder(mSupervisor).setCreateActivity(true).build();
+        final ActivityRecord unembeddedActivity = task.getTopMostActivity();
+
+        final TaskFragment fragment1 = createTaskFragmentWithEmbeddedActivity(task, organizer);
+        final TaskFragment fragment2 = createTaskFragmentWithEmbeddedActivity(task, organizer);
+        final SurfaceControl.Transaction t = task.getSyncTransaction();
+        final SurfaceControl.Transaction clientTransaction = mock(SurfaceControl.Transaction.class);
+
+        doNothing().when(task).sendTaskFragmentParentInfoChangedIfNeeded();
+        spyOn(unembeddedActivity);
+        spyOn(fragment1);
+        spyOn(fragment2);
+
+        doReturn(true).when(unembeddedActivity).isUid(task.effectiveUid);
+        doReturn(true).when(fragment1).isAllowedToBeEmbeddedInTrustedMode();
+        doReturn(false).when(fragment2).isAllowedToBeEmbeddedInTrustedMode();
+        doReturn(true).when(fragment1).isVisible();
+
+        task.moveOrCreateDecorSurfaceFor(fragment1);
+
+        clearInvocations(t);
+        clearInvocations(unembeddedActivity);
+        clearInvocations(fragment1);
+        clearInvocations(fragment2);
+
+        // The decor surface should be placed above all the windows when boosted and the cover
+        // surface should show.
+        task.setDecorSurfaceBoosted(fragment1, true /* isBoosted */, clientTransaction);
+
+        verify(unembeddedActivity).assignLayer(t, 0);
+        verify(fragment1).assignLayer(t, 1);
+        verify(fragment2).assignLayer(t, 2);
+        verify(t).setLayer(task.mDecorSurfaceContainer.mContainerSurface, 3);
+
+        verify(t).setVisibility(task.mDecorSurfaceContainer.mContainerSurface, true);
+        verify(t).merge(clientTransaction);
+
+        clearInvocations(t);
+        clearInvocations(unembeddedActivity);
+        clearInvocations(fragment1);
+        clearInvocations(fragment2);
+
+        // The decor surface should be placed just above the owner TaskFragment and the cover
+        // surface should hide.
+        task.moveOrCreateDecorSurfaceFor(fragment1);
+        task.setDecorSurfaceBoosted(fragment1, false /* isBoosted */, clientTransaction);
+
+        verify(unembeddedActivity).assignLayer(t, 0);
+        verify(fragment1).assignLayer(t, 1);
+        verify(t).setLayer(task.mDecorSurfaceContainer.mContainerSurface, 2);
+        verify(fragment2).assignLayer(t, 3);
+
+        verify(t).setVisibility(task.mDecorSurfaceContainer.mContainerSurface, true);
+        verify(t).merge(clientTransaction);
+
+    }
+
+    @Test
     public void testMoveTaskFragmentsToBottomIfNeeded() {
         final TaskFragmentOrganizer organizer = new TaskFragmentOrganizer(Runnable::run);
         final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
@@ -1849,6 +1943,21 @@ public class TaskTests extends WindowTestsBase {
         assertEquals(unembeddedActivity, task.mChildren.get(2));
         assertEquals(fragment2, task.mChildren.get(3));
         assertEquals(2, finishCount[0]);
+    }
+
+    @Test
+    public void testPauseActivityWhenHasEmptyLeafTaskFragment() {
+        // Creating a task that has a RESUMED activity and an empty TaskFragment.
+        final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
+        final ActivityRecord activity = task.getTopMostActivity();
+        new TaskFragmentBuilder(mAtm).setParentTask(task).build();
+        activity.setState(ActivityRecord.State.RESUMED, "test");
+
+        // Ensure the activity is paused if cannot be resumed.
+        doReturn(false).when(task).canBeResumed(any());
+        mSupervisor.mUserLeaving = true;
+        task.pauseActivityIfNeeded(null /* resuming */, "test");
+        verify(task).startPausing(eq(true) /* userLeaving */, anyBoolean(), any(), any());
     }
 
     private Task getTestTask() {

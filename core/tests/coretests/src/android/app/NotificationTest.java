@@ -85,6 +85,7 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemProperties;
+import android.platform.test.annotations.Presubmit;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
@@ -107,6 +108,7 @@ import junit.framework.Assert;
 import libcore.junit.util.compat.CoreCompatChangeRule;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
@@ -117,6 +119,7 @@ import java.util.function.Consumer;
 
 @RunWith(AndroidJUnit4.class)
 @SmallTest
+@Presubmit
 public class NotificationTest {
 
     private Context mContext;
@@ -768,6 +771,7 @@ public class NotificationTest {
     }
 
     @Test
+    @Ignore // TODO: b/329389261 - Restore or delete
     public void testColors_ensureColors_dayMode_producesValidPalette() {
         Notification.Colors c = new Notification.Colors();
         boolean colorized = false;
@@ -796,6 +800,7 @@ public class NotificationTest {
     }
 
     @Test
+    @Ignore // TODO: b/329389261 - Restore or delete
     public void testColors_ensureColors_colorized_producesValidPalette_red() {
         validateColorizedPaletteForColor(Color.RED);
     }
@@ -1244,29 +1249,25 @@ public class NotificationTest {
     }
 
     @Test
-    public void testBigPictureStyle_setExtras_pictureIconNull_pictureIconKeyNull() {
+    public void testBigPictureStyle_setExtras_pictureIconNull_noPictureIconKey() {
         Notification.BigPictureStyle bpStyle = new Notification.BigPictureStyle();
         bpStyle.bigPicture((Bitmap) null);
 
         Bundle extras = new Bundle();
         bpStyle.addExtras(extras);
 
-        assertThat(extras.containsKey(EXTRA_PICTURE_ICON)).isTrue();
-        final Parcelable pictureIcon = extras.getParcelable(EXTRA_PICTURE_ICON);
-        assertThat(pictureIcon).isNull();
+        assertThat(extras.containsKey(EXTRA_PICTURE_ICON)).isFalse();
     }
 
     @Test
-    public void testBigPictureStyle_setExtras_pictureIconNull_pictureKeyNull() {
+    public void testBigPictureStyle_setExtras_pictureIconNull_noPictureKey() {
         Notification.BigPictureStyle bpStyle = new Notification.BigPictureStyle();
         bpStyle.bigPicture((Bitmap) null);
 
         Bundle extras = new Bundle();
         bpStyle.addExtras(extras);
 
-        assertThat(extras.containsKey(EXTRA_PICTURE)).isTrue();
-        final Parcelable picture = extras.getParcelable(EXTRA_PICTURE);
-        assertThat(picture).isNull();
+        assertThat(extras.containsKey(EXTRA_PICTURE)).isFalse();
     }
 
     @Test

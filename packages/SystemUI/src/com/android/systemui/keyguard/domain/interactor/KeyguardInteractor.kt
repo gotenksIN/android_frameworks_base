@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.combineTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
@@ -82,6 +83,7 @@ constructor(
     shadeRepository: ShadeRepository,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     sceneInteractorProvider: Provider<SceneInteractor>,
+    private val fromGoneTransitionInteractor: Provider<FromGoneTransitionInteractor>,
 ) {
     // TODO(b/296118689): move to a repository
     private val _sharedNotificationContainerBounds = MutableStateFlow(NotificationContainerBounds())
@@ -179,11 +181,19 @@ constructor(
 
     /** Keyguard can be clipped at the top as the shade is dragged */
     val topClippingBounds: Flow<Int?> =
-        combine(configurationInteractor.onAnyConfigurationChange, repository.topClippingBounds) {
-            _,
-            topClippingBounds ->
-            topClippingBounds
-        }
+        combineTransform(
+                configurationInteractor.onAnyConfigurationChange,
+                keyguardTransitionInteractor
+                    .transitionValue(GONE)
+                    .map { it == 1f }
+                    .onStart { emit(false) },
+                repository.topClippingBounds
+            ) { _, isGone, topClippingBounds ->
+                if (!isGone) {
+                    emit(topClippingBounds)
+                }
+            }
+            .distinctUntilChanged()
 
     /** Last point that [KeyguardRootView] view was tapped */
     val lastRootViewTapPosition: Flow<Point?> = repository.lastRootViewTapPosition.asStateFlow()
@@ -372,6 +382,11 @@ constructor(
 
     fun setTopClippingBounds(top: Int?) {
         repository.topClippingBounds.value = top
+    }
+
+    /** Temporary shim, until [KeyguardWmStateRefactor] is enabled */
+    fun showKeyguard() {
+        fromGoneTransitionInteractor.get().showKeyguard()
     }
 
     companion object {

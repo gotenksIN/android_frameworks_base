@@ -29,6 +29,7 @@ import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
@@ -693,7 +694,19 @@ public class LauncherApps {
      *
      * <p>If the caller is running on a managed profile, it'll return only the current profile.
      * Otherwise it'll return the same list as {@link UserManager#getUserProfiles()} would.
+     *
+     * <p>To get hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public List<UserHandle> getProfiles() {
         if (mUserManager.isManagedProfile()
                 || (android.multiuser.Flags.enableLauncherAppsHiddenProfileChecks()
@@ -751,11 +764,23 @@ public class LauncherApps {
      * list.</li>
      * </ul>
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param packageName The specific package to query. If null, it checks all installed packages
      *            in the profile.
      * @param user The UserHandle of the profile.
      * @return List of launchable activities. Can be an empty list but will not be null.
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public List<LauncherActivityInfo> getActivityList(String packageName, UserHandle user) {
         logErrorForInvalidProfileAccess(user);
         try {
@@ -795,15 +820,21 @@ public class LauncherApps {
      * Returns information related to a user which is useful for displaying UI elements
      * to distinguish it from other users (eg, badges).
      *
-     * <p>If the user in question is a hidden profile like
-     * {@link UserManager.USER_TYPE_PROFILE_PRIVATE}, caller should have
-     * {@link android.app.role.RoleManager.ROLE_HOME} and either of the permissions required.
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
      *
      * @param userHandle user handle of the user for which LauncherUserInfo is requested.
      * @return the {@link LauncherUserInfo} object related to the user specified, null in case
      * the user is inaccessible.
      */
     @Nullable
+    @SuppressLint("RequiresPermission")
     @FlaggedApi(Flags.FLAG_ALLOW_PRIVATE_PROFILE)
     @RequiresPermission(conditional = true,
             anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
@@ -842,9 +873,14 @@ public class LauncherApps {
      * </ul>
      * </p>
      *
-     * <p>If the user in question is a hidden profile
-     * {@link UserManager.USER_TYPE_PROFILE_PRIVATE}, caller should have
-     * {@link android.app.role.RoleManager.ROLE_HOME} and either of the permissions required.
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
      *
      * @param packageName the package for which intent sender to launch App Market Activity is
      *                    required.
@@ -853,6 +889,7 @@ public class LauncherApps {
      *         there is no such activity.
      */
     @Nullable
+    @SuppressLint("RequiresPermission")
     @FlaggedApi(Flags.FLAG_ALLOW_PRIVATE_PROFILE)
     @RequiresPermission(conditional = true,
             anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
@@ -876,9 +913,14 @@ public class LauncherApps {
      * <p>An empty list denotes that all system packages should be treated as pre-installed for that
      * user at creation.
      *
-     * <p>If the user in question is a hidden profile like
-     * {@link UserManager.USER_TYPE_PROFILE_PRIVATE}, caller should have
-     * {@link android.app.role.RoleManager.ROLE_HOME} and either of the permissions required.
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
      *
      * @param userHandle the user for which installed system packages are required.
      * @return {@link List} of {@link String}, representing the package name of the installed
@@ -886,6 +928,7 @@ public class LauncherApps {
      */
     @FlaggedApi(Flags.FLAG_ALLOW_PRIVATE_PROFILE)
     @NonNull
+    @SuppressLint("RequiresPermission")
     @RequiresPermission(conditional = true,
             anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public List<String> getPreInstalledSystemPackages(@NonNull UserHandle userHandle) {
@@ -925,10 +968,22 @@ public class LauncherApps {
      * Returns the activity info for a given intent and user handle, if it resolves. Otherwise it
      * returns null.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param intent The intent to find a match for.
      * @param user The profile to look in for a match.
      * @return An activity info object if there is a match.
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public LauncherActivityInfo resolveActivity(Intent intent, UserHandle user) {
         logErrorForInvalidProfileAccess(user);
         try {
@@ -978,11 +1033,23 @@ public class LauncherApps {
     /**
      * Starts a Main activity in the specified profile.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param component The ComponentName of the activity to launch
      * @param user The UserHandle of the profile
      * @param sourceBounds The Rect containing the source bounds of the clicked icon
      * @param opts Options to pass to startActivity
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public void startMainActivity(ComponentName component, UserHandle user, Rect sourceBounds,
             Bundle opts) {
         logErrorForInvalidProfileAccess(user);
@@ -1020,11 +1087,23 @@ public class LauncherApps {
      * Starts the settings activity to show the application details for a
      * package in the specified profile.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param component The ComponentName of the package to launch settings for.
      * @param user The UserHandle of the profile
      * @param sourceBounds The Rect containing the source bounds of the clicked icon
      * @param opts Options to pass to startActivity
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public void startAppDetailsActivity(ComponentName component, UserHandle user,
             Rect sourceBounds, Bundle opts) {
         logErrorForInvalidProfileAccess(user);
@@ -1068,7 +1147,8 @@ public class LauncherApps {
      * @param packageName The specific package to query. If null, it checks all installed packages
      *            in the profile.
      * @param user The UserHandle of the profile.
-     * @return List of config activities. Can be an empty list but will not be null.
+     * @return List of config activities. Can be an empty list but will not be null. Empty list will
+     * be returned for user-profiles that have items restricted on home screen.
      *
      * @see Intent#ACTION_CREATE_SHORTCUT
      * @see #getShortcutConfigActivityIntent(LauncherActivityInfo)
@@ -1135,11 +1215,23 @@ public class LauncherApps {
     /**
      * Checks if the package is installed and enabled for a profile.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param packageName The package to check.
      * @param user The UserHandle of the profile.
      *
      * @return true if the package exists and is enabled.
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public boolean isPackageEnabled(String packageName, UserHandle user) {
         logErrorForInvalidProfileAccess(user);
         try {
@@ -1157,6 +1249,15 @@ public class LauncherApps {
      * <p>The contents of this {@link Bundle} are supposed to be a contract between the suspending
      * app and the launcher.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * <p>Note: This just returns whatever extras were provided to the system, <em>which might
      * even be {@code null}.</em>
      *
@@ -1168,6 +1269,9 @@ public class LauncherApps {
      * @see Callback#onPackagesSuspended(String[], UserHandle, Bundle)
      * @see PackageManager#isPackageSuspended()
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public @Nullable Bundle getSuspendedPackageLauncherExtras(String packageName, UserHandle user) {
         logErrorForInvalidProfileAccess(user);
         try {
@@ -1182,10 +1286,22 @@ public class LauncherApps {
      * could be done because the package was marked as distracting to the user via
      * {@code PackageManager.setDistractingPackageRestrictions(String[], int)}.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param packageName The package for which to check.
      * @param user the {@link UserHandle} of the profile.
      * @return
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public boolean shouldHideFromSuggestions(@NonNull String packageName,
             @NonNull UserHandle user) {
         Objects.requireNonNull(packageName, "packageName");
@@ -1200,6 +1316,15 @@ public class LauncherApps {
     /**
      * Returns {@link ApplicationInfo} about an application installed for a specific user profile.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param packageName The package name of the application
      * @param flags Additional option flags {@link PackageManager#getApplicationInfo}
      * @param user The UserHandle of the profile.
@@ -1208,6 +1333,9 @@ public class LauncherApps {
      *         {@code null} if the package isn't installed for the given profile, or the profile
      *         isn't enabled.
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public ApplicationInfo getApplicationInfo(@NonNull String packageName,
             @ApplicationInfoFlagsBits int flags, @NonNull UserHandle user)
             throws PackageManager.NameNotFoundException {
@@ -1257,11 +1385,23 @@ public class LauncherApps {
      * <p>The activity may still not be exported, in which case {@link #startMainActivity} will
      * throw a {@link SecurityException} unless the caller has the same UID as the target app's.
      *
+     * <p>If the user in question is a hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param component The activity to check.
      * @param user The UserHandle of the profile.
      *
      * @return true if the activity exists and is enabled.
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public boolean isActivityEnabled(ComponentName component, UserHandle user) {
         logErrorForInvalidProfileAccess(user);
         try {
@@ -1429,6 +1569,9 @@ public class LauncherApps {
      * <p>The calling launcher application must be allowed to access the shortcut information,
      * as defined in {@link #hasShortcutHostPermission()}.
      *
+     * <p>For user-profiles with items restricted on home screen, caller must have the required
+     * permission.
+     *
      * @param packageName The target package name.
      * @param shortcutIds The IDs of the shortcut to be pinned.
      * @param user The UserHandle of the profile.
@@ -1437,6 +1580,7 @@ public class LauncherApps {
      *
      * @see ShortcutManager
      */
+    @RequiresPermission(conditional = true, value = android.Manifest.permission.ACCESS_SHORTCUTS)
     public void pinShortcuts(@NonNull String packageName, @NonNull List<String> shortcutIds,
             @NonNull UserHandle user) {
         logErrorForInvalidProfileAccess(user);
@@ -1816,8 +1960,20 @@ public class LauncherApps {
     /**
      * Registers a callback for changes to packages in this user and managed profiles.
      *
+     * <p>To receive callbacks for hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param callback The callback to register.
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public void registerCallback(Callback callback) {
         registerCallback(callback, null);
     }
@@ -1825,9 +1981,21 @@ public class LauncherApps {
     /**
      * Registers a callback for changes to packages in this user and managed profiles.
      *
+     * <p>To receive callbacks for hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES_FULL}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @param callback The callback to register.
      * @param handler that should be used to post callbacks on, may be null.
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public void registerCallback(Callback callback, Handler handler) {
         synchronized (this) {
             if (callback != null && findCallbackLocked(callback) < 0) {
@@ -2227,6 +2395,9 @@ public class LauncherApps {
      * app's manifest, have the android.permission.QUERY_ALL_PACKAGES, or be the session owner to
      * watch for these events.
      *
+     * <p> Session callbacks are not sent for user-profiles that have items restricted on home
+     * screen.
+     *
      * @param callback The callback to register.
      * @param executor {@link Executor} to handle the callbacks, cannot be null.
      *
@@ -2275,8 +2446,20 @@ public class LauncherApps {
      * package name in the app's manifest, have the android.permission.QUERY_ALL_PACKAGES, or be
      * the session owner to retrieve these details.
      *
+     * <p>To receive callbacks for hidden profile {@link UserManager.USER_TYPE_PROFILE_PRIVATE},
+     * caller should have either:</p>
+     * <ul>
+     * <li>the privileged {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES}
+     * permission</li>
+     * <li>the normal {@link android.Manifest.permission.ACCESS_HIDDEN_PROFILES} permission and the
+     * {@link android.app.role.RoleManager.ROLE_HOME} role. </li>
+     * </ul>
+     *
      * @see PackageInstaller#getAllSessions()
      */
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(conditional = true,
+            anyOf = {ACCESS_HIDDEN_PROFILES_FULL, ACCESS_HIDDEN_PROFILES})
     public @NonNull List<SessionInfo> getAllPackageInstallerSessions() {
         try {
             return mService.getAllSessions(mContext.getPackageName()).getList();

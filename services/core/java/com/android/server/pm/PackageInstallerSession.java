@@ -148,6 +148,7 @@ import android.os.incremental.V4Signature;
 import android.os.storage.StorageManager;
 import android.provider.DeviceConfig;
 import android.provider.Settings.Global;
+import android.service.persistentdata.PersistentDataBlockManager;
 import android.stats.devicepolicy.DevicePolicyEnums;
 import android.system.ErrnoException;
 import android.system.Int64Ref;
@@ -972,13 +973,22 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     private boolean isEmergencyInstallerEnabled(String packageName, Computer snapshot) {
         final PackageStateInternal ps = snapshot.getPackageStateInternal(packageName);
-        if (ps == null || ps.getPkg() == null) {
+        if (ps == null || ps.getPkg() == null || !ps.isSystem()) {
             return false;
         }
+        int uid = UserHandle.getUid(userId, ps.getAppId());
         String emergencyInstaller = ps.getPkg().getEmergencyInstaller();
         if (emergencyInstaller == null || !ArrayUtils.contains(
-                snapshot.getPackagesForUid(mInstallerUid),
-                emergencyInstaller)) {
+                snapshot.getPackagesForUid(mInstallerUid), emergencyInstaller)) {
+            return false;
+        }
+        // Only system installers can have an emergency installer
+        if (PackageManager.PERMISSION_GRANTED
+                != snapshot.checkUidPermission(Manifest.permission.INSTALL_PACKAGES, uid)
+                && PackageManager.PERMISSION_GRANTED
+                != snapshot.checkUidPermission(Manifest.permission.INSTALL_PACKAGE_UPDATES, uid)
+                && PackageManager.PERMISSION_GRANTED
+                != snapshot.checkUidPermission(Manifest.permission.INSTALL_SELF_UPDATES, uid)) {
             return false;
         }
         return (snapshot.checkUidPermission(Manifest.permission.EMERGENCY_INSTALL_PACKAGES,
@@ -2375,8 +2385,21 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             assertPreparedAndNotDestroyedLocked("commit of session " + sessionId);
             assertNoWriteFileTransfersOpenLocked();
 
-            final boolean isSecureFrpEnabled =
-                    Global.getInt(mContext.getContentResolver(), Global.SECURE_FRP_MODE, 0) == 1;
+            boolean isSecureFrpEnabled;
+            if (android.security.Flags.frpEnforcement()) {
+                PersistentDataBlockManager pdbManager =
+                        mContext.getSystemService(PersistentDataBlockManager.class);
+                if (pdbManager == null) {
+                    // Some devices may not support FRP. In that case, we can't block the install
+                    // accordingly.
+                    isSecureFrpEnabled = false;
+                } else {
+                    isSecureFrpEnabled = pdbManager.isFactoryResetProtectionActive();
+                }
+            } else {
+                isSecureFrpEnabled = Global.getInt(mContext.getContentResolver(),
+                        Global.SECURE_FRP_MODE, 0) == 1;
+            }
 
             if (isSecureFrpEnabled
                     && !isSecureFrpInstallAllowed(mContext, Binder.getCallingUid())) {

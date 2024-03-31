@@ -16,14 +16,19 @@
 
 package com.android.server.backup;
 
-import static androidx.test.core.app.ApplicationProvider.getApplicationContext;
-
 import static com.google.common.truth.Truth.assertThat;
+
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 
 import android.app.backup.BackupDataInput;
 import android.app.backup.BackupDataOutput;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.content.pm.SigningDetails;
+import android.content.pm.SigningInfo;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.platform.test.annotations.Presubmit;
@@ -38,6 +43,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
@@ -51,9 +58,13 @@ import java.util.Optional;
 public class PackageManagerBackupAgentTest {
 
     private static final String EXISTING_PACKAGE_NAME = "com.android.wallpaperbackup";
+    private static final int EXISTING_PACKAGE_VERSION = 1;
+
     private static final int USER_ID = 0;
 
     @Rule public TemporaryFolder folder = new TemporaryFolder();
+
+    @Mock private PackageManager mPackageManager;
 
     private PackageManagerBackupAgent mPackageManagerBackupAgent;
     private ImmutableList<PackageInfo> mPackages;
@@ -61,14 +72,19 @@ public class PackageManagerBackupAgentTest {
 
     @Before
     public void setUp() throws Exception {
-        PackageManager packageManager = getApplicationContext().getPackageManager();
+        MockitoAnnotations.initMocks(this);
 
         PackageInfo existingPackageInfo =
-                packageManager.getPackageInfoAsUser(
-                        EXISTING_PACKAGE_NAME, PackageManager.GET_SIGNING_CERTIFICATES, USER_ID);
+                createPackage(EXISTING_PACKAGE_NAME, EXISTING_PACKAGE_VERSION);
+        Signature sig = new Signature(new byte[256]);
+        existingPackageInfo.signingInfo =
+                new SigningInfo(new SigningDetails(new Signature[] {sig}, 1, null, null));
+        when(mPackageManager.getPackageInfoAsUser(eq(EXISTING_PACKAGE_NAME), anyInt(), anyInt()))
+                .thenReturn(existingPackageInfo);
+
         mPackages = ImmutableList.of(existingPackageInfo);
         mPackageManagerBackupAgent =
-                new PackageManagerBackupAgent(packageManager, mPackages, USER_ID);
+                new PackageManagerBackupAgent(mPackageManager, mPackages, USER_ID);
 
         mBackupData = folder.newFile("backup_data");
         mOldState = folder.newFile("old_state");
@@ -101,11 +117,8 @@ public class PackageManagerBackupAgentTest {
 
         runBackupAgentOnBackup();
 
-        // We shouldn't have written anything, but a known issue is that we always write the
-        // ancestral record version.
         ImmutableMap<String, Optional<ByteBuffer>> keyValues = getKeyValues(mBackupData);
-        assertThat(keyValues.keySet())
-                .containsExactly(PackageManagerBackupAgent.ANCESTRAL_RECORD_KEY);
+        assertThat(keyValues).isEmpty();
         assertThat(mNewState.length()).isGreaterThan(0);
         assertThat(mNewState.length()).isEqualTo(mOldState.length());
     }
@@ -122,9 +135,7 @@ public class PackageManagerBackupAgentTest {
 
         // Note that uninstalledPackageName should not exist, i.e. it did not get deleted.
         ImmutableMap<String, Optional<ByteBuffer>> keyValues = getKeyValues(mBackupData);
-        assertThat(keyValues.keySet())
-                .containsExactly(
-                        PackageManagerBackupAgent.ANCESTRAL_RECORD_KEY, EXISTING_PACKAGE_NAME);
+        assertThat(keyValues.keySet()).containsExactly(EXISTING_PACKAGE_NAME);
         assertThat(mNewState.length()).isGreaterThan(0);
     }
 
@@ -133,7 +144,9 @@ public class PackageManagerBackupAgentTest {
         String uninstalledPackageName = "does.not.exist";
         writeLegacyStateFile(
                 mOldState,
-                ImmutableList.of(createPackage(uninstalledPackageName, 1), mPackages.getFirst()));
+                ImmutableList.of(createPackage(uninstalledPackageName, 1), mPackages.getFirst()),
+                /* writeStateFileVersion= */ false,
+                /* writeAncestralRecordVersion= */ false);
 
         runBackupAgentOnBackup();
 
@@ -144,6 +157,30 @@ public class PackageManagerBackupAgentTest {
                         PackageManagerBackupAgent.GLOBAL_METADATA_KEY,
                         EXISTING_PACKAGE_NAME);
         assertThat(mNewState.length()).isGreaterThan(0);
+    }
+
+    @Test
+    public void onBackup_noAncestralRecordInfo_deletesUninstalledPackagesFromBackup()
+            throws Exception {
+        PackageInfo pkgNotInstalled = createPackage("does.not.exist", 2);
+        PackageInfo pkgInstalled =
+                mPackageManager.getPackageInfoAsUser(
+                        EXISTING_PACKAGE_NAME, PackageManager.GET_SIGNING_CERTIFICATES, USER_ID);
+        writeLegacyStateFile(
+                mOldState,
+                ImmutableList.of(pkgInstalled, pkgNotInstalled),
+                /* writeStateFileVersion= */ true,
+                /* writeAncestralRecordVersion= */ false);
+
+        runBackupAgentOnBackup();
+
+        ImmutableMap<String, Optional<ByteBuffer>> keyValues = getKeyValues(mBackupData);
+        assertThat(keyValues.keySet())
+                .containsExactly(
+                        PackageManagerBackupAgent.ANCESTRAL_RECORD_KEY,
+                        pkgInstalled.packageName,
+                        pkgNotInstalled.packageName);
+        assertThat(keyValues).containsEntry(pkgNotInstalled.packageName, Optional.empty());
     }
 
     @Test
@@ -229,7 +266,11 @@ public class PackageManagerBackupAgentTest {
     }
 
     /** This creates a legacy state file in which {@code STATE_FILE_HEADER} was not yet present. */
-    private static void writeLegacyStateFile(File stateFile, ImmutableList<PackageInfo> packages)
+    private static void writeLegacyStateFile(
+            File stateFile,
+            ImmutableList<PackageInfo> packages,
+            boolean writeStateFileVersion,
+            boolean writeAncestralRecordVersion)
             throws Exception {
         try (ParcelFileDescriptor stateFileDescriptor = openForWriting(stateFile);
                 DataOutputStream out =
@@ -237,6 +278,19 @@ public class PackageManagerBackupAgentTest {
                                 new BufferedOutputStream(
                                         new FileOutputStream(
                                                 stateFileDescriptor.getFileDescriptor())))) {
+
+            if (writeStateFileVersion) {
+                // state file version header
+                out.writeUTF(PackageManagerBackupAgent.STATE_FILE_HEADER);
+                out.writeInt(PackageManagerBackupAgent.STATE_FILE_VERSION);
+            }
+
+            if (writeAncestralRecordVersion) {
+                // Record the ancestral record
+                out.writeUTF(PackageManagerBackupAgent.ANCESTRAL_RECORD_KEY);
+                out.writeInt(PackageManagerBackupAgent.ANCESTRAL_RECORD_VERSION);
+            }
+
             out.writeUTF(PackageManagerBackupAgent.GLOBAL_METADATA_KEY);
             out.writeInt(Build.VERSION.SDK_INT);
             out.writeUTF(Build.VERSION.INCREMENTAL);

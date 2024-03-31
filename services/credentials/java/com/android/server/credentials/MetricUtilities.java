@@ -16,6 +16,7 @@
 
 package com.android.server.credentials;
 
+import android.annotation.UserIdInt;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -68,17 +69,27 @@ public class MetricUtilities {
      *
      * @return the uid of a given package
      */
-    protected static int getPackageUid(Context context, ComponentName componentName) {
-        int sessUid = -1;
-        try {
-            // Only for T and above, which is fine for our use case
-            sessUid = context.getPackageManager().getApplicationInfo(
-                    componentName.getPackageName(),
-                    PackageManager.ApplicationInfoFlags.of(0)).uid;
-        } catch (Throwable t) {
-            Slog.i(TAG, "Couldn't find required uid");
+    protected static int getPackageUid(Context context, ComponentName componentName,
+            @UserIdInt int userId) {
+        if (componentName == null) {
+            return -1;
         }
-        return sessUid;
+        return getPackageUid(context, componentName.getPackageName(), userId);
+    }
+
+    /** Returns the package uid, or -1 if not found. */
+    public static int getPackageUid(Context context, String packageName,
+            @UserIdInt int userId) {
+        if (packageName == null) {
+            return -1;
+        }
+        try {
+            return context.getPackageManager().getPackageUidAsUser(packageName,
+                    PackageManager.PackageInfoFlags.of(0), userId);
+        } catch (Throwable t) {
+            Slog.i(TAG, "Couldn't find uid for " + packageName + ": " + t);
+            return -1;
+        }
     }
 
     /**
@@ -568,7 +579,10 @@ public class MetricUtilities {
                     /* clicked_entries */ browsedClickedEntries,
                     /* provider_of_clicked_entry */ browsedProviderUid,
                     /* api_status */ apiStatus,
-                    /* primary_indicated */ finalPhaseMetric.isPrimary()
+                    /* primary_indicated */ finalPhaseMetric.isPrimary(),
+                    /* oem_credential_manager_ui_uid */ finalPhaseMetric.getOemUiUid(),
+                    /* fallback_credential_manager_ui_uid */ finalPhaseMetric.getFallbackUiUid(),
+                    /* oem_ui_usage_status */ finalPhaseMetric.getOemUiUsageStatus()
             );
         } catch (Exception e) {
             Slog.w(TAG, "Unexpected error during final no uid metric logging: " + e);

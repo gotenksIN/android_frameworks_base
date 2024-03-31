@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 
 /**
  * Breaks down GLANCEABLE_HUB->LOCKSCREEN transition into discrete steps for corresponding views to
@@ -53,16 +52,17 @@ constructor(
         )
 
     val keyguardAlpha: Flow<Float> =
-        transitionAnimation
-            .sharedFlow(
-                duration = 167.milliseconds,
-                startTime = 167.milliseconds,
-                onStep = { it },
-                onFinish = { 1f },
-                onCancel = { 0f },
-                name = "GLANCEABLE_HUB->LOCKSCREEN: keyguardAlpha",
-            )
-            .onStart { emit(0f) }
+        transitionAnimation.sharedFlow(
+            duration = 167.milliseconds,
+            startTime = 167.milliseconds,
+            onStep = { it },
+            onFinish = { 1f },
+            onCancel = { 0f },
+            name = "GLANCEABLE_HUB->LOCKSCREEN: keyguardAlpha",
+        )
+
+    // Show UMO as long as keyguard is not visible.
+    val showUmo: Flow<Boolean> = keyguardAlpha.map { alpha -> alpha == 0f }
 
     val keyguardTranslationX: Flow<StateToValue> =
         configurationInteractor
@@ -72,7 +72,11 @@ constructor(
                     duration = TO_LOCKSCREEN_DURATION,
                     onStep = { value -> -translatePx + value * translatePx },
                     interpolator = EMPHASIZED,
-                    onCancel = { -translatePx.toFloat() },
+                    // Move notifications back to their original position since they can be
+                    // accessed from the shade, and also keyguard elements in case the animation
+                    // is cancelled.
+                    onFinish = { 0f },
+                    onCancel = { 0f },
                     name = "GLANCEABLE_HUB->LOCKSCREEN: keyguardTranslationX"
                 )
             }

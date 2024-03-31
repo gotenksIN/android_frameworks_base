@@ -2665,12 +2665,6 @@
       "group": "WM_DEBUG_RECENTS_ANIMATIONS",
       "at": "com\/android\/server\/wm\/Task.java"
     },
-    "4446998544419008924": {
-      "message": "Moving to RESUMED: %s (starting new instance) callers=%s",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_STATES",
-      "at": "com\/android\/server\/wm\/Task.java"
-    },
     "4037728373502324767": {
       "message": "resumeNextFocusableActivityWhenRootTaskIsEmpty: %s, go home",
       "level": "DEBUG",
@@ -2764,12 +2758,6 @@
     "-8359248677489986541": {
       "message": "Moving to RESUMED: %s (in existing)",
       "level": "VERBOSE",
-      "group": "WM_DEBUG_STATES",
-      "at": "com\/android\/server\/wm\/TaskFragment.java"
-    },
-    "2088177629189452176": {
-      "message": "Activity config changed during resume: %s, new next: %s",
-      "level": "INFO",
       "group": "WM_DEBUG_STATES",
       "at": "com\/android\/server\/wm\/TaskFragment.java"
     },
@@ -3433,6 +3421,24 @@
       "group": "WM_DEBUG_WALLPAPER",
       "at": "com\/android\/server\/wm\/WallpaperController.java"
     },
+    "-6856158722649737204": {
+      "message": "Waiting for offset complete...",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WALLPAPER",
+      "at": "com\/android\/server\/wm\/WallpaperController.java"
+    },
+    "-5966696477376431672": {
+      "message": "Offset complete!",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WALLPAPER",
+      "at": "com\/android\/server\/wm\/WallpaperController.java"
+    },
+    "4198834090919802045": {
+      "message": "Timeout waiting for wallpaper to offset: %s",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WALLPAPER",
+      "at": "com\/android\/server\/wm\/WallpaperController.java"
+    },
     "-3477087868568520027": {
       "message": "No longer animating wallpaper targets!",
       "level": "VERBOSE",
@@ -3463,8 +3469,32 @@
       "group": "WM_DEBUG_WALLPAPER",
       "at": "com\/android\/server\/wm\/WallpaperController.java"
     },
-    "-2504764636812266719": {
-      "message": "New wallpaper: target=%s prev=%s",
+    "7408402065665963407": {
+      "message": "Wallpaper at display %d - visibility: %b, keyguardLocked: %b",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WALLPAPER",
+      "at": "com\/android\/server\/wm\/WallpaperController.java"
+    },
+    "-8598497865499265448": {
+      "message": "Wallpaper target=%s prev=%s",
+      "level": "DEBUG",
+      "group": "WM_DEBUG_WALLPAPER",
+      "at": "com\/android\/server\/wm\/WallpaperController.java"
+    },
+    "-5402010429724738603": {
+      "message": "Wallpaper should be visible but has not been drawn yet. mWallpaperDrawState=%d",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WALLPAPER",
+      "at": "com\/android\/server\/wm\/WallpaperController.java"
+    },
+    "4151327328872447804": {
+      "message": "New home screen wallpaper: %s, prev: %s",
+      "level": "DEBUG",
+      "group": "WM_DEBUG_WALLPAPER",
+      "at": "com\/android\/server\/wm\/WallpaperController.java"
+    },
+    "6943105284590482059": {
+      "message": "New lock\/shared screen wallpaper: %s, prev: %s",
       "level": "DEBUG",
       "group": "WM_DEBUG_WALLPAPER",
       "at": "com\/android\/server\/wm\/WallpaperController.java"

@@ -18,6 +18,7 @@ package android.view;
 
 import static android.content.res.Resources.ID_NULL;
 import static android.os.Trace.TRACE_TAG_APP;
+import static android.os.Trace.TRACE_TAG_VIEW;
 import static android.service.autofill.Flags.FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION;
 import static android.view.ContentInfo.SOURCE_DRAG_AND_DROP;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
@@ -43,6 +44,7 @@ import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 import static android.view.flags.Flags.viewVelocityApi;
 import static android.view.inputmethod.Flags.FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR;
+import static android.view.inputmethod.Flags.initiationWithoutInputConnection;
 
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__DEEP_PRESS;
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS;
@@ -122,7 +124,6 @@ import android.hardware.input.InputManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.DeviceIntegrationUtils;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -2373,6 +2374,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     protected static final int[] PRESSED_ENABLED_FOCUSED_SELECTED_WINDOW_FOCUSED_STATE_SET;
 
     /**
+     * This indicates that the frame rate category was chosen for an unknown reason.
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_UNKNOWN = 0x0000_0000;
+
+    /**
      * This indicates that the frame rate category was chosen because it was a small area update.
      * @hide
      */
@@ -2403,9 +2410,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     public static final int FRAME_RATE_CATEGORY_REASON_INVALID = 0x0500_0000;
 
+    /**
+     * This indicates that the frame rate category was chosen because the view has a velocity
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_VELOCITY = 0x0600_0000;
+
+    /**
+     * This indicates that the frame rate category was chosen because it is idle.
+     * @hide
+     */
+    public static final int FRAME_RATE_CATEGORY_REASON_IDLE = 0x0700_0000;
+
     private static final int FRAME_RATE_CATEGORY_REASON_MASK = 0xFFFF_0000;
 
-    private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
+    /**
+     * @hide
+     */
+    protected static boolean sToolkitSetFrameRateReadOnlyFlagValue;
     private static boolean sToolkitMetricsForFrameRateDecisionFlagValue;
     // Used to set frame rate compatibility.
     @Surface.FrameRateCompatibility int mFrameRateCompatibility =
@@ -8475,8 +8497,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *            hierarchy
      * @param refocus when propagate is true, specifies whether to request the
      *            root view place new focus
+     * @hide
      */
-    void clearFocusInternal(View focused, boolean propagate, boolean refocus) {
+    public void clearFocusInternal(View focused, boolean propagate, boolean refocus) {
         if ((mPrivateFlags & PFLAG_FOCUSED) != 0) {
             mPrivateFlags &= ~PFLAG_FOCUSED;
             clearParentsWantFocus();
@@ -8647,11 +8670,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             onFocusLost();
         } else if (hasWindowFocus()) {
             notifyFocusChangeToImeFocusController(true /* hasFocus */);
-
-            if (mIsHandwritingDelegate) {
-                ViewRootImpl viewRoot = getViewRootImpl();
-                if (viewRoot != null) {
+            ViewRootImpl viewRoot = getViewRootImpl();
+            if (viewRoot != null) {
+                if (mIsHandwritingDelegate) {
                     viewRoot.getHandwritingInitiator().onDelegateViewFocused(this);
+                } else if (initiationWithoutInputConnection() && onCheckIsTextEditor()) {
+                    viewRoot.getHandwritingInitiator().onEditorFocused(this);
                 }
             }
         }
@@ -12679,7 +12703,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (getSystemGestureExclusionRects().isEmpty()
                 && collectPreferKeepClearRects().isEmpty()
                 && collectUnrestrictedPreferKeepClearRects().isEmpty()
-                && (info.mHandwritingArea == null || !shouldInitiateHandwriting())) {
+                && (info.mHandwritingArea == null || !shouldTrackHandwritingArea())) {
             if (info.mPositionUpdateListener != null) {
                 mRenderNode.removePositionUpdateListener(info.mPositionUpdateListener);
                 info.mPositionUpdateListener = null;
@@ -13046,7 +13070,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     void updateHandwritingArea() {
         // If autoHandwritingArea is not enabled, do nothing.
-        if (!shouldInitiateHandwriting()) return;
+        if (!shouldTrackHandwritingArea()) return;
         final AttachInfo ai = mAttachInfo;
         if (ai != null) {
             ai.mViewRootImpl.getHandwritingInitiator().updateHandwritingAreasForView(this);
@@ -13061,6 +13085,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     boolean shouldInitiateHandwriting() {
         return isAutoHandwritingEnabled() || getHandwritingDelegatorCallback() != null;
+    }
+
+    /**
+     * Returns whether the handwriting initiator should track the handwriting area for this view,
+     * either to initiate handwriting mode, or to prepare handwriting delegation, or to show the
+     * handwriting unsupported message.
+     * @hide
+     */
+    public boolean shouldTrackHandwritingArea() {
+        return shouldInitiateHandwriting();
     }
 
     /**
@@ -16342,20 +16376,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         ListenerInfo li = mListenerInfo;
         if (li != null && li.mOnTouchListener != null && (mViewFlags & ENABLED_MASK) == ENABLED) {
             try {
-                Trace.traceBegin(Trace.TRACE_TAG_VIEW, "View.onTouchListener#onTouch");
+                Trace.traceBegin(TRACE_TAG_VIEW, "View.onTouchListener#onTouch");
                 handled = li.mOnTouchListener.onTouch(this, event);
             } finally {
-                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                Trace.traceEnd(TRACE_TAG_VIEW);
             }
         }
         if (handled) {
             return true;
         }
         try {
-            Trace.traceBegin(Trace.TRACE_TAG_VIEW, "View#onTouchEvent");
+            Trace.traceBegin(TRACE_TAG_VIEW, "View#onTouchEvent");
             return onTouchEvent(event);
         } finally {
-            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+            Trace.traceEnd(TRACE_TAG_VIEW);
         }
     }
 
@@ -16676,6 +16710,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             onFocusLost();
         } else if ((mPrivateFlags & PFLAG_FOCUSED) != 0) {
             notifyFocusChangeToImeFocusController(true /* hasFocus */);
+            ViewRootImpl viewRoot = getViewRootImpl();
+            if (viewRoot != null && initiationWithoutInputConnection() && onCheckIsTextEditor()) {
+                viewRoot.getHandwritingInitiator().onEditorFocused(this);
+            }
         }
 
         refreshDrawableState();
@@ -22283,10 +22321,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @see #onMovedToDisplay(int, Configuration)
      */
     void dispatchMovedToDisplay(Display display, Configuration config) {
-        // Device Integration: Fix bug that Youtube cannot move from MD2VD/VD2MD.
-        if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION && mAttachInfo == null) {
-            return;
-        }
         mAttachInfo.mDisplay = display;
         mAttachInfo.mDisplayState = display.getState();
         onMovedToDisplay(display.getDisplayId(), config);
@@ -23839,14 +23873,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void buildDrawingCache(boolean autoScale) {
         if ((mPrivateFlags & PFLAG_DRAWING_CACHE_VALID) == 0 || (autoScale ?
                 mDrawingCache == null : mUnscaledDrawingCache == null)) {
-            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
-                Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+            if (Trace.isTagEnabled(TRACE_TAG_VIEW)) {
+                Trace.traceBegin(TRACE_TAG_VIEW,
                         "buildDrawingCache/SW Layer for " + getClass().getSimpleName());
             }
             try {
                 buildDrawingCacheImpl(autoScale);
             } finally {
-                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                Trace.traceEnd(TRACE_TAG_VIEW);
             }
         }
     }
@@ -28973,6 +29007,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         surface.copyFrom(surfaceControl);
         IBinder token = null;
         try {
+            Trace.traceBegin(TRACE_TAG_VIEW, "startDragAndDrop#drawDragShadow");
             final Canvas canvas = isHardwareAccelerated()
                     ? surface.lockHardwareCanvas()
                     : surface.lockCanvas(null);
@@ -28981,33 +29016,40 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 shadowBuilder.onDrawShadow(canvas);
             } finally {
                 surface.unlockCanvasAndPost(canvas);
+                Trace.traceEnd(TRACE_TAG_VIEW);
             }
 
-            token = mAttachInfo.mSession.performDrag(mAttachInfo.mWindow, flags, surfaceControl,
-                    root.getLastTouchSource(), root.getLastTouchDeviceId(),
-                    root.getLastTouchPointerId(), lastTouchPoint.x, lastTouchPoint.y,
-                    shadowTouchPoint.x, shadowTouchPoint.y, data);
-            if (ViewDebug.DEBUG_DRAG) {
-                Log.d(VIEW_LOG_TAG, "performDrag returned " + token);
+            Trace.traceBegin(TRACE_TAG_VIEW, "startDragAndDrop#performDrag");
+            try {
+                token = mAttachInfo.mSession.performDrag(mAttachInfo.mWindow, flags, surfaceControl,
+                        root.getLastTouchSource(), root.getLastTouchDeviceId(),
+                        root.getLastTouchPointerId(), lastTouchPoint.x, lastTouchPoint.y,
+                        shadowTouchPoint.x, shadowTouchPoint.y, data);
+                if (ViewDebug.DEBUG_DRAG) {
+                    Log.d(VIEW_LOG_TAG, "performDrag returned " + token);
+                }
+                if (token != null) {
+                    if (mAttachInfo.mDragSurface != null) {
+                        mAttachInfo.mDragSurface.release();
+                    }
+                    if (mAttachInfo.mDragData != null) {
+                        // Clean up previous drag data intents
+                        View.cleanUpPendingIntents(mAttachInfo.mDragData);
+                    }
+                    mAttachInfo.mDragSurface = surface;
+                    mAttachInfo.mDragToken = token;
+                    mAttachInfo.mDragData = data;
+                    // Cache the local state object for delivery with DragEvents
+                    root.setLocalDragState(myLocalState);
+                    if (a11yEnabled) {
+                        // Set for AccessibilityEvents
+                        mAttachInfo.mViewRootImpl.setDragStartedViewForAccessibility(this);
+                    }
+                }
+                return token != null;
+            } finally {
+                Trace.traceEnd(TRACE_TAG_VIEW);
             }
-            if (token != null) {
-                if (mAttachInfo.mDragSurface != null) {
-                    mAttachInfo.mDragSurface.release();
-                }
-                if (mAttachInfo.mDragData != null) {
-                    View.cleanUpPendingIntents(mAttachInfo.mDragData);
-                }
-                mAttachInfo.mDragSurface = surface;
-                mAttachInfo.mDragToken = token;
-                mAttachInfo.mDragData = data;
-                // Cache the local state object for delivery with DragEvents
-                root.setLocalDragState(myLocalState);
-                if (a11yEnabled) {
-                    // Set for AccessibilityEvents
-                    mAttachInfo.mViewRootImpl.setDragStartedViewForAccessibility(this);
-                }
-            }
-            return token != null;
         } catch (Exception e) {
             Log.e(VIEW_LOG_TAG, "Unable to initiate drag", e);
             return false;
@@ -33792,6 +33834,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                     return;
                 }
             }
+            if (sToolkitMetricsForFrameRateDecisionFlagValue) {
+                float sizePercentage = getSizePercentage();
+                viewRootImpl.recordViewPercentage(sizePercentage);
+            }
             int frameRateCategory;
             if (Float.isNaN(mPreferredFrameRate)) {
                 frameRateCategory = calculateFrameRateCategory(width, height);
@@ -33820,11 +33866,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             }
 
             int category = frameRateCategory & ~FRAME_RATE_CATEGORY_REASON_MASK;
-            if (sToolkitMetricsForFrameRateDecisionFlagValue) {
-                int reason = frameRateCategory & FRAME_RATE_CATEGORY_REASON_MASK;
-                viewRootImpl.recordCategory(category, reason, this);
-            }
-            viewRootImpl.votePreferredFrameRateCategory(category);
+            int reason = frameRateCategory & FRAME_RATE_CATEGORY_REASON_MASK;
+            viewRootImpl.votePreferredFrameRateCategory(category, reason, this);
             mLastFrameRateCategory = frameRateCategory;
         }
     }
@@ -33920,9 +33963,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * This function is mainly used for migrating infrequent layer lagic
+     * This function is mainly used for migrating infrequent layer logic
      * from SurfaceFlinger to Toolkit.
-     * The infrequent layter logic includes:
+     * The infrequent layer logic includes:
      * - NORMAL for infrequent update: FT2-FT1 > 100 && FT3-FT2 > 100.
      * - HIGH/NORMAL based on size for frequent update: (FT3-FT2) + (FT2 - FT1) < 100.
      * - otherwise, use the previous category value.

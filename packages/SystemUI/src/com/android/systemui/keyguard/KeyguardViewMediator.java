@@ -155,7 +155,7 @@ import com.android.systemui.res.R;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeExpansionStateManager;
-import com.android.systemui.shade.ShadeLockscreenInteractor;
+import com.android.systemui.shade.domain.interactor.ShadeLockscreenInteractor;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.NotificationShadeDepthController;
@@ -3404,6 +3404,12 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             } finally {
                 mSurfaceBehindRemoteAnimationFinishedCallback = null;
             }
+        }
+
+        // Ensure that keyguard becomes visible if the going away animation is canceled
+        if (showKeyguard && !KeyguardWmStateRefactor.isEnabled()
+                && MigrateClocksToBlueprint.isEnabled()) {
+            mKeyguardInteractor.showKeyguard();
         }
     }
 

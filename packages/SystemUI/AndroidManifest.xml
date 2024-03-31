@@ -277,6 +277,9 @@
     <!-- to change spatial audio -->
     <uses-permission android:name="android.permission.MODIFY_DEFAULT_AUDIO_EFFECTS" />
 
+    <!-- to adjust volume in volume panel -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <!-- to access ResolverRankerServices -->
     <uses-permission android:name="android.permission.BIND_RESOLVER_RANKER_SERVICE" />
 
@@ -437,7 +440,7 @@
             </intent-filter>
         </receiver>
 
-        <activity android:name=".screenshot.LongScreenshotActivity"
+        <activity android:name=".screenshot.scroll.LongScreenshotActivity"
                   android:theme="@style/LongScreenshotActivity"
                   android:process=":screenshot"
                   android:exported="false"
@@ -531,15 +534,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
-
-        <!-- Springboard for launching the share and edit activity. This needs to be in the main
-             system ui process since we need to notify the status bar to dismiss the keyguard -->
-        <receiver android:name=".screenshot.ActionProxyReceiver"
-            android:exported="false" />
-
-        <!-- Callback for deleting screenshot notification -->
-        <receiver android:name=".screenshot.DeleteScreenshotReceiver"
-            android:exported="false" />
 
         <!-- Callback for invoking a smart action from the screenshot notification. -->
         <receiver android:name=".screenshot.SmartActionsReceiver"
@@ -914,7 +908,7 @@
 
         <activity
             android:name=".volume.panel.ui.activity.VolumePanelActivity"
-            android:label="@string/sound_settings"
+            android:label="@string/accessibility_volume_settings"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleInstance"

@@ -5422,4 +5422,6 @@
 
   <!-- Whether WM DisplayContent supports high performance transitions -->
   <java-symbol type="bool" name="config_deviceSupportsHighPerfTransitions" />
+
+  <java-symbol type="string" name="config_wearRemoteIntentAction" />
 </resources>

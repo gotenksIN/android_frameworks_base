@@ -140,6 +140,7 @@ import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
+import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor;
 import com.android.systemui.dreams.DreamOverlayStateController;
 import com.android.systemui.dreams.ui.viewmodel.DreamViewModel;
 import com.android.systemui.dump.DumpManager;
@@ -178,8 +179,6 @@ import com.android.systemui.util.time.SystemClock;
 import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
-import dagger.Lazy;
-
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -189,6 +188,7 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
+import dagger.Lazy;
 import kotlinx.coroutines.CoroutineDispatcher;
 
 /**
@@ -966,6 +966,13 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     @VisibleForTesting
     final ActivityTransitionAnimator.Controller mOccludeAnimationController =
             new ActivityTransitionAnimator.Controller() {
+                private boolean mIsLaunching = true;
+
+                @Override
+                public boolean isLaunching() {
+                    return mIsLaunching;
+                }
+
                 @Override
                 public void onTransitionAnimationStart(boolean isExpandingFullyAbove) {
                     mOccludeAnimationPlaying = true;
@@ -2149,13 +2156,6 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mInteractionJankMonitor.cancel(CUJ_LOCKSCREEN_TRANSITION_FROM_AOD);
 
         synchronized (KeyguardViewMediator.this) {
-            if (mHiding && isOccluded) {
-                // We're in the process of going away but WindowManager wants to show a
-                // SHOW_WHEN_LOCKED activity instead.
-                // TODO(bc-unlock): Migrate to remote animation.
-                startKeyguardExitAnimation(0, 0);
-            }
-
             mPowerGestureIntercepted =
                     isOccluded && mUpdateMonitor.isSecureCameraLaunchedOverKeyguard();
 
@@ -2523,18 +2523,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             String message = "";
             switch (msg.what) {
                 case SHOW:
-                    // There is a potential race condition when SysUI starts up. CentralSurfaces
-                    // must invoke #registerCentralSurfaces on this class before any messages can be
-                    // processed. If this happens, repost the message with a small delay and try
-                    // again.
-                    if (mCentralSurfaces == null) {
-                        message = "DELAYING SHOW";
-                        Message newMsg = mHandler.obtainMessage(SHOW, (Bundle) msg.obj);
-                        mHandler.sendMessageDelayed(newMsg, 100);
-                    } else {
-                        message = "SHOW";
-                        handleShow((Bundle) msg.obj);
-                    }
+                    message = "SHOW";
+                    handleShow((Bundle) msg.obj);
                     break;
                 case HIDE:
                     message = "HIDE";
@@ -2621,18 +2611,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     Trace.endSection();
                     break;
                 case SYSTEM_READY:
-                    // There is a potential race condition when SysUI starts up. CentralSurfaces
-                    // must invoke #registerCentralSurfaces on this class before any messages can be
-                    // processed. If this happens, repost the message with a small delay and try
-                    // again.
-                    if (mCentralSurfaces == null) {
-                        message = "DELAYING SYSTEM_READY";
-                        Message newMsg = mHandler.obtainMessage(SYSTEM_READY);
-                        mHandler.sendMessageDelayed(newMsg, 100);
-                    } else {
-                        message = "SYSTEM_READY";
-                        handleSystemReady();
-                    }
+                    message = "SYSTEM_READY";
+                    handleSystemReady();
                     break;
             }
             Log.d(TAG, "KeyguardViewMediator queue processing message: " + message);
@@ -3408,7 +3388,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
         // Ensure that keyguard becomes visible if the going away animation is canceled
         if (showKeyguard && !KeyguardWmStateRefactor.isEnabled()
-                && MigrateClocksToBlueprint.isEnabled()) {
+                && (MigrateClocksToBlueprint.isEnabled()
+                    || DeviceEntryUdfpsRefactor.isEnabled())) {
             mKeyguardInteractor.showKeyguard();
         }
     }

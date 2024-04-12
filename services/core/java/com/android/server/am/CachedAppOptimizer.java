@@ -100,6 +100,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import dalvik.annotation.optimization.NeverCompile;
+
 public final class CachedAppOptimizer {
 
     // Flags stored in the DeviceConfig API.
@@ -590,6 +592,7 @@ public final class CachedAppOptimizer {
             mTotalCpuTimeMillis += totalCpuTimeMillis;
         }
 
+        @NeverCompile
         public void dump(PrintWriter pw) {
             long totalCompactRequested = mSomeCompactRequested + mFullCompactRequested;
             long totalCompactPerformed = mSomeCompactPerformed + mFullCompactPerformed;
@@ -826,6 +829,7 @@ public final class CachedAppOptimizer {
     }
 
     @GuardedBy("mProcLock")
+    @NeverCompile
     void dump(PrintWriter pw) {
         pw.println("CachedAppOptimizer settings");
         synchronized (mPhenotypeFlagLock) {
@@ -1567,8 +1571,7 @@ public final class CachedAppOptimizer {
             return;
         }
 
-        if (mAm.mConstants.USE_MODERN_TRIM
-                && app.mState.getSetAdj() >= ProcessList.CACHED_APP_MIN_ADJ) {
+        if (app.mState.getSetAdj() >= ProcessList.CACHED_APP_MIN_ADJ) {
             final IApplicationThread thread = app.getThread();
             if (thread != null) {
                 try {
@@ -1942,6 +1945,7 @@ public final class CachedAppOptimizer {
             return mRssAfterCompaction;
         }
 
+        @NeverCompile
         void dump(PrintWriter pw) {
             pw.println("    (" + mProcessName + "," + mSourceType.name() + "," + mDeltaAnonRssKBs
                     + "," + mZramConsumedKBs + "," + mAnonMemFreedKBs + "," + getCompactEfficiency()

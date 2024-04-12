@@ -91,13 +91,6 @@ sealed interface CommunalContentModel {
         override val size = CommunalContentSize.HALF
     }
 
-    /** A CTA tile in the glanceable hub edit model which remains visible in the grid. */
-    class CtaTileInEditMode : CommunalContentModel {
-        override val key: String = KEY.CTA_TILE_IN_EDIT_MODE_KEY
-        // Same as widget size.
-        override val size = CommunalContentSize.HALF
-    }
-
     class Tutorial(
         id: Int,
         override var size: CommunalContentSize,
@@ -154,5 +147,5 @@ sealed interface CommunalContentModel {
 
     fun isWidgetContent() = this is WidgetContent
 
-    fun isSmartspace() = this is Smartspace
+    fun isLiveContent() = this is Smartspace || this is Umo
 }

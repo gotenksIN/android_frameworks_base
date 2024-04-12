@@ -38,9 +38,11 @@ import static com.android.server.wm.ActivityTaskManagerService.APP_SWITCH_ALLOW;
 import static com.android.server.wm.ActivityTaskManagerService.APP_SWITCH_FG_ONLY;
 import static com.android.server.wm.ActivityTaskSupervisor.getApplicationLabel;
 import static com.android.server.wm.PendingRemoteAnimationRegistry.TIMEOUT_MS;
+import static com.android.window.flags.Flags.balDontBringExistingBackgroundTaskStackToFg;
 import static com.android.window.flags.Flags.balImproveRealCallerVisibilityCheck;
 import static com.android.window.flags.Flags.balRequireOptInByPendingIntentCreator;
 import static com.android.window.flags.Flags.balRequireOptInSameUid;
+import static com.android.window.flags.Flags.balRespectAppSwitchStateWhenCheckBoundByForegroundUid;
 import static com.android.window.flags.Flags.balShowToastsBlocked;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
@@ -539,6 +541,16 @@ public class BackgroundActivityStartController {
                 sb.append("; balAllowedByPiSender: ").append(mBalAllowedByPiSender);
                 sb.append("; resultIfPiSenderAllowsBal: ").append(mResultForRealCaller);
             }
+            // features
+            sb.append("; balImproveRealCallerVisibilityCheck: ")
+                    .append(balImproveRealCallerVisibilityCheck());
+            sb.append("; balRequireOptInByPendingIntentCreator: ")
+                    .append(balRequireOptInByPendingIntentCreator());
+            sb.append("; balRequireOptInSameUid: ").append(balRequireOptInSameUid());
+            sb.append("; balRespectAppSwitchStateWhenCheckBoundByForegroundUid: ")
+                    .append(balRespectAppSwitchStateWhenCheckBoundByForegroundUid());
+            sb.append("; balDontBringExistingBackgroundTaskStackToFg: ")
+                    .append(balDontBringExistingBackgroundTaskStackToFg());
             sb.append("]");
             return sb.toString();
         }
@@ -783,7 +795,7 @@ public class BackgroundActivityStartController {
         if (balShowToastsBlocked()
                 && (state.mResultForCaller.allows() || state.mResultForRealCaller.allows())) {
             // only show a toast if either caller or real caller could launch if they opted in
-            showToast("BAL blocked. go/debug-bal");
+            showToast("BAL blocked. goo.gle/android-bal");
         }
         return statsLog(BalVerdict.BLOCK, state);
     }
@@ -854,8 +866,7 @@ public class BackgroundActivityStartController {
         }
 
         // don't abort if the callingUid has START_ACTIVITIES_FROM_BACKGROUND permission
-        if (ActivityTaskManagerService.checkPermission(START_ACTIVITIES_FROM_BACKGROUND,
-                callingPid, callingUid) == PERMISSION_GRANTED) {
+        if (hasBalPermission(callingUid, callingPid)) {
             return new BalVerdict(BAL_ALLOW_PERMISSION,
                     /*background*/ true,
                     "START_ACTIVITIES_FROM_BACKGROUND permission granted");
@@ -920,9 +931,7 @@ public class BackgroundActivityStartController {
     BalVerdict checkBackgroundActivityStartAllowedBySender(BalState state) {
 
         if (state.isPendingIntentBalAllowedByPermission()
-                && ActivityManager.checkComponentPermission(
-                android.Manifest.permission.START_ACTIVITIES_FROM_BACKGROUND,
-                state.mRealCallingUid, NO_PROCESS_UID, true) == PackageManager.PERMISSION_GRANTED) {
+                && hasBalPermission(state.mRealCallingUid, state.mRealCallingPid)) {
             return new BalVerdict(BAL_ALLOW_PERMISSION,
                     /*background*/ false,
                     "realCallingUid has BAL permission.");
@@ -979,6 +988,11 @@ public class BackgroundActivityStartController {
 
         // If we are here, it means all exemptions based on PI sender failed
         return BalVerdict.BLOCK;
+    }
+
+    @VisibleForTesting boolean hasBalPermission(int uid, int pid) {
+        return ActivityTaskManagerService.checkPermission(START_ACTIVITIES_FROM_BACKGROUND,
+                pid, uid) == PERMISSION_GRANTED;
     }
 
     /**

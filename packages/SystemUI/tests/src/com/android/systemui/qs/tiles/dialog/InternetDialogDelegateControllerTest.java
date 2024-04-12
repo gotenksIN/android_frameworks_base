@@ -43,6 +43,7 @@ import android.graphics.drawable.Drawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.telephony.ServiceState;
@@ -183,6 +184,8 @@ public class InternetDialogDelegateControllerTest extends SysuiTestCase {
     private WifiStateWorker mWifiStateWorker;
     @Mock
     private SignalStrength mSignalStrength;
+    @Mock
+    private WifiConfiguration mWifiConfiguration;
     @Mock
     private CarrierNameCustomization mCarrierNameCustomization;
 
@@ -1047,9 +1050,19 @@ public class InternetDialogDelegateControllerTest extends SysuiTestCase {
     }
 
     @Test
+    public void getConfiguratorQrCodeGeneratorIntentOrNull_configurationNull_returnNull() {
+        mFlags.set(Flags.SHARE_WIFI_QS_BUTTON, true);
+        when(mConnectedEntry.canShare()).thenReturn(true);
+        when(mConnectedEntry.getWifiConfiguration()).thenReturn(null);
+        assertThat(mInternetDialogController.getConfiguratorQrCodeGeneratorIntentOrNull(
+                mConnectedEntry)).isNull();
+    }
+
+    @Test
     public void getConfiguratorQrCodeGeneratorIntentOrNull_wifiShareable() {
         mFlags.set(Flags.SHARE_WIFI_QS_BUTTON, true);
         when(mConnectedEntry.canShare()).thenReturn(true);
+        when(mConnectedEntry.getWifiConfiguration()).thenReturn(mWifiConfiguration);
         assertThat(mInternetDialogController.getConfiguratorQrCodeGeneratorIntentOrNull(
                 mConnectedEntry)).isNotNull();
     }

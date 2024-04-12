@@ -25,6 +25,7 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.constraintlayout.widget.ConstraintSet.BOTTOM
 import androidx.constraintlayout.widget.ConstraintSet.END
 import androidx.constraintlayout.widget.ConstraintSet.GONE
+import androidx.constraintlayout.widget.ConstraintSet.MATCH_CONSTRAINT
 import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
@@ -42,10 +43,9 @@ import com.android.systemui.plugins.clocks.ClockController
 import com.android.systemui.plugins.clocks.ClockFaceLayout
 import com.android.systemui.res.R
 import com.android.systemui.shared.R as sharedR
-import com.android.systemui.statusbar.policy.SplitShadeStateController
-import com.android.systemui.util.Utils
 import dagger.Lazy
 import javax.inject.Inject
+import kotlinx.coroutines.DisposableHandle
 
 internal fun ConstraintSet.setVisibility(
     views: Iterable<View>,
@@ -63,23 +63,26 @@ constructor(
     private val clockInteractor: KeyguardClockInteractor,
     protected val keyguardClockViewModel: KeyguardClockViewModel,
     private val context: Context,
-    private val splitShadeStateController: SplitShadeStateController,
     val smartspaceViewModel: KeyguardSmartspaceViewModel,
     val blueprintInteractor: Lazy<KeyguardBlueprintInteractor>,
 ) : KeyguardSection() {
+    private var handle: DisposableHandle? = null
+
     override fun addViews(constraintLayout: ConstraintLayout) {}
 
     override fun bindData(constraintLayout: ConstraintLayout) {
         if (!MigrateClocksToBlueprint.isEnabled) {
             return
         }
-        KeyguardClockViewBinder.bind(
-            this,
-            constraintLayout,
-            keyguardClockViewModel,
-            clockInteractor,
-            blueprintInteractor.get()
-        )
+        handle?.dispose()
+        handle =
+            KeyguardClockViewBinder.bind(
+                this,
+                constraintLayout,
+                keyguardClockViewModel,
+                clockInteractor,
+                blueprintInteractor.get()
+            )
     }
 
     override fun applyConstraints(constraintSet: ConstraintSet) {
@@ -91,7 +94,13 @@ constructor(
         }
     }
 
-    override fun removeViews(constraintLayout: ConstraintLayout) {}
+    override fun removeViews(constraintLayout: ConstraintLayout) {
+        if (!MigrateClocksToBlueprint.isEnabled) {
+            return
+        }
+        handle?.dispose()
+        handle = null
+    }
 
     private fun buildConstraints(
         clock: ClockController,
@@ -160,19 +169,14 @@ constructor(
         constraints.apply {
             connect(R.id.lockscreen_clock_view_large, START, PARENT_ID, START)
             connect(R.id.lockscreen_clock_view_large, END, guideline, END)
-            connect(R.id.lockscreen_clock_view_large, BOTTOM, R.id.lock_icon_view, TOP)
-            var largeClockTopMargin =
-                context.resources.getDimensionPixelSize(R.dimen.status_bar_height) +
-                    context.resources.getDimensionPixelSize(
-                        customizationR.dimen.small_clock_padding_top
-                    ) +
-                    context.resources.getDimensionPixelSize(R.dimen.keyguard_smartspace_top_offset)
+            connect(R.id.lockscreen_clock_view_large, BOTTOM, R.id.device_entry_icon_view, TOP)
+            var largeClockTopMargin = KeyguardClockViewModel.getLargeClockTopMargin(context)
             largeClockTopMargin += getDimen(DATE_WEATHER_VIEW_HEIGHT)
             largeClockTopMargin += getDimen(ENHANCED_SMARTSPACE_HEIGHT)
 
             connect(R.id.lockscreen_clock_view_large, TOP, PARENT_ID, TOP, largeClockTopMargin)
             constrainWidth(R.id.lockscreen_clock_view_large, WRAP_CONTENT)
-            constrainHeight(R.id.lockscreen_clock_view_large, WRAP_CONTENT)
+            constrainHeight(R.id.lockscreen_clock_view_large, MATCH_CONSTRAINT)
             constrainWidth(R.id.lockscreen_clock_view, WRAP_CONTENT)
             constrainHeight(
                 R.id.lockscreen_clock_view,
@@ -186,14 +190,7 @@ constructor(
                 context.resources.getDimensionPixelSize(customizationR.dimen.clock_padding_start) +
                     context.resources.getDimensionPixelSize(R.dimen.status_view_margin_horizontal)
             )
-            val smallClockTopMargin =
-                if (splitShadeStateController.shouldUseSplitNotificationShade(context.resources)) {
-                    context.resources.getDimensionPixelSize(R.dimen.keyguard_split_shade_top_margin)
-                } else {
-                    context.resources.getDimensionPixelSize(R.dimen.keyguard_clock_top_margin) +
-                        Utils.getStatusBarHeaderHeightKeyguard(context)
-                }
-
+            val smallClockTopMargin = keyguardClockViewModel.getSmallClockTopMargin(context)
             create(R.id.small_clock_guideline_top, ConstraintSet.HORIZONTAL_GUIDELINE)
             setGuidelineBegin(R.id.small_clock_guideline_top, smallClockTopMargin)
             connect(R.id.lockscreen_clock_view, TOP, R.id.small_clock_guideline_top, BOTTOM)

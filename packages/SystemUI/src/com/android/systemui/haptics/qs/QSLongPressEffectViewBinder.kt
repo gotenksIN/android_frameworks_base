@@ -18,45 +18,59 @@ package com.android.systemui.haptics.qs
 
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.android.app.tracing.coroutines.launch
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.qs.tileimpl.QSTileViewImpl
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.DisposableHandle
 
-object QSLongPressEffectViewBinder {
+class QSLongPressEffectViewBinder {
+
+    private var handle: DisposableHandle? = null
+    val isBound: Boolean
+        get() = handle != null
 
     fun bind(
         tile: QSTileViewImpl,
+        tileSpec: String?,
         effect: QSLongPressEffect?,
     ) {
         if (effect == null) return
 
-        tile.repeatWhenAttached {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                effect.scope = this
+        handle =
+            tile.repeatWhenAttached {
+                repeatOnLifecycle(Lifecycle.State.CREATED) {
+                    effect.scope = this
+                    val tag = "${tileSpec ?: "unknownTileSpec"}#LongPressEffect"
 
-                launch {
-                    effect.effectProgress.collect { progress ->
-                        progress?.let {
-                            if (it == 0f) {
-                                tile.bringToFront()
+                    launch("$tag#progress") {
+                        effect.effectProgress.collect { progress ->
+                            progress?.let {
+                                if (it == 0f) {
+                                    tile.bringToFront()
+                                }
+                                tile.updateLongPressEffectProperties(it)
                             }
-                            tile.updateLongPressEffectProperties(it)
                         }
                     }
-                }
 
-                launch {
-                    effect.actionType.collect { action ->
-                        action?.let {
-                            when (it) {
-                                QSLongPressEffect.ActionType.CLICK -> tile.performClick()
-                                QSLongPressEffect.ActionType.LONG_PRESS -> tile.performLongClick()
+                    launch("$tag#action") {
+                        effect.actionType.collect { action ->
+                            action?.let {
+                                when (it) {
+                                    QSLongPressEffect.ActionType.CLICK -> tile.performClick()
+                                    QSLongPressEffect.ActionType.LONG_PRESS ->
+                                        tile.performLongClick()
+                                }
+                                effect.clearActionType()
                             }
-                            effect.clearActionType()
                         }
                     }
                 }
             }
-        }
+    }
+
+    fun dispose() {
+        handle?.dispose()
+        handle = null
     }
 }

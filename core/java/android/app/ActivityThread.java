@@ -366,7 +366,7 @@ public final class ActivityThread extends ClientTransactionHandler
     @UnsupportedAppUsage
     private ContextImpl mSystemContext;
     @GuardedBy("this")
-    private SparseArray<ContextImpl> mDisplaySystemUiContexts;
+    private ArrayList<WeakReference<ContextImpl>> mDisplaySystemUiContexts;
 
     @UnsupportedAppUsage
     static volatile IPackageManager sPackageManager;
@@ -608,9 +608,9 @@ public final class ActivityThread extends ClientTransactionHandler
         Configuration createdConfig;
         Configuration overrideConfig;
         @NonNull
-        private ActivityWindowInfo mActivityWindowInfo;
-        @Nullable
-        private ActivityWindowInfo mLastReportedActivityWindowInfo;
+        private final ActivityWindowInfo mActivityWindowInfo = new ActivityWindowInfo();
+        @NonNull
+        private final ActivityWindowInfo mLastReportedActivityWindowInfo = new ActivityWindowInfo();
 
         // Used for consolidating configs before sending on to Activity.
         private final Configuration tmpConfig = new Configuration();
@@ -701,7 +701,7 @@ public final class ActivityThread extends ClientTransactionHandler
             mSceneTransitionInfo = sceneTransitionInfo;
             mLaunchedFromBubble = launchedFromBubble;
             mTaskFragmentToken = taskFragmentToken;
-            mActivityWindowInfo = activityWindowInfo;
+            mActivityWindowInfo.set(activityWindowInfo);
             init();
         }
 
@@ -721,7 +721,7 @@ public final class ActivityThread extends ClientTransactionHandler
                         throw new IllegalStateException(
                                 "Received config update for non-existing activity");
                     }
-                    if (activityWindowInfoFlag() && activityWindowInfo == null) {
+                    if (activityWindowInfo == null) {
                         Log.w(TAG, "Received empty ActivityWindowInfo update for r=" + activity);
                         activityWindowInfo = mActivityWindowInfo;
                     }
@@ -1083,6 +1083,8 @@ public final class ActivityThread extends ClientTransactionHandler
         public boolean managed;
         public boolean mallocInfo;
         public boolean runGc;
+        // compression format to dump bitmaps, null if no bitmaps to be dumped
+        public String dumpBitmaps;
         String path;
         ParcelFileDescriptor fd;
         RemoteCallback finishCallback;
@@ -1487,11 +1489,12 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         @Override
-        public void dumpHeap(boolean managed, boolean mallocInfo, boolean runGc, String path,
-                ParcelFileDescriptor fd, RemoteCallback finishCallback) {
+        public void dumpHeap(boolean managed, boolean mallocInfo, boolean runGc, String dumpBitmaps,
+                String path, ParcelFileDescriptor fd, RemoteCallback finishCallback) {
             DumpHeapData dhd = new DumpHeapData();
             dhd.managed = managed;
             dhd.mallocInfo = mallocInfo;
+            dhd.dumpBitmaps = dumpBitmaps;
             dhd.runGc = runGc;
             dhd.path = path;
             try {
@@ -3034,14 +3037,19 @@ public final class ActivityThread extends ClientTransactionHandler
     public ContextImpl getSystemUiContext(int displayId) {
         synchronized (this) {
             if (mDisplaySystemUiContexts == null) {
-                mDisplaySystemUiContexts = new SparseArray<>();
+                mDisplaySystemUiContexts = new ArrayList<>();
             }
-            ContextImpl systemUiContext = mDisplaySystemUiContexts.get(displayId);
-            if (systemUiContext == null) {
-                systemUiContext = ContextImpl.createSystemUiContext(getSystemContext(), displayId);
-                mDisplaySystemUiContexts.put(displayId, systemUiContext);
+
+            mDisplaySystemUiContexts.removeIf(contextRef -> contextRef.refersTo(null));
+
+            ContextImpl context = getSystemUiContextNoCreateLocked(displayId);
+            if (context != null) {
+                return context;
             }
-            return systemUiContext;
+
+            context = ContextImpl.createSystemUiContext(getSystemContext(), displayId);
+            mDisplaySystemUiContexts.add(new WeakReference<>(context));
+            return context;
         }
     }
 
@@ -3049,18 +3057,30 @@ public final class ActivityThread extends ClientTransactionHandler
     @Override
     public ContextImpl getSystemUiContextNoCreate() {
         synchronized (this) {
-            if (mDisplaySystemUiContexts == null) return null;
-            return mDisplaySystemUiContexts.get(DEFAULT_DISPLAY);
+            if (mDisplaySystemUiContexts == null) {
+                return null;
+            }
+            return getSystemUiContextNoCreateLocked(DEFAULT_DISPLAY);
         }
+    }
+
+    @GuardedBy("this")
+    @Nullable
+    private ContextImpl getSystemUiContextNoCreateLocked(int displayId) {
+        for (int i = 0; i < mDisplaySystemUiContexts.size(); i++) {
+            ContextImpl context = mDisplaySystemUiContexts.get(i).get();
+            if (context != null && context.getDisplayId() == displayId) {
+                return context;
+            }
+        }
+        return null;
     }
 
     void onSystemUiContextCleanup(ContextImpl context) {
         synchronized (this) {
             if (mDisplaySystemUiContexts == null) return;
-            final int index = mDisplaySystemUiContexts.indexOfValue(context);
-            if (index >= 0) {
-                mDisplaySystemUiContexts.removeAt(index);
-            }
+            mDisplaySystemUiContexts.removeIf(
+                    contextRef -> contextRef.refersTo(null) || contextRef.refersTo(context));
         }
     }
 
@@ -6064,7 +6084,7 @@ public final class ActivityThread extends ClientTransactionHandler
             target.createdConfig = config.getGlobalConfiguration();
             target.overrideConfig = config.getOverrideConfiguration();
             target.pendingConfigChanges |= configChanges;
-            target.mActivityWindowInfo = activityWindowInfo;
+            target.mActivityWindowInfo.set(activityWindowInfo);
         }
 
         return scheduleRelaunch ? target : null;
@@ -6258,7 +6278,7 @@ public final class ActivityThread extends ClientTransactionHandler
         }
         r.startsNotResumed = startsNotResumed;
         r.overrideConfig = overrideConfig;
-        r.mActivityWindowInfo = activityWindowInfo;
+        r.mActivityWindowInfo.set(activityWindowInfo);
 
         handleLaunchActivity(r, pendingActions, mLastReportedDeviceId, customIntent);
     }
@@ -6760,7 +6780,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
         // Perform updates.
         r.overrideConfig = overrideConfig;
-        r.mActivityWindowInfo = activityWindowInfo;
+        r.mActivityWindowInfo.set(activityWindowInfo);
 
         final ViewRootImpl viewRoot = r.activity.mDecor != null
             ? r.activity.mDecor.getViewRootImpl() : null;
@@ -6793,11 +6813,10 @@ public final class ActivityThread extends ClientTransactionHandler
         if (!activityWindowInfoFlag()) {
             return;
         }
-        if (r.mActivityWindowInfo == null
-                || r.mActivityWindowInfo.equals(r.mLastReportedActivityWindowInfo)) {
+        if (r.mActivityWindowInfo.equals(r.mLastReportedActivityWindowInfo)) {
             return;
         }
-        r.mLastReportedActivityWindowInfo = r.mActivityWindowInfo;
+        r.mLastReportedActivityWindowInfo.set(r.mActivityWindowInfo);
         ClientTransactionListenerController.getInstance().onActivityWindowInfoChanged(r.token,
                 r.mActivityWindowInfo);
     }
@@ -6844,6 +6863,9 @@ public final class ActivityThread extends ClientTransactionHandler
             System.runFinalization();
             System.gc();
         }
+        if (dhd.dumpBitmaps != null) {
+            Bitmap.dumpAll(dhd.dumpBitmaps);
+        }
         try (ParcelFileDescriptor fd = dhd.fd) {
             if (dhd.managed) {
                 Debug.dumpHprofData(dhd.path, fd.getFileDescriptor());
@@ -6870,6 +6892,9 @@ public final class ActivityThread extends ClientTransactionHandler
         }
         if (dhd.finishCallback != null) {
             dhd.finishCallback.sendResult(null);
+        }
+        if (dhd.dumpBitmaps != null) {
+            Bitmap.dumpAll(null); // clear dump
         }
     }
 
@@ -6967,7 +6992,7 @@ public final class ActivityThread extends ClientTransactionHandler
                             }
                         } else {
                             // No package, perhaps it was removed?
-                            Slog.e(TAG, "Package [" + packages[i] + "] reported as REPLACED,"
+                            Slog.d(TAG, "Package [" + packages[i] + "] reported as REPLACED,"
                                     + " but missing application info. Assuming REMOVED.");
                             mPackages.remove(packages[i]);
                             mResourcePackages.remove(packages[i]);

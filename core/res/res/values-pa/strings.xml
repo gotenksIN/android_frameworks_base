@@ -84,7 +84,7 @@
     <string name="NetworkPreferenceSwitchTitle" msgid="1008329951315753038">"ਮੋਬਾਈਲ ਨੈੱਟਵਰਕ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ"</string>
     <string name="NetworkPreferenceSwitchSummary" msgid="2086506181486324860">"ਤਰਜੀਹੀ ਨੈੱਟਵਰਕ ਨੂੰ ਬਦਲ ਕੇ ਦੇਖੋ। ਬਦਲਣ ਲਈ ਟੈਪ ਕਰੋ।"</string>
     <string name="EmergencyCallWarningTitle" msgid="1615688002899152860">"ਸੰਕਟਕਾਲੀਨ ਕਾਲਿੰਗ ਉਪਲਬਧ ਨਹੀਂ"</string>
-    <string name="EmergencyCallWarningSummary" msgid="1194185880092805497">"ਵਾਈ-ਫਾਈ ਰਾਹੀਂ ਸੰਕਟਕਾਲੀਨ ਕਾਲਾਂ ਨਹੀਂ ਕਰ ਸਕਦੇ"</string>
+    <string name="EmergencyCallWarningSummary" msgid="9102799172089265268">"ਐਮਰਜੈਂਸੀ ਕਾਲਾਂ ਲਈ ਕਿਸੇ ਮੋਬਾਈਲ ਨੈੱਟਵਰਕ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
     <string name="notification_channel_network_alert" msgid="4788053066033851841">"ਅਲਰਟ"</string>
     <string name="notification_channel_call_forward" msgid="8230490317314272406">"ਕਾਲ ਫਾਰਵਰਡਿੰਗ"</string>
     <string name="notification_channel_emergency_callback" msgid="54074839059123159">"ਸੰਕਟਕਾਲੀਨ ਕਾਲਬੈਕ ਮੋਡ"</string>
@@ -1183,6 +1183,8 @@
     <string name="deleteText" msgid="4200807474529938112">"ਮਿਟਾਓ"</string>
     <string name="inputMethod" msgid="1784759500516314751">"ਇਨਪੁੱਟ ਵਿਧੀ"</string>
     <string name="editTextMenuTitle" msgid="857666911134482176">"ਟੈਕਸਟ ਕਿਰਿਆਵਾਂ"</string>
+    <string name="error_handwriting_unsupported" msgid="7809438534946014050">"ਇਸ ਖੇਤਰ ਵਿੱਚ ਲਿਖਾਈ ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ"</string>
+    <string name="error_handwriting_unsupported_password" msgid="5095401146106891087">"ਪਾਸਵਰਡ ਖੇਤਰਾਂ ਵਿੱਚ ਲਿਖਾਈ ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ"</string>
     <string name="input_method_nav_back_button_desc" msgid="3655838793765691787">"ਪਿੱਛੇ"</string>
     <string name="input_method_ime_switch_button_desc" msgid="2736542240252198501">"ਇਨਪੁੱਟ ਵਿਧੀ ਨੂੰ ਸਵਿੱਚ ਕਰੋ"</string>
     <string name="low_internal_storage_view_title" msgid="9024241779284783414">"ਸਟੋਰੇਜ ਦੀ ਜਗ੍ਹਾ ਖਤਮ ਹੋ ਰਹੀ ਹੈ"</string>
@@ -1559,7 +1561,7 @@
     <string name="sync_really_delete" msgid="5657871730315579051">"ਆਈਟਮਾਂ ਹਟਾਓ"</string>
     <string name="sync_undo_deletes" msgid="5786033331266418896">"ਮਿਟਾਏ ਗਏ ਨੂੰ ਅਣਕੀਤਾ ਕਰੋ"</string>
     <string name="sync_do_nothing" msgid="4528734662446469646">"ਹੁਣ ਕੁਝ ਨਾ ਕਰੋ"</string>
-    <string name="choose_account_label" msgid="5557833752759831548">"ਇੱਕ ਖਾਤਾ ਚੁਣੋ"</string>
+    <string name="choose_account_label" msgid="5557833752759831548">"ਕੋਈ ਖਾਤਾ ਚੁਣੋ"</string>
     <string name="add_account_label" msgid="4067610644298737417">"ਇੱਕ ਖਾਤਾ ਸ਼ਾਮਲ ਕਰੋ"</string>
     <string name="add_account_button_label" msgid="322390749416414097">"ਖਾਤਾ ਸ਼ਾਮਲ ਕਰੋ"</string>
     <string name="number_picker_increment_button" msgid="7621013714795186298">"ਵਧਾਓ"</string>
@@ -1900,7 +1902,7 @@
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ਠੀਕ ਹੈ"</string>
     <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"ਬੈਟਰੀ ਸੇਵਰ ਗੂੜ੍ਹੇ ਥੀਮ ਨੂੰ ਚਾਲੂ ਕਰਦਾ ਹੈ ਅਤੇ ਬੈਕਗ੍ਰਾਊਂਡ ਸਰਗਰਮੀ, ਕੁਝ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਭਾਵਾਂ, ਕੁਝ ਖਾਸ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਕੁਝ ਨੈੱਟਵਰਕ ਕਨੈਕਸ਼ਨਾਂ ਨੂੰ ਸੀਮਤ ਜਾਂ ਬੰਦ ਕਰਦਾ ਹੈ।"</string>
     <string name="battery_saver_description" msgid="8518809702138617167">"ਬੈਟਰੀ ਸੇਵਰ ਗੂੜ੍ਹੇ ਥੀਮ ਨੂੰ ਚਾਲੂ ਕਰਦਾ ਹੈ ਅਤੇ ਬੈਕਗ੍ਰਾਊਂਡ ਸਰਗਰਮੀ, ਕੁਝ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਭਾਵਾਂ, ਕੁਝ ਖਾਸ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਕੁਝ ਨੈੱਟਵਰਕ ਕਨੈਕਸ਼ਨਾਂ ਨੂੰ ਸੀਮਤ ਜਾਂ ਬੰਦ ਕਰਦਾ ਹੈ।"</string>
-    <string name="data_saver_description" msgid="4995164271550590517">"ਡਾਟਾ ਵਰਤੋਂ ਘਟਾਉਣ ਵਿੱਚ ਮਦਦ ਕਰਨ ਲਈ, ਡਾਟਾ ਸੇਵਰ ਕੁਝ ਐਪਾਂ ਨੂੰ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਟਾ ਭੇਜਣ ਜਾਂ ਪ੍ਰਾਪਤ ਕਰਨ ਤੋਂ ਰੋਕਦਾ ਹੈ। ਤੁਹਾਡੇ ਵੱਲੋਂ ਵਰਤਮਾਨ ਤੌਰ \'ਤੇ ਵਰਤੀ ਜਾ ਰਹੀ ਐਪ ਡਾਟਾ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੀ ਹੈ, ਪਰ ਉਹ ਇੰਝ ਕਦੇ-ਕਦਾਈਂ ਕਰ ਸਕਦੀ ਹੈ। ਉਦਾਹਰਨ ਲਈ, ਇਸ ਦਾ ਮਤਲਬ ਇਹ ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਚਿੱਤਰ ਉਦੋਂ ਤੱਕ ਨਹੀਂ ਦਿਖਾਏ ਜਾਂਦੇ, ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਉਨ੍ਹਾਂ \'ਤੇ ਟੈਪ ਨਹੀਂ ਕਰਦੇ।"</string>
+    <string name="data_saver_description" msgid="4995164271550590517">"ਡਾਟਾ ਵਰਤੋਂ ਘਟਾਉਣ ਵਿੱਚ ਮਦਦ ਕਰਨ ਲਈ, ਡਾਟਾ ਸੇਵਰ ਵਿਸ਼ੇਸ਼ਤਾ ਕੁਝ ਐਪਾਂ ਨੂੰ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਟਾ ਭੇਜਣ ਜਾਂ ਪ੍ਰਾਪਤ ਕਰਨ ਤੋਂ ਰੋਕਦੀ ਹੈ। ਤੁਹਾਡੇ ਵੱਲੋਂ ਮੌਜੂਦਾ ਤੌਰ \'ਤੇ ਵਰਤੀ ਜਾ ਰਹੀ ਐਪ ਡਾਟਾ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੀ ਹੈ, ਪਰ ਉਹ ਇੰਝ ਕਦੇ-ਕਦਾਈਂ ਕਰ ਸਕਦੀ ਹੈ। ਉਦਾਹਰਨ ਲਈ, ਇਸ ਦਾ ਮਤਲਬ ਇਹ ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਚਿੱਤਰ ਉਦੋਂ ਤੱਕ ਨਹੀਂ ਦਿਖਾਏ ਜਾਂਦੇ, ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਉਨ੍ਹਾਂ \'ਤੇ ਟੈਪ ਨਹੀਂ ਕਰਦੇ।"</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"ਕੀ ਡਾਟਾ ਸੇਵਰ ਚਾਲੂ ਕਰਨਾ ਹੈ?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"ਚਾਲੂ ਕਰੋ"</string>
     <string name="zen_mode_duration_minutes_summary" msgid="4555514757230849789">"{count,plural, =1{ਇੱਕ ਮਿੰਟ ਲਈ ({formattedTime} ਤੱਕ)}one{# ਮਿੰਟ ਲਈ ({formattedTime} ਤੱਕ)}other{# ਮਿੰਟਾਂ ਲਈ ({formattedTime} ਤੱਕ)}}"</string>
@@ -1927,6 +1929,9 @@
     <string name="zen_mode_implicit_trigger_description" msgid="5714956693073007111">"<xliff:g id="APP_NAME">%1$s</xliff:g> ਵੱਲੋਂ ਪ੍ਰਬੰਧਿਤ"</string>
     <string name="zen_mode_implicit_activated" msgid="2634285680776672994">"ਚਾਲੂ ਹੈ"</string>
     <string name="zen_mode_implicit_deactivated" msgid="8688441768371501750">"ਬੰਦ ਹੈ"</string>
+    <string name="zen_mode_trigger_summary_divider_text" msgid="7461583466043698862">", "</string>
+    <string name="zen_mode_trigger_summary_range_symbol_combination" msgid="1804900738798069619">"<xliff:g id="START">%1$s</xliff:g> - <xliff:g id="END">%2$s</xliff:g>"</string>
+    <string name="zen_mode_trigger_event_calendar_any" msgid="2086784607921121803">"ਕੋਈ ਵੀ ਕੈਲੰਡਰ"</string>
     <string name="muted_by" msgid="91464083490094950">"<xliff:g id="THIRD_PARTY">%1$s</xliff:g> ਕੁਝ ਧੁਨੀਆਂ ਨੂੰ ਮਿਊਟ ਕਰ ਰਹੀ ਹੈ"</string>
     <string name="system_error_wipe_data" msgid="5910572292172208493">"ਤੁਹਾਡੇ ਡੀਵਾਈਸ ਨਾਲ ਇੱਕ ਅੰਦਰੂਨੀ ਸਮੱਸਿਆ ਹੈ ਅਤੇ ਇਹ ਅਸਥਿਰ ਹੋ ਸਕਦੀ ਹੈ ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਫੈਕਟਰੀ ਡਾਟਾ ਰੀਸੈੱਟ ਨਹੀਂ ਕਰਦੇ।"</string>
     <string name="system_error_manufacturer" msgid="703545241070116315">"ਤੁਹਾਡੇ ਡੀਵਾਈਸ ਨਾਲ ਇੱਕ ਅੰਦਰੂਨੀ ਸਮੱਸਿਆ ਸੀ। ਵੇਰਵਿਆਂ ਲਈ ਆਪਣੇ ਨਿਰਮਾਤਾ ਨੂੰ ਸੰਪਰਕ ਕਰੋ।"</string>
@@ -2389,6 +2394,8 @@
     <string name="profile_label_test" msgid="9168641926186071947">"ਜਾਂਚ"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"ਭਾਈਚਾਰਕ"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
+    <!-- no translation found for screen_not_shared_sensitive_content (7058419185079565001) -->
+    <skip />
     <string name="satellite_notification_title" msgid="4026338973463121526">"ਸੈਟੇਲਾਈਟ ਨਾਲ ਸਵੈ-ਕਨੈਕਟ ਹੋਇਆ"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"ਤੁਸੀਂ ਮੋਬਾਈਲ ਜਾਂ ਵਾਈ-ਫਾਈ ਨੈੱਟਵਰਕ ਤੋਂ ਬਿਨਾਂ ਸੁਨੇਹੇ ਭੇਜ ਅਤੇ ਪ੍ਰਾਪਤ ਕਰ ਸਕਦੇ ਹੋ"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Messages ਐਪ ਖੋਲ੍ਹੋ"</string>

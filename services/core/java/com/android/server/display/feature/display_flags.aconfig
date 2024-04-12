@@ -1,4 +1,5 @@
 package: "com.android.server.display.feature.flags"
+container: "system"
 
 # Important: Flags must be accessed through DisplayManagerFlags.
 
@@ -7,6 +8,14 @@ flag {
     namespace: "display_manager"
     description: "Allows refering to displays by port in display layout"
     bug: "303058435"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "resolution_backup_restore"
+    namespace: "display_manager"
+    description: "Backup/Restore support for High Resolution setting"
+    bug: "321821289"
     is_fixed_read_only: true
 }
 
@@ -225,5 +234,13 @@ flag {
     namespace: "display_manager"
     description: "Feature flag for reducing the refresh rate when the screen is idle after a timeout"
     bug: "310026579"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "use_fusion_prox_sensor"
+    namespace: "display_manager"
+    description: "Feature flag to control usage of a Fusion Proximity sensor if configued."
+    bug: "306203895"
     is_fixed_read_only: true
 }

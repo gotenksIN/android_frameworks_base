@@ -33,7 +33,6 @@ import com.android.systemui.classifier.FalsingCollectorFake
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
 import com.android.systemui.coroutines.collectLastValue
-import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.flags.EnableSceneContainer
@@ -42,14 +41,16 @@ import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.keyguard.data.repository.FakeCommandQueue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository
+import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.domain.interactor.FromLockscreenTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.FromPrimaryBouncerTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.fromGoneTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.fromLockscreenTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.fromPrimaryBouncerTransitionInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardClockInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
-import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.keyguard.shared.model.SuccessFingerprintAuthenticationStatus
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.power.data.repository.FakePowerRepository
@@ -64,6 +65,7 @@ import com.android.systemui.shade.domain.interactor.ShadeInteractorImpl
 import com.android.systemui.shade.domain.interactor.ShadeInteractorLegacyImpl
 import com.android.systemui.statusbar.disableflags.data.repository.FakeDisableFlagsRepository
 import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor
+import com.android.systemui.statusbar.notification.stack.domain.interactor.sharedNotificationContainerInteractor
 import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController
 import com.android.systemui.statusbar.policy.data.repository.FakeUserSetupRepository
 import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
@@ -86,8 +88,8 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.mockito.MockitoAnnotations
 import org.mockito.Mockito.`when` as whenever
+import org.mockito.MockitoAnnotations
 
 @SmallTest
 @RunWith(AndroidTestingRunner::class)
@@ -121,6 +123,7 @@ class StatusBarStateControllerImplTest : SysuiTestCase() {
                     { shadeInteractor },
                     { kosmos.deviceUnlockedInteractor },
                     { kosmos.sceneInteractor },
+                    { kosmos.keyguardClockInteractor },
                 ) {
                 override fun createDarkAnimator(): ObjectAnimator {
                     return mockDarkAnimator
@@ -151,6 +154,8 @@ class StatusBarStateControllerImplTest : SysuiTestCase() {
                 keyguardTransitionInteractor,
                 { kosmos.sceneInteractor },
                 { kosmos.fromGoneTransitionInteractor },
+                { kosmos.sharedNotificationContainerInteractor },
+                testScope,
             )
 
         whenever(deviceEntryUdfpsInteractor.isUdfpsSupported).thenReturn(MutableStateFlow(false))
@@ -305,17 +310,20 @@ class StatusBarStateControllerImplTest : SysuiTestCase() {
             underTest.addCallback(listener)
 
             val currentScene by collectLastValue(kosmos.sceneInteractor.currentScene)
+            val deviceUnlockStatus by
+                collectLastValue(kosmos.deviceUnlockedInteractor.deviceUnlockStatus)
+
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.Password
             )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(false)
             runCurrent()
+            assertThat(deviceUnlockStatus!!.isUnlocked).isFalse()
+
             kosmos.sceneInteractor.changeScene(
                 toScene = Scenes.Lockscreen,
                 loggingReason = "reason"
             )
             runCurrent()
-            assertThat(kosmos.deviceUnlockedInteractor.isDeviceUnlocked.value).isFalse()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
             // Call start to begin hydrating based on the scene framework:
@@ -339,10 +347,7 @@ class StatusBarStateControllerImplTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.QuickSettings)
             assertThat(statusBarState).isEqualTo(StatusBarState.SHADE_LOCKED)
 
-            kosmos.sceneInteractor.changeScene(
-                toScene = Scenes.Communal,
-                loggingReason = "reason"
-            )
+            kosmos.sceneInteractor.changeScene(toScene = Scenes.Communal, loggingReason = "reason")
             runCurrent()
             assertThat(currentScene).isEqualTo(Scenes.Communal)
             assertThat(statusBarState).isEqualTo(StatusBarState.KEYGUARD)
@@ -370,14 +375,20 @@ class StatusBarStateControllerImplTest : SysuiTestCase() {
             underTest.addCallback(listener)
 
             val currentScene by collectLastValue(kosmos.sceneInteractor.currentScene)
+            val deviceUnlockStatus by
+                collectLastValue(kosmos.deviceUnlockedInteractor.deviceUnlockStatus)
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.Password
             )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(true)
+            kosmos.fakeDeviceEntryFingerprintAuthRepository.setAuthenticationStatus(
+                SuccessFingerprintAuthenticationStatus(0, true)
+            )
             runCurrent()
+
+            assertThat(deviceUnlockStatus!!.isUnlocked).isTrue()
+
             kosmos.sceneInteractor.changeScene(toScene = Scenes.Gone, loggingReason = "reason")
             runCurrent()
-            assertThat(kosmos.deviceUnlockedInteractor.isDeviceUnlocked.value).isTrue()
             assertThat(currentScene).isEqualTo(Scenes.Gone)
 
             // Call start to begin hydrating based on the scene framework:

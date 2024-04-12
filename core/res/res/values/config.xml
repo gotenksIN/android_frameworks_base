@@ -2886,6 +2886,13 @@
     -->
     <integer name="config_minimumScreenOffTimeout">10000</integer>
 
+    <!-- User activity timeout: Screen timeout override in milliseconds.
+
+         This value must be greater than 0, otherwise the invalid value will not apply to
+         the screen timeout override policy.
+    -->
+    <integer name="config_screenTimeoutOverride">-1</integer>
+
     <!-- User activity timeout: Maximum screen dim duration in milliseconds.
 
          Sets an upper bound for how long the screen will dim before the device goes
@@ -3346,6 +3353,11 @@
     <string name="config_hdmiCecSetMenuLanguageActivity">
         com.android.systemui/com.android.systemui.tv.hdmi.HdmiCecSetMenuLanguageActivity
     </string>
+
+    <!-- Component name of the activity used to inform user that their device lost Active Source
+      status and will go to standby if there is no interaction. -->
+    <string name="config_hdmiCecActiveSourceLostActivity"
+    >com.android.systemui/com.android.systemui.tv.hdmi.HdmiCecActiveSourceLostActivity</string>
 
     <!-- Name of the dialog that is used to request the user's consent for a Platform VPN -->
     <string name="config_platformVpnConfirmDialogComponent" translatable="false"
@@ -4806,6 +4818,18 @@
      See android.credentials.CredentialManager
     -->
     <string name="config_defaultCredentialManagerHybridService" translatable="false"></string>
+    
+    <!-- The component name, flattened to a string, for the system's credential manager
+      autofill service. This service allows interceding autofill requests and routing
+      them to credential manager.
+
+     This service must be trusted, as it can be activated without explicit consent of the user.
+     If no service with the specified name exists on the device, autofill will still
+     work with the user configured autofill service
+
+     See android.credentials.CredentialManager
+    -->
+    <string name="config_defaultCredentialManagerAutofillService" translatable="false"></string>
 
     <!-- The component name(s), flattened to a string, for the system's credential manager
       provider services. These services allow retrieving and storing credentials.
@@ -7011,4 +7035,11 @@
 
     <!-- Wear devices: An intent action that is used for remote intent. -->
     <string name="config_wearRemoteIntentAction" translatable="false" />
+
+    <!-- Whether desktop mode is supported on the current device  -->
+    <bool name="config_isDesktopModeSupported">false</bool>
+
+    <!-- Frame rate compatibility value for Wallpaper
+         FRAME_RATE_COMPATIBILITY_MIN (102) is used by default for lower power consumption -->
+    <integer name="config_wallpaperFrameRateCompatibility">102</integer>
 </resources>

@@ -15,6 +15,8 @@
  */
 package com.android.server.notification;
 
+import static android.app.Flags.sortSectionByTime;
+import static android.app.NotificationManager.IMPORTANCE_MIN;
 import static android.text.TextUtils.formatSimple;
 
 import android.annotation.NonNull;
@@ -25,15 +27,20 @@ import android.util.ArrayMap;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 
+import com.android.tools.r8.keepanno.annotations.KeepItemKind;
+import com.android.tools.r8.keepanno.annotations.KeepTarget;
+import com.android.tools.r8.keepanno.annotations.UsesReflection;
+
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 
 public class RankingHelper {
     private static final String TAG = "RankingHelper";
 
     private final NotificationSignalExtractor[] mSignalExtractors;
-    private final NotificationComparator mPreliminaryComparator;
+    private final Comparator mPreliminaryComparator;
     private final GlobalSortKeyComparator mFinalComparator = new GlobalSortKeyComparator();
 
     private final ArrayMap<String, NotificationRecord> mProxyByGroupTmp = new ArrayMap<>();
@@ -41,12 +48,22 @@ public class RankingHelper {
     private final Context mContext;
     private final RankingHandler mRankingHandler;
 
-
+    @UsesReflection(
+            value = {
+                @KeepTarget(
+                        kind = KeepItemKind.CLASS_AND_MEMBERS,
+                        instanceOfClassConstantExclusive = NotificationSignalExtractor.class,
+                        methodName = "<init>")
+            })
     public RankingHelper(Context context, RankingHandler rankingHandler, RankingConfig config,
             ZenModeHelper zenHelper, NotificationUsageStats usageStats, String[] extractorNames) {
         mContext = context;
         mRankingHandler = rankingHandler;
-        mPreliminaryComparator = new NotificationComparator(mContext);
+        if (sortSectionByTime()) {
+            mPreliminaryComparator = new NotificationTimeComparator();
+        } else {
+            mPreliminaryComparator = new NotificationComparator(mContext);
+        }
 
         final int N = extractorNames.length;
         mSignalExtractors = new NotificationSignalExtractor[N];
@@ -104,9 +121,13 @@ public class RankingHelper {
         }
 
         // Rank each record individually.
-        // Lock comparator state for consistent compare() results.
-        synchronized (mPreliminaryComparator.mStateLock) {
+        if (sortSectionByTime()) {
             notificationList.sort(mPreliminaryComparator);
+        } else {
+            // Lock comparator state for consistent compare() results.
+            synchronized (((NotificationComparator) mPreliminaryComparator).mStateLock) {
+                notificationList.sort(mPreliminaryComparator);
+            }
         }
 
         synchronized (mProxyByGroupTmp) {
@@ -114,10 +135,22 @@ public class RankingHelper {
             for (int i = 0; i < N; i++) {
                 final NotificationRecord record = notificationList.get(i);
                 record.setAuthoritativeRank(i);
-                final String groupKey = record.getGroupKey();
-                NotificationRecord existingProxy = mProxyByGroupTmp.get(groupKey);
-                if (existingProxy == null) {
-                    mProxyByGroupTmp.put(groupKey, record);
+                if (sortSectionByTime()) {
+                    final String groupKey = record.getGroupKey();
+                    NotificationRecord existingProxy = mProxyByGroupTmp.get(groupKey);
+                    // summaries are mostly hidden in systemui - if there is a child notification
+                    // with better information, use its rank
+                    if (existingProxy == null
+                            || (existingProxy.getNotification().isGroupSummary()
+                            && !existingProxy.getNotification().hasAppProvidedWhen())) {
+                        mProxyByGroupTmp.put(groupKey, record);
+                    }
+                } else {
+                    final String groupKey = record.getGroupKey();
+                    NotificationRecord existingProxy = mProxyByGroupTmp.get(groupKey);
+                    if (existingProxy == null) {
+                        mProxyByGroupTmp.put(groupKey, record);
+                    }
                 }
             }
             // assign global sort key:
@@ -142,12 +175,14 @@ public class RankingHelper {
                 }
 
                 boolean isGroupSummary = record.getNotification().isGroupSummary();
+                char intrusiveRank = sortSectionByTime()
+                        ? '2'
+                        : record.isRecentlyIntrusive() && record.getImportance() > IMPORTANCE_MIN
+                        ? '0' : '1';
                 record.setGlobalSortKey(
                         formatSimple("crtcl=0x%04x:intrsv=%c:grnk=0x%04x:gsmry=%c:%s:rnk=0x%04x",
                         record.getCriticality(),
-                        record.isRecentlyIntrusive()
-                                && record.getImportance() > NotificationManager.IMPORTANCE_MIN
-                                ? '0' : '1',
+                        intrusiveRank,
                         groupProxy.getAuthoritativeRank(),
                         isGroupSummary ? '0' : '1',
                         groupSortKeyPortion,

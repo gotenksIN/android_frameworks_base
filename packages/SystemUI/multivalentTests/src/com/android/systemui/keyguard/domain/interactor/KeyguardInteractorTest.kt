@@ -40,6 +40,7 @@ import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.flag.fakeSceneContainerFlags
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.data.repository.FakeShadeRepository
+import com.android.systemui.statusbar.notification.stack.domain.interactor.sharedNotificationContainerInteractor
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -81,6 +82,10 @@ class KeyguardInteractorTest : SysuiTestCase() {
             keyguardTransitionInteractor = kosmos.keyguardTransitionInteractor,
             sceneInteractorProvider = { sceneInteractor },
             fromGoneTransitionInteractor = { fromGoneTransitionInteractor },
+            sharedNotificationContainerInteractor = {
+                kosmos.sharedNotificationContainerInteractor
+            },
+            applicationScope = testScope,
         )
     }
 
@@ -209,14 +214,16 @@ class KeyguardInteractorTest : SysuiTestCase() {
             )
 
             repository.setStatusBarState(StatusBarState.KEYGUARD)
-            shadeRepository.setLegacyShadeExpansion(1f)
+            // User begins to swipe up
+            shadeRepository.setLegacyShadeExpansion(0.99f)
 
             // When not dismissable, no alpha value (null) should emit
             repository.setKeyguardDismissible(false)
             assertThat(dismissAlpha).isNull()
 
             repository.setKeyguardDismissible(true)
-            assertThat(dismissAlpha).isGreaterThan(0.95f)
+            shadeRepository.setLegacyShadeExpansion(0.98f)
+            assertThat(dismissAlpha).isGreaterThan(0.5f)
         }
 
     @Test

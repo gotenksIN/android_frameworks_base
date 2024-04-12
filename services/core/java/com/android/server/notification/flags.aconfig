@@ -1,4 +1,5 @@
 package: "com.android.server.notification"
+container: "system"
 
 flag {
   name: "expire_bitmaps"
@@ -79,3 +80,18 @@ flag {
     purpose: PURPOSE_BUGFIX
   }
 }
+
+flag {
+  name: "polite_notifications_attn_update"
+  namespace: "systemui"
+  description: "This flag controls the polite notification attention behavior updates as per UXR feedback"
+  bug: "270456865"
+}
+
+flag {
+  name: "all_notifs_need_ttl"
+  namespace: "systemui"
+  description: "This flag sets a TTL on all notifications that don't already have an app provided one"
+  bug: "331967355"
+}
+

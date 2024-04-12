@@ -106,11 +106,33 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Aktivno, samo s leve strane"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Aktivno, s desne strane"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Aktivno, s leve i desne strane"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Zvuk medija"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"Telefonski pozivi"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Prenos datoteke"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"Ulazni uređaj"</string>
-    <string name="bluetooth_profile_pan" msgid="1006235139308318188">"Pristup Internetu"</string>
+    <string name="bluetooth_profile_pan" msgid="1006235139308318188">"Pristup internetu"</string>
     <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"Dozvoli kontakte i istoriju poziva"</string>
     <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"Informacije će se koristiti za obaveštenja o pozivima i drugo"</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"Deljenje internet veze"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"Podrazumevaj da aplikacije podržavaju moderne formate"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Prikazuj obaveštenja o transkodiranju"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Onemogući keš transkodiranja"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Widevine podešavanja"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"Prinudno primeni L3 rezervu"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"Izaberite da biste prinudno primenili L3 rezervu"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Pokrenute usluge"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Prikaz i kontrola trenutno pokrenutih usluga"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"Primena WebView-a"</string>
@@ -611,16 +630,15 @@
     <string name="user_new_profile_name" msgid="2405500423304678841">"Novi profil"</string>
     <string name="user_info_settings_title" msgid="6351390762733279907">"Podaci o korisniku"</string>
     <string name="profile_info_settings_title" msgid="105699672534365099">"Podaci o profilu"</string>
-    <string name="user_need_lock_message" msgid="4311424336209509301">"Da biste mogli da napravite ograničeni profil, treba da podesite zaključavanje ekrana da biste zaštitili aplikacije i lične podatke."</string>
-    <string name="user_set_lock_button" msgid="1427128184982594856">"Podesi zaključavanje"</string>
+    <string name="user_need_lock_message" msgid="4311424336209509301">"Da biste mogli da napravite ograničeni profil, treba da podesite otključavanje ekrana da biste zaštitili aplikacije i lične podatke."</string>
+    <string name="user_set_lock_button" msgid="1427128184982594856">"Podesi otključavanje"</string>
     <string name="user_switch_to_user" msgid="6975428297154968543">"Pređi na korisnika <xliff:g id="USER_NAME">%s</xliff:g>"</string>
     <string name="creating_new_user_dialog_message" msgid="7232880257538970375">"Pravi se novi korisnik…"</string>
     <string name="creating_new_guest_dialog_message" msgid="1114905602181350690">"Pravi se novi gost…"</string>
     <string name="add_user_failed" msgid="4809887794313944872">"Pravljenje novog korisnika nije uspelo"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"Pravljenje novog gosta nije uspelo"</string>
     <string name="user_nickname" msgid="262624187455825083">"Nadimak"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"Ime i sliku koje izaberete videće svako ko koristi ovaj uređaj."</string>
     <string name="user_add_user" msgid="7876449291500212468">"Dodaj korisnika"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"Dodaj gosta"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"Ukloni gosta"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"Sve aktivnosti će biti izbrisane pri izlazu"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"Možete da sačuvate ili izbrišete aktivnosti pri izlazu"</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"Resetujete za brisanje aktivnosti sesije, ili sačuvajte ili izbrišite aktivnosti pri izlazu"</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"Slikaj"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"Odaberi sliku"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"Izaberite sliku"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"Previše netačnih pokušaja. Izbrisaćemo podatke sa ovog uređaja."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"Previše netačnih pokušaja. Izbrisaćemo ovog korisnika."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"Veza sa eternetom je prekinuta."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"Eternet."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"Bez pozivanja."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"Odaberite sliku profila"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"Podrazumevana ikona korisnika"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Fizička tastatura"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Odaberite raspored tastature"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Podrazumevano"</string>

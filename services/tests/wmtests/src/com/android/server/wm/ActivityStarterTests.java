@@ -46,6 +46,7 @@ import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.os.Process.SYSTEM_UID;
+import static android.server.wm.ActivityManagerTestBase.isTablet;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.clearInvocations;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
@@ -75,6 +76,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -122,6 +124,7 @@ import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import com.android.server.wm.LaunchParamsController.LaunchParamsModifier;
 import com.android.server.wm.utils.MockTracker;
+import com.android.window.flags.Flags;
 
 import org.junit.Ignore;
 import org.junit.After;
@@ -1300,6 +1303,12 @@ public class ActivityStarterTests extends WindowTestsBase {
      */
     @Test
     public void testDeliverIntentToTopActivityOfNonTopDisplay() {
+        // TODO(b/330152508): Remove check once legacy multi-display behaviour can coexist with
+        //  desktop windowing mode
+        // Ignore test if desktop windowing is enabled on tablets as legacy multi-display
+        // behaviour will not be respected
+        assumeFalse(Flags.enableDesktopWindowingMode() && isTablet());
+
         final ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK,
                 false /* mockGetRootTask */);
 
@@ -1637,6 +1646,28 @@ public class ActivityStarterTests extends WindowTestsBase {
         assertThat(controller.isCollecting(top.getTask())).isTrue();
         assertThat(transition.isTransientLaunch(target)).isTrue();
         assertThat(transition.isInTransientHide(top.getTask())).isTrue();
+    }
+
+    /**
+     * Tests ATMS#startActivityWithScreenshot should collect display content for creating snapshot.
+     */
+    @Test
+    public void testActivityStartWithScreenshot() {
+        final ActivityStarter starter = prepareStarter(0 /* flags */);
+        starter.setFreezeScreen(true);
+
+        registerTestTransitionPlayer();
+
+        final Intent intent = new Intent();
+        intent.setComponent(ActivityBuilder.getDefaultComponent());
+        starter.setReason("testActivityStartWithScreenshot")
+                .setIntent(intent)
+                .execute();
+
+        final TransitionController controller = mRootWindowContainer.mTransitionController;
+        final Transition transition = controller.getCollectingTransition();
+        final Transition.ChangeInfo targetChangeInfo = transition.mChanges.get(mDisplayContent);
+        assertThat(targetChangeInfo).isNotNull();
     }
 
     @Test

@@ -3110,6 +3110,10 @@ public class ActivityRecordTests extends WindowTestsBase {
 
     @Test
     public void testCloseToSquareFixedOrientation() {
+        if (Flags.insetsDecoupledConfiguration()) {
+            // No test needed as decor insets no longer affects orientation.
+            return;
+        }
         // create a square display
         final DisplayContent squareDisplay = new TestDisplayContent.Builder(mAtm, 2000, 2000)
                 .setSystemDecorations(true).build();
@@ -3416,6 +3420,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         // Remove window during transition, so it is requested to hide, but won't be committed until
         // the transition is finished.
         app.mActivityRecord.onRemovedFromDisplay();
+        app.mActivityRecord.prepareSurfaces();
 
         assertTrue(mDisplayContent.mClosingApps.contains(app.mActivityRecord));
         assertFalse(app.mActivityRecord.isVisibleRequested());
@@ -3433,6 +3438,7 @@ public class ActivityRecordTests extends WindowTestsBase {
     public void testInClosingAnimation_visibilityCommitted_hideSurface() {
         final WindowState app = createWindow(null, TYPE_APPLICATION, "app");
         makeWindowVisibleAndDrawn(app);
+        app.mActivityRecord.prepareSurfaces();
 
         // Put the activity in close transition.
         mDisplayContent.mOpeningApps.clear();

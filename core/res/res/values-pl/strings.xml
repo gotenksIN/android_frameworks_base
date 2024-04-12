@@ -86,7 +86,7 @@
     <string name="NetworkPreferenceSwitchTitle" msgid="1008329951315753038">"Brak zasięgu sieci komórkowej"</string>
     <string name="NetworkPreferenceSwitchSummary" msgid="2086506181486324860">"Spróbuj zmienić preferowaną sieć. Kliknij, by zmienić."</string>
     <string name="EmergencyCallWarningTitle" msgid="1615688002899152860">"Połączenia alarmowe są niedostępne"</string>
-    <string name="EmergencyCallWarningSummary" msgid="1194185880092805497">"Nie można nawiązywać połączeń alarmowych przez Wi‑Fi"</string>
+    <string name="EmergencyCallWarningSummary" msgid="9102799172089265268">"Połączenia alarmowe wymagają sieci komórkowej"</string>
     <string name="notification_channel_network_alert" msgid="4788053066033851841">"Alerty"</string>
     <string name="notification_channel_call_forward" msgid="8230490317314272406">"Przekierowanie połączeń"</string>
     <string name="notification_channel_emergency_callback" msgid="54074839059123159">"Tryb alarmowego połączenia zwrotnego"</string>
@@ -1185,6 +1185,8 @@
     <string name="deleteText" msgid="4200807474529938112">"Usuń"</string>
     <string name="inputMethod" msgid="1784759500516314751">"Sposób wprowadzania tekstu"</string>
     <string name="editTextMenuTitle" msgid="857666911134482176">"Działania na tekście"</string>
+    <string name="error_handwriting_unsupported" msgid="7809438534946014050">"To pole nie obsługuje pisma odręcznego"</string>
+    <string name="error_handwriting_unsupported_password" msgid="5095401146106891087">"Pola haseł nie obsługują pisma odręcznego"</string>
     <string name="input_method_nav_back_button_desc" msgid="3655838793765691787">"Wstecz"</string>
     <string name="input_method_ime_switch_button_desc" msgid="2736542240252198501">"Przełącz metodę wprowadzania"</string>
     <string name="low_internal_storage_view_title" msgid="9024241779284783414">"Kończy się miejsce"</string>
@@ -1315,7 +1317,7 @@
     <string name="volume_unknown" msgid="4041914008166576293">"Głośność"</string>
     <string name="volume_icon_description_bluetooth" msgid="7540388479345558400">"Głośność Bluetooth"</string>
     <string name="volume_icon_description_ringer" msgid="2187800636867423459">"Głośność dzwonka"</string>
-    <string name="volume_icon_description_incall" msgid="4491255105381227919">"Głośność w czasie połączenia"</string>
+    <string name="volume_icon_description_incall" msgid="4491255105381227919">"Głośność połączeń"</string>
     <string name="volume_icon_description_media" msgid="4997633254078171233">"Głośność multimediów"</string>
     <string name="volume_icon_description_notification" msgid="579091344110747279">"Głośność powiadomień"</string>
     <string name="ringtone_default" msgid="9118299121288174597">"Dzwonek domyślny"</string>
@@ -1929,6 +1931,9 @@
     <string name="zen_mode_implicit_trigger_description" msgid="5714956693073007111">"Zarządzana przez aplikację <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="zen_mode_implicit_activated" msgid="2634285680776672994">"Włączono"</string>
     <string name="zen_mode_implicit_deactivated" msgid="8688441768371501750">"Wyłączono"</string>
+    <string name="zen_mode_trigger_summary_divider_text" msgid="7461583466043698862">", "</string>
+    <string name="zen_mode_trigger_summary_range_symbol_combination" msgid="1804900738798069619">"<xliff:g id="START">%1$s</xliff:g> – <xliff:g id="END">%2$s</xliff:g>"</string>
+    <string name="zen_mode_trigger_event_calendar_any" msgid="2086784607921121803">"Dowolny kalendarz"</string>
     <string name="muted_by" msgid="91464083490094950">"<xliff:g id="THIRD_PARTY">%1$s</xliff:g> wycisza niektóre dźwięki"</string>
     <string name="system_error_wipe_data" msgid="5910572292172208493">"W Twoim urządzeniu wystąpił problem wewnętrzny. Może być ono niestabilne, dopóki nie przywrócisz danych fabrycznych."</string>
     <string name="system_error_manufacturer" msgid="703545241070116315">"W Twoim urządzeniu wystąpił problem wewnętrzny. Skontaktuj się z jego producentem, by otrzymać szczegółowe informacje."</string>
@@ -2391,6 +2396,8 @@
     <string name="profile_label_test" msgid="9168641926186071947">"Testowy"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Wspólny"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
+    <!-- no translation found for screen_not_shared_sensitive_content (7058419185079565001) -->
+    <skip />
     <string name="satellite_notification_title" msgid="4026338973463121526">"Automatycznie połączono z satelitą"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"Możesz wymieniać wiadomości bez dostępu do sieci komórkowej lub Wi-Fi"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Otwórz Wiadomości"</string>

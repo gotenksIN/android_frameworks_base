@@ -114,6 +114,7 @@ class MediaRouter2ServiceImpl {
             };
 
     private final Context mContext;
+    private final Looper mLooper;
     private final UserManagerInternal mUserManagerInternal;
     private final Object mLock = new Object();
     private final AppOpsManager mAppOpsManager;
@@ -178,8 +179,9 @@ class MediaRouter2ServiceImpl {
                 Manifest.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS,
                 Manifest.permission.WATCH_APPOPS
             })
-    /* package */ MediaRouter2ServiceImpl(Context context) {
+    /* package */ MediaRouter2ServiceImpl(@NonNull Context context, @NonNull Looper looper) {
         mContext = context;
+        mLooper = looper;
         mActivityManager = mContext.getSystemService(ActivityManager.class);
         mActivityManager.addOnUidImportanceListener(mOnUidImportanceListener,
                 REQUIRED_PACKAGE_IMPORTANCE_FOR_SCANNING);
@@ -187,12 +189,10 @@ class MediaRouter2ServiceImpl {
         mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
         mAppOpsManager = mContext.getSystemService(AppOpsManager.class);
 
-        if (!Flags.disableScreenOffBroadcastReceiver()) {
-            IntentFilter screenOnOffIntentFilter = new IntentFilter();
-            screenOnOffIntentFilter.addAction(ACTION_SCREEN_ON);
-            screenOnOffIntentFilter.addAction(ACTION_SCREEN_OFF);
-            mContext.registerReceiver(mScreenOnOffReceiver, screenOnOffIntentFilter);
-        }
+        IntentFilter screenOnOffIntentFilter = new IntentFilter();
+        screenOnOffIntentFilter.addAction(ACTION_SCREEN_ON);
+        screenOnOffIntentFilter.addAction(ACTION_SCREEN_OFF);
+        mContext.registerReceiver(mScreenOnOffReceiver, screenOnOffIntentFilter);
 
         // Passing null package name to listen to all events.
         mAppOpsManager.startWatchingMode(
@@ -221,18 +221,27 @@ class MediaRouter2ServiceImpl {
     // Start of methods that implement MediaRouter2 operations.
 
     @NonNull
-    public List<MediaRoute2Info> getSystemRoutes() {
+    public List<MediaRoute2Info> getSystemRoutes(@NonNull String callerPackageName,
+            boolean isProxyRouter) {
         final int uid = Binder.getCallingUid();
         final int pid = Binder.getCallingPid();
         final int userId = UserHandle.getUserHandleForUid(uid).getIdentifier();
-        final boolean hasSystemRoutingPermission = checkCallerHasSystemRoutingPermissions(pid, uid);
+
+        boolean hasSystemRoutingPermissions;
+        if (!isProxyRouter) {
+            hasSystemRoutingPermissions = checkCallerHasSystemRoutingPermissions(pid, uid);
+        } else {
+            // Request from ProxyRouter.
+            hasSystemRoutingPermissions =
+                    checkCallerHasPrivilegedRoutingPermissions(pid, uid, callerPackageName);
+        }
 
         final long token = Binder.clearCallingIdentity();
         try {
             Collection<MediaRoute2Info> systemRoutes;
             synchronized (mLock) {
                 UserRecord userRecord = getOrCreateUserRecordLocked(userId);
-                if (hasSystemRoutingPermission) {
+                if (hasSystemRoutingPermissions) {
                     MediaRoute2ProviderInfo providerInfo =
                             userRecord.mHandler.mSystemProvider.getProviderInfo();
                     if (providerInfo != null) {
@@ -795,12 +804,21 @@ class MediaRouter2ServiceImpl {
 
     @Nullable
     public RoutingSessionInfo getSystemSessionInfo(
-            @Nullable String packageName, boolean setDeviceRouteSelected) {
+            @NonNull String callerPackageName,
+            @Nullable String targetPackageName,
+            boolean setDeviceRouteSelected) {
         final int uid = Binder.getCallingUid();
         final int pid = Binder.getCallingPid();
         final int userId = UserHandle.getUserHandleForUid(uid).getIdentifier();
-        final boolean hasSystemRoutingPermissions =
-                checkCallerHasSystemRoutingPermissions(pid, uid);
+
+        boolean hasSystemRoutingPermissions;
+        if (targetPackageName == null) {
+            hasSystemRoutingPermissions = checkCallerHasSystemRoutingPermissions(pid, uid);
+        } else {
+            // Request from ProxyRouter.
+            hasSystemRoutingPermissions =
+                    checkCallerHasPrivilegedRoutingPermissions(pid, uid, callerPackageName);
+        }
 
         final long token = Binder.clearCallingIdentity();
         try {
@@ -812,14 +830,14 @@ class MediaRouter2ServiceImpl {
                         // Return a fake system session that shows the device route as selected and
                         // available bluetooth routes as transferable.
                         return userRecord.mHandler.mSystemProvider
-                                .generateDeviceRouteSelectedSessionInfo(packageName);
+                                .generateDeviceRouteSelectedSessionInfo(targetPackageName);
                     } else {
                         sessionInfos = userRecord.mHandler.mSystemProvider.getSessionInfos();
                         if (!sessionInfos.isEmpty()) {
                             // Return a copy of the current system session with no modification,
                             // except setting the client package name.
                             return new RoutingSessionInfo.Builder(sessionInfos.get(0))
-                                    .setClientPackageName(packageName)
+                                    .setClientPackageName(targetPackageName)
                                     .build();
                         } else {
                             Slog.w(TAG, "System provider does not have any session info.");
@@ -828,7 +846,7 @@ class MediaRouter2ServiceImpl {
                 } else {
                     return new RoutingSessionInfo.Builder(
                                     userRecord.mHandler.mSystemProvider.getDefaultSessionInfo())
-                            .setClientPackageName(packageName)
+                            .setClientPackageName(targetPackageName)
                             .build();
                 }
             }
@@ -841,6 +859,12 @@ class MediaRouter2ServiceImpl {
     private boolean checkCallerHasSystemRoutingPermissions(int pid, int uid) {
         return checkCallerHasModifyAudioRoutingPermission(pid, uid)
                 || checkCallerHasBluetoothPermissions(pid, uid);
+    }
+
+    private boolean checkCallerHasPrivilegedRoutingPermissions(
+            int pid, int uid, @NonNull String callerPackageName) {
+        return checkMediaContentControlPermission(uid, pid)
+                || checkMediaRoutingControlPermission(uid, pid, callerPackageName);
     }
 
     private boolean checkCallerHasModifyAudioRoutingPermission(int pid, int uid) {
@@ -864,13 +888,9 @@ class MediaRouter2ServiceImpl {
                 Manifest.permission.MEDIA_CONTENT_CONTROL
             })
     private void enforcePrivilegedRoutingPermissions(
-            int callerUid, int callerPid, @Nullable String callerPackageName) {
-        if (hasMediaContentControlPermission(callerUid, callerPid)) {
+            int callerUid, int callerPid, @NonNull String callerPackageName) {
+        if (checkMediaContentControlPermission(callerUid, callerPid)) {
             return;
-        }
-
-        if (!Flags.enablePrivilegedRoutingForMediaRoutingControl()) {
-            throw new SecurityException("Must hold MEDIA_CONTENT_CONTROL");
         }
 
         if (!checkMediaRoutingControlPermission(callerUid, callerPid, callerPackageName)) {
@@ -879,15 +899,18 @@ class MediaRouter2ServiceImpl {
         }
     }
 
-    @RequiresPermission(Manifest.permission.MEDIA_CONTENT_CONTROL)
-    private boolean hasMediaContentControlPermission(int callerUid, int callerPid) {
+    private boolean checkMediaContentControlPermission(int callerUid, int callerPid) {
         return mContext.checkPermission(
                         Manifest.permission.MEDIA_CONTENT_CONTROL, callerPid, callerUid)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
     private boolean checkMediaRoutingControlPermission(
-            int callerUid, int callerPid, @Nullable String callerPackageName) {
+            int callerUid, int callerPid, @NonNull String callerPackageName) {
+        if (!Flags.enablePrivilegedRoutingForMediaRoutingControl()) {
+            return false;
+        }
+
         return PermissionChecker.checkPermissionForDataDelivery(
                         mContext,
                         Manifest.permission.MEDIA_ROUTING_CONTROL,
@@ -1022,7 +1045,7 @@ class MediaRouter2ServiceImpl {
 
         // Uid and package name are shared across all manager records in the list.
         boolean isAppOpAllowed =
-                mAppOpsManager.unsafeCheckOp(
+                mAppOpsManager.unsafeCheckOpNoThrow(
                                 AppOpsManager.OPSTR_MEDIA_ROUTING_CONTROL,
                                 record.mOwnerUid,
                                 record.mOwnerPackageName)
@@ -1520,7 +1543,7 @@ class MediaRouter2ServiceImpl {
         boolean hasMediaRoutingControl =
                 checkMediaRoutingControlPermission(callerUid, callerPid, callerPackageName);
 
-        boolean hasMediaContentControl = hasMediaContentControlPermission(callerUid, callerPid);
+        boolean hasMediaContentControl = checkMediaContentControlPermission(callerUid, callerPid);
 
         Slog.i(
                 TAG,
@@ -1868,7 +1891,7 @@ class MediaRouter2ServiceImpl {
     private UserRecord getOrCreateUserRecordLocked(int userId) {
         UserRecord userRecord = mUserRecords.get(userId);
         if (userRecord == null) {
-            userRecord = new UserRecord(userId);
+            userRecord = new UserRecord(userId, mLooper);
             mUserRecords.put(userId, userRecord);
             userRecord.init();
             if (isUserActiveLocked(userId)) {
@@ -1939,9 +1962,13 @@ class MediaRouter2ServiceImpl {
         Set<String> mActivelyScanningPackages = Set.of();
         final UserHandler mHandler;
 
-        UserRecord(int userId) {
+        UserRecord(int userId, @NonNull Looper looper) {
             mUserId = userId;
-            mHandler = new UserHandler(MediaRouter2ServiceImpl.this, this);
+            mHandler =
+                    new UserHandler(
+                            /* service= */ MediaRouter2ServiceImpl.this,
+                            /* userRecord= */ this,
+                            looper);
         }
 
         void init() {
@@ -2342,12 +2369,16 @@ class MediaRouter2ServiceImpl {
         private boolean mRunning;
 
         // TODO: (In Android S+) Pull out SystemMediaRoute2Provider out of UserHandler.
-        UserHandler(@NonNull MediaRouter2ServiceImpl service, @NonNull UserRecord userRecord) {
-            super(Looper.getMainLooper(), null, true);
+        UserHandler(
+                @NonNull MediaRouter2ServiceImpl service,
+                @NonNull UserRecord userRecord,
+                @NonNull Looper looper) {
+            super(looper, /* callback= */ null, /* async= */ true);
             mServiceRef = new WeakReference<>(service);
             mUserRecord = userRecord;
-            mSystemProvider = new SystemMediaRoute2Provider(service.mContext,
-                    UserHandle.of(userRecord.mUserId));
+            mSystemProvider =
+                    new SystemMediaRoute2Provider(
+                            service.mContext, UserHandle.of(userRecord.mUserId), looper);
             mRouteProviders.add(mSystemProvider);
             mWatcher = new MediaRoute2ProviderWatcher(service.mContext, this,
                     this, mUserRecord.mUserId);
@@ -3402,9 +3433,7 @@ class MediaRouter2ServiceImpl {
         @NonNull
         private static List<RouterRecord> getIndividuallyActiveRouters(
                 MediaRouter2ServiceImpl service, List<RouterRecord> allRouterRecords) {
-            if (!Flags.disableScreenOffBroadcastReceiver()
-                    && !service.mPowerManager.isInteractive()
-                    && !Flags.enableScreenOffScanning()) {
+            if (!service.mPowerManager.isInteractive() && !Flags.enableScreenOffScanning()) {
                 return Collections.emptyList();
             }
 
@@ -3420,9 +3449,7 @@ class MediaRouter2ServiceImpl {
 
         private static boolean areManagersScanning(
                 MediaRouter2ServiceImpl service, List<ManagerRecord> managerRecords) {
-            if (!Flags.disableScreenOffBroadcastReceiver()
-                    && !service.mPowerManager.isInteractive()
-                    && !Flags.enableScreenOffScanning()) {
+            if (!service.mPowerManager.isInteractive() && !Flags.enableScreenOffScanning()) {
                 return false;
             }
 

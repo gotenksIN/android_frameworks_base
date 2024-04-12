@@ -19,6 +19,7 @@ package com.android.server.pm;
 import static android.content.pm.Flags.disallowSdkLibsToBeApps;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_APK;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_INSTALLER;
+import static android.content.pm.PackageManager.APP_METADATA_SOURCE_UNKNOWN;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.INSTALL_FAILED_ALREADY_EXISTS;
@@ -36,6 +37,7 @@ import static android.content.pm.PackageManager.INSTALL_FAILED_UID_CHANGED;
 import static android.content.pm.PackageManager.INSTALL_FAILED_UPDATE_INCOMPATIBLE;
 import static android.content.pm.PackageManager.INSTALL_STAGED;
 import static android.content.pm.PackageManager.INSTALL_SUCCEEDED;
+import static android.content.pm.PackageManager.PROPERTY_ANDROID_SAFETY_LABEL_PATH;
 import static android.content.pm.PackageManager.UNINSTALL_REASON_UNKNOWN;
 import static android.content.pm.SigningDetails.SignatureSchemeVersion.SIGNING_BLOCK_V4;
 import static android.content.pm.parsing.ApkLiteParseUtils.isApkFile;
@@ -45,8 +47,8 @@ import static android.os.storage.StorageManager.FLAG_STORAGE_CE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_DE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_EXTERNAL;
 
-import static com.android.internal.pm.pkg.parsing.ParsingPackageUtils.APP_METADATA_FILE_NAME;
 import static com.android.server.pm.InstructionSets.getAppDexInstructionSets;
+import static com.android.server.pm.PackageManagerService.APP_METADATA_FILE_NAME;
 import static com.android.server.pm.PackageManagerService.DEBUG_COMPRESSION;
 import static com.android.server.pm.PackageManagerService.DEBUG_INSTALL;
 import static com.android.server.pm.PackageManagerService.DEBUG_PACKAGE_SCANNING;
@@ -747,7 +749,7 @@ final class InstallPackageHelper {
                                 onInstallComplete(PackageManager.INSTALL_SUCCEEDED, mContext,
                                         onCompleteSender);
                             }
-                        });
+                        }, pkgSetting.getAppId(), callingUid, pkgSetting.isSystem());
                 restoreAndPostInstall(request);
             }
         } finally {
@@ -2217,8 +2219,10 @@ final class InstallPackageHelper {
                         ps.setAppMetadataSource(APP_METADATA_SOURCE_INSTALLER);
                     }
                 } else {
+                    Map<String, PackageManager.Property> properties = parsedPackage.getProperties();
                     if (Flags.aslInApkAppMetadataSource()
-                            && parsedPackage.isAppMetadataFileInApk()) {
+                            && properties.containsKey(PROPERTY_ANDROID_SAFETY_LABEL_PATH)) {
+                        // ASL file extraction is done in post-install
                         ps.setAppMetadataFilePath(appMetadataFile.getAbsolutePath());
                         ps.setAppMetadataSource(APP_METADATA_SOURCE_APK);
                     } else {
@@ -2829,6 +2833,20 @@ final class InstallPackageHelper {
         }
 
         if (succeeded) {
+            if (Flags.aslInApkAppMetadataSource()
+                    && pkgSetting.getAppMetadataSource() == APP_METADATA_SOURCE_APK) {
+                if (!PackageManagerServiceUtils.extractAppMetadataFromApk(request.getPkg(),
+                        pkgSetting.getAppMetadataFilePath())) {
+                    synchronized (mPm.mLock) {
+                        PackageSetting setting = mPm.mSettings.getPackageLPr(packageName);
+                        if (setting != null) {
+                            setting.setAppMetadataFilePath(null)
+                                    .setAppMetadataSource(APP_METADATA_SOURCE_UNKNOWN);
+                        }
+                    }
+                }
+            }
+
             // Clear the uid cache after we installed a new package.
             mPm.mPerUidReadTimeoutsCache = null;
 

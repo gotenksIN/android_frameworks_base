@@ -312,8 +312,8 @@ public class AuthService extends SystemService {
             if (promptInfo.containsPrivateApiConfigurations()) {
                 checkInternalPermission();
             }
-            if (promptInfo.containsSetLogoApiConfigurations()) {
-                checkManageBiometricPermission();
+            if (promptInfo.containsAdvancedApiConfigurations()) {
+                checkBiometricAdvancedPermission();
             }
 
             final long identity = Binder.clearCallingIdentity();
@@ -869,9 +869,7 @@ public class AuthService extends SystemService {
             }
 
             if (faceAidlInstances != null && faceAidlInstances.length > 0) {
-                mFaceSensorConfigurations.addAidlConfigs(faceAidlInstances,
-                        name -> IFace.Stub.asInterface(Binder.allowBlocking(
-                                ServiceManager.waitForDeclaredService(name))));
+                mFaceSensorConfigurations.addAidlConfigs(faceAidlInstances);
             }
 
             if (faceService != null) {
@@ -909,9 +907,7 @@ public class AuthService extends SystemService {
             }
 
             if (fingerprintAidlInstances != null && fingerprintAidlInstances.length > 0) {
-                mFingerprintSensorConfigurations.addAidlSensors(fingerprintAidlInstances,
-                        name -> IFingerprint.Stub.asInterface(Binder.allowBlocking(
-                                ServiceManager.waitForDeclaredService(name))));
+                mFingerprintSensorConfigurations.addAidlSensors(fingerprintAidlInstances);
             }
 
             if (fingerprintService != null) {
@@ -1029,7 +1025,7 @@ public class AuthService extends SystemService {
                 "Must have USE_BIOMETRIC_INTERNAL permission");
     }
 
-    private void checkManageBiometricPermission() {
+    private void checkBiometricAdvancedPermission() {
         getContext().enforceCallingOrSelfPermission(SET_BIOMETRIC_DIALOG_ADVANCED,
                 "Must have SET_BIOMETRIC_DIALOG_ADVANCED permission");
     }

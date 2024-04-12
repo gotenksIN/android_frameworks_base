@@ -58,7 +58,6 @@ import static android.app.admin.flags.Flags.FLAG_DEVICE_THEFT_API_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_ESIM_MANAGEMENT_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_DEVICE_POLICY_SIZE_TRACKING_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_HEADLESS_DEVICE_OWNER_SINGLE_USER_ENABLED;
-import static android.app.admin.flags.Flags.FLAG_PERMISSION_MIGRATION_FOR_ZERO_TRUST_API_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_SECURITY_LOG_V2_ENABLED;
 import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
 import static android.app.admin.flags.Flags.FLAG_IS_MTE_POLICY_ENFORCED;
@@ -10285,6 +10284,16 @@ public class DevicePolicyManager {
      * get the list of app restrictions set by each admin via
      * {@link android.content.RestrictionsManager#getApplicationRestrictionsPerAdmin}.
      *
+     * <p>Starting from Android Version {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM},
+     * the device policy management role holder can also set app restrictions on any applications
+     * in the calling user, as well as the parent user of an organization-owned managed profile via
+     * the {@link DevicePolicyManager} instance returned by
+     * {@link #getParentProfileInstance(ComponentName)}. App restrictions set by the device policy
+     * management role holder are not returned by
+     * {@link UserManager#getApplicationRestrictions(String)}. The target application should use
+     * {@link android.content.RestrictionsManager#getApplicationRestrictionsPerAdmin} to retrieve
+     * them, alongside any app restrictions the profile or device owner might have set.
+     *
      * <p>NOTE: The method performs disk I/O and shouldn't be called on the main thread
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with, or
@@ -10300,11 +10309,14 @@ public class DevicePolicyManager {
     @WorkerThread
     public void setApplicationRestrictions(@Nullable ComponentName admin, String packageName,
             Bundle settings) {
-        throwIfParentInstance("setApplicationRestrictions");
+        if (!Flags.dmrhCanSetAppRestriction()) {
+            throwIfParentInstance("setApplicationRestrictions");
+        }
+
         if (mService != null) {
             try {
                 mService.setApplicationRestrictions(admin, mContext.getPackageName(), packageName,
-                        settings);
+                        settings, mParentInstance);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -11705,11 +11717,14 @@ public class DevicePolicyManager {
     @WorkerThread
     public @NonNull Bundle getApplicationRestrictions(
             @Nullable ComponentName admin, String packageName) {
-        throwIfParentInstance("getApplicationRestrictions");
+        if (!Flags.dmrhCanSetAppRestriction()) {
+            throwIfParentInstance("getApplicationRestrictions");
+        }
+
         if (mService != null) {
             try {
                 return mService.getApplicationRestrictions(admin, mContext.getPackageName(),
-                        packageName);
+                        packageName, mParentInstance);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -12732,7 +12747,6 @@ public class DevicePolicyManager {
     @StringDef({
             Settings.System.SCREEN_BRIGHTNESS_MODE,
             Settings.System.SCREEN_BRIGHTNESS,
-            Settings.System.SCREEN_BRIGHTNESS_FLOAT,
             Settings.System.SCREEN_OFF_TIMEOUT
     })
     @Retention(RetentionPolicy.SOURCE)
@@ -13462,7 +13476,6 @@ public class DevicePolicyManager {
      */
     @RequiresPermission(value = MANAGE_DEVICE_POLICY_QUERY_SYSTEM_UPDATES, conditional = true)
     @SuppressLint("RequiresPermission")
-    @FlaggedApi(FLAG_PERMISSION_MIGRATION_FOR_ZERO_TRUST_API_ENABLED)
     public @Nullable SystemUpdateInfo getPendingSystemUpdate(@Nullable ComponentName admin) {
         throwIfParentInstance("getPendingSystemUpdate");
         try {
@@ -13989,8 +14002,15 @@ public class DevicePolicyManager {
     public @NonNull DevicePolicyManager getParentProfileInstance(@NonNull ComponentName admin) {
         throwIfParentInstance("getParentProfileInstance");
         try {
-            if (!mService.isManagedProfile(admin)) {
-                throw new SecurityException("The current user does not have a parent profile.");
+            if (Flags.dmrhCanSetAppRestriction()) {
+                UserManager um = mContext.getSystemService(UserManager.class);
+                if (!um.isManagedProfile()) {
+                    throw new SecurityException("The current user does not have a parent profile.");
+                }
+            } else {
+                if (!mService.isManagedProfile(admin)) {
+                    throw new SecurityException("The current user does not have a parent profile.");
+                }
             }
             return new DevicePolicyManager(mContext, mService, true);
         } catch (RemoteException e) {
@@ -16638,7 +16658,6 @@ public class DevicePolicyManager {
      */
     @RequiresPermission(value = MANAGE_DEVICE_POLICY_CERTIFICATES, conditional = true)
     @SuppressLint("RequiresPermission")
-    @FlaggedApi(FLAG_PERMISSION_MIGRATION_FOR_ZERO_TRUST_API_ENABLED)
     @NonNull public String getEnrollmentSpecificId() {
         throwIfParentInstance("getEnrollmentSpecificId");
         if (mService == null) {

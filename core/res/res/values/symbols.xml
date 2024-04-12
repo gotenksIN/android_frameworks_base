@@ -394,6 +394,7 @@
   <java-symbol type="string" name="config_sensorUseStartedActivity_hwToggle" />
   <java-symbol type="string" name="config_sensorStateChangedActivity" />
   <java-symbol type="string" name="config_hdmiCecSetMenuLanguageActivity" />
+  <java-symbol type="string" name="config_hdmiCecActiveSourceLostActivity" />
   <java-symbol type="integer" name="config_minNumVisibleRecentTasks_lowRam" />
   <java-symbol type="integer" name="config_maxNumVisibleRecentTasks_lowRam" />
   <java-symbol type="integer" name="config_minNumVisibleRecentTasks" />
@@ -2311,6 +2312,7 @@
   <java-symbol type="bool" name="config_powerDecoupleAutoSuspendModeFromDisplay" />
   <java-symbol type="bool" name="config_powerDecoupleInteractiveModeFromDisplay" />
   <java-symbol type="integer" name="config_minimumScreenOffTimeout" />
+  <java-symbol type="integer" name="config_screenTimeoutOverride" />
   <java-symbol type="integer" name="config_maximumScreenDimDuration" />
   <java-symbol type="fraction" name="config_maximumScreenDimRatio" />
   <java-symbol type="integer" name="config_attentiveTimeout" />
@@ -2636,6 +2638,10 @@
   <java-symbol type="string" name="zen_mode_implicit_trigger_description" />
   <java-symbol type="string" name="zen_mode_implicit_activated" />
   <java-symbol type="string" name="zen_mode_implicit_deactivated" />
+  <java-symbol type="string" name="zen_mode_trigger_summary_divider_text" />
+  <java-symbol type="string" name="zen_mode_trigger_summary_range_symbol_combination" />
+  <java-symbol type="string" name="zen_mode_trigger_event_calendar_any" />
+
   <java-symbol type="string" name="display_rotation_camera_compat_toast_after_rotation" />
   <java-symbol type="string" name="display_rotation_camera_compat_toast_in_multi_window" />
   <java-symbol type="array" name="config_system_condition_providers" />
@@ -3927,6 +3933,7 @@
   <java-symbol type="string" name="config_defaultAppPredictionService" />
   <java-symbol type="string" name="config_defaultContentSuggestionsService" />
   <java-symbol type="string" name="config_defaultCredentialManagerHybridService" />
+  <java-symbol type="string" name="config_defaultCredentialManagerAutofillService" />
   <java-symbol type="array" name="config_enabledCredentialProviderService" />
   <java-symbol type="array" name="config_primaryCredentialProviderService" />
   <java-symbol type="string" name="config_defaultSearchUiService" />
@@ -5238,9 +5245,10 @@
   <java-symbol type="string" name="keyboard_layout_notification_multiple_selected_title"/>
   <java-symbol type="string" name="keyboard_layout_notification_multiple_selected_message"/>
 
-  <!-- For redacted notifications -->
+  <!-- For redacted notifications and screen sharing-->
   <java-symbol type="string" name="redacted_notification_message"/>
   <java-symbol type="string" name="redacted_notification_action_title"/>
+  <java-symbol type="string" name="screen_not_shared_sensitive_content"/>
 
   <java-symbol type="integer" name="config_maximumDelayTimeToDeactivateDataCall" />
   <java-symbol type="bool" name="config_batteryStatsResetOnUnplugHighBatteryLevel" />
@@ -5424,4 +5432,10 @@
   <java-symbol type="bool" name="config_deviceSupportsHighPerfTransitions" />
 
   <java-symbol type="string" name="config_wearRemoteIntentAction" />
+
+  <!-- Whether desktop mode is supported on the current device  -->
+  <java-symbol type="bool" name="config_isDesktopModeSupported" />
+
+  <!-- Frame rate compatibility value for Wallpaper -->
+  <java-symbol type="integer" name="config_wallpaperFrameRateCompatibility" />
 </resources>

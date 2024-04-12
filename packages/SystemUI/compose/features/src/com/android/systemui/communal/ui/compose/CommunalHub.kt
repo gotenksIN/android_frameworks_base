@@ -17,9 +17,11 @@
 package com.android.systemui.communal.ui.compose
 
 import android.appwidget.AppWidgetHostView
+import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.os.Bundle
 import android.util.SizeF
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -76,7 +78,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -93,6 +94,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -155,11 +157,14 @@ fun CommunalHub(
         derivedStateOf { selectedKey.value != null || reorderingWidgets }
     }
     var isButtonToEditWidgetsShowing by remember { mutableStateOf(false) }
+    val isEmptyState by viewModel.isEmptyState.collectAsState(initial = false)
 
     val contentPadding = gridContentPadding(viewModel.isEditMode, toolbarSize)
     val contentOffset = beforeContentPadding(contentPadding).toOffset()
 
-    ScrollOnNewSmartspaceEffect(viewModel, gridState)
+    if (!viewModel.isEditMode) {
+        ScrollOnUpdatedLiveContentEffect(communalContent, gridState)
+    }
 
     Box(
         modifier =
@@ -177,7 +182,7 @@ fun CommunalHub(
                         viewModel.setSelectedKey(key)
                     }
                 }
-                .thenIf(!viewModel.isEditMode) {
+                .thenIf(!viewModel.isEditMode && !isEmptyState) {
                     Modifier.pointerInput(
                             gridState,
                             contentOffset,
@@ -218,26 +223,33 @@ fun CommunalHub(
                         .motionEventSpy { onMotionEvent(viewModel) }
                 },
     ) {
-        CommunalHubLazyGrid(
-            communalContent = communalContent,
-            viewModel = viewModel,
-            contentPadding = contentPadding,
-            contentOffset = contentOffset,
-            setGridCoordinates = { gridCoordinates = it },
-            updateDragPositionForRemove = { offset ->
-                isDraggingToRemove =
-                    isPointerWithinCoordinates(
-                        offset = gridCoordinates?.let { it.positionInWindow() + offset },
-                        containerToCheck = removeButtonCoordinates
-                    )
-                isDraggingToRemove
-            },
-            onOpenWidgetPicker = onOpenWidgetPicker,
-            gridState = gridState,
-            contentListState = contentListState,
-            selectedKey = selectedKey,
-            widgetConfigurator = widgetConfigurator,
-        )
+        if (!viewModel.isEditMode && isEmptyState) {
+            EmptyStateCta(
+                contentPadding = contentPadding,
+                viewModel = viewModel,
+            )
+        } else {
+            CommunalHubLazyGrid(
+                communalContent = communalContent,
+                viewModel = viewModel,
+                contentPadding = contentPadding,
+                contentOffset = contentOffset,
+                setGridCoordinates = { gridCoordinates = it },
+                updateDragPositionForRemove = { offset ->
+                    isDraggingToRemove =
+                        isPointerWithinCoordinates(
+                            offset = gridCoordinates?.let { it.positionInWindow() + offset },
+                            containerToCheck = removeButtonCoordinates
+                        )
+                    isDraggingToRemove
+                },
+                onOpenWidgetPicker = onOpenWidgetPicker,
+                gridState = gridState,
+                contentListState = contentListState,
+                selectedKey = selectedKey,
+                widgetConfigurator = widgetConfigurator,
+            )
+        }
 
         // TODO(b/326060686): Remove this once keyguard indication area can persist over hub
         if (viewModel is CommunalViewModel) {
@@ -331,31 +343,33 @@ private fun onMotionEvent(viewModel: BaseCommunalViewModel) {
     viewModel.signalUserInteraction()
 }
 
+/**
+ * Observes communal content and scrolls to any added or updated live content, e.g. a new media
+ * session is started, or a paused timer is resumed.
+ */
 @Composable
-private fun ScrollOnNewSmartspaceEffect(
-    viewModel: BaseCommunalViewModel,
-    gridState: LazyGridState
+private fun ScrollOnUpdatedLiveContentEffect(
+    communalContent: List<CommunalContentModel>,
+    gridState: LazyGridState,
 ) {
-    val communalContent by viewModel.communalContent.collectAsState(initial = emptyList())
-    var smartspaceCount by remember { mutableStateOf(0) }
+    val coroutineScope = rememberCoroutineScope()
+    val liveContentKeys = remember { mutableListOf<String>() }
 
     LaunchedEffect(communalContent) {
-        snapshotFlow { gridState.firstVisibleItemIndex }
-            .collect { index ->
-                val existingSmartspaceCount = smartspaceCount
-                smartspaceCount = communalContent.count { it.isSmartspace() }
-                val firstIndex = communalContent.indexOfFirst { it.isSmartspace() }
+        val prevLiveContentKeys = liveContentKeys.toList()
+        liveContentKeys.clear()
+        liveContentKeys.addAll(communalContent.filter { it.isLiveContent() }.map { it.key })
 
-                // Scroll to the beginning of the smartspace area whenever the number of
-                // smartspace elements grows
-                if (
-                    existingSmartspaceCount < smartspaceCount &&
-                        !viewModel.isEditMode &&
-                        index > firstIndex
-                ) {
-                    gridState.animateScrollToItem(firstIndex)
-                }
-            }
+        // Find the first updated content
+        val indexOfFirstUpdatedContent =
+            liveContentKeys.indexOfFirst { !prevLiveContentKeys.contains(it) }
+
+        // Scroll if current position is behind the first updated content
+        if (indexOfFirstUpdatedContent in 0 until gridState.firstVisibleItemIndex) {
+            // Launching with a scope to prevent the job from being canceled in the case of a
+            // recomposition during scrolling
+            coroutineScope.launch { gridState.animateScrollToItem(indexOfFirstUpdatedContent) }
+        }
     }
 }
 
@@ -457,6 +471,67 @@ private fun BoxScope.CommunalHubLazyGrid(
     }
 }
 
+/**
+ * The empty state displays a fullscreen call-to-action (CTA) tile when no widgets are available.
+ */
+@Composable
+private fun EmptyStateCta(
+    contentPadding: PaddingValues,
+    viewModel: BaseCommunalViewModel,
+) {
+    val colors = LocalAndroidColorScheme.current
+    Card(
+        modifier = Modifier.height(Dimensions.GridHeight).padding(contentPadding),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(3.dp, colors.secondary),
+        shape = RoundedCornerShape(size = 80.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 110.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(Dimensions.Spacing, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(R.string.title_for_empty_state_cta),
+                style = MaterialTheme.typography.displaySmall,
+                textAlign = TextAlign.Center,
+                color = colors.secondary,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Button(
+                    modifier = Modifier.height(56.dp),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = colors.primary,
+                            contentColor = colors.onPrimary,
+                        ),
+                    onClick = {
+                        viewModel.onOpenWidgetEditor(
+                            shouldOpenWidgetPickerOnStart = true,
+                        )
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription =
+                            stringResource(R.string.label_for_button_in_empty_state_cta),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(
+                        text = stringResource(R.string.label_for_button_in_empty_state_cta),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun LockStateIcon(
     isUnlocked: Boolean,
@@ -511,7 +586,7 @@ private fun Toolbar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val spacerModifier = Modifier.width(Dimensions.ToolbarButtonSpaceBetween)
+        val spacerModifier = Modifier.width(ButtonDefaults.IconSpacing)
         Button(
             onClick = onOpenWidgetPicker,
             colors = filledButtonColors(),
@@ -666,8 +741,6 @@ private fun CommunalContent(
         is CommunalContentModel.WidgetContent.DisabledWidget ->
             DisabledWidgetPlaceholder(model, viewModel, modifier)
         is CommunalContentModel.CtaTileInViewMode -> CtaTileInViewModeContent(viewModel, modifier)
-        is CommunalContentModel.CtaTileInEditMode ->
-            CtaTileInEditModeContent(modifier, onOpenWidgetPicker)
         is CommunalContentModel.Smartspace -> SmartspaceContent(model, modifier)
         is CommunalContentModel.Tutorial -> TutorialContent(modifier)
         is CommunalContentModel.Umo -> Umo(viewModel, modifier)
@@ -753,45 +826,6 @@ private fun CtaTileInViewModeContent(
     }
 }
 
-/** Presents a CTA tile at the end of the hub in edit mode, to add more widgets. */
-@Composable
-private fun CtaTileInEditModeContent(
-    modifier: Modifier = Modifier,
-    onOpenWidgetPicker: (() -> Unit)? = null,
-) {
-    if (onOpenWidgetPicker == null) {
-        throw IllegalArgumentException("onOpenWidgetPicker should not be null.")
-    }
-    val colors = LocalAndroidColorScheme.current
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        border = BorderStroke(1.dp, colors.primary),
-        shape = RoundedCornerShape(200.dp),
-        onClick = onOpenWidgetPicker,
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement =
-                Arrangement.spacedBy(Dimensions.Spacing, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Widgets,
-                contentDescription = stringResource(R.string.cta_label_to_open_widget_picker),
-                tint = colors.primary,
-                modifier = Modifier.size(Dimensions.IconSize),
-            )
-            Text(
-                text = stringResource(R.string.cta_label_to_open_widget_picker),
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.primary,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
 @Composable
 private fun WidgetContent(
     viewModel: BaseCommunalViewModel,
@@ -801,6 +835,13 @@ private fun WidgetContent(
     widgetConfigurator: WidgetConfigurator?,
     modifier: Modifier = Modifier,
 ) {
+    var widgetId: Int by remember { mutableStateOf(-1) }
+    var configuration: Configuration? by remember { mutableStateOf(null) }
+
+    // In addition to returning the current configuration, this also causes a recompose on
+    // configuration change.
+    val currentConfiguration = LocalConfiguration.current
+
     Box(
         modifier =
             modifier.thenIf(!viewModel.isEditMode && model.inQuietMode) {
@@ -816,18 +857,48 @@ private fun WidgetContent(
         AndroidView(
             modifier = Modifier.fillMaxSize().allowGestures(allowed = !viewModel.isEditMode),
             factory = { context ->
-                model.appWidgetHost
-                    .createViewForCommunal(context, model.appWidgetId, model.providerInfo)
-                    .apply {
-                        updateAppWidgetSize(Bundle.EMPTY, listOf(size))
-                        // Remove the extra padding applied to AppWidgetHostView to allow widgets to
-                        // occupy the entire box.
-                        setPadding(0)
-                    }
+                // This FrameLayout becomes the container view for the AppWidgetHostView we add as a
+                // child in update below. Having a container view allows for updating the contained
+                // host view as needed (e.g. on configuration changes).
+                FrameLayout(context).apply {
+                    layoutParams =
+                        ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    setPadding(0)
+                }
+            },
+            update = { widgetContainer: ViewGroup ->
+                if (widgetId == model.appWidgetId && currentConfiguration.equals(configuration)) {
+                    return@AndroidView
+                }
+
+                // Add the widget's host view to the FrameLayout parent (after removing any
+                // previously added host view).
+                widgetContainer.removeAllViews()
+                widgetContainer.addView(
+                    model.appWidgetHost
+                        .createViewForCommunal(
+                            widgetContainer.context,
+                            model.appWidgetId,
+                            model.providerInfo
+                        )
+                        .apply {
+                            updateAppWidgetSize(Bundle.EMPTY, listOf(size))
+                            // Remove the extra padding applied to AppWidgetHostView to allow
+                            // widgets to occupy the entire box.
+                            setPadding(0)
+                        }
+                )
+
+                widgetId = model.appWidgetId
+                configuration = currentConfiguration
             },
             // For reusing composition in lazy lists.
             onReset = {},
         )
+
         if (
             viewModel is CommunalEditModeViewModel &&
                 model.reconfigurable &&
@@ -1042,7 +1113,6 @@ object Dimensions {
     val ToolbarPaddingHorizontal = 16.dp
     val ToolbarButtonPaddingHorizontal = 24.dp
     val ToolbarButtonPaddingVertical = 16.dp
-    val ToolbarButtonSpaceBetween = 8.dp
     val ButtonPadding =
         PaddingValues(
             vertical = ToolbarButtonPaddingVertical,

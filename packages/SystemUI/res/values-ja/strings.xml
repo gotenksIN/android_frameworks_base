@@ -86,6 +86,7 @@
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"スクリーンショットの撮影は IT 管理者によってブロックされています。"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"編集"</string>
     <string name="screenshot_edit_description" msgid="3333092254706788906">"スクリーンショットを編集します"</string>
+    <string name="screenshot_share_label" msgid="1653061117238861559">"共有"</string>
     <string name="screenshot_share_description" msgid="2861628935812656612">"スクリーンショットを共有"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"キャプチャ範囲を拡大"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"スクリーンショットを閉じます"</string>
@@ -150,6 +151,7 @@
     <string name="accessibility_scanning_face" msgid="3093828357921541387">"顔のスキャン"</string>
     <string name="accessibility_send_smart_reply" msgid="8885032190442015141">"送信"</string>
     <string name="cancel" msgid="1089011503403416730">"キャンセル"</string>
+    <string name="biometric_dialog_logo" msgid="7681107853070774595">"アプリのロゴ"</string>
     <string name="biometric_dialog_confirm" msgid="2005978443007344895">"確認"</string>
     <string name="biometric_dialog_try_again" msgid="8575345628117768844">"再試行"</string>
     <string name="biometric_dialog_empty_space_description" msgid="3330555462071453396">"タップすると認証をキャンセルします"</string>
@@ -164,6 +166,7 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_3" msgid="2192670471930606539">"顔を認識しました。ロック解除アイコンを押して続行します。"</string>
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"認証済み"</string>
     <string name="biometric_dialog_cancel_authentication" msgid="981316588773442637">"認証をキャンセルします"</string>
+    <string name="biometric_dialog_content_view_more_options_button" msgid="2663810393874865475">"その他のオプション"</string>
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"PIN を使用"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"パターンを使用"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"パスワードを使用"</string>
@@ -360,6 +363,13 @@
     <string name="quick_settings_contrast_standard" msgid="2538227821968061832">"標準"</string>
     <string name="quick_settings_contrast_medium" msgid="5158352575583902566">"中"</string>
     <string name="quick_settings_contrast_high" msgid="656049259587494499">"高"</string>
+    <string name="quick_settings_hearing_devices_label" msgid="7277170419679404129">"補聴器"</string>
+    <!-- no translation found for quick_settings_hearing_devices_dialog_title (9004774017688484981) -->
+    <skip />
+    <!-- no translation found for quick_settings_pair_hearing_devices (5987105102207447322) -->
+    <skip />
+    <!-- no translation found for accessibility_hearing_device_pair_new_device (8440082580186130090) -->
+    <skip />
     <string name="sensor_privacy_start_use_mic_dialog_title" msgid="563796653825944944">"デバイスのマイクのブロックを解除しますか？"</string>
     <string name="sensor_privacy_start_use_camera_dialog_title" msgid="8807639852654305227">"デバイスのカメラのブロックを解除しますか？"</string>
     <string name="sensor_privacy_start_use_mic_camera_dialog_title" msgid="4316471859905020023">"デバイスのカメラとマイクのブロックを解除しますか？"</string>
@@ -437,6 +447,8 @@
     <string name="button_to_remove_widget" msgid="3948204829181214098">"削除"</string>
     <string name="hub_mode_add_widget_button_text" msgid="4831464661209971729">"ウィジェットを追加"</string>
     <string name="hub_mode_editing_exit_button_text" msgid="3704686734192264771">"完了"</string>
+    <string name="label_for_button_in_empty_state_cta" msgid="7314975555382055823">"ウィジェットを追加"</string>
+    <string name="title_for_empty_state_cta" msgid="6161654421223450530">"タブレットのロックを解除せずにお気に入りのアプリ ウィジェットにすばやくアクセスできます。"</string>
     <string name="dialog_title_to_allow_any_widget" msgid="1004820948962675644">"ロック画面でのウィジェットを許可しますか？"</string>
     <string name="button_text_to_open_settings" msgid="1987729256950941628">"設定を開く"</string>
     <string name="work_mode_off_title" msgid="5794818421357835873">"仕事用アプリの停止解除"</string>
@@ -468,7 +480,7 @@
     <string name="media_projection_entry_app_permission_dialog_warning_single_app" msgid="5211695779082563959">"アプリの共有、録画、キャスト中は、そのアプリで表示または再生される内容に <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> がアクセスできるため、パスワード、お支払いの詳細、メッセージ、写真、音声、動画などの情報にご注意ください。"</string>
     <string name="media_projection_entry_app_permission_dialog_continue" msgid="295463518195075840">"開始"</string>
     <string name="media_projection_entry_app_permission_dialog_single_app_disabled" msgid="8999903044874669995">"<xliff:g id="APP_NAME">%1$s</xliff:g> がこのオプションを無効にしています"</string>
-    <string name="media_projection_entry_cast_permission_dialog_title" msgid="8860150223172993547">"キャスト開始しますか？"</string>
+    <string name="media_projection_entry_cast_permission_dialog_title" msgid="8860150223172993547">"キャストを開始しますか？"</string>
     <string name="media_projection_entry_cast_permission_dialog_warning_entire_screen" msgid="1986212276016817231">"キャスト中は、画面に表示される内容やデバイスで再生される内容に Android がアクセスできるため、パスワード、お支払いの詳細、メッセージ、写真、音声、動画などの情報にご注意ください。"</string>
     <string name="media_projection_entry_cast_permission_dialog_warning_single_app" msgid="9900961380294292">"アプリのキャスト中は、そのアプリで表示または再生される内容に Android がアクセスできるため、パスワード、お支払いの詳細、メッセージ、写真、音声、動画などの情報にご注意ください。"</string>
     <string name="media_projection_entry_cast_permission_dialog_continue" msgid="7209890669948870042">"キャストを開始"</string>
@@ -538,7 +550,8 @@
     <string name="monitoring_description_parental_controls" msgid="8184693528917051626">"このデバイスは保護者によって管理されています。保護者は、あなたが使用するアプリ、あなたの現在地、デバイスの利用時間などの情報を確認したり、管理したりできます。"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"信頼エージェントがロック解除を管理"</string>
-    <string name="kg_prompt_after_adaptive_auth_lock" msgid="1265107698772588299">"盗難防止\nデバイスをロック - ロック解除に繰り返し失敗"</string>
+    <string name="kg_prompt_after_adaptive_auth_lock" msgid="2587481497846342760">"認証の試行回数が上限を超えたため、デバイスがロックされました"</string>
+    <string name="keyguard_indication_after_adaptive_auth_lock" msgid="2323400645470712787">"デバイスがロックされました\n認証に失敗しました"</string>
     <string name="zen_mode_and_condition" msgid="5043165189511223718">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>。<xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
     <string name="accessibility_volume_settings" msgid="1458961116951564784">"音声の設定"</string>
     <string name="volume_odi_captions_tip" msgid="8825655463280990941">"メディアの自動字幕起こし"</string>
@@ -606,8 +619,8 @@
     <string name="volume_panel_collapsed_sliders" msgid="1413383759434791450">"音量スライダーを閉じました"</string>
     <string name="volume_panel_hint_mute" msgid="6962563028495243738">"%s をミュート"</string>
     <string name="volume_panel_hint_unmute" msgid="7489063242934477382">"%s のミュートを解除"</string>
-    <string name="media_output_label_title" msgid="872824698593182505">"<xliff:g id="LABEL">%s</xliff:g> を再生:"</string>
-    <string name="media_output_title_without_playing" msgid="3825663683169305013">"音声の再生形式:"</string>
+    <string name="media_output_label_title" msgid="872824698593182505">"<xliff:g id="LABEL">%s</xliff:g> の再生先:"</string>
+    <string name="media_output_title_without_playing" msgid="3825663683169305013">"音声の再生先"</string>
     <string name="system_ui_tuner" msgid="1471348823289954729">"システムUI調整ツール"</string>
     <string name="status_bar" msgid="4357390266055077437">"ステータスバー"</string>
     <string name="demo_mode" msgid="263484519766901593">"システム UI デモモード"</string>
@@ -653,7 +666,7 @@
     <string name="notification_silence_title" msgid="8608090968400832335">"サイレント"</string>
     <string name="notification_alert_title" msgid="3656229781017543655">"デフォルト"</string>
     <string name="notification_automatic_title" msgid="3745465364578762652">"自動"</string>
-    <string name="notification_channel_summary_low" msgid="4860617986908931158">"着信音もバイブレーションも無効になります"</string>
+    <string name="notification_channel_summary_low" msgid="4860617986908931158">"着信音もバイブレーションも OFF になります"</string>
     <string name="notification_conversation_summary_low" msgid="1734433426085468009">"着信音もバイブレーションも無効になり会話セクションの下に表示されます"</string>
     <string name="notification_channel_summary_default" msgid="777294388712200605">"デバイスの設定を基に着信音またはバイブレーションが有効になります"</string>
     <string name="notification_channel_summary_default_with_bubbles" msgid="3482483084451555344">"デバイスの設定を基に着信音またはバイブレーションが有効になります。デフォルトでは <xliff:g id="APP_NAME">%1$s</xliff:g> からの会話がふきだしで表示されます。"</string>
@@ -752,7 +765,6 @@
     <string name="group_system_cycle_forward" msgid="5478663965957647805">"最近使ったアプリを確認する"</string>
     <string name="group_system_cycle_back" msgid="8194102916946802902">"最近使ったアプリを確認する（逆方向）"</string>
     <string name="group_system_access_all_apps_search" msgid="1553588630154197469">"アプリの一覧を開く"</string>
-    <string name="group_system_hide_reshow_taskbar" msgid="6108733797075862081">"タスクバーを表示する"</string>
     <string name="group_system_access_system_settings" msgid="8731721963449070017">"設定を開く"</string>
     <string name="group_system_access_google_assistant" msgid="7210074957915968110">"アシスタントを開く"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"画面をロック"</string>
@@ -761,6 +773,8 @@
     <string name="system_multitasking_rhs" msgid="2454557648974553729">"分割画面にして現在のアプリを右側に設定する"</string>
     <string name="system_multitasking_lhs" msgid="3516599774920979402">"分割画面にして現在のアプリを左側に設定する"</string>
     <string name="system_multitasking_full_screen" msgid="336048080383640562">"分割画面から全画面に切り替える"</string>
+    <string name="system_multitasking_splitscreen_focus_rhs" msgid="3838578650313318508">"分割画面の使用時に右側または下部のアプリに切り替える"</string>
+    <string name="system_multitasking_splitscreen_focus_lhs" msgid="3164261844398662518">"分割画面の使用時に左側または上部のアプリに切り替える"</string>
     <string name="system_multitasking_replace" msgid="7410071959803642125">"分割画面中: アプリを順に置換する"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"入力"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"次の言語に切り替える"</string>
@@ -1259,8 +1273,7 @@
     <string name="camera_blocked_dream_overlay_content_description" msgid="4074759493559418130">"カメラはブロックされています"</string>
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"カメラとマイクはブロックされています"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"マイクはブロックされています"</string>
-    <!-- no translation found for priority_mode_dream_overlay_content_description (3361628029609329182) -->
-    <skip />
+    <string name="priority_mode_dream_overlay_content_description" msgid="3361628029609329182">"サイレント モード"</string>
     <string name="assistant_attention_content_description" msgid="4166330881435263596">"会話を始められます"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"[設定] でデフォルトのメモアプリを設定してください"</string>
     <string name="install_app" msgid="5066668100199613936">"アプリをインストール"</string>

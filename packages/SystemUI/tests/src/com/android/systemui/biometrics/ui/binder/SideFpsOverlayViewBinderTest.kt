@@ -58,6 +58,7 @@ import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.bouncer.ui.BouncerView
 import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFingerprintAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryFingerprintAuthInteractor
 import com.android.systemui.display.data.repository.FakeDisplayRepository
 import com.android.systemui.keyguard.DismissCallbackRegistry
@@ -66,6 +67,8 @@ import com.android.systemui.keyguard.data.repository.FakeDeviceEntryFingerprintA
 import com.android.systemui.keyguard.data.repository.FakeTrustRepository
 import com.android.systemui.keyguard.data.repository.biometricSettingsRepository
 import com.android.systemui.keyguard.domain.interactor.DeviceEntrySideFpsOverlayInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
 import com.android.systemui.keyguard.ui.viewmodel.SideFpsProgressBarViewModel
@@ -74,6 +77,8 @@ import com.android.systemui.log.logcatLogBuffer
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.res.R
+import com.android.systemui.scene.domain.interactor.sceneInteractor
+import com.android.systemui.scene.shared.flag.fakeSceneContainerFlags
 import com.android.systemui.shared.Flags.FLAG_SIDEFPS_CONTROLLER_REFACTOR
 import com.android.systemui.statusbar.phone.dozeServiceHost
 import com.android.systemui.statusbar.policy.KeyguardStateController
@@ -82,7 +87,6 @@ import com.android.systemui.unfold.compat.ScreenSizeFoldProvider
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.mockito.eq
-import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.time.FakeSystemClock
 import java.util.Optional
@@ -193,6 +197,9 @@ class SideFpsOverlayViewBinderTest : SysuiTestCase() {
                 biometricSettingsRepository,
                 FakeSystemClock(),
                 keyguardUpdateMonitor,
+                { mock(DeviceEntryFingerprintAuthInteractor::class.java) },
+                { mock(KeyguardInteractor::class.java) },
+                { mock(KeyguardTransitionInteractor::class.java) },
                 testScope.backgroundScope,
             )
 
@@ -232,6 +239,8 @@ class SideFpsOverlayViewBinderTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 mContext,
                 deviceEntryFingerprintAuthRepository,
+                kosmos.fakeSceneContainerFlags,
+                kosmos.sceneInteractor,
                 primaryBouncerInteractor,
                 alternateBouncerInteractor,
                 keyguardUpdateMonitor

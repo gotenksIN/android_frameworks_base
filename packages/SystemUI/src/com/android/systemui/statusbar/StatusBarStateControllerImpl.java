@@ -46,6 +46,9 @@ import com.android.keyguard.KeyguardClockSwitch;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor;
+import com.android.systemui.deviceentry.shared.model.DeviceUnlockStatus;
+import com.android.systemui.keyguard.MigrateClocksToBlueprint;
+import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor;
 import com.android.systemui.plugins.statusbar.StatusBarStateController.StateListener;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.domain.interactor.SceneInteractor;
@@ -108,6 +111,7 @@ public class StatusBarStateControllerImpl implements
     private final Lazy<ShadeInteractor> mShadeInteractorLazy;
     private final Lazy<DeviceUnlockedInteractor> mDeviceUnlockedInteractorLazy;
     private final Lazy<SceneInteractor> mSceneInteractorLazy;
+    private final Lazy<KeyguardClockInteractor> mKeyguardClockInteractorLazy;
     private int mState;
     private int mLastState;
     private int mUpcomingState;
@@ -173,13 +177,15 @@ public class StatusBarStateControllerImpl implements
             JavaAdapter javaAdapter,
             Lazy<ShadeInteractor> shadeInteractorLazy,
             Lazy<DeviceUnlockedInteractor> deviceUnlockedInteractorLazy,
-            Lazy<SceneInteractor> sceneInteractorLazy) {
+            Lazy<SceneInteractor> sceneInteractorLazy,
+            Lazy<KeyguardClockInteractor> keyguardClockInteractorLazy) {
         mUiEventLogger = uiEventLogger;
         mInteractionJankMonitor = interactionJankMonitor;
         mJavaAdapter = javaAdapter;
         mShadeInteractorLazy = shadeInteractorLazy;
         mDeviceUnlockedInteractorLazy = deviceUnlockedInteractorLazy;
         mSceneInteractorLazy = sceneInteractorLazy;
+        mKeyguardClockInteractorLazy = keyguardClockInteractorLazy;
         for (int i = 0; i < HISTORY_SIZE; i++) {
             mHistoricalRecords[i] = new HistoricalState();
         }
@@ -193,7 +199,7 @@ public class StatusBarStateControllerImpl implements
         if (SceneContainerFlag.isEnabled()) {
             mJavaAdapter.alwaysCollectFlow(
                     combineFlows(
-                        mDeviceUnlockedInteractorLazy.get().isDeviceUnlocked(),
+                        mDeviceUnlockedInteractorLazy.get().getDeviceUnlockStatus(),
                         mSceneInteractorLazy.get().getCurrentScene(),
                         this::calculateStateFromSceneFramework),
                     this::onStatusBarStateChanged);
@@ -461,6 +467,10 @@ public class StatusBarStateControllerImpl implements
 
     /** Returns the id of the currently rendering clock */
     public String getClockId() {
+        if (MigrateClocksToBlueprint.isEnabled()) {
+            return mKeyguardClockInteractorLazy.get().getRenderedClockId();
+        }
+
         if (mClockSwitchView == null) {
             Log.e(TAG, "Clock container was missing");
             return KeyguardClockSwitch.MISSING_CLOCK_ID;
@@ -637,11 +647,11 @@ public class StatusBarStateControllerImpl implements
     }
 
     private int calculateStateFromSceneFramework(
-            boolean isDeviceUnlocked,
+            DeviceUnlockStatus deviceUnlockStatus,
             SceneKey currentScene) {
         SceneContainerFlag.isUnexpectedlyInLegacyMode();
 
-        if (isDeviceUnlocked) {
+        if (deviceUnlockStatus.isUnlocked()) {
             return StatusBarState.SHADE;
         } else {
             return Preconditions.checkNotNull(sStatusBarStateByLockedSceneKey.get(currentScene));
@@ -664,7 +674,8 @@ public class StatusBarStateControllerImpl implements
             Scenes.Bouncer, StatusBarState.KEYGUARD,
             Scenes.Communal, StatusBarState.KEYGUARD,
             Scenes.Shade, StatusBarState.SHADE_LOCKED,
-            Scenes.QuickSettings, StatusBarState.SHADE_LOCKED
+            Scenes.QuickSettings, StatusBarState.SHADE_LOCKED,
+            Scenes.Gone, StatusBarState.SHADE
     );
 
     /**

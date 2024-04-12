@@ -106,6 +106,28 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Иштеп жатат, сол кулак гана"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Жигердүү, оң кулакчын гана"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Жигердүү, сол жана оң кулакчын"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Аудио"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"Телефон чалуулар"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Файл алмашуу"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"Колдонмолордо заманбап форматтар колдоого алынат"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Транскоддоо билдирмелерин көрсөтүү"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Транскоддоо кешин өчүрүү"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Widevine параметрлери"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"L3 деңгээлин мажбурлап артка кайтаруу"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"L3 деңгээлин мажбурлап артка кайтаруу үчүн тандаңыз"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Иштеп жаткан кызматтар"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Учурда иштеп жаткан кызматтарды көрүп, көзөмөлдөп турасыз"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"WebView кызматы"</string>
@@ -555,7 +574,7 @@
     <string name="media_transfer_this_device_name_tablet" msgid="2975593806278422086">"Ушул планшет"</string>
     <!-- no translation found for media_transfer_this_device_name_tv (5285685336836896535) -->
     <skip />
-    <string name="media_transfer_dock_speaker_device_name" msgid="2856219597113881950">"Док бекети үчүн динамик"</string>
+    <string name="media_transfer_dock_speaker_device_name" msgid="2856219597113881950">"Док бекеттин динамиги"</string>
     <string name="media_transfer_external_device_name" msgid="2588672258721846418">"Тышкы түзмөк"</string>
     <string name="media_transfer_default_device_name" msgid="4315604017399871828">"Туташкан түзмөк"</string>
     <string name="media_transfer_this_phone" msgid="7194341457812151531">"Ушул телефон"</string>
@@ -619,18 +638,17 @@
     <string name="add_user_failed" msgid="4809887794313944872">"Жаңы колдонуучу түзүлбөй калды"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"Жаңы конок түзүлгөн жок"</string>
     <string name="user_nickname" msgid="262624187455825083">"Ылакап аты"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"Сиз тандаган аталыш жана сүрөт ушул түзмөктү колдонгондордун баарына көрүнөт."</string>
     <string name="user_add_user" msgid="7876449291500212468">"Колдонуучу кошуу"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"Конок кошуу"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"Конокту өчүрүү"</string>
     <string name="guest_reset_guest" msgid="6110013010356013758">"Конок сеансын баштапкы абалга келтирүү"</string>
-    <string name="guest_reset_guest_dialog_title" msgid="8047270010895437534">"Конок сеансын баштапкы абалга келтиресизби?"</string>
+    <string name="guest_reset_guest_dialog_title" msgid="8047270010895437534">"Конок сеансын кайра коёсузбу?"</string>
     <string name="guest_remove_guest_dialog_title" msgid="4548511006624088072">"Конокту өчүрөсүзбү?"</string>
-    <string name="guest_reset_guest_confirm_button" msgid="2989915693215617237">"Баштапкы абалга келтирүү"</string>
+    <string name="guest_reset_guest_confirm_button" msgid="2989915693215617237">"Ооба"</string>
     <string name="guest_remove_guest_confirm_button" msgid="7858123434954143879">"Өчүрүү"</string>
     <string name="guest_resetting" msgid="7822120170191509566">"Конок сеансы баштапкы абалга келтирилүүдө…"</string>
-    <string name="guest_reset_and_restart_dialog_title" msgid="3396657008451616041">"Конок сеансын баштапкы абалга келтиресизби?"</string>
+    <string name="guest_reset_and_restart_dialog_title" msgid="3396657008451616041">"Конок сеансын кайра коёсузбу?"</string>
     <string name="guest_reset_and_restart_dialog_message" msgid="2764425635305200790">"Бул аракет жаңы конок сеансын баштап, учурдагы сеанстагы бардык колдонмолорду жана алардагы нерселерди жок кылат"</string>
     <string name="guest_exit_dialog_title" msgid="1846494656849381804">"Конок режиминен чыгасызбы?"</string>
     <string name="guest_exit_dialog_message" msgid="1743218864242719783">"Учурдагы конок сеансындагы бардык колдонмолор менен алардагы нерселер өчүп калат"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"Чыксаңыз, бардык аракеттер өчүп калат"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"Чыгуудан мурун аракеттериңизди сактап же жок кылсаңыз болот"</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"Сеанстагы аракеттерди азыр өчүрсөңүз болот же чыгып баратып өчүрүп же сактап коюңуз"</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"Сүрөткө тартуу"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"Сүрөт тандаңыз"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"Сүрөт тандаңыз"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"Өтө көп жолу туура эмес аракет кылынды. Бул түзмөктүн дайындары жок кылынат."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"Өтө көп жолу жаңылдыңыз. Бул колдонуучу өчүрүлөт."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"Ethernet ажырады."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"Ethernet."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"Чалуу жок."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"Профилдин сүрөтүн тандоо"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"Демейки колдонуучунун сүрөтчөсү"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Аппараттык баскычтоп"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Тергичтин жайылмасын тандоо"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Демейки"</string>

@@ -106,6 +106,28 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Aktywne, tylko lewa strona"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Aktywne, tylko prawa strona"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Aktywny, lewa i prawa strona"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Dźwięk multimediów"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"Połączenia telefoniczne"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Przesyłanie pliku"</string>
@@ -257,7 +279,7 @@
     <string name="adb_wireless_verifying_qrcode_text" msgid="6123192424916029207">"Paruję urządzenie…"</string>
     <string name="adb_qrcode_pairing_device_failed_msg" msgid="6936292092592914132">"Nie udało się sparować z urządzeniem. Kod QR jest nieprawidłowy albo urządzenie nie jest podłączone do tej samej sieci."</string>
     <string name="adb_wireless_ip_addr_preference_title" msgid="8335132107715311730">"Adres IP i port"</string>
-    <string name="adb_wireless_qrcode_pairing_title" msgid="1906409667944674707">"Skaner kodów QR"</string>
+    <string name="adb_wireless_qrcode_pairing_title" msgid="1906409667944674707">"Zeskanuj kod QR"</string>
     <string name="adb_wireless_qrcode_pairing_description" msgid="6014121407143607851">"Sparuj urządzenia przez Wi-Fi, skanując kod QR"</string>
     <string name="adb_wireless_no_network_msg" msgid="2365795244718494658">"Połącz się z siecią Wi-Fi"</string>
     <string name="keywords_adb_wireless" msgid="6507505581882171240">"adb, debug, dev"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"Zakładaj, że aplikacje obsługują nowoczesne formaty"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Pokaż powiadomienia transkodowania"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Wyłącz pamięć podręczną transkodowania"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Ustawienia Widevine"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"Wymuszaj kreację zastępczą L3"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"Wybierz wymuszanie kreacji zastępczej L3"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Uruchomione usługi"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Wyświetl obecnie uruchomione usługi i nimi zarządzaj"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"Implementacja WebView"</string>
@@ -491,7 +510,7 @@
     <string name="battery_info_status_full_charged" msgid="3536054261505567948">"Bateria w pełni naładowana"</string>
     <string name="battery_info_status_charging_on_hold" msgid="6364355145521694438">"Ładowanie wstrzymane"</string>
     <string name="disabled_by_admin_summary_text" msgid="5343911767402923057">"Kontrolowane przez administratora"</string>
-    <string name="disabled_by_app_ops_text" msgid="8373595926549098012">"Kontrolowane przez ograniczone ustawienia"</string>
+    <string name="disabled_by_app_ops_text" msgid="8373595926549098012">"Obowiązują ustawienia z ograniczonym dostępem"</string>
     <string name="disabled" msgid="8017887509554714950">"Wyłączone"</string>
     <string name="external_source_trusted" msgid="1146522036773132905">"Dozwolone"</string>
     <string name="external_source_untrusted" msgid="5037891688911672227">"Niedozwolone"</string>
@@ -518,7 +537,7 @@
     <string name="use_system_language_to_select_input_method_subtypes" msgid="4865195835541387040">"Użyj języków systemu"</string>
     <string name="failed_to_open_app_settings_toast" msgid="764897252657692092">"Nie udało się otworzyć ustawień aplikacji <xliff:g id="SPELL_APPLICATION_NAME">%1$s</xliff:g>"</string>
     <string name="ime_security_warning" msgid="6547562217880551450">"Ta metoda wprowadzania tekstu może gromadzić cały wpisywany tekst, w tym dane osobowe takie jak hasła czy numery kart kredytowych. Pochodzi ona z aplikacji <xliff:g id="IME_APPLICATION_NAME">%1$s</xliff:g>. Użyć jej?"</string>
-    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"Uwaga: po restarcie ta aplikacja będzie mogła uruchomić się dopiero po odblokowaniu telefonu"</string>
+    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"Uwaga: po restarcie ta aplikacja będzie mogła uruchomić się dopiero, gdy odblokujesz telefon."</string>
     <string name="ims_reg_title" msgid="8197592958123671062">"Stan rejestracji IMS"</string>
     <string name="ims_reg_status_registered" msgid="884916398194885457">"Zarejestrowane"</string>
     <string name="ims_reg_status_not_registered" msgid="2989287366045704694">"Niezarejestrowane"</string>
@@ -619,8 +638,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"Nie udało się utworzyć nowego użytkownika"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"Nie udało się utworzyć nowego gościa"</string>
     <string name="user_nickname" msgid="262624187455825083">"Pseudonim"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"Nazwa i zdjęcie, które wybierzesz, będą widoczne dla każdego, kto używa tego urządzenia."</string>
     <string name="user_add_user" msgid="7876449291500212468">"Dodaj użytkownika"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"Dodaj gościa"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"Usuń gościa"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"Po zamknięciu cała aktywność zostanie usunięta"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"Możesz zapisać lub usunąć swoją aktywność podczas zamykania."</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"Zresetuj, aby teraz usunąć aktywność z tej sesji. Możesz też ją zapisać lub usunąć podczas zamykania sesji."</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"Zrób zdjęcie"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"Wybierz obraz"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"Wybierz zdjęcie"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"Zbyt wiele nieudanych prób. Dane na urządzeniu zostaną usunięte."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"Zbyt wiele nieudanych prób. Użytkownik zostanie usunięty."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"Rozłączono z siecią Ethernet."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"Ethernet."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"Brak połączenia."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"Wybierz zdjęcie profilowe"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"Ikona domyślnego użytkownika"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Klawiatura fizyczna"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Wybierz układ klawiatury"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Domyślny"</string>

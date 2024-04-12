@@ -106,6 +106,28 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Aktiv, bara vänster"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Aktiv, bara höger"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Aktiv, vänster och höger"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Medialjud"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"Telefonsamtal"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Filöverföring"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"Anta att appar har stöd för moderna format"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Visa aviseringar för omkodning"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Inaktivera cacheminne för omkodning"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Widevine-inställningar"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"Tvinga L3-alternativ"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"Välj för att tvinga L3-alternativ"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Aktiva tjänster"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Visa och styr aktiva tjänster"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"WebView-implementering"</string>
@@ -518,7 +537,7 @@
     <string name="use_system_language_to_select_input_method_subtypes" msgid="4865195835541387040">"Använd systemspråk"</string>
     <string name="failed_to_open_app_settings_toast" msgid="764897252657692092">"Det gick inte att öppna inställningarna för <xliff:g id="SPELL_APPLICATION_NAME">%1$s</xliff:g>"</string>
     <string name="ime_security_warning" msgid="6547562217880551450">"Den här inmatningsmetoden kan samla all text som du skriver, inklusive personliga uppgifter som lösenord och kreditkortsnummer. Den kommer från appen <xliff:g id="IME_APPLICATION_NAME">%1$s</xliff:g>. Vill du använda inmatningsmetoden?"</string>
-    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"Obs! När du har startat om enheten måste du låsa upp mobilen innan du kan starta den här appen"</string>
+    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"Obs! När du har startat om enheten måste du låsa upp telefonen innan du kan starta den här appen"</string>
     <string name="ims_reg_title" msgid="8197592958123671062">"IMS-registrering"</string>
     <string name="ims_reg_status_registered" msgid="884916398194885457">"Registrerad"</string>
     <string name="ims_reg_status_not_registered" msgid="2989287366045704694">"Ej registrerad"</string>
@@ -619,8 +638,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"Det gick inte att skapa en ny användare"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"Det gick inte att skapa en ny gäst"</string>
     <string name="user_nickname" msgid="262624187455825083">"Smeknamn"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"Namnet och bilden du väljer visas för alla som använder den här enheten."</string>
     <string name="user_add_user" msgid="7876449291500212468">"Lägg till användare"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"Lägg till gäst"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"Ta bort gäst"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"All aktivitet raderas när du avslutar"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"Du kan spara eller radera aktivitet när du avslutar"</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"Återställ om du vill radera sessionsaktiviteten nu, eller spara eller radera aktivitet när du avslutar"</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"Ta ett foto"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"Välj en bild"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"Välj foto"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"För många felaktiga försök. Enhetens data raderas."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"För många felaktiga försök. Den här användaren raderas."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"Ethernet har kopplats från."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"Ethernet."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"Inga anrop."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"Välj en profilbild"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"Ikon för standardanvändare"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Fysiskt tangentbord"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Välj en tangentbordslayout"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Standard"</string>

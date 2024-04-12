@@ -20,6 +20,7 @@ import static android.permission.flags.Flags.sensitiveNotificationAppProtection;
 import static android.provider.Settings.Global.DISABLE_SCREEN_SHARE_PROTECTIONS_FOR_APPS_AND_NOTIFICATIONS;
 
 import static com.android.server.notification.Flags.screenshareNotificationHiding;
+import static com.android.systemui.Flags.screenshareNotificationHidingBugFix;
 
 import android.annotation.MainThread;
 import android.app.IActivityManager;
@@ -31,6 +32,7 @@ import android.media.projection.MediaProjectionManager;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.Trace;
+import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
 import android.util.ArraySet;
 import android.util.Log;
@@ -39,6 +41,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.util.FrameworkStatsLog;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -47,6 +50,7 @@ import com.android.systemui.util.Assert;
 import com.android.systemui.util.ListenerSet;
 import com.android.systemui.util.settings.GlobalSettings;
 
+import java.util.Random;
 import java.util.concurrent.Executor;
 
 import javax.inject.Inject;
@@ -61,7 +65,24 @@ public class SensitiveNotificationProtectionControllerImpl
     private final ArraySet<String> mExemptPackages = new ArraySet<>();
     private final ListenerSet<Runnable> mListeners = new ListenerSet<>();
     private volatile MediaProjectionInfo mProjection;
+    private SensitiveNotificatioMediaProjectionSession mActiveMediaProjectionSession;
     boolean mDisableScreenShareProtections = false;
+
+
+    private static class SensitiveNotificatioMediaProjectionSession {
+        final long mSessionId;
+        final int mProjectionAppUid;
+        final boolean mExempt;
+
+        SensitiveNotificatioMediaProjectionSession(
+                long sessionId,
+                int projectionAppUid,
+                boolean exempt) {
+            this.mSessionId = sessionId;
+            this.mProjectionAppUid = projectionAppUid;
+            this.mExempt = exempt;
+        }
+    }
 
     @VisibleForTesting
     final MediaProjectionManager.Callback mMediaProjectionCallback =
@@ -72,6 +93,19 @@ public class SensitiveNotificationProtectionControllerImpl
                     try {
                         updateProjectionStateAndNotifyListeners(info);
                         mLogger.logProjectionStart(isSensitiveStateActive(), info.getPackageName());
+
+                        int packageUid;
+                        try {
+                            packageUid = mPackageManager.getPackageUidAsUser(info.getPackageName(),
+                                    info.getUserHandle().getIdentifier());
+                        } catch (PackageManager.NameNotFoundException e) {
+                            Log.w(LOG_TAG, "Package " + info.getPackageName() + " not found");
+                            packageUid = -1;
+                        }
+                        // TODO(b/329665707): MediaProjectionSessionIdGenerator instead of random
+                        //  long
+                        logSensitiveContentProtectionSessionStart(
+                                new Random().nextLong(), packageUid, !isSensitiveStateActive());
                     } finally {
                         Trace.endSection();
                     }
@@ -82,12 +116,43 @@ public class SensitiveNotificationProtectionControllerImpl
                     Trace.beginSection("SNPC.onProjectionStop");
                     try {
                         mLogger.logProjectionStop();
+                        logSensitiveContentProtectionSessionStop();
                         updateProjectionStateAndNotifyListeners(null);
                     } finally {
                         Trace.endSection();
                     }
                 }
             };
+
+    private void logSensitiveContentProtectionSessionStart(
+            long sessionId, int projectionAppUid, boolean exempt) {
+        mActiveMediaProjectionSession =
+                new SensitiveNotificatioMediaProjectionSession(sessionId, projectionAppUid, exempt);
+        logSensitiveContentProtectionSession(
+                mActiveMediaProjectionSession,
+                FrameworkStatsLog.SENSITIVE_CONTENT_MEDIA_PROJECTION_SESSION__STATE__START);
+    }
+
+    private void logSensitiveContentProtectionSessionStop() {
+        if (mActiveMediaProjectionSession == null) {
+            return;
+        }
+        logSensitiveContentProtectionSession(
+                mActiveMediaProjectionSession,
+                FrameworkStatsLog.SENSITIVE_CONTENT_MEDIA_PROJECTION_SESSION__STATE__STOP);
+        mActiveMediaProjectionSession = null;
+    }
+
+    private void logSensitiveContentProtectionSession(
+            SensitiveNotificatioMediaProjectionSession session, int state) {
+        FrameworkStatsLog.write(
+                FrameworkStatsLog.SENSITIVE_CONTENT_MEDIA_PROJECTION_SESSION,
+                session.mSessionId,
+                session.mProjectionAppUid,
+                session.mExempt,
+                state,
+                FrameworkStatsLog.SENSITIVE_CONTENT_MEDIA_PROJECTION_SESSION__SOURCE__SYS_UI);
+    }
 
     @Inject
     public SensitiveNotificationProtectionControllerImpl(
@@ -251,6 +316,10 @@ public class SensitiveNotificationProtectionControllerImpl
         if (sbn.getNotification().isFgsOrUij()
                 && sbn.getPackageName().equals(projection.getPackageName())) {
             return false;
+        }
+
+        if (screenshareNotificationHidingBugFix() && UserHandle.isCore(sbn.getUid())) {
+            return false; // do not hide/redact notifications from system uid
         }
 
         // Only protect/redact notifications if the developer has not explicitly set notification

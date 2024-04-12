@@ -31,9 +31,12 @@ import com.android.systemui.qs.FooterActionsController
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsViewModel
 import com.android.systemui.qs.ui.adapter.FakeQSSceneAdapter
 import com.android.systemui.res.R
+import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.settings.brightness.ui.viewmodel.brightnessMirrorViewModel
 import com.android.systemui.shade.domain.interactor.privacyChipInteractor
 import com.android.systemui.shade.domain.interactor.shadeHeaderClockInteractor
+import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModel
 import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
@@ -86,6 +89,7 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
             flags,
             scope = testScope.backgroundScope,
         )
+    private val sceneInteractor = kosmos.sceneInteractor
 
     private lateinit var shadeHeaderViewModel: ShadeHeaderViewModel
 
@@ -97,6 +101,7 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
             ShadeHeaderViewModel(
                 applicationScope = testScope.backgroundScope,
                 context = context,
+                shadeInteractor = kosmos.shadeInteractor,
                 mobileIconsInteractor = mobileIconsInteractor,
                 mobileIconsViewModel = mobileIconsViewModel,
                 privacyChipInteractor = kosmos.privacyChipInteractor,
@@ -106,16 +111,18 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
 
         underTest =
             QuickSettingsSceneViewModel(
+                brightnessMirrorViewModel = kosmos.brightnessMirrorViewModel,
                 shadeHeaderViewModel = shadeHeaderViewModel,
                 qsSceneAdapter = qsFlexiglassAdapter,
                 notifications = kosmos.notificationsPlaceholderViewModel,
                 footerActionsViewModelFactory = footerActionsViewModelFactory,
                 footerActionsController = footerActionsController,
+                sceneInteractor = sceneInteractor,
             )
     }
 
     @Test
-    fun destinationsNotCustomizing() =
+    fun destinations_whenNotCustomizing() =
         testScope.runTest {
             overrideResource(R.bool.config_use_split_notification_shade, false)
             val destinations by collectLastValue(underTest.destinationScenes)
@@ -131,18 +138,36 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun destinationsCustomizing() =
+    fun destinations_whenNotCustomizing_withPreviousSceneLockscreen() =
+        testScope.runTest {
+            overrideResource(R.bool.config_use_split_notification_shade, false)
+            qsFlexiglassAdapter.setCustomizing(false)
+            val destinations by collectLastValue(underTest.destinationScenes)
+
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val previousScene by collectLastValue(sceneInteractor.previousScene)
+            sceneInteractor.changeScene(Scenes.Lockscreen, "reason")
+            sceneInteractor.changeScene(Scenes.QuickSettings, "reason")
+            assertThat(currentScene).isEqualTo(Scenes.QuickSettings)
+            assertThat(previousScene).isEqualTo(Scenes.Lockscreen)
+
+            assertThat(destinations)
+                .isEqualTo(
+                    mapOf(
+                        Back to UserActionResult(Scenes.Lockscreen),
+                        Swipe(SwipeDirection.Up) to UserActionResult(Scenes.Lockscreen),
+                    )
+                )
+        }
+
+    @Test
+    fun destinations_whenCustomizing_noDestinations() =
         testScope.runTest {
             overrideResource(R.bool.config_use_split_notification_shade, false)
             val destinations by collectLastValue(underTest.destinationScenes)
             qsFlexiglassAdapter.setCustomizing(true)
 
-            assertThat(destinations)
-                .isEqualTo(
-                    mapOf(
-                        Back to UserActionResult(Scenes.QuickSettings),
-                    )
-                )
+            assertThat(destinations).isEmpty()
         }
 
     @Test
@@ -162,18 +187,13 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun destinations_whenCustomizing_inSplitShade() =
+    fun destinations_whenCustomizing_inSplitShade_noDestinations() =
         testScope.runTest {
             overrideResource(R.bool.config_use_split_notification_shade, true)
             val destinations by collectLastValue(underTest.destinationScenes)
             qsFlexiglassAdapter.setCustomizing(true)
 
-            assertThat(destinations)
-                .isEqualTo(
-                    mapOf(
-                        Back to UserActionResult(Scenes.QuickSettings),
-                    )
-                )
+            assertThat(destinations).isEmpty()
         }
 
     @Test

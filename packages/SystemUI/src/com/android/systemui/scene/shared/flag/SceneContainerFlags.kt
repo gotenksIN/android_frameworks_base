@@ -22,13 +22,14 @@ import com.android.systemui.Flags.FLAG_SCENE_CONTAINER
 import com.android.systemui.Flags.sceneContainer
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.flags.FlagToken
-import com.android.systemui.flags.Flags.SCENE_CONTAINER_ENABLED
 import com.android.systemui.flags.RefactorFlagUtils
 import com.android.systemui.keyguard.KeyguardBottomAreaRefactor
 import com.android.systemui.keyguard.KeyguardWmStateRefactor
 import com.android.systemui.keyguard.MigrateClocksToBlueprint
 import com.android.systemui.keyguard.shared.ComposeLockscreen
 import com.android.systemui.media.controls.util.MediaInSceneContainerFlag
+import com.android.systemui.statusbar.notification.shared.NotificationsHeadsUpRefactor
+import com.android.systemui.statusbar.phone.PredictiveBackSysUiFlag
 import dagger.Module
 import dagger.Provides
 
@@ -40,22 +41,15 @@ object SceneContainerFlag {
     @JvmStatic
     inline val isEnabled
         get() =
-            SCENE_CONTAINER_ENABLED && // mainStaticFlag
             sceneContainer() && // mainAconfigFlag
+            ComposeLockscreen.isEnabled &&
                 KeyguardBottomAreaRefactor.isEnabled &&
-                MigrateClocksToBlueprint.isEnabled &&
-                ComposeLockscreen.isEnabled &&
+                KeyguardWmStateRefactor.isEnabled &&
                 MediaInSceneContainerFlag.isEnabled &&
-                KeyguardWmStateRefactor.isEnabled
+                MigrateClocksToBlueprint.isEnabled &&
+                NotificationsHeadsUpRefactor.isEnabled &&
+                PredictiveBackSysUiFlag.isEnabled
     // NOTE: Changes should also be made in getSecondaryFlags and @EnableSceneContainer
-
-    /**
-     * The main static flag, SCENE_CONTAINER_ENABLED. This is an explicit static flag check that
-     * helps with downstream optimizations (like unused code stripping) in builds where aconfig
-     * flags are still writable. Do not remove!
-     */
-    inline fun getMainStaticFlag() =
-        FlagToken("Flags.SCENE_CONTAINER_ENABLED", SCENE_CONTAINER_ENABLED)
 
     /** The main aconfig flag. */
     inline fun getMainAconfigFlag() = FlagToken(FLAG_SCENE_CONTAINER, sceneContainer())
@@ -63,29 +57,25 @@ object SceneContainerFlag {
     /** The set of secondary flags which must be enabled for scene container to work properly */
     inline fun getSecondaryFlags(): Sequence<FlagToken> =
         sequenceOf(
-            KeyguardBottomAreaRefactor.token,
-            MigrateClocksToBlueprint.token,
-            KeyguardWmStateRefactor.token,
             ComposeLockscreen.token,
+            KeyguardBottomAreaRefactor.token,
+            KeyguardWmStateRefactor.token,
             MediaInSceneContainerFlag.token,
+            MigrateClocksToBlueprint.token,
+            NotificationsHeadsUpRefactor.token,
+            PredictiveBackSysUiFlag.token,
             // NOTE: Changes should also be made in isEnabled and @EnableSceneContainer
         )
 
     /** The full set of requirements for SceneContainer */
     inline fun getAllRequirements(): Sequence<FlagToken> {
-        return sequenceOf(getMainStaticFlag(), getMainAconfigFlag()) + getSecondaryFlags()
+        return sequenceOf(getMainAconfigFlag()) + getSecondaryFlags()
     }
 
     /** Return all dependencies of this flag in pairs where [Pair.first] depends on [Pair.second] */
     inline fun getFlagDependencies(): Sequence<Pair<FlagToken, FlagToken>> {
-        val mainStaticFlag = getMainStaticFlag()
         val mainAconfigFlag = getMainAconfigFlag()
-        return sequence {
-            // The static and aconfig flags should be equal; make them co-dependent
-            yield(mainAconfigFlag to mainStaticFlag)
-            yield(mainStaticFlag to mainAconfigFlag)
-            // all other flags depend on the static flag for brevity
-        } + getSecondaryFlags().map { mainStaticFlag to it }
+        return getSecondaryFlags().map { mainAconfigFlag to it }
     }
 
     /**

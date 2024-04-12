@@ -567,7 +567,7 @@ public class UserManagerService extends IUserManager.Stub {
                     int autoLockPreference =
                             Settings.Secure.getIntForUser(mContext.getContentResolver(),
                                     Settings.Secure.PRIVATE_SPACE_AUTO_LOCK,
-                                    Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_NEVER,
+                                    Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_AFTER_DEVICE_RESTART,
                                     getMainUserIdUnchecked());
                     Slog.i(LOG_TAG, "Auto-lock settings changed to " + autoLockPreference);
                     setOrUpdateAutoLockPreferenceForPrivateProfile(autoLockPreference);
@@ -615,7 +615,7 @@ public class UserManagerService extends IUserManager.Stub {
         int privateSpaceAutoLockPreference =
                 Settings.Secure.getIntForUser(mContext.getContentResolver(),
                         Settings.Secure.PRIVATE_SPACE_AUTO_LOCK,
-                        Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_NEVER,
+                        Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_AFTER_DEVICE_RESTART,
                         getMainUserIdUnchecked());
         if (privateSpaceAutoLockPreference
                 != Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_AFTER_INACTIVITY) {
@@ -714,7 +714,7 @@ public class UserManagerService extends IUserManager.Stub {
         if (isAutoLockForPrivateSpaceEnabled()) {
             int autoLockPreference = Settings.Secure.getIntForUser(mContext.getContentResolver(),
                     Settings.Secure.PRIVATE_SPACE_AUTO_LOCK,
-                    Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_NEVER,
+                    Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_AFTER_DEVICE_RESTART,
                     getMainUserIdUnchecked());
             boolean isAutoLockOnDeviceLockSelected =
                     autoLockPreference == Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_ON_DEVICE_LOCK;
@@ -1052,7 +1052,8 @@ public class UserManagerService extends IUserManager.Stub {
                 setOrUpdateAutoLockPreferenceForPrivateProfile(
                         Settings.Secure.getIntForUser(mContext.getContentResolver(),
                                 Settings.Secure.PRIVATE_SPACE_AUTO_LOCK,
-                                Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_NEVER, mainUserId));
+                                Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_AFTER_DEVICE_RESTART,
+                                mainUserId));
             }
         }
 
@@ -1717,20 +1718,28 @@ public class UserManagerService extends IUserManager.Stub {
                         return false;
                     }
 
-                    if (android.multiuser.Flags.showSetScreenLockDialog()) {
-                        // Show the prompt to set a new screen lock if the device does not have one
-                        final KeyguardManager km = mContext.getSystemService(KeyguardManager.class);
-                        if (km != null && !km.isDeviceSecure()) {
-                            Intent setScreenLockPromptIntent =
-                                    SetScreenLockDialogActivity
-                                            .createBaseIntent(LAUNCH_REASON_DISABLE_QUIET_MODE);
-                            setScreenLockPromptIntent.putExtra(EXTRA_ORIGIN_USER_ID, userId);
-                            mContext.startActivity(setScreenLockPromptIntent);
-                            return false;
-                        }
+                    final KeyguardManager km = mContext.getSystemService(KeyguardManager.class);
+                    int parentUserId = getProfileParentId(userId);
+                    if (km != null && km.isDeviceSecure(parentUserId)) {
+                        showConfirmCredentialToDisableQuietMode(userId, target, callingPackage);
+                        return false;
+                    } else if (km != null && !km.isDeviceSecure(parentUserId)
+                            && android.multiuser.Flags.showSetScreenLockDialog()
+                            // TODO(b/330720545): Add a better way to accomplish this, also use it
+                            //  to block profile creation w/o device credentials present.
+                            && Settings.Secure.getIntForUser(mContext.getContentResolver(),
+                                Settings.Secure.USER_SETUP_COMPLETE, 0, userId) == 1) {
+                        Intent setScreenLockPromptIntent =
+                                SetScreenLockDialogActivity
+                                        .createBaseIntent(LAUNCH_REASON_DISABLE_QUIET_MODE);
+                        setScreenLockPromptIntent.putExtra(EXTRA_ORIGIN_USER_ID, userId);
+                        mContext.startActivityAsUser(setScreenLockPromptIntent,
+                                UserHandle.of(parentUserId));
+                        return false;
+                    } else {
+                        Slog.w(LOG_TAG, "Allowing profile unlock even when device credentials "
+                                + "are not set for user " + userId);
                     }
-                    showConfirmCredentialToDisableQuietMode(userId, target, callingPackage);
-                    return false;
                 }
             }
             final boolean hasUnifiedChallenge =
@@ -1873,11 +1882,10 @@ public class UserManagerService extends IUserManager.Stub {
                 && android.multiuser.Flags.enablePrivateSpaceFeatures()) {
             // Allow delayed locking since some profile types want to be able to unlock again via
             // biometrics.
-            ActivityManager.getService()
-                    .stopUserWithDelayedLocking(userId, /* force= */ true, null);
+            ActivityManager.getService().stopUserWithDelayedLocking(userId, null);
             return;
         }
-        ActivityManager.getService().stopUser(userId, /* force= */ true, null);
+        ActivityManager.getService().stopUserWithCallback(userId, null);
     }
 
     private void logQuietModeEnabled(@UserIdInt int userId, boolean enableQuietMode,
@@ -6123,7 +6131,7 @@ public class UserManagerService extends IUserManager.Stub {
             if (DBG) Slog.i(LOG_TAG, "Stopping user " + userId);
             int res;
             try {
-                res = ActivityManager.getService().stopUser(userId, /* force= */ true,
+                res = ActivityManager.getService().stopUserWithCallback(userId,
                 new IStopUserCallback.Stub() {
                             @Override
                             public void userStopped(int userIdParam) {

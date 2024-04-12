@@ -106,6 +106,28 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Ενεργό, μόνο το αριστερό"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Ενεργό, μόνο το δεξί"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Ενεργό, αριστερό και δεξί"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Ήχος πολυμέσων"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"Τηλεφωνικές κλήσεις"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Μεταφορά αρχείου"</string>
@@ -411,7 +433,7 @@
     <string name="enable_freeform_support" msgid="7599125687603914253">"Ενεργοποίηση παραθύρων ελεύθερης μορφής"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"Ενεργοποίηση υποστήριξης για πειραματικά παράθυρα ελεύθερης μορφής."</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"Εφ/κός κωδικός desktop"</string>
-    <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Τα πλήρη αντίγραφα ασφαλείας επιφάνειας εργασίας δεν προστατεύονται αυτήν τη στιγμή"</string>
+    <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Τα πλήρη αντίγραφα ασφαλείας επιφάνειας εργασίας δεν προστατεύονται αυτή τη στιγμή"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"Πατήστε για αλλαγή ή κατάργηση του κωδικού πρόσβασης για τα πλήρη αντίγραφα ασφαλείας επιφάνειας εργασίας"</string>
     <string name="local_backup_password_toast_success" msgid="4891666204428091604">"Ορίστηκε νέος εφεδρικός κωδικός πρόσβασης"</string>
     <string name="local_backup_password_toast_confirmation_mismatch" msgid="2994718182129097733">"Ο νέος κωδικός πρόσβασης και η επιβεβαίωση δεν ταιριάζουν"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"Να θεωρείται ότι οι εφαρμογές χρησιμοποιούν σύγχρονες μορφές"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Εμφάνιση ειδοποιήσεων διακωδικοποίησης"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Απενεργοποίηση κρυφής μνήμης για διακωδικοποίηση"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Ρυθμίσεις Widevine"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"Επιβολή εναλλακτικής L3"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"Επιλογή για επιβολή εναλλακτικής L3"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Υπηρεσίες που εκτελούνται"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Προβολή και έλεγχος των εφαρμογών που εκτελούνται αυτή τη στιγμή"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"Υλοποίηση WebView"</string>
@@ -619,8 +638,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"Η δημιουργία νέου χρήστη απέτυχε"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"Αποτυχία δημιουργίας νέου επισκέπτη"</string>
     <string name="user_nickname" msgid="262624187455825083">"Ψευδώνυμο"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"Το όνομα και η εικόνα που θα επιλέξετε θα είναι ορατά σε όλους όσους χρησιμοποιούν αυτή τη συσκευή."</string>
     <string name="user_add_user" msgid="7876449291500212468">"Προσθήκη χρήστη"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"Προσθήκη επισκέπτη"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"Κατάργηση επισκέπτη"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"Όλη η δραστηριότητα θα διαγραφεί κατά την έξοδο"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"Αποθηκεύστε ή διαγράψτε τη δραστηριότητά σας κατά την έξοδο"</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"Επαναφορά για διαγραφή της δραστηριότητας της περιόδου σύνδεσης ή αποθήκευση ή διαγραφή κατά την έξοδο."</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"Λήψη φωτογραφίας"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"Επιλογή εικόνας"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"Επιλογή φωτογραφίας"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"Πάρα πολλές ανεπιτυχείς προσπάθειες. Τα δεδομένα αυτής της συσκευής θα διαγραφούν."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"Πάρα πολλές ανεπιτυχείς προσπάθειες. Αυτός ο χρήστης θα διαγραφεί."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"Το Ethernet αποσυνδέθηκε."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"Ethernet."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"Χωρίς κλήσεις."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"Επιλογή φωτογραφ­ίας προφίλ"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"Προεπιλεγμένο εικονίδιο χρήστη"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Φυσικό πληκτρολόγιο"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Επιλέξτε διάταξη πληκτρολογίου"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Προεπιλογή"</string>

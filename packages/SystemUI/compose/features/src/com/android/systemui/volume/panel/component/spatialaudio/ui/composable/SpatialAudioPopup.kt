@@ -16,12 +16,14 @@
 
 package com.android.systemui.volume.panel.component.spatialaudio.ui.composable
 
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import com.android.systemui.animation.Expandable
@@ -49,6 +51,7 @@ constructor(
     @Composable
     private fun Title() {
         Text(
+            modifier = Modifier.basicMarquee(),
             text = stringResource(R.string.volume_panel_spatial_audio_title),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
@@ -71,9 +74,11 @@ constructor(
         }
         VolumePanelRadioButtonBar {
             for (buttonViewModel in enabledModelStates) {
+                val label = buttonViewModel.button.label.toString()
                 item(
                     isSelected = buttonViewModel.button.isChecked,
                     onItemSelected = { viewModel.setEnabled(buttonViewModel.model) },
+                    contentDescription = label,
                     icon = {
                         Icon(
                             icon = buttonViewModel.button.icon,
@@ -82,9 +87,12 @@ constructor(
                     },
                     label = {
                         Text(
-                            text = buttonViewModel.button.label.toString(),
+                            modifier = Modifier.basicMarquee(),
+                            text = label,
                             style = MaterialTheme.typography.labelMedium,
                             color = buttonViewModel.labelColor.toColor(),
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
                         )
                     }
                 )

@@ -28,7 +28,6 @@ import com.android.systemui.bouncer.data.repository.fakeSimBouncerRepository
 import com.android.systemui.bouncer.domain.interactor.bouncerInteractor
 import com.android.systemui.bouncer.domain.interactor.simBouncerInteractor
 import com.android.systemui.coroutines.collectLastValue
-import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.sceneInteractor
@@ -254,7 +253,14 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onAutoConfirm_whenCorrect() =
         testScope.runTest {
+            // TODO(b/332768183) remove this after the bug if fixed.
+            // Collect the flow so that it is hot, in the real application this is done by using a
+            // refreshingFlow that relies on the UI to make this flow hot.
+            val autoConfirmEnabled by
+                collectLastValue(authenticationInteractor.isAutoConfirmEnabled)
             kosmos.fakeAuthenticationRepository.setAutoConfirmFeatureEnabled(true)
+
+            assertThat(autoConfirmEnabled).isTrue()
             val authResult by collectLastValue(authenticationInteractor.onAuthenticationResult)
             lockDeviceAndOpenPinBouncer()
 
@@ -266,9 +272,17 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onAutoConfirm_whenWrong() =
         testScope.runTest {
+            // TODO(b/332768183) remove this after the bug if fixed.
+            // Collect the flow so that it is hot, in the real application this is done by using a
+            // refreshingFlow that relies on the UI to make this flow hot.
+            val autoConfirmEnabled by
+                collectLastValue(authenticationInteractor.isAutoConfirmEnabled)
+
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
             kosmos.fakeAuthenticationRepository.setAutoConfirmFeatureEnabled(true)
+
+            assertThat(autoConfirmEnabled).isTrue()
             lockDeviceAndOpenPinBouncer()
 
             FakeAuthenticationRepository.DEFAULT_PIN.dropLast(1).forEach { digit ->
@@ -388,7 +402,6 @@ class PinBouncerViewModelTest : SysuiTestCase() {
 
     private fun TestScope.lockDeviceAndOpenPinBouncer() {
         kosmos.fakeAuthenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-        kosmos.fakeDeviceEntryRepository.setUnlocked(false)
         switchToScene(Scenes.Bouncer)
     }
 

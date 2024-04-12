@@ -36,6 +36,7 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.app.animation.Interpolators
+import com.android.app.tracing.coroutines.launch
 import com.android.keyguard.EmergencyCarrierArea
 import com.android.settingslib.Utils
 import com.android.systemui.animation.ActivityTransitionAnimator
@@ -62,7 +63,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 /**
  * Binds a keyguard bottom area view to its view-model.
@@ -78,6 +78,7 @@ object KeyguardBottomAreaViewBinder {
     private const val EXIT_DOZE_BUTTON_REVEAL_ANIMATION_DURATION_MS = 250L
     private const val SCALE_SELECTED_BUTTON = 1.23f
     private const val DIM_ALPHA = 0.3f
+    private const val TAG = "KeyguardBottomAreaViewBinder"
 
     /**
      * Defines interface for an object that acts as the binding between the view and its view-model.
@@ -174,7 +175,7 @@ object KeyguardBottomAreaViewBinder {
             view.repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     // If updated, be sure to update [KeyguardQuickAffordanceViewBinder.kt]
-                    launch {
+                    launch("$TAG#viewModel.startButton") {
                         viewModel.startButton.collect { buttonModel ->
                             updateButton(
                                 view = startButton,
@@ -187,7 +188,7 @@ object KeyguardBottomAreaViewBinder {
                     }
 
                     // If updated, be sure to update [KeyguardQuickAffordanceViewBinder.kt]
-                    launch {
+                    launch("$TAG#viewModel.endButton") {
                         viewModel.endButton.collect { buttonModel ->
                             updateButton(
                                 view = endButton,
@@ -199,7 +200,7 @@ object KeyguardBottomAreaViewBinder {
                         }
                     }
 
-                    launch {
+                    launch("$TAG#viewModel.isOverlayContainerVisible") {
                         viewModel.isOverlayContainerVisible.collect { isVisible ->
                             overlayContainer.visibility =
                                 if (isVisible) {
@@ -220,7 +221,7 @@ object KeyguardBottomAreaViewBinder {
                         }
                     }
 
-                    launch {
+                    launch("$TAG#viewModel.alpha") {
                         viewModel.alpha.collect { alpha ->
                             ambientIndicationArea?.apply {
                                 this.importantForAccessibility =
@@ -236,7 +237,7 @@ object KeyguardBottomAreaViewBinder {
                     }
 
                     // If updated, be sure to update [KeyguardQuickAffordanceViewBinder.kt]
-                    launch {
+                    launch("$TAG#updateButtonAlpha") {
                         updateButtonAlpha(
                             view = startButton,
                             viewModel = viewModel.startButton,
@@ -245,7 +246,7 @@ object KeyguardBottomAreaViewBinder {
                     }
 
                     // If updated, be sure to update [KeyguardQuickAffordanceViewBinder.kt]
-                    launch {
+                    launch("$TAG#updateButtonAlpha") {
                         updateButtonAlpha(
                             view = endButton,
                             viewModel = viewModel.endButton,
@@ -253,13 +254,13 @@ object KeyguardBottomAreaViewBinder {
                         )
                     }
 
-                    launch {
+                    launch("$TAG#viewModel.indicationAreaTranslationX") {
                         viewModel.indicationAreaTranslationX.collect { translationX ->
                             ambientIndicationArea?.translationX = translationX
                         }
                     }
 
-                    launch {
+                    launch("$TAG#viewModel.indicationAreaTranslationY") {
                         configurationBasedDimensions
                             .map { it.defaultBurnInPreventionYOffsetPx }
                             .flatMapLatest { defaultBurnInOffsetY ->
@@ -271,7 +272,7 @@ object KeyguardBottomAreaViewBinder {
                     }
 
                     // If updated, be sure to update [KeyguardQuickAffordanceViewBinder.kt]
-                    launch {
+                    launch("$TAG#startButton.updateLayoutParams<ViewGroup") {
                         configurationBasedDimensions.collect { dimensions ->
                             startButton.updateLayoutParams<ViewGroup.LayoutParams> {
                                 width = dimensions.buttonSizePx.width
@@ -284,7 +285,7 @@ object KeyguardBottomAreaViewBinder {
                         }
                     }
 
-                    launch {
+                    launch("$TAG#viewModel.settingsMenuViewModel") {
                         viewModel.settingsMenuViewModel.isVisible.distinctUntilChanged().collect {
                             isVisible ->
                             settingsMenu.animateVisibility(visible = isVisible)
@@ -311,7 +312,7 @@ object KeyguardBottomAreaViewBinder {
                     // shows up in the Wallpaper Picker app. If we do that, then the
                     // settings menu should never be visible.
                     if (activityStarter != null) {
-                        launch {
+                        launch("$TAG#viewModel.settingsMenuViewModel") {
                             viewModel.settingsMenuViewModel.shouldOpenSettings
                                 .filter { it }
                                 .collect {

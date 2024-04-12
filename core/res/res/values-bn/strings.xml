@@ -84,7 +84,7 @@
     <string name="NetworkPreferenceSwitchTitle" msgid="1008329951315753038">"মোবাইল নেটওয়ার্কে কানেক্ট করা যাচ্ছে না"</string>
     <string name="NetworkPreferenceSwitchSummary" msgid="2086506181486324860">"পছন্দের নেটওয়ার্ক পরিবর্তন করে দেখুন। অন্য নেটওয়ার্ক বেছে নিতে ট্যাপ করুন।"</string>
     <string name="EmergencyCallWarningTitle" msgid="1615688002899152860">"জরুরি কল করা যাবে না"</string>
-    <string name="EmergencyCallWarningSummary" msgid="1194185880092805497">"ওয়াই-ফাইয়ের মাধ্যমে জরুরি কল করা যাবে না"</string>
+    <string name="EmergencyCallWarningSummary" msgid="9102799172089265268">"জরুরি কলের জন্য মোবাইল নেটওয়ার্ক থাকতে হবে"</string>
     <string name="notification_channel_network_alert" msgid="4788053066033851841">"সতর্কতা"</string>
     <string name="notification_channel_call_forward" msgid="8230490317314272406">"কল ফরওয়ার্ড করা"</string>
     <string name="notification_channel_emergency_callback" msgid="54074839059123159">"জরুরি কলব্যাক মোড"</string>
@@ -1183,6 +1183,8 @@
     <string name="deleteText" msgid="4200807474529938112">"মুছুন"</string>
     <string name="inputMethod" msgid="1784759500516314751">"ইনপুট পদ্ধতি"</string>
     <string name="editTextMenuTitle" msgid="857666911134482176">"পাঠ্য ক্রিয়াগুলি"</string>
+    <string name="error_handwriting_unsupported" msgid="7809438534946014050">"এই ফিল্ডে হাতের লেখা কাজ করে না"</string>
+    <string name="error_handwriting_unsupported_password" msgid="5095401146106891087">"পাসওয়ার্ডের ফিল্ডে হাতের লেখা কাজ করে না"</string>
     <string name="input_method_nav_back_button_desc" msgid="3655838793765691787">"ফিরে যান"</string>
     <string name="input_method_ime_switch_button_desc" msgid="2736542240252198501">"ইনপুট পদ্ধতি পাল্টান"</string>
     <string name="low_internal_storage_view_title" msgid="9024241779284783414">"স্টোরেজ পূর্ণ হতে চলেছে"</string>
@@ -1718,7 +1720,7 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"উভয় ভলিউম কী কয়েক সেকেন্ড ধরে থাকলে <xliff:g id="SERVICE">%1$s</xliff:g> চালু হয়ে যাবে। এটি একটি অ্যাক্সেসিবিলিটি ফিচার। এর ফলে, আপনার ডিভাইস কীভাবে কাজ করবে সেটিতে পরিবর্তন হতে পারে।\n\nসেটিংস &gt; অ্যাক্সেসিবিলিটি থেকে আপনি এই শর্টকাট পরিবর্তন করতে পারবেন।"</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"চালু করুন"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"চালু করবেন না"</string>
-    <string name="accessibility_shortcut_menu_item_status_on" msgid="6608392117189732543">"চালু"</string>
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6608392117189732543">"চালু আছে"</string>
     <string name="accessibility_shortcut_menu_item_status_off" msgid="5531598275559472393">"বন্ধ"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"<xliff:g id="SERVICE">%1$s</xliff:g> অ্যাপটিকে আপনার ডিভাইসে সম্পূর্ণ নিয়ন্ত্রণের অনুমতি দিতে চান?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"যে অ্যাপগুলি আপনাকে অ্যাক্সেসিবিলিটির প্রয়োজন মেটাতে সাহায্য করে সেই অ্যাপগুলির জন্য সম্পূর্ণ নিয়ন্ত্রণের বিষয়টি উপযুক্ত, কিন্তু তা বলে সমস্ত অ্যাপের জন্য নয়।"</string>
@@ -1927,6 +1929,9 @@
     <string name="zen_mode_implicit_trigger_description" msgid="5714956693073007111">"<xliff:g id="APP_NAME">%1$s</xliff:g> ম্যানেজ করে"</string>
     <string name="zen_mode_implicit_activated" msgid="2634285680776672994">"চালু আছে"</string>
     <string name="zen_mode_implicit_deactivated" msgid="8688441768371501750">"বন্ধ আছে"</string>
+    <string name="zen_mode_trigger_summary_divider_text" msgid="7461583466043698862">", "</string>
+    <string name="zen_mode_trigger_summary_range_symbol_combination" msgid="1804900738798069619">"<xliff:g id="START">%1$s</xliff:g> - <xliff:g id="END">%2$s</xliff:g>"</string>
+    <string name="zen_mode_trigger_event_calendar_any" msgid="2086784607921121803">"যেকোনও ক্যালেন্ডার"</string>
     <string name="muted_by" msgid="91464083490094950">"<xliff:g id="THIRD_PARTY">%1$s</xliff:g> কিছু সাউন্ডকে মিউট করে দিচ্ছে"</string>
     <string name="system_error_wipe_data" msgid="5910572292172208493">"আপনার ডিভাইসে একটি অভ্যন্তরীন সমস্যা হয়েছে, এবং আপনি যতক্ষণ না পর্যন্ত এটিকে ফ্যাক্টরি ডেটা রিসেট করছেন ততক্ষণ এটি ঠিকভাবে কাজ নাও করতে পারে৷"</string>
     <string name="system_error_manufacturer" msgid="703545241070116315">"আপনার ডিভাইসে একটি অভ্যন্তরীন সমস্যা হয়েছে৷ বিস্তারিত জানার জন্য প্রস্তুতকারকের সাথে যোগাযোগ করুন৷"</string>
@@ -2389,6 +2394,8 @@
     <string name="profile_label_test" msgid="9168641926186071947">"পরীক্ষা"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"কমিউনাল"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
+    <!-- no translation found for screen_not_shared_sensitive_content (7058419185079565001) -->
+    <skip />
     <string name="satellite_notification_title" msgid="4026338973463121526">"স্যাটেলাইটের সাথে অটোমেটিক কানেক্ট করা হয়েছে"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"আপনি কোনও মেবাইল বা ওয়াই-ফাই নেটওয়ার্ক ছাড়াই মেসেজ পাঠাতে ও পেতে পারবেন"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Messages খুলুন"</string>

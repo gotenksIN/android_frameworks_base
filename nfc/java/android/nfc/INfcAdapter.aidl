@@ -31,6 +31,7 @@ import android.nfc.INfcVendorNciCallback;
 import android.nfc.INfcTag;
 import android.nfc.INfcCardEmulation;
 import android.nfc.INfcFCardEmulation;
+import android.nfc.INfcOemExtensionCallback;
 import android.nfc.INfcUnlockHandler;
 import android.nfc.ITagRemovedCallback;
 import android.nfc.INfcDta;
@@ -53,8 +54,8 @@ interface INfcAdapter
     IBinder getNfcAdapterVendorInterface(in String vendor);
 
     int getState();
-    boolean disable(boolean saveState);
-    boolean enable();
+    boolean disable(boolean saveState, in String pkg);
+    boolean enable(in String pkg);
     void pausePolling(int timeoutInMs);
     void resumePolling();
 
@@ -111,4 +112,7 @@ interface INfcAdapter
     int sendVendorNciMessage(int mt, int gid, int oid, in byte[] payload);
     void registerVendorExtensionCallback(in INfcVendorNciCallback callbacks);
     void unregisterVendorExtensionCallback(in INfcVendorNciCallback callbacks);
+    void registerOemExtensionCallback(INfcOemExtensionCallback callbacks);
+    void unregisterOemExtensionCallback(INfcOemExtensionCallback callbacks);
+    void clearPreference();
 }

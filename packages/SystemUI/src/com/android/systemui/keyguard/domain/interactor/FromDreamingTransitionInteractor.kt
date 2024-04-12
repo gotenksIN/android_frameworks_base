@@ -29,17 +29,15 @@ import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
 import com.android.systemui.keyguard.shared.model.DozeStateModel
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.power.domain.interactor.PowerInteractor
-import com.android.systemui.util.kotlin.Utils
 import com.android.systemui.util.kotlin.Utils.Companion.sample as sampleCombine
-import com.android.systemui.util.kotlin.Utils.Companion.toTriple
-import com.android.systemui.util.kotlin.sample
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 @SysUISingleton
@@ -110,6 +108,7 @@ constructor(
         }
     }
 
+    @OptIn(FlowPreview::class)
     private fun listenForDreamingToOccluded() {
         if (KeyguardWmStateRefactor.isEnabled) {
             scope.launch {
@@ -118,28 +117,30 @@ constructor(
                         keyguardOcclusionInteractor.isShowWhenLockedActivityOnTop,
                         ::Pair
                     )
-                    .sample(startedKeyguardTransitionStep, ::toTriple)
-                    .filter { (isDreaming, _, startedStep) ->
-                        !isDreaming && startedStep.to == KeyguardState.DREAMING
-                    }
+                    .filterRelevantKeyguardStateAnd { (isDreaming, _) -> !isDreaming }
                     .collect { maybeStartTransitionToOccludedOrInsecureCamera() }
             }
         } else {
             scope.launch {
                 combine(
                         keyguardInteractor.isKeyguardOccluded,
-                        keyguardInteractor.isDreaming,
+                        keyguardInteractor.isDreaming
+                            // Debounce the dreaming signal since there is a race condition between
+                            // the occluded and dreaming signals. We therefore add a small delay
+                            // to give enough time for occluded to flip to false when the dream
+                            // ends, to avoid transitioning to OCCLUDED erroneously when exiting
+                            // the dream.
+                            .debounce(100.milliseconds),
                         ::Pair
                     )
-                    .sample(startedKeyguardTransitionStep, Utils.Companion::toTriple)
-                    .collect { (isOccluded, isDreaming, lastStartedTransition) ->
-                        if (
-                            isOccluded &&
-                                !isDreaming &&
-                                lastStartedTransition.to == KeyguardState.DREAMING
-                        ) {
-                            startTransitionTo(KeyguardState.OCCLUDED)
-                        }
+                    .filterRelevantKeyguardStateAnd { (isOccluded, isDreaming) ->
+                        isOccluded && !isDreaming
+                    }
+                    .collect {
+                        startTransitionTo(
+                            toState = KeyguardState.OCCLUDED,
+                            ownerReason = "Occluded but no longer dreaming",
+                        )
                     }
             }
         }
@@ -152,13 +153,8 @@ constructor(
 
         scope.launch {
             keyguardOcclusionInteractor.isShowWhenLockedActivityOnTop
-                .filter { onTop -> !onTop }
-                .sample(startedKeyguardState)
-                .collect { startedState ->
-                    if (startedState == KeyguardState.DREAMING) {
-                        startTransitionTo(KeyguardState.LOCKSCREEN)
-                    }
-                }
+                .filterRelevantKeyguardStateAnd { onTop -> !onTop }
+                .collect { startTransitionTo(KeyguardState.LOCKSCREEN) }
         }
     }
 
@@ -168,49 +164,35 @@ constructor(
                 .sampleCombine(
                     keyguardInteractor.isKeyguardShowing,
                     keyguardInteractor.isKeyguardDismissible,
-                    startedKeyguardTransitionStep,
                 )
-                .collect {
-                    (isDreaming, isKeyguardShowing, isKeyguardDismissible, lastStartedTransition) ->
-                    if (
-                        !isDreaming &&
-                            lastStartedTransition.to == KeyguardState.DREAMING &&
-                            isKeyguardDismissible &&
-                            !isKeyguardShowing
-                    ) {
-                        startTransitionTo(KeyguardState.GONE)
-                    }
+                .filterRelevantKeyguardStateAnd {
+                    (isDreaming, isKeyguardShowing, isKeyguardDismissible) ->
+                    !isDreaming && isKeyguardDismissible && !isKeyguardShowing
                 }
+                .collect { startTransitionTo(KeyguardState.GONE) }
         }
     }
 
     private fun listenForDreamingToGoneFromBiometricUnlock() {
         scope.launch {
             keyguardInteractor.biometricUnlockState
-                .sample(startedKeyguardTransitionStep, ::Pair)
-                .collect { (biometricUnlockState, lastStartedTransitionStep) ->
-                    if (
-                        lastStartedTransitionStep.to == KeyguardState.DREAMING &&
-                            biometricUnlockState == BiometricUnlockModel.WAKE_AND_UNLOCK_FROM_DREAM
-                    ) {
-                        startTransitionTo(KeyguardState.GONE)
-                    }
+                .filterRelevantKeyguardStateAnd { biometricUnlockState ->
+                    biometricUnlockState == BiometricUnlockModel.WAKE_AND_UNLOCK_FROM_DREAM
                 }
+                .collect { startTransitionTo(KeyguardState.GONE) }
         }
     }
 
     private fun listenForDreamingToAodOrDozing() {
         scope.launch {
-            combine(keyguardInteractor.dozeTransitionModel, finishedKeyguardState, ::Pair)
-                .collect { (dozeTransitionModel, keyguardState) ->
-                    if (keyguardState == KeyguardState.DREAMING) {
-                        if (dozeTransitionModel.to == DozeStateModel.DOZE) {
-                            startTransitionTo(KeyguardState.DOZING)
-                        } else if (dozeTransitionModel.to == DozeStateModel.DOZE_AOD) {
-                            startTransitionTo(KeyguardState.AOD)
-                        }
-                    }
+            keyguardInteractor.dozeTransitionModel.filterRelevantKeyguardState().collect {
+                dozeTransitionModel ->
+                if (dozeTransitionModel.to == DozeStateModel.DOZE) {
+                    startTransitionTo(KeyguardState.DOZING)
+                } else if (dozeTransitionModel.to == DozeStateModel.DOZE_AOD) {
+                    startTransitionTo(KeyguardState.AOD)
                 }
+            }
         }
     }
 

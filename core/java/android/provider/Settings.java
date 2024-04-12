@@ -16,6 +16,8 @@
 
 package android.provider;
 
+import static android.app.Flags.systemTermsOfAddressEnabled;
+
 import android.Manifest;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
@@ -37,6 +39,7 @@ import android.app.ActivityThread;
 import android.app.AppOpsManager;
 import android.app.Application;
 import android.app.AutomaticZenRule;
+import android.app.GrammaticalInflectionManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.SearchManager;
@@ -693,6 +696,8 @@ public final class Settings {
      * Output: When a package data uri is passed as input, the activity result is set to
      * {@link android.app.Activity#RESULT_OK} if the permission was granted to the app. Otherwise,
      * the result is set to {@link android.app.Activity#RESULT_CANCELED}.
+     *
+     * @hide
      */
     @FlaggedApi(Flags.FLAG_BACKUP_TASKS_SETTINGS_SCREEN)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
@@ -997,6 +1002,21 @@ public final class Settings {
             "android.settings.BLUETOOTH_SETTINGS";
 
     /**
+     * Activity Action: Show settings to allow configuration of Hearing Devices.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_HEARING_DEVICES_SETTINGS =
+            "android.settings.HEARING_DEVICES_SETTINGS";
+
+    /**
      * Activity action: Show Settings app search UI when this action is available for device.
      * <p>
      * Input: Nothing.
@@ -1244,6 +1264,22 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_BLUETOOTH_PAIRING_SETTINGS =
             "android.settings.BLUETOOTH_PAIRING_SETTINGS";
+
+    /**
+     * Activity Action: Show settings to allow pairing hearing devices.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_HEARING_DEVICE_PAIRING_SETTINGS =
+            "android.settings.HEARING_DEVICES_PAIRING_SETTINGS";
 
     /**
      * Activity Action: Show settings to configure input methods, in particular
@@ -1564,23 +1600,6 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS =
             "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS";
-
-    /**
-     * Activity Action: Show screen for controlling any background restrictions imposed on
-     * an app. If the system returns true for
-     * {@link android.app.ActivityManager#isBackgroundRestricted()}, and the app is not able to
-     * satisfy user requests due to being restricted in the background, then this intent can be
-     * used to request the user to unrestrict the app.
-     * <p>
-     * Input: The Intent's data URI must specify the application package name
-     *        to be shown, with the "package" scheme, such as "package:com.my.app".
-     * <p>
-     * Output: Nothing.
-     */
-    @FlaggedApi(android.app.Flags.FLAG_APP_RESTRICTIONS_API)
-    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
-    public static final String ACTION_BACKGROUND_RESTRICTIONS_SETTINGS =
-            "android.settings.BACKGROUND_RESTRICTIONS_SETTINGS";
 
     /**
      * Activity Action: Open the advanced power usage details page of an associated app.
@@ -4596,6 +4615,13 @@ public final class Settings {
             }
             outConfig.fontWeightAdjustment = Settings.Secure.getIntForUser(
                     cr, Settings.Secure.FONT_WEIGHT_ADJUSTMENT, DEFAULT_FONT_WEIGHT, userHandle);
+            if (systemTermsOfAddressEnabled()) {
+                GrammaticalInflectionManager manager =
+                        ActivityThread.currentApplication().getApplicationContext()
+                                .getSystemService(GrammaticalInflectionManager.class);
+                outConfig.setGrammaticalGender(
+                        manager.peekSystemGrammaticalGenderByUserId(userHandle));
+            }
 
             final String localeValue =
                     Settings.System.getStringForUser(cr, SYSTEM_LOCALES, userHandle);
@@ -7990,6 +8016,7 @@ public final class Settings {
          *
          * @hide
          */
+        @Readable
         public static final String ACCESSIBILITY_BOUNCE_KEYS = "accessibility_bounce_keys";
 
         /**
@@ -8001,6 +8028,7 @@ public final class Settings {
          *
          * @hide
          */
+        @Readable
         public static final String ACCESSIBILITY_SLOW_KEYS = "accessibility_slow_keys";
 
         /**
@@ -8010,6 +8038,7 @@ public final class Settings {
          *
          * @hide
          */
+        @Readable
         public static final String ACCESSIBILITY_STICKY_KEYS = "accessibility_sticky_keys";
 
         /**
@@ -10210,6 +10239,13 @@ public final class Settings {
                 "screensaver_complications_enabled";
 
         /**
+         * Defines the enabled state for the glanceable hub.
+         *
+         * @hide
+         */
+        public static final String GLANCEABLE_HUB_ENABLED = "glanceable_hub_enabled";
+
+        /**
          * Whether home controls are enabled to be shown over the screensaver by the user.
          *
          * @hide
@@ -10955,12 +10991,28 @@ public final class Settings {
                 "biometric_debug_enabled";
 
         /**
-         * Whether or not virtual sensors are enabled.
+         * Whether or not both fingerprint and face virtual sensors are enabled.
          * @hide
          */
         @TestApi
         @Readable
         public static final String BIOMETRIC_VIRTUAL_ENABLED = "biometric_virtual_enabled";
+
+        /**
+         * Whether or not fingerprint virtual sensors are enabled.
+         * @hide
+         */
+        @FlaggedApi("com.android.server.biometrics.face_vhal_feature")
+        public static final String BIOMETRIC_FINGERPRINT_VIRTUAL_ENABLED =
+                "biometric_fingerprint_virtual_enabled";
+
+        /**
+         * Whether or not face virtual sensors are enabled.
+         * @hide
+         */
+        @FlaggedApi("com.android.server.biometrics.face_vhal_feature")
+        public static final String BIOMETRIC_FACE_VIRTUAL_ENABLED =
+                "biometric_face_virtual_enabled";
 
         /**
          * Whether or not biometric is allowed on Keyguard.
@@ -11184,6 +11236,32 @@ public final class Settings {
          */
         @Readable
         public static final String DISPLAY_WHITE_BALANCE_ENABLED = "display_white_balance_enabled";
+
+        /**
+         * Used by DisplayManager to backup/restore the user-selected resolution mode.
+         * @hide
+         */
+        @Readable
+        public static final String SCREEN_RESOLUTION_MODE = "screen_resolution_mode";
+
+        /**
+         * Resolution Mode Constants for SCREEN_RESOLUTION_MODE setting.
+         *
+         * @hide
+         */
+        @IntDef(prefix = { "RESOLUTION_MODE_" }, value = {
+                RESOLUTION_MODE_UNKNOWN,
+                RESOLUTION_MODE_HIGH,
+                RESOLUTION_MODE_FULL
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface ResolutionMode {}
+        /** @hide */
+        public static final int RESOLUTION_MODE_UNKNOWN = 0;
+        /** @hide */
+        public static final int RESOLUTION_MODE_HIGH = 1;
+        /** @hide */
+        public static final int RESOLUTION_MODE_FULL = 2;
 
         /**
          * Names of the service components that the current user has explicitly allowed to
@@ -12426,7 +12504,7 @@ public final class Settings {
         /** @hide */
         public static final int PRIVATE_SPACE_AUTO_LOCK_AFTER_INACTIVITY = 1;
         /** @hide */
-        public static final int PRIVATE_SPACE_AUTO_LOCK_NEVER = 2;
+        public static final int PRIVATE_SPACE_AUTO_LOCK_AFTER_DEVICE_RESTART = 2;
 
         /**
          * The different auto lock options for private space.
@@ -12436,7 +12514,7 @@ public final class Settings {
         @IntDef(prefix = {"PRIVATE_SPACE_AUTO_LOCK_"}, value = {
                 PRIVATE_SPACE_AUTO_LOCK_ON_DEVICE_LOCK,
                 PRIVATE_SPACE_AUTO_LOCK_AFTER_INACTIVITY,
-                PRIVATE_SPACE_AUTO_LOCK_NEVER,
+                PRIVATE_SPACE_AUTO_LOCK_AFTER_DEVICE_RESTART,
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface PrivateSpaceAutoLockOption {
@@ -15907,41 +15985,6 @@ public final class Settings {
         @Readable
         public static final String FORCED_APP_STANDBY_FOR_SMALL_BATTERY_ENABLED
                 = "forced_app_standby_for_small_battery_enabled";
-
-        /**
-         * Whether to enable the TARE subsystem or not.
-         * Valid values are
-         * {@link android.app.tare.EconomyManager#ENABLE_TARE_ON EconomyManager.ENABLE_TARE_*}.
-         *
-         * @hide
-         */
-        public static final String ENABLE_TARE = "enable_tare";
-
-        /**
-         * Whether to show the TARE page in Developer Options or not.
-         * 1 = true, everything else = false
-         *
-         * @hide
-         */
-        public static final String SHOW_TARE_DEVELOPER_OPTIONS = "show_tare_developer_options";
-
-        /**
-         * Settings for AlarmManager's TARE EconomicPolicy (list of its economic factors).
-         *
-         * Keys are listed in {@link android.app.tare.EconomyManager}.
-         *
-         * @hide
-         */
-        public static final String TARE_ALARM_MANAGER_CONSTANTS = "tare_alarm_manager_constants";
-
-        /**
-         * Settings for JobScheduler's TARE EconomicPolicy (list of its economic factors).
-         *
-         * Keys are listed in {@link android.app.tare.EconomyManager}.
-         *
-         * @hide
-         */
-        public static final String TARE_JOB_SCHEDULER_CONSTANTS = "tare_job_scheduler_constants";
 
         /**
          * Whether or not to enable the User Absent, Radios Off feature on small battery devices.

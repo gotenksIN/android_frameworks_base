@@ -30,6 +30,7 @@ import android.annotation.RequiresPermission;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
 import android.app.ForegroundServiceDelegationOptions;
+import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
@@ -89,6 +90,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -429,28 +431,9 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             int stream = getVolumeStream(mAudioAttrs);
             final int volumeValue = value;
             mHandler.post(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                mAudioManager.setStreamVolumeForUid(
-                                        stream,
-                                        volumeValue,
-                                        flags,
-                                        opPackageName,
-                                        uid,
-                                        pid,
-                                        mContext.getApplicationInfo().targetSdkVersion);
-                            } catch (IllegalArgumentException | SecurityException e) {
-                                Slog.e(
-                                        TAG,
-                                        "Cannot set volume: stream=" + stream
-                                                + ", value=" + volumeValue
-                                                + ", flags=" + flags,
-                                        e);
-                            }
-                        }
-                    });
+                    () ->
+                            setStreamVolumeForUid(
+                                    opPackageName, pid, uid, flags, stream, volumeValue));
         } else {
             if (mVolumeControlType != VOLUME_CONTROL_ABSOLUTE) {
                 if (DEBUG) {
@@ -477,6 +460,27 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
             // Always notify, even if the volume hasn't changed.
             mService.notifyRemoteVolumeChanged(flags, this);
+        }
+    }
+
+    private void setStreamVolumeForUid(
+            String opPackageName, int pid, int uid, int flags, int stream, int volumeValue) {
+        try {
+            mAudioManager.setStreamVolumeForUid(
+                    stream,
+                    volumeValue,
+                    flags,
+                    opPackageName,
+                    uid,
+                    pid,
+                    mContext.getApplicationInfo().targetSdkVersion);
+        } catch (IllegalArgumentException | SecurityException e) {
+            Slog.e(
+                    TAG,
+                    "Cannot set volume: stream=" + stream
+                            + ", value=" + volumeValue
+                            + ", flags=" + flags,
+                    e);
         }
     }
 
@@ -639,6 +643,15 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
     }
 
     @Override
+    boolean isLinkedToNotification(Notification notification) {
+        return notification.isMediaNotification()
+                && Objects.equals(
+                        notification.extras.getParcelable(
+                                Notification.EXTRA_MEDIA_SESSION, MediaSession.Token.class),
+                        mSessionToken);
+    }
+
+    @Override
     public int getSessionPolicies() {
         synchronized (mLock) {
             return mPolicies;
@@ -738,52 +751,70 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             pid = callingPid;
         }
         mHandler.post(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            if (useSuggested) {
-                                if (AudioSystem.isStreamActive(stream, 0)) {
-                                    mAudioManager.adjustSuggestedStreamVolumeForUid(
-                                            stream,
-                                            direction,
-                                            flags,
-                                            opPackageName,
-                                            uid,
-                                            pid,
-                                            mContext.getApplicationInfo().targetSdkVersion);
-                                } else {
-                                    mAudioManager.adjustSuggestedStreamVolumeForUid(
-                                            AudioManager.USE_DEFAULT_STREAM_TYPE,
-                                            direction,
-                                            flags | previousFlagPlaySound,
-                                            opPackageName,
-                                            uid,
-                                            pid,
-                                            mContext.getApplicationInfo().targetSdkVersion);
-                                }
-                            } else {
-                                mAudioManager.adjustStreamVolumeForUid(
-                                        stream,
-                                        direction,
-                                        flags,
-                                        opPackageName,
-                                        uid,
-                                        pid,
-                                        mContext.getApplicationInfo().targetSdkVersion);
-                            }
-                        } catch (IllegalArgumentException | SecurityException e) {
-                            Slog.e(
-                                    TAG,
-                                    "Cannot adjust volume: direction=" + direction
-                                            + ", stream=" + stream + ", flags=" + flags
-                                            + ", opPackageName=" + opPackageName + ", uid=" + uid
-                                            + ", useSuggested=" + useSuggested
-                                            + ", previousFlagPlaySound=" + previousFlagPlaySound,
-                                    e);
-                        }
-                    }
-                });
+                () ->
+                        adjustSuggestedStreamVolumeForUid(
+                                stream,
+                                direction,
+                                flags,
+                                useSuggested,
+                                previousFlagPlaySound,
+                                opPackageName,
+                                uid,
+                                pid));
+    }
+
+    private void adjustSuggestedStreamVolumeForUid(
+            int stream,
+            int direction,
+            int flags,
+            boolean useSuggested,
+            int previousFlagPlaySound,
+            String opPackageName,
+            int uid,
+            int pid) {
+        try {
+            if (useSuggested) {
+                if (AudioSystem.isStreamActive(stream, 0)) {
+                    mAudioManager.adjustSuggestedStreamVolumeForUid(
+                            stream,
+                            direction,
+                            flags,
+                            opPackageName,
+                            uid,
+                            pid,
+                            mContext.getApplicationInfo().targetSdkVersion);
+                } else {
+                    mAudioManager.adjustSuggestedStreamVolumeForUid(
+                            AudioManager.USE_DEFAULT_STREAM_TYPE,
+                            direction,
+                            flags | previousFlagPlaySound,
+                            opPackageName,
+                            uid,
+                            pid,
+                            mContext.getApplicationInfo().targetSdkVersion);
+                }
+            } else {
+                mAudioManager.adjustStreamVolumeForUid(
+                        stream,
+                        direction,
+                        flags,
+                        opPackageName,
+                        uid,
+                        pid,
+                        mContext.getApplicationInfo().targetSdkVersion);
+            }
+        } catch (IllegalArgumentException | SecurityException e) {
+            Slog.e(
+                    TAG,
+                    "Cannot adjust volume: direction=" + direction
+                            + ", stream=" + stream
+                            + ", flags=" + flags
+                            + ", opPackageName=" + opPackageName
+                            + ", uid=" + uid
+                            + ", useSuggested=" + useSuggested
+                            + ", previousFlagPlaySound=" + previousFlagPlaySound,
+                    e);
+        }
     }
 
     private void logCallbackException(
@@ -818,7 +849,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         if (deadCallbackHolders != null) {
-            mControllerCallbackHolders.removeAll(deadCallbackHolders);
+            removeControllerHoldersSafely(deadCallbackHolders);
         }
     }
 
@@ -845,7 +876,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         if (deadCallbackHolders != null) {
-            mControllerCallbackHolders.removeAll(deadCallbackHolders);
+            removeControllerHoldersSafely(deadCallbackHolders);
         }
     }
 
@@ -880,7 +911,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         if (deadCallbackHolders != null) {
-            mControllerCallbackHolders.removeAll(deadCallbackHolders);
+            removeControllerHoldersSafely(deadCallbackHolders);
         }
     }
 
@@ -907,7 +938,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         if (deadCallbackHolders != null) {
-            mControllerCallbackHolders.removeAll(deadCallbackHolders);
+            removeControllerHoldersSafely(deadCallbackHolders);
         }
     }
 
@@ -934,7 +965,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         if (deadCallbackHolders != null) {
-            mControllerCallbackHolders.removeAll(deadCallbackHolders);
+            removeControllerHoldersSafely(deadCallbackHolders);
         }
     }
 
@@ -961,7 +992,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         if (deadCallbackHolders != null) {
-            mControllerCallbackHolders.removeAll(deadCallbackHolders);
+            removeControllerHoldersSafely(deadCallbackHolders);
         }
     }
 
@@ -986,7 +1017,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         if (deadCallbackHolders != null) {
-            mControllerCallbackHolders.removeAll(deadCallbackHolders);
+            removeControllerHoldersSafely(deadCallbackHolders);
         }
     }
 
@@ -1011,7 +1042,7 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             }
         }
         // After notifying clear all listeners
-        mControllerCallbackHolders.clear();
+        removeControllerHoldersSafely(null);
     }
 
     private PlaybackState getStateWithUpdatedPosition() {
@@ -1059,6 +1090,17 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
         return -1;
     }
 
+    private void removeControllerHoldersSafely(
+            Collection<ISessionControllerCallbackHolder> holders) {
+        synchronized (mLock) {
+            if (holders == null) {
+                mControllerCallbackHolders.clear();
+            } else {
+                mControllerCallbackHolders.removeAll(holders);
+            }
+        }
+    }
+
     private PlaybackInfo getVolumeAttributes() {
         int volumeType;
         AudioAttributes attributes;
@@ -1078,16 +1120,14 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
                 volumeType, VOLUME_CONTROL_ABSOLUTE, max, current, attributes, null);
     }
 
-    private final Runnable mClearOptimisticVolumeRunnable = new Runnable() {
-        @Override
-        public void run() {
-            boolean needUpdate = (mOptimisticVolume != mCurrentVolume);
-            mOptimisticVolume = -1;
-            if (needUpdate) {
-                pushVolumeUpdate();
-            }
-        }
-    };
+    private final Runnable mClearOptimisticVolumeRunnable =
+            () -> {
+                boolean needUpdate = (mOptimisticVolume != mCurrentVolume);
+                mOptimisticVolume = -1;
+                if (needUpdate) {
+                    pushVolumeUpdate();
+                }
+            };
 
     @RequiresPermission(Manifest.permission.INTERACT_ACROSS_USERS)
     private static boolean componentNameExists(

@@ -43,8 +43,6 @@ import android.app.AppOpsManager;
 import android.content.ComponentName;
 import android.content.pm.PackageManager;
 import android.hardware.biometrics.IBiometricService;
-import android.hardware.biometrics.fingerprint.IFingerprint;
-import android.hardware.biometrics.fingerprint.SensorProps;
 import android.hardware.fingerprint.FingerprintAuthenticateOptions;
 import android.hardware.fingerprint.FingerprintSensorConfigurations;
 import android.hardware.fingerprint.FingerprintSensorPropertiesInternal;
@@ -123,10 +121,6 @@ public class FingerprintServiceTest {
     private IBinder mToken;
     @Mock
     private VirtualDeviceManagerInternal mVdmInternal;
-    @Mock
-    private IFingerprint mDefaultFingerprintDaemon;
-    @Mock
-    private IFingerprint mVirtualFingerprintDaemon;
 
     @Captor
     private ArgumentCaptor<FingerprintAuthenticateOptions> mAuthenticateOptionsCaptor;
@@ -145,8 +139,6 @@ public class FingerprintServiceTest {
                     false /* resetLockoutRequiresHardwareAuthToken */);
     private FingerprintSensorConfigurations mFingerprintSensorConfigurations;
     private FingerprintService mService;
-    private final SensorProps mDefaultSensorProps = new SensorProps();
-    private final SensorProps mVirtualSensorProps = new SensorProps();
 
     @Before
     public void setup() throws Exception {
@@ -159,10 +151,6 @@ public class FingerprintServiceTest {
                 .thenAnswer(i -> i.getArguments()[0].equals(ID_DEFAULT));
         when(mFingerprintVirtual.containsSensor(anyInt()))
                 .thenAnswer(i -> i.getArguments()[0].equals(ID_VIRTUAL));
-        when(mDefaultFingerprintDaemon.getSensorProps()).thenReturn(
-                new SensorProps[]{mDefaultSensorProps});
-        when(mVirtualFingerprintDaemon.getSensorProps()).thenReturn(
-                new SensorProps[]{mVirtualSensorProps});
 
         mContext.addMockSystemService(AppOpsManager.class, mAppOpsManager);
         for (int permission : List.of(OP_USE_BIOMETRIC, OP_USE_FINGERPRINT)) {
@@ -177,15 +165,7 @@ public class FingerprintServiceTest {
 
         mFingerprintSensorConfigurations = new FingerprintSensorConfigurations(
                 true /* resetLockoutRequiresHardwareAuthToken */);
-        mFingerprintSensorConfigurations.addAidlSensors(new String[]{NAME_DEFAULT, NAME_VIRTUAL},
-                (name) -> {
-                    if (name.equals(IFingerprint.DESCRIPTOR + "/" + NAME_DEFAULT)) {
-                        return mDefaultFingerprintDaemon;
-                    } else if (name.equals(IFingerprint.DESCRIPTOR + "/" + NAME_VIRTUAL)) {
-                        return mVirtualFingerprintDaemon;
-                    }
-                    return null;
-                });
+        mFingerprintSensorConfigurations.addAidlSensors(new String[]{NAME_DEFAULT, NAME_VIRTUAL});
     }
 
     private void initServiceWith(String... aidlInstances) {
@@ -243,6 +223,18 @@ public class FingerprintServiceTest {
     }
 
     @Test
+    public void registerAuthenticators_virtualFingerprintOnly() throws Exception {
+        initServiceWith(NAME_DEFAULT, NAME_VIRTUAL);
+        Settings.Secure.putInt(mSettingsRule.mockContentResolver(mContext),
+                Settings.Secure.BIOMETRIC_FINGERPRINT_VIRTUAL_ENABLED, 1);
+
+        mService.mServiceWrapper.registerAuthenticators(HIDL_AUTHENTICATORS);
+        waitForRegistration();
+
+        verify(mIBiometricService).registerAuthenticator(eq(ID_VIRTUAL), anyInt(), anyInt(), any());
+    }
+
+    @Test
     @RequiresFlagsEnabled(Flags.FLAG_DE_HIDL)
     public void registerAuthenticatorsLegacy_virtualOnly() throws Exception {
         initServiceWith(NAME_DEFAULT, NAME_VIRTUAL);
@@ -270,15 +262,7 @@ public class FingerprintServiceTest {
     public void registerAuthenticatorsLegacy_virtualAlwaysWhenNoOther() throws Exception {
         mFingerprintSensorConfigurations =
                 new FingerprintSensorConfigurations(true);
-        mFingerprintSensorConfigurations.addAidlSensors(new String[]{NAME_VIRTUAL},
-                        (name) -> {
-                            if (name.equals(IFingerprint.DESCRIPTOR + "/" + NAME_DEFAULT)) {
-                                return mDefaultFingerprintDaemon;
-                            } else if (name.equals(IFingerprint.DESCRIPTOR + "/" + NAME_VIRTUAL)) {
-                                return mVirtualFingerprintDaemon;
-                            }
-                            return null;
-                        });
+        mFingerprintSensorConfigurations.addAidlSensors(new String[]{NAME_VIRTUAL});
         initServiceWith(NAME_VIRTUAL);
 
         mService.mServiceWrapper.registerAuthenticatorsLegacy(mFingerprintSensorConfigurations);

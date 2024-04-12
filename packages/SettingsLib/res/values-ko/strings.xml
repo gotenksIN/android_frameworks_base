@@ -106,6 +106,28 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"활성, 왼쪽만"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"활성, 오른쪽만"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"활성, 왼쪽 및 오른쪽"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"미디어 오디오"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"전화 통화"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"파일 전송"</string>
@@ -145,7 +167,7 @@
     <string name="bluetooth_pairing_decline" msgid="6483118841204885890">"취소"</string>
     <string name="bluetooth_pairing_will_share_phonebook" msgid="3064334458659165176">"페어링하면 연결 시 연락처 및 통화 기록에 액세스할 수 있습니다."</string>
     <string name="bluetooth_pairing_error_message" msgid="6626399020672335565">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>와(과) 페어링하지 못했습니다."</string>
-    <string name="bluetooth_pairing_pin_error_message" msgid="264422127613704940">"PIN 또는 패스키가 잘못되어 <xliff:g id="DEVICE_NAME">%1$s</xliff:g>와 페어링하지 못했습니다."</string>
+    <string name="bluetooth_pairing_pin_error_message" msgid="264422127613704940">"PIN 또는 패스키가 잘못되어 <xliff:g id="DEVICE_NAME">%1$s</xliff:g> 기기와 페어링할 수 없습니다."</string>
     <string name="bluetooth_pairing_device_down_error_message" msgid="2554424863101358857">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>와(과) 통신할 수 없습니다."</string>
     <string name="bluetooth_pairing_rejected_error_message" msgid="5943444352777314442">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>에서 페어링을 거부했습니다."</string>
     <string name="bluetooth_talkback_computer" msgid="3736623135703893773">"컴퓨터"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"앱이 최신 형식을 지원하는 것으로 가정"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"트랜스코딩 알림 표시"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"트랜스코딩 캐시 사용 중지"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Widevine 설정"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"L3 대체 강제"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"L3 대체를 강제하려면 선택하세요."</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"실행 중인 서비스"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"현재 실행 중인 서비스 보기 및 제어"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"WebView 구현"</string>
@@ -619,8 +638,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"새 사용자를 만들지 못함"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"새 게스트 생성 실패"</string>
     <string name="user_nickname" msgid="262624187455825083">"닉네임"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"선택한 이름과 사진이 이 기기를 사용하는 모든 사용자에게 표시됩니다."</string>
     <string name="user_add_user" msgid="7876449291500212468">"사용자 추가"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"게스트 추가"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"게스트 삭제"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"종료하면 모든 활동이 삭제됩니다."</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"종료 시 활동을 저장하거나 삭제할 수 있습니다."</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"지금 재설정하여 활동 세션을 삭제하거나 종료 시 활동을 저장 또는 삭제할 수 있습니다."</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"사진 찍기"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"이미지 선택"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"사진 선택"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"잘못된 시도 횟수가 너무 많습니다. 이 기기의 데이터가 삭제됩니다."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"잘못된 시도 횟수가 너무 많습니다. 이 사용자가 삭제됩니다."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"이더넷에서 연결 해제되었습니다."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"이더넷에 연결되었습니다."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"통화 모드가 없습니다."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"프로필 사진 선택하기"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"기본 사용자 아이콘"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"물리적 키보드"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"키보드 레이아웃 선택"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"기본"</string>

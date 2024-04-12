@@ -18,14 +18,16 @@ package com.android.internal.accessibility;
 
 import static android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK;
 import static android.view.WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG;
-import static android.view.accessibility.AccessibilityManager.ACCESSIBILITY_SHORTCUT_KEY;
 
+import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.HARDWARE;
 import static com.android.internal.accessibility.dialog.AccessibilityTargetHelper.getTargets;
 import static com.android.internal.os.RoSystemProperties.SUPPORT_ONE_HANDED_MODE;
 import static com.android.internal.util.ArrayUtils.convertToLongArray;
 
+import android.Manifest;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.annotation.IntDef;
+import android.annotation.RequiresPermission;
 import android.app.ActivityManager;
 import android.app.ActivityThread;
 import android.app.AlertDialog;
@@ -57,7 +59,6 @@ import android.view.accessibility.Flags;
 import android.widget.Toast;
 
 import com.android.internal.R;
-import com.android.internal.accessibility.common.ShortcutConstants;
 import com.android.internal.accessibility.dialog.AccessibilityTarget;
 import com.android.internal.accessibility.util.ShortcutUtils;
 import com.android.internal.util.function.pooled.PooledLambda;
@@ -330,11 +331,14 @@ public class AccessibilityShortcutController {
         warningToast.show();
     }
 
+    @RequiresPermission(Manifest.permission.MANAGE_ACCESSIBILITY)
     private AlertDialog createShortcutWarningDialog(int userId) {
-        List<AccessibilityTarget> targets = getTargets(mContext, ACCESSIBILITY_SHORTCUT_KEY);
+        List<AccessibilityTarget> targets = getTargets(mContext, HARDWARE);
         if (targets.size() == 0) {
             return null;
         }
+        final AccessibilityManager am = mFrameworkObjectProvider
+                .getAccessibilityManagerInstance(mContext);
 
         // Avoid non-a11y users accidentally turning shortcut on without reading this carefully.
         // Put "don't turn on" as the primary action.
@@ -362,32 +366,34 @@ public class AccessibilityShortcutController {
                                 // to the Settings.
                                 final ComponentName configDefaultService =
                                         ComponentName.unflattenFromString(defaultService);
-                                Settings.Secure.putStringForUser(mContext.getContentResolver(),
-                                        Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE,
-                                        configDefaultService.flattenToString(),
-                                        userId);
+                                if (Flags.a11yQsShortcut()) {
+                                    am.enableShortcutsForTargets(true, HARDWARE,
+                                            Set.of(configDefaultService.flattenToString()), userId);
+                                } else {
+                                    Settings.Secure.putStringForUser(mContext.getContentResolver(),
+                                            Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE,
+                                            configDefaultService.flattenToString(),
+                                            userId);
+                                }
                             }
                         })
                 .setPositiveButton(R.string.accessibility_shortcut_off,
                         (DialogInterface d, int which) -> {
-                            if (Flags.updateAlwaysOnA11yService()) {
-                                Set<String> targetServices =
-                                        ShortcutUtils.getShortcutTargetsFromSettings(
-                                                mContext,
-                                                ShortcutConstants.UserShortcutType.HARDWARE,
-                                                userId);
-
+                            Set<String> targetServices =
+                                    ShortcutUtils.getShortcutTargetsFromSettings(
+                                            mContext,
+                                            HARDWARE,
+                                            userId);
+                            if (Flags.a11yQsShortcut()) {
+                                am.enableShortcutsForTargets(
+                                        false, HARDWARE, targetServices, userId);
+                            } else {
                                 Settings.Secure.putStringForUser(mContext.getContentResolver(),
                                         Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE, "",
                                         userId);
                                 ShortcutUtils.updateInvisibleToggleAccessibilityServiceEnableState(
                                         mContext, targetServices, userId);
-                            } else {
-                                Settings.Secure.putStringForUser(mContext.getContentResolver(),
-                                        Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE, "",
-                                        userId);
                             }
-
                             // If canceled, treat as if the dialog has never been shown
                             Settings.Secure.putIntForUser(mContext.getContentResolver(),
                                     Settings.Secure.ACCESSIBILITY_SHORTCUT_DIALOG_SHOWN,
@@ -543,7 +549,7 @@ public class AccessibilityShortcutController {
     private ComponentName getShortcutTargetComponentName() {
         final List<String> shortcutTargets = mFrameworkObjectProvider
                 .getAccessibilityManagerInstance(mContext)
-                .getAccessibilityShortcutTargets(ACCESSIBILITY_SHORTCUT_KEY);
+                .getAccessibilityShortcutTargets(HARDWARE);
         if (shortcutTargets.size() != 1) {
             return null;
         }

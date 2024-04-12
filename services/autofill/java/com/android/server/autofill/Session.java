@@ -52,8 +52,10 @@ import static android.view.autofill.AutofillManager.FLAG_SMART_SUGGESTION_SYSTEM
 import static android.view.autofill.AutofillManager.getSmartSuggestionModeToString;
 
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
+import static com.android.server.autofill.FillRequestEventLogger.TRIGGER_REASON_EXPLICITLY_REQUESTED;
 import static com.android.server.autofill.FillRequestEventLogger.TRIGGER_REASON_NORMAL_TRIGGER;
 import static com.android.server.autofill.FillRequestEventLogger.TRIGGER_REASON_PRE_TRIGGER;
+import static com.android.server.autofill.FillRequestEventLogger.TRIGGER_REASON_RETRIGGER;
 import static com.android.server.autofill.FillRequestEventLogger.TRIGGER_REASON_SERVED_FROM_CACHED_RESPONSE;
 import static com.android.server.autofill.FillResponseEventLogger.AVAILABLE_COUNT_WHEN_FILL_REQUEST_FAILED_OR_TIMEOUT;
 import static com.android.server.autofill.FillResponseEventLogger.DETECTION_PREFER_AUTOFILL_PROVIDER;
@@ -240,10 +242,6 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     public static final String EXTRA_KEY_DETECTIONS = "detections";
     private static final int DEFAULT__FILL_REQUEST_ID_SNAPSHOT = -2;
     private static final int DEFAULT__FIELD_CLASSIFICATION_REQUEST_ID_SNAPSHOT = -2;
-
-    private static final ComponentName CREDMAN_SERVICE_COMPONENT_NAME =
-            new ComponentName("com.android.credentialmanager",
-                    "com.android.credentialmanager.autofill.CredentialAutofillService");
 
     static final String SESSION_ID_KEY = "autofill_session_id";
     static final String REQUEST_ID_KEY = "autofill_request_id";
@@ -521,6 +519,9 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
 
     private final ClassificationState mClassificationState = new ClassificationState();
 
+    @Nullable
+    private final ComponentName mCredentialAutofillService;
+
     // TODO(b/216576510): Share one BroadcastReceiver between all Sessions instead of creating a
     // new one per Session.
     private final BroadcastReceiver mDelayedFillBroadcastReceiver =
@@ -542,6 +543,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                     synchronized (mLock) {
                         int requestId = intent.getIntExtra(EXTRA_REQUEST_ID, 0);
                         FillResponse response = intent.getParcelableExtra(EXTRA_FILL_RESPONSE, android.service.autofill.FillResponse.class);
+                        mFillRequestEventLogger.maybeSetRequestTriggerReason(
+                                TRIGGER_REASON_RETRIGGER);
                         mAssistReceiver.processDelayedFillLocked(requestId, response);
                     }
                 }
@@ -1264,7 +1267,13 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         if(mPreviouslyFillDialogPotentiallyStarted) {
             mFillRequestEventLogger.maybeSetRequestTriggerReason(TRIGGER_REASON_PRE_TRIGGER);
         } else {
-            mFillRequestEventLogger.maybeSetRequestTriggerReason(TRIGGER_REASON_NORMAL_TRIGGER);
+            if ((flags & FLAG_MANUAL_REQUEST) != 0) {
+                mFillRequestEventLogger.maybeSetRequestTriggerReason(
+                        TRIGGER_REASON_EXPLICITLY_REQUESTED);
+            } else {
+                mFillRequestEventLogger.maybeSetRequestTriggerReason(
+                        TRIGGER_REASON_NORMAL_TRIGGER);
+            }
         }
         if (existingResponse != null) {
             setViewStatesLocked(
@@ -1467,23 +1476,26 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         mUi = ui;
         mHandler = handler;
 
+        mCredentialAutofillService = getCredentialAutofillService(context);
+
         ComponentName primaryServiceComponentName, secondaryServiceComponentName;
         if (isPrimaryCredential) {
-            primaryServiceComponentName = CREDMAN_SERVICE_COMPONENT_NAME;
+            primaryServiceComponentName = mCredentialAutofillService;
             secondaryServiceComponentName = serviceComponentName;
         } else {
             primaryServiceComponentName = serviceComponentName;
-            secondaryServiceComponentName = CREDMAN_SERVICE_COMPONENT_NAME;
+            secondaryServiceComponentName = mCredentialAutofillService;
         }
         Slog.v(TAG, "Primary service component name: " + primaryServiceComponentName
                 + ", secondary service component name: " + secondaryServiceComponentName);
 
         mRemoteFillService = primaryServiceComponentName == null ? null
                 : new RemoteFillService(context, primaryServiceComponentName, userId, this,
-                        bindInstantServiceAllowed);
+                        bindInstantServiceAllowed, mCredentialAutofillService);
         mSecondaryProviderHandler = secondaryServiceComponentName == null ? null
                 : new SecondaryProviderHandler(context, userId, bindInstantServiceAllowed,
-                this::onSecondaryFillResponse, secondaryServiceComponentName);
+                this::onSecondaryFillResponse, secondaryServiceComponentName,
+                        mCredentialAutofillService);
         mActivityToken = activityToken;
         mHasCallback = hasCallback;
         mUiLatencyHistory = uiLatencyHistory;
@@ -1540,6 +1552,21 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         mMetricsLogger.write(newLogMaker(MetricsEvent.AUTOFILL_SESSION_STARTED)
                 .addTaggedData(MetricsEvent.FIELD_AUTOFILL_FLAGS, flags));
         mLogViewEntered = false;
+    }
+
+    private ComponentName getCredentialAutofillService(Context context) {
+        ComponentName componentName = null;
+        String credentialManagerAutofillCompName = context.getResources().getString(
+                R.string.config_defaultCredentialManagerAutofillService);
+        if (credentialManagerAutofillCompName != null
+                && !credentialManagerAutofillCompName.isEmpty()) {
+            componentName = ComponentName.unflattenFromString(
+                    credentialManagerAutofillCompName);
+        }
+        if (componentName == null) {
+            Slog.w(TAG, "Invalid CredentialAutofillService");
+        }
+        return componentName;
     }
 
     /**
@@ -2379,6 +2406,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 mFillResponseEventLogger.maybeSetResponseStatus(RESPONSE_STATUS_FAILURE);
             }
             mPresentationStatsEventLogger.logAndEndEvent();
+            mFillResponseEventLogger.maybeSetLatencyResponseProcessingMillis();
             mFillResponseEventLogger.logAndEndEvent();
         }
         notifyUnavailableToClient(AutofillManager.STATE_UNKNOWN_FAILED,
@@ -5110,7 +5138,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             return;
         }
         for (Dataset dataset: response.getDatasets()) {
-            if (isPinnedDataset(dataset)) {
+            if (dataset.getId() != null
+                    && dataset.getId().equals(AutofillManager.PINNED_DATASET_ID)) {
                 Slog.d(TAG, "Adding Credential Manager callback to a pinned entry");
                 addCredentialManagerCallbackForDataset(dataset, response.getRequestId());
             }
@@ -5380,6 +5409,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         }
         // Log the existing FillResponse event.
         mFillResponseEventLogger.maybeSetAvailableCount(0);
+        mFillResponseEventLogger.maybeSetLatencyResponseProcessingMillis();
         mFillResponseEventLogger.logAndEndEvent();
         mService.resetLastResponse();
 

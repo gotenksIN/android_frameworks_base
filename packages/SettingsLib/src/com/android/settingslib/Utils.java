@@ -48,7 +48,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.print.PrintManager;
 import android.provider.Settings;
-import android.provider.Settings.Secure;
 import android.telephony.AccessNetworkConstants;
 import android.telephony.NetworkRegistrationInfo;
 import android.telephony.ServiceState;
@@ -75,7 +74,6 @@ import com.android.settingslib.drawable.UserIconDrawable;
 import com.android.settingslib.fuelgauge.BatteryStatus;
 import com.android.settingslib.utils.BuildCompatUtils;
 
-import java.time.Duration;
 import java.util.List;
 
 public class Utils {
@@ -84,20 +82,9 @@ public class Utils {
 
     public static final String INCOMPATIBLE_CHARGER_WARNING_DISABLED =
             "incompatible_charger_warning_disabled";
-    public static final String WIRELESS_CHARGING_NOTIFICATION_TIMESTAMP =
-            "wireless_charging_notification_timestamp";
 
     @VisibleForTesting
     static final String STORAGE_MANAGER_ENABLED_PROPERTY = "ro.storage_manager.enabled";
-
-    @VisibleForTesting static final long WIRELESS_CHARGING_DEFAULT_TIMESTAMP = -1L;
-
-    @VisibleForTesting
-    static final long WIRELESS_CHARGING_NOTIFICATION_THRESHOLD_MILLIS =
-            Duration.ofDays(30).toMillis();
-
-    @VisibleForTesting
-    static final String WIRELESS_CHARGING_WARNING_ENABLED = "wireless_charging_warning_enabled";
 
     private static Signature[] sSystemSignature;
     private static String sPermissionControllerPackageName;
@@ -858,30 +845,5 @@ public class Utils {
             }
         }
         return false;
-    }
-
-    /** Whether to show the wireless charging warning in Settings. */
-    public static boolean shouldShowWirelessChargingWarningTip(
-            @NonNull Context context, @NonNull String tag) {
-        try {
-            return Secure.getInt(context.getContentResolver(), WIRELESS_CHARGING_WARNING_ENABLED, 0)
-                    == 1;
-        } catch (Exception e) {
-            Log.e(tag, "shouldShowWirelessChargingWarningTip()", e);
-        }
-        return false;
-    }
-
-    /** Stores the state of whether the wireless charging warning in Settings is enabled. */
-    public static void updateWirelessChargingWarningEnabled(
-            @NonNull Context context, boolean enabled, @NonNull String tag) {
-        try {
-            Secure.putInt(
-                    context.getContentResolver(),
-                    WIRELESS_CHARGING_WARNING_ENABLED,
-                    enabled ? 1 : 0);
-        } catch (Exception e) {
-            Log.e(tag, "setWirelessChargingWarningEnabled()", e);
-        }
     }
 }

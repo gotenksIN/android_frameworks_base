@@ -17,9 +17,12 @@
 package com.android.systemui.keyguard.ui.viewmodel
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.helper.widget.Layer
+import com.android.internal.policy.SystemBarUtils
 import com.android.keyguard.KeyguardClockSwitch.LARGE
 import com.android.keyguard.KeyguardClockSwitch.SMALL
+import com.android.systemui.customization.R as customizationR
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
@@ -47,7 +50,7 @@ constructor(
     private val keyguardClockInteractor: KeyguardClockInteractor,
     @Application private val applicationScope: CoroutineScope,
     notifsKeyguardInteractor: NotificationsKeyguardInteractor,
-    private val shadeInteractor: ShadeInteractor,
+    @VisibleForTesting val shadeInteractor: ShadeInteractor,
 ) {
     var burnInLayer: Layer? = null
     val useLargeClock: Boolean
@@ -130,6 +133,17 @@ constructor(
                 initialValue = ClockLayout.SMALL_CLOCK
             )
 
+    val hasCustomPositionUpdatedAnimation: StateFlow<Boolean> =
+        combine(currentClock, isLargeClockVisible) { currentClock, isLargeClockVisible ->
+                isLargeClockVisible &&
+                    currentClock?.largeClock?.config?.hasCustomPositionUpdatedAnimation == true
+            }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = false
+            )
+
     /** Calculates the top margin for the small clock. */
     fun getSmallClockTopMargin(context: Context): Int {
         var topMargin: Int
@@ -148,6 +162,16 @@ constructor(
             }
         }
         return topMargin
+    }
+
+    companion object {
+        fun getLargeClockTopMargin(context: Context): Int {
+            return SystemBarUtils.getStatusBarHeight(context) +
+                context.resources.getDimensionPixelSize(
+                    customizationR.dimen.small_clock_padding_top
+                ) +
+                context.resources.getDimensionPixelSize(R.dimen.keyguard_smartspace_top_offset)
+        }
     }
 
     enum class ClockLayout {

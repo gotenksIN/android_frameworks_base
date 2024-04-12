@@ -61,8 +61,6 @@ import com.android.wm.shell.common.RemoteCallable
 import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.common.SingleInstanceRemoteListener
 import com.android.wm.shell.common.SyncTransactionQueue
-import com.android.wm.shell.common.annotations.ExternalThread
-import com.android.wm.shell.common.annotations.ShellMainThread
 import com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT
 import com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT
 import com.android.wm.shell.compatui.isSingleTopActivityTranslucent
@@ -72,6 +70,8 @@ import com.android.wm.shell.draganddrop.DragAndDropController
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.recents.RecentsTransitionHandler
 import com.android.wm.shell.recents.RecentsTransitionStateListener
+import com.android.wm.shell.shared.annotations.ExternalThread
+import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_DESKTOP_MODE
 import com.android.wm.shell.sysui.ShellCommandHandler
@@ -120,7 +120,6 @@ class DesktopTasksController(
     private var visualIndicator: DesktopModeVisualIndicator? = null
     private val desktopModeShellCommandHandler: DesktopModeShellCommandHandler =
         DesktopModeShellCommandHandler(this)
-
     private val mOnAnimationFinishedCallback = Consumer<SurfaceControl.Transaction> {
         t: SurfaceControl.Transaction ->
         visualIndicator?.releaseVisualIndicator(t)
@@ -570,7 +569,10 @@ class DesktopTasksController(
         }
     }
 
-    /** Quick-resizes a desktop task, toggling between the stable bounds and the default bounds. */
+    /**
+     * Quick-resizes a desktop task, toggling between the stable bounds and the last saved bounds
+     * if available or the default bounds otherwise.
+     */
     fun toggleDesktopTaskSize(taskInfo: RunningTaskInfo) {
         val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
 
@@ -578,11 +580,21 @@ class DesktopTasksController(
         displayLayout.getStableBounds(stableBounds)
         val destinationBounds = Rect()
         if (taskInfo.configuration.windowConfiguration.bounds == stableBounds) {
-            // The desktop task is currently occupying the whole stable bounds, toggle to the
-            // default bounds.
-            getDefaultDesktopTaskBounds(displayLayout, destinationBounds)
+            // The desktop task is currently occupying the whole stable bounds. If the bounds
+            // before the task was toggled to stable bounds were saved, toggle the task to those
+            // bounds. Otherwise, toggle to the default bounds.
+            val taskBoundsBeforeMaximize =
+                    desktopModeTaskRepository.removeBoundsBeforeMaximize(taskInfo.taskId)
+            if (taskBoundsBeforeMaximize != null) {
+                destinationBounds.set(taskBoundsBeforeMaximize)
+            } else {
+                getDefaultDesktopTaskBounds(displayLayout, destinationBounds)
+            }
         } else {
-            // Toggle to the stable bounds.
+            // Save current bounds so that task can be restored back to original bounds if necessary
+            // and toggle to the stable bounds.
+            val taskBounds = taskInfo.configuration.windowConfiguration.bounds
+            desktopModeTaskRepository.saveBoundsBeforeMaximize(taskInfo.taskId, taskBounds)
             destinationBounds.set(stableBounds)
         }
 

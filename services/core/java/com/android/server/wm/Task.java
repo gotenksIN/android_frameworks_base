@@ -1081,9 +1081,11 @@ class Task extends TaskFragment {
         // as the one in the task because either one of them could be the alias activity.
         if (Objects.equals(realActivity, r.mActivityComponent) && this.intent != null) {
             intent.setComponent(this.intent.getComponent());
-            // Make sure the package name the same to prevent one of the intent is set while the
-            // other one is not.
-            intent.setPackage(this.intent.getPackage());
+            if (intent.getSelector() == null) {
+                // Make sure the package name the same to prevent one of the intent is set while the
+                // other one is not.
+                intent.setPackage(this.intent.getPackage());
+            }
         }
         return intent.filterEquals(this.intent);
     }
@@ -1282,8 +1284,9 @@ class Task extends TaskFragment {
             final ActivityRecord top = topRunningActivity();
             final ActivityRecord resumedActivity = getResumedActivity();
             if (resumedActivity != null
-                    && (top.getTaskFragment() != this || !canBeResumed(resuming))) {
-                // Pausing the resumed activity because it is occluded by other task fragment.
+                    && (top == null || top.getTaskFragment() != this || !canBeResumed(resuming))) {
+                // Pausing the resumed activity because it is occluded by other task fragment, or
+                // should not be remained in resumed state.
                 if (startPausing(false /* uiSleeping*/, resuming, reason)) {
                     someActivityPaused[0]++;
                 }
@@ -4686,9 +4689,10 @@ class Task extends TaskFragment {
 
     @Override
     public void setWindowingMode(int windowingMode) {
-        // Calling Task#setWindowingMode() for leaf task since this is the a specialization of
+        // Calling Task#setWindowingMode() for leaf task since this is a specialization of
         // {@link #setWindowingMode(int)} for root task.
         if (!isRootTask()) {
+            mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
             super.setWindowingMode(windowingMode);
             return;
         }
@@ -4731,6 +4735,9 @@ class Task extends TaskFragment {
             getRequestedOverrideConfiguration().windowConfiguration.setWindowingMode(windowingMode);
             return;
         }
+
+        // Reset multi-window restore windowing mode.
+        mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
 
         final ActivityRecord topActivity = getTopNonFinishingActivity();
 
@@ -5795,7 +5802,7 @@ class Task extends TaskFragment {
         // If we have a watcher, preflight the move before committing to it.  First check
         // for *other* available tasks, but if none are available, then try again allowing the
         // current task to be selected.
-        if (isTopRootTaskInDisplayArea() && mAtmService.mController != null) {
+        if (mAtmService.mController != null && isTopRootTaskInDisplayArea()) {
             ActivityRecord next = topRunningActivity(null, task.mTaskId);
             if (next == null) {
                 next = topRunningActivity(null, INVALID_TASK_ID);
@@ -5839,6 +5846,15 @@ class Task extends TaskFragment {
                 + tr.mTaskId);
 
         if (mTransitionController.isShellTransitionsEnabled()) {
+            // TODO(b/277838915): Consider to make it concurrent to eliminate the special case.
+            final Transition collecting = mTransitionController.getCollectingTransition();
+            if (collecting != null && collecting.mType == TRANSIT_OPEN) {
+                // It can be a CLOSING participate of an OPEN transition. This avoids the deferred
+                // transition from moving task to back after the task was moved to front.
+                collecting.collect(tr);
+                moveTaskToBackInner(tr, collecting);
+                return true;
+            }
             final Transition transition = new Transition(TRANSIT_TO_BACK, 0 /* flags */,
                     mTransitionController, mWmService.mSyncEngine);
             // Guarantee that this gets its own transition by queueing on SyncEngine
@@ -5867,7 +5883,7 @@ class Task extends TaskFragment {
         return true;
     }
 
-    private boolean moveTaskToBackInner(@NonNull Task task, @Nullable Transition transition) {
+    private void moveTaskToBackInner(@NonNull Task task, @Nullable Transition transition) {
         final Transition.ReadyCondition movedToBack =
                 new Transition.ReadyCondition("moved-to-back", task);
         if (transition != null) {
@@ -5882,7 +5898,7 @@ class Task extends TaskFragment {
 
             if (inPinnedWindowingMode()) {
                 mTaskSupervisor.removeRootTask(this);
-                return true;
+                return;
             }
 
             mRootWindowContainer.ensureVisibilityAndConfig(null /* starting */,
@@ -5905,7 +5921,6 @@ class Task extends TaskFragment {
         } else {
             mRootWindowContainer.resumeFocusedTasksTopActivities();
         }
-        return true;
     }
 
     boolean willActivityBeVisible(IBinder token) {
@@ -6803,6 +6818,15 @@ class Task extends TaskFragment {
             getBounds(mTmpRect);
             mOverlayHost.dispatchInsetsChanged(s, mTmpRect);
         }
+    }
+
+    @Nullable
+    ActivityRecord getBottomMostActivityInSamePackage() {
+        if (realActivity == null) {
+            return null;
+        }
+        return getActivity(ar -> ar.packageName.equals(
+                realActivity.getPackageName()), false /* traverseTopToBottom */);
     }
 
     /**

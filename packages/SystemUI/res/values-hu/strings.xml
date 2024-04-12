@@ -86,6 +86,7 @@
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"A képernyőkép készítésének lehetőségét a rendszergazda letiltotta"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Szerkesztés"</string>
     <string name="screenshot_edit_description" msgid="3333092254706788906">"Képernyőkép szerkesztése"</string>
+    <string name="screenshot_share_label" msgid="1653061117238861559">"Megosztás"</string>
     <string name="screenshot_share_description" msgid="2861628935812656612">"Képernyőkép megosztása"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"Több rögzítése"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"Képernyőkép elvetése"</string>
@@ -150,6 +151,7 @@
     <string name="accessibility_scanning_face" msgid="3093828357921541387">"Arc keresése"</string>
     <string name="accessibility_send_smart_reply" msgid="8885032190442015141">"Küldés"</string>
     <string name="cancel" msgid="1089011503403416730">"Mégse"</string>
+    <string name="biometric_dialog_logo" msgid="7681107853070774595">"Alkalmazás emblémája"</string>
     <string name="biometric_dialog_confirm" msgid="2005978443007344895">"Megerősítés"</string>
     <string name="biometric_dialog_try_again" msgid="8575345628117768844">"Újrapróbálkozás"</string>
     <string name="biometric_dialog_empty_space_description" msgid="3330555462071453396">"Koppintson a hitelesítés visszavonásához"</string>
@@ -164,6 +166,7 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_3" msgid="2192670471930606539">"Arc felismerve. A folytatáshoz koppintson a Feloldásra."</string>
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"Hitelesítve"</string>
     <string name="biometric_dialog_cancel_authentication" msgid="981316588773442637">"Hitelesítés megszakítása"</string>
+    <string name="biometric_dialog_content_view_more_options_button" msgid="2663810393874865475">"További lehetőségek"</string>
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"PIN-kód használata"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"Minta használata"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"Jelszó használata"</string>
@@ -360,6 +363,14 @@
     <string name="quick_settings_contrast_standard" msgid="2538227821968061832">"Normál"</string>
     <string name="quick_settings_contrast_medium" msgid="5158352575583902566">"Közepes"</string>
     <string name="quick_settings_contrast_high" msgid="656049259587494499">"Nagy"</string>
+    <!-- no translation found for quick_settings_hearing_devices_label (7277170419679404129) -->
+    <skip />
+    <!-- no translation found for quick_settings_hearing_devices_dialog_title (9004774017688484981) -->
+    <skip />
+    <!-- no translation found for quick_settings_pair_hearing_devices (5987105102207447322) -->
+    <skip />
+    <!-- no translation found for accessibility_hearing_device_pair_new_device (8440082580186130090) -->
+    <skip />
     <string name="sensor_privacy_start_use_mic_dialog_title" msgid="563796653825944944">"Feloldja az eszköz mikrofonjának letiltását?"</string>
     <string name="sensor_privacy_start_use_camera_dialog_title" msgid="8807639852654305227">"Feloldja az eszköz kamerájának letiltását?"</string>
     <string name="sensor_privacy_start_use_mic_camera_dialog_title" msgid="4316471859905020023">"Feloldja az eszköz kamerájának és mikrofonjának letiltását?"</string>
@@ -437,6 +448,8 @@
     <string name="button_to_remove_widget" msgid="3948204829181214098">"Eltávolítás"</string>
     <string name="hub_mode_add_widget_button_text" msgid="4831464661209971729">"Modul hozzáadása"</string>
     <string name="hub_mode_editing_exit_button_text" msgid="3704686734192264771">"Kész"</string>
+    <string name="label_for_button_in_empty_state_cta" msgid="7314975555382055823">"Modulok hozzáadása"</string>
+    <string name="title_for_empty_state_cta" msgid="6161654421223450530">"Táblagépe feloldása nélkül, gyorsan hozzáférhet kedvenc alkalmazásmoduljaihoz."</string>
     <string name="dialog_title_to_allow_any_widget" msgid="1004820948962675644">"Minden modult engedélyez a lezárási képernyőn?"</string>
     <string name="button_text_to_open_settings" msgid="1987729256950941628">"Beállítások megnyitása"</string>
     <string name="work_mode_off_title" msgid="5794818421357835873">"Feloldja a munkahelyi appokat?"</string>
@@ -538,7 +551,8 @@
     <string name="monitoring_description_parental_controls" msgid="8184693528917051626">"Az eszközt a szülőd felügyeli. A szülőd megtekintheti és kezelheti például a használt alkalmazásokra, a tartózkodási helyre és a képernyőidőre vonatkozó adatokat."</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"Feloldva tartva TrustAgent által"</string>
-    <string name="kg_prompt_after_adaptive_auth_lock" msgid="1265107698772588299">"Lopásgátlás\nTúl sok feloldási kísérlet, eszköz zárolva"</string>
+    <string name="kg_prompt_after_adaptive_auth_lock" msgid="2587481497846342760">"Az eszköz túl sok hitelesítési kísérlet miatt zárolva lett."</string>
+    <string name="keyguard_indication_after_adaptive_auth_lock" msgid="2323400645470712787">"Eszköz zárolva\nSikertelen hitelesítés"</string>
     <string name="zen_mode_and_condition" msgid="5043165189511223718">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
     <string name="accessibility_volume_settings" msgid="1458961116951564784">"Hangbeállítások"</string>
     <string name="volume_odi_captions_tip" msgid="8825655463280990941">"Automatikus feliratozás"</string>
@@ -583,10 +597,8 @@
     <string name="volume_ringer_status_silent" msgid="3691324657849880883">"Néma"</string>
     <string name="media_device_cast" msgid="4786241789687569892">"Átküldés"</string>
     <string name="stream_notification_unavailable" msgid="4313854556205836435">"Nem lehetséges, a csörgés le van némítva"</string>
-    <!-- no translation found for stream_alarm_unavailable (4059817189292197839) -->
-    <skip />
-    <!-- no translation found for stream_media_unavailable (6823020894438959853) -->
-    <skip />
+    <string name="stream_alarm_unavailable" msgid="4059817189292197839">"Nem működik, mert be van kapcsolva a Ne zavarjanak"</string>
+    <string name="stream_media_unavailable" msgid="6823020894438959853">"Nem működik, mert be van kapcsolva a Ne zavarjanak"</string>
     <string name="volume_stream_content_description_unmute" msgid="7729576371406792977">"%1$s. Koppintson a némítás megszüntetéséhez."</string>
     <string name="volume_stream_content_description_vibrate" msgid="4858111994183089761">"%1$s. Koppintson a rezgés beállításához. Előfordulhat, hogy a kisegítő lehetőségek szolgáltatásai le vannak némítva."</string>
     <string name="volume_stream_content_description_mute" msgid="4079046784917920984">"%1$s. Koppintson a némításhoz. Előfordulhat, hogy a kisegítő lehetőségek szolgáltatásai le vannak némítva."</string>
@@ -603,16 +615,11 @@
     <string name="volume_ringer_hint_vibrate" msgid="6211609047099337509">"rezgés"</string>
     <string name="volume_dialog_title" msgid="6502703403483577940">"%s hangerőszabályzók"</string>
     <string name="volume_dialog_ringer_guidance_ring" msgid="9143194270463146858">"A hívásoknál és értesítéseknél csörög a telefon (<xliff:g id="VOLUME_LEVEL">%1$s</xliff:g>)"</string>
-    <!-- no translation found for volume_panel_enter_media_output_settings (8824244246272552669) -->
-    <skip />
-    <!-- no translation found for volume_panel_expanded_sliders (1885750987768506271) -->
-    <skip />
-    <!-- no translation found for volume_panel_collapsed_sliders (1413383759434791450) -->
-    <skip />
-    <!-- no translation found for volume_panel_hint_mute (6962563028495243738) -->
-    <skip />
-    <!-- no translation found for volume_panel_hint_unmute (7489063242934477382) -->
-    <skip />
+    <string name="volume_panel_enter_media_output_settings" msgid="8824244246272552669">"Kimenet beállításainak megadása"</string>
+    <string name="volume_panel_expanded_sliders" msgid="1885750987768506271">"Hangerő-szabályozók kibontva"</string>
+    <string name="volume_panel_collapsed_sliders" msgid="1413383759434791450">"Hangerő-szabályozók összecsukva"</string>
+    <string name="volume_panel_hint_mute" msgid="6962563028495243738">"%s némítása"</string>
+    <string name="volume_panel_hint_unmute" msgid="7489063242934477382">"%s némításának feloldása"</string>
     <string name="media_output_label_title" msgid="872824698593182505">"<xliff:g id="LABEL">%s</xliff:g> lejátszása itt:"</string>
     <string name="media_output_title_without_playing" msgid="3825663683169305013">"Hang lejátszása itt:"</string>
     <string name="system_ui_tuner" msgid="1471348823289954729">"Kezelőfelület-hangoló"</string>
@@ -759,7 +766,6 @@
     <string name="group_system_cycle_forward" msgid="5478663965957647805">"Lépegetés előrefelé a legutóbbi alkalmazások között"</string>
     <string name="group_system_cycle_back" msgid="8194102916946802902">"Lépegetés visszafelé a legutóbbi alkalmazások között"</string>
     <string name="group_system_access_all_apps_search" msgid="1553588630154197469">"Alkalmazáslista megnyitása"</string>
-    <string name="group_system_hide_reshow_taskbar" msgid="6108733797075862081">"Feladatsáv megjelenítése"</string>
     <string name="group_system_access_system_settings" msgid="8731721963449070017">"Beállítások megnyitása"</string>
     <string name="group_system_access_google_assistant" msgid="7210074957915968110">"A Segéd megnyitása"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Lezárási képernyő"</string>
@@ -768,6 +774,8 @@
     <string name="system_multitasking_rhs" msgid="2454557648974553729">"Osztott képernyő aktiválása; az aktuális alkalmazás kerüljön jobbra"</string>
     <string name="system_multitasking_lhs" msgid="3516599774920979402">"Osztott képernyő aktiválása; az aktuális alkalmazás kerüljön balra"</string>
     <string name="system_multitasking_full_screen" msgid="336048080383640562">"Váltás osztott képernyőről teljes képernyőre"</string>
+    <string name="system_multitasking_splitscreen_focus_rhs" msgid="3838578650313318508">"Váltás a jobb oldalt, illetve lent lévő appra osztott képernyő esetén"</string>
+    <string name="system_multitasking_splitscreen_focus_lhs" msgid="3164261844398662518">"Váltás a bal oldalt, illetve fent lévő appra osztott képernyő esetén"</string>
     <string name="system_multitasking_replace" msgid="7410071959803642125">"Osztott képernyőn: az egyik alkalmazás lecserélése egy másikra"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Bevitel"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"Váltás a következő nyelvre"</string>
@@ -1266,8 +1274,7 @@
     <string name="camera_blocked_dream_overlay_content_description" msgid="4074759493559418130">"Kamera letiltva"</string>
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"Kamera és mikrofon letiltva"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"Mikrofon letiltva"</string>
-    <!-- no translation found for priority_mode_dream_overlay_content_description (3361628029609329182) -->
-    <skip />
+    <string name="priority_mode_dream_overlay_content_description" msgid="3361628029609329182">"Ne zavarjanak"</string>
     <string name="assistant_attention_content_description" msgid="4166330881435263596">"Felhasználói jelenlét észlelve"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"Állítson be alapértelmezett jegyzetkészítő alkalmazást a Beállításokban"</string>
     <string name="install_app" msgid="5066668100199613936">"Alkalmazás telepítése"</string>

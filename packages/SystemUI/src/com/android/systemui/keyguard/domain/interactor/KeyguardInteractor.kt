@@ -29,6 +29,8 @@ import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCall
 import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.keyguard.MigrateClocksToBlueprint
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
 import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
@@ -46,14 +48,18 @@ import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.data.repository.ShadeRepository
 import com.android.systemui.statusbar.CommandQueue
+import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor
+import com.android.systemui.util.kotlin.Utils.Companion.sample as sampleCombine
 import com.android.systemui.util.kotlin.sample
 import javax.inject.Inject
 import javax.inject.Provider
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -66,6 +72,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * Encapsulates business-logic related to the keyguard but not to a more specific part within it.
@@ -84,16 +91,33 @@ constructor(
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     sceneInteractorProvider: Provider<SceneInteractor>,
     private val fromGoneTransitionInteractor: Provider<FromGoneTransitionInteractor>,
+    sharedNotificationContainerInteractor: Provider<SharedNotificationContainerInteractor>,
+    @Application applicationScope: CoroutineScope,
 ) {
     // TODO(b/296118689): move to a repository
-    private val _sharedNotificationContainerBounds = MutableStateFlow(NotificationContainerBounds())
+    private val _notificationPlaceholderBounds = MutableStateFlow(NotificationContainerBounds())
 
     /** Bounds of the notification container. */
-    val notificationContainerBounds: StateFlow<NotificationContainerBounds> =
-        _sharedNotificationContainerBounds.asStateFlow()
+    val notificationContainerBounds: StateFlow<NotificationContainerBounds> by lazy {
+        combine(
+                _notificationPlaceholderBounds,
+                sharedNotificationContainerInteractor.get().configurationBasedDimensions,
+            ) { bounds, cfg ->
+                // We offset the placeholder bounds by the configured top margin to account for
+                // legacy placement behavior within notifications for splitshade.
+                if (MigrateClocksToBlueprint.isEnabled && cfg.useSplitShade) {
+                    bounds.copy(bottom = bounds.bottom - cfg.keyguardSplitShadeTopMargin)
+                } else bounds
+            }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = NotificationContainerBounds(),
+            )
+    }
 
     fun setNotificationContainerBounds(position: NotificationContainerBounds) {
-        _sharedNotificationContainerBounds.value = position
+        _notificationPlaceholderBounds.value = position
     }
 
     /**
@@ -169,7 +193,7 @@ constructor(
     val isKeyguardShowing: Flow<Boolean> = repository.isKeyguardShowing
 
     /** Whether the keyguard is dismissible or not. */
-    val isKeyguardDismissible: Flow<Boolean> = repository.isKeyguardDismissible
+    val isKeyguardDismissible: StateFlow<Boolean> = repository.isKeyguardDismissible
 
     /** Whether the keyguard is occluded (covered by an activity). */
     @Deprecated("Use KeyguardTransitionInteractor + KeyguardState.OCCLUDED")
@@ -256,12 +280,16 @@ constructor(
      * signal should be sent directly to transitions.
      */
     val dismissAlpha: Flow<Float?> =
-        combine(
-                shadeRepository.legacyShadeExpansion,
+        shadeRepository.legacyShadeExpansion
+            .filter { it < 1f }
+            .sampleCombine(
                 statusBarState,
                 keyguardTransitionInteractor.currentKeyguardState,
                 isKeyguardDismissible,
-            ) { legacyShadeExpansion, statusBarState, currentKeyguardState, isKeyguardDismissible ->
+            )
+            .map {
+                (legacyShadeExpansion, statusBarState, currentKeyguardState, isKeyguardDismissible)
+                ->
                 if (
                     statusBarState == StatusBarState.KEYGUARD &&
                         isKeyguardDismissible &&

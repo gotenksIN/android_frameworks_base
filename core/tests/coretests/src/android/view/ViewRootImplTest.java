@@ -19,6 +19,8 @@ package android.view;
 import static android.view.accessibility.Flags.FLAG_FORCE_INVERT_COLOR;
 import static android.view.flags.Flags.FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY;
 import static android.view.flags.Flags.FLAG_TOOLKIT_FRAME_RATE_BY_SIZE_READ_ONLY;
+import static android.view.flags.Flags.FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY;
+import static android.view.flags.Flags.FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY;
 import static android.view.flags.Flags.FLAG_VIEW_VELOCITY_API;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH_HINT;
@@ -41,6 +43,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
+import static android.view.flags.Flags.toolkitFrameRateDefaultNormalReadOnly;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -81,7 +84,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -152,7 +154,8 @@ public class ViewRootImplTest {
     public void adjustLayoutParamsForCompatibility_layoutFullscreen() {
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(TYPE_APPLICATION);
         attrs.systemUiVisibility = SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         // Type.statusBars() must be removed.
         assertEquals(0, attrs.getFitInsetsTypes() & Type.statusBars());
@@ -162,7 +165,8 @@ public class ViewRootImplTest {
     public void adjustLayoutParamsForCompatibility_layoutInScreen() {
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(TYPE_APPLICATION);
         attrs.flags = FLAG_LAYOUT_IN_SCREEN;
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         // Type.statusBars() must be removed.
         assertEquals(0, attrs.getFitInsetsTypes() & Type.statusBars());
@@ -172,7 +176,8 @@ public class ViewRootImplTest {
     public void adjustLayoutParamsForCompatibility_layoutHideNavigation() {
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(TYPE_APPLICATION);
         attrs.systemUiVisibility = SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         // Type.systemBars() must be removed.
         assertEquals(0, attrs.getFitInsetsTypes() & Type.systemBars());
@@ -181,7 +186,8 @@ public class ViewRootImplTest {
     @Test
     public void adjustLayoutParamsForCompatibility_toast() {
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(TYPE_TOAST);
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         assertTrue(attrs.isFitInsetsIgnoringVisibility());
     }
@@ -189,7 +195,8 @@ public class ViewRootImplTest {
     @Test
     public void adjustLayoutParamsForCompatibility_systemAlert() {
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(TYPE_SYSTEM_ALERT);
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         assertTrue(attrs.isFitInsetsIgnoringVisibility());
     }
@@ -197,7 +204,8 @@ public class ViewRootImplTest {
     @Test
     public void adjustLayoutParamsForCompatibility_fitSystemBars() {
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(TYPE_APPLICATION);
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         assertEquals(Type.systemBars(), attrs.getFitInsetsTypes());
     }
@@ -206,7 +214,8 @@ public class ViewRootImplTest {
     public void adjustLayoutParamsForCompatibility_fitSystemBarsAndIme() {
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(TYPE_APPLICATION);
         attrs.softInputMode |= SOFT_INPUT_ADJUST_RESIZE;
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         assertEquals(Type.systemBars() | Type.ime(), attrs.getFitInsetsTypes());
     }
@@ -221,7 +230,8 @@ public class ViewRootImplTest {
         attrs.setFitInsetsTypes(types);
         attrs.setFitInsetsSides(sides);
         attrs.setFitInsetsIgnoringVisibility(fitMaxInsets);
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(
+                attrs, 0 /* appearanceControlled */, false /* behaviorControlled */);
 
         // Fit-insets related fields must not be adjusted due to legacy system UI visibility
         // after calling fit-insets related methods.
@@ -232,14 +242,16 @@ public class ViewRootImplTest {
 
     @Test
     public void adjustLayoutParamsForCompatibility_noAdjustAppearance() {
-        final WindowInsetsController controller = mViewRootImpl.getInsetsController();
+        final InsetsController controller = mViewRootImpl.getInsetsController();
         final WindowManager.LayoutParams attrs = mViewRootImpl.mWindowAttributes;
         final int appearance = APPEARANCE_OPAQUE_STATUS_BARS;
         controller.setSystemBarsAppearance(appearance, 0xffffffff);
         attrs.systemUiVisibility = SYSTEM_UI_FLAG_LOW_PROFILE
                 | SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 | SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs,
+                controller.getAppearanceControlled(),
+                controller.isBehaviorControlled());
 
         // Appearance must not be adjusted due to legacy system UI visibility after calling
         // setSystemBarsAppearance.
@@ -253,12 +265,14 @@ public class ViewRootImplTest {
 
     @Test
     public void adjustLayoutParamsForCompatibility_noAdjustBehavior() {
-        final WindowInsetsController controller = mViewRootImpl.getInsetsController();
+        final InsetsController controller = mViewRootImpl.getInsetsController();
         final WindowManager.LayoutParams attrs = mViewRootImpl.mWindowAttributes;
         final int behavior = BEHAVIOR_DEFAULT;
         controller.setSystemBarsBehavior(behavior);
         attrs.systemUiVisibility = SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs);
+        ViewRootImpl.adjustLayoutParamsForCompatibility(attrs,
+                controller.getAppearanceControlled(),
+                controller.isBehaviorControlled());
 
         // Behavior must not be adjusted due to legacy system UI visibility after calling
         // setSystemBarsBehavior.
@@ -463,8 +477,8 @@ public class ViewRootImplTest {
      */
     @UiThreadTest
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_getDefaultValues() {
         ViewRootImpl viewRootImpl = new ViewRootImpl(sContext,
                 sContext.getDisplayNoVerify());
@@ -480,9 +494,9 @@ public class ViewRootImplTest {
      * Also, mIsFrameRateBoosting should be true when the visibility becomes visible
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
     @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
-            FLAG_TOOLKIT_FRAME_RATE_BY_SIZE_READ_ONLY})
+            FLAG_TOOLKIT_FRAME_RATE_BY_SIZE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_visibility_bySize() {
         View view = new View(sContext);
         attachViewToWindow(view);
@@ -514,9 +528,9 @@ public class ViewRootImplTest {
      * <7%: FRAME_RATE_CATEGORY_LOW
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
     @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
-            FLAG_TOOLKIT_FRAME_RATE_BY_SIZE_READ_ONLY})
+            FLAG_TOOLKIT_FRAME_RATE_BY_SIZE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_smallSize_bySize() {
         View view = new View(sContext);
         WindowManager.LayoutParams wmlp = new WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY);
@@ -543,9 +557,9 @@ public class ViewRootImplTest {
      * >=7% : FRAME_RATE_CATEGORY_NORMAL
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
     @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
-            FLAG_TOOLKIT_FRAME_RATE_BY_SIZE_READ_ONLY})
+            FLAG_TOOLKIT_FRAME_RATE_BY_SIZE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_normalSize_bySize() {
         View view = new View(sContext);
         WindowManager.LayoutParams wmlp = new WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY);
@@ -576,8 +590,9 @@ public class ViewRootImplTest {
      * Also, mIsFrameRateBoosting should be true when the visibility becomes visible
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_visibility_defaultHigh() {
         View view = new View(sContext);
         attachViewToWindow(view);
@@ -593,8 +608,9 @@ public class ViewRootImplTest {
         sInstrumentation.runOnMainSync(() -> {
             view.setVisibility(View.VISIBLE);
             view.invalidate();
-            assertEquals(viewRootImpl.getPreferredFrameRateCategory(),
-                    FRAME_RATE_CATEGORY_HIGH);
+            int expected = toolkitFrameRateDefaultNormalReadOnly()
+                    ? FRAME_RATE_CATEGORY_NORMAL : FRAME_RATE_CATEGORY_HIGH;
+            assertEquals(expected, viewRootImpl.getPreferredFrameRateCategory());
         });
         sInstrumentation.waitForIdleSync();
 
@@ -609,8 +625,9 @@ public class ViewRootImplTest {
      * <7%: FRAME_RATE_CATEGORY_NORMAL
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_smallSize_defaultHigh() {
         View view = new View(sContext);
         WindowManager.LayoutParams wmlp = new WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY);
@@ -637,8 +654,9 @@ public class ViewRootImplTest {
      * >=7% : FRAME_RATE_CATEGORY_HIGH
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_normalSize_defaultHigh() {
         View view = new View(sContext);
         WindowManager.LayoutParams wmlp = new WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY);
@@ -658,17 +676,19 @@ public class ViewRootImplTest {
         ViewRootImpl viewRootImpl = view.getViewRootImpl();
         sInstrumentation.runOnMainSync(() -> {
             view.invalidate();
-            assertEquals(viewRootImpl.getPreferredFrameRateCategory(), FRAME_RATE_CATEGORY_HIGH);
+            int expected = toolkitFrameRateDefaultNormalReadOnly()
+                    ? FRAME_RATE_CATEGORY_NORMAL : FRAME_RATE_CATEGORY_HIGH;
+            assertEquals(expected, viewRootImpl.getPreferredFrameRateCategory());
         });
     }
 
     /**
-     * Test how values of the frame rate cateogry are aggregated.
+     * Test how values of the frame rate category are aggregated.
      * It should take the max value among all of the voted categories per frame.
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_aggregate() {
         View view = new View(sContext);
         attachViewToWindow(view);
@@ -713,8 +733,8 @@ public class ViewRootImplTest {
      * prioritize 60Hz..
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRate_aggregate() {
         View view = new View(sContext);
         attachViewToWindow(view);
@@ -772,8 +792,9 @@ public class ViewRootImplTest {
      * submit your preferred choice to the ViewRootImpl.
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRate_category() {
         View view = new View(sContext);
         attachViewToWindow(view);
@@ -812,8 +833,10 @@ public class ViewRootImplTest {
      * Also, we shouldn't call setFrameRate.
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY, FLAG_VIEW_VELOCITY_API})
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_VIEW_VELOCITY_API,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateCategory_velocityToHigh() {
         View view = new View(sContext);
         WindowManager.LayoutParams wmlp = new WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY);
@@ -844,8 +867,8 @@ public class ViewRootImplTest {
      * We should boost the frame rate if the value of mInsetsAnimationRunning is true.
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_insetsAnimation() {
         View view = new View(sContext);
         WindowManager.LayoutParams wmlp = new WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY);
@@ -881,8 +904,8 @@ public class ViewRootImplTest {
      * Test FrameRateBoostOnTouchEnabled API
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_frameRateBoostOnTouch() {
         View view = new View(sContext);
         attachViewToWindow(view);
@@ -914,8 +937,8 @@ public class ViewRootImplTest {
      * mPreferredFrameRate should be set to 0.
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateTimeOut() throws InterruptedException {
         final long delay = 200L;
 
@@ -952,8 +975,9 @@ public class ViewRootImplTest {
      * A View should either vote a frame rate or a frame rate category instead of both.
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_voteFrameRateOnly() {
         View view = new View(sContext);
         float frameRate = 20;
@@ -995,8 +1019,9 @@ public class ViewRootImplTest {
      * - otherwise, use the previous category value.
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_infrequentLayer_defaultHigh() throws InterruptedException {
         final long delay = 200L;
 
@@ -1017,11 +1042,13 @@ public class ViewRootImplTest {
 
         ViewRootImpl viewRootImpl = view.getViewRootImpl();
 
-        // In transistion from frequent update to infrequent update
+        // In transition from frequent update to infrequent update
         Thread.sleep(delay);
         sInstrumentation.runOnMainSync(() -> {
             view.invalidate();
-            assertEquals(viewRootImpl.getPreferredFrameRateCategory(), FRAME_RATE_CATEGORY_HIGH);
+            int expected = toolkitFrameRateDefaultNormalReadOnly()
+                    ? FRAME_RATE_CATEGORY_NORMAL : FRAME_RATE_CATEGORY_HIGH;
+            assertEquals(expected, viewRootImpl.getPreferredFrameRateCategory());
         });
 
         // reset the frame rate category counts
@@ -1033,7 +1060,7 @@ public class ViewRootImplTest {
             sInstrumentation.waitForIdleSync();
         }
 
-        // In transistion from frequent update to infrequent update
+        // In transition from frequent update to infrequent update
         Thread.sleep(delay);
         sInstrumentation.runOnMainSync(() -> {
             view.setRequestedFrameRate(view.REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE);
@@ -1061,18 +1088,32 @@ public class ViewRootImplTest {
     /**
      * Test the IsFrameRatePowerSavingsBalanced values are properly set
      */
-    @UiThreadTest
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_isFrameRatePowerSavingsBalanced() {
-        ViewRootImpl viewRootImpl = new ViewRootImpl(sContext,
-                sContext.getDisplayNoVerify());
-        assertEquals(viewRootImpl.isFrameRatePowerSavingsBalanced(), true);
-        viewRootImpl.setFrameRatePowerSavingsBalanced(false);
-        assertEquals(viewRootImpl.isFrameRatePowerSavingsBalanced(), false);
-        viewRootImpl.setFrameRatePowerSavingsBalanced(true);
-        assertEquals(viewRootImpl.isFrameRatePowerSavingsBalanced(), true);
+        View view = new View(sContext);
+        attachViewToWindow(view);
+        sInstrumentation.waitForIdleSync();
+
+        ViewRootImpl viewRoot = view.getViewRootImpl();
+        final WindowManager.LayoutParams attrs = viewRoot.mWindowAttributes;
+        assertEquals(attrs.isFrameRatePowerSavingsBalanced(), true);
+        assertEquals(viewRoot.isFrameRatePowerSavingsBalanced(),
+                attrs.isFrameRatePowerSavingsBalanced());
+
+        sInstrumentation.runOnMainSync(() -> {
+            attrs.setFrameRatePowerSavingsBalanced(false);
+            viewRoot.setLayoutParams(attrs, false);
+        });
+        sInstrumentation.waitForIdleSync();
+
+        sInstrumentation.runOnMainSync(() -> {
+            final WindowManager.LayoutParams newAttrs = viewRoot.mWindowAttributes;
+            assertEquals(newAttrs.isFrameRatePowerSavingsBalanced(), false);
+            assertEquals(viewRoot.isFrameRatePowerSavingsBalanced(),
+                    newAttrs.isFrameRatePowerSavingsBalanced());
+        });
     }
 
     /**
@@ -1081,8 +1122,9 @@ public class ViewRootImplTest {
      * 2. If FT2-FT1 > 15ms && FT3-FT2 > 15ms -> vote for NORMAL category
      */
     @Test
-    @Ignore("Can be enabled only after b/330596920 is ready")
-    @RequiresFlagsEnabled(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    @RequiresFlagsEnabled({FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_FUNCTION_ENABLING_READ_ONLY,
+            FLAG_TOOLKIT_FRAME_RATE_VIEW_ENABLING_READ_ONLY})
     public void votePreferredFrameRate_applyTextureViewHeuristic() throws InterruptedException {
         final long delay = 30L;
 
@@ -1107,8 +1149,9 @@ public class ViewRootImplTest {
             assertEquals(viewRootImpl.getPreferredFrameRateCategory(),
                     FRAME_RATE_CATEGORY_NO_PREFERENCE);
             view.invalidate();
-            assertEquals(viewRootImpl.getPreferredFrameRateCategory(),
-                    FRAME_RATE_CATEGORY_HIGH);
+            int expected = toolkitFrameRateDefaultNormalReadOnly()
+                    ? FRAME_RATE_CATEGORY_NORMAL : FRAME_RATE_CATEGORY_HIGH;
+            assertEquals(expected, viewRootImpl.getPreferredFrameRateCategory());
         });
 
          // reset the frame rate category counts

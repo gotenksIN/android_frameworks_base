@@ -32,8 +32,6 @@ import android.content.ComponentName;
 import android.content.pm.PackageManager;
 import android.hardware.biometrics.BiometricAuthenticator;
 import android.hardware.biometrics.IBiometricService;
-import android.hardware.biometrics.face.IFace;
-import android.hardware.biometrics.face.SensorProps;
 import android.hardware.face.FaceAuthenticateOptions;
 import android.hardware.face.FaceSensorConfigurations;
 import android.hardware.face.FaceSensorPropertiesInternal;
@@ -93,18 +91,12 @@ public class FaceServiceTest {
     @Mock
     private FaceProvider mFaceProviderVirtual;
     @Mock
-    private IFace mDefaultFaceDaemon;
-    @Mock
-    private IFace mVirtualFaceDaemon;
-    @Mock
     private IBiometricService mIBiometricService;
     @Mock
     private IBinder mToken;
     @Mock
     private IFaceServiceReceiver mFaceServiceReceiver;
 
-    private final SensorProps mDefaultSensorProps = new SensorProps();
-    private final SensorProps mVirtualSensorProps = new SensorProps();
     private FaceService mFaceService;
     private final FaceSensorPropertiesInternal mSensorPropsDefault =
             new FaceSensorPropertiesInternal(ID_DEFAULT, STRENGTH_STRONG,
@@ -126,10 +118,6 @@ public class FaceServiceTest {
 
     @Before
     public void setUp() throws RemoteException {
-        when(mDefaultFaceDaemon.getSensorProps()).thenReturn(
-                new SensorProps[]{mDefaultSensorProps});
-        when(mVirtualFaceDaemon.getSensorProps()).thenReturn(
-                new SensorProps[]{mVirtualSensorProps});
         when(mFaceProviderDefault.getSensorProperties()).thenReturn(List.of(mSensorPropsDefault));
         when(mFaceProviderVirtual.getSensorProperties()).thenReturn(List.of(mSensorPropsVirtual));
         when(mFaceProviderDefault.containsSensor(anyInt()))
@@ -140,15 +128,7 @@ public class FaceServiceTest {
         mContext.getTestablePermissions().setPermission(
                 USE_BIOMETRIC_INTERNAL, PackageManager.PERMISSION_GRANTED);
         mFaceSensorConfigurations = new FaceSensorConfigurations(false);
-        mFaceSensorConfigurations.addAidlConfigs(new String[]{NAME_DEFAULT, NAME_VIRTUAL},
-                (name) -> {
-                    if (name.equals(IFace.DESCRIPTOR + "/" + NAME_DEFAULT)) {
-                        return mDefaultFaceDaemon;
-                    } else if (name.equals(IFace.DESCRIPTOR + "/" + NAME_VIRTUAL)) {
-                        return mVirtualFaceDaemon;
-                    }
-                    return null;
-                });
+        mFaceSensorConfigurations.addAidlConfigs(new String[]{NAME_DEFAULT, NAME_VIRTUAL});
     }
 
     private void initService() {
@@ -181,7 +161,7 @@ public class FaceServiceTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_DE_HIDL)
+    @RequiresFlagsEnabled({Flags.FLAG_DE_HIDL, Flags.FLAG_FACE_VHAL_FEATURE})
     public void registerAuthenticatorsLegacy_virtualOnly() throws Exception {
         initService();
         Settings.Secure.putInt(mSettingsRule.mockContentResolver(mContext),
@@ -196,18 +176,25 @@ public class FaceServiceTest {
     }
 
     @Test
+    @RequiresFlagsEnabled({Flags.FLAG_DE_HIDL, Flags.FLAG_FACE_VHAL_FEATURE})
+    public void registerAuthenticatorsLegacy_virtualFaceOnly() throws Exception {
+        initService();
+        Settings.Secure.putInt(mSettingsRule.mockContentResolver(mContext),
+                Settings.Secure.BIOMETRIC_FACE_VIRTUAL_ENABLED, 1);
+
+        mFaceService.mServiceWrapper.registerAuthenticatorsLegacy(mFaceSensorConfigurations);
+        waitForRegistration();
+
+        verify(mIBiometricService).registerAuthenticator(eq(ID_VIRTUAL),
+                eq(BiometricAuthenticator.TYPE_FACE),
+                eq(Utils.propertyStrengthToAuthenticatorStrength(STRENGTH_STRONG)), any());
+    }
+
+    @Test
     @RequiresFlagsEnabled(Flags.FLAG_DE_HIDL)
     public void registerAuthenticatorsLegacy_virtualAlwaysWhenNoOther() throws Exception {
         mFaceSensorConfigurations = new FaceSensorConfigurations(false);
-        mFaceSensorConfigurations.addAidlConfigs(new String[]{NAME_VIRTUAL},
-                (name) -> {
-                    if (name.equals(IFace.DESCRIPTOR + "/" + NAME_DEFAULT)) {
-                        return mDefaultFaceDaemon;
-                    } else if (name.equals(IFace.DESCRIPTOR + "/" + NAME_VIRTUAL)) {
-                        return mVirtualFaceDaemon;
-                    }
-                    return null;
-                });
+        mFaceSensorConfigurations.addAidlConfigs(new String[]{NAME_VIRTUAL});
         initService();
 
         mFaceService.mServiceWrapper.registerAuthenticatorsLegacy(mFaceSensorConfigurations);

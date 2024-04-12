@@ -140,6 +140,14 @@ constructor(
             )
 
     /**
+     * The previous scene.
+     *
+     * This is effectively the previous value of [currentScene] which means that all caveats, for
+     * example regarding when in a transition the current scene changes, apply.
+     */
+    val previousScene: StateFlow<SceneKey?> = repository.previousScene
+
+    /**
      * Returns the keys of all scenes in the container.
      *
      * The scenes will be sorted in z-order such that the last one is the one that should be
@@ -162,7 +170,9 @@ constructor(
         loggingReason: String,
         transitionKey: TransitionKey? = null,
     ) {
-        check(toScene != Scenes.Gone || deviceUnlockedInteractor.isDeviceUnlocked.value) {
+        check(
+            toScene != Scenes.Gone || deviceUnlockedInteractor.deviceUnlockStatus.value.isUnlocked
+        ) {
             "Cannot change to the Gone scene while the device is locked. Logging reason for scene" +
                 " change was: $loggingReason"
         }

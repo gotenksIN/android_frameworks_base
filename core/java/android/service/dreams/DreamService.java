@@ -17,6 +17,7 @@
 package android.service.dreams;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static android.service.dreams.Flags.dreamHandlesConfirmKeys;
 
 import android.annotation.FlaggedApi;
 import android.annotation.IdRes;
@@ -29,6 +30,7 @@ import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.TestApi;
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.KeyguardManager;
 import android.app.Service;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ComponentName;
@@ -263,7 +265,9 @@ public class DreamService extends Service implements Window.Callback {
     private boolean mCanDoze;
     private boolean mDozing;
     private boolean mWindowless;
+    private boolean mPreviewMode;
     private int mDozeScreenState = Display.STATE_UNKNOWN;
+    private @Display.StateReason int mDozeScreenStateReason = Display.STATE_REASON_UNKNOWN;
     private int mDozeScreenBrightness = PowerManager.BRIGHTNESS_DEFAULT;
 
     private boolean mDebug = false;
@@ -277,6 +281,8 @@ public class DreamService extends Service implements Window.Callback {
     private DreamOverlayConnectionHandler mOverlayConnection;
 
     private IDreamOverlayCallback mOverlayCallback;
+
+    private Integer mTrackingConfirmKey = null;
 
 
     public DreamService() {
@@ -294,7 +300,54 @@ public class DreamService extends Service implements Window.Callback {
     /** {@inheritDoc} */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        // TODO: create more flexible version of mInteractive that allows use of KEYCODE_BACK
+        if (dreamHandlesConfirmKeys()) {
+            // In the case of an interactive dream that consumes the event, do not process further.
+            if (mInteractive && mWindow.superDispatchKeyEvent(event)) {
+                return true;
+            }
+
+            // If the key is a confirm key and on up, either unlock (no auth) or show bouncer.
+            if (KeyEvent.isConfirmKey(event.getKeyCode())) {
+                switch (event.getAction()) {
+                    case KeyEvent.ACTION_DOWN -> {
+                        if (mTrackingConfirmKey != null) {
+                            return true;
+                        }
+
+                        mTrackingConfirmKey = event.getKeyCode();
+                    }
+                    case KeyEvent.ACTION_UP -> {
+                        if (mTrackingConfirmKey != event.getKeyCode()) {
+                            return true;
+                        }
+
+                        mTrackingConfirmKey = null;
+
+                        final KeyguardManager keyguardManager =
+                                getSystemService(KeyguardManager.class);
+
+                        // Simply wake up in the case the device is not locked.
+                        if (!keyguardManager.isKeyguardLocked()) {
+                            wakeUp();
+                            return true;
+                        }
+
+                        keyguardManager.requestDismissKeyguard(getActivity(),
+                                new KeyguardManager.KeyguardDismissCallback() {
+                                    @Override
+                                    public void onDismissError() {
+                                        Log.e(TAG, "Could not dismiss keyguard on confirm key");
+                                    }
+                                });
+                    }
+                }
+
+                // All key events for matching key codes should be consumed to prevent other actions
+                // from triggering.
+                return true;
+            }
+        }
+
         if (!mInteractive) {
             if (mDebug) Slog.v(mTag, "Waking up on keyEvent");
             wakeUp();
@@ -647,12 +700,13 @@ public class DreamService extends Service implements Window.Callback {
     }
 
     /**
-     * Marks this dream as keeping the screen bright while dreaming.
+     * Marks this dream as keeping the screen bright while dreaming. In preview mode, the screen
+     * is always allowed to dim and overrides the value specified here.
      *
      * @param screenBright True to keep the screen bright while dreaming.
      */
     public void setScreenBright(boolean screenBright) {
-        if (mScreenBright != screenBright) {
+        if (mScreenBright != screenBright && !mPreviewMode) {
             mScreenBright = screenBright;
             int flag = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
             applyWindowFlags(mScreenBright ? flag : 0, flag);
@@ -661,7 +715,7 @@ public class DreamService extends Service implements Window.Callback {
 
     /**
      * Returns whether this dream keeps the screen bright while dreaming.
-     * Defaults to false, allowing the screen to dim if necessary.
+     * Defaults to true, preventing the screen from dimming.
      *
      * @see #setScreenBright(boolean)
      */
@@ -748,7 +802,9 @@ public class DreamService extends Service implements Window.Callback {
 
         if (mDozing) {
             try {
-                mDreamManager.startDozing(mDreamToken, mDozeScreenState, mDozeScreenBrightness);
+                mDreamManager.startDozing(
+                        mDreamToken, mDozeScreenState, mDozeScreenStateReason,
+                        mDozeScreenBrightness);
             } catch (RemoteException ex) {
                 // system server died
             }
@@ -808,6 +864,19 @@ public class DreamService extends Service implements Window.Callback {
     }
 
     /**
+     * Same as {@link #setDozeScreenState(int, int)}, but with no screen state reason specified.
+     *
+     * <p>Use {@link #setDozeScreenState(int, int)} whenever possible to allow properly accounting
+     * for the screen state reason.
+     *
+     * @hide
+     */
+    @UnsupportedAppUsage
+    public void setDozeScreenState(int state) {
+        setDozeScreenState(state, Display.STATE_REASON_UNKNOWN);
+    }
+
+    /**
      * Sets the screen state to use while dozing.
      * <p>
      * The value of this property determines the power state of the primary display
@@ -841,13 +910,15 @@ public class DreamService extends Service implements Window.Callback {
      * {@link Display#STATE_DOZE}, {@link Display#STATE_DOZE_SUSPEND},
      * {@link Display#STATE_ON_SUSPEND}, {@link Display#STATE_OFF}, or {@link Display#STATE_UNKNOWN}
      * for the default behavior.
+     * @param reason the reason for setting the specified screen state.
      *
      * @hide For use by system UI components only.
      */
     @UnsupportedAppUsage
-    public void setDozeScreenState(int state) {
+    public void setDozeScreenState(int state, @Display.StateReason int reason) {
         if (mDozeScreenState != state) {
             mDozeScreenState = state;
+            mDozeScreenStateReason = reason;
             updateDoze();
         }
     }
@@ -1030,12 +1101,10 @@ public class DreamService extends Service implements Window.Callback {
                     overlay.endDream();
                     mOverlayConnection.unbind();
                     mOverlayConnection = null;
-                    finish();
                 } catch (RemoteException e) {
                     Log.e(mTag, "could not inform overlay of dream end:" + e);
                 }
             });
-            return;
         }
 
         if (mDebug) Slog.v(mTag, "finish(): mFinished=" + mFinished);
@@ -1280,6 +1349,11 @@ public class DreamService extends Service implements Window.Callback {
 
         mDreamToken = dreamToken;
         mCanDoze = canDoze;
+        mPreviewMode = isPreviewMode;
+        if (mPreviewMode) {
+            // Allow screen to dim when in preview mode.
+            mScreenBright = false;
+        }
         // This is not a security check to prevent malicious dreams but a guard rail to stop
         // third-party dreams from being windowless and not working well as a result.
         if (mWindowless && !mCanDoze && !isCallerSystemUi()) {

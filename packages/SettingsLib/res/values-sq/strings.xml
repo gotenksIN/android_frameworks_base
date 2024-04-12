@@ -106,7 +106,29 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Aktive, vetëm majtas"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Aktive, vetëm djathtas"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Aktive, majtas dhe djathtas"</string>
-    <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Audioja e klipit \"media\""</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
+    <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Audioja e medias"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"Telefonatat"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Transferimi i skedarëve"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"Pajisja e hyrjes"</string>
@@ -410,8 +432,8 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"Bëj që të gjitha aktivitetet të kenë madhësi të ndryshueshme për përdorimin me shumë dritare, pavarësisht vlerave të manifestit."</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"Aktivizo dritaret me formë të lirë"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"Aktivizo mbështetjen për dritaret eksperimentale me formë të lirë."</string>
-    <string name="local_backup_password_title" msgid="4631017948933578709">"Fjalëkalimi rezervë i kompjuterit"</string>
-    <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Rezervimet e plota në kompjuter nuk janë të mbrojtura aktualisht"</string>
+    <string name="local_backup_password_title" msgid="4631017948933578709">"Fjalëkalimi i rezervimit të desktopit"</string>
+    <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Rezervimet e plota të desktopit nuk janë të mbrojtura aktualisht"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"Trokit për të ndryshuar ose hequr fjalëkalimin për rezervime të plota të desktopit"</string>
     <string name="local_backup_password_toast_success" msgid="4891666204428091604">"Fjalëkalimi i ri u vendos"</string>
     <string name="local_backup_password_toast_confirmation_mismatch" msgid="2994718182129097733">"Fjalëkalimi i ri dhe konfirmimi nuk përputhen"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"Supozo se aplikacionet i mbështetin formatet moderne"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Shfaq njoftimet e transkodimit"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Çaktivizo memorien specifike të transkodimit"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Cilësimet e Widevine"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"Detyro kalimin përsëri te L3"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"Zgjidh që të detyrosh kalimin përsëri te L3"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Shërbimet në ekzekutim"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Shiko dhe kontrollo shërbimet që po ekzekutohen aktualisht"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"Zbatimi i WebView"</string>
@@ -619,8 +638,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"Krijimi i një përdoruesi të ri dështoi"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"Profili i vizitorit të ri nuk u krijua"</string>
     <string name="user_nickname" msgid="262624187455825083">"Pseudonimi"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"Emri dhe fotografia që zgjedh ti do të jenë të dukshme për çdo person që përdor këtë pajisje."</string>
     <string name="user_add_user" msgid="7876449291500212468">"Shto përdorues"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"Shto vizitor"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"Hiq vizitorin"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"Të gjitha aktivitetet do të fshihen kur të dalësh"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"Mund ta ruash ose ta fshish aktivitetin tënd kur të dalësh"</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"Rivendose për të fshirë aktivitetin e sesionit tani ose mund ta ruash ose ta fshish aktivitetin kur të dalësh"</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"Bëj një fotografi"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"Zgjidh një imazh"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"Zgjidh një fotografi"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"Shumë tentativa të pasakta. Të dhënat e kësaj pajisjeje do të fshihen."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"Shumë tentativa të pasakta. Ky përdorues do të fshihet."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"Lidhja e eternetit u shkëput."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"Eternet."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"Telefonatat nuk ofrohen"</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"Zgjidh një fotografi profili"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"Ikona e parazgjedhur e përdoruesit"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Tastiera fizike"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Zgjidh strukturën e tastierës"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Parazgjedhja"</string>

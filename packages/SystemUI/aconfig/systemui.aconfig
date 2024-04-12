@@ -1,4 +1,5 @@
 package: "com.android.systemui"
+container: "system"
 
 flag {
     name: "example_flag"
@@ -22,6 +23,21 @@ flag {
    metadata {
         purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+   name: "refactor_keyguard_dismiss_intent"
+   namespace: "systemui"
+   description: "Update how keyguard dismiss intents are stored."
+   bug: "275069969"
+}
+
+flag {
+
+    name: "notification_heads_up_cycling"
+    namespace: "systemui"
+    description: "Heads-up notification cycling animation for the Notification Avalanche feature."
+    bug: "316404716"
 }
 
 flag {
@@ -126,6 +142,16 @@ flag {
    description: "Fixes the app selector abruptly disappearing without an animation, when the"
         "selected task is the foreground task."
    bug: "314385883"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "pss_app_selector_recents_split_screen"
+   namespace: "systemui"
+   description: "Allows recent apps selected for partial screenshare to be launched in split screen mode"
+   bug: "320449039"
    metadata {
         purpose: PURPOSE_BUGFIX
    }
@@ -251,6 +277,13 @@ flag {
    name: "qs_new_tiles"
    namespace: "systemui"
    description: "Use the new tiles in the Quick Settings. Should have no behavior changes."
+   bug: "311147395"
+}
+
+flag {
+   name: "qs_new_tiles_future"
+   namespace: "systemui"
+   description: "Use the new tiles in the Quick Settings that are still under development. This flag will not be used to gate release but to prevent tiles under development from reaching teamfood."
    bug: "311147395"
 }
 
@@ -504,13 +537,6 @@ flag {
 }
 
 flag {
-   name: "enable_contextual_tips_frequency_cap"
-   description: "Enables frequency capping for contextual tips, e.g. 1x/day, 2x/week, 3x/lifetime."
-   namespace: "systemui"
-   bug: "322891421"
-}
-
-flag {
    name: "disable_contextual_tips_frequency_check"
    description: "Disables frequency capping check for contextual tips."
    namespace: "systemui"
@@ -520,13 +546,6 @@ flag {
 flag {
    name: "disable_contextual_tips_ios_switcher_check"
    description: "Disables iOS switcher check which guard the tips designed only for iOS switchers."
-   namespace: "systemui"
-   bug: "322891421"
-}
-
-flag {
-   name: "disable_contextual_tips_first_30d_check"
-   description: "Disables condition check which only show tips within 30 days after phone setup."
    namespace: "systemui"
    bug: "322891421"
 }
@@ -699,9 +718,26 @@ flag {
 }
 
 flag {
+  name: "screenshare_notification_hiding_bug_fix"
+  namespace: "systemui"
+  description: "Various bug fixes for notification redaction while screensharing"
+  bug: "312784809"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
     name: "qs_ui_refactor"
     namespace: "systemui"
     description: "Enables the new QS UI pipeline that follows recommended architecture and uses"
       " Compose for the UI."
     bug: "325099249"
+}
+
+flag {
+    name: "keyboard_docking_indicator"
+    namespace: "systemui"
+    description: "Glow bar indicator reveals upon keyboard docking."
+    bug: "324600132"
 }

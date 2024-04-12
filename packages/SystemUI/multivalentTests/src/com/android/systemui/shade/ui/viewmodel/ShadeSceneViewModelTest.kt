@@ -29,6 +29,8 @@ import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepositor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.flags.Flags
+import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFingerprintAuthRepository
+import com.android.systemui.keyguard.shared.model.SuccessFingerprintAuthenticationStatus
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.media.controls.domain.pipeline.MediaDataManager
 import com.android.systemui.qs.footerActionsController
@@ -37,6 +39,7 @@ import com.android.systemui.qs.ui.adapter.FakeQSSceneAdapter
 import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.settings.brightness.ui.viewmodel.brightnessMirrorViewModel
 import com.android.systemui.shade.data.repository.shadeRepository
 import com.android.systemui.shade.domain.interactor.privacyChipInteractor
 import com.android.systemui.shade.domain.interactor.shadeHeaderClockInteractor
@@ -110,6 +113,7 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
             ShadeHeaderViewModel(
                 applicationScope = testScope.backgroundScope,
                 context = context,
+                shadeInteractor = kosmos.shadeInteractor,
                 mobileIconsInteractor = mobileIconsInteractor,
                 mobileIconsViewModel = mobileIconsViewModel,
                 privacyChipInteractor = kosmos.privacyChipInteractor,
@@ -124,10 +128,12 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
                 shadeHeaderViewModel = shadeHeaderViewModel,
                 qsSceneAdapter = qsSceneAdapter,
                 notifications = kosmos.notificationsPlaceholderViewModel,
+                brightnessMirrorViewModel = kosmos.brightnessMirrorViewModel,
                 mediaDataManager = mediaDataManager,
                 shadeInteractor = kosmos.shadeInteractor,
                 footerActionsViewModelFactory = kosmos.footerActionsViewModelFactory,
                 footerActionsController = kosmos.footerActionsController,
+                sceneInteractor = kosmos.sceneInteractor,
             )
     }
 
@@ -138,7 +144,6 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.Pin
             )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(false)
 
             assertThat(destinationScenes?.get(Swipe(SwipeDirection.Up))?.toScene)
                 .isEqualTo(Scenes.Lockscreen)
@@ -151,7 +156,9 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.Pin
             )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(true)
+            kosmos.fakeDeviceEntryFingerprintAuthRepository.setAuthenticationStatus(
+                SuccessFingerprintAuthenticationStatus(0, true)
+            )
 
             assertThat(destinationScenes?.get(Swipe(SwipeDirection.Up))?.toScene)
                 .isEqualTo(Scenes.Gone)
@@ -176,7 +183,6 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val destinationScenes by collectLastValue(underTest.destinationScenes)
             kosmos.fakeDeviceEntryRepository.setLockscreenEnabled(true)
-            kosmos.fakeDeviceEntryRepository.setUnlocked(true)
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.None
             )
@@ -194,7 +200,9 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.Pin
             )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(true)
+            kosmos.fakeDeviceEntryFingerprintAuthRepository.setAuthenticationStatus(
+                SuccessFingerprintAuthenticationStatus(0, true)
+            )
             runCurrent()
 
             assertThat(isClickable).isFalse()
@@ -207,40 +215,23 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.Pin
             )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(false)
             runCurrent()
 
             assertThat(isClickable).isTrue()
         }
 
     @Test
-    fun onContentClicked_deviceUnlocked_switchesToGone() =
+    fun onContentClicked_deviceLockedSecurely_switchesToLockscreen() =
         testScope.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
                 AuthenticationMethodModel.Pin
             )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(true)
             runCurrent()
 
             underTest.onContentClicked()
 
-            assertThat(currentScene).isEqualTo(Scenes.Gone)
-        }
-
-    @Test
-    fun onContentClicked_deviceLockedSecurely_switchesToBouncer() =
-        testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.currentScene)
-            kosmos.fakeAuthenticationRepository.setAuthenticationMethod(
-                AuthenticationMethodModel.Pin
-            )
-            kosmos.fakeDeviceEntryRepository.setUnlocked(false)
-            runCurrent()
-
-            underTest.onContentClicked()
-
-            assertThat(currentScene).isEqualTo(Scenes.Bouncer)
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
         }
 
     @Test
@@ -280,17 +271,17 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
 
     @Test
     fun upTransitionSceneKey_customizing_noTransition() =
-            testScope.runTest {
-                val destinationScenes by collectLastValue(underTest.destinationScenes)
+        testScope.runTest {
+            val destinationScenes by collectLastValue(underTest.destinationScenes)
 
-                qsSceneAdapter.setCustomizing(true)
-                assertThat(
-                        destinationScenes!!
-                                .keys
-                                .filterIsInstance<Swipe>()
-                                .filter { it.direction == SwipeDirection.Up }
-                ).isEmpty()
-            }
+            qsSceneAdapter.setCustomizing(true)
+            assertThat(
+                    destinationScenes!!.keys.filterIsInstance<Swipe>().filter {
+                        it.direction == SwipeDirection.Up
+                    }
+                )
+                .isEmpty()
+        }
 
     @Test
     fun shadeMode() =

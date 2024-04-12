@@ -50,7 +50,11 @@ constructor(
 
     val spatialAudioButton: StateFlow<ButtonViewModel?> =
         interactor.isEnabled
-            .map { it.toViewModel(true).toButtonViewModel() }
+            .map {
+                it.toViewModel(true)
+                    .toButtonViewModel()
+                    .copy(label = context.getString(R.string.volume_panel_spatial_audio_title))
+            }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
     val isAvailable: StateFlow<Boolean> =
@@ -77,15 +81,19 @@ constructor(
                             model = isEnabled,
                             iconColor =
                                 Color.Attribute(
-                                    if (isChecked)
+                                    if (isChecked) {
                                         com.android.internal.R.attr.materialColorOnPrimaryContainer
-                                    else com.android.internal.R.attr.materialColorOnSurfaceVariant
+                                    } else {
+                                        com.android.internal.R.attr.materialColorOnSurfaceVariant
+                                    }
                                 ),
                             labelColor =
                                 Color.Attribute(
-                                    if (isChecked)
+                                    if (isChecked) {
                                         com.android.internal.R.attr.materialColorOnSurface
-                                    else com.android.internal.R.attr.materialColorOutline
+                                    } else {
+                                        com.android.internal.R.attr.materialColorOnSurfaceVariant
+                                    }
                                 ),
                         )
                     }

@@ -405,8 +405,6 @@ public class ScreenDecorations implements
         mExecutor = mThreadFactory.buildDelayableExecutorOnHandler(mHandler);
         mExecutor.execute(this::startOnScreenDecorationsThread);
         mDotViewController.setUiExecutor(mExecutor);
-        mJavaAdapter.alwaysCollectFlow(mFacePropertyRepository.getSensorLocation(),
-                this::onFaceSensorLocationChanged);
         mCommandRegistry.registerCommand(ScreenDecorCommand.SCREEN_DECOR_CMD_NAME,
                 () -> new ScreenDecorCommand(mScreenDecorCommandCallback));
     }
@@ -583,6 +581,8 @@ public class ScreenDecorations implements
         };
         mDisplayTracker.addDisplayChangeCallback(mDisplayListener, new HandlerExecutor(mHandler));
         updateConfiguration();
+        mJavaAdapter.alwaysCollectFlow(mFacePropertyRepository.getSensorLocation(),
+                this::onFaceSensorLocationChanged);
         Trace.endSection();
     }
 
@@ -1328,10 +1328,18 @@ public class ScreenDecorations implements
     @VisibleForTesting
     void onFaceSensorLocationChanged(Point location) {
         mLogger.onSensorLocationChanged();
+
         if (mExecutor != null) {
             mExecutor.execute(
-                    () -> updateOverlayProviderViews(
-                            new Integer[]{mFaceScanningViewId}));
+                    () -> {
+                        if (getOverlayView(mFaceScanningViewId) == null) {
+                            // face sensor location was just initialized
+                            setupDecorations();
+                        } else {
+                            updateOverlayProviderViews(new Integer[]{mFaceScanningViewId});
+                        }
+                    }
+            );
         }
     }
 

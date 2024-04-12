@@ -106,6 +106,28 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"இடது பக்கம் மட்டும் செயலில் உள்ளது"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"வலது பக்கம் மட்டும் செயலில் உள்ளது"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"வலது மற்றும் இடது பக்கம் செயலில் உள்ளது"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"மீடியா ஆடியோ"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"ஃபோன் அழைப்புகள்"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"ஃபைல் இடமாற்றம்"</string>
@@ -265,7 +287,7 @@
     <string name="bugreport_in_power_summary" msgid="1885529649381831775">"பிழை அறிக்கையைப் பெற பவர் மெனுவில் விருப்பத்தைக் காட்டு"</string>
     <string name="keep_screen_on" msgid="1187161672348797558">"செயலில் வைத்திரு"</string>
     <string name="keep_screen_on_summary" msgid="1510731514101925829">"சார்ஜ் ஏறும்போது திரை எப்போதும் உறக்கநிலைக்குச் செல்லாது"</string>
-    <string name="bt_hci_snoop_log" msgid="7291287955649081448">"புளூடூத் HCI ஸ்னுப் பதிவை இயக்கு"</string>
+    <string name="bt_hci_snoop_log" msgid="7291287955649081448">"புளூடூத் HCI ஸ்னுப் பதிவை இயக்குதல்"</string>
     <string name="bt_hci_snoop_log_summary" msgid="6808538971394092284">"புளூடூத் பேக்கெட்டுகளைக் கண்டறி. (இந்த அமைப்பை மாற்றிய பின்பு, புளூடூத்தை மாற்று)"</string>
     <string name="oem_unlock_enable" msgid="5334869171871566731">"OEM திறத்தல்"</string>
     <string name="oem_unlock_enable_summary" msgid="5857388174390953829">"பூட்லோடரைத் திறக்க அனுமதி"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"ஆப்ஸ் மாடர்ன் வடிவங்களை ஆதரிக்கும்படி அமை"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"குறிமாற்ற அறிவிப்புகளைக் காட்டு"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"குறிமாற்றத்திற்கான தற்காலிக சேமிப்பை முடக்குதல்"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Widevine அமைப்புகள்"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"L3 ஃபால்பேக்கை இயக்குதல்"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"L3 ஃபால்பேக்கை இயக்குவதற்குத் தேர்ந்தெடுக்கலாம்"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"இயங்கும் சேவைகள்"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"தற்போது இயக்கத்தில் இருக்கும் சேவைகளைப் பார்த்து கட்டுப்படுத்து"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"WebView செயல்படுத்தல்"</string>
@@ -619,8 +638,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"புதிய பயனரை உருவாக்க முடியவில்லை"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"புதிய விருந்தினரை உருவாக்க முடியவில்லை"</string>
     <string name="user_nickname" msgid="262624187455825083">"புனைப்பெயர்"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"நீங்கள் தேர்வுசெய்யும் பெயரையும் படத்தையும் இந்தச் சாதனத்தைப் பயன்படுத்தும் அனைவரும் பார்க்கலாம்."</string>
     <string name="user_add_user" msgid="7876449291500212468">"பயனரைச் சேர்"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"கெஸ்ட்டைச் சேர்"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"கெஸ்ட்டை அகற்று"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"வெளியேறியவுடன் அனைத்துச் செயல்பாடுகளும் நீக்கப்படும்"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"வெளியேறும்போது செயல்பாடுகளைச் சேமிக்கலாம் அல்லது நீக்கலாம்"</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"அமர்வின் செயல்பாடுகளை இப்போதே நீக்க ரீசெட் செய்யவும் அல்லது வெளியேறும்போது செயல்பாடுகளைச் சேமிக்கலாம் அல்லது நீக்கலாம்"</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"படமெடுங்கள்"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"படத்தைத் தேர்வுசெய்யுங்கள்"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"படத்தைத் தேர்ந்தெடுங்கள்"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"பலமுறை தவறாக முயன்ற காரணத்தால் இந்தச் சாதனத்தின் தரவு நீக்கப்படும்."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"பலமுறை தவறாக முயன்ற காரணத்தால் இந்தப் பயனர் நீக்கப்படுவார்."</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"ஈத்தர்நெட் துண்டிக்கப்பட்டது."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"ஈதர்நெட்."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"அழைப்பை மேற்கொள்ள முடியவில்லை."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"சுயவிவரப் படத்தைத் தேர்வுசெய்யுங்கள்"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"இயல்புநிலைப் பயனர் ஐகான்"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"கீபோர்டு"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"கீபோர்டு தளவமைப்பைத் தேர்வுசெய்தல்"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"இயல்பு"</string>

@@ -101,14 +101,14 @@ import com.android.wm.shell.common.SingleInstanceRemoteListener;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.TaskStackListenerCallback;
 import com.android.wm.shell.common.TaskStackListenerImpl;
-import com.android.wm.shell.common.annotations.ShellBackgroundThread;
-import com.android.wm.shell.common.annotations.ShellMainThread;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 import com.android.wm.shell.common.bubbles.BubbleBarUpdate;
 import com.android.wm.shell.draganddrop.DragAndDropController;
 import com.android.wm.shell.onehanded.OneHandedController;
 import com.android.wm.shell.onehanded.OneHandedTransitionCallback;
 import com.android.wm.shell.pip.PinnedStackListenerForwarder;
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
+import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.sysui.ConfigurationChangeListener;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
@@ -455,8 +455,7 @@ public class BubbleController implements ConfigurationChangeListener,
                         ProtoLog.d(WM_SHELL_BUBBLES,
                                 "onActivityRestartAttempt - taskId=%d selecting matching bubble=%s",
                                 task.taskId, b.getKey());
-                        mBubbleData.setSelectedBubble(b);
-                        mBubbleData.setExpanded(true);
+                        mBubbleData.setSelectedBubbleAndExpandStack(b);
                         return;
                     }
                 }
@@ -591,13 +590,6 @@ public class BubbleController implements ConfigurationChangeListener,
         } catch (RemoteException e) {
             e.printStackTrace();
         }
-    }
-
-    private void openBubbleOverflow() {
-        ensureBubbleViewsAndWindowCreated();
-        mBubbleData.setShowingOverflow(true);
-        mBubbleData.setSelectedBubble(mBubbleData.getOverflow());
-        mBubbleData.setExpanded(true);
     }
 
     /**
@@ -1247,8 +1239,7 @@ public class BubbleController implements ConfigurationChangeListener,
         }
         if (mBubbleData.hasBubbleInStackWithKey(b.getKey())) {
             // already in the stack
-            mBubbleData.setSelectedBubble(b);
-            mBubbleData.setExpanded(true);
+            mBubbleData.setSelectedBubbleAndExpandStack(b);
         } else if (mBubbleData.hasOverflowBubbleWithKey(b.getKey())) {
             // promote it out of the overflow
             promoteBubbleFromOverflow(b);
@@ -1273,8 +1264,7 @@ public class BubbleController implements ConfigurationChangeListener,
             String key = entry.getKey();
             Bubble bubble = mBubbleData.getBubbleInStackWithKey(key);
             if (bubble != null) {
-                mBubbleData.setSelectedBubble(bubble);
-                mBubbleData.setExpanded(true);
+                mBubbleData.setSelectedBubbleAndExpandStack(bubble);
             } else {
                 bubble = mBubbleData.getOverflowBubbleWithKey(key);
                 if (bubble != null) {
@@ -1367,8 +1357,7 @@ public class BubbleController implements ConfigurationChangeListener,
             } else {
                 // App bubble is not selected, select it & expand
                 Log.i(TAG, "  showOrHideAppBubble, expand and select existing app bubble");
-                mBubbleData.setSelectedBubble(existingAppBubble);
-                mBubbleData.setExpanded(true);
+                mBubbleData.setSelectedBubbleAndExpandStack(existingAppBubble);
             }
         } else {
             // Check if it exists in the overflow
@@ -2328,6 +2317,17 @@ public class BubbleController implements ConfigurationChangeListener,
         public void showUserEducation(int positionX, int positionY) {
             mMainExecutor.execute(() ->
                     mController.showUserEducation(new Point(positionX, positionY)));
+        }
+
+        @Override
+        public void setBubbleBarLocation(BubbleBarLocation location) {
+            mMainExecutor.execute(() ->
+                    mController.setBubbleBarLocation(location));
+        }
+
+        @Override
+        public void setBubbleBarBounds(Rect bubbleBarBounds) {
+            mMainExecutor.execute(() -> mBubblePositioner.setBubbleBarBounds(bubbleBarBounds));
         }
     }
 

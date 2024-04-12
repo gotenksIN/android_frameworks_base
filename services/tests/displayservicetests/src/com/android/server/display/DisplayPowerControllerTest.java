@@ -82,6 +82,7 @@ import com.android.server.display.brightness.BrightnessReason;
 import com.android.server.display.brightness.clamper.BrightnessClamperController;
 import com.android.server.display.brightness.clamper.HdrClamper;
 import com.android.server.display.color.ColorDisplayService;
+import com.android.server.display.config.HysteresisLevels;
 import com.android.server.display.config.SensorData;
 import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.display.feature.flags.Flags;
@@ -264,7 +265,8 @@ public final class DisplayPowerControllerTest {
         advanceTime(1);
 
         // The display should have been turned off
-        verify(mHolder.displayPowerState).setScreenState(Display.STATE_OFF);
+        verify(mHolder.displayPowerState)
+                .setScreenState(Display.STATE_OFF, Display.STATE_REASON_DEFAULT_POLICY);
 
         clearInvocations(mHolder.displayPowerState);
         when(mHolder.displayPowerState.getScreenState()).thenReturn(Display.STATE_OFF);
@@ -275,13 +277,15 @@ public final class DisplayPowerControllerTest {
         advanceTime(1);
 
         // The prox sensor is debounced so the display should not have been turned back on yet
-        verify(mHolder.displayPowerState, never()).setScreenState(Display.STATE_ON);
+        verify(mHolder.displayPowerState, never())
+                .setScreenState(Display.STATE_ON, Display.STATE_REASON_DEFAULT_POLICY);
 
         // Advance time by more than PROXIMITY_SENSOR_NEGATIVE_DEBOUNCE_DELAY
         advanceTime(1000);
 
         // The display should have been turned back on
-        verify(mHolder.displayPowerState).setScreenState(Display.STATE_ON);
+        verify(mHolder.displayPowerState)
+                .setScreenState(Display.STATE_ON, Display.STATE_REASON_DEFAULT_POLICY);
     }
 
     @Test
@@ -304,7 +308,8 @@ public final class DisplayPowerControllerTest {
         advanceTime(1);
 
         // The display should have been turned off
-        verify(mHolder.displayPowerState).setScreenState(Display.STATE_OFF);
+        verify(mHolder.displayPowerState)
+                .setScreenState(Display.STATE_OFF, Display.STATE_REASON_DEFAULT_POLICY);
 
         when(mHolder.displayPowerState.getScreenState()).thenReturn(Display.STATE_OFF);
         // The display device changes and we no longer have a prox sensor
@@ -317,7 +322,8 @@ public final class DisplayPowerControllerTest {
 
         // The display should have been turned back on and the listener should have been
         // unregistered
-        verify(mHolder.displayPowerState).setScreenState(Display.STATE_ON);
+        verify(mHolder.displayPowerState)
+                .setScreenState(Display.STATE_ON, Display.STATE_REASON_DEFAULT_POLICY);
         verify(mSensorManagerMock).unregisterListener(listener);
     }
 
@@ -813,17 +819,17 @@ public final class DisplayPowerControllerTest {
         DisplayPowerRequest dpr = new DisplayPowerRequest();
         mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
         advanceTime(1); // Run updatePowerState
-        verify(mHolder.displayPowerState).setScreenState(anyInt());
+        verify(mHolder.displayPowerState).setScreenState(anyInt(), anyInt());
 
         mHolder = createDisplayPowerController(42, UNIQUE_ID);
 
         mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
         advanceTime(1); // Run updatePowerState
-        verify(mHolder.displayPowerState, never()).setScreenState(anyInt());
+        verify(mHolder.displayPowerState, never()).setScreenState(anyInt(), anyInt());
 
         mHolder.dpc.onBootCompleted();
         advanceTime(1); // Run updatePowerState
-        verify(mHolder.displayPowerState).setScreenState(anyInt());
+        verify(mHolder.displayPowerState).setScreenState(anyInt(), anyInt());
     }
 
     @Test
@@ -1479,7 +1485,7 @@ public final class DisplayPowerControllerTest {
         doAnswer(invocation -> {
             when(mHolder.displayPowerState.getScreenState()).thenReturn(invocation.getArgument(0));
             return null;
-        }).when(mHolder.displayPowerState).setScreenState(anyInt());
+        }).when(mHolder.displayPowerState).setScreenState(anyInt(), anyInt());
         mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
 
         // start with DOZE.
@@ -1489,10 +1495,12 @@ public final class DisplayPowerControllerTest {
         mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
         advanceTime(1); // Run updatePowerState
 
-        mHolder.dpc.overrideDozeScreenState(supportedTargetState);
+        mHolder.dpc.overrideDozeScreenState(
+                supportedTargetState, Display.STATE_REASON_DEFAULT_POLICY);
         advanceTime(1); // Run updatePowerState
 
-        verify(mHolder.displayPowerState).setScreenState(supportedTargetState);
+        verify(mHolder.displayPowerState)
+                .setScreenState(supportedTargetState, Display.STATE_REASON_DEFAULT_POLICY);
     }
 
     @Test
@@ -1505,7 +1513,7 @@ public final class DisplayPowerControllerTest {
         doAnswer(invocation -> {
             when(mHolder.displayPowerState.getScreenState()).thenReturn(invocation.getArgument(0));
             return null;
-        }).when(mHolder.displayPowerState).setScreenState(anyInt());
+        }).when(mHolder.displayPowerState).setScreenState(anyInt(), anyInt());
         mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
 
         // start with DOZE.
@@ -1515,10 +1523,12 @@ public final class DisplayPowerControllerTest {
         mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
         advanceTime(1); // Run updatePowerState
 
-        mHolder.dpc.overrideDozeScreenState(unSupportedTargetState);
+        mHolder.dpc.overrideDozeScreenState(
+                unSupportedTargetState, Display.STATE_REASON_DEFAULT_POLICY);
         advanceTime(1); // Run updatePowerState
 
-        verify(mHolder.displayPowerState, never()).setScreenState(anyInt());
+        verify(mHolder.displayPowerState, never())
+                .setScreenState(anyInt(), eq(Display.STATE_REASON_DEFAULT_POLICY));
     }
 
     @Test
@@ -1530,7 +1540,7 @@ public final class DisplayPowerControllerTest {
         doAnswer(invocation -> {
             when(mHolder.displayPowerState.getScreenState()).thenReturn(invocation.getArgument(0));
             return null;
-        }).when(mHolder.displayPowerState).setScreenState(anyInt());
+        }).when(mHolder.displayPowerState).setScreenState(anyInt(), anyInt());
         mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
 
         // start with OFF.
@@ -1540,10 +1550,11 @@ public final class DisplayPowerControllerTest {
         mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
         advanceTime(1); // Run updatePowerState
 
-        mHolder.dpc.overrideDozeScreenState(supportedTargetState);
+        mHolder.dpc.overrideDozeScreenState(
+                supportedTargetState, Display.STATE_REASON_DEFAULT_POLICY);
         advanceTime(1); // Run updatePowerState
 
-        verify(mHolder.displayPowerState, never()).setScreenState(anyInt());
+        verify(mHolder.displayPowerState, never()).setScreenState(anyInt(), anyInt());
     }
 
     @Test
@@ -1944,6 +1955,14 @@ public final class DisplayPowerControllerTest {
                 .thenReturn(BRIGHTNESS_RAMP_INCREASE_MAX_IDLE);
         when(displayDeviceConfigMock.getBrightnessRampDecreaseMaxIdleMillis())
                 .thenReturn(BRIGHTNESS_RAMP_DECREASE_MAX_IDLE);
+
+        final HysteresisLevels hysteresisLevels = mock(HysteresisLevels.class);
+        when(displayDeviceConfigMock.getAmbientBrightnessHysteresis()).thenReturn(hysteresisLevels);
+        when(displayDeviceConfigMock.getAmbientBrightnessIdleHysteresis()).thenReturn(
+                hysteresisLevels);
+        when(displayDeviceConfigMock.getScreenBrightnessHysteresis()).thenReturn(hysteresisLevels);
+        when(displayDeviceConfigMock.getScreenBrightnessIdleHysteresis()).thenReturn(
+                hysteresisLevels);
     }
 
     private DisplayPowerControllerHolder createDisplayPowerController(int displayId,
@@ -1985,7 +2004,7 @@ public final class DisplayPowerControllerTest {
 
         TestInjector injector = spy(new TestInjector(displayPowerState, animator,
                 automaticBrightnessController, wakelockController, brightnessMappingStrategy,
-                hysteresisLevels, screenOffBrightnessSensorController,
+                screenOffBrightnessSensorController,
                 hbmController, normalBrightnessModeController, hdrClamper,
                 clamperController, mDisplayManagerFlagsMock));
 
@@ -1994,6 +2013,11 @@ public final class DisplayPowerControllerTest {
         final HighBrightnessModeMetadata hbmMetadata = mock(HighBrightnessModeMetadata.class);
         final BrightnessSetting brightnessSetting = mock(BrightnessSetting.class);
         final DisplayDeviceConfig config = mock(DisplayDeviceConfig.class);
+
+        when(config.getAmbientBrightnessHysteresis()).thenReturn(hysteresisLevels);
+        when(config.getAmbientBrightnessIdleHysteresis()).thenReturn(hysteresisLevels);
+        when(config.getScreenBrightnessHysteresis()).thenReturn(hysteresisLevels);
+        when(config.getScreenBrightnessIdleHysteresis()).thenReturn(hysteresisLevels);
 
         setUpDisplay(displayId, uniqueId, display, device, config, isEnabled);
         when(config.isAutoBrightnessAvailable()).thenReturn(isAutoBrightnessAvailable);
@@ -2070,7 +2094,6 @@ public final class DisplayPowerControllerTest {
         private final AutomaticBrightnessController mAutomaticBrightnessController;
         private final WakelockController mWakelockController;
         private final BrightnessMappingStrategy mBrightnessMappingStrategy;
-        private final HysteresisLevels mHysteresisLevels;
         private final ScreenOffBrightnessSensorController mScreenOffBrightnessSensorController;
         private final HighBrightnessModeController mHighBrightnessModeController;
 
@@ -2086,7 +2109,6 @@ public final class DisplayPowerControllerTest {
                 AutomaticBrightnessController automaticBrightnessController,
                 WakelockController wakelockController,
                 BrightnessMappingStrategy brightnessMappingStrategy,
-                HysteresisLevels hysteresisLevels,
                 ScreenOffBrightnessSensorController screenOffBrightnessSensorController,
                 HighBrightnessModeController highBrightnessModeController,
                 NormalBrightnessModeController normalBrightnessModeController,
@@ -2098,7 +2120,6 @@ public final class DisplayPowerControllerTest {
             mAutomaticBrightnessController = automaticBrightnessController;
             mWakelockController = wakelockController;
             mBrightnessMappingStrategy = brightnessMappingStrategy;
-            mHysteresisLevels = hysteresisLevels;
             mScreenOffBrightnessSensorController = screenOffBrightnessSensorController;
             mHighBrightnessModeController = highBrightnessModeController;
             mNormalBrightnessModeController = normalBrightnessModeController;
@@ -2173,22 +2194,6 @@ public final class DisplayPowerControllerTest {
                 DisplayDeviceConfig displayDeviceConfig,
                 DisplayWhiteBalanceController displayWhiteBalanceController) {
             return mBrightnessMappingStrategy;
-        }
-
-        @Override
-        HysteresisLevels getHysteresisLevels(float[] brighteningThresholdsPercentages,
-                float[] darkeningThresholdsPercentages, float[] brighteningThresholdLevels,
-                float[] darkeningThresholdLevels, float minDarkeningThreshold,
-                float minBrighteningThreshold) {
-            return mHysteresisLevels;
-        }
-
-        @Override
-        HysteresisLevels getHysteresisLevels(float[] brighteningThresholdsPercentages,
-                float[] darkeningThresholdsPercentages, float[] brighteningThresholdLevels,
-                float[] darkeningThresholdLevels, float minDarkeningThreshold,
-                float minBrighteningThreshold, boolean potentialOldBrightnessRange) {
-            return mHysteresisLevels;
         }
 
         @Override

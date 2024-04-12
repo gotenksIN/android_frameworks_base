@@ -24,7 +24,7 @@ import static android.hardware.biometrics.BiometricManager.Authenticators;
 import static android.hardware.biometrics.Flags.FLAG_ADD_KEY_AGREEMENT_CRYPTO_OBJECT;
 import static android.hardware.biometrics.Flags.FLAG_CUSTOM_BIOMETRIC_PROMPT;
 import static android.hardware.biometrics.Flags.FLAG_GET_OP_ID_CRYPTO_OBJECT;
-import static android.multiuser.Flags.FLAG_ENABLE_BIOMETRICS_TO_UNLOCK_PRIVATE_SPACE;
+import static android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE;
 
 import android.annotation.CallbackExecutor;
 import android.annotation.DrawableRes;
@@ -52,6 +52,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.R;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.FrameworkStatsLog;
 
 import java.lang.annotation.Retention;
@@ -70,6 +71,8 @@ import javax.crypto.Mac;
 public class BiometricPrompt implements BiometricAuthenticator, BiometricConstants {
 
     private static final String TAG = "BiometricPrompt";
+    @VisibleForTesting
+    static final int MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER = 30;
 
     /**
      * Error/help message will show for this amount of time.
@@ -123,6 +126,15 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
     public static final int DISMISSED_REASON_CREDENTIAL_CONFIRMED = 7;
 
     /**
+     * Dialog is done animating away after user clicked on the button set via
+     * {@link PromptContentViewWithMoreOptionsButton.Builder#setMoreOptionsButtonListener(Executor,
+     * DialogInterface.OnClickListener)} )}.
+     *
+     * @hide
+     */
+    public static final int DISMISSED_REASON_CONTENT_VIEW_MORE_OPTIONS = 8;
+
+    /**
      * @hide
      */
     @IntDef({DISMISSED_REASON_BIOMETRIC_CONFIRMED,
@@ -131,7 +143,8 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
             DISMISSED_REASON_BIOMETRIC_CONFIRM_NOT_REQUIRED,
             DISMISSED_REASON_ERROR,
             DISMISSED_REASON_SERVER_REQUESTED,
-            DISMISSED_REASON_CREDENTIAL_CONFIRMED})
+            DISMISSED_REASON_CREDENTIAL_CONFIRMED,
+            DISMISSED_REASON_CONTENT_VIEW_MORE_OPTIONS})
     @Retention(RetentionPolicy.SOURCE)
     public @interface DismissedReason {}
 
@@ -212,15 +225,22 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
          *
          * @param logoDescription The logo description text that will be shown on the prompt.
          * @return This builder.
+         * @throws IllegalArgumentException If logo description is null or exceeds certain character
+         *                                  limit.
          */
         @FlaggedApi(FLAG_CUSTOM_BIOMETRIC_PROMPT)
         @RequiresPermission(SET_BIOMETRIC_DIALOG_ADVANCED)
         @NonNull
         public BiometricPrompt.Builder setLogoDescription(@NonNull String logoDescription) {
+            if (logoDescription == null
+                    || logoDescription.length() > MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER) {
+                throw new IllegalArgumentException(
+                        "Logo description passed in can not be null or exceed "
+                                + MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER + " character number.");
+            }
             mPromptInfo.setLogoDescription(logoDescription);
             return this;
         }
-
 
         /**
          * Required: Sets the title that will be shown on the prompt.
@@ -510,7 +530,7 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
 
         /**
          * Remove {@link Builder#setAllowBackgroundAuthentication(boolean)} once
-         * FLAG_ENABLE_BIOMETRICS_TO_UNLOCK_PRIVATE_SPACE is enabled.
+         * FLAG_ALLOW_PRIVATE_PROFILE is enabled.
          *
          * @param allow If true, allows authentication when the calling package is not in the
          *              foreground. This is set to false by default.
@@ -519,7 +539,7 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
          * @return This builder
          * @hide
          */
-        @FlaggedApi(FLAG_ENABLE_BIOMETRICS_TO_UNLOCK_PRIVATE_SPACE)
+        @FlaggedApi(FLAG_ALLOW_PRIVATE_PROFILE)
         @TestApi
         @NonNull
         @RequiresPermission(anyOf = {TEST_BIOMETRIC, USE_BIOMETRIC_INTERNAL})
@@ -654,8 +674,6 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
     private final IAuthService mService;
     private final PromptInfo mPromptInfo;
     private final ButtonInfo mNegativeButtonInfo;
-    // TODO(b/328843028): add callback onContentViewMoreOptionsButtonClicked() in
-    //  IBiometricServiceReceiver.
     private final ButtonInfo mContentViewMoreOptionsButtonInfo;
 
     private CryptoObject mCryptoObject;
@@ -745,6 +763,13 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
                     mNegativeButtonInfo.listener.onClick(null, DialogInterface.BUTTON_NEGATIVE);
                     mIsPromptShowing = false;
                 });
+            } else if (reason == DISMISSED_REASON_CONTENT_VIEW_MORE_OPTIONS) {
+                if (mContentViewMoreOptionsButtonInfo != null) {
+                    mContentViewMoreOptionsButtonInfo.executor.execute(() -> {
+                        mContentViewMoreOptionsButtonInfo.listener.onClick(null,
+                                DialogInterface.BUTTON_NEGATIVE);
+                    });
+                }
             } else {
                 mIsPromptShowing = false;
                 Log.e(TAG, "Unknown reason: " + reason);
@@ -799,7 +824,7 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
 
     /**
      * Gets the logo description for the prompt, as set by
-     * {@link Builder#setDescription(CharSequence)}.
+     * {@link Builder#setLogoDescription(String)}.
      * Currently for system applications use only.
      *
      * @return The logo description of the prompt, or null if the prompt has no logo description

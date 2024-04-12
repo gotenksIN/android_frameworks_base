@@ -1159,6 +1159,9 @@ public final class InputMethodManager {
                     }
                     final boolean startInput;
                     synchronized (mH) {
+                        if (reason == UnbindReason.DISCONNECT_IME) {
+                            mImeDispatcher.clear();
+                        }
                         if (getBindSequenceLocked() != sequence) {
                             return;
                         }
@@ -4319,6 +4322,19 @@ public final class InputMethodManager {
     @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
     public boolean hasPendingImeVisibilityRequests() {
         return IInputMethodManagerGlobalInvoker.hasPendingImeVisibilityRequests();
+    }
+
+    /**
+     * A test API for CTS to finish the tracking of any pending IME visibility requests. This
+     * won't stop the actual requests, but allows resetting the state when starting up test runs.
+     *
+     * @hide
+     */
+    @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+    @TestApi
+    @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
+    public void finishTrackingPendingImeVisibilityRequests() {
+        IInputMethodManagerGlobalInvoker.finishTrackingPendingImeVisibilityRequests();
     }
 
     /**

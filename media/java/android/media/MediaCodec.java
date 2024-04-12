@@ -65,6 +65,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 /**
  MediaCodec class can be used to access low-level media codecs, i.e. encoder/decoder components.
@@ -2014,6 +2015,23 @@ final public class MediaCodec {
         }
     }
 
+    // HACKY(b/325389296): aconfig flag accessors may not work in all contexts where MediaCodec API
+    // is used, so allow accessors to fail. In those contexts use a default value, normally false.
+
+    /* package private */
+    static boolean GetFlag(Supplier<Boolean> flagValueSupplier) {
+        return GetFlag(flagValueSupplier, false /* defaultValue */);
+    }
+
+    /* package private */
+    static boolean GetFlag(Supplier<Boolean> flagValueSupplier, boolean defaultValue) {
+        try {
+            return flagValueSupplier.get();
+        } catch (java.lang.RuntimeException e) {
+            return defaultValue;
+        }
+    }
+
     private boolean mHasSurface = false;
 
     /**
@@ -2346,12 +2364,16 @@ final public class MediaCodec {
         }
 
         // at the moment no codecs support detachable surface
-        if (android.media.codec.Flags.nullOutputSurface()) {
+        boolean canDetach = GetFlag(() -> android.media.codec.Flags.nullOutputSurfaceSupport());
+        if (GetFlag(() -> android.media.codec.Flags.nullOutputSurface())) {
             // Detached surface flag is only meaningful if surface is null. Otherwise, it is
             // ignored.
-            if (surface == null && (flags & CONFIGURE_FLAG_DETACHED_SURFACE) != 0) {
+            if (surface == null && (flags & CONFIGURE_FLAG_DETACHED_SURFACE) != 0 && !canDetach) {
                 throw new IllegalArgumentException("Codec does not support detached surface");
             }
+        } else {
+            // don't allow detaching if API is disabled
+            canDetach = false;
         }
 
         String[] keys = null;
@@ -2393,6 +2415,14 @@ final public class MediaCodec {
         }
 
         native_configure(keys, values, surface, crypto, descramblerBinder, flags);
+
+        if (canDetach) {
+            // If we were able to configure native codec with a detached surface
+            // we now know that we have a surface.
+            if (surface == null && (flags & CONFIGURE_FLAG_DETACHED_SURFACE) != 0) {
+                mHasSurface = true;
+            }
+        }
     }
 
     /**
@@ -2437,11 +2467,18 @@ final public class MediaCodec {
         if (!mHasSurface) {
             throw new IllegalStateException("codec was not configured for an output surface");
         }
+
         // note: we still have a surface in detached mode, so keep mHasSurface
         // we also technically allow calling detachOutputSurface multiple times in a row
-        throw new IllegalStateException("codec does not support detaching output surface");
-        // native_detachSurface();
+
+        if (GetFlag(() -> android.media.codec.Flags.nullOutputSurfaceSupport())) {
+            native_detachOutputSurface();
+        } else {
+            throw new IllegalStateException("codec does not support detaching output surface");
+        }
     }
+
+    private native void native_detachOutputSurface();
 
     /**
      * Create a persistent input surface that can be used with codecs that normally have an input

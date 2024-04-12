@@ -123,6 +123,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -678,6 +679,87 @@ public class UserControllerTest {
     }
 
     /**
+     * Test that, when exceeding the maximum number of running users, a profile of the current user
+     * is not stopped.
+     */
+    @Test
+    public void testStoppingExcessRunningUsersAfterSwitch_currentProfileNotStopped()
+            throws Exception {
+        mUserController.setInitialConfig(/* userSwitchUiEnabled= */ true,
+                /* maxRunningUsers= */ 5, /* delayUserDataLocking= */ false);
+
+        final int PARENT_ID = 200;
+        final int PROFILE1_ID = 201;
+        final int PROFILE2_ID = 202;
+        final int FG_USER_ID = 300;
+        final int BG_USER_ID = 400;
+
+        setUpUser(PARENT_ID, 0).profileGroupId = PARENT_ID;
+        setUpUser(PROFILE1_ID, UserInfo.FLAG_PROFILE).profileGroupId = PARENT_ID;
+        setUpUser(PROFILE2_ID, UserInfo.FLAG_PROFILE).profileGroupId = PARENT_ID;
+        setUpUser(FG_USER_ID, 0).profileGroupId = FG_USER_ID;
+        setUpUser(BG_USER_ID, 0).profileGroupId = UserInfo.NO_PROFILE_GROUP_ID;
+        mUserController.onSystemReady(); // To set the profileGroupIds in UserController.
+
+        assertEquals(newHashSet(
+                SYSTEM_USER_ID),
+                new HashSet<>(mUserController.getRunningUsersLU()));
+
+        int numberOfUserSwitches = 1;
+        addForegroundUserAndContinueUserSwitch(PARENT_ID, UserHandle.USER_SYSTEM,
+                numberOfUserSwitches, false);
+        mUserController.finishUserSwitch(mUserStates.get(PARENT_ID));
+        waitForHandlerToComplete(mInjector.mHandler, HANDLER_WAIT_TIME_MS);
+        assertTrue(mUserController.canStartMoreUsers());
+        assertEquals(newHashSet(
+                SYSTEM_USER_ID, PARENT_ID),
+                new HashSet<>(mUserController.getRunningUsersLU()));
+
+        assertThat(mUserController.startProfile(PROFILE1_ID, true, null)).isTrue();
+        assertEquals(newHashSet(
+                SYSTEM_USER_ID, PROFILE1_ID, PARENT_ID),
+                new HashSet<>(mUserController.getRunningUsersLU()));
+
+        numberOfUserSwitches++;
+        addForegroundUserAndContinueUserSwitch(FG_USER_ID, PARENT_ID,
+                numberOfUserSwitches, false);
+        mUserController.finishUserSwitch(mUserStates.get(FG_USER_ID));
+        waitForHandlerToComplete(mInjector.mHandler, HANDLER_WAIT_TIME_MS);
+        assertTrue(mUserController.canStartMoreUsers());
+        assertEquals(newHashSet(
+                SYSTEM_USER_ID, PROFILE1_ID, PARENT_ID, FG_USER_ID),
+                new HashSet<>(mUserController.getRunningUsersLU()));
+
+        mUserController.startUser(BG_USER_ID, USER_START_MODE_BACKGROUND);
+        assertEquals(newHashSet(
+                SYSTEM_USER_ID, PROFILE1_ID, PARENT_ID, BG_USER_ID, FG_USER_ID),
+                new HashSet<>(mUserController.getRunningUsersLU()));
+
+        // Now we exceed the maxRunningUsers parameter (of 5):
+        assertThat(mUserController.startProfile(PROFILE2_ID, true, null)).isTrue();
+        // Currently, starting a profile doesn't trigger evaluating whether we've exceeded max, so
+        // we expect no users to be stopped. This policy may change in the future. Log but no fail.
+        if (!newHashSet(SYSTEM_USER_ID, PROFILE1_ID, BG_USER_ID, PROFILE2_ID, PARENT_ID, FG_USER_ID)
+                .equals(new HashSet<>(mUserController.getRunningUsersLU()))) {
+            Log.w(TAG, "Starting a profile that exceeded max running users didn't lead to "
+                    + "expectations: " + mUserController.getRunningUsersLU());
+        }
+
+        numberOfUserSwitches++;
+        addForegroundUserAndContinueUserSwitch(PARENT_ID, FG_USER_ID,
+                numberOfUserSwitches, false);
+        mUserController.finishUserSwitch(mUserStates.get(PARENT_ID));
+        waitForHandlerToComplete(mInjector.mHandler, HANDLER_WAIT_TIME_MS);
+        // We've now done a user switch and should notice that we've exceeded the maximum number of
+        // users. The oldest background user should be stopped (BG_USER); even though PROFILE1 was
+        // older, it should not be stopped since it's a profile of the (new) current user.
+        assertFalse(mUserController.canStartMoreUsers());
+        assertEquals(newHashSet(
+                SYSTEM_USER_ID, PROFILE1_ID, PROFILE2_ID, FG_USER_ID, PARENT_ID),
+                new HashSet<>(mUserController.getRunningUsersLU()));
+    }
+
+    /**
      * Test that, in getRunningUsersLU, parents come after their profile, even if the profile was
      * started afterwards.
      */
@@ -806,7 +888,7 @@ public class UserControllerTest {
         int userId = -1;
 
         assertThrows(IllegalArgumentException.class,
-                () -> mUserController.stopUser(userId, /* force= */ true,
+                () -> mUserController.stopUser(userId,
                         /* allowDelayedLocking= */ true, /* stopUserCallback= */ null,
                         /* keyEvictedCallback= */ null));
     }
@@ -815,7 +897,7 @@ public class UserControllerTest {
     public void testStopUser_systemUser() {
         int userId = UserHandle.USER_SYSTEM;
 
-        int r = mUserController.stopUser(userId, /* force= */ true,
+        int r = mUserController.stopUser(userId,
                 /* allowDelayedLocking= */ true, /* stopUserCallback= */ null,
                 /* keyEvictedCallback= */ null);
 
@@ -827,7 +909,7 @@ public class UserControllerTest {
         setUpUser(TEST_USER_ID1, /* flags= */ 0);
         mUserController.startUser(TEST_USER_ID1, USER_START_MODE_FOREGROUND);
 
-        int r = mUserController.stopUser(TEST_USER_ID1, /* force= */ true,
+        int r = mUserController.stopUser(TEST_USER_ID1,
                 /* allowDelayedLocking= */ true, /* stopUserCallback= */ null,
                 /* keyEvictedCallback= */ null);
 
@@ -1256,7 +1338,7 @@ public class UserControllerTest {
 
     private void assertUserLockedOrUnlockedAfterStopping(int userId, boolean allowDelayedLocking,
             KeyEvictedCallback keyEvictedCallback, boolean expectLocking) throws Exception {
-        int r = mUserController.stopUser(userId, /* force= */ true, /* allowDelayedLocking= */
+        int r = mUserController.stopUser(userId, /* allowDelayedLocking= */
                 allowDelayedLocking, null, keyEvictedCallback);
         assertThat(r).isEqualTo(ActivityManager.USER_OP_SUCCESS);
         assertUserLockedOrUnlockedState(userId, allowDelayedLocking, expectLocking);

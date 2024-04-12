@@ -41,10 +41,13 @@ import android.view.DisplayInfo;
 import android.view.DisplayAddress;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.foldables.FoldGracePeriodProvider;
+import com.android.server.LocalServices;
 import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.display.layout.DisplayIdProducer;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.utils.DebugUtils;
+import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.FoldSettingProvider;
 
 import java.io.PrintWriter;
@@ -121,7 +124,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     /**
      * Sleep the device when transitioning into these device state.
      */
-    private final SparseBooleanArray mDeviceStatesOnWhichToSleep;
+    private final SparseBooleanArray mDeviceStatesOnWhichToSelectiveSleep;
 
     /**
      * Map of all logical displays indexed by logical display id.
@@ -155,6 +158,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     private final DisplayManagerService.SyncRoot mSyncRoot;
     private final LogicalDisplayMapperHandler mHandler;
     private final FoldSettingProvider mFoldSettingProvider;
+    private final FoldGracePeriodProvider mFoldGracePeriodProvider;
     private final PowerManager mPowerManager;
 
     /**
@@ -189,6 +193,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
      * #updateLogicalDisplaysLocked} to establish which Virtual Devices own which Virtual Displays.
      */
     private final ArrayMap<String, Integer> mVirtualDeviceDisplayMapping = new ArrayMap<>();
+    private WindowManagerPolicy mWindowManagerPolicy;
 
     private int mNextNonDefaultGroupId = Display.DEFAULT_DISPLAY_GROUP + 1;
     private final DisplayIdProducer mIdProducer = (isDefault) ->
@@ -203,15 +208,18 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     private final DisplayManagerFlags mFlags;
 
     LogicalDisplayMapper(@NonNull Context context, FoldSettingProvider foldSettingProvider,
+            FoldGracePeriodProvider foldGracePeriodProvider,
             @NonNull DisplayDeviceRepository repo,
             @NonNull Listener listener, @NonNull DisplayManagerService.SyncRoot syncRoot,
             @NonNull Handler handler, DisplayManagerFlags flags) {
-        this(context, foldSettingProvider, repo, listener, syncRoot, handler,
+        this(context, foldSettingProvider, foldGracePeriodProvider, repo, listener, syncRoot,
+                handler,
                 new DeviceStateToLayoutMap((isDefault) -> isDefault ? DEFAULT_DISPLAY
                         : sNextNonDefaultDisplayId++, flags), flags);
     }
 
     LogicalDisplayMapper(@NonNull Context context, FoldSettingProvider foldSettingProvider,
+            FoldGracePeriodProvider foldGracePeriodProvider,
             @NonNull DisplayDeviceRepository repo,
             @NonNull Listener listener, @NonNull DisplayManagerService.SyncRoot syncRoot,
             @NonNull Handler handler, @NonNull DeviceStateToLayoutMap deviceStateToLayoutMap,
@@ -223,13 +231,15 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
         mDisplayDeviceRepo = repo;
         mListener = listener;
         mFoldSettingProvider = foldSettingProvider;
+        mFoldGracePeriodProvider = foldGracePeriodProvider;
         mSingleDisplayDemoMode = SystemProperties.getBoolean("persist.demo.singledisplay", false);
         mSupportsConcurrentInternalDisplays = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_supportsConcurrentInternalDisplays);
         mDeviceStatesOnWhichToWakeUp = toSparseBooleanArray(context.getResources().getIntArray(
                 com.android.internal.R.array.config_deviceStatesOnWhichToWakeUp));
-        mDeviceStatesOnWhichToSleep = toSparseBooleanArray(context.getResources().getIntArray(
-                com.android.internal.R.array.config_deviceStatesOnWhichToSleep));
+        mDeviceStatesOnWhichToSelectiveSleep = toSparseBooleanArray(
+                context.getResources().getIntArray(
+                        com.android.internal.R.array.config_deviceStatesOnWhichToSleep));
         mDisplayDeviceRepo.addListener(this);
         mDeviceStateToLayoutMap = deviceStateToLayoutMap;
         mFlags = flags;
@@ -267,6 +277,10 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     @Override
     public void onTraversalRequested() {
         mListener.onTraversalRequested();
+    }
+
+    public void onWindowManagerReady() {
+        mWindowManagerPolicy = LocalServices.getService(WindowManagerPolicy.class);
     }
 
     public LogicalDisplay getDisplayLocked(int displayId) {
@@ -406,7 +420,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
         ipw.println("mSingleDisplayDemoMode=" + mSingleDisplayDemoMode);
         ipw.println("mCurrentLayout=" + mCurrentLayout);
         ipw.println("mDeviceStatesOnWhichToWakeUp=" + mDeviceStatesOnWhichToWakeUp);
-        ipw.println("mDeviceStatesOnWhichToSleep=" + mDeviceStatesOnWhichToSleep);
+        ipw.println("mDeviceStatesOnWhichSelectiveSleep=" + mDeviceStatesOnWhichToSelectiveSleep);
         ipw.println("mInteractive=" + mInteractive);
         ipw.println("mBootCompleted=" + mBootCompleted);
 
@@ -571,8 +585,8 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     boolean shouldDeviceBePutToSleep(int pendingState, int currentState, boolean isInteractive,
             boolean isBootCompleted) {
         return currentState != DeviceStateManager.INVALID_DEVICE_STATE_IDENTIFIER
-                && mDeviceStatesOnWhichToSleep.get(pendingState)
-                && !mDeviceStatesOnWhichToSleep.get(currentState)
+                && mDeviceStatesOnWhichToSelectiveSleep.get(pendingState)
+                && !mDeviceStatesOnWhichToSelectiveSleep.get(currentState)
                 && isInteractive
                 && isBootCompleted
                 && !mFoldSettingProvider.shouldStayAwakeOnFold();
@@ -613,9 +627,12 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
         final boolean waitingToWakeDevice = mDeviceStatesOnWhichToWakeUp.get(mPendingDeviceState)
                 && !mDeviceStatesOnWhichToWakeUp.get(mDeviceState)
                 && !mInteractive && mBootCompleted;
-        final boolean waitingToSleepDevice = mDeviceStatesOnWhichToSleep.get(mPendingDeviceState)
-                && !mDeviceStatesOnWhichToSleep.get(mDeviceState)
-                && mInteractive && mBootCompleted;
+        // The device should only wait for sleep if #shouldStayAwakeOnFold method returns false.
+        // If not, device should be marked ready for transition immediately.
+        final boolean waitingToSleepDevice = mDeviceStatesOnWhichToSelectiveSleep.get(
+                mPendingDeviceState)
+                && !mDeviceStatesOnWhichToSelectiveSleep.get(mDeviceState)
+                && mInteractive && mBootCompleted && !shouldStayAwakeOnFold();
 
         final boolean displaysOff = areAllTransitioningDisplaysOffLocked();
         final boolean isReadyToTransition = displaysOff && !waitingToWakeDevice
@@ -1106,14 +1123,22 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             final int logicalDisplayId = displayLayout.getLogicalDisplayId();
 
             LogicalDisplay newDisplay = getDisplayLocked(logicalDisplayId);
+            boolean newDisplayCreated = false;
             if (newDisplay == null) {
                 newDisplay = createNewLogicalDisplayLocked(
                         null /*displayDevice*/, logicalDisplayId);
+                newDisplayCreated = true;
             }
 
             // Now swap the underlying display devices between the old display and the new display
             final LogicalDisplay oldDisplay = getDisplayLocked(device);
             if (newDisplay != oldDisplay) {
+                // Display is swapping, notify WindowManager, so it can prepare for
+                // the display switch
+                if (!newDisplayCreated && mWindowManagerPolicy != null) {
+                    mWindowManagerPolicy.onDisplaySwitchStart(newDisplay.getDisplayIdLocked());
+                }
+
                 newDisplay.swapDisplaysLocked(oldDisplay);
             }
             DisplayDeviceConfig config = device.getDisplayDeviceConfig();
@@ -1233,6 +1258,16 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             retval.put(input[i], true);
         }
         return retval;
+    }
+
+    /**
+     * Returns true if the device would definitely have outer display ON/Stay Awake on fold based on
+     * the value of `Continue using app on fold` setting
+     */
+    private boolean shouldStayAwakeOnFold() {
+        return mFoldSettingProvider.shouldStayAwakeOnFold() || (
+                mFoldSettingProvider.shouldSelectiveStayAwakeOnFold()
+                        && mFoldGracePeriodProvider.isEnabled());
     }
 
     private String displayEventToString(int msg) {

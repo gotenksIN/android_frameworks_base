@@ -174,6 +174,7 @@ public abstract class InfoMediaManager {
 
     public void startScan() {
         mMediaDevices.clear();
+        registerRouter();
         startScanOnRouter();
         updateRouteListingPreference();
         refreshDevices();
@@ -188,9 +189,18 @@ public abstract class InfoMediaManager {
         }
     }
 
-    public abstract void stopScan();
+    public final void stopScan() {
+        stopScanOnRouter();
+        unregisterRouter();
+    }
+
+    protected abstract void stopScanOnRouter();
 
     protected abstract void startScanOnRouter();
+
+    protected abstract void registerRouter();
+
+    protected abstract void unregisterRouter();
 
     protected abstract void transferToRoute(@NonNull MediaRoute2Info route);
 
@@ -244,8 +254,6 @@ public abstract class InfoMediaManager {
     protected abstract List<MediaRoute2Info> getTransferableRoutes(@NonNull String packageName);
 
     protected final void rebuildDeviceList() {
-        mMediaDevices.clear();
-        mCurrentConnectedDevice = null;
         buildAvailableRoutes();
     }
 
@@ -515,17 +523,27 @@ public abstract class InfoMediaManager {
     // MediaRoute2Info.getType was made public on API 34, but exists since API 30.
     @SuppressWarnings("NewApi")
     private synchronized void buildAvailableRoutes() {
-        for (MediaRoute2Info route : getAvailableRoutes()) {
+        mMediaDevices.clear();
+        RoutingSessionInfo activeSession = getActiveRoutingSession();
+
+        for (MediaRoute2Info route : getAvailableRoutes(activeSession)) {
             if (DEBUG) {
                 Log.d(TAG, "buildAvailableRoutes() route : " + route.getName() + ", volume : "
                         + route.getVolume() + ", type : " + route.getType());
             }
-            addMediaDevice(route);
+            addMediaDevice(route, activeSession);
+        }
+
+        // In practice, mMediaDevices should always have at least one route.
+        if (!mMediaDevices.isEmpty()) {
+            // First device on the list is always the first selected route.
+            mCurrentConnectedDevice = mMediaDevices.get(0);
         }
     }
-    private synchronized List<MediaRoute2Info> getAvailableRoutes() {
+
+    private synchronized List<MediaRoute2Info> getAvailableRoutes(
+            RoutingSessionInfo activeSession) {
         List<MediaRoute2Info> availableRoutes = new ArrayList<>();
-        RoutingSessionInfo activeSession = getActiveRoutingSession();
 
         List<MediaRoute2Info> selectedRoutes = getSelectedRoutes(activeSession);
         availableRoutes.addAll(selectedRoutes);
@@ -563,7 +581,7 @@ public abstract class InfoMediaManager {
     // MediaRoute2Info.getType was made public on API 34, but exists since API 30.
     @SuppressWarnings("NewApi")
     @VisibleForTesting
-    void addMediaDevice(MediaRoute2Info route) {
+    void addMediaDevice(MediaRoute2Info route, RoutingSessionInfo activeSession) {
         final int deviceType = route.getType();
         MediaDevice mediaDevice = null;
         switch (deviceType) {
@@ -628,14 +646,10 @@ public abstract class InfoMediaManager {
                 break;
         }
 
-        if (mediaDevice != null
-                && getActiveRoutingSession().getSelectedRoutes().contains(route.getId())) {
-            mediaDevice.setState(STATE_SELECTED);
-            if (mCurrentConnectedDevice == null) {
-                mCurrentConnectedDevice = mediaDevice;
-            }
-        }
         if (mediaDevice != null) {
+            if (activeSession.getSelectedRoutes().contains(route.getId())) {
+                mediaDevice.setState(STATE_SELECTED);
+            }
             mMediaDevices.add(mediaDevice);
         }
     }

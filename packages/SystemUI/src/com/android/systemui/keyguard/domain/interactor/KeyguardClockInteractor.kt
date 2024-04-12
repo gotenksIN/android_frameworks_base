@@ -17,7 +17,9 @@
 
 package com.android.systemui.keyguard.domain.interactor
 
+import android.util.Log
 import com.android.keyguard.ClockEventController
+import com.android.keyguard.KeyguardClockSwitch
 import com.android.keyguard.KeyguardClockSwitch.ClockSize
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.data.repository.KeyguardClockRepository
@@ -29,8 +31,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 private val TAG = KeyguardClockInteractor::class.simpleName
-/** Manages keyguard clock for the lockscreen root view. */
-/** Encapsulates business-logic related to the keyguard clock. */
+/** Manages and ecapsulates the clock components of the lockscreen root view. */
 @SysUISingleton
 class KeyguardClockInteractor
 @Inject
@@ -46,6 +47,8 @@ constructor(
 
     val previewClock: Flow<ClockController> = keyguardClockRepository.previewClock
 
+    val clockEventController: ClockEventController by keyguardClockRepository::clockEventController
+
     var clock: ClockController? by keyguardClockRepository.clockEventController::clock
 
     val clockSize: StateFlow<Int> = keyguardClockRepository.clockSize
@@ -53,8 +56,19 @@ constructor(
         keyguardClockRepository.setClockSize(size)
     }
 
-    val clockEventController: ClockEventController
+    val renderedClockId: ClockId
         get() {
-            return keyguardClockRepository.clockEventController
+            return clock?.let { clock -> clock.config.id }
+                ?: run {
+                    Log.e(TAG, "No clock is available")
+                    KeyguardClockSwitch.MISSING_CLOCK_ID
+                }
         }
+
+    fun animateFoldToAod(foldFraction: Float) {
+        clock?.let { clock ->
+            clock.smallClock.animations.fold(foldFraction)
+            clock.largeClock.animations.fold(foldFraction)
+        }
+    }
 }

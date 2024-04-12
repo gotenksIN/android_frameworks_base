@@ -106,6 +106,28 @@
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Aktief, net links"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Aktief, net regs"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Aktief, links en regs"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (1164678961213251365) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (1345174295097854560) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (8580950145907305436) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (8534816721698743015) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (6605320955858788855) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (5717356160322149355) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_no_battery_level (71106861912593126) -->
+    <skip />
+    <!-- no translation found for bluetooth_saved_device_lea_support (7231323139968285768) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_active (1632152540901488645) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_right_active (3854140683042617230) -->
+    <skip />
+    <!-- no translation found for bluetooth_hearing_aid_media_only_left_and_right_active (1299913413062528417) -->
+    <skip />
     <string name="bluetooth_profile_a2dp" msgid="4632426382762851724">"Media-oudio"</string>
     <string name="bluetooth_profile_headset" msgid="5395952236133499331">"Foonoproepe"</string>
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Lêeroordrag"</string>
@@ -117,7 +139,7 @@
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"Teksboodskappe"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"SIM-toegang"</string>
     <string name="bluetooth_profile_a2dp_high_quality" msgid="4739440941324792775">"HD-oudio: <xliff:g id="CODEC_NAME">%1$s</xliff:g>"</string>
-    <string name="bluetooth_profile_a2dp_high_quality_unknown_codec" msgid="2477639096903834374">"HD oudio"</string>
+    <string name="bluetooth_profile_a2dp_high_quality_unknown_codec" msgid="2477639096903834374">"HD-oudio"</string>
     <string name="bluetooth_profile_hearing_aid" msgid="2607867572569689732">"Gehoortoestelle"</string>
     <string name="bluetooth_profile_le_audio" msgid="1725521360076451751">"LE-oudio"</string>
     <string name="bluetooth_hearing_aid_profile_summary_connected" msgid="5757754050938807276">"Gekoppel aan gehoortoestelle"</string>
@@ -265,7 +287,7 @@
     <string name="bugreport_in_power_summary" msgid="1885529649381831775">"Wys \'n knoppie in die kragkieslys om \'n foutverslag te doen"</string>
     <string name="keep_screen_on" msgid="1187161672348797558">"Bly wakker"</string>
     <string name="keep_screen_on_summary" msgid="1510731514101925829">"Skerm sal nooit slaap terwyl dit laai nie"</string>
-    <string name="bt_hci_snoop_log" msgid="7291287955649081448">"Aktiveer Bluetooth HCI-loerloglêer"</string>
+    <string name="bt_hci_snoop_log" msgid="7291287955649081448">"Aktiveer Bluetooth HCI-snuffelloglêer"</string>
     <string name="bt_hci_snoop_log_summary" msgid="6808538971394092284">"Vang Bluetooth-pakkette vas. (Wissel Bluetooth nadat jy hierdie instelling verander het)"</string>
     <string name="oem_unlock_enable" msgid="5334869171871566731">"OEM-ontsluit"</string>
     <string name="oem_unlock_enable_summary" msgid="5857388174390953829">"Laat toe dat die selflaaiprogram ontsluit word"</string>
@@ -396,7 +418,7 @@
     <string name="transition_animation_scale_title" msgid="1278477690695439337">"Oorganganimasieskaal"</string>
     <string name="animator_duration_scale_title" msgid="7082913931326085176">"Animator-tydsduurskaal"</string>
     <string name="overlay_display_devices_title" msgid="5411894622334469607">"Simuleer sekondêre uitstallings"</string>
-    <string name="debug_applications_category" msgid="5394089406638954196">"Programme"</string>
+    <string name="debug_applications_category" msgid="5394089406638954196">"Apps"</string>
     <string name="immediately_destroy_activities" msgid="1826287490705167403">"Moenie aktiwiteite behou nie"</string>
     <string name="immediately_destroy_activities_summary" msgid="6289590341144557614">"Vernietig elke aktiwiteit sodra die gebruiker dit verlaat"</string>
     <string name="app_process_limit_title" msgid="8361367869453043007">"Agtergrondproseslimiet"</string>
@@ -437,9 +459,6 @@
     <string name="transcode_default" msgid="3784803084573509491">"Aanvaar dat programme moderne formate steun"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Wys kodewisselingkennisgewings"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Deaktiveer kodewisselingkas"</string>
-    <string name="widevine_settings_title" msgid="4023329801172572917">"Widevine-instellings"</string>
-    <string name="force_l3_fallback_title" msgid="4987972688770202547">"Forseer terugskakeling na L3"</string>
-    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"Kies vir geforseerde terugskakeling na L3"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Lopende dienste"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Sien en beheer dienste wat tans aktief is"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"WebView-implementering"</string>
@@ -518,7 +537,7 @@
     <string name="use_system_language_to_select_input_method_subtypes" msgid="4865195835541387040">"Gebruik stelseltale"</string>
     <string name="failed_to_open_app_settings_toast" msgid="764897252657692092">"Kon nie instellings vir <xliff:g id="SPELL_APPLICATION_NAME">%1$s</xliff:g> oopmaak nie"</string>
     <string name="ime_security_warning" msgid="6547562217880551450">"Die invoermetode kan dalk alle teks wat jy invoer, versamel, insluitend persoonlike data soos wagwoorde en kredietkaartnommers. Dit kom van die program <xliff:g id="IME_APPLICATION_NAME">%1$s</xliff:g>. Wil jy dié invoermetode gebruik?"</string>
-    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"Let wel: Ná \'n herselflaai kan hierdie program nie begin voordat jy jou foon ontsluit het nie"</string>
+    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"Let wel: Ná \'n herselflaai kan hierdie app nie begin voordat jy jou foon ontsluit het nie"</string>
     <string name="ims_reg_title" msgid="8197592958123671062">"IMS-registrasiestaat"</string>
     <string name="ims_reg_status_registered" msgid="884916398194885457">"Geregistreer"</string>
     <string name="ims_reg_status_not_registered" msgid="2989287366045704694">"Nie geregistreer nie"</string>
@@ -619,8 +638,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"Kon nie \'n nuwe gebruiker skep nie"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"Kon nie ’n nuwe gas skep nie"</string>
     <string name="user_nickname" msgid="262624187455825083">"Bynaam"</string>
-    <!-- no translation found for edit_user_info_message (6677556031419002895) -->
-    <skip />
+    <string name="edit_user_info_message" msgid="6677556031419002895">"Die naam en prent wat jy kies sal sigbaar wees vir enigiemand wat hierdie toestel gebruik."</string>
     <string name="user_add_user" msgid="7876449291500212468">"Voeg gebruiker by"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"Voeg gas by"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"Verwyder gas"</string>
@@ -631,7 +649,7 @@
     <string name="guest_remove_guest_confirm_button" msgid="7858123434954143879">"Verwyder"</string>
     <string name="guest_resetting" msgid="7822120170191509566">"Stel tans gassessie terug …"</string>
     <string name="guest_reset_and_restart_dialog_title" msgid="3396657008451616041">"Stel gastesessie terug?"</string>
-    <string name="guest_reset_and_restart_dialog_message" msgid="2764425635305200790">"Dit sal ’n nuwe gastesessie begin en alle programme en data van die huidige sessie uitvee"</string>
+    <string name="guest_reset_and_restart_dialog_message" msgid="2764425635305200790">"Dit sal ’n nuwe gastesessie begin en alle apps en data van die huidige sessie uitvee"</string>
     <string name="guest_exit_dialog_title" msgid="1846494656849381804">"Verlaat gasmodus?"</string>
     <string name="guest_exit_dialog_message" msgid="1743218864242719783">"Dit sal programme en data in die huidige gastesessie uitvee"</string>
     <string name="grant_admin" msgid="4323199171790522574">"Ja, maak hulle ’n admin"</string>
@@ -647,8 +665,6 @@
     <string name="guest_notification_ephemeral" msgid="7263252466950923871">"Alle aktiwiteit sal uitgevee word wanneer jy uitgaan"</string>
     <string name="guest_notification_non_ephemeral" msgid="6843799963012259330">"Jy kan jou aktiwiteit stoor of uitvee wanneer jy uitgaan"</string>
     <string name="guest_notification_non_ephemeral_non_first_login" msgid="8009307983766934876">"Stel terug om aktiwiteit nou uit te vee, of stoor of vee aktiwiteit uit wanneer jy uitgaan"</string>
-    <string name="user_image_take_photo" msgid="467512954561638530">"Neem \'n foto"</string>
-    <string name="user_image_choose_photo" msgid="1363820919146782908">"Kies \'n prent"</string>
     <string name="user_image_photo_selector" msgid="433658323306627093">"Kies foto"</string>
     <string name="failed_attempts_now_wiping_device" msgid="4016329172216428897">"Te veel verkeerde pogings. Hierdie toestel se data sal uitgevee word."</string>
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"Te veel verkeerde pogings. Hierdie gebruiker sal uitgevee word."</string>
@@ -658,7 +674,7 @@
     <string name="cached_apps_freezer_disabled" msgid="4816382260660472042">"Gedeaktiveer"</string>
     <string name="cached_apps_freezer_enabled" msgid="8866703500183051546">"Geaktiveer"</string>
     <string name="cached_apps_freezer_reboot_dialog_text" msgid="695330563489230096">"Jou toestel moet herselflaai om hierdie verandering toe te pas. Herselflaai nou of kanselleer."</string>
-    <string name="media_transfer_wired_usb_device_name" msgid="7699141088423210903">"Bedraade oorfoon"</string>
+    <string name="media_transfer_wired_usb_device_name" msgid="7699141088423210903">"Bedrade oorfone"</string>
     <string name="wifi_hotspot_switch_on_text" msgid="9212273118217786155">"Aan"</string>
     <string name="wifi_hotspot_switch_off_text" msgid="7245567251496959764">"Af"</string>
     <string name="carrier_network_change_mode" msgid="4257621815706644026">"Diensverskaffernetwerk verander tans"</string>
@@ -688,8 +704,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"Ethernet is ontkoppel."</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"Ethernet."</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"Geen oproepe nie."</string>
-    <string name="avatar_picker_title" msgid="8492884172713170652">"Kies \'n profielprent"</string>
-    <string name="default_user_icon_description" msgid="6554047177298972638">"Verstekgebruikerikoon"</string>
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Fisieke sleutelbord"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Kies sleutelborduitleg"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Verstek"</string>

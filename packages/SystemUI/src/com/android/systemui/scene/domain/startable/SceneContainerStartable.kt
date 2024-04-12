@@ -32,7 +32,9 @@ import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCall
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.DisplayId
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
+import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.model.SceneContainerPlugin
 import com.android.systemui.model.SysUiState
@@ -40,6 +42,7 @@ import com.android.systemui.model.updateFlags
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.plugins.FalsingManager.FalsingBeliefListener
 import com.android.systemui.power.domain.interactor.PowerInteractor
+import com.android.systemui.scene.domain.interactor.SceneContainerOcclusionInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.logger.SceneLogger
@@ -49,6 +52,7 @@ import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNoti
 import com.android.systemui.statusbar.phone.CentralSurfaces
 import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor
 import com.android.systemui.util.asIndenting
+import com.android.systemui.util.kotlin.sample
 import com.android.systemui.util.printSection
 import com.android.systemui.util.println
 import dagger.Lazy
@@ -62,6 +66,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -79,6 +85,7 @@ constructor(
     @Application private val applicationScope: CoroutineScope,
     private val sceneInteractor: SceneInteractor,
     private val deviceEntryInteractor: DeviceEntryInteractor,
+    private val deviceUnlockedInteractor: DeviceUnlockedInteractor,
     private val bouncerInteractor: BouncerInteractor,
     private val keyguardInteractor: KeyguardInteractor,
     private val flags: SceneContainerFlags,
@@ -94,6 +101,8 @@ constructor(
     private val deviceProvisioningInteractor: DeviceProvisioningInteractor,
     private val centralSurfaces: CentralSurfaces,
     private val headsUpInteractor: HeadsUpNotificationInteractor,
+    private val occlusionInteractor: SceneContainerOcclusionInteractor,
+    private val faceUnlockInteractor: DeviceEntryFaceAuthInteractor,
 ) : CoreStartable {
 
     override fun start() {
@@ -106,6 +115,7 @@ constructor(
             respondToFalsingDetections()
             hydrateWindowFocus()
             hydrateInteractionState()
+            handleBouncerOverscroll()
         } else {
             sceneLogger.logFrameworkEnabled(
                 isEnabled = false,
@@ -126,41 +136,40 @@ constructor(
     private fun hydrateVisibility() {
         applicationScope.launch {
             // TODO(b/296114544): Combine with some global hun state to make it visible!
-            combine(
-                    deviceProvisioningInteractor.isDeviceProvisioned,
-                    deviceProvisioningInteractor.isFactoryResetProtectionActive,
-                ) { isDeviceProvisioned, isFrpActive ->
-                    isDeviceProvisioned && !isFrpActive
-                }
+            deviceProvisioningInteractor.isDeviceProvisioned
                 .distinctUntilChanged()
                 .flatMapLatest { isAllowedToBeVisible ->
                     if (isAllowedToBeVisible) {
-                        sceneInteractor.transitionState
-                            .mapNotNull { state ->
-                                when (state) {
-                                    is ObservableTransitionState.Idle -> {
-                                        if (state.scene != Scenes.Gone) {
-                                            true to "scene is not Gone"
-                                        } else {
-                                            false to "scene is Gone"
+                        combine(
+                                sceneInteractor.transitionState.mapNotNull { state ->
+                                    when (state) {
+                                        is ObservableTransitionState.Idle -> {
+                                            if (state.scene != Scenes.Gone) {
+                                                true to "scene is not Gone"
+                                            } else {
+                                                false to "scene is Gone"
+                                            }
+                                        }
+                                        is ObservableTransitionState.Transition -> {
+                                            if (state.fromScene == Scenes.Gone) {
+                                                true to "scene transitioning away from Gone"
+                                            } else {
+                                                null
+                                            }
                                         }
                                     }
-                                    is ObservableTransitionState.Transition -> {
-                                        if (state.fromScene == Scenes.Gone) {
-                                            true to "scene transitioning away from Gone"
-                                        } else {
-                                            null
-                                        }
-                                    }
-                                }
-                            }
-                            .combine(headsUpInteractor.isHeadsUpOrAnimatingAway) {
+                                },
+                                headsUpInteractor.isHeadsUpOrAnimatingAway,
+                                occlusionInteractor.invisibleDueToOcclusion,
+                            ) {
                                 visibilityForTransitionState,
-                                isHeadsUpOrAnimatingAway ->
-                                if (isHeadsUpOrAnimatingAway) {
-                                    true to "showing a HUN"
-                                } else {
-                                    visibilityForTransitionState
+                                isHeadsUpOrAnimatingAway,
+                                invisibleDueToOcclusion,
+                                ->
+                                when {
+                                    isHeadsUpOrAnimatingAway -> true to "showing a HUN"
+                                    invisibleDueToOcclusion -> false to "invisible due to occlusion"
+                                    else -> visibilityForTransitionState
                                 }
                             }
                             .distinctUntilChanged()
@@ -188,51 +197,53 @@ constructor(
             }
         }
         applicationScope.launch {
-            simBouncerInteractor.get().isAnySimSecure.collect { isAnySimLocked ->
-                val canSwipeToEnter = deviceEntryInteractor.canSwipeToEnter.value
-                val isUnlocked = deviceEntryInteractor.isUnlocked.value
-
-                when {
-                    isAnySimLocked -> {
-                        switchToScene(
-                            targetSceneKey = Scenes.Bouncer,
-                            loggingReason = "Need to authenticate locked SIM card."
-                        )
-                    }
-                    isUnlocked && canSwipeToEnter == false -> {
-                        switchToScene(
-                            targetSceneKey = Scenes.Gone,
-                            loggingReason =
-                                "All SIM cards unlocked and device already" +
-                                    " unlocked and lockscreen doesn't require a swipe to dismiss."
-                        )
-                    }
-                    else -> {
-                        switchToScene(
-                            targetSceneKey = Scenes.Lockscreen,
-                            loggingReason =
-                                "All SIM cards unlocked and device still locked" +
-                                    " or lockscreen still requires a swipe to dismiss."
-                        )
+            simBouncerInteractor
+                .get()
+                .isAnySimSecure
+                .sample(deviceUnlockedInteractor.deviceUnlockStatus, ::Pair)
+                .collect { (isAnySimLocked, unlockStatus) ->
+                    when {
+                        isAnySimLocked -> {
+                            switchToScene(
+                                targetSceneKey = Scenes.Bouncer,
+                                loggingReason = "Need to authenticate locked SIM card."
+                            )
+                        }
+                        unlockStatus.isUnlocked &&
+                            deviceEntryInteractor.canSwipeToEnter.value == false -> {
+                            switchToScene(
+                                targetSceneKey = Scenes.Gone,
+                                loggingReason =
+                                    "All SIM cards unlocked and device already unlocked and " +
+                                        "lockscreen doesn't require a swipe to dismiss."
+                            )
+                        }
+                        else -> {
+                            switchToScene(
+                                targetSceneKey = Scenes.Lockscreen,
+                                loggingReason =
+                                    "All SIM cards unlocked and device still locked" +
+                                        " or lockscreen still requires a swipe to dismiss."
+                            )
+                        }
                     }
                 }
-            }
         }
         applicationScope.launch {
-            deviceEntryInteractor.isUnlocked
-                .mapNotNull { isUnlocked ->
+            deviceUnlockedInteractor.deviceUnlockStatus
+                .mapNotNull { deviceUnlockStatus ->
                     val renderedScenes =
                         when (val transitionState = sceneInteractor.transitionState.value) {
                             is ObservableTransitionState.Idle -> setOf(transitionState.scene)
                             is ObservableTransitionState.Transition ->
                                 setOf(
-                                    transitionState.progress,
+                                    transitionState.fromScene,
                                     transitionState.toScene,
                                 )
                         }
                     val isOnLockscreen = renderedScenes.contains(Scenes.Lockscreen)
                     val isOnBouncer = renderedScenes.contains(Scenes.Bouncer)
-                    if (!isUnlocked) {
+                    if (!deviceUnlockStatus.isUnlocked) {
                         return@mapNotNull if (isOnLockscreen || isOnBouncer) {
                             // Already on lockscreen or bouncer, no need to change scenes.
                             null
@@ -244,8 +255,6 @@ constructor(
                         }
                     }
 
-                    val isBypassEnabled = deviceEntryInteractor.isBypassEnabled.value
-                    val canSwipeToEnter = deviceEntryInteractor.canSwipeToEnter.value
                     when {
                         isOnBouncer ->
                             // When the device becomes unlocked in Bouncer, go to Gone.
@@ -260,14 +269,12 @@ constructor(
                             //    when the unlock state changes indicates this is an active
                             //    authentication attempt.
                             when {
-                                isBypassEnabled ->
+                                deviceUnlockStatus.deviceUnlockSource?.dismissesLockscreen ==
+                                    true ->
                                     Scenes.Gone to
-                                        "device has been unlocked on lockscreen with bypass" +
-                                            " enabled"
-                                canSwipeToEnter == false ->
-                                    Scenes.Gone to
-                                        "device has been unlocked on lockscreen using an active" +
-                                            " authentication mechanism"
+                                        "device has been unlocked on lockscreen with bypass " +
+                                            "enabled or using an active authentication " +
+                                            "mechanism: ${deviceUnlockStatus.deviceUnlockSource}"
                                 else -> null
                             }
                         // Not on lockscreen or bouncer, so remain in the current scene.
@@ -291,14 +298,19 @@ constructor(
                     )
                 } else {
                     val canSwipeToEnter = deviceEntryInteractor.canSwipeToEnter.value
-                    val isUnlocked = deviceEntryInteractor.isUnlocked.value
+                    val isUnlocked = deviceUnlockedInteractor.deviceUnlockStatus.value.isUnlocked
                     if (isUnlocked && canSwipeToEnter == false) {
-                        switchToScene(
-                            targetSceneKey = Scenes.Gone,
-                            loggingReason =
-                                "device is waking up while unlocked without the ability" +
-                                    " to swipe up on lockscreen to enter.",
-                        )
+                        val isTransitioningToLockscreen =
+                            sceneInteractor.transitioningTo.value == Scenes.Lockscreen
+                        if (!isTransitioningToLockscreen) {
+                            switchToScene(
+                                targetSceneKey = Scenes.Gone,
+                                loggingReason =
+                                    "device is waking up while unlocked without the ability to" +
+                                        " swipe up on lockscreen to enter and not on or" +
+                                        " transitioning to, the lockscreen scene.",
+                            )
+                        }
                     } else if (
                         authenticationInteractor.get().getAuthenticationMethod() ==
                             AuthenticationMethodModel.Sim
@@ -316,15 +328,23 @@ constructor(
     /** Keeps [SysUiState] up-to-date */
     private fun hydrateSystemUiState() {
         applicationScope.launch {
-            sceneInteractor.transitionState
-                .mapNotNull { it as? ObservableTransitionState.Idle }
-                .map { it.scene }
-                .distinctUntilChanged()
-                .collect { sceneKey ->
+            combine(
+                    sceneInteractor.transitionState
+                        .mapNotNull { it as? ObservableTransitionState.Idle }
+                        .map { it.scene }
+                        .distinctUntilChanged(),
+                    occlusionInteractor.invisibleDueToOcclusion,
+                ) { sceneKey, invisibleDueToOcclusion ->
+                    SceneContainerPlugin.SceneContainerPluginState(
+                        scene = sceneKey,
+                        invisibleDueToOcclusion = invisibleDueToOcclusion,
+                    )
+                }
+                .collect { sceneContainerPluginState ->
                     sysUiState.updateFlags(
                         displayId,
                         *SceneContainerPlugin.EvaluatorByFlag.map { (flag, evaluator) ->
-                                flag to evaluator.invoke(sceneKey)
+                                flag to evaluator.invoke(sceneContainerPluginState)
                             }
                             .toTypedArray(),
                     )
@@ -410,8 +430,8 @@ constructor(
     /** Keeps the interaction state of [CentralSurfaces] up-to-date. */
     private fun hydrateInteractionState() {
         applicationScope.launch {
-            deviceEntryInteractor.isUnlocked
-                .map { !it }
+            deviceUnlockedInteractor.deviceUnlockStatus
+                .map { !it.isUnlocked }
                 .flatMapLatest { isDeviceLocked ->
                     if (isDeviceLocked) {
                         sceneInteractor.transitionState
@@ -444,6 +464,33 @@ constructor(
                         )
                     }
                 }
+        }
+    }
+
+    private fun handleBouncerOverscroll() {
+        applicationScope.launch {
+            sceneInteractor.transitionState
+                // Only consider transitions.
+                .filterIsInstance<ObservableTransitionState.Transition>()
+                // Only consider user-initiated (e.g. drags) that go from bouncer to lockscreen.
+                .filter { transition ->
+                    transition.fromScene == Scenes.Bouncer &&
+                        transition.toScene == Scenes.Lockscreen &&
+                        transition.isInitiatedByUserInput
+                }
+                .flatMapLatest { it.progress }
+                // Figure out the direction of scrolling.
+                .map { progress ->
+                    when {
+                        progress > 0 -> 1
+                        progress < 0 -> -1
+                        else -> 0
+                    }
+                }
+                .distinctUntilChanged()
+                // Only consider negative scrolling, AKA overscroll.
+                .filter { it == -1 }
+                .collect { faceUnlockInteractor.onSwipeUpOnBouncer() }
         }
     }
 

@@ -5071,7 +5071,7 @@ public class ActivityManager {
      * <p><b>NOTE:</b> differently from {@link #switchUser(int)}, which stops the current foreground
      * user before starting a new one, this method does not stop the previous user running in
      * background in the display, and it will return {@code false} in this case. It's up to the
-     * caller to call {@link #stopUser(int, boolean)} before starting a new user.
+     * caller to call {@link #stopUser(int)} before starting a new user.
      *
      * @param userId user to be started in the display. It will return {@code false} if the user is
      * a profile, the {@link #getCurrentUser()}, the {@link UserHandle#SYSTEM system user}, or
@@ -5281,15 +5281,16 @@ public class ActivityManager {
      *
      * @hide
      */
+    @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
     @TestApi
     @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
-    public boolean stopUser(@UserIdInt int userId, boolean force) {
+    public boolean stopUser(@UserIdInt int userId) {
         if (userId == UserHandle.USER_SYSTEM) {
             return false;
         }
         try {
-            return USER_OP_SUCCESS == getService().stopUser(
-                    userId, force, /* callback= */ null);
+            return USER_OP_SUCCESS == getService().stopUserWithCallback(
+                    userId, /* callback= */ null);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -5672,9 +5673,11 @@ public class ActivityManager {
     }
 
     /**
-     * Return if a given profile is in the foreground.
+     * Returns whether the given user, or its parent (if the user is a profile), is in the
+     * foreground.
      * @param userHandle UserHandle to check
-     * @return Returns the boolean result.
+     * @return whether the user is the foreground user or, if it is a profile, whether its parent
+     *         is the foreground user
      * @hide
      */
     @RequiresPermission(anyOf = {

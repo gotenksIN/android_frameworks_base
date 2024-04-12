@@ -31,6 +31,7 @@ license {
 aconfig_declarations {
     name: "hwui_flags",
     package: "com.android.graphics.hwui.flags",
+    container: "system",
     srcs: [
         "aconfig/hwui_flags.aconfig",
     ],
@@ -78,13 +79,13 @@ cc_defaults {
     include_dirs: [
         "external/skia/include/private",
         "external/skia/src/core",
+        "external/skia/src/utils",
     ],
 
     target: {
         android: {
             include_dirs: [
                 "external/skia/src/image",
-                "external/skia/src/utils",
                 "external/skia/src/gpu",
                 "external/skia/src/shaders",
             ],
@@ -345,6 +346,7 @@ cc_defaults {
         "jni/android_nio_utils.cpp",
         "jni/android_util_PathParser.cpp",
 
+        "jni/AnimatedImageDrawable.cpp",
         "jni/Bitmap.cpp",
         "jni/BitmapRegionDecoder.cpp",
         "jni/BufferUtils.cpp",
@@ -418,7 +420,6 @@ cc_defaults {
     target: {
         android: {
             srcs: [ // sources that depend on android only libraries
-                "jni/AnimatedImageDrawable.cpp",
                 "jni/android_graphics_TextureLayer.cpp",
                 "jni/android_graphics_HardwareRenderer.cpp",
                 "jni/android_graphics_HardwareBufferRenderer.cpp",
@@ -529,7 +530,9 @@ cc_defaults {
         "effects/GainmapRenderer.cpp",
         "pipeline/skia/BackdropFilterDrawable.cpp",
         "pipeline/skia/HolePunch.cpp",
+        "pipeline/skia/SkiaCpuPipeline.cpp",
         "pipeline/skia/SkiaDisplayList.cpp",
+        "pipeline/skia/SkiaPipeline.cpp",
         "pipeline/skia/SkiaRecordingCanvas.cpp",
         "pipeline/skia/StretchMask.cpp",
         "pipeline/skia/RenderNodeDrawable.cpp",
@@ -539,6 +542,7 @@ cc_defaults {
         "renderthread/RenderTask.cpp",
         "renderthread/TimeLord.cpp",
         "hwui/AnimatedImageDrawable.cpp",
+        "hwui/AnimatedImageThread.cpp",
         "hwui/Bitmap.cpp",
         "hwui/BlurDrawLooper.cpp",
         "hwui/Canvas.cpp",
@@ -567,6 +571,7 @@ cc_defaults {
         "HWUIProperties.sysprop",
         "Interpolator.cpp",
         "JankTracker.cpp",
+        "LayerUpdateQueue.cpp",
         "LightingInfo.cpp",
         "Matrix.cpp",
         "Mesh.cpp",
@@ -599,14 +604,13 @@ cc_defaults {
             local_include_dirs: ["platform/android"],
 
             srcs: [
-                "hwui/AnimatedImageThread.cpp",
                 "pipeline/skia/ATraceMemoryDump.cpp",
                 "pipeline/skia/GLFunctorDrawable.cpp",
                 "pipeline/skia/LayerDrawable.cpp",
                 "pipeline/skia/ShaderCache.cpp",
+                "pipeline/skia/SkiaGpuPipeline.cpp",
                 "pipeline/skia/SkiaMemoryTracer.cpp",
                 "pipeline/skia/SkiaOpenGLPipeline.cpp",
-                "pipeline/skia/SkiaPipeline.cpp",
                 "pipeline/skia/SkiaProfileRenderer.cpp",
                 "pipeline/skia/SkiaVulkanPipeline.cpp",
                 "pipeline/skia/VkFunctorDrawable.cpp",
@@ -630,7 +634,6 @@ cc_defaults {
                 "DeferredLayerUpdater.cpp",
                 "HardwareBitmapUploader.cpp",
                 "Layer.cpp",
-                "LayerUpdateQueue.cpp",
                 "ProfileDataContainer.cpp",
                 "Readback.cpp",
                 "TreeInfo.cpp",

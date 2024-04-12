@@ -35,10 +35,11 @@ flag {
 }
 
 flag {
-  name: "cross_user_suspension_enabled"
+  name: "cross_user_suspension_enabled_ro"
   namespace: "enterprise"
   description: "Allow holders of INTERACT_ACROSS_USERS_FULL to suspend apps in different users."
   bug: "263464464"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -174,6 +175,17 @@ flag {
 }
 
 flag {
+  name: "copy_account_with_retry_enabled"
+  namespace: "enterprise"
+  description: "Retry copy and remove account from personal to work profile in case of failure"
+  bug: "329424312"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+  }
+}
+
+
+flag {
   name: "esim_management_ux_enabled"
   namespace: "enterprise"
   description: "Enable UX changes for esim management"
@@ -186,8 +198,15 @@ flag {
   description: "Fix provisioning for single-user headless DO"
   bug: "289515470"
   metadata {
-      purpose: PURPOSE_BUGFIX
-    }
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "dmrh_can_set_app_restriction"
+  namespace: "enterprise"
+  description: "Allow DMRH to set application restrictions (both on the profile and the parent)"
+  bug: "328758346"
 }
 
 flag {
@@ -202,4 +221,14 @@ flag {
   namespace: "enterprise"
   description: "Guards a new flow for recursive required enterprise app list merging"
   bug: "319084618"
+}
+
+flag {
+  name: "headless_device_owner_delegate_security_logging_bug_fix"
+  namespace: "enterprise"
+  description: "Fix delegate security logging for single user headless DO."
+  bug: "289515470"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

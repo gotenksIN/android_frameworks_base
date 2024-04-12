@@ -3221,10 +3221,18 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (!Flags.activityWindowInfoFlag() || !isAttached()) {
             return mTmpActivityWindowInfo;
         }
-        mTmpActivityWindowInfo.set(
-                isEmbeddedInHostContainer(),
-                getTask().getBounds(),
-                getTaskFragment().getBounds());
+        if (isFixedRotationTransforming()) {
+            // Fixed rotation only applied to fullscreen activity, thus using the activity bounds
+            // for Task/TaskFragment so that it is "pre-rotated" and in sync with the Configuration
+            // update.
+            final Rect bounds = getBounds();
+            mTmpActivityWindowInfo.set(false /* isEmbedded */, bounds, bounds);
+        } else {
+            mTmpActivityWindowInfo.set(
+                    isEmbeddedInHostContainer(),
+                    getTask().getBounds(),
+                    getTaskFragment().getBounds());
+        }
         return mTmpActivityWindowInfo;
     }
 
@@ -6611,13 +6619,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         newIntents = null;
 
-        if (isActivityTypeHome()) {
-            mTaskSupervisor.updateHomeProcess(task.getBottomMostActivity().app);
-            try {
-                mTaskSupervisor.new PreferredAppsTask().execute();
-            } catch (Exception e) {
-                Slog.v (TAG, "Exception: " + e);
-            }
+        mTaskSupervisor.updateHomeProcessIfNeeded(this);
+        try {
+            mTaskSupervisor.new PreferredAppsTask().execute();
+        } catch (Exception e) {
+            Slog.v (TAG, "Exception: " + e);
         }
 
         if (nowVisible) {
@@ -8682,8 +8688,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         applySizeOverrideIfNeeded(newParentConfiguration, parentWindowingMode, resolvedConfig);
 
-        final boolean isFixedOrientationLetterboxAllowed =
-                parentWindowingMode == WINDOWING_MODE_MULTI_WINDOW
+        // Bubble activities should always fill their parent and should not be letterboxed.
+        final boolean isFixedOrientationLetterboxAllowed = !getLaunchedFromBubble()
+                && (parentWindowingMode == WINDOWING_MODE_MULTI_WINDOW
                         || parentWindowingMode == WINDOWING_MODE_FULLSCREEN
                         // When starting to switch between PiP and fullscreen, the task is pinned
                         // and the activity is fullscreen. But only allow to apply letterbox if the
@@ -8691,7 +8698,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                         || (!mWaitForEnteringPinnedMode
                                 && parentWindowingMode == WINDOWING_MODE_PINNED
                                 && resolvedConfig.windowConfiguration.getWindowingMode()
-                                        == WINDOWING_MODE_FULLSCREEN);
+                                        == WINDOWING_MODE_FULLSCREEN));
         // TODO(b/181207944): Consider removing the if condition and always run
         // resolveFixedOrientationConfiguration() since this should be applied for all cases.
         if (isFixedOrientationLetterboxAllowed) {
@@ -8813,7 +8820,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         // Override starts here.
         final Rect stableInsets = mDisplayContent.getDisplayPolicy().getDecorInsetsInfo(
-                rotation, fullBounds.width(), fullBounds.height()).mLegacyConfigInsets;
+                rotation, fullBounds.width(), fullBounds.height()).mOverrideConfigInsets;
         // This should be the only place override the configuration for ActivityRecord. Override
         // the value if not calculated yet.
         Rect outAppBounds = inOutConfig.windowConfiguration.getAppBounds();
@@ -8849,7 +8856,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             mDisplayContent.getDisplay().getDisplayInfo(info);
             mDisplayContent.computeSizeRanges(info, rotated, info.logicalWidth,
                     info.logicalHeight, mDisplayContent.getDisplayMetrics().density,
-                    inOutConfig, true /* legacyConfig */);
+                    inOutConfig, true /* overrideConfig */);
         }
 
         // It's possible that screen size will be considered in different orientation with or

@@ -16,8 +16,10 @@
 
 package com.android.wm.shell.desktopmode
 
+import android.graphics.Rect
 import android.testing.AndroidTestingRunner
 import android.view.Display.DEFAULT_DISPLAY
+import android.view.Display.INVALID_DISPLAY
 import androidx.test.filters.SmallTest
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
@@ -237,6 +239,27 @@ class DesktopModeTaskRepositoryTest : ShellTestCase() {
         assertThat(listener.visibleChangesOnDefaultDisplay).isEqualTo(4)
     }
 
+    /**
+     * When a task vanishes, the displayId of the task is set to INVALID_DISPLAY.
+     * This tests that task is removed from the last parent display when it vanishes.
+     */
+    @Test
+    fun updateVisibleFreeformTasks_removeVisibleTasksRemovesTaskWithInvalidDisplay() {
+        val listener = TestVisibilityListener()
+        val executor = TestShellExecutor()
+        repo.addVisibleTasksListener(listener, executor)
+        repo.updateVisibleFreeformTasks(DEFAULT_DISPLAY, taskId = 1, visible = true)
+        repo.updateVisibleFreeformTasks(DEFAULT_DISPLAY, taskId = 2, visible = true)
+        executor.flushAll()
+
+        assertThat(listener.visibleTasksCountOnDefaultDisplay).isEqualTo(2)
+        repo.updateVisibleFreeformTasks(INVALID_DISPLAY, taskId = 1, visible = false)
+        executor.flushAll()
+
+        assertThat(listener.visibleChangesOnDefaultDisplay).isEqualTo(3)
+        assertThat(listener.visibleTasksCountOnDefaultDisplay).isEqualTo(1)
+    }
+
     @Test
     fun getVisibleTaskCount() {
         // No tasks, count is 0
@@ -382,6 +405,31 @@ class DesktopModeTaskRepositoryTest : ShellTestCase() {
         executor.flushAll()
         assertThat(listener.stashedOnDefaultDisplay).isFalse()
         assertThat(listener.stashedOnSecondaryDisplay).isTrue()
+    }
+
+    @Test
+    fun removeFreeformTask_removesTaskBoundsBeforeMaximize() {
+        val taskId = 1
+        repo.saveBoundsBeforeMaximize(taskId, Rect(0, 0, 200, 200))
+        repo.removeFreeformTask(taskId)
+        assertThat(repo.removeBoundsBeforeMaximize(taskId)).isNull()
+    }
+
+    @Test
+    fun saveBoundsBeforeMaximize_boundsSavedByTaskId() {
+        val taskId = 1
+        val bounds = Rect(0, 0, 200, 200)
+        repo.saveBoundsBeforeMaximize(taskId, bounds)
+        assertThat(repo.removeBoundsBeforeMaximize(taskId)).isEqualTo(bounds)
+    }
+
+    @Test
+    fun removeBoundsBeforeMaximize_returnsNullAfterBoundsRemoved() {
+        val taskId = 1
+        val bounds = Rect(0, 0, 200, 200)
+        repo.saveBoundsBeforeMaximize(taskId, bounds)
+        repo.removeBoundsBeforeMaximize(taskId)
+        assertThat(repo.removeBoundsBeforeMaximize(taskId)).isNull()
     }
 
     class TestListener : DesktopModeTaskRepository.ActiveTasksListener {

@@ -83,6 +83,7 @@ aconfig_declarations_group {
         "com.android.internal.pm.pkg.component.flags-aconfig-java",
         "com.android.media.flags.bettertogether-aconfig-java",
         "com.android.media.flags.editing-aconfig-java",
+        "com.android.media.flags.performance-aconfig-java",
         "com.android.media.flags.projection-aconfig-java",
         "com.android.net.thread.platform.flags-aconfig-java",
         "com.android.server.flags.services-aconfig-java",
@@ -339,6 +340,7 @@ java_aconfig_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.mediaprovider",
+        "com.android.permission",
     ],
 }
 
@@ -573,6 +575,21 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
+// Media Performance
+aconfig_declarations {
+    name: "com.android.media.flags.performance-aconfig",
+    package: "com.android.media.performance.flags",
+    srcs: [
+        "media/java/android/media/flags/performance.aconfig",
+    ],
+}
+
+java_aconfig_library {
+    name: "com.android.media.flags.performance-aconfig-java",
+    aconfig_declarations: "com.android.media.flags.performance-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 // Media TV
 aconfig_declarations {
     name: "android.media.tv.flags-aconfig",
@@ -631,6 +648,12 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
+cc_aconfig_library {
+    name: "android.database.sqlite-aconfig-cc",
+    aconfig_declarations: "android.database.sqlite-aconfig",
+    host_supported: true,
+}
+
 // Biometrics
 aconfig_declarations {
     name: "android.hardware.biometrics.flags-aconfig",
@@ -662,6 +685,11 @@ java_aconfig_library {
     name: "display_flags_lib",
     aconfig_declarations: "display_flags",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "android.server.display.flags-aconfig-cc",
+    aconfig_declarations: "display_flags",
 }
 
 java_aconfig_library {

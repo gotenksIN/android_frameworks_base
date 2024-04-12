@@ -1640,6 +1640,10 @@ final class DevicePolicyEngine {
                     mAdminPolicySize.get(admin.getUserId()).get(admin) - sizeOf(
                             policyState.getPoliciesSetByAdmins().get(admin)));
         }
+        if (!mAdminPolicySize.contains(admin.getUserId())
+                || !mAdminPolicySize.get(admin.getUserId()).containsKey(admin)) {
+            return;
+        }
         if (mAdminPolicySize.get(admin.getUserId()).get(admin) <= 0) {
             mAdminPolicySize.get(admin.getUserId()).remove(admin);
         }
@@ -1671,19 +1675,29 @@ final class DevicePolicyEngine {
     public void dump(IndentingPrintWriter pw) {
         synchronized (mLock) {
             pw.println("Local Policies: ");
+            pw.increaseIndent();
             for (int i = 0; i < mLocalPolicies.size(); i++) {
-                for (PolicyKey policy : mLocalPolicies.get(mLocalPolicies.keyAt(i)).keySet()) {
-                    PolicyState<?> policyState = mLocalPolicies.get(
-                            mLocalPolicies.keyAt(i)).get(policy);
-                    pw.println(policyState);
+                int userId = mLocalPolicies.keyAt(i);
+                pw.printf("User %d:\n", userId);
+                pw.increaseIndent();
+                for (PolicyKey policy : mLocalPolicies.get(userId).keySet()) {
+                    PolicyState<?> policyState = mLocalPolicies.get(userId).get(policy);
+                    policyState.dump(pw);
+                    pw.println();
                 }
+                pw.decreaseIndent();
             }
+            pw.decreaseIndent();
             pw.println();
+
             pw.println("Global Policies: ");
+            pw.increaseIndent();
             for (PolicyKey policy : mGlobalPolicies.keySet()) {
                 PolicyState<?> policyState = mGlobalPolicies.get(policy);
-                pw.println(policyState);
+                policyState.dump(pw);
+                pw.println();
             }
+            pw.decreaseIndent();
         }
     }
 

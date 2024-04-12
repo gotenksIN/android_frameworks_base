@@ -16,6 +16,7 @@
 
 package android.inputmethodservice;
 
+import static android.view.inputmethod.Flags.predictiveBackIme;
 import static android.inputmethodservice.InputMethodServiceProto.CANDIDATES_VIEW_STARTED;
 import static android.inputmethodservice.InputMethodServiceProto.CANDIDATES_VISIBILITY;
 import static android.inputmethodservice.InputMethodServiceProto.CONFIGURATION;
@@ -55,6 +56,7 @@ import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECT
 import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECTIONLESS_HANDWRITING_ERROR_OTHER;
 import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECTIONLESS_HANDWRITING_ERROR_UNSUPPORTED;
 import static android.view.inputmethod.Flags.FLAG_CONNECTIONLESS_HANDWRITING;
+import static android.view.inputmethod.Flags.ctrlShiftShortcut;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
@@ -399,9 +401,14 @@ public class InputMethodService extends AbstractInputMethodService {
     private long mStylusHwSessionsTimeout = STYLUS_HANDWRITING_IDLE_TIMEOUT_MS;
     private Runnable mStylusWindowIdleTimeoutRunnable;
     private long mStylusWindowIdleTimeoutForTest;
-    /** Tracks last {@link MotionEvent#getToolType(int)} used for {@link MotionEvent#ACTION_DOWN}.
+    /**
+     * Tracks last {@link MotionEvent#getToolType(int)} used for {@link MotionEvent#ACTION_DOWN}.
      **/
     private int mLastUsedToolType;
+    /**
+     * Tracks the ctrl+shift shortcut
+     **/
+    private boolean mUsingCtrlShiftShortcut = false;
 
     /**
      * Returns whether {@link InputMethodService} is responsible for rendering the back button and
@@ -3098,7 +3105,7 @@ public class InputMethodService extends AbstractInputMethodService {
         cancelImeSurfaceRemoval();
         mInShowWindow = false;
         Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
-        registerCompatOnBackInvokedCallback();
+        registerDefaultOnBackInvokedCallback();
     }
 
 
@@ -3107,18 +3114,27 @@ public class InputMethodService extends AbstractInputMethodService {
      *  back dispatching is enabled. We keep the {@link KeyEvent#KEYCODE_BACK} based legacy code
      *  around to handle back on older devices.
      */
-    private void registerCompatOnBackInvokedCallback() {
+    private void registerDefaultOnBackInvokedCallback() {
         if (mBackCallbackRegistered) {
             return;
         }
         if (mWindow != null) {
-            mWindow.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, mCompatBackCallback);
+            if (getApplicationInfo().isOnBackInvokedCallbackEnabled() && predictiveBackIme()) {
+                // Register the compat callback as system-callback if IME has opted in for
+                // predictive back (and predictiveBackIme feature flag is enabled). This indicates
+                // to the receiving process (application process) that a predictive IME dismiss
+                // animation may be played instead of invoking the callback.
+                mWindow.getOnBackInvokedDispatcher().registerSystemOnBackInvokedCallback(
+                        mCompatBackCallback);
+            } else {
+                mWindow.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                        OnBackInvokedDispatcher.PRIORITY_DEFAULT, mCompatBackCallback);
+            }
             mBackCallbackRegistered = true;
         }
     }
 
-    private void unregisterCompatOnBackInvokedCallback() {
+    private void unregisterDefaultOnBackInvokedCallback() {
         if (!mBackCallbackRegistered) {
             return;
         }
@@ -3251,7 +3267,7 @@ public class InputMethodService extends AbstractInputMethodService {
         }
         mLastWasInFullscreenMode = mIsFullscreen;
         updateFullscreenMode();
-        unregisterCompatOnBackInvokedCallback();
+        unregisterDefaultOnBackInvokedCallback();
     }
 
     /**
@@ -3328,7 +3344,7 @@ public class InputMethodService extends AbstractInputMethodService {
         // Back callback is typically unregistered in {@link #hideWindow()}, but it's possible
         // for {@link #doFinishInput()} to be called without {@link #hideWindow()} so we also
         // unregister here.
-        unregisterCompatOnBackInvokedCallback();
+        unregisterDefaultOnBackInvokedCallback();
     }
 
     void doStartInput(InputConnection ic, EditorInfo editorInfo, boolean restarting) {
@@ -3602,7 +3618,8 @@ public class InputMethodService extends AbstractInputMethodService {
             // any KeyEvent keyDown should reset last toolType.
             updateEditorToolTypeInternal(MotionEvent.TOOL_TYPE_UNKNOWN);
         }
-        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
             final ExtractEditText eet = getExtractEditTextIfVisible();
             if (eet != null && eet.handleBackInTextActionModeIfNeeded(event)) {
                 return true;
@@ -3612,14 +3629,33 @@ public class InputMethodService extends AbstractInputMethodService {
                 return true;
             }
             return false;
-        } else if (event.getKeyCode() == KeyEvent.KEYCODE_SPACE && KeyEvent.metaStateHasModifiers(
+        } else if (keyCode == KeyEvent.KEYCODE_SPACE && KeyEvent.metaStateHasModifiers(
                 event.getMetaState() & ~KeyEvent.META_SHIFT_MASK, KeyEvent.META_CTRL_ON)) {
             if (mDecorViewVisible && mWindowVisible) {
                 int direction = (event.getMetaState() & KeyEvent.META_SHIFT_MASK) != 0 ? -1 : 1;
                 mPrivOps.switchKeyboardLayoutAsync(direction);
+                event.startTracking();
                 return true;
             }
         }
+
+        // Check if this may be a ctrl+shift shortcut
+        if (ctrlShiftShortcut()) {
+            if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT
+                    || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
+                // Potentially Ctrl+Shift shortcut if Ctrl is currently pressed
+                mUsingCtrlShiftShortcut = KeyEvent.metaStateHasModifiers(
+                    event.getMetaState() & ~KeyEvent.META_SHIFT_MASK, KeyEvent.META_CTRL_ON);
+            } else if (keyCode == KeyEvent.KEYCODE_CTRL_LEFT
+                    || keyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
+                // Potentially Ctrl+Shift shortcut if Shift is currently pressed
+                mUsingCtrlShiftShortcut = KeyEvent.metaStateHasModifiers(
+                    event.getMetaState() & ~KeyEvent.META_CTRL_MASK, KeyEvent.META_SHIFT_ON);
+            } else {
+                mUsingCtrlShiftShortcut = false;
+            }
+        }
+
         return doMovementKey(keyCode, event, MOVEMENT_DOWN);
     }
 
@@ -3661,7 +3697,27 @@ public class InputMethodService extends AbstractInputMethodService {
      * them to perform navigation in the underlying application.
      */
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+        if (ctrlShiftShortcut()) {
+            if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT
+                    || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT
+                    || keyCode == KeyEvent.KEYCODE_CTRL_LEFT
+                    || keyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
+                if (mUsingCtrlShiftShortcut
+                        && event.hasNoModifiers()) {
+                    mUsingCtrlShiftShortcut = false;
+                    if (mDecorViewVisible && mWindowVisible) {
+                        // Move to the next IME
+                        switchToNextInputMethod(false /* onlyCurrentIme */);
+                        // TODO(b/332937629): Make the event stream consistent again
+                        return true;
+                    }
+                }
+            } else {
+                mUsingCtrlShiftShortcut = false;
+            }
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
             final ExtractEditText eet = getExtractEditTextIfVisible();
             if (eet != null && eet.handleBackInTextActionModeIfNeeded(event)) {
                 return true;
@@ -3669,7 +3725,12 @@ public class InputMethodService extends AbstractInputMethodService {
             if (event.isTracking() && !event.isCanceled()) {
                 return handleBack(true);
             }
+        } else if (keyCode == KeyEvent.KEYCODE_SPACE) {
+            if (event.isTracking() && !event.isCanceled()) {
+                return true;
+            }
         }
+
         return doMovementKey(keyCode, event, MOVEMENT_UP);
     }
 
@@ -4473,7 +4534,7 @@ public class InputMethodService extends AbstractInputMethodService {
     private void compatHandleBack() {
         if (!mDecorViewVisible) {
             Log.e(TAG, "Back callback invoked on a hidden IME. Removing the callback...");
-            unregisterCompatOnBackInvokedCallback();
+            unregisterDefaultOnBackInvokedCallback();
             return;
         }
         final KeyEvent downEvent = createBackKeyEvent(

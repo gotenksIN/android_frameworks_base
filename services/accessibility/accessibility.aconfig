@@ -1,4 +1,5 @@
 package: "com.android.server.accessibility"
+container: "system"
 
 # NOTE: Keep alphabetized to help limit merge conflicts from multiple simultaneous editors.
 
@@ -24,10 +25,13 @@ flag {
 }
 
 flag {
-    name: "compute_window_changes_on_a11y"
+    name: "compute_window_changes_on_a11y_v2"
     namespace: "accessibility"
     description: "Computes accessibility window changes in accessibility instead of wm package."
     bug: "322444245"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -42,6 +46,13 @@ flag {
     namespace: "accessibility"
     description: "When a package is force stopped, remove the button shortcuts of any continuously-running shortcuts."
     bug: "198018180"
+}
+
+flag {
+    name: "enable_a11y_checker_logging"
+    namespace: "accessibility"
+    description: "Whether to identify and log app a11y issues."
+    bug: "325420273"
 }
 
 flag {

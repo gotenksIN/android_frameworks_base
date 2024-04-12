@@ -27,12 +27,15 @@ import static android.graphics.Matrix.MSKEW_Y;
 import static android.view.View.SYSTEM_UI_FLAG_VISIBLE;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
 
+import static com.android.window.flags.Flags.FLAG_OFFLOAD_COLOR_EXTRACTION;
 import static com.android.window.flags.Flags.noConsecutiveVisibilityEvents;
+import static com.android.window.flags.Flags.offloadColorExtraction;
 
 import android.animation.AnimationHandler;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
+import android.annotation.FlaggedApi;
 import android.annotation.FloatRange;
 import android.annotation.MainThread;
 import android.annotation.NonNull;
@@ -106,6 +109,7 @@ import android.window.ActivityWindowInfo;
 import android.window.ClientWindowFrames;
 import android.window.ScreenCapture;
 
+import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.HandlerCaller;
@@ -831,6 +835,15 @@ public abstract class WallpaperService extends Service {
         }
 
         /**
+         * Called when the dim amount of the wallpaper changed. This can be used to recompute the
+         * wallpaper colors based on the new dim, and call {@link #notifyColorsChanged()}.
+         * @hide
+         */
+        @FlaggedApi(FLAG_OFFLOAD_COLOR_EXTRACTION)
+        public void onDimAmountChanged(float dimAmount) {
+        }
+
+        /**
          * Called when an application has changed the desired virtual size of
          * the wallpaper.
          */
@@ -1042,6 +1055,10 @@ public abstract class WallpaperService extends Service {
             }
 
             mPreviousWallpaperDimAmount = mWallpaperDimAmount;
+
+            // after the dim changes, allow colors to be immediately recomputed
+            mLastColorInvalidation = 0;
+            if (offloadColorExtraction()) onDimAmountChanged(mWallpaperDimAmount);
         }
 
         /**
@@ -1283,8 +1300,14 @@ public abstract class WallpaperService extends Service {
                                     .build();
                             SurfaceControl.Transaction transaction =
                                     new SurfaceControl.Transaction();
+                            final int frameRateCompat = getResources().getInteger(
+                                    R.integer.config_wallpaperFrameRateCompatibility);
+                            if (DEBUG) {
+                                Log.d(TAG, "Set frame rate compatibility value for Wallpaper: "
+                                        + frameRateCompat);
+                            }
                             transaction.setDefaultFrameRateCompatibility(mBbqSurfaceControl,
-                                Surface.FRAME_RATE_COMPATIBILITY_MIN).apply();
+                                    frameRateCompat).apply();
                         }
                         // Propagate transform hint from WM, so we can use the right hint for the
                         // first frame.

@@ -84,7 +84,7 @@
     <string name="NetworkPreferenceSwitchTitle" msgid="1008329951315753038">"Der er ingen forbindelse til mobilnetværket"</string>
     <string name="NetworkPreferenceSwitchSummary" msgid="2086506181486324860">"Prøv at skifte dit foretrukne netværk. Tryk for skifte."</string>
     <string name="EmergencyCallWarningTitle" msgid="1615688002899152860">"Det er ikke muligt at foretage nødopkald"</string>
-    <string name="EmergencyCallWarningSummary" msgid="1194185880092805497">"Det er ikke muligt at foretage nødopkald via Wi‑Fi"</string>
+    <string name="EmergencyCallWarningSummary" msgid="9102799172089265268">"Nødopkald kræver adgang til et mobilnetværk"</string>
     <string name="notification_channel_network_alert" msgid="4788053066033851841">"Underretninger"</string>
     <string name="notification_channel_call_forward" msgid="8230490317314272406">"Viderestilling af opkald"</string>
     <string name="notification_channel_emergency_callback" msgid="54074839059123159">"Nødtilbagekaldstilstand"</string>
@@ -827,7 +827,7 @@
     <string name="permdesc_writeVerificationStateE2eeContactKeys" msgid="8453156829747427041">"Giver appen tilladelse til at opdatere tilstandene for verificering E2EE-kontaktnøgler, som ejes af andre apps"</string>
     <string name="policylab_limitPassword" msgid="4851829918814422199">"Angiv regler for adgangskoder"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"Tjek længden samt tilladte tegn i adgangskoder og pinkoder til skærmlåsen."</string>
-    <string name="policylab_watchLogin" msgid="7599669460083719504">"Overvåg forsøg på oplåsning af skærm"</string>
+    <string name="policylab_watchLogin" msgid="7599669460083719504">"Overvåge forsøg på oplåsning af skærm"</string>
     <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Overvåg antallet af forkert indtastede adgangskoder, når du låser skærmen op, og lås din tablet, eller slet alle data i den, hvis der er indtastet for mange forkerte adgangskoder."</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"Registrer antallet af forkerte adgangskoder, der angives ved oplåsning af skærmen, og lås din Android TV-enhed, eller ryd alle dataene på din Android TV-enhed, hvis adgangskoden angives forkert for mange gange."</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"Registrer antallet af forkert indtastede adgangskoder, når du låser skærmen op, og lås infotainmentsystemet, eller slet alle data i infotainmentsystemet, hvis der er indtastet for mange forkerte adgangskoder."</string>
@@ -1183,6 +1183,8 @@
     <string name="deleteText" msgid="4200807474529938112">"Slet"</string>
     <string name="inputMethod" msgid="1784759500516314751">"Inputmetode"</string>
     <string name="editTextMenuTitle" msgid="857666911134482176">"Teksthandlinger"</string>
+    <string name="error_handwriting_unsupported" msgid="7809438534946014050">"Håndskrift understøttes ikke for dette felt"</string>
+    <string name="error_handwriting_unsupported_password" msgid="5095401146106891087">"Håndskrift understøttes ikke for adgangskodefelter"</string>
     <string name="input_method_nav_back_button_desc" msgid="3655838793765691787">"Tilbage"</string>
     <string name="input_method_ime_switch_button_desc" msgid="2736542240252198501">"Skift indtastningsmetode"</string>
     <string name="low_internal_storage_view_title" msgid="9024241779284783414">"Der er snart ikke mere lagerplads"</string>
@@ -1927,6 +1929,9 @@
     <string name="zen_mode_implicit_trigger_description" msgid="5714956693073007111">"Administreres af <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="zen_mode_implicit_activated" msgid="2634285680776672994">"Til"</string>
     <string name="zen_mode_implicit_deactivated" msgid="8688441768371501750">"Fra"</string>
+    <string name="zen_mode_trigger_summary_divider_text" msgid="7461583466043698862">", "</string>
+    <string name="zen_mode_trigger_summary_range_symbol_combination" msgid="1804900738798069619">"<xliff:g id="START">%1$s</xliff:g>-<xliff:g id="END">%2$s</xliff:g>"</string>
+    <string name="zen_mode_trigger_event_calendar_any" msgid="2086784607921121803">"Alle kalendere"</string>
     <string name="muted_by" msgid="91464083490094950">"<xliff:g id="THIRD_PARTY">%1$s</xliff:g> slår nogle lyde fra"</string>
     <string name="system_error_wipe_data" msgid="5910572292172208493">"Der er et internt problem med enheden, og den vil muligvis være ustabil, indtil du gendanner fabriksdataene."</string>
     <string name="system_error_manufacturer" msgid="703545241070116315">"Der er et internt problem med enheden. Kontakt producenten for at få yderligere oplysninger."</string>
@@ -2389,6 +2394,8 @@
     <string name="profile_label_test" msgid="9168641926186071947">"Test"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Fælles"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
+    <!-- no translation found for screen_not_shared_sensitive_content (7058419185079565001) -->
+    <skip />
     <string name="satellite_notification_title" msgid="4026338973463121526">"Der blev automatisk oprettet forbindelse til satellit"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"Du kan sende og modtage beskeder uden et mobil- eller Wi-Fi-netværk"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Åbn Beskeder"</string>

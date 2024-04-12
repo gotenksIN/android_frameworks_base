@@ -28,6 +28,7 @@ import static android.graphics.GraphicsProtos.dumpPointProto;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.PowerManager.DRAW_WAKE_LOCK;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
+import static android.permission.flags.Flags.sensitiveContentImprovements;
 import static android.view.SurfaceControl.Transaction;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_CONTENT;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_FRAME;
@@ -246,6 +247,7 @@ import android.window.OnBackInvokedCallbackInfo;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.KeyInterceptionInfo;
+import com.android.internal.protolog.common.LogLevel;
 import com.android.internal.protolog.common.ProtoLog;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.ToBooleanFunction;
@@ -420,6 +422,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * client won't perform unnecessary updates.
      */
     private final MergedConfiguration mLastReportedConfiguration = new MergedConfiguration();
+
+    /**
+     * Similar to {@link #mLastReportedConfiguration}, used to store last reported to client
+     * ActivityWindowInfo. {@code null} if this is not an Activity window.
+     */
+    @Nullable
+    final ActivityWindowInfo mLastReportedActivityWindowInfo;
 
     /** @see #isLastConfigReportedToClient() */
     private boolean mLastConfigReportedToClient;
@@ -1080,6 +1089,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mPolicy = mWmService.mPolicy;
         mContext = mWmService.mContext;
         mForceSeamlesslyRotate = token.mRoundedCornerOverlay;
+        mLastReportedActivityWindowInfo = Flags.activityWindowInfoFlag() && mActivityRecord != null
+                ? new ActivityWindowInfo()
+                : null;
         mInputWindowHandle = new InputWindowHandleWrapper(new InputWindowHandle(
                 mActivityRecord != null
                         ? mActivityRecord.getInputApplicationHandle(false /* update */) : null,
@@ -2127,6 +2139,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 }
             }
             setDisplayLayoutNeeded();
+            if (sensitiveContentImprovements() && visible) {
+                mWmService.onWindowVisible(this);
+            }
         }
     }
 
@@ -3603,12 +3618,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      *
      * @param outFrames The frames that will be sent to the client.
      * @param outMergedConfiguration The configuration that will be sent to the client.
+     * @param outActivityWindowInfo The ActivityWindowInfo that will be sent to the client if set.
+     *                              {@code null} if this is not activity window.
      * @param useLatestConfig Whether to use the latest configuration.
      * @param relayoutVisible Whether to consider visibility to use the latest configuration.
      */
-    void fillClientWindowFramesAndConfiguration(ClientWindowFrames outFrames,
-            MergedConfiguration outMergedConfiguration, boolean useLatestConfig,
-            boolean relayoutVisible) {
+    void fillClientWindowFramesAndConfiguration(@NonNull ClientWindowFrames outFrames,
+            @NonNull MergedConfiguration outMergedConfiguration,
+            @Nullable ActivityWindowInfo outActivityWindowInfo,
+            boolean useLatestConfig, boolean relayoutVisible) {
         outFrames.frame.set(mWindowFrames.mCompatFrame);
         outFrames.displayFrame.set(mWindowFrames.mDisplayFrame);
         if (mInvGlobalScale != 1f) {
@@ -3638,8 +3656,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             if (outMergedConfiguration != mLastReportedConfiguration) {
                 mLastReportedConfiguration.setTo(outMergedConfiguration);
             }
+            if (outActivityWindowInfo != null && mLastReportedActivityWindowInfo != null) {
+                outActivityWindowInfo.set(mActivityRecord.getActivityWindowInfo());
+                mLastReportedActivityWindowInfo.set(outActivityWindowInfo);
+            }
         } else {
             outMergedConfiguration.setTo(mLastReportedConfiguration);
+            if (outActivityWindowInfo != null && mLastReportedActivityWindowInfo != null) {
+                outActivityWindowInfo.set(mLastReportedActivityWindowInfo);
+            }
         }
         mLastConfigReportedToClient = true;
     }
@@ -3676,10 +3701,22 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mDragResizingChangeReported = true;
         mWindowFrames.clearReportResizeHints();
 
+        // App window resize may trigger Activity#onConfigurationChanged, so we need to update
+        // ActivityWindowInfo as well.
+        final IBinder activityToken;
+        final ActivityWindowInfo activityWindowInfo;
+        if (mLastReportedActivityWindowInfo != null) {
+            activityToken = mActivityRecord.token;
+            activityWindowInfo = mLastReportedActivityWindowInfo;
+        } else {
+            activityToken = null;
+            activityWindowInfo = null;
+        }
+
         final int prevRotation = mLastReportedConfiguration
                 .getMergedConfiguration().windowConfiguration.getRotation();
         fillClientWindowFramesAndConfiguration(mClientWindowFrames, mLastReportedConfiguration,
-                true /* useLatestConfig */, false /* relayoutVisible */);
+                activityWindowInfo, true /* useLatestConfig */, false /* relayoutVisible */);
         final boolean syncRedraw = shouldSendRedrawForSync();
         final boolean syncWithBuffers = syncRedraw && shouldSyncWithBuffers();
         final boolean reportDraw = syncRedraw || drawPending;
@@ -3696,18 +3733,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         final boolean isDragResizing = isDragResizing();
 
         markRedrawForSyncReported();
-
-        // App window resize may trigger Activity#onConfigurationChanged, so we need to update
-        // ActivityWindowInfo as well.
-        final IBinder activityToken;
-        final ActivityWindowInfo activityWindowInfo;
-        if (Flags.activityWindowInfoFlag() && mActivityRecord != null) {
-            activityToken = mActivityRecord.token;
-            activityWindowInfo = mActivityRecord.getActivityWindowInfo();
-        } else {
-            activityToken = null;
-            activityWindowInfo = null;
-        }
 
         if (Flags.bundleClientTransactionFlag()) {
             getProcess().scheduleClientTransactionItem(
@@ -4132,6 +4157,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
             pw.println(prefix + "mFullConfiguration=" + getConfiguration());
             pw.println(prefix + "mLastReportedConfiguration=" + getLastReportedConfiguration());
+            if (mLastReportedActivityWindowInfo != null) {
+                pw.println(prefix + "mLastReportedActivityWindowInfo="
+                        + mLastReportedActivityWindowInfo);
+            }
         }
         pw.println(prefix + "mHasSurface=" + mHasSurface
                 + " isReadyForDisplay()=" + isReadyForDisplay()
@@ -4711,7 +4740,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     void onExitAnimationDone() {
-        if (ProtoLog.isEnabled(WM_DEBUG_ANIM)) {
+        if (ProtoLog.isEnabled(WM_DEBUG_ANIM, LogLevel.VERBOSE)) {
             final AnimationAdapter animationAdapter = mSurfaceAnimator.getAnimation();
             StringWriter sw = new StringWriter();
             if (animationAdapter != null) {
@@ -4949,8 +4978,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 displayInfo.appWidth, displayInfo.appHeight);
         anim.restrictDuration(MAX_ANIMATION_DURATION);
         anim.scaleCurrentDuration(mWmService.getWindowAnimationScaleLocked());
+        final Point position = new Point();
+        if (com.android.window.flags.Flags.removePrepareSurfaceInPlacement()) {
+            transformFrameToSurfacePosition(mWindowFrames.mFrame.left, mWindowFrames.mFrame.top,
+                    position);
+        } else {
+            position.set(mSurfacePosition);
+        }
         final AnimationAdapter adapter = new LocalAnimationAdapter(
-                new WindowAnimationSpec(anim, mSurfacePosition, false /* canSkipFirstFrame */,
+                new WindowAnimationSpec(anim, position, false /* canSkipFirstFrame */,
                         0 /* windowCornerRadius */),
                 mWmService.mSurfaceAnimationRunner);
         startAnimation(getPendingTransaction(), adapter);

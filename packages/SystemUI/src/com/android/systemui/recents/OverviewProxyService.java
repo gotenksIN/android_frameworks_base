@@ -99,6 +99,7 @@ import com.android.systemui.navigationbar.buttons.KeyButtonView;
 import com.android.systemui.recents.OverviewProxyService.OverviewProxyListener;
 import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.scene.shared.flag.SceneContainerFlags;
+import com.android.systemui.scene.shared.model.Scenes;
 import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeViewController;
@@ -239,6 +240,11 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                             } else {
                                 mShadeViewControllerLazy.get().finishInputFocusTransfer(velocity);
                             }
+                        } else if (action == ACTION_UP) {
+                            // Gesture was too short to be picked up by scene container touch
+                            // handling; programmatically start the transition to shade scene.
+                            mSceneInteractor.get().changeScene(
+                                    Scenes.Shade, "short launcher swipe");
                         }
                     }
                     event.recycle();
@@ -256,6 +262,12 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         public void animateNavBarLongPress(boolean isTouchDown, boolean shrink, long durationMs) {
             verifyCallerAndClearCallingIdentityPostMain("animateNavBarLongPress", () ->
                     notifyAnimateNavBarLongPress(isTouchDown, shrink, durationMs));
+        }
+
+        @Override
+        public void setOverrideHomeButtonLongPress(long duration, float slopMultiplier) {
+            verifyCallerAndClearCallingIdentityPostMain("setOverrideHomeButtonLongPress",
+                    () -> notifySetOverrideHomeButtonLongPress(duration, slopMultiplier));
         }
 
         @Override
@@ -947,6 +959,12 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         }
     }
 
+    private void notifySetOverrideHomeButtonLongPress(long duration, float slopMultiplier) {
+        for (int i = mConnectionCallbacks.size() - 1; i >= 0; --i) {
+            mConnectionCallbacks.get(i).setOverrideHomeButtonLongPress(duration, slopMultiplier);
+        }
+    }
+
     public void notifyAssistantVisibilityChanged(float visibility) {
         try {
             if (mOverviewProxy != null) {
@@ -1104,6 +1122,8 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         default void startAssistant(Bundle bundle) {}
         default void setAssistantOverridesRequested(int[] invocationTypes) {}
         default void animateNavBarLongPress(boolean isTouchDown, boolean shrink, long durationMs) {}
+        /** Set override of home button long press duration and touch slop multiplier. */
+        default void setOverrideHomeButtonLongPress(long override, float slopMultiplier) {}
     }
 
     /**

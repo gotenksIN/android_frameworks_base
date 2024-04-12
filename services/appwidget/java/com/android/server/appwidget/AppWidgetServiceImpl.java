@@ -23,6 +23,8 @@ import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.res.Resources.ID_NULL;
 import static android.provider.DeviceConfig.NAMESPACE_SYSTEMUI;
 
+import static com.android.server.appwidget.AppWidgetXmlUtil.deserializeWidgetSizesStr;
+import static com.android.server.appwidget.AppWidgetXmlUtil.serializeWidgetSizes;
 import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
 
 import android.Manifest;
@@ -107,6 +109,7 @@ import android.util.IntArray;
 import android.util.Log;
 import android.util.LongSparseArray;
 import android.util.Pair;
+import android.util.SizeF;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
@@ -175,6 +178,8 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     private static final int KEYGUARD_HOST_ID = 0x4b455947;
 
     private static final String STATE_FILENAME = "appwidgets.xml";
+
+    private static final String KEY_SIZES = "sizes";
 
     private static final int MIN_UPDATE_PERIOD = DEBUG ? 0 : 30 * 60 * 1000; // 30 minutes
 
@@ -2710,6 +2715,11 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
             out.attributeIntHex(null, "max_height", (maxHeight > 0) ? maxHeight : 0);
             out.attributeIntHex(null, "host_category", widget.options.getInt(
                     AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY));
+            List<SizeF> sizes = widget.options.getParcelableArrayList(
+                    AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF.class);
+            if (sizes != null) {
+                out.attribute(null, KEY_SIZES, serializeWidgetSizes(sizes));
+            }
             if (saveRestoreCompleted) {
                 boolean restoreCompleted = widget.options.getBoolean(
                         AppWidgetManager.OPTION_APPWIDGET_RESTORE_COMPLETED);
@@ -2740,6 +2750,11 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         int maxHeight = parser.getAttributeIntHex(null, "max_height", -1);
         if (maxHeight != -1) {
             options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeight);
+        }
+        String sizesStr = parser.getAttributeValue(null, KEY_SIZES);
+        ArrayList<SizeF> sizes = deserializeWidgetSizesStr(sizesStr);
+        if (sizes != null) {
+            options.putParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, sizes);
         }
         int category = parser.getAttributeIntHex(null, "host_category",
                 AppWidgetProviderInfo.WIDGET_CATEGORY_UNKNOWN);

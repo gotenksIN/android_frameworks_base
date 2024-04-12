@@ -28,6 +28,7 @@ import android.annotation.UserIdInt;
 import android.app.WindowConfiguration;
 import android.app.compat.CompatChanges;
 import android.companion.virtual.VirtualDeviceManager.ActivityListener;
+import android.companion.virtual.flags.Flags;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 import android.content.AttributionSource;
@@ -298,14 +299,28 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
     public boolean canActivityBeLaunched(@NonNull ActivityInfo activityInfo,
             @Nullable Intent intent, @WindowConfiguration.WindowingMode int windowingMode,
             int launchingFromDisplayId, boolean isNewTask) {
-        if (!canContainActivity(activityInfo, windowingMode, launchingFromDisplayId, isNewTask)) {
-            notifyActivityBlocked(activityInfo);
-            return false;
-        }
-        if (mIntentListenerCallback != null && intent != null
-                && mIntentListenerCallback.shouldInterceptIntent(intent)) {
-            Slog.d(TAG, "Virtual device intercepting intent");
-            return false;
+        if (Flags.interceptIntentsBeforeApplyingPolicy()) {
+            if (mIntentListenerCallback != null && intent != null
+                    && mIntentListenerCallback.shouldInterceptIntent(intent)) {
+                Slog.d(TAG, "Virtual device intercepting intent");
+                return false;
+            }
+            if (!canContainActivity(activityInfo, windowingMode, launchingFromDisplayId,
+                    isNewTask)) {
+                notifyActivityBlocked(activityInfo);
+                return false;
+            }
+        } else {
+            if (!canContainActivity(activityInfo, windowingMode, launchingFromDisplayId,
+                    isNewTask)) {
+                notifyActivityBlocked(activityInfo);
+                return false;
+            }
+            if (mIntentListenerCallback != null && intent != null
+                    && mIntentListenerCallback.shouldInterceptIntent(intent)) {
+                Slog.d(TAG, "Virtual device intercepting intent");
+                return false;
+            }
         }
         return true;
     }
@@ -334,7 +349,7 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
             // The error dialog alerting users that streaming is blocked is always allowed.
             return true;
         }
-        if (!mAllowedUsers.contains(activityUser)) {
+        if (!activityUser.isSystem() && !mAllowedUsers.contains(activityUser)) {
             Slog.d(TAG, "Virtual device launch disallowed from user " + activityUser);
             return false;
         }

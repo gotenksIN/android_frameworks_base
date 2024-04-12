@@ -27,10 +27,15 @@ import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.os.UserHandle
 import android.util.Log
+import com.android.app.tracing.traceSection
+import com.android.systemui.Flags.communalHub
+import com.android.systemui.backup.BackupHelper.Companion.ACTION_RESTORE_FINISHED
+import com.android.systemui.communal.domain.backup.CommunalPrefsBackupHelper
 import com.android.systemui.controls.controller.AuxiliaryPersistenceWrapper
 import com.android.systemui.controls.controller.ControlsFavoritePersistenceWrapper
 import com.android.systemui.keyguard.domain.backup.KeyguardQuickAffordanceBackupHelper
 import com.android.systemui.people.widget.PeopleBackupHelper
+import com.android.systemui.res.R
 import com.android.systemui.settings.UserFileManagerImpl
 
 /**
@@ -52,6 +57,8 @@ open class BackupHelper : BackupAgentHelper() {
         private const val PEOPLE_TILES_BACKUP_KEY = "systemui.people.shared_preferences"
         private const val KEYGUARD_QUICK_AFFORDANCES_BACKUP_KEY =
             "systemui.keyguard.quickaffordance.shared_preferences"
+        private const val COMMUNAL_PREFS_BACKUP_KEY =
+            "systemui.communal.shared_preferences"
         val controlsDataLock = Any()
         const val ACTION_RESTORE_FINISHED = "com.android.systemui.backup.RESTORE_FINISHED"
         const val PERMISSION_SELF = "com.android.systemui.permission.SELF"
@@ -74,6 +81,15 @@ open class BackupHelper : BackupAgentHelper() {
                 userId = userHandle.identifier,
             ),
         )
+        if (communalEnabled()) {
+            addHelper(
+                COMMUNAL_PREFS_BACKUP_KEY,
+                CommunalPrefsBackupHelper(
+                    context = this,
+                    userId = userHandle.identifier,
+                )
+            )
+        }
     }
 
     override fun onRestoreFinished() {
@@ -99,6 +115,10 @@ open class BackupHelper : BackupAgentHelper() {
         }
     }
 
+    private fun communalEnabled(): Boolean {
+        return resources.getBoolean(R.bool.config_communalServiceEnabled) && communalHub()
+    }
+
     /**
      * Helper class for restoring files ONLY if they are not present.
      *
@@ -119,14 +139,22 @@ open class BackupHelper : BackupAgentHelper() {
     ) : FileBackupHelper(context, *fileNamesAndPostProcess.keys.toTypedArray()) {
 
         override fun restoreEntity(data: BackupDataInputStream) {
+            Log.d(TAG, "Starting restore for ${data.key} for user ${context.userId}")
             val file = Environment.buildPath(context.filesDir, data.key)
             if (file.exists()) {
                 Log.w(TAG, "File " + data.key + " already exists. Skipping restore.")
                 return
             }
             synchronized(lock) {
-                super.restoreEntity(data)
-                fileNamesAndPostProcess.get(data.key)?.invoke()
+                traceSection("File restore: ${data.key}") {
+                    super.restoreEntity(data)
+                }
+                Log.d(TAG, "Finishing restore for ${data.key} for user ${context.userId}. " +
+                        "Starting postProcess.")
+                traceSection("Postprocess: ${data.key}") {
+                    fileNamesAndPostProcess.get(data.key)?.invoke()
+                }
+                Log.d(TAG, "Finishing postprocess for ${data.key} for user ${context.userId}.")
             }
         }
 

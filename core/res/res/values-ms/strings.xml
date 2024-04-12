@@ -84,7 +84,7 @@
     <string name="NetworkPreferenceSwitchTitle" msgid="1008329951315753038">"Tidak dapat mencapai rangkaian mudah alih"</string>
     <string name="NetworkPreferenceSwitchSummary" msgid="2086506181486324860">"Cuba tukar rangkaian pilihan. Ketik untuk menukar."</string>
     <string name="EmergencyCallWarningTitle" msgid="1615688002899152860">"Panggilan kecemasan tidak tersedia"</string>
-    <string name="EmergencyCallWarningSummary" msgid="1194185880092805497">"Tidak boleh membuat panggilan kecemasan melalui Wi-Fi"</string>
+    <string name="EmergencyCallWarningSummary" msgid="9102799172089265268">"Rangkaian mudah alih diperlukan untuk membuat panggilan kecemasan"</string>
     <string name="notification_channel_network_alert" msgid="4788053066033851841">"Makluman"</string>
     <string name="notification_channel_call_forward" msgid="8230490317314272406">"Pemajuan panggilan"</string>
     <string name="notification_channel_emergency_callback" msgid="54074839059123159">"Mod paggil balik kecemasan"</string>
@@ -1183,6 +1183,8 @@
     <string name="deleteText" msgid="4200807474529938112">"Padam"</string>
     <string name="inputMethod" msgid="1784759500516314751">"Kaedah input"</string>
     <string name="editTextMenuTitle" msgid="857666911134482176">"Tindakan teks"</string>
+    <string name="error_handwriting_unsupported" msgid="7809438534946014050">"Tulisan tangan tidak disokong dalam medan ini"</string>
+    <string name="error_handwriting_unsupported_password" msgid="5095401146106891087">"Tulisan tangan tidak disokong dalam medan kata laluan"</string>
     <string name="input_method_nav_back_button_desc" msgid="3655838793765691787">"Kembali"</string>
     <string name="input_method_ime_switch_button_desc" msgid="2736542240252198501">"Tukar kaedah masukan"</string>
     <string name="low_internal_storage_view_title" msgid="9024241779284783414">"Ruang storan semakin berkurangan"</string>
@@ -1900,7 +1902,7 @@
     <string name="confirm_battery_saver" msgid="5247976246208245754">"OK"</string>
     <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Penjimat Bateri menghidupkan tema Gelap dan mengehadkan atau mematikan aktiviti latar, sesetengah kesan visual, ciri tertentu dan sesetengah sambungan rangkaian."</string>
     <string name="battery_saver_description" msgid="8518809702138617167">"Penjimat Bateri menghidupkan tema Gelap dan mengehadkan atau mematikan aktiviti latar, sesetengah kesan visual, ciri tertentu dan sesetengah sambungan rangkaian."</string>
-    <string name="data_saver_description" msgid="4995164271550590517">"Untuk membantu penggunaan data dikurangkan, Penjimat Data menghalang sesetengah apl daripada menghantar atau menerima data di latar. Apl yang sedang digunakan boleh mengakses data tetapi mungkin tidak secara kerap. Perkara ini mungkin bermaksud bahawa imej tidak dipaparkan sehingga anda mengetik pada imej itu, contohnya."</string>
+    <string name="data_saver_description" msgid="4995164271550590517">"Untuk mengurangkan penggunaan data, Penjimat Data menghalang sesetengah apl daripada menghantar atau menerima data di latar. Apl yang sedang digunakan boleh mengakses data tetapi mungkin tidak secara kerap. Sebagai contoh, imej tidak dipaparkan sehingga anda mengetik pada imej itu."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Hidupkan Penjimat Data?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Hidupkan"</string>
     <string name="zen_mode_duration_minutes_summary" msgid="4555514757230849789">"{count,plural, =1{Selama satu minit (hingga{formattedTime})}other{Selama # minit (hingga {formattedTime})}}"</string>
@@ -1927,6 +1929,9 @@
     <string name="zen_mode_implicit_trigger_description" msgid="5714956693073007111">"Diurus oleh <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="zen_mode_implicit_activated" msgid="2634285680776672994">"Hidup"</string>
     <string name="zen_mode_implicit_deactivated" msgid="8688441768371501750">"Mati"</string>
+    <string name="zen_mode_trigger_summary_divider_text" msgid="7461583466043698862">", "</string>
+    <string name="zen_mode_trigger_summary_range_symbol_combination" msgid="1804900738798069619">"<xliff:g id="START">%1$s</xliff:g> - <xliff:g id="END">%2$s</xliff:g>"</string>
+    <string name="zen_mode_trigger_event_calendar_any" msgid="2086784607921121803">"Sebarang kalendar"</string>
     <string name="muted_by" msgid="91464083490094950">"<xliff:g id="THIRD_PARTY">%1$s</xliff:g> meredamkan sesetengah bunyi"</string>
     <string name="system_error_wipe_data" msgid="5910572292172208493">"Terdapat masalah dalaman dengan peranti anda. Peranti mungkin tidak stabil sehingga anda membuat tetapan semula data kilang."</string>
     <string name="system_error_manufacturer" msgid="703545241070116315">"Terdapat masalah dalaman dengan peranti anda. Hubungi pengilang untuk mengetahui butirannya."</string>
@@ -1988,7 +1993,7 @@
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Kecemasan"</string>
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Tetapkan kunci skrin"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Tetapkan kunci skrin"</string>
-    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Tetapkan kunci skrin pada peranti untuk guna ruang privasi"</string>
+    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Tetapkan kunci skrin pada peranti untuk menggunakan ruang privasi"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"Apl tidak tersedia"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> tidak tersedia sekarang."</string>
     <string name="app_streaming_blocked_title" msgid="6090945835898766139">"<xliff:g id="ACTIVITY">%1$s</xliff:g> tidak tersedia"</string>
@@ -2389,6 +2394,8 @@
     <string name="profile_label_test" msgid="9168641926186071947">"Ujian"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Umum"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
+    <!-- no translation found for screen_not_shared_sensitive_content (7058419185079565001) -->
+    <skip />
     <string name="satellite_notification_title" msgid="4026338973463121526">"Disambungkan secara automatik kepada satelit"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"Anda boleh menghantar dan menerima mesej tanpa rangkaian mudah alih atau Wi-Fi"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Buka Messages"</string>

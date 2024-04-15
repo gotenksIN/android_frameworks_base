@@ -153,11 +153,6 @@ object Flags {
     // TODO(b/267722622): Tracking Bug
     @JvmField val WALLPAPER_PICKER_UI_FOR_AIWP = releasedFlag("wallpaper_picker_ui_for_aiwp")
 
-    /** Whether to use a new data source for intents to run on keyguard dismissal. */
-    // TODO(b/275069969): Tracking bug.
-    @JvmField
-    val REFACTOR_KEYGUARD_DISMISS_INTENT = unreleasedFlag("refactor_keyguard_dismiss_intent")
-
     /** Whether to allow long-press on the lock screen to directly open wallpaper picker. */
     // TODO(b/277220285): Tracking bug.
     @JvmField
@@ -341,11 +336,6 @@ object Flags {
             name = "enable_record_task_content",
             namespace = DeviceConfig.NAMESPACE_WINDOW_MANAGER,
         )
-
-    @Keep
-    @JvmField
-    val WM_CAPTION_ON_SHELL =
-        sysPropBooleanFlag("persist.wm.debug.caption_on_shell", default = true)
 
     // TODO(b/256873975): Tracking Bug
     @JvmField

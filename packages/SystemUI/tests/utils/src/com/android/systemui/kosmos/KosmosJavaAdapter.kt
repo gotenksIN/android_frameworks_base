@@ -33,6 +33,7 @@ import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.flags.fakeFeatureFlagsClassic
 import com.android.systemui.globalactions.domain.interactor.globalActionsInteractor
+import com.android.systemui.haptics.qs.qsLongPressEffect
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
@@ -48,6 +49,7 @@ import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.sceneContainerConfig
 import com.android.systemui.scene.shared.flag.fakeSceneContainerFlags
+import com.android.systemui.scene.shared.flag.sceneContainerFlags
 import com.android.systemui.scene.shared.model.sceneDataSource
 import com.android.systemui.settings.brightness.domain.interactor.brightnessMirrorShowingInteractor
 import com.android.systemui.statusbar.notification.stack.domain.interactor.sharedNotificationContainerInteractor
@@ -70,6 +72,7 @@ class KosmosJavaAdapter(
     val testScope by lazy { kosmos.testScope }
     val fakeFeatureFlags by lazy { kosmos.fakeFeatureFlagsClassic }
     val fakeSceneContainerFlags by lazy { kosmos.fakeSceneContainerFlags }
+    val sceneContainerFlags by lazy { kosmos.sceneContainerFlags }
     val fakeExecutor by lazy { kosmos.fakeExecutor }
     val fakeExecutorHandler by lazy { kosmos.fakeExecutorHandler }
     val configurationRepository by lazy { kosmos.fakeConfigurationRepository }
@@ -108,6 +111,7 @@ class KosmosJavaAdapter(
         kosmos.sharedNotificationContainerInteractor
     }
     val brightnessMirrorShowingInteractor by lazy { kosmos.brightnessMirrorShowingInteractor }
+    val qsLongPressEffect by lazy { kosmos.qsLongPressEffect }
 
     init {
         kosmos.applicationContext = testCase.context

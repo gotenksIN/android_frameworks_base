@@ -23,6 +23,7 @@ import static android.app.admin.DevicePolicyResources.Drawables.WORK_PROFILE_ICO
 import static android.app.admin.DevicePolicyResources.UNDEFINED;
 import static android.graphics.drawable.Icon.TYPE_URI;
 import static android.graphics.drawable.Icon.TYPE_URI_ADAPTIVE_BITMAP;
+import static android.app.Flags.cleanUpSpansAndNewLines;
 import static android.app.Flags.evenlyDividedCallStyleActionLayout;
 import static android.app.Flags.updateRankingTime;
 
@@ -2654,8 +2655,16 @@ public class Notification implements Parcelable
         if (mAllowlistToken == null) {
             mAllowlistToken = processAllowlistToken;
         }
-        // Propagate this token to all pending intents that are unmarshalled from the parcel.
-        parcel.setClassCookie(PendingIntent.class, mAllowlistToken);
+        if (Flags.secureAllowlistToken()) {
+            // Propagate this token to all pending intents that are unmarshalled from the parcel,
+            // or keep the one we're already propagating, if that's the case.
+            if (!parcel.hasClassCookie(PendingIntent.class)) {
+                parcel.setClassCookie(PendingIntent.class, mAllowlistToken);
+            }
+        } else {
+            // Propagate this token to all pending intents that are unmarshalled from the parcel.
+            parcel.setClassCookie(PendingIntent.class, mAllowlistToken);
+        }
 
         when = parcel.readLong();
         creationTime = parcel.readLong();
@@ -3124,7 +3133,27 @@ public class Notification implements Parcelable
                     + " instance is a custom Parcelable and not allowed in Notification");
             return cs.toString();
         }
+        if (Flags.cleanUpSpansAndNewLines()) {
+            return stripStyling(cs);
+        }
+
         return removeTextSizeSpans(cs);
+    }
+
+    private static CharSequence stripStyling(@Nullable CharSequence cs) {
+        if (cs == null) {
+            return cs;
+        }
+
+        return cs.toString();
+    }
+
+    private static CharSequence cleanUpNewLines(@Nullable CharSequence charSequence) {
+        if (charSequence == null) {
+            return charSequence;
+        }
+
+        return charSequence.toString().replaceAll("[\r\n]+", "\n");
     }
 
     private static CharSequence removeTextSizeSpans(CharSequence charSequence) {
@@ -3189,9 +3218,29 @@ public class Notification implements Parcelable
             PendingIntent.addOnMarshaledListener(addedListener);
         }
         try {
-            // IMPORTANT: Add marshaling code in writeToParcelImpl as we
-            // want to intercept all pending events written to the parcel.
-            writeToParcelImpl(parcel, flags);
+            if (Flags.secureAllowlistToken()) {
+                boolean mustClearCookie = false;
+                if (!parcel.hasClassCookie(Notification.class)) {
+                    // This is the "root" notification, and not an "inner" notification (including
+                    // publicVersion or anything else that might be embedded in extras).
+                    parcel.setClassCookie(Notification.class, this);
+                    mustClearCookie = true;
+                }
+                try {
+                    // IMPORTANT: Add marshaling code in writeToParcelImpl as we
+                    // want to intercept all pending events written to the parcel.
+                    writeToParcelImpl(parcel, flags);
+                } finally {
+                    if (mustClearCookie) {
+                        parcel.removeClassCookie(Notification.class, this);
+                    }
+                }
+            } else {
+                // IMPORTANT: Add marshaling code in writeToParcelImpl as we
+                // want to intercept all pending events written to the parcel.
+                writeToParcelImpl(parcel, flags);
+            }
+
             synchronized (this) {
                 // Must be written last!
                 parcel.writeArraySet(allPendingIntents);
@@ -3206,7 +3255,19 @@ public class Notification implements Parcelable
     private void writeToParcelImpl(Parcel parcel, int flags) {
         parcel.writeInt(1);
 
-        parcel.writeStrongBinder(mAllowlistToken);
+        if (Flags.secureAllowlistToken()) {
+            Notification rootNotification = (Notification) parcel.getClassCookie(
+                    Notification.class);
+            if (rootNotification != null && rootNotification != this) {
+                // Always use the same token as the root notification
+                parcel.writeStrongBinder(rootNotification.mAllowlistToken);
+            } else {
+                parcel.writeStrongBinder(mAllowlistToken);
+            }
+        } else {
+            parcel.writeStrongBinder(mAllowlistToken);
+        }
+
         parcel.writeLong(when);
         parcel.writeLong(creationTime);
         if (mSmallIcon == null && icon != 0) {
@@ -3599,16 +3660,21 @@ public class Notification implements Parcelable
      * Sets the token used for background operations for the pending intents associated with this
      * notification.
      *
-     * This token is automatically set during deserialization for you, you usually won't need to
-     * call this unless you want to change the existing token, if any.
+     * Note: Should <em>only</em> be invoked by NotificationManagerService, since this is normally
+     * populated by unparceling (and also used there). Any other usage is suspect.
      *
      * @hide
      */
-    public void clearAllowlistToken() {
-        mAllowlistToken = null;
+    public void overrideAllowlistToken(IBinder token) {
+        mAllowlistToken = token;
         if (publicVersion != null) {
-            publicVersion.clearAllowlistToken();
+            publicVersion.overrideAllowlistToken(token);
         }
+    }
+
+    /** @hide */
+    public IBinder getAllowlistToken() {
+        return mAllowlistToken;
     }
 
     /**
@@ -5505,7 +5571,8 @@ public class Notification implements Parcelable
             boolean hasSecondLine = showProgress;
             if (p.hasTitle()) {
                 contentView.setViewVisibility(p.mTitleViewId, View.VISIBLE);
-                contentView.setTextViewText(p.mTitleViewId, ensureColorSpanContrast(p.mTitle, p));
+                contentView.setTextViewText(p.mTitleViewId,
+                        ensureColorSpanContrastOrStripStyling(p.mTitle, p));
                 setTextViewColorPrimary(contentView, p.mTitleViewId, p);
             } else if (p.mTitleViewId != R.id.title) {
                 // This alternate title view ID is not cleared by resetStandardTemplate
@@ -5515,7 +5582,8 @@ public class Notification implements Parcelable
             if (p.mText != null && p.mText.length() != 0
                     && (!showProgress || p.mAllowTextWithProgress)) {
                 contentView.setViewVisibility(p.mTextViewId, View.VISIBLE);
-                contentView.setTextViewText(p.mTextViewId, ensureColorSpanContrast(p.mText, p));
+                contentView.setTextViewText(p.mTextViewId,
+                        ensureColorSpanContrastOrStripStyling(p.mText, p));
                 setTextViewColorSecondary(contentView, p.mTextViewId, p);
                 hasSecondLine = true;
             } else if (p.mTextViewId != R.id.text) {
@@ -5804,7 +5872,7 @@ public class Notification implements Parcelable
                 headerText = mN.extras.getCharSequence(EXTRA_INFO_TEXT);
             }
             if (!TextUtils.isEmpty(headerText)) {
-                contentView.setTextViewText(R.id.header_text, ensureColorSpanContrast(
+                contentView.setTextViewText(R.id.header_text, ensureColorSpanContrastOrStripStyling(
                         processLegacyText(headerText), p));
                 setTextViewColorSecondary(contentView, R.id.header_text, p);
                 contentView.setViewVisibility(R.id.header_text, View.VISIBLE);
@@ -5826,8 +5894,9 @@ public class Notification implements Parcelable
                 return false;
             }
             if (!TextUtils.isEmpty(p.mHeaderTextSecondary)) {
-                contentView.setTextViewText(R.id.header_text_secondary, ensureColorSpanContrast(
-                        processLegacyText(p.mHeaderTextSecondary), p));
+                contentView.setTextViewText(R.id.header_text_secondary,
+                        ensureColorSpanContrastOrStripStyling(
+                                processLegacyText(p.mHeaderTextSecondary), p));
                 setTextViewColorSecondary(contentView, R.id.header_text_secondary, p);
                 contentView.setViewVisibility(R.id.header_text_secondary, View.VISIBLE);
                 if (hasTextToLeft) {
@@ -6048,7 +6117,7 @@ public class Notification implements Parcelable
                 big.setViewVisibility(R.id.notification_material_reply_text_1_container,
                         View.VISIBLE);
                 big.setTextViewText(R.id.notification_material_reply_text_1,
-                        ensureColorSpanContrast(replyText[0].getText(), p));
+                        ensureColorSpanContrastOrStripStyling(replyText[0].getText(), p));
                 setTextViewColorSecondary(big, R.id.notification_material_reply_text_1, p);
                 big.setViewVisibility(R.id.notification_material_reply_progress,
                         showSpinner ? View.VISIBLE : View.GONE);
@@ -6060,7 +6129,7 @@ public class Notification implements Parcelable
                         && p.maxRemoteInputHistory > 1) {
                     big.setViewVisibility(R.id.notification_material_reply_text_2, View.VISIBLE);
                     big.setTextViewText(R.id.notification_material_reply_text_2,
-                            ensureColorSpanContrast(replyText[1].getText(), p));
+                            ensureColorSpanContrastOrStripStyling(replyText[1].getText(), p));
                     setTextViewColorSecondary(big, R.id.notification_material_reply_text_2, p);
 
                     if (replyText.length > 2 && !TextUtils.isEmpty(replyText[2].getText())
@@ -6068,7 +6137,7 @@ public class Notification implements Parcelable
                         big.setViewVisibility(
                                 R.id.notification_material_reply_text_3, View.VISIBLE);
                         big.setTextViewText(R.id.notification_material_reply_text_3,
-                                ensureColorSpanContrast(replyText[2].getText(), p));
+                                ensureColorSpanContrastOrStripStyling(replyText[2].getText(), p));
                         setTextViewColorSecondary(big, R.id.notification_material_reply_text_3, p);
                     }
                 }
@@ -6500,21 +6569,37 @@ public class Notification implements Parcelable
                                     mContext, getColors(p).getBackgroundColor(), mInNightMode),
                             R.dimen.notification_action_disabled_container_alpha);
                 }
-                if (isLegacy()) {
-                    title = ContrastColorUtil.clearColorSpans(title);
-                } else {
-                    // Check for a full-length span color to use as the button fill color.
-                    Integer fullLengthColor = getFullLengthSpanColor(title);
-                    if (fullLengthColor != null) {
-                        // Ensure the custom button fill has 1.3:1 contrast w/ notification bg.
-                        int notifBackgroundColor = getColors(p).getBackgroundColor();
-                        buttonFillColor = ensureButtonFillContrast(
-                                fullLengthColor, notifBackgroundColor);
+                if (Flags.cleanUpSpansAndNewLines()) {
+                    if (!isLegacy()) {
+                        // Check for a full-length span color to use as the button fill color.
+                        Integer fullLengthColor = getFullLengthSpanColor(title);
+                        if (fullLengthColor != null) {
+                            // Ensure the custom button fill has 1.3:1 contrast w/ notification bg.
+                            int notifBackgroundColor = getColors(p).getBackgroundColor();
+                            buttonFillColor = ensureButtonFillContrast(
+                                    fullLengthColor, notifBackgroundColor);
+                        }
                     }
-                    // Remove full-length color spans and ensure text contrast with the button fill.
-                    title = ContrastColorUtil.ensureColorSpanContrast(title, buttonFillColor);
+                } else {
+                    if (isLegacy()) {
+                        title = ContrastColorUtil.clearColorSpans(title);
+                    } else {
+                        // Check for a full-length span color to use as the button fill color.
+                        Integer fullLengthColor = getFullLengthSpanColor(title);
+                        if (fullLengthColor != null) {
+                            // Ensure the custom button fill has 1.3:1 contrast w/ notification bg.
+                            int notifBackgroundColor = getColors(p).getBackgroundColor();
+                            buttonFillColor = ensureButtonFillContrast(
+                                    fullLengthColor, notifBackgroundColor);
+                        }
+                        // Remove full-length color spans
+                        // and ensure text contrast with the button fill.
+                        title = ContrastColorUtil.ensureColorSpanContrast(title, buttonFillColor);
+                    }
                 }
-                final CharSequence label = ensureColorSpanContrast(title, p);
+
+
+                final CharSequence label = ensureColorSpanContrastOrStripStyling(title, p);
                 if (p.mCallStyleActions && evenlyDividedCallStyleActionLayout()) {
                     if (CallStyle.DEBUG_NEW_ACTION_LAYOUT) {
                         Log.d(TAG, "new action layout enabled, gluing instead of setting text");
@@ -6554,7 +6639,7 @@ public class Notification implements Parcelable
                     button.setIntDimen(R.id.action0, "setMinimumWidth", minWidthDimen);
                 }
             } else {
-                button.setTextViewText(R.id.action0, ensureColorSpanContrast(
+                button.setTextViewText(R.id.action0, ensureColorSpanContrastOrStripStyling(
                         action.title, p));
                 button.setTextColor(R.id.action0, getStandardActionColor(p));
             }
@@ -6626,6 +6711,26 @@ public class Notification implements Parcelable
                 }
             }
             return result;
+        }
+
+        /**
+         * @hide
+         */
+        public CharSequence ensureColorSpanContrastOrStripStyling(CharSequence cs,
+                StandardTemplateParams p) {
+            return ensureColorSpanContrastOrStripStyling(cs, getBackgroundColor(p));
+        }
+
+        /**
+         * @hide
+         */
+        public CharSequence ensureColorSpanContrastOrStripStyling(CharSequence cs,
+                int buttonFillColor) {
+            if (Flags.cleanUpSpansAndNewLines()) {
+                return stripStyling(cs);
+            }
+
+            return ContrastColorUtil.ensureColorSpanContrast(cs, buttonFillColor);
         }
 
         /**
@@ -7853,8 +7958,9 @@ public class Notification implements Parcelable
             RemoteViews contentView = getStandardView(mBuilder.getBigPictureLayoutResource(),
                     p, null /* result */);
             if (mSummaryTextSet) {
-                contentView.setTextViewText(R.id.text, mBuilder.ensureColorSpanContrast(
-                        mBuilder.processLegacyText(mSummaryText), p));
+                contentView.setTextViewText(R.id.text,
+                        mBuilder.ensureColorSpanContrastOrStripStyling(
+                                mBuilder.processLegacyText(mSummaryText), p));
                 mBuilder.setTextViewColorSecondary(contentView, R.id.text, p);
                 contentView.setViewVisibility(R.id.text, View.VISIBLE);
             }
@@ -8017,6 +8123,9 @@ public class Notification implements Parcelable
          */
         public BigTextStyle bigText(CharSequence cs) {
             mBigText = safeCharSequence(cs);
+            if (Flags.cleanUpSpansAndNewLines()) {
+                mBigText = cleanUpNewLines(mBigText);
+            }
             return this;
         }
 
@@ -8517,7 +8626,7 @@ public class Notification implements Parcelable
             for (int i = 0; i < N; i++) {
                 final Message m = messages.get(i);
                 if (ensureContrast) {
-                    m.ensureColorContrast(backgroundColor);
+                    m.ensureColorContrastOrStripStyling(backgroundColor);
                 }
                 bundles[i] = m.toBundle();
             }
@@ -8543,7 +8652,9 @@ public class Notification implements Parcelable
             } else {
                 title = sender;
             }
-
+            if (Flags.cleanUpSpansAndNewLines()) {
+                title = stripStyling(title);
+            }
             if (title != null) {
                 extras.putCharSequence(EXTRA_TITLE, title);
             }
@@ -8995,6 +9106,17 @@ public class Notification implements Parcelable
             }
 
             /**
+             * Strip styling or updates TextAppearance spans in message text.
+             * @hide
+             */
+            public void ensureColorContrastOrStripStyling(int backgroundColor) {
+                if (Flags.cleanUpSpansAndNewLines()) {
+                    mText = stripStyling(mText);
+                } else {
+                    ensureColorContrast(backgroundColor);
+                }
+            }
+            /**
              * Updates TextAppearance spans in the message text so it has sufficient contrast
              * against its background.
              * @hide
@@ -9324,7 +9446,8 @@ public class Notification implements Parcelable
                 if (!TextUtils.isEmpty(str)) {
                     contentView.setViewVisibility(rowIds[i], View.VISIBLE);
                     contentView.setTextViewText(rowIds[i],
-                            mBuilder.ensureColorSpanContrast(mBuilder.processLegacyText(str), p));
+                            mBuilder.ensureColorSpanContrastOrStripStyling(
+                                    mBuilder.processLegacyText(str), p));
                     mBuilder.setTextViewColorSecondary(contentView, rowIds[i], p);
                     contentView.setViewPadding(rowIds[i], 0, topPadding, 0, 0);
                     if (first) {

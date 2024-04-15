@@ -1972,9 +1972,6 @@ public final class CameraManager {
 
         private static final String TAG = "CameraManagerGlobal";
 
-        private static final String BACK_CAMERA_ID = "0";
-        private static final String FRONT_CAMERA_ID = "1";
-
         private final boolean DEBUG = false;
 
         private final int CAMERA_SERVICE_RECONNECT_DELAY_MS = 1000;
@@ -2324,11 +2321,6 @@ public final class CameraManager {
 
             if (devicePolicy == DEVICE_POLICY_DEFAULT && info.mDeviceId == DEVICE_ID_DEFAULT) {
                 // Don't hide default-device cameras for a default-policy virtual device.
-                return false;
-            }
-
-            // External cameras should never be hidden.
-            if (!info.mCameraId.equals(FRONT_CAMERA_ID) && !info.mCameraId.equals(BACK_CAMERA_ID)) {
                 return false;
             }
 

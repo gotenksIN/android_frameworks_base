@@ -74,6 +74,16 @@ flag {
 }
 
 flag {
+  name: "secure_allowlist_token"
+  namespace: "systemui"
+  description: "Prevents allowlist_token from leaking out and foreign tokens from being accepted"
+  bug: "328254922"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "update_ranking_time"
   namespace: "systemui"
   description: "Updates notification sorting criteria to highlight new content while maintaining stability"
@@ -109,4 +119,11 @@ flag {
   namespace: "systemui"
   description: "No notifs can use USAGE_UNKNOWN or USAGE_MEDIA"
   bug: "331793339"
+}
+
+flag {
+  name: "clean_up_spans_and_new_lines"
+  namespace: "systemui"
+  description: "Cleans up spans and unnecessary new lines from standard notification templates"
+  bug: "313439845"
 }

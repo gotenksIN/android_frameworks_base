@@ -258,7 +258,6 @@ import com.android.internal.inputmethod.ImeTracing;
 import com.android.internal.inputmethod.InputMethodDebug;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.os.SomeArgs;
-import com.android.internal.policy.DecorView;
 import com.android.internal.policy.PhoneFallbackEventHandler;
 import com.android.internal.view.BaseSurfaceHolder;
 import com.android.internal.view.RootViewSurfaceTaker;
@@ -334,13 +333,6 @@ public final class ViewRootImpl implements ViewParent,
      * This is intended as a temporary flag, ultimately becoming permanently 'true'.
      */
     private static final boolean USE_ASYNC_PERFORM_HAPTIC_FEEDBACK = true;
-
-    /**
-     * Whether the caption is drawn by the shell.
-     * @hide
-     */
-    public static final boolean CAPTION_ON_SHELL =
-            SystemProperties.getBoolean("persist.wm.debug.caption_on_shell", true);
 
     /**
      * Whether the client (system UI) is handling the transient gesture and the corresponding
@@ -3181,22 +3173,6 @@ public final class ViewRootImpl implements ViewParent,
         Trace.traceEnd(Trace.TRACE_TAG_VIEW);
     }
 
-    private boolean updateCaptionInsets() {
-        if (CAPTION_ON_SHELL) {
-            return false;
-        }
-        if (!(mView instanceof DecorView)) return false;
-        final int captionInsetsHeight = ((DecorView) mView).getCaptionInsetsHeight();
-        final Rect captionFrame = new Rect();
-        if (captionInsetsHeight != 0) {
-            captionFrame.set(mWinFrame.left, mWinFrame.top, mWinFrame.right,
-                            mWinFrame.top + captionInsetsHeight);
-        }
-        if (mAttachInfo.mCaptionInsets.equals(captionFrame)) return false;
-        mAttachInfo.mCaptionInsets.set(captionFrame);
-        return true;
-    }
-
     private boolean shouldDispatchCutout() {
         return mWindowAttributes.layoutInDisplayCutoutMode
                         == LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -3648,9 +3624,6 @@ public final class ViewRootImpl implements ViewParent,
                 }
                 if (alwaysConsumeSystemBarsChanged) {
                     mAttachInfo.mAlwaysConsumeSystemBars = mPendingAlwaysConsumeSystemBars;
-                    dispatchApplyInsets = true;
-                }
-                if (updateCaptionInsets()) {
                     dispatchApplyInsets = true;
                 }
                 if (dispatchApplyInsets || mLastSystemUiVisibility !=
@@ -4232,6 +4205,7 @@ public final class ViewRootImpl implements ViewParent,
                 ? mFrameRateCategoryLowCount - 1 : mFrameRateCategoryLowCount;
         mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
         mPreferredFrameRate = -1;
+        mFrameRateCompatibility = FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
         mIsFrameRateConflicted = false;
     }
 
@@ -12510,6 +12484,7 @@ public final class ViewRootImpl implements ViewParent,
     private void setPreferredFrameRateCategory(int preferredFrameRateCategory) {
         if (!shouldSetFrameRateCategory()
                 || (mFrameRateCompatibility == FRAME_RATE_COMPATIBILITY_GTE
+                && mPreferredFrameRate > 0
                 && sToolkitFrameRateVelocityMappingReadOnlyFlagValue)) {
             return;
         }

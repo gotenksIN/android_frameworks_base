@@ -66,6 +66,7 @@ import com.android.systemui.keyguard.data.repository.fakeTrustRepository
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.kosmos.testDispatcher
@@ -820,13 +821,14 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    fun isAuthenticatedIsResetToFalseWhenTransitioningToGone() =
+    fun isAuthenticatedIsResetToFalseWhenFinishedTransitioningToGoneAndStatusBarStateShade() =
         testScope.runTest {
             initCollectors()
             allPreconditionsToRunFaceAuthAreTrue()
 
             triggerFaceAuth(false)
 
+            keyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
             authenticationCallback.value.onAuthenticationSucceeded(
                 mock(FaceManager.AuthenticationResult::class.java)
             )
@@ -840,7 +842,16 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
                     to = KeyguardState.GONE,
                 )
             )
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.FINISHED,
+                    from = KeyguardState.LOCKSCREEN,
+                    to = KeyguardState.GONE,
+                )
+            )
+            assertThat(authenticated()).isTrue()
 
+            keyguardRepository.setStatusBarState(StatusBarState.SHADE)
             assertThat(authenticated()).isFalse()
         }
 

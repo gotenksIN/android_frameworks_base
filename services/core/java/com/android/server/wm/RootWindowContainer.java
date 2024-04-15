@@ -2252,9 +2252,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             newTransition.setReady(rootTask, true /* ready */);
         }
 
-        if (!isPip2ExperimentEnabled()) {
-            resumeFocusedTasksTopActivities();
-        }
+        resumeFocusedTasksTopActivities();
 
         notifyActivityPipModeChanged(r.getTask(), r);
     }

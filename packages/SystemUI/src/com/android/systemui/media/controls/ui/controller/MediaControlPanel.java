@@ -118,8 +118,9 @@ import com.android.systemui.res.R;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
+import com.android.systemui.surfaceeffects.PaintDrawCallback;
 import com.android.systemui.surfaceeffects.loadingeffect.LoadingEffect;
-import com.android.systemui.surfaceeffects.loadingeffect.LoadingEffect.Companion.AnimationState;
+import com.android.systemui.surfaceeffects.loadingeffect.LoadingEffect.AnimationState;
 import com.android.systemui.surfaceeffects.loadingeffect.LoadingEffectView;
 import com.android.systemui.surfaceeffects.ripple.MultiRippleController;
 import com.android.systemui.surfaceeffects.ripple.MultiRippleView;
@@ -264,15 +265,15 @@ public class MediaControlPanel {
     private boolean mWasPlaying = false;
     private boolean mButtonClicked = false;
 
-    private final LoadingEffect.Companion.PaintDrawCallback mNoiseDrawCallback =
-            new LoadingEffect.Companion.PaintDrawCallback() {
+    private final PaintDrawCallback mNoiseDrawCallback =
+            new PaintDrawCallback() {
                 @Override
-                public void onDraw(@NonNull Paint loadingPaint) {
-                    mMediaViewHolder.getLoadingEffectView().draw(loadingPaint);
+                public void onDraw(@NonNull Paint paint) {
+                    mMediaViewHolder.getLoadingEffectView().draw(paint);
                 }
             };
-    private final LoadingEffect.Companion.AnimationStateChangedCallback mStateChangedCallback =
-            new LoadingEffect.Companion.AnimationStateChangedCallback() {
+    private final LoadingEffect.AnimationStateChangedCallback mStateChangedCallback =
+            new LoadingEffect.AnimationStateChangedCallback() {
                 @Override
                 public void onStateChanged(@NonNull AnimationState oldState,
                         @NonNull AnimationState newState) {
@@ -747,18 +748,23 @@ public class MediaControlPanel {
                             boolean showOverLockscreen = mKeyguardStateController.isShowing()
                                     && mActivityIntentHelper.wouldPendingShowOverLockscreen(
                                         deviceIntent, mLockscreenUserManager.getCurrentUserId());
-                            if (deviceIntent.isActivity() && !showOverLockscreen) {
-                                mActivityStarter.postStartActivityDismissingKeyguard(deviceIntent);
-                            } else {
-                                try {
-                                    BroadcastOptions options = BroadcastOptions.makeBasic();
-                                    options.setInteractive(true);
-                                    options.setPendingIntentBackgroundActivityStartMode(
+                            if (deviceIntent.isActivity()) {
+                                if (!showOverLockscreen) {
+                                    mActivityStarter.postStartActivityDismissingKeyguard(
+                                            deviceIntent);
+                                } else {
+                                    try {
+                                        BroadcastOptions options = BroadcastOptions.makeBasic();
+                                        options.setInteractive(true);
+                                        options.setPendingIntentBackgroundActivityStartMode(
                                             ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
-                                    deviceIntent.send(options.toBundle());
-                                } catch (PendingIntent.CanceledException e) {
-                                    Log.e(TAG, "Device pending intent was canceled");
+                                        deviceIntent.send(options.toBundle());
+                                    } catch (PendingIntent.CanceledException e) {
+                                        Log.e(TAG, "Device pending intent was canceled");
+                                    }
                                 }
+                            } else {
+                                Log.w(TAG, "Device pending intent is not an activity.");
                             }
                         } else {
                             mMediaOutputDialogManager.createAndShow(mPackageName, true,

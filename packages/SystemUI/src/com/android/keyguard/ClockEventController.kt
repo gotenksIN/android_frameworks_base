@@ -15,6 +15,7 @@
  */
 package com.android.keyguard
 
+import android.os.Trace
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -31,7 +32,6 @@ import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.android.app.tracing.coroutines.launch
 import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.customization.R
 import com.android.systemui.dagger.qualifiers.Background
@@ -66,7 +66,6 @@ import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.Executor
 import javax.inject.Inject
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Job
@@ -74,6 +73,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.launch
 
 /**
  * Controller for a Clock provided by the registry and used on the keyguard. Instantiated by
@@ -91,7 +91,6 @@ constructor(
     @DisplaySpecific private val resources: Resources,
     private val context: Context,
     @Main private val mainExecutor: DelayableExecutor,
-    @Main private val mainImmediateDispatcher: CoroutineDispatcher,
     @Background private val bgExecutor: Executor,
     private val clockBuffers: ClockMessageBuffers,
     private val featureFlags: FeatureFlagsClassic,
@@ -426,7 +425,7 @@ constructor(
         keyguardUpdateMonitor.registerCallback(keyguardUpdateMonitorCallback)
         zenModeController.addCallback(zenModeCallback)
         disposableHandle =
-            parent.repeatWhenAttached(mainImmediateDispatcher) {
+            parent.repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.CREATED) {
                     listenForDozing(this)
                     if (MigrateClocksToBlueprint.isEnabled) {
@@ -523,8 +522,12 @@ constructor(
     private fun handleDoze(doze: Float) {
         dozeAmount = doze
         clock?.run {
+            Trace.beginSection("$TAG#smallClock.animations.doze")
             smallClock.animations.doze(dozeAmount)
+            Trace.endSection()
+            Trace.beginSection("$TAG#largeClock.animations.doze")
             largeClock.animations.doze(dozeAmount)
+            Trace.endSection()
         }
         smallTimeListener?.update(doze < DOZE_TICKRATE_THRESHOLD)
         largeTimeListener?.update(doze < DOZE_TICKRATE_THRESHOLD)
@@ -532,19 +535,17 @@ constructor(
 
     @VisibleForTesting
     internal fun listenForDozeAmount(scope: CoroutineScope): Job {
-        return scope.launch("$TAG#listenForDozeAmount") {
-            keyguardInteractor.dozeAmount.collect { handleDoze(it) }
-        }
+        return scope.launch { keyguardInteractor.dozeAmount.collect { handleDoze(it) } }
     }
 
     @VisibleForTesting
     internal fun listenForDozeAmountTransition(scope: CoroutineScope): Job {
-        return scope.launch("$TAG#listenForDozeAmountTransition") {
+        return scope.launch {
             merge(
-                    keyguardTransitionInteractor.aodToLockscreenTransition.map { step ->
+                    keyguardTransitionInteractor.transition(AOD, LOCKSCREEN).map { step ->
                         step.copy(value = 1f - step.value)
                     },
-                    keyguardTransitionInteractor.lockscreenToAodTransition,
+                    keyguardTransitionInteractor.transition(LOCKSCREEN, AOD),
                 ).filter {
                     it.transitionState != TransitionState.FINISHED
                 }
@@ -557,7 +558,7 @@ constructor(
      */
     @VisibleForTesting
     internal fun listenForAnyStateToAodTransition(scope: CoroutineScope): Job {
-        return scope.launch("$TAG#listenForAnyStateToAodTransition") {
+        return scope.launch {
             keyguardTransitionInteractor
                 .transitionStepsToState(AOD)
                 .filter { it.transitionState == TransitionState.STARTED }
@@ -568,7 +569,7 @@ constructor(
 
     @VisibleForTesting
     internal fun listenForAnyStateToLockscreenTransition(scope: CoroutineScope): Job {
-        return scope.launch("$TAG#listenForAnyStateToLockscreenTransition") {
+        return scope.launch {
             keyguardTransitionInteractor
                     .transitionStepsToState(LOCKSCREEN)
                     .filter { it.transitionState == TransitionState.STARTED }
@@ -579,7 +580,7 @@ constructor(
 
     @VisibleForTesting
     internal fun listenForDozing(scope: CoroutineScope): Job {
-        return scope.launch("$TAG#listenForDozing") {
+        return scope.launch {
             combine(
                     keyguardInteractor.dozeAmount,
                     keyguardInteractor.isDozing,

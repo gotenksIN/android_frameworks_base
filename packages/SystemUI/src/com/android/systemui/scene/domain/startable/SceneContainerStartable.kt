@@ -47,6 +47,7 @@ import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
 import com.android.systemui.statusbar.phone.CentralSurfaces
@@ -61,6 +62,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -68,10 +70,12 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -103,6 +107,7 @@ constructor(
     private val headsUpInteractor: HeadsUpNotificationInteractor,
     private val occlusionInteractor: SceneContainerOcclusionInteractor,
     private val faceUnlockInteractor: DeviceEntryFaceAuthInteractor,
+    private val shadeInteractor: ShadeInteractor,
 ) : CoreStartable {
 
     override fun start() {
@@ -185,6 +190,14 @@ constructor(
 
     /** Switches between scenes based on ever-changing application state. */
     private fun automaticallySwitchScenes() {
+        handleBouncerImeVisibility()
+        handleSimUnlock()
+        handleDeviceUnlockStatus()
+        handlePowerState()
+        handleShadeTouchability()
+    }
+
+    private fun handleBouncerImeVisibility() {
         applicationScope.launch {
             // TODO (b/308001302): Move this to a bouncer specific interactor.
             bouncerInteractor.onImeHiddenByUser.collectLatest {
@@ -196,6 +209,9 @@ constructor(
                 }
             }
         }
+    }
+
+    private fun handleSimUnlock() {
         applicationScope.launch {
             simBouncerInteractor
                 .get()
@@ -229,7 +245,16 @@ constructor(
                     }
                 }
         }
+    }
+
+    private fun handleDeviceUnlockStatus() {
         applicationScope.launch {
+            // Track the previous scene (sans Bouncer), so that we know where to go when the device
+            // is unlocked whilst on the bouncer.
+            val previousScene =
+                sceneInteractor.previousScene
+                    .filterNot { it == Scenes.Bouncer }
+                    .stateIn(this, SharingStarted.Eagerly, initialValue = null)
             deviceUnlockedInteractor.deviceUnlockStatus
                 .mapNotNull { deviceUnlockStatus ->
                     val renderedScenes =
@@ -257,8 +282,15 @@ constructor(
 
                     when {
                         isOnBouncer ->
-                            // When the device becomes unlocked in Bouncer, go to Gone.
-                            Scenes.Gone to "device was unlocked in Bouncer scene"
+                            // When the device becomes unlocked in Bouncer, go to previous scene,
+                            // or Gone.
+                            if (previousScene.value == Scenes.Lockscreen) {
+                                Scenes.Gone to "device was unlocked in Bouncer scene"
+                            } else {
+                                val prevScene = previousScene.value
+                                (prevScene ?: Scenes.Gone) to
+                                    "device was unlocked in Bouncer scene, from sceneKey=$prevScene"
+                            }
                         isOnLockscreen ->
                             // The lockscreen should be dismissed automatically in 2 scenarios:
                             // 1. When face auth bypass is enabled and authentication happens while
@@ -288,7 +320,9 @@ constructor(
                     )
                 }
         }
+    }
 
+    private fun handlePowerState() {
         applicationScope.launch {
             powerInteractor.isAsleep.collect { isAsleep ->
                 if (isAsleep) {
@@ -317,11 +351,25 @@ constructor(
                     ) {
                         switchToScene(
                             targetSceneKey = Scenes.Bouncer,
-                            loggingReason = "device is starting to wake up with a locked sim"
+                            loggingReason = "device is starting to wake up with a locked sim",
                         )
                     }
                 }
             }
+        }
+    }
+
+    private fun handleShadeTouchability() {
+        applicationScope.launch {
+            shadeInteractor.isShadeTouchable
+                .distinctUntilChanged()
+                .filter { !it }
+                .collect {
+                    switchToScene(
+                        targetSceneKey = Scenes.Lockscreen,
+                        loggingReason = "device became non-interactive",
+                    )
+                }
         }
     }
 

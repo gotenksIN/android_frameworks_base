@@ -21,6 +21,8 @@ import android.os.UserHandle
 import com.android.systemui.screenshot.data.model.DisplayContentModel
 import com.android.systemui.screenshot.data.model.ProfileType
 import com.android.systemui.screenshot.data.repository.ProfileTypeRepository
+import com.android.systemui.screenshot.policy.CapturePolicy.PolicyResult
+import com.android.systemui.screenshot.policy.CapturePolicy.PolicyResult.NotMatched
 import com.android.systemui.screenshot.policy.CaptureType.IsolatedTask
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -35,7 +37,13 @@ class WorkProfilePolicy
 constructor(
     private val profileTypes: ProfileTypeRepository,
 ) : CapturePolicy {
-    override suspend fun apply(content: DisplayContentModel): CaptureParameters? {
+
+    override suspend fun check(content: DisplayContentModel): PolicyResult {
+        // The systemUI notification shade isn't a work app, skip.
+        if (content.systemUiState.shadeExpanded) {
+            return NotMatched(policy = NAME, reason = "Notification shade is expanded")
+        }
+
         // Find the first non PiP rootTask with a top child task owned by a work user
         val (rootTask, childTask) =
             content.rootTasks
@@ -44,13 +52,24 @@ constructor(
                 .firstOrNull { (_, child) ->
                     profileTypes.getProfileType(child.userId) == ProfileType.WORK
                 }
-                ?: return null
+                ?: return NotMatched(
+                    policy = NAME,
+                    reason = "The top-most non-PINNED task does not belong to a work profile user"
+                )
 
         // If matched, return parameters needed to modify the request.
-        return CaptureParameters(
-            type = IsolatedTask(taskId = childTask.id, taskBounds = childTask.bounds),
-            component = childTask.componentName ?: rootTask.topActivity,
-            owner = UserHandle.of(childTask.userId),
+        return PolicyResult.Matched(
+            policy = NAME,
+            reason = "The top-most non-PINNED task ($childTask) belongs to a work profile user",
+            CaptureParameters(
+                type = IsolatedTask(taskId = childTask.id, taskBounds = childTask.bounds),
+                component = childTask.componentName ?: rootTask.topActivity,
+                owner = UserHandle.of(childTask.userId),
+            )
         )
+    }
+
+    companion object {
+        val NAME = "WorkProfile"
     }
 }

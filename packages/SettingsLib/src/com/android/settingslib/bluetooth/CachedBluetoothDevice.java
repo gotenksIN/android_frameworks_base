@@ -16,6 +16,8 @@
 
 package com.android.settingslib.bluetooth;
 
+import static com.android.settingslib.flags.Flags.enableSetPreferredTransportForLeAudioDevice;
+
 import android.annotation.CallbackExecutor;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
@@ -321,6 +323,10 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                         mLocalNapRoleConnected = true;
                     }
                 }
+                if (enableSetPreferredTransportForLeAudioDevice()
+                        && profile instanceof HidProfile) {
+                    updatePreferredTransport();
+                }
             } else if (profile instanceof MapProfile
                     && newProfileState == BluetoothProfile.STATE_DISCONNECTED) {
                 profile.setEnabled(mDevice, false);
@@ -333,10 +339,32 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 mLocalNapRoleConnected = false;
             }
 
+            if (enableSetPreferredTransportForLeAudioDevice()
+                    && profile instanceof LeAudioProfile) {
+                updatePreferredTransport();
+            }
+
             HearingAidStatsLogUtils.updateHistoryIfNeeded(mContext, this, profile, newProfileState);
         }
 
         fetchActiveDevices();
+    }
+
+    private void updatePreferredTransport() {
+        if (mProfiles.stream().noneMatch(p -> p instanceof LeAudioProfile)
+                || mProfiles.stream().noneMatch(p -> p instanceof HidProfile)) {
+            return;
+        }
+        // Both LeAudioProfile and HidProfile are connectable.
+        if (!mProfileManager
+                .getHidProfile()
+                .setPreferredTransport(
+                        mDevice,
+                        mProfileManager.getLeAudioProfile().isEnabled(mDevice)
+                                ? BluetoothDevice.TRANSPORT_LE
+                                : BluetoothDevice.TRANSPORT_BREDR)) {
+            Log.w(TAG, "Fail to set preferred transport");
+        }
     }
 
     @VisibleForTesting

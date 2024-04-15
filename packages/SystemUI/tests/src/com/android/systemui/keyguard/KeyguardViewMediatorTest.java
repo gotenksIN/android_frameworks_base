@@ -94,6 +94,7 @@ import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollectorFake;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
+import com.android.systemui.communal.ui.viewmodel.CommunalTransitionViewModel;
 import com.android.systemui.dreams.DreamOverlayStateController;
 import com.android.systemui.dreams.ui.viewmodel.DreamViewModel;
 import com.android.systemui.dump.DumpManager;
@@ -226,6 +227,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
 
     private @Mock CoroutineDispatcher mDispatcher;
     private @Mock DreamViewModel mDreamViewModel;
+    private @Mock CommunalTransitionViewModel mCommunalTransitionViewModel;
     private @Mock SystemPropertiesHelper mSystemPropertiesHelper;
     private @Mock SceneContainerFlags mSceneContainerFlags;
 
@@ -247,6 +249,10 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         when(mDreamViewModel.getDreamAlpha())
                 .thenReturn(mock(Flow.class));
         when(mDreamViewModel.getTransitionEnded())
+                .thenReturn(mock(Flow.class));
+        when(mCommunalTransitionViewModel.getShowByDefault())
+                .thenReturn(mock(Flow.class));
+        when(mCommunalTransitionViewModel.getTransitionFromOccludedEnded())
                 .thenReturn(mock(Flow.class));
         when(mSelectedUserInteractor.getSelectedUserId()).thenReturn(mDefaultUserId);
         when(mSelectedUserInteractor.getSelectedUserId(anyBoolean())).thenReturn(mDefaultUserId);
@@ -1200,6 +1206,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 mSystemClock,
                 mDispatcher,
                 () -> mDreamViewModel,
+                () -> mCommunalTransitionViewModel,
                 mSystemPropertiesHelper,
                 () -> mock(WindowManagerLockscreenVisibilityManager.class),
                 mSelectedUserInteractor,

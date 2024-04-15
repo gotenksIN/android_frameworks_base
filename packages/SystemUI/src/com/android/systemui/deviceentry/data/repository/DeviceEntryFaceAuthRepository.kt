@@ -50,6 +50,7 @@ import com.android.systemui.keyguard.data.repository.TrustRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.keyguard.shared.model.SysUiFaceAuthenticateOptions
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.log.FaceAuthenticationLogger
@@ -294,7 +295,8 @@ constructor(
     }
 
     private fun listenForSchedulingWatchdog() {
-        keyguardTransitionInteractor.anyStateToGoneTransition
+        keyguardTransitionInteractor
+            .transition(to = KeyguardState.GONE)
             .filter { it.transitionState == TransitionState.FINISHED }
             .onEach {
                 // We deliberately want to run this in background because scheduleWatchdog does
@@ -312,7 +314,17 @@ constructor(
         // or device starts going to sleep.
         merge(
                 powerInteractor.isAsleep,
-                keyguardTransitionInteractor.isInTransitionToState(KeyguardState.GONE),
+                combine(
+                    keyguardTransitionInteractor.isFinishedInState(KeyguardState.GONE),
+                    keyguardInteractor.statusBarState,
+                ) { isFinishedInGoneState, statusBarState ->
+                    // When the user is dragging the primary bouncer in (up) by manually scrolling
+                    // up on the lockscreen, the device won't be irreversibly transitioned to GONE
+                    // until the statusBarState updates to SHADE, so we check that here.
+                    // Else, we could reset the face auth state too early and end up in a strange
+                    // state.
+                    isFinishedInGoneState && statusBarState == StatusBarState.SHADE
+                },
                 userRepository.selectedUser.map {
                     it.selectionStatus == SelectionStatus.SELECTION_IN_PROGRESS
                 },

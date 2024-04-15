@@ -586,8 +586,7 @@ public class LocalBluetoothProfileManager {
         return mSapProfile;
     }
 
-    @VisibleForTesting
-    HidProfile getHidProfile() {
+    public HidProfile getHidProfile() {
         return mHidProfile;
     }
 

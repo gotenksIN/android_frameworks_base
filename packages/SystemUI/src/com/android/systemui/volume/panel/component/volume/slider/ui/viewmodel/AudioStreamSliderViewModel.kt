@@ -18,13 +18,14 @@ package com.android.systemui.volume.panel.component.volume.slider.ui.viewmodel
 
 import android.content.Context
 import android.media.AudioManager
+import com.android.internal.logging.UiEventLogger
 import com.android.settingslib.volume.domain.interactor.AudioVolumeInteractor
 import com.android.settingslib.volume.shared.model.AudioStream
 import com.android.settingslib.volume.shared.model.AudioStreamModel
 import com.android.settingslib.volume.shared.model.RingerMode
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.res.R
-import com.android.systemui.volume.panel.component.volume.domain.interactor.VolumeSliderInteractor
+import com.android.systemui.volume.panel.ui.VolumePanelUiEvent
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -44,7 +45,7 @@ constructor(
     @Assisted private val coroutineScope: CoroutineScope,
     private val context: Context,
     private val audioVolumeInteractor: AudioVolumeInteractor,
-    private val volumeSliderInteractor: VolumeSliderInteractor,
+    private val uiEventLogger: UiEventLogger,
 ) : SliderViewModel {
 
     private val audioStream = audioStreamWrapper.audioStream
@@ -71,6 +72,19 @@ constructor(
             AudioStream(AudioManager.STREAM_ALARM) to R.string.stream_alarm_unavailable,
             AudioStream(AudioManager.STREAM_MUSIC) to R.string.stream_media_unavailable,
         )
+    private val uiEventByStream =
+        mapOf(
+            AudioStream(AudioManager.STREAM_MUSIC) to
+                VolumePanelUiEvent.VOLUME_PANEL_MUSIC_SLIDER_TOUCHED,
+            AudioStream(AudioManager.STREAM_VOICE_CALL) to
+                VolumePanelUiEvent.VOLUME_PANEL_VOICE_CALL_SLIDER_TOUCHED,
+            AudioStream(AudioManager.STREAM_RING) to
+                VolumePanelUiEvent.VOLUME_PANEL_RING_SLIDER_TOUCHED,
+            AudioStream(AudioManager.STREAM_NOTIFICATION) to
+                VolumePanelUiEvent.VOLUME_PANEL_NOTIFICATION_SLIDER_TOUCHED,
+            AudioStream(AudioManager.STREAM_ALARM) to
+                VolumePanelUiEvent.VOLUME_PANEL_ALARM_SLIDER_TOUCHED,
+        )
 
     override val slider: StateFlow<SliderState> =
         combine(
@@ -90,6 +104,10 @@ constructor(
         }
     }
 
+    override fun onValueChangeFinished() {
+        uiEventByStream[audioStream]?.let { uiEventLogger.log(it) }
+    }
+
     override fun toggleMuted(state: SliderState) {
         val audioViewModel = state as? State
         audioViewModel ?: return
@@ -105,10 +123,6 @@ constructor(
         return State(
             value = volume.toFloat(),
             valueRange = volumeRange.first.toFloat()..volumeRange.last.toFloat(),
-            valueText =
-                SliderViewModel.formatValue(
-                    volumeSliderInteractor.processVolumeToValue(volume, volumeRange)
-                ),
             icon = getIcon(ringerMode),
             label = labelsByStream[audioStream]?.let(context::getString)
                     ?: error("No label for the stream: $audioStream"),
@@ -157,7 +171,6 @@ constructor(
         override val valueRange: ClosedFloatingPointRange<Float>,
         override val icon: Icon,
         override val label: String,
-        override val valueText: String,
         override val disabledMessage: String?,
         override val isEnabled: Boolean,
         override val a11yStep: Int,

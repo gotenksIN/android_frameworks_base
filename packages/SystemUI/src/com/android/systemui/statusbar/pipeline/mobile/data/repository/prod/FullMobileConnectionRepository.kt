@@ -61,6 +61,7 @@ class FullMobileConnectionRepository(
     @Application scope: CoroutineScope,
     private val mobileRepoFactory: MobileConnectionRepositoryImpl.Factory,
     private val carrierMergedRepoFactory: CarrierMergedConnectionRepository.Factory,
+    slotIndexForSubId:  Flow<Int>? = null,
 ) : MobileConnectionRepository {
     /**
      * Sets whether this connection is a typical mobile connection or a carrier merged connection.
@@ -92,6 +93,7 @@ class FullMobileConnectionRepository(
             subscriptionModel,
             defaultNetworkName,
             networkNameSeparator,
+            slotIndexForSubId,
         )
     }
 
@@ -527,6 +529,7 @@ class FullMobileConnectionRepository(
             subscriptionModel: Flow<SubscriptionModel?>,
             defaultNetworkName: NetworkNameModel,
             networkNameSeparator: String,
+            slotIndexForSubId:  Flow<Int>? = null,
         ): FullMobileConnectionRepository {
             val mobileLogger =
                 logFactory.getOrCreate(tableBufferLogName(subId), MOBILE_CONNECTION_BUFFER_SIZE)
@@ -541,6 +544,7 @@ class FullMobileConnectionRepository(
                 scope,
                 mobileRepoFactory,
                 carrierMergedRepoFactory,
+                slotIndexForSubId,
             )
         }
 

@@ -233,6 +233,34 @@ constructor(
             { "Lost prioritized network (nedId=$int1)" },
         )
     }
+
+    fun logImsStateCallbackRegistered(registered: Boolean, subId: Int) {
+        buffer.log(
+            TAG,
+            LogLevel.INFO,
+            {
+                bool1 = registered
+                int1 = subId
+            },
+            { "ImsStateCallback registered =$bool1 subId=$int1" },
+        )
+    }
+
+    fun logSlotIndex(slotIndex: Int, subId: Int) {
+        buffer.log(
+            TAG,
+            LogLevel.INFO,
+            {
+                int1 = slotIndex
+                int2 = subId
+            },
+            { "SlotIndex changed =$int1 subId=$int2" },
+        )
+    }
+
+    fun logException(ex: Exception, logMsg: String) {
+        buffer.log(TAG, LogLevel.ERROR, {}, { logMsg }, exception = ex)
+    }
 }
 
 private const val TAG = "MobileInputLog"

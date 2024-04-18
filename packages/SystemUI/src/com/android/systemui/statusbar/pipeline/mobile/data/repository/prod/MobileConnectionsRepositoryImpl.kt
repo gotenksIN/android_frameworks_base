@@ -363,6 +363,15 @@ constructor(
         }
     }
 
+    private fun slotIndexForSubId(subId: Int): Flow<Int> {
+        return mobileSubscriptionsChangeEvent.map {
+            SubscriptionManager.getSlotIndex(subId)
+        }
+        .distinctUntilChanged()
+        .flowOn(bgDispatcher)
+    }
+
+
     private fun createRepositoryForSubId(subId: Int): FullMobileConnectionRepository {
         return fullMobileRepoFactory.build(
             subId,
@@ -370,6 +379,7 @@ constructor(
             subscriptionModelForSubId(subId),
             defaultNetworkName,
             networkNameSeparator,
+            slotIndexForSubId(subId),
         )
     }
 

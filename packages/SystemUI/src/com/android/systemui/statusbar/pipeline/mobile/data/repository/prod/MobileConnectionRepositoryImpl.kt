@@ -118,6 +118,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 /**
  * A repository implementation for a typical mobile connection (as opposed to a carrier merged
@@ -137,11 +138,12 @@ class MobileConnectionRepositoryImpl(
     broadcastDispatcher: BroadcastDispatcher,
     private val mobileMappingsProxy: MobileMappingsProxy,
     private val bgDispatcher: CoroutineDispatcher,
-    logger: MobileInputLogger,
+    private val logger: MobileInputLogger,
     override val tableLogBuffer: TableLogBuffer,
     flags: FeatureFlagsClassic,
     scope: CoroutineScope,
     private val fiveGServiceClient: FiveGServiceClient,
+    slotIndexForSubId:  Flow<Int>? = null,
 ) : MobileConnectionRepository {
     init {
         if (telephonyManager.subscriptionId != subId) {
@@ -150,11 +152,23 @@ class MobileConnectionRepositoryImpl(
                     "Found ${telephonyManager.subscriptionId} instead."
             )
         }
+        slotIndexForSubId?.let { slotIndex ->
+            scope.launch { slotIndex.collect {
+                logger.logSlotIndex(it, subId)
+                if (SubscriptionManager.isValidSlotIndex(it)) {
+                    registerImsCallbackIfNeeded()
+                } else {
+                    unRegisterImsCallbackIfNeeded()
+                }
+            }}
+        }
     }
     private val tag: String = MobileConnectionRepositoryImpl::class.java.simpleName
     private val imsMmTelManager: ImsMmTelManager = ImsMmTelManager.createForSubscriptionId(subId)
+    private var imsStateCallback: ImsStateCallback? = null
     private var registrationCallback: RegistrationManager.RegistrationCallback? = null
     private var capabilityCallback: ImsMmTelManager.CapabilityCallback? = null
+    private var imsStateCallBackRegistered = false
     /**
      * This flow defines the single shared connection to system_server via TelephonyCallback. Any
      * new callback should be added to this listener and funneled through callbackEvents via a data
@@ -237,43 +251,67 @@ class MobileConnectionRepositoryImpl(
                         }
                     }
 
-                val imsStateCallback =
-                    object : ImsStateCallback() {
-                        override fun onAvailable() {
-                            registerCapabilityAndRegistrationCallback()
-                        }
-
-                        override fun onUnavailable(reason: Int) {
-                            unregisterCapabilityAndRegistrationCallback()
-                        }
-
-                        override fun onError() {
-                            unregisterCapabilityAndRegistrationCallback()
-                        }
-                    }
-
                 telephonyManager.registerTelephonyCallback(bgDispatcher.asExecutor(), callback)
                 val slotIndex = getSlotIndex(subId)
                 fiveGServiceClient.registerListener(slotIndex, callback)
-                try {
-                    imsMmTelManager.registerImsStateCallback(context.mainExecutor, imsStateCallback)
-                } catch (exception: ImsException) {
-                    Log.e(tag, "failed to call registerImsStateCallback ", exception)
-                }
                 awaitClose {
                     telephonyManager.unregisterTelephonyCallback(callback)
                     fiveGServiceClient.unregisterListener(slotIndex, callback)
-                    try {
-                        imsMmTelManager.unregisterImsStateCallback(imsStateCallback)
-                    } catch (exception: Exception) {
-                        Log.e(tag, "failed to call unregister ims callback ", exception)
-                    }
-                    unregisterCapabilityAndRegistrationCallback()
                 }
             }
             .flowOn(bgDispatcher)
             .scan(initial = initial) { state, event -> state.applyEvent(event) }
             .stateIn(scope = scope, started = SharingStarted.WhileSubscribed(), initial)
+    }
+
+    private fun unRegisterImsCallbackIfNeeded() {
+        if (!imsStateCallBackRegistered) {
+            return
+        }
+        try {
+            imsStateCallback?.let {
+                imsMmTelManager.unregisterImsStateCallback(it)
+            }
+        } catch (exception: Exception) {
+            logger.logException(exception, "UnregisterImsStateCallback failed sub: $subId")
+        }
+        unregisterCapabilityAndRegistrationCallback()
+        imsStateCallBackRegistered = false
+        logger.logImsStateCallbackRegistered(false, subId)
+    }
+
+    private fun registerImsCallbackIfNeeded() {
+        if (imsStateCallBackRegistered) {
+            return
+        }
+        if (imsStateCallback == null) {
+            imsStateCallback =
+                object : ImsStateCallback() {
+                    override fun onAvailable() {
+                        registerCapabilityAndRegistrationCallback()
+                    }
+
+                    override fun onUnavailable(reason: Int) {
+                        unregisterCapabilityAndRegistrationCallback()
+                        if (reason == 5) {
+                            unRegisterImsCallbackIfNeeded()
+                        }
+                    }
+
+                    override fun onError() {
+                        unregisterCapabilityAndRegistrationCallback()
+                    }
+                }
+        }
+        try {
+            imsStateCallback?.let {
+                imsMmTelManager.registerImsStateCallback(context.mainExecutor,it) }
+            imsStateCallBackRegistered = true
+            logger.logImsStateCallbackRegistered(true, subId)
+        } catch (exception: ImsException) {
+            logger.logException(exception, "RegisterImsStateCallback failed sub: $subId")
+            imsStateCallBackRegistered = false
+        }
     }
 
     override val isEmergencyOnly =
@@ -751,6 +789,7 @@ class MobileConnectionRepositoryImpl(
             subscriptionModel: Flow<SubscriptionModel?>,
             defaultNetworkName: NetworkNameModel,
             networkNameSeparator: String,
+            slotIndexForSubId:  Flow<Int>? = null,
         ): MobileConnectionRepository {
             return MobileConnectionRepositoryImpl(
                 subId,
@@ -769,6 +808,7 @@ class MobileConnectionRepositoryImpl(
                 flags,
                 scope,
                 fiveGServiceClient,
+                slotIndexForSubId,
             )
         }
     }

@@ -471,7 +471,6 @@ public class InternetDialogDelegate implements
         mMobileDataToggle.setOnClickListener(v -> {
             boolean isChecked = mMobileDataToggle.isChecked();
             if (!isChecked && shouldShowMobileDialog(mDefaultDataSubId)) {
-                mMobileDataToggle.setChecked(true);
                 showTurnOffMobileDialog(mDefaultDataSubId);
             } else if (mInternetDialogController.isMobileDataEnabled(mDefaultDataSubId) != isChecked) {
                 mInternetDialogController.setMobileDataEnabled(
@@ -626,8 +625,9 @@ public class InternetDialogDelegate implements
                         mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
                 divider.setVisibility(
                         mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
-                mSecondaryMobileDataToggle.setOnCheckedChangeListener(
-                    (buttonView, isChecked) -> {
+                mSecondaryMobileDataToggle.setOnClickListener(
+                    (v) -> {
+                        boolean isChecked = mSecondaryMobileDataToggle.isChecked();
                         if (!isChecked && shouldShowMobileDialog(mNddsSubId)) {
                             showTurnOffMobileDialog(mNddsSubId);
                         } else if (!shouldShowMobileDialog(mNddsSubId)) {
@@ -1005,13 +1005,16 @@ public class InternetDialogDelegate implements
                 .setTitle(R.string.mobile_data_disable_title)
                 .setMessage(mobileDataDisableDialogMessage)
                 .setNegativeButton(android.R.string.cancel, (d, w) -> {
+                    // toggle has already been set to off before dialog is shown,
+                    // it shall be set back to true if negative button is selected
+                    mobileDataToggle.setChecked(true);
                 })
                 .setPositiveButton(
                         com.android.internal.R.string.alert_windows_notification_turn_off_action,
                         (d, w) -> {
                             mInternetDialogController.setMobileDataEnabled(context,
                                     subId, false, false);
-                            mMobileDataToggle.setChecked(false);
+                            mobileDataToggle.setChecked(false);
                             Prefs.putBoolean(context, QS_HAS_TURNED_OFF_MOBILE_DATA, true);
                         })
                 .create();

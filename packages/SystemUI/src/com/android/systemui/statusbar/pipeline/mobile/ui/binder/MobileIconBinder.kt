@@ -136,6 +136,8 @@ object MobileIconBinder {
                                 mobileGroupView,
                                 dotView,
                             )
+
+                            view.requestLayout()
                         }
                     }
 
@@ -265,12 +267,16 @@ object MobileIconBinder {
 
                     launch {
                         viewModel.volteId.distinctUntilChanged().collect { volteId ->
+                            val prevVisibility = volteView.visibility;
                             if (volteId != 0 &&
                                 viewModel.location != StatusBarLocation.SHADE_CARRIER_GROUP) {
                                 volteView.visibility = VISIBLE
                                 volteView.setImageResource(volteId)
                             } else {
                                 volteView.visibility = GONE
+                            }
+                            if (prevVisibility != volteView.visibility) {
+                                view.requestLayout()
                             }
                         }
                     }

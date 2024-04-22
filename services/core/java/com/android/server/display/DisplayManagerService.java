@@ -5291,5 +5291,13 @@ public final class DisplayManagerService extends SystemService {
         public ExternalDisplayStatsService getExternalDisplayStatsService() {
             return mExternalDisplayStatsService;
         }
+
+        /**
+         * Called on external display is ready to be enabled.
+         */
+        @Override
+        public void onExternalDisplayReadyToBeEnabled(int displayId) {
+            mDisplayModeDirector.onExternalDisplayReadyToBeEnabled(displayId);
+        }
     }
 }

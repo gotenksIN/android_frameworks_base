@@ -811,6 +811,13 @@ class BackNavigationController {
         return mAnimationHandler.isTarget(wc, wc.isVisibleRequested() /* open */);
     }
 
+    boolean shouldPauseTouch(WindowContainer wc) {
+        // Once the close transition is ready, it means the onBackInvoked callback has invoked, and
+        // app is ready to trigger next transition, no matter what it will be.
+        return mAnimationHandler.mComposed && mWaitTransitionFinish == null
+                && mAnimationHandler.isTarget(wc, wc.isVisibleRequested() /* open */);
+    }
+
     /**
      * Cleanup animation, this can either happen when legacy transition ready, or when the Shell
      * transition finish.
@@ -1762,18 +1769,39 @@ class BackNavigationController {
     }
 
     private void onBackNavigationDone(Bundle result, int backType) {
-        boolean triggerBack = result != null && result.getBoolean(
-                BackNavigationInfo.KEY_TRIGGER_BACK);
-        ProtoLog.d(WM_DEBUG_BACK_PREVIEW, "onBackNavigationDone backType=%s, "
-                + "triggerBack=%b", backType, triggerBack);
+        if (result == null) {
+            return;
+        }
+        if (result.containsKey(BackNavigationInfo.KEY_NAVIGATION_FINISHED)) {
+            final boolean triggerBack = result.getBoolean(
+                    BackNavigationInfo.KEY_NAVIGATION_FINISHED);
+            ProtoLog.d(WM_DEBUG_BACK_PREVIEW, "onBackNavigationDone backType=%s, "
+                    + "triggerBack=%b", backType, triggerBack);
 
-        synchronized (mWindowManagerService.mGlobalLock) {
-            mNavigationMonitor.stopMonitorForRemote();
-            mBackAnimationInProgress = false;
-            mShowWallpaper = false;
-            // All animation should be done, clear any un-send animation.
-            mPendingAnimation = null;
-            mPendingAnimationBuilder = null;
+            synchronized (mWindowManagerService.mGlobalLock) {
+                mNavigationMonitor.stopMonitorForRemote();
+                mBackAnimationInProgress = false;
+                mShowWallpaper = false;
+                // All animation should be done, clear any un-send animation.
+                mPendingAnimation = null;
+                mPendingAnimationBuilder = null;
+            }
+        }
+        if (result.getBoolean(BackNavigationInfo.KEY_GESTURE_FINISHED)) {
+            synchronized (mWindowManagerService.mGlobalLock) {
+                final AnimationHandler ah = mAnimationHandler;
+                if (!ah.mComposed || ah.mWaitTransition || ah.mOpenActivities == null
+                        || (ah.mSwitchType != AnimationHandler.TASK_SWITCH
+                        && ah.mSwitchType != AnimationHandler.ACTIVITY_SWITCH)) {
+                    return;
+                }
+                for (int i = mAnimationHandler.mOpenActivities.length - 1; i >= 0; --i) {
+                    final ActivityRecord preDrawActivity = mAnimationHandler.mOpenActivities[i];
+                    if (!preDrawActivity.mLaunchTaskBehind) {
+                        setLaunchBehind(preDrawActivity);
+                    }
+                }
+            }
         }
     }
 

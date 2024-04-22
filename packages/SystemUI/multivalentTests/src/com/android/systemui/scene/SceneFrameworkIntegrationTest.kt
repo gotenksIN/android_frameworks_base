@@ -51,6 +51,7 @@ import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepositor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryFaceAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
+import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.flags.Flags
 import com.android.systemui.flags.fakeFeatureFlagsClassic
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
@@ -69,30 +70,22 @@ import com.android.systemui.qs.ui.adapter.FakeQSSceneAdapter
 import com.android.systemui.scene.domain.interactor.sceneContainerOcclusionInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.SceneContainerStartable
-import com.android.systemui.scene.shared.flag.fakeSceneContainerFlags
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.fakeSceneDataSource
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.settings.FakeDisplayTracker
 import com.android.systemui.settings.brightness.ui.viewmodel.brightnessMirrorViewModel
-import com.android.systemui.shade.domain.interactor.privacyChipInteractor
-import com.android.systemui.shade.domain.interactor.shadeHeaderClockInteractor
 import com.android.systemui.shade.domain.interactor.shadeInteractor
-import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.shade.ui.viewmodel.ShadeSceneViewModel
+import com.android.systemui.shade.ui.viewmodel.shadeHeaderViewModel
 import com.android.systemui.statusbar.notification.stack.domain.interactor.headsUpNotificationInteractor
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModel
-import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
-import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeMobileConnectionsRepository
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.fakeMobileConnectionsRepository
-import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.FakeMobileIconsInteractor
-import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
-import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
-import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
 import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
 import com.android.systemui.telephony.data.repository.fakeTelephonyRepository
 import com.android.systemui.testKosmos
+import com.android.systemui.unfold.domain.interactor.unfoldTransitionInteractor
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
@@ -136,9 +129,10 @@ import org.mockito.MockitoAnnotations
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 @RunWithLooper
+@EnableSceneContainer
 class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
-    private val kosmos = testKosmos().apply { fakeSceneContainerFlags.enabled = true }
+    private val kosmos = testKosmos()
     private val testScope = kosmos.testScope
     private val sceneContainerConfig by lazy { kosmos.sceneContainerConfig }
     private val sceneInteractor by lazy { kosmos.sceneInteractor }
@@ -180,25 +174,6 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         )
     }
 
-    private val mobileIconsInteractor = FakeMobileIconsInteractor(FakeMobileMappingsProxy(), mock())
-
-    private var mobileIconsViewModel: MobileIconsViewModel =
-        MobileIconsViewModel(
-            logger = mock(),
-            verboseLogger = mock(),
-            interactor = mobileIconsInteractor,
-            airplaneModeInteractor =
-                AirplaneModeInteractor(
-                    FakeAirplaneModeRepository(),
-                    FakeConnectivityRepository(),
-                    FakeMobileConnectionsRepository(),
-                ),
-            constants = mock(),
-            flags = kosmos.fakeFeatureFlagsClassic,
-            scope = testScope.backgroundScope,
-        )
-
-    private lateinit var shadeHeaderViewModel: ShadeHeaderViewModel
     private lateinit var shadeSceneViewModel: ShadeSceneViewModel
 
     private val keyguardInteractor by lazy { kosmos.keyguardInteractor }
@@ -241,23 +216,11 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         bouncerActionButtonInteractor = kosmos.bouncerActionButtonInteractor
         bouncerViewModel = kosmos.bouncerViewModel
 
-        shadeHeaderViewModel =
-            ShadeHeaderViewModel(
-                applicationScope = testScope.backgroundScope,
-                context = context,
-                shadeInteractor = kosmos.shadeInteractor,
-                mobileIconsInteractor = mobileIconsInteractor,
-                mobileIconsViewModel = mobileIconsViewModel,
-                privacyChipInteractor = kosmos.privacyChipInteractor,
-                clockInteractor = kosmos.shadeHeaderClockInteractor,
-                broadcastDispatcher = fakeBroadcastDispatcher,
-            )
-
         shadeSceneViewModel =
             ShadeSceneViewModel(
                 applicationScope = testScope.backgroundScope,
                 deviceEntryInteractor = deviceEntryInteractor,
-                shadeHeaderViewModel = shadeHeaderViewModel,
+                shadeHeaderViewModel = kosmos.shadeHeaderViewModel,
                 qsSceneAdapter = qsFlexiglassAdapter,
                 notifications = kosmos.notificationsPlaceholderViewModel,
                 brightnessMirrorViewModel = kosmos.brightnessMirrorViewModel,
@@ -266,6 +229,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 footerActionsController = kosmos.footerActionsController,
                 footerActionsViewModelFactory = kosmos.footerActionsViewModelFactory,
                 sceneInteractor = sceneInteractor,
+                unfoldTransitionInteractor = kosmos.unfoldTransitionInteractor,
             )
 
         val displayTracker = FakeDisplayTracker(context)
@@ -275,15 +239,15 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 applicationScope = testScope.backgroundScope,
                 sceneInteractor = sceneInteractor,
                 deviceEntryInteractor = deviceEntryInteractor,
+                deviceUnlockedInteractor = kosmos.deviceUnlockedInteractor,
+                bouncerInteractor = bouncerInteractor,
                 keyguardInteractor = keyguardInteractor,
-                flags = kosmos.fakeSceneContainerFlags,
                 sysUiState = sysUiState,
                 displayId = displayTracker.defaultDisplayId,
                 sceneLogger = mock(),
                 falsingCollector = kosmos.falsingCollector,
                 falsingManager = kosmos.falsingManager,
                 powerInteractor = powerInteractor,
-                bouncerInteractor = bouncerInteractor,
                 simBouncerInteractor = dagger.Lazy { kosmos.simBouncerInteractor },
                 authenticationInteractor = dagger.Lazy { kosmos.authenticationInteractor },
                 windowController = mock(),
@@ -292,7 +256,6 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 headsUpInteractor = kosmos.headsUpNotificationInteractor,
                 occlusionInteractor = kosmos.sceneContainerOcclusionInteractor,
                 faceUnlockInteractor = kosmos.deviceEntryFaceAuthInteractor,
-                deviceUnlockedInteractor = kosmos.deviceUnlockedInteractor,
                 shadeInteractor = kosmos.shadeInteractor,
             )
         startable.start()

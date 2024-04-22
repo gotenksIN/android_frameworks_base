@@ -39,6 +39,7 @@ class FakeMobileConnectionRepository(
     override val tableLogBuffer: TableLogBuffer,
 ) : MobileConnectionRepository {
     override val carrierId = MutableStateFlow(UNKNOWN_CARRIER_ID)
+    override val inflateSignalStrength: MutableStateFlow<Boolean> = MutableStateFlow(false)
     override val isEmergencyOnly = MutableStateFlow(false)
     override val isRoaming = MutableStateFlow(false)
     override val operatorAlphaShort: MutableStateFlow<String?> = MutableStateFlow(null)
@@ -82,8 +83,6 @@ class FakeMobileConnectionRepository(
     override val isAllowedDuringAirplaneMode = MutableStateFlow(false)
 
     override val hasPrioritizedNetworkCapabilities = MutableStateFlow(false)
-
-    override val satelliteConnectionHysteresisSeconds = MutableStateFlow(0)
 
     private var isInEcmMode: Boolean = false
 

@@ -970,7 +970,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
     private boolean performSurfaceTransaction(ViewRootImpl viewRoot, Translator translator,
             boolean creating, boolean sizeChanged, boolean hintChanged, boolean relativeZChanged,
-            Transaction surfaceUpdateTransaction) {
+            boolean hdrHeadroomChanged, Transaction surfaceUpdateTransaction) {
         boolean realSizeChanged = false;
 
         mSurfaceLock.lock();
@@ -1005,7 +1005,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
             updateBackgroundVisibility(surfaceUpdateTransaction);
             updateBackgroundColor(surfaceUpdateTransaction);
-            if (mLimitedHdrEnabled) {
+            if (mLimitedHdrEnabled && hdrHeadroomChanged) {
                 surfaceUpdateTransaction.setDesiredHdrHeadroom(
                         mBlastSurfaceControl, mHdrHeadroom);
             }
@@ -1222,7 +1222,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
                 }
 
                 final boolean realSizeChanged = performSurfaceTransaction(viewRoot, translator,
-                        creating, sizeChanged, hintChanged, relativeZChanged,
+                        creating, sizeChanged, hintChanged, relativeZChanged, hdrHeadroomChanged,
                         surfaceUpdateTransaction);
 
                 try {

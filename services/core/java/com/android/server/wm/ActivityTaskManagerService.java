@@ -390,6 +390,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     final VisibleActivityProcessTracker mVisibleActivityProcessTracker;
 
+    /** The starting activities which are waiting for their processes to attach. */
+    final ArrayList<ActivityRecord> mStartingProcessActivities = new ArrayList<>();
+
     /* Global service lock used by the package the owns this service. */
     final WindowManagerGlobalLock mGlobalLock = new WindowManagerGlobalLock();
     /**
@@ -3781,17 +3784,25 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 }
                 EventLogTags.writeWmEnterPip(r.mUserId, System.identityHashCode(r),
                         r.shortComponentName, Boolean.toString(isAutoEnter));
-                r.setPictureInPictureParams(params);
-                r.mAutoEnteringPip = isAutoEnter;
-                mRootWindowContainer.moveActivityToPinnedRootTask(r,
-                        null /* launchIntoPipHostActivity */, "enterPictureInPictureMode",
-                        transition);
-                // Continue the pausing process after entering pip.
-                if (r.isState(PAUSING) && r.mPauseSchedulePendingForPip) {
-                    r.getTask().schedulePauseActivity(r, false /* userLeaving */,
-                            false /* pauseImmediately */, true /* autoEnteringPip */, "auto-pip");
+
+                // Ensure the ClientTransactionItems are bundled for this operation.
+                deferWindowLayout();
+                try {
+                    r.setPictureInPictureParams(params);
+                    r.mAutoEnteringPip = isAutoEnter;
+                    mRootWindowContainer.moveActivityToPinnedRootTask(r,
+                            null /* launchIntoPipHostActivity */, "enterPictureInPictureMode",
+                            transition);
+                    // Continue the pausing process after entering pip.
+                    if (r.isState(PAUSING) && r.mPauseSchedulePendingForPip) {
+                        r.getTask().schedulePauseActivity(r, false /* userLeaving */,
+                                false /* pauseImmediately */, true /* autoEnteringPip */,
+                                "auto-pip");
+                    }
+                    r.mAutoEnteringPip = false;
+                } finally {
+                    continueWindowLayout();
                 }
-                r.mAutoEnteringPip = false;
             }
         };
 
@@ -4324,6 +4335,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mActiveUids.dump(pw, "  ");
             if (mDemoteTopAppReasons != 0) {
                 pw.println("  mDemoteTopAppReasons=" + mDemoteTopAppReasons);
+            }
+            if (!mStartingProcessActivities.isEmpty()) {
+                pw.println("  mStartingProcessActivities=" + mStartingProcessActivities);
             }
         }
 
@@ -5172,6 +5186,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     void startProcessAsync(ActivityRecord activity, boolean knownToBeDead, boolean isTop,
             String hostingType) {
+        if (!mStartingProcessActivities.contains(activity)) {
+            mStartingProcessActivities.add(activity);
+        } else if (mProcessNames.get(
+                activity.processName, activity.info.applicationInfo.uid) != null) {
+            // The process is already starting. Wait for it to attach.
+            return;
+        }
         try {
             if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
                 Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "dispatchingStartProcess:"
@@ -6180,7 +6201,20 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public void onProcessRemoved(String name, int uid) {
             synchronized (mGlobalLockWithoutBoost) {
-                mProcessNames.remove(name, uid);
+                final WindowProcessController proc = mProcessNames.remove(name, uid);
+                if (proc != null && !mStartingProcessActivities.isEmpty()) {
+                    for (int i = mStartingProcessActivities.size() - 1; i >= 0; i--) {
+                        final ActivityRecord r = mStartingProcessActivities.get(i);
+                        if (uid == r.info.applicationInfo.uid && name.equals(r.processName)) {
+                            Slog.w(TAG, proc + " is removed with pending start " + r);
+                            mStartingProcessActivities.remove(i);
+                            // If visible, finish it to avoid getting stuck on screen.
+                            if (r.isVisibleRequested()) {
+                                r.finishIfPossible("starting-proc-removed", false /* oomAdj */);
+                            }
+                        }
+                    }
+                }
             }
         }
 

@@ -17,6 +17,7 @@
 package com.android.systemui.volume.panel.component.spatialaudio.ui.composable
 
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +30,6 @@ import androidx.compose.ui.text.style.TextAlign
 import com.android.internal.logging.UiEventLogger
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.ui.compose.Icon
-import com.android.systemui.common.ui.compose.toColor
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import com.android.systemui.volume.panel.component.popup.ui.composable.VolumePanelPopup
@@ -52,7 +52,7 @@ constructor(
             VolumePanelUiEvent.VOLUME_PANEL_SPATIAL_AUDIO_POP_UP_SHOWN,
             0,
             null,
-            viewModel.spatialAudioButtons.value.indexOfFirst { it.button.isChecked }
+            viewModel.spatialAudioButtons.value.indexOfFirst { it.button.isActive }
         )
         volumePanelPopup.show(expandable, { Title() }, { Content(it) })
     }
@@ -85,21 +85,16 @@ constructor(
             for (buttonViewModel in enabledModelStates) {
                 val label = buttonViewModel.button.label.toString()
                 item(
-                    isSelected = buttonViewModel.button.isChecked,
+                    isSelected = buttonViewModel.button.isActive,
                     onItemSelected = { viewModel.setEnabled(buttonViewModel.model) },
                     contentDescription = label,
-                    icon = {
-                        Icon(
-                            icon = buttonViewModel.button.icon,
-                            tint = buttonViewModel.iconColor.toColor(),
-                        )
-                    },
+                    icon = { Icon(icon = buttonViewModel.button.icon) },
                     label = {
                         Text(
                             modifier = Modifier.basicMarquee(),
                             text = label,
                             style = MaterialTheme.typography.labelMedium,
-                            color = buttonViewModel.labelColor.toColor(),
+                            color = LocalContentColor.current,
                             textAlign = TextAlign.Center,
                             maxLines = 2
                         )

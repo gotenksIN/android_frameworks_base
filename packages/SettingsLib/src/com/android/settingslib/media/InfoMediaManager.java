@@ -52,6 +52,7 @@ import android.media.MediaRoute2Info;
 import android.media.RouteListingPreference;
 import android.media.RoutingSessionInfo;
 import android.os.Build;
+import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -131,6 +132,7 @@ public abstract class InfoMediaManager {
     protected final List<MediaDevice> mMediaDevices = new CopyOnWriteArrayList<>();
     @NonNull protected final Context mContext;
     @NonNull protected final String mPackageName;
+    @NonNull protected final UserHandle mUserHandle;
     private final Collection<MediaDeviceCallback> mCallbacks = new CopyOnWriteArrayList<>();
     private MediaDevice mCurrentConnectedDevice;
     private final LocalBluetoothManager mBluetoothManager;
@@ -140,16 +142,28 @@ public abstract class InfoMediaManager {
     /* package */ InfoMediaManager(
             @NonNull Context context,
             @NonNull String packageName,
+            @NonNull UserHandle userHandle,
             @NonNull LocalBluetoothManager localBluetoothManager) {
         mContext = context;
         mBluetoothManager = localBluetoothManager;
         mPackageName = packageName;
+        mUserHandle = userHandle;
     }
 
-    /** Creates an instance of InfoMediaManager. */
+    /**
+     * Creates an instance of InfoMediaManager.
+     *
+     * @param context The {@link Context}.
+     * @param packageName The package name of the app for which to control routing, or null if the
+     *     caller is interested in system-level routing only (for example, headsets, built-in
+     *     speakers, as opposed to app-specific routing (for example, casting to another device).
+     * @param userHandle The {@link UserHandle} of the user on which the app to control is running,
+     *     or null if the caller does not need app-specific routing (see {@code packageName}).
+     */
     public static InfoMediaManager createInstance(
             Context context,
             @Nullable String packageName,
+            @Nullable UserHandle userHandle,
             LocalBluetoothManager localBluetoothManager) {
 
         // The caller is only interested in system routes (headsets, built-in speakers, etc), and is
@@ -159,25 +173,28 @@ public abstract class InfoMediaManager {
             packageName = context.getPackageName();
         }
 
+        if (userHandle == null) {
+            userHandle = android.os.Process.myUserHandle();
+        }
+
         if (Flags.useMediaRouter2ForInfoMediaManager()) {
             try {
-                return new RouterInfoMediaManager(context, packageName, localBluetoothManager);
+                return new RouterInfoMediaManager(
+                        context, packageName, userHandle, localBluetoothManager);
             } catch (PackageNotAvailableException ex) {
                 // TODO: b/293578081 - Propagate this exception to callers for proper handling.
                 Log.w(TAG, "Returning a no-op InfoMediaManager for package " + packageName);
-                return new NoOpInfoMediaManager(context, packageName, localBluetoothManager);
+                return new NoOpInfoMediaManager(
+                        context, packageName, userHandle, localBluetoothManager);
             }
         } else {
-            return new ManagerInfoMediaManager(context, packageName, localBluetoothManager);
+            return new ManagerInfoMediaManager(
+                    context, packageName, userHandle, localBluetoothManager);
         }
     }
 
     public void startScan() {
-        mMediaDevices.clear();
-        registerRouter();
         startScanOnRouter();
-        updateRouteListingPreference();
-        refreshDevices();
     }
 
     private void updateRouteListingPreference() {
@@ -191,7 +208,6 @@ public abstract class InfoMediaManager {
 
     public final void stopScan() {
         stopScanOnRouter();
-        unregisterRouter();
     }
 
     protected abstract void stopScanOnRouter();
@@ -278,14 +294,37 @@ public abstract class InfoMediaManager {
         return null;
     }
 
-    protected final void registerCallback(MediaDeviceCallback callback) {
+    /**
+     * Registers the specified {@code callback} to receive state updates about routing information.
+     *
+     * <p>As long as there is a registered {@link MediaDeviceCallback}, {@link InfoMediaManager}
+     * will receive state updates from the platform.
+     *
+     * <p>Call {@link #unregisterCallback(MediaDeviceCallback)} once you no longer need platform
+     * updates.
+     */
+    public final void registerCallback(@NonNull MediaDeviceCallback callback) {
+        boolean wasEmpty = mCallbacks.isEmpty();
         if (!mCallbacks.contains(callback)) {
             mCallbacks.add(callback);
+            if (wasEmpty) {
+                mMediaDevices.clear();
+                registerRouter();
+                updateRouteListingPreference();
+                refreshDevices();
+            }
         }
     }
 
-    protected final void unregisterCallback(MediaDeviceCallback callback) {
-        mCallbacks.remove(callback);
+    /**
+     * Unregisters the specified {@code callback}.
+     *
+     * @see #registerCallback(MediaDeviceCallback)
+     */
+    public final void unregisterCallback(@NonNull MediaDeviceCallback callback) {
+        if (mCallbacks.remove(callback) && mCallbacks.isEmpty()) {
+            unregisterRouter();
+        }
     }
 
     private void dispatchDeviceListAdded(@NonNull List<MediaDevice> devices) {

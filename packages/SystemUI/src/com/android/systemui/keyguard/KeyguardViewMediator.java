@@ -1372,7 +1372,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private final Lazy<DreamViewModel> mDreamViewModel;
     private final Lazy<CommunalTransitionViewModel> mCommunalTransitionViewModel;
     private RemoteAnimationTarget mRemoteAnimationTarget;
-    private Boolean mShowCommunalByDefault;
+    private boolean mShowCommunalByDefault = false;
 
     private final Lazy<WindowManagerLockscreenVisibilityManager> mWmLockscreenVisibilityManager;
 
@@ -3563,15 +3563,14 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             ShadeLockscreenInteractor shadeLockscreenInteractor,
             @Nullable ShadeExpansionStateManager shadeExpansionStateManager,
             BiometricUnlockController biometricUnlockController,
-            View notificationContainer, KeyguardBypassController bypassController) {
+            View notificationContainer) {
         mCentralSurfaces = centralSurfaces;
         mKeyguardViewControllerLazy.get().registerCentralSurfaces(
                 centralSurfaces,
                 shadeLockscreenInteractor,
                 shadeExpansionStateManager,
                 biometricUnlockController,
-                notificationContainer,
-                bypassController);
+                notificationContainer);
         return mKeyguardViewControllerLazy.get();
     }
 

@@ -106,22 +106,23 @@ import static android.service.notification.NotificationListenerService.Ranking.U
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
-
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
 import static com.android.server.am.PendingIntentRecord.FLAG_ACTIVITY_SENDER;
 import static com.android.server.am.PendingIntentRecord.FLAG_BROADCAST_SENDER;
 import static com.android.server.am.PendingIntentRecord.FLAG_SERVICE_SENDER;
+import static com.android.server.notification.Flags.FLAG_ALL_NOTIFS_NEED_TTL;
 import static com.android.server.notification.NotificationManagerService.BITMAP_DURATION;
 import static com.android.server.notification.NotificationManagerService.DEFAULT_MAX_NOTIFICATION_ENQUEUE_RATE;
 import static com.android.server.notification.NotificationManagerService.NOTIFICATION_TTL;
+import static com.android.server.notification.NotificationManagerService.TAG;
 import static com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent.NOTIFICATION_ADJUSTED;
 import static com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent.NOTIFICATION_POSTED;
 import static com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent.NOTIFICATION_UPDATED;
-
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
-
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
@@ -130,7 +131,6 @@ import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertSame;
 import static junit.framework.Assert.assertTrue;
 import static junit.framework.Assert.fail;
-
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -138,10 +138,24 @@ import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
-
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import android.Manifest;
 import android.annotation.Nullable;
@@ -168,6 +182,8 @@ import android.app.RemoteInput;
 import android.app.RemoteInputHistoryItem;
 import android.app.StatsManager;
 import android.app.admin.DevicePolicyManagerInternal;
+import android.app.job.JobScheduler;
+import android.app.role.RoleManager;
 import android.app.usage.UsageStatsManagerInternal;
 import android.companion.AssociationInfo;
 import android.companion.AssociationRequest;
@@ -184,9 +200,11 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.LauncherApps;
+import android.content.pm.ModuleInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ParceledListSlice;
+import android.content.pm.ResolveInfo;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutServiceInternal;
 import android.content.pm.UserInfo;
@@ -217,6 +235,7 @@ import android.os.WorkSource;
 import android.permission.PermissionManager;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.FlagsParameterization;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.platform.test.rule.LimitDevicesRule;
 import android.provider.DeviceConfig;
@@ -235,7 +254,8 @@ import android.service.notification.StatusBarNotification;
 import android.service.notification.ZenModeConfig;
 import android.service.notification.ZenPolicy;
 import android.telecom.TelecomManager;
-import android.testing.AndroidTestingRunner;
+import android.testing.TestWithLooperRule;
+import android.testing.TestableContentResolver;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
 import android.testing.TestablePermissions;
@@ -245,13 +265,13 @@ import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.AtomicFile;
+import android.util.Log;
 import android.util.Pair;
 import android.util.Xml;
+import android.view.accessibility.AccessibilityManager;
 import android.widget.RemoteViews;
-
 import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
-
 import com.android.internal.R;
 import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
 import com.android.internal.config.sysui.TestableFlagResolver;
@@ -259,6 +279,7 @@ import com.android.internal.logging.InstanceIdSequence;
 import com.android.internal.logging.InstanceIdSequenceFake;
 import com.android.internal.messages.nano.SystemMessageProto;
 import com.android.internal.statusbar.NotificationVisibility;
+import com.android.internal.widget.LockPatternUtils;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 import com.android.server.DeviceIdleInternal;
@@ -282,13 +303,10 @@ import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.utils.quota.MultiRateLimiter;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
-
 import com.google.android.collect.Lists;
 import com.google.common.collect.ImmutableList;
-
 import libcore.junit.util.compat.CoreCompatChangeRule.DisableCompatChanges;
 import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
-
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -306,6 +324,8 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
+import platform.test.runner.parameterized.Parameters;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -322,9 +342,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 @SmallTest
-@RunWith(AndroidTestingRunner.class)
-@SuppressLint("GuardedBy") // It's ok for this test to access guarded methods from the service.
+@RunWith(ParameterizedAndroidJunit4.class)
 @RunWithLooper
+@SuppressLint("GuardedBy") // It's ok for this test to access guarded methods from the service.
 public class NotificationManagerServiceTest extends UiServiceTestCase {
     private static final String TEST_CHANNEL_ID = "NotificationManagerServiceTestChannelId";
     private static final String TEST_PACKAGE = "The.name.is.Package.Test.Package";
@@ -369,6 +389,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Mock
     private PermissionHelper mPermissionHelper;
     private NotificationChannelLoggerFake mLogger = new NotificationChannelLoggerFake();
+    @Rule(order = Integer.MAX_VALUE)
+    public TestWithLooperRule mlooperRule = new TestWithLooperRule();
     private TestableLooper mTestableLooper;
     @Mock
     private RankingHelper mRankingHelper;
@@ -415,8 +437,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     private final TestPostNotificationTrackerFactory mPostNotificationTrackerFactory =
             new TestPostNotificationTrackerFactory();
 
-    @Mock
-    IIntentSender pi1;
+    private PendingIntent mActivityIntent;
+    private PendingIntent mActivityIntentImmutable;
 
     private static final int MAX_POST_DELAY = 1000;
 
@@ -429,6 +451,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     private static final String VALID_CONVO_SHORTCUT_ID = "shortcut";
     private static final String SEARCH_SELECTOR_PKG = "searchSelector";
+    private static final String ADSERVICES_MODULE_PKG = "com.android.adservices";
+    private static final String ADSERVICES_APK_PKG = "com.android.adservices.api";
+
     @Mock
     private NotificationListeners mListeners;
     @Mock
@@ -465,6 +490,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     StatsManager mStatsManager;
     @Mock
     AlarmManager mAlarmManager;
+    @Mock JobScheduler mJobScheduler;
     @Mock
     MultiRateLimiter mToastRateLimiter;
     BroadcastReceiver mPackageIntentReceiver;
@@ -508,6 +534,16 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         }
     }
 
+    @Parameters(name = "{0}")
+    public static List<FlagsParameterization> getParams() {
+        return FlagsParameterization.allCombinationsOf(
+                FLAG_ALL_NOTIFS_NEED_TTL);
+    }
+
+    public NotificationManagerServiceTest(FlagsParameterization flags) {
+        mSetFlagsRule.setFlagsParameterization(flags);
+    }
+
     @Before
     public void setUp() throws Exception {
         // Shell permisssions will override permissions of our app, so add all necessary permissions
@@ -540,12 +576,22 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         LocalServices.addService(PackageManagerInternal.class, mPackageManagerInternal);
         LocalServices.removeServiceForTest(PermissionPolicyInternal.class);
         LocalServices.addService(PermissionPolicyInternal.class, mPermissionPolicyInternal);
+        LocalServices.removeServiceForTest(ShortcutServiceInternal.class);
+        LocalServices.addService(ShortcutServiceInternal.class, mShortcutServiceInternal);
         mContext.addMockSystemService(Context.ALARM_SERVICE, mAlarmManager);
         mContext.addMockSystemService(NotificationManager.class, mMockNm);
+        mContext.addMockSystemService(RoleManager.class, mock(RoleManager.class));
+        mContext.addMockSystemService(Context.LAUNCHER_APPS_SERVICE, mLauncherApps);
+        mContext.addMockSystemService(Context.USER_SERVICE, mUm);
+        mContext.addMockSystemService(Context.ACCESSIBILITY_SERVICE,
+                mock(AccessibilityManager.class));
 
         doNothing().when(mContext).sendBroadcast(any(), anyString());
         doNothing().when(mContext).sendBroadcastAsUser(any(), any());
         doNothing().when(mContext).sendBroadcastAsUser(any(), any(), any());
+        TestableContentResolver cr = mock(TestableContentResolver.class);
+        when(mContext.getContentResolver()).thenReturn(cr);
+        doNothing().when(cr).registerContentObserver(any(), anyBoolean(), any(), anyInt());
 
         setDpmAppOppsExemptFromDismissal(false);
 
@@ -648,10 +694,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 });
 
         // TODO (b/291907312): remove feature flag
-        // NOTE: Prefer using the @EnableFlag annotation where possible. Do not add any android.app
+        // NOTE: Prefer using the @EnableFlags annotation where possible. Do not add any android.app
         //  flags here.
         mSetFlagsRule.disableFlags(
                 Flags.FLAG_POLITE_NOTIFICATIONS, Flags.FLAG_AUTOGROUP_SUMMARY_ICON_UPDATE);
+
+        mActivityIntent = spy(PendingIntent.getActivity(mContext, 0,
+                new Intent().setPackage(mPkg), PendingIntent.FLAG_MUTABLE));
+        mActivityIntentImmutable = spy(PendingIntent.getActivity(mContext, 0,
+                new Intent().setPackage(mPkg), FLAG_IMMUTABLE));
 
         initNMS();
     }
@@ -689,10 +740,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mPowerManager, mPostNotificationTrackerFactory);
 
         mService.setAttentionHelper(mAttentionHelper);
+        mService.setLockPatternUtils(mock(LockPatternUtils.class));
 
         // Return first true for RoleObserver main-thread check
         when(mMainLooper.isCurrentThread()).thenReturn(true).thenReturn(false);
-
+        ModuleInfo moduleInfo = new ModuleInfo();
+        moduleInfo.setApexModuleName(ADSERVICES_MODULE_PKG);
+        moduleInfo.setApkInApexPackageNames(List.of(ADSERVICES_APK_PKG));
+        when(mPackageManagerClient.getInstalledModules(anyInt()))
+                .thenReturn(List.of(moduleInfo));
         if (upToBootPhase >= SystemService.PHASE_SYSTEM_SERVICES_READY) {
             mService.onBootPhase(SystemService.PHASE_SYSTEM_SERVICES_READY, mMainLooper);
         }
@@ -749,7 +805,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         }
         assertNotNull("package intent receiver should exist", mPackageIntentReceiver);
         assertNotNull("User-switch receiver should exist", mUserSwitchIntentReceiver);
-        assertNotNull("Notification timeout receiver should exist", mNotificationTimeoutReceiver);
+        if (!Flags.allNotifsNeedTtl()) {
+            assertNotNull("Notification timeout receiver should exist",
+                    mNotificationTimeoutReceiver);
+        }
 
         // Pretend the shortcut exists
         List<ShortcutInfo> shortcutInfos = new ArrayList<>();
@@ -834,9 +893,17 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         if (mFile != null) mFile.delete();
         clearDeviceConfig();
 
+        if (mActivityIntent != null) {
+            mActivityIntent.cancel();
+        }
+
+        mService.clearNotifications();
+        TestableLooper.get(this).processAllMessages();
+
         try {
             mService.onDestroy();
         } catch (IllegalStateException | IllegalArgumentException e) {
+            Log.e(TAG, "failed to destroy", e);
             // can throw if a broadcast receiver was never registered
         }
 
@@ -846,6 +913,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // could cause issues, for example, messages that remove/cancel shown toasts (this causes
         // problematic interactions with mocks when they're no longer working as expected).
         mWorkerHandler.removeCallbacksAndMessages(null);
+
+        if (TestableLooper.get(this) != null) {
+            // Must remove static reference to this test object to prevent leak (b/261039202)
+            TestableLooper.remove(this);
+        }
     }
 
     private void simulatePackageSuspendBroadcast(boolean suspend, String pkg,
@@ -1005,7 +1077,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Notification.Builder nb = new Notification.Builder(mContext, channel.getId())
                 .setContentTitle("foo")
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
-                .addAction(new Notification.Action.Builder(null, "test", null).build());
+                .addAction(new Notification.Action.Builder(null, "test", mActivityIntent).build())
+                .addAction(new Notification.Action.Builder(
+                        null, "test", mActivityIntentImmutable).build());
         if (extender != null) {
             nb.extend(extender);
         }
@@ -1045,18 +1119,20 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     private NotificationRecord generateMessageBubbleNotifRecord(NotificationChannel channel,
             String tag) {
-        return generateMessageBubbleNotifRecord(true, channel, 1, tag, null, false);
+        return generateMessageBubbleNotifRecord(true, channel, 1, tag, null, false, true);
     }
 
     private NotificationRecord generateMessageBubbleNotifRecord(boolean addMetadata,
-            NotificationChannel channel, int id, String tag, String groupKey, boolean isSummary) {
+            NotificationChannel channel, int id, String tag, String groupKey, boolean isSummary,
+            boolean mutable) {
         if (channel == null) {
             channel = mTestNotificationChannel;
         }
         if (tag == null) {
             tag = "tag";
         }
-        Notification.Builder nb = getMessageStyleNotifBuilder(addMetadata, groupKey, isSummary);
+        Notification.Builder nb = getMessageStyleNotifBuilder(addMetadata, groupKey,
+                isSummary, mutable);
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, id,
                 tag, mUid, 0,
                 nb.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -1129,18 +1205,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     private Notification.Builder getMessageStyleNotifBuilder(boolean addBubbleMetadata,
-            String groupKey, boolean isSummary) {
+            String groupKey, boolean isSummary, boolean mutable) {
         // Give it a person
         Person person = new Person.Builder()
                 .setName("bubblebot")
                 .build();
         RemoteInput remoteInput = new RemoteInput.Builder("reply_key").setLabel("reply").build();
-        PendingIntent inputIntent = PendingIntent.getActivity(mContext, 0,
-                new Intent().setPackage(mContext.getPackageName()),
-                PendingIntent.FLAG_MUTABLE);
         Icon icon = Icon.createWithResource(mContext, android.R.drawable.sym_def_app_icon);
         Notification.Action replyAction = new Notification.Action.Builder(icon, "Reply",
-                inputIntent).addRemoteInput(remoteInput)
+                mutable ? mActivityIntent : mActivityIntentImmutable).addRemoteInput(remoteInput)
                 .build();
         // Make it messaging style
         Notification.Builder nb = new Notification.Builder(mContext,
@@ -1167,17 +1240,14 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     private Notification.BubbleMetadata getBubbleMetadata() {
-        PendingIntent pendingIntent = mock(PendingIntent.class);
-        Intent intent = mock(Intent.class);
-        when(pendingIntent.getIntent()).thenReturn(intent);
-        when(pendingIntent.getTarget()).thenReturn(pi1);
-
         ActivityInfo info = new ActivityInfo();
         info.resizeMode = RESIZE_MODE_RESIZEABLE;
-        when(intent.resolveActivityInfo(any(), anyInt())).thenReturn(info);
+        ResolveInfo ri = new ResolveInfo();
+        ri.activityInfo = info;
+        when(mPackageManagerClient.resolveActivity(any(), anyInt())).thenReturn(ri);
 
         return new Notification.BubbleMetadata.Builder(
-                pendingIntent,
+                mActivityIntent,
                 Icon.createWithResource(mContext, android.R.drawable.sym_def_app_icon))
                 .build();
     }
@@ -1189,7 +1259,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // Notification that has bubble metadata
         NotificationRecord nrBubble = generateMessageBubbleNotifRecord(true /* addMetadata */,
-                mTestNotificationChannel, 1 /* id */, "tag", groupKey, false /* isSummary */);
+                mTestNotificationChannel, 1 /* id */, "tag", groupKey, false /* isSummary */,
+                true);
 
         mBinderService.enqueueNotificationWithTag(mPkg, mPkg, nrBubble.getSbn().getTag(),
                 nrBubble.getSbn().getId(), nrBubble.getSbn().getNotification(),
@@ -1203,7 +1274,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // Notification without bubble metadata
         NotificationRecord nrPlain = generateMessageBubbleNotifRecord(false /* addMetadata */,
-                mTestNotificationChannel, 2 /* id */, "tag", groupKey, false /* isSummary */);
+                mTestNotificationChannel, 2 /* id */, "tag", groupKey, false /* isSummary */,
+                true);
 
         mBinderService.enqueueNotificationWithTag(mPkg, mPkg, nrPlain.getSbn().getTag(),
                 nrPlain.getSbn().getId(), nrPlain.getSbn().getNotification(),
@@ -1215,7 +1287,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // Summary notification for both of those
         NotificationRecord nrSummary = generateMessageBubbleNotifRecord(false /* addMetadata */,
-                mTestNotificationChannel, 3 /* id */, "tag", groupKey, true /* isSummary */);
+                mTestNotificationChannel, 3 /* id */, "tag", groupKey, true /* isSummary */,
+                true);
 
         if (summaryAutoCancel) {
             nrSummary.getNotification().flags |= FLAG_AUTO_CANCEL;
@@ -1232,6 +1305,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @DisableFlags(FLAG_ALL_NOTIFS_NEED_TTL)
     public void testLimitTimeOutBroadcast() {
         NotificationChannel channel = new NotificationChannel("id", "name",
                 NotificationManager.IMPORTANCE_HIGH);
@@ -2501,8 +2575,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testCancelWithTagDoesNotCancelLifetimeExtended() throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         final NotificationRecord notif = generateNotificationRecord(null);
         notif.getSbn().getNotification().flags =
                 Notification.FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
@@ -2529,19 +2603,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertThat(captor.getValue().getNotification().flags
                 & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY).isEqualTo(
                 FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY);
-
-        mSetFlagsRule.disableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
-        mBinderService.cancelNotificationWithTag(mPkg, mPkg, sbn.getTag(), sbn.getId(),
-                sbn.getUserId());
-        waitForIdle();
-
-        assertThat(mBinderService.getActiveNotifications(sbn.getPackageName()).length).isEqualTo(0);
-        assertThat(mService.getNotificationRecordCount()).isEqualTo(0);
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testCancelAllDoesNotCancelLifetimeExtended() throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         // Adds a lifetime extended notification.
         final NotificationRecord notif = generateNotificationRecord(mTestNotificationChannel, 1,
                 null, false);
@@ -2978,9 +3044,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testCancelNotificationsFromListener_clearAll_NoClearLifetimeExt()
             throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         final NotificationRecord notif = generateNotificationRecord(
                 mTestNotificationChannel, 1, null, false);
         notif.getNotification().flags |= FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
@@ -3211,9 +3277,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testCancelNotificationsFromListener_byKey_NoClearLifetimeExt()
             throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         final NotificationRecord notif = generateNotificationRecord(
                 mTestNotificationChannel, 3, null, false);
         notif.getNotification().flags |= FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
@@ -5695,12 +5761,16 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mZenModeHelper).updateZenRulesOnLocaleChange();
     }
 
-    private void simulateNotificationTimeoutBroadcast(String notificationKey) {
-        final Bundle extras = new Bundle();
-        extras.putString(EXTRA_KEY, notificationKey);
-        final Intent intent = new Intent(ACTION_NOTIFICATION_TIMEOUT);
-        intent.putExtras(extras);
-        mNotificationTimeoutReceiver.onReceive(getContext(), intent);
+    private void simulateNotificationTimeout(String notificationKey) {
+        if (Flags.allNotifsNeedTtl()) {
+            mService.mNotificationManagerPrivate.timeoutNotification(notificationKey);
+        } else {
+            final Bundle extras = new Bundle();
+            extras.putString(EXTRA_KEY, notificationKey);
+            final Intent intent = new Intent(ACTION_NOTIFICATION_TIMEOUT);
+            intent.putExtras(extras);
+            mNotificationTimeoutReceiver.onReceive(getContext(), intent);
+        }
     }
 
     @Test
@@ -5709,7 +5779,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mTestNotificationChannel, 1, null, false);
         mService.addNotification(notif);
 
-        simulateNotificationTimeoutBroadcast(notif.getKey());
+        simulateNotificationTimeout(notif.getKey());
         waitForIdle();
 
         // Check that the notification was cancelled.
@@ -5725,7 +5795,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         notif.getSbn().getNotification().flags = Notification.FLAG_FOREGROUND_SERVICE;
         mService.addNotification(notif);
 
-        simulateNotificationTimeoutBroadcast(notif.getKey());
+        simulateNotificationTimeout(notif.getKey());
         waitForIdle();
 
         // Check that the notification was not cancelled.
@@ -5741,7 +5811,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         notif.getSbn().getNotification().flags = Notification.FLAG_USER_INITIATED_JOB;
         mService.addNotification(notif);
 
-        simulateNotificationTimeoutBroadcast(notif.getKey());
+        simulateNotificationTimeout(notif.getKey());
         waitForIdle();
 
         // Check that the notification was not cancelled.
@@ -5751,15 +5821,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testTimeout_NoCancelLifetimeExtensionNotification() throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         // Create a notification with FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY
         final NotificationRecord notif = generateNotificationRecord(null);
         notif.getSbn().getNotification().flags =
                 Notification.FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
         mService.addNotification(notif);
 
-        simulateNotificationTimeoutBroadcast(notif.getKey());
+        simulateNotificationTimeout(notif.getKey());
         waitForIdle();
 
         // Check that the notification was not cancelled.
@@ -5839,8 +5909,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testStats_DirectReplyLifetimeExtendedPostsUpdate() throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         final NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
         r.getSbn().getNotification().flags |= FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
         mService.addNotification(r);
@@ -6662,6 +6732,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(visitor, times(1)).accept(eq(personIcon.getUri()));
         verify(visitor, times(1)).accept(eq(verificationIcon.getUri()));
         verify(visitor, times(1)).accept(eq(hangUpUri));
+        hangUpIntent.cancel();
     }
 
     @Test
@@ -6691,6 +6762,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(visitor, times(1)).accept(eq(verificationIcon.getUri()));
         verify(visitor, times(1)).accept(eq(answerIntent.getIntent().getData()));
         verify(visitor, times(1)).accept(eq(declineUri));
+        answerIntent.cancel();
+        declineIntent.cancel();
     }
 
     @Test
@@ -6767,6 +6840,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(visitor, times(1)).accept(eq(actionIntentUri));
         verify(visitor).accept(eq(wearActionIcon.getUri()));
         verify(visitor, times(1)).accept(eq(wearActionIntentUri));
+        displayIntent.cancel();
+        actionIntent.cancel();
+        wearActionIntent.cancel();
     }
 
     @Test
@@ -6788,6 +6864,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         verify(visitor, times(1)).accept(eq(contentIntentUri));
         verify(visitor, times(1)).accept(eq(deleteIntentUri));
+        contentIntent.cancel();
+        deleteIntent.cancel();
     }
 
     @Test
@@ -6813,6 +6891,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         verify(visitor, times(1)).accept(eq(readPendingIntentUri));
         verify(visitor, times(1)).accept(eq(replyPendingIntentUri));
+        readPendingIntent.cancel();
+        replyPendingIntent.cancel();
     }
 
     @Test
@@ -8587,8 +8667,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testOnNotificationSmartReplySent() {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         final int replyIndex = 2;
         final String reply = "Hello";
         final boolean modifiedBeforeSending = true;
@@ -8613,8 +8693,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testStats_SmartReplyAlreadyLifetimeExtendedPostsUpdate() throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         final int replyIndex = 2;
         final String reply = "Hello";
         final boolean modifiedBeforeSending = true;
@@ -8647,8 +8727,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void testOnNotificationActionClick() {
         final int actionIndex = 2;
         final Notification.Action action =
-                new Notification.Action.Builder(null, "text", PendingIntent.getActivity(
-                        mContext, 0, new Intent(), PendingIntent.FLAG_IMMUTABLE)).build();
+                new Notification.Action.Builder(null, "text", mActivityIntent).build();
         final boolean generatedByAssistant = false;
 
         NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
@@ -8669,9 +8748,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testActionClickLifetimeExtendedCancel() throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
-
         final Notification.Action action =
                 new Notification.Action.Builder(null, "text", PendingIntent.getActivity(
                         mContext, 0, new Intent(), PendingIntent.FLAG_IMMUTABLE)).build();
@@ -8797,8 +8875,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void testOnAssistantNotificationActionClick() {
         final int actionIndex = 1;
         final Notification.Action action =
-                new Notification.Action.Builder(null, "text", PendingIntent.getActivity(
-                        mContext, 0, new Intent(), PendingIntent.FLAG_IMMUTABLE)).build();
+                new Notification.Action.Builder(null, "text", mActivityIntent).build();
         final boolean generatedByAssistant = true;
 
         NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
@@ -9313,7 +9390,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 BUBBLE_PREFERENCE_ALL /* app */,
                 true /* channel */);
 
-        Notification.Builder nb = getMessageStyleNotifBuilder(true, null, false);
+        Notification.Builder nb = getMessageStyleNotifBuilder(true, null, false, true);
         nb.setShortcutId(null);
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
                 null, mUid, 0,
@@ -9357,7 +9434,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // Messaging notif WITHOUT bubble metadata
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addBubbleMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
 
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
                 "testFlagBubbleNotifs_noFlag_notBubble", mUid, 0,
@@ -10615,7 +10692,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Notification.BubbleMetadata metadata =
                 new Notification.BubbleMetadata.Builder(VALID_CONVO_SHORTCUT_ID).build();
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(VALID_CONVO_SHORTCUT_ID);
         nb.setBubbleMetadata(metadata);
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
@@ -10675,7 +10752,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Notification.BubbleMetadata metadata = new Notification.BubbleMetadata.Builder(
                 shortcutId).build();
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(shortcutId);
         nb.setBubbleMetadata(metadata);
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
@@ -11068,7 +11145,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         //Create notification record
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(VALID_CONVO_SHORTCUT_ID);
         nb.setChannelId(originalChannel.getId());
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
@@ -11104,7 +11181,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         //Create notification record
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(VALID_CONVO_SHORTCUT_ID);
         nb.setChannelId(originalChannel.getId());
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
@@ -11148,7 +11225,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         //Create notification record
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(VALID_CONVO_SHORTCUT_ID);
         nb.setChannelId(originalChannel.getId());
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
@@ -11193,7 +11270,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         //Create notification record without a shortcutId
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(null);
         nb.setChannelId(originalChannel.getId());
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
@@ -11328,7 +11405,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testRecordMessages_invalidMsg() throws RemoteException {
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(null);
         StatusBarNotification sbn = new StatusBarNotification(PKG_P, PKG_P, 1,
                 "testRecordMessages_invalidMsg", mUid, 0, nb.build(),
@@ -11369,7 +11446,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testRecordMessages_validMsg() throws RemoteException {
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(null);
         StatusBarNotification sbn = new StatusBarNotification(PKG_P, PKG_P, 1,
                 "testRecordMessages_validMsg", mUid, 0, nb.build(),
@@ -11405,7 +11482,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         waitForIdle();
 
         Notification.Builder nb = getMessageStyleNotifBuilder(false /* addDefaultMetadata */,
-                null /* groupKey */, false /* isSummary */);
+                null /* groupKey */, false /* isSummary */, true);
         nb.setShortcutId(null);
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
                 "testRecordMessages_invalidMsg_afterValidMsg_2", mUid, 0, nb.build(),
@@ -11625,10 +11702,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testImmutableBubbleIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(pi1))
-                .thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
+        when(mAmi.getPendingIntentFlags(any())).thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
         NotificationRecord r = generateMessageBubbleNotifRecord(true,
-                mTestNotificationChannel, 7, "testImmutableBubbleIntent", null, false);
+                mTestNotificationChannel, 7, "testImmutableBubbleIntent", null, false, false);
         try {
             mBinderService.enqueueNotificationWithTag(mPkg, mPkg, r.getSbn().getTag(),
                     r.getSbn().getId(), r.getNotification(), r.getSbn().getUserId());
@@ -11642,10 +11718,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testMutableBubbleIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(pi1))
-                .thenReturn(FLAG_MUTABLE | FLAG_ONE_SHOT);
         NotificationRecord r = generateMessageBubbleNotifRecord(true,
-                mTestNotificationChannel, 7, "testMutableBubbleIntent", null, false);
+                mTestNotificationChannel, 7, "testMutableBubbleIntent", null, false, true);
 
         mBinderService.enqueueNotificationWithTag(mPkg, mPkg, r.getSbn().getTag(),
                 r.getSbn().getId(), r.getNotification(), r.getSbn().getUserId());
@@ -11658,10 +11732,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testImmutableDirectReplyActionIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(any(IIntentSender.class)))
-                .thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
+        when(mAmi.getPendingIntentFlags(any())).thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
         NotificationRecord r = generateMessageBubbleNotifRecord(false,
-                mTestNotificationChannel, 7, "testImmutableDirectReplyActionIntent", null, false);
+                mTestNotificationChannel, 7, "testImmutableDirectReplyActionIntent", null, false,
+                false);
         try {
             mBinderService.enqueueNotificationWithTag(mPkg, mPkg, r.getSbn().getTag(),
                     r.getSbn().getId(), r.getNotification(), r.getSbn().getUserId());
@@ -11675,10 +11749,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testMutableDirectReplyActionIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(any(IIntentSender.class)))
-                .thenReturn(FLAG_MUTABLE | FLAG_ONE_SHOT);
         NotificationRecord r = generateMessageBubbleNotifRecord(false,
-                mTestNotificationChannel, 7, "testMutableDirectReplyActionIntent", null, false);
+                mTestNotificationChannel, 7, "testMutableDirectReplyActionIntent", null, false,
+                true);
         mBinderService.enqueueNotificationWithTag(mPkg, mPkg, r.getSbn().getTag(),
                 r.getSbn().getId(), r.getNotification(), r.getSbn().getUserId());
 
@@ -11690,18 +11763,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testImmutableDirectReplyContextualActionIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(any(IIntentSender.class)))
-                .thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
+        when(mAmi.getPendingIntentFlags(any())).thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
         when(mAssistants.isSameUser(any(), anyInt())).thenReturn(true);
 
         NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
         ArrayList<Notification.Action> extraAction = new ArrayList<>();
         RemoteInput remoteInput = new RemoteInput.Builder("reply_key").setLabel("reply").build();
-        PendingIntent inputIntent = PendingIntent.getActivity(mContext, 0, new Intent(),
-                PendingIntent.FLAG_IMMUTABLE);
         Icon icon = Icon.createWithResource(mContext, android.R.drawable.sym_def_app_icon);
         Notification.Action replyAction = new Notification.Action.Builder(icon, "Reply",
-                inputIntent).addRemoteInput(remoteInput)
+                mActivityIntentImmutable).addRemoteInput(remoteInput)
                 .build();
         extraAction.add(replyAction);
         Bundle signals = new Bundle();
@@ -11722,18 +11792,13 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testMutableDirectReplyContextualActionIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(any(IIntentSender.class)))
-                .thenReturn(FLAG_MUTABLE | FLAG_ONE_SHOT);
         when(mAssistants.isSameUser(any(), anyInt())).thenReturn(true);
         NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
         ArrayList<Notification.Action> extraAction = new ArrayList<>();
         RemoteInput remoteInput = new RemoteInput.Builder("reply_key").setLabel("reply").build();
-        PendingIntent inputIntent = PendingIntent.getActivity(mContext, 0,
-                new Intent().setPackage(mContext.getPackageName()),
-                PendingIntent.FLAG_MUTABLE);
         Icon icon = Icon.createWithResource(mContext, android.R.drawable.sym_def_app_icon);
         Notification.Action replyAction = new Notification.Action.Builder(icon, "Reply",
-                inputIntent).addRemoteInput(remoteInput)
+                mActivityIntent).addRemoteInput(remoteInput)
                 .build();
         extraAction.add(replyAction);
         Bundle signals = new Bundle();
@@ -11749,10 +11814,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testImmutableActionIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(any(IIntentSender.class)))
-                .thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
+        when(mAmi.getPendingIntentFlags(any())).thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
         NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
-
         mBinderService.enqueueNotificationWithTag(mPkg, mPkg, r.getSbn().getTag(),
                 r.getSbn().getId(), r.getNotification(), r.getSbn().getUserId());
 
@@ -11764,12 +11827,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testImmutableContextualActionIntent() throws Exception {
-        when(mAmi.getPendingIntentFlags(any(IIntentSender.class)))
-                .thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
+        when(mAmi.getPendingIntentFlags(any())).thenReturn(FLAG_IMMUTABLE | FLAG_ONE_SHOT);
         when(mAssistants.isSameUser(any(), anyInt())).thenReturn(true);
         NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
         ArrayList<Notification.Action> extraAction = new ArrayList<>();
-        extraAction.add(new Notification.Action(0, "hello", null));
+        extraAction.add(new Notification.Action(0, "hello", mActivityIntentImmutable));
         Bundle signals = new Bundle();
         signals.putParcelableArrayList(Adjustment.KEY_CONTEXTUAL_ACTIONS, extraAction);
         Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals, "",
@@ -12121,8 +12183,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     public void testCallNotificationsBypassBlock() throws Exception {
-        when(mAmi.getPendingIntentFlags(any(IIntentSender.class)))
-                .thenReturn(FLAG_MUTABLE | FLAG_ONE_SHOT);
         when(mAssistants.isSameUser(any(), anyInt())).thenReturn(true);
 
         Notification.Builder nb = new Notification.Builder(
@@ -12145,8 +12205,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setName("caller")
                 .build();
         nb.setStyle(Notification.CallStyle.forOngoingCall(
-                person, mock(PendingIntent.class)));
-        nb.setFullScreenIntent(mock(PendingIntent.class), true);
+                person, mActivityIntent));
+        nb.setFullScreenIntent(mActivityIntent, true);
         sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0,
                 nb.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
         r = new NotificationRecord(mContext, sbn, mTestNotificationChannel);
@@ -12214,8 +12274,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mService.clearNotifications();
         reset(mUsageStats);
         Person person = new Person.Builder().setName("caller").build();
-        nb.setStyle(Notification.CallStyle.forOngoingCall(person, mock(PendingIntent.class)));
-        nb.setFullScreenIntent(mock(PendingIntent.class), true);
+        nb.setStyle(Notification.CallStyle.forOngoingCall(person, mActivityIntent));
+        nb.setFullScreenIntent(mActivityIntent, true);
         sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0, nb.build(),
                 UserHandle.getUserHandleForUid(mUid), null, 0);
         r = new NotificationRecord(mContext, sbn, mTestNotificationChannel);
@@ -12709,7 +12769,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 Settings.Global.REVIEW_PERMISSIONS_NOTIFICATION_STATE,
                 NotificationManagerService.REVIEW_NOTIF_STATE_SHOULD_SHOW);
         mService.maybeShowInitialReviewPermissionsNotification();
-        verify(mMockNm, times(1)).notify(eq(NotificationManagerService.TAG),
+        verify(mMockNm, times(1)).notify(eq(TAG),
                 eq(SystemMessageProto.SystemMessage.NOTE_REVIEW_NOTIFICATION_PERMISSIONS),
                 any(Notification.class));
     }
@@ -12744,7 +12804,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 Settings.Global.REVIEW_PERMISSIONS_NOTIFICATION_STATE,
                 NotificationManagerService.REVIEW_NOTIF_STATE_RESHOWN);
         mService.maybeShowInitialReviewPermissionsNotification();
-        verify(mMockNm, times(1)).notify(eq(NotificationManagerService.TAG),
+        verify(mMockNm, times(1)).notify(eq(TAG),
                 eq(SystemMessageProto.SystemMessage.NOTE_REVIEW_NOTIFICATION_PERMISSIONS),
                 any(Notification.class));
     }
@@ -12760,7 +12820,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mInternalService.sendReviewPermissionsNotification();
 
         // Notification should be sent
-        verify(mMockNm, times(1)).notify(eq(NotificationManagerService.TAG),
+        verify(mMockNm, times(1)).notify(eq(TAG),
                 eq(SystemMessageProto.SystemMessage.NOTE_REVIEW_NOTIFICATION_PERMISSIONS),
                 any(Notification.class));
 
@@ -12792,7 +12852,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .thenReturn(permissionState);
 
         Notification n = new Notification.Builder(mContext, "test")
-                .setFullScreenIntent(mock(PendingIntent.class), true)
+                .setFullScreenIntent(mActivityIntent, true)
                 .build();
 
         mService.fixNotification(n, mPkg, "tag", 9, mUserId, mUid, NOT_FOREGROUND_SERVICE, true);
@@ -12860,7 +12920,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Person person = new Person.Builder().setName("caller").build();
         Notification n = new Notification.Builder(mContext, "test")
                 .setStyle(Notification.CallStyle.forOngoingCall(
-                        person, mock(PendingIntent.class)))
+                        person, mActivityIntent))
                 .build();
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0,
                 n, UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -12881,7 +12941,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Notification n = new Notification.Builder(mContext, "test")
                 .setFlag(FLAG_FOREGROUND_SERVICE, true)
                 .setStyle(Notification.CallStyle.forOngoingCall(
-                        person, mock(PendingIntent.class)))
+                        person, mActivityIntent))
                 .build();
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0,
                 n, UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -13040,8 +13100,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Notification n = new Notification.Builder(mContext, "test")
                 // Without FLAG_FOREGROUND_SERVICE.
                 //.setFlag(FLAG_FOREGROUND_SERVICE, true)
-                .setStyle(Notification.CallStyle.forOngoingCall(
-                        person, mock(PendingIntent.class)))
+                .setStyle(Notification.CallStyle.forOngoingCall(person, mActivityIntent))
                 .build();
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0,
                 n, UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -13057,8 +13116,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Person person = new Person.Builder().setName("caller").build();
         Notification n = new Notification.Builder(mContext, "test")
                 .setFlag(FLAG_USER_INITIATED_JOB, true)
-                .setStyle(Notification.CallStyle.forOngoingCall(
-                        person, mock(PendingIntent.class)))
+                .setStyle(Notification.CallStyle.forOngoingCall(person, mActivityIntent))
                 .build();
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0,
                 n, UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -13072,9 +13130,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void checkCallStyleNotification_allowedForFsiAllowed() throws Exception {
         Person person = new Person.Builder().setName("caller").build();
         Notification n = new Notification.Builder(mContext, "test")
-                .setFullScreenIntent(mock(PendingIntent.class), true)
-                .setStyle(Notification.CallStyle.forOngoingCall(
-                        person, mock(PendingIntent.class)))
+                .setFullScreenIntent(mActivityIntent, true)
+                .setStyle(Notification.CallStyle.forOngoingCall(person, mActivityIntent))
                 .build();
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0,
                 n, UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -13089,8 +13146,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Person person = new Person.Builder().setName("caller").build();
         Notification n = new Notification.Builder(mContext, "test")
                 .setFlag(Notification.FLAG_FSI_REQUESTED_BUT_DENIED, true)
-                .setStyle(Notification.CallStyle.forOngoingCall(
-                        person, mock(PendingIntent.class)))
+                .setStyle(Notification.CallStyle.forOngoingCall(person, mActivityIntent))
                 .build();
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 8, "tag", mUid, 0,
                 n, UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -13170,6 +13226,33 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    public void fixSystemNotification_defaultAdservices_withOnGoingFlag_nondismissible()
+            throws Exception {
+        final ApplicationInfo ai = new ApplicationInfo();
+        ai.packageName = ADSERVICES_APK_PKG;
+        ai.uid = mUid;
+        ai.flags |= ApplicationInfo.FLAG_SYSTEM;
+
+        when(mPackageManagerClient.getApplicationInfoAsUser(anyString(), anyInt(), anyInt()))
+                .thenReturn(ai);
+        when(mAppOpsManager.checkOpNoThrow(
+                AppOpsManager.OP_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS, ai.uid,
+                ai.packageName)).thenReturn(AppOpsManager.MODE_IGNORED);
+        // Given: a notification from an app on the system partition has the flag
+        // FLAG_ONGOING_EVENT set
+        Notification n = new Notification.Builder(mContext, "test")
+                .setOngoing(true)
+                .build();
+
+        // When: fix the notification with NotificationManagerService
+        mService.fixNotification(n, ADSERVICES_APK_PKG, "tag", 9, 0, mUid, NOT_FOREGROUND_SERVICE,
+                 true);
+
+        // Then: the notification's flag FLAG_NO_DISMISS should be set
+        assertNotSame(0, n.flags & Notification.FLAG_NO_DISMISS);
+    }
+
+    @Test
     public void fixCallNotification_withOnGoingFlag_shouldNotBeNonDismissible()
             throws Exception {
         // Given: a call notification has the flag FLAG_ONGOING_EVENT set
@@ -13178,8 +13261,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .build();
         Notification n = new Notification.Builder(mContext, "test")
                 .setOngoing(true)
-                .setStyle(Notification.CallStyle.forOngoingCall(
-                        person, mock(PendingIntent.class)))
+                .setStyle(Notification.CallStyle.forOngoingCall(person, mActivityIntent))
                 .build();
 
         // When: fix the notification with NotificationManagerService
@@ -14338,6 +14420,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 eq(REASON_NOTIFICATION_SERVICE), any());
         verify(mAmi, times(3)).setPendingIntentAllowBgActivityStarts(any(),
                 any(), eq(FLAG_ACTIVITY_SENDER | FLAG_BROADCAST_SENDER | FLAG_SERVICE_SENDER));
+        contentIntent.cancel();
+        actionIntent2.cancel();
+        actionIntent1.cancel();
     }
 
     @Test
@@ -14366,6 +14451,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 eq(REASON_NOTIFICATION_SERVICE), any());
         verify(mAmi, times(4)).setPendingIntentAllowBgActivityStarts(any(),
                 any(), eq(FLAG_ACTIVITY_SENDER | FLAG_BROADCAST_SENDER | FLAG_SERVICE_SENDER));
+        contentIntent.cancel();
+        publicContentIntent.cancel();
+        actionIntent.cancel();
+        publicActionIntent.cancel();
     }
 
     @Test
@@ -14891,8 +14980,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void testFixNotification_clearsLifetimeExtendedFlag() throws Exception {
-        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         Notification n = new Notification.Builder(mContext, "test")
                 .setFlag(FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY, true)
                 .build();
@@ -15321,7 +15410,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ALL_NOTIFS_NEED_TTL)
+    @EnableFlags(FLAG_ALL_NOTIFS_NEED_TTL)
     public void testFixNotification_missingTtl() throws Exception {
         Notification n = new Notification.Builder(mContext, mTestNotificationChannel.getId())
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
@@ -15333,7 +15422,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ALL_NOTIFS_NEED_TTL)
+    @EnableFlags(FLAG_ALL_NOTIFS_NEED_TTL)
     public void testFixNotification_doesNotOverwriteTtl() throws Exception {
         Notification n = new Notification.Builder(mContext, mTestNotificationChannel.getId())
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
@@ -15351,8 +15440,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Notification.Builder nb = new Notification.Builder(mContext,
                 mTestNotificationChannel.getId())
                 .setFlag(FLAG_USER_INITIATED_JOB, true)
-                .setStyle(Notification.CallStyle.forOngoingCall(
-                    person, mock(PendingIntent.class)))
+                .setStyle(Notification.CallStyle.forOngoingCall(person, mActivityIntent))
                 .setSmallIcon(android.R.drawable.sym_def_app_icon);
         StatusBarNotification sbn = new StatusBarNotification(packageName, packageName, 1,
                 testName, mUid, 0, nb.build(), userHandle, null, 0);

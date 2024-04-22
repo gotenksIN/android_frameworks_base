@@ -421,8 +421,10 @@ class MobileConnectionRepositoryImpl(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), UnknownNetworkType)
 
+    override val inflateSignalStrength = systemUiCarrierConfig.shouldInflateSignalStrength
+
     override val numberOfLevels =
-        systemUiCarrierConfig.shouldInflateSignalStrength
+        inflateSignalStrength
             .map { shouldInflate ->
                 if (shouldInflate) {
                     DEFAULT_NUM_LEVELS + 1
@@ -764,9 +766,6 @@ class MobileConnectionRepositoryImpl(
             }
             .flowOn(bgDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
-
-    override val satelliteConnectionHysteresisSeconds: StateFlow<Int> =
-        systemUiCarrierConfig.satelliteConnectionHysteresisSeconds
 
     class Factory
     @Inject

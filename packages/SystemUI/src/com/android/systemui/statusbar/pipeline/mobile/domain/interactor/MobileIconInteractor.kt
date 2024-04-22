@@ -52,26 +52,19 @@ import com.android.systemui.statusbar.pipeline.satellite.ui.model.SatelliteIconM
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState
 import com.android.systemui.util.CarrierNameCustomization
-import com.android.systemui.util.kotlin.pairwiseBy
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 interface MobileIconInteractor {
     /** The table log created for this connection */
@@ -500,43 +493,6 @@ class MobileIconInteractorImpl(
             MutableStateFlow(false).asStateFlow()
         }
 
-    private val hysteresisActive = MutableStateFlow(false)
-
-    private val isNonTerrestrialWithHysteresis: StateFlow<Boolean> =
-        combine(isNonTerrestrial, hysteresisActive) { isNonTerrestrial, hysteresisActive ->
-                if (hysteresisActive) {
-                    true
-                } else {
-                    isNonTerrestrial
-                }
-            }
-            .logDiffsForTable(
-                tableLogBuffer = tableLogBuffer,
-                columnName = "isNonTerrestrialWithHysteresis",
-                columnPrefix = "",
-                initialValue = Flags.carrierEnabledSatelliteFlag(),
-            )
-            .stateIn(scope, SharingStarted.Eagerly, Flags.carrierEnabledSatelliteFlag())
-
-    private val lostSatelliteConnection =
-        isNonTerrestrial.pairwiseBy { old, new -> hysteresisActive.value = old && !new }
-
-    init {
-        scope.launch { lostSatelliteConnection.collect() }
-        scope.launch {
-            hysteresisActive.collectLatest {
-                if (it) {
-                    delay(
-                        connectionRepository.satelliteConnectionHysteresisSeconds.value.toDuration(
-                            DurationUnit.SECONDS
-                        )
-                    )
-                    hysteresisActive.value = false
-                }
-            }
-        }
-    }
-
     private val level: StateFlow<Int> =
         combine(
                 connectionRepository.isGsm,
@@ -637,8 +593,11 @@ class MobileIconInteractorImpl(
         combine(
                 level,
                 isInService,
-            ) { level, isInService ->
-                if (isInService) level else 0
+                connectionRepository.inflateSignalStrength,
+            ) { level, isInService, inflate ->
+                if (isInService) {
+                    if (inflate) level + 1 else level
+                } else 0
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), 0)
 
@@ -686,7 +645,7 @@ class MobileIconInteractorImpl(
                 showExclamationMark.value,
                 carrierNetworkChangeActive.value,
             )
-        isNonTerrestrialWithHysteresis
+        isNonTerrestrial
             .flatMapLatest { ntn ->
                 if (ntn) {
                     satelliteIcon

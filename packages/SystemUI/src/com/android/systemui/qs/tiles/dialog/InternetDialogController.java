@@ -16,7 +16,7 @@
 
 /**
  * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -1258,6 +1258,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
                     TelephonyManager nDdsSubTm = mSubIdTelephonyManagerMap.get(mNddsSubId);
                     nDdsSubTm.unregisterTelephonyCallback(oldTelephonyCallback);
                     nDdsSubTm.registerTelephonyCallback(mExecutor, telephonyCallback);
+                    mSubIdTelephonyCallbackMap.put(mNddsSubId, telephonyCallback);
                 }
             }
         } else {

@@ -118,6 +118,8 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
@@ -141,7 +143,7 @@ class MobileConnectionRepositoryImpl(
     private val logger: MobileInputLogger,
     override val tableLogBuffer: TableLogBuffer,
     flags: FeatureFlagsClassic,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val fiveGServiceClient: FiveGServiceClient,
     slotIndexForSubId:  Flow<Int>? = null,
 ) : MobileConnectionRepository {
@@ -198,8 +200,7 @@ class MobileConnectionRepositoryImpl(
                         TelephonyCallback.DataActivityListener,
                         TelephonyCallback.CarrierNetworkListener,
                         TelephonyCallback.DisplayInfoListener,
-                        TelephonyCallback.DataEnabledListener,
-                        FiveGServiceClient.IFiveGStateListener {
+                        TelephonyCallback.DataEnabledListener {
                         override fun onServiceStateChanged(serviceState: ServiceState) {
                             logger.logOnServiceStateChanged(serviceState, subId)
                             trySend(CallbackEvent.OnServiceStateChanged(serviceState))
@@ -239,29 +240,56 @@ class MobileConnectionRepositoryImpl(
                             logger.logOnDataEnabledChanged(enabled, subId)
                             trySend(CallbackEvent.OnDataEnabledChanged(enabled))
                         }
-
-                        override fun onStateChanged(serviceState: FiveGServiceState) {
-                            logger.logOnNrIconTypeChanged(serviceState.nrIconType, subId)
-                            trySend(CallbackEvent.OnNrIconTypeChanged(serviceState.nrIconType))
-                        }
-
-                        override fun onCiwlanAvailableChanged(available: Boolean) {
-                            logger.logOnCiwlanAvailableChanged(available, subId)
-                            trySend(CallbackEvent.OnCiwlanAvailableChanged(available))
-                        }
                     }
 
                 telephonyManager.registerTelephonyCallback(bgDispatcher.asExecutor(), callback)
-                val slotIndex = getSlotIndex(subId)
-                fiveGServiceClient.registerListener(slotIndex, callback)
                 awaitClose {
                     telephonyManager.unregisterTelephonyCallback(callback)
-                    fiveGServiceClient.unregisterListener(slotIndex, callback)
                 }
             }
             .flowOn(bgDispatcher)
             .scan(initial = initial) { state, event -> state.applyEvent(event) }
             .stateIn(scope = scope, started = SharingStarted.WhileSubscribed(), initial)
+    }
+
+    private fun getFiveGStateFlow(slotIndex: Int): Flow<TelephonyCallbackState> {
+        return callbackFlow {
+            val listener =
+                object : IFiveGStateListener {
+                    override fun onStateChanged(serviceState: FiveGServiceState) {
+                        logger.logOnNrIconTypeChanged(serviceState.nrIconType, subId)
+                        trySend(CallbackEvent.OnNrIconTypeChanged(serviceState.nrIconType))
+                    }
+
+                    override fun onCiwlanAvailableChanged(available: Boolean) {
+                        logger.logOnCiwlanAvailableChanged(available, subId)
+                        trySend(CallbackEvent.OnCiwlanAvailableChanged(available))
+                    }
+                }
+            fiveGServiceClient.registerListener(slotIndex, listener)
+            awaitClose {
+                fiveGServiceClient.unregisterListener(slotIndex, listener) }
+        }
+            .scan(TelephonyCallbackState()) { state, event -> state.applyEvent(event) }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), TelephonyCallbackState())
+    }
+
+    private val fiveGState: Flow<TelephonyCallbackState> = run {
+        val initial = flowOf(TelephonyCallbackState()
+            .applyEvent(CallbackEvent.OnNrIconTypeChanged(NrIconType.TYPE_NONE))
+            .applyEvent(CallbackEvent.OnCiwlanAvailableChanged(false)))
+        if (slotIndexForSubId == null) {
+            initial
+        } else {
+            slotIndexForSubId
+                .flatMapLatest { it ->
+                    if (SubscriptionManager.isValidSlotIndex(it)) {
+                        getFiveGStateFlow(it)
+                    } else {
+                        initial
+                    }
+                }
+        }
     }
 
     private fun unRegisterImsCallbackIfNeeded() {
@@ -560,7 +588,7 @@ class MobileConnectionRepositoryImpl(
             .stateIn(scope, SharingStarted.WhileSubscribed(), NETWORK_TYPE_UNKNOWN)
 
     override val nrIconType: StateFlow<Int> =
-        callbackEvents
+        fiveGState
             .mapNotNull {it.onNrIconTypeChanged }
             .map { it.nrIconType}
             .stateIn(scope, SharingStarted.WhileSubscribed(), NrIconType.TYPE_NONE)
@@ -675,7 +703,7 @@ class MobileConnectionRepositoryImpl(
         MutableStateFlow<Int>(REGISTRATION_TECH_NONE)
 
     override val ciwlanAvailable: StateFlow<Boolean> =
-        callbackEvents
+        fiveGState
             .mapNotNull {it.onCiwlanAvailableChanged }
             .map { it.available}
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)

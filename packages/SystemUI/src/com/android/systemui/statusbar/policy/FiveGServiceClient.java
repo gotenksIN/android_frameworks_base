@@ -114,7 +114,7 @@ public class FiveGServiceClient {
         @VisibleForTesting
         public FiveGServiceState(int nrIconType){
             mNrIconType = nrIconType;
-            mIconGroup = getNrIconGroup(nrIconType, 0);
+            mIconGroup = getNrIconGroup(nrIconType);
         }
 
         public boolean isNrIconTypeValid() {
@@ -330,15 +330,22 @@ public class FiveGServiceClient {
                     mInitRetryTimes +=1;
                 }
             }
+
+            boolean ciWlanAvailable = mExtTelephonyManager.isCiwlanAvailable(phoneId);
+            try {
+                mExtPhoneCallbackListener.onCiwlanAvailable(phoneId, ciWlanAvailable);
+            } catch (RemoteException e) {
+                Log.d(TAG, "onCiwlanAvailable: Exception = " + e);
+            }
         }
     }
 
     @VisibleForTesting
-    void update5GIcon(FiveGServiceState state,int phoneId) {
-        state.mIconGroup = getNrIconGroup(state.mNrIconType, phoneId);
+    void update5GIcon(FiveGServiceState state) {
+        state.mIconGroup = getNrIconGroup(state.mNrIconType);
     }
 
-    private static MobileIconGroup getNrIconGroup(int nrIconType , int phoneId) {
+    private static MobileIconGroup getNrIconGroup(int nrIconType) {
         MobileIconGroup iconGroup = TelephonyIcons.UNKNOWN;
         switch (nrIconType){
             case NrIconType.TYPE_5G_BASIC:
@@ -395,7 +402,7 @@ public class FiveGServiceClient {
             if (status.get() == Status.SUCCESS) {
                 FiveGServiceState state = getCurrentServiceState(slotId);
                 state.mNrIconType = nrIconType.get();
-                update5GIcon(state, slotId);
+                update5GIcon(state);
                 notifyListenersIfNecessary(slotId);
             }
         }

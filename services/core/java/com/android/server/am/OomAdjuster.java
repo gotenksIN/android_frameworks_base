@@ -639,7 +639,6 @@ public class OomAdjuster {
 
         mLastReason = oomAdjReason;
         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, oomAdjReasonToString(oomAdjReason));
-        mService.mOomAdjProfiler.oomAdjStarted();
 
         final ProcessStateRecord state = app.mState;
 
@@ -669,7 +668,6 @@ public class OomAdjuster {
         }
         mTmpProcessList.clear();
         mService.clearPendingTopAppLocked();
-        mService.mOomAdjProfiler.oomAdjEnded();
         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         return true;
     }
@@ -888,7 +886,6 @@ public class OomAdjuster {
 
         mLastReason = oomAdjReason;
         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, oomAdjReasonToString(oomAdjReason));
-        mService.mOomAdjProfiler.oomAdjStarted();
         mProcessStateCurTop = enqueuePendingTopAppIfNecessaryLSP();
 
         final ArrayList<ProcessRecord> processes = mTmpProcessList;
@@ -901,7 +898,6 @@ public class OomAdjuster {
         processes.clear();
         mService.clearPendingTopAppLocked();
 
-        mService.mOomAdjProfiler.oomAdjEnded();
         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
     }
 
@@ -934,7 +930,6 @@ public class OomAdjuster {
         mLastReason = oomAdjReason;
         if (startProfiling) {
             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, oomAdjReasonToString(oomAdjReason));
-            mService.mOomAdjProfiler.oomAdjStarted();
         }
         final long now = SystemClock.uptimeMillis();
         final long nowElapsed = SystemClock.elapsedRealtime();
@@ -1028,7 +1023,6 @@ public class OomAdjuster {
         postUpdateOomAdjInnerLSP(oomAdjReason, activeUids, now, nowElapsed, oldTime, true);
 
         if (startProfiling) {
-            mService.mOomAdjProfiler.oomAdjEnded();
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
     }

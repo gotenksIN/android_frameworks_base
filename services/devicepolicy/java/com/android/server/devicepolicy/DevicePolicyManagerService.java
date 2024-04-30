@@ -107,6 +107,8 @@ import static android.app.AppOpsManager.OPSTR_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOT
 import static android.app.AppOpsManager.OPSTR_SYSTEM_EXEMPT_FROM_HIBERNATION;
 import static android.app.AppOpsManager.OPSTR_SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS;
 import static android.app.AppOpsManager.OPSTR_SYSTEM_EXEMPT_FROM_SUSPENSION;
+import static android.app.AppOpsManager.OP_RUN_ANY_IN_BACKGROUND;
+import static android.app.AppOpsManager.OP_RUN_IN_BACKGROUND;
 import static android.app.admin.DeviceAdminInfo.HEADLESS_DEVICE_OWNER_MODE_AFFILIATED;
 import static android.app.admin.DeviceAdminInfo.HEADLESS_DEVICE_OWNER_MODE_SINGLE_USER;
 import static android.app.admin.DeviceAdminInfo.HEADLESS_DEVICE_OWNER_MODE_UNSUPPORTED;
@@ -885,10 +887,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     private static final String PERMISSION_BASED_ACCESS_EXPERIMENT_FLAG =
             "enable_permission_based_access";
     private static final boolean DEFAULT_VALUE_PERMISSION_BASED_ACCESS_FLAG = false;
-
-    // TODO(b/266831522) remove the flag after rollout.
-    private static final String APPLICATION_EXEMPTIONS_FLAG = "application_exemptions";
-    private static final boolean DEFAULT_APPLICATION_EXEMPTIONS_FLAG = true;
 
     private static final int RETRY_COPY_ACCOUNT_ATTEMPTS = 3;
 
@@ -3689,26 +3687,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         mDevicePolicyEngine.handleStartUser(userId);
     }
 
-    void pushUserControlDisabledPackagesLocked(int userId) {
-        final int targetUserId;
-        final ActiveAdmin owner;
-        if (getDeviceOwnerUserIdUncheckedLocked() == userId) {
-            owner = getDeviceOwnerAdminLocked();
-            targetUserId = UserHandle.USER_ALL;
-        } else {
-            owner = getProfileOwnerAdminLocked(userId);
-            targetUserId = userId;
-        }
-
-        List<String> protectedPackages = (owner == null || owner.protectedPackages == null)
-                ? null : owner.protectedPackages;
-        mInjector.binderWithCleanCallingIdentity(() ->
-                mInjector.getPackageManagerInternal().setOwnerProtectedPackages(
-                        targetUserId, protectedPackages));
-        mUsageStatsManagerInternal.setAdminProtectedPackages(new ArraySet(protectedPackages),
-                targetUserId);
-    }
-
     void handleUnlockUser(int userId) {
         startOwnerService(userId, "unlock-user");
         mDevicePolicyEngine.handleUnlockUser(userId);
@@ -3957,7 +3935,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (policy.mPasswordOwner == oldAdminUid) {
             policy.mPasswordOwner = adminToTransfer.getUid();
         }
-
+        transferSubscriptionOwnership(outgoingReceiver, incomingReceiver);
         saveSettingsLocked(userHandle);
         sendAdminCommandLocked(adminToTransfer, DeviceAdminReceiver.ACTION_DEVICE_ADMIN_ENABLED,
                 null, null);
@@ -15913,14 +15891,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         @Override
-        public boolean isApplicationExemptionsFlagEnabled() {
-            return DeviceConfig.getBoolean(
-                    NAMESPACE_DEVICE_POLICY_MANAGER,
-                    APPLICATION_EXEMPTIONS_FLAG,
-                    DEFAULT_APPLICATION_EXEMPTIONS_FLAG);
-        }
-
-        @Override
         public List<Bundle> getApplicationRestrictionsPerAdminForUser(
                 String packageName, @UserIdInt int userId) {
             if (UserHandle.getCallingUserId() != userId
@@ -19501,6 +19471,21 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 .write();
     }
 
+    private void transferSubscriptionOwnership(ComponentName admin, ComponentName target) {
+        if (Flags.esimManagementEnabled()) {
+            SubscriptionManager subscriptionManager = mContext.getSystemService(
+                    SubscriptionManager.class);
+            for (int subId : getSubscriptionIdsInternal(admin.getPackageName()).toArray()) {
+                try {
+                    subscriptionManager.setGroupOwner(subId, target.getPackageName());
+                } catch (Exception e) {
+                    // Shouldn't happen.
+                    Slogf.e(LOG_TAG, e, "Error setting group owner for subId: " + subId);
+                }
+            }
+        }
+    }
+
     private void prepareTransfer(ComponentName admin, ComponentName target,
             PersistableBundle bundle, int callingUserId, String adminType) {
         saveTransferOwnershipBundleLocked(bundle, callingUserId);
@@ -20378,34 +20363,47 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 hasCallingOrSelfPermission(permission.MANAGE_DEVICE_POLICY_APP_EXEMPTIONS));
 
         final CallerIdentity caller = getCallerIdentity(callerPackage);
-        final ApplicationInfo packageInfo;
-        packageInfo = getPackageInfoWithNullCheck(packageName, caller);
+        final AppOpsManager appOpsMgr = mInjector.getAppOpsManager();
+        final ApplicationInfo appInfo = getPackageInfoWithNullCheck(packageName, caller);
+        final int uid = appInfo.uid;
 
-        for (Map.Entry<Integer, String> entry :
-                APPLICATION_EXEMPTION_CONSTANTS_TO_APP_OPS.entrySet()) {
-            int currentMode = mInjector.getAppOpsManager().unsafeCheckOpNoThrow(
-                    entry.getValue(), packageInfo.uid, packageInfo.packageName);
-            int newMode = ArrayUtils.contains(exemptions, entry.getKey())
-                    ? MODE_ALLOWED : MODE_DEFAULT;
-            mInjector.binderWithCleanCallingIdentity(() -> {
+        mInjector.binderWithCleanCallingIdentity(() -> {
+            APPLICATION_EXEMPTION_CONSTANTS_TO_APP_OPS.forEach((exemption, appOp) -> {
+                int currentMode = appOpsMgr.unsafeCheckOpNoThrow(appOp, uid, packageName);
+                int newMode = ArrayUtils.contains(exemptions, exemption)
+                        ? MODE_ALLOWED : MODE_DEFAULT;
                 if (currentMode != newMode) {
-                    mInjector.getAppOpsManager()
-                            .setMode(entry.getValue(),
-                                    packageInfo.uid,
-                                    packageName,
-                                    newMode);
+                    appOpsMgr.setMode(appOp, uid, packageName, newMode);
+
+                    // If the user has already disabled background usage for the package, it won't
+                    // have OP_RUN_ANY_IN_BACKGROUND app op and won't execute in the background. The
+                    // code below grants that app op, and once the exemption is in place, the user
+                    // won't be able to disable background usage anymore.
+                    if (Flags.powerExemptionBgUsageFix()
+                            && exemption == EXEMPT_FROM_POWER_RESTRICTIONS
+                            && newMode == MODE_ALLOWED) {
+                        setBgUsageAppOp(appOpsMgr, appInfo);
+                    }
                 }
             });
-        }
+        });
+
         String[] appOpExemptions = new String[exemptions.length];
         for (int i = 0; i < exemptions.length; i++) {
             appOpExemptions[i] = APPLICATION_EXEMPTION_CONSTANTS_TO_APP_OPS.get(exemptions[i]);
         }
         DevicePolicyEventLogger
-            .createEvent(DevicePolicyEnums.SET_APPLICATION_EXEMPTIONS)
-            .setAdmin(caller.getPackageName())
-            .setStrings(packageName, appOpExemptions)
-            .write();
+                .createEvent(DevicePolicyEnums.SET_APPLICATION_EXEMPTIONS)
+                .setAdmin(caller.getPackageName())
+                .setStrings(packageName, appOpExemptions)
+                .write();
+    }
+
+    static void setBgUsageAppOp(AppOpsManager appOpsMgr, ApplicationInfo appInfo) {
+        appOpsMgr.setMode(OP_RUN_ANY_IN_BACKGROUND, appInfo.uid, appInfo.packageName, MODE_ALLOWED);
+        if (appInfo.targetSdkVersion < Build.VERSION_CODES.O) {
+            appOpsMgr.setMode(OP_RUN_IN_BACKGROUND, appInfo.uid, appInfo.packageName, MODE_ALLOWED);
+        }
     }
 
     @Override

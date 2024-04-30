@@ -37,6 +37,9 @@ import static android.app.ActivityManager.PROCESS_STATE_BOUND_TOP;
 import static android.app.ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND;
 import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static android.app.ActivityManager.PROCESS_STATE_TOP;
+import static android.app.ActivityManager.RESTRICTION_LEVEL_FORCE_STOPPED;
+import static android.app.ActivityManager.RESTRICTION_REASON_DEFAULT;
+import static android.app.ActivityManager.RESTRICTION_REASON_USAGE;
 import static android.app.ActivityManager.StopUserOnSwitch;
 import static android.app.ActivityManager.UidFrozenStateChangedCallback.UID_FROZEN_STATE_FROZEN;
 import static android.app.ActivityManager.UidFrozenStateChangedCallback.UID_FROZEN_STATE_UNFROZEN;
@@ -502,6 +505,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -696,8 +701,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     final ArrayList<ActiveInstrumentation> mActiveInstrumentation = new ArrayList<>();
 
     public final IntentFirewall mIntentFirewall;
-
-    public OomAdjProfiler mOomAdjProfiler = new OomAdjProfiler();
 
     /**
      * The global lock for AMS, it's de-facto the ActivityManagerService object as of now.
@@ -2618,7 +2621,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 BackgroundThread.getHandler(), this);
         mOnBattery = DEBUG_POWER ? true
                 : mBatteryStatsService.getActiveStatistics().getIsOnBattery();
-        mOomAdjProfiler.batteryPowerChanged(mOnBattery);
 
         mProcessStats = new ProcessStatsService(this, new File(systemDir, "procstats"));
 
@@ -2868,13 +2870,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         updateCpuStatsNow();
         synchronized (mProcLock) {
             mOnBattery = DEBUG_POWER ? true : onBattery;
-            mOomAdjProfiler.batteryPowerChanged(onBattery);
         }
     }
 
     @Override
     public void batteryStatsReset() {
-        mOomAdjProfiler.reset();
+        // Empty for now.
     }
 
     @Override
@@ -5194,10 +5195,19 @@ public class ActivityManagerService extends IActivityManager.Stub
                 } // else, stopped packages in private space may still hit the logic below
             }
         }
+
+        final boolean wasForceStopped = app.wasForceStopped()
+                || app.getWindowProcessController().wasForceStopped();
+        if (android.app.Flags.appRestrictionsApi() && wasForceStopped) {
+            noteAppRestrictionEnabled(app.info.packageName, app.uid,
+                    RESTRICTION_LEVEL_FORCE_STOPPED, false,
+                    RESTRICTION_REASON_USAGE, "unknown", 0L);
+        }
+
         if (!sendBroadcast) {
             if (!android.content.pm.Flags.stayStopped()) return;
             // Nothing to do if it wasn't previously stopped
-            if (!app.wasForceStopped() && !app.getWindowProcessController().wasForceStopped()) {
+            if (!wasForceStopped) {
                 return;
             }
         }
@@ -5508,14 +5518,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
-    /**
-     * Checks if feature flag is enabled and if system is Headless (HSUM), case in which 
-     * home delay should be skipped.
-     *
-     * @hide
-     */
-    public boolean isHomeLaunchDelayable() {
-        return !UserManager.isHeadlessSystemUserMode() && enableHomeDelay();
+    /** Checks whether the home launch delay feature is enabled. */
+    private boolean isHomeLaunchDelayable() {
+        // This feature is disabled on Auto since it seems to add an unacceptably long boot delay
+        // without even solving the underlying issue (it merely hits the timeout).
+        return enableHomeDelay() &&
+                !mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE);
     }
 
     final void ensureBootCompleted() {
@@ -7512,7 +7520,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mServices.updateScreenStateLocked(isAwake);
                 reportCurWakefulnessUsageEvent();
                 mActivityTaskManager.onScreenAwakeChanged(isAwake);
-                mOomAdjProfiler.onWakefulnessChanged(wakefulness);
                 mOomAdjuster.onWakefulnessChanged(wakefulness);
 
                 updateOomAdjLocked(OOM_ADJ_REASON_UI_VISIBILITY);
@@ -9044,8 +9051,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     com.android.internal.R.integer.config_multiuserMaxRunningUsers);
             final boolean delayUserDataLocking = res.getBoolean(
                     com.android.internal.R.bool.config_multiuserDelayUserDataLocking);
+            final int backgroundUserScheduledStopTimeSecs = res.getInteger(
+                    com.android.internal.R.integer.config_backgroundUserScheduledStopTimeSecs);
             mUserController.setInitialConfig(userSwitchUiEnabled, maxRunningUsers,
-                    delayUserDataLocking);
+                    delayUserDataLocking, backgroundUserScheduledStopTimeSecs);
         }
         mAppErrors.loadAppsNotReportingCrashesFromConfig(res.getString(
                 com.android.internal.R.string.config_appsNotReportingCrashes));
@@ -9940,6 +9949,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                 sb.append("Process-Runtime: ").append(runtimeMillis).append("\n");
             }
         }
+        if (eventType.equals("crash")) {
+            String formattedTime = DROPBOX_TIME_FORMATTER.format(
+                    Instant.now().atZone(ZoneId.systemDefault()));
+            sb.append("Timestamp: ").append(formattedTime).append("\n");
+        }
         if (activityShortComponentName != null) {
             sb.append("Activity: ").append(activityShortComponentName).append("\n");
         }
@@ -10632,12 +10646,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mProcessList.mAppExitInfoTracker.dumpHistoryProcessExitInfo(pw, dumpPackage);
             }
             if (dumpPackage == null) {
-                pw.println();
-                if (dumpAll) {
-                    pw.println(
-                            "-------------------------------------------------------------------------------");
-                }
-                mOomAdjProfiler.dump(pw);
                 pw.println();
                 if (dumpAll) {
                     pw.println(
@@ -14448,6 +14456,20 @@ public class ActivityManagerService extends IActivityManager.Stub
         int newBackupUid;
 
         synchronized(this) {
+            if (android.app.Flags.appRestrictionsApi()) {
+                try {
+                    final boolean wasStopped = mPackageManagerInt.isPackageStopped(app.packageName,
+                            UserHandle.getUserId(app.uid));
+                    if (wasStopped) {
+                        noteAppRestrictionEnabled(app.packageName, app.uid,
+                                RESTRICTION_LEVEL_FORCE_STOPPED, false,
+                                RESTRICTION_REASON_DEFAULT, "restore", 0L);
+                    }
+                } catch (NameNotFoundException e) {
+                    Slog.w(TAG, "No such package", e);
+                }
+            }
+
             // !!! TODO: currently no check here that we're already bound
             // Backup agent is now in use, its package can't be stopped.
             try {
@@ -20232,6 +20254,34 @@ public class ActivityManagerService extends IActivityManager.Stub
             mAppRestrictionController.applyRestrictionLevel(packageName, uid, level,
                     null /* trackerInfo */, curBucket, true /* allowUpdateBucket */,
                     reason, subReason);
+        } finally {
+            Binder.restoreCallingIdentity(callingId);
+        }
+    }
+
+    /**
+     * Log the reason for changing an app restriction. Purely used for logging purposes and does not
+     * cause any change to app state.
+     *
+     * @see ActivityManager#noteAppRestrictionEnabled(String, int, int, boolean, int, String, long)
+     */
+    @Override
+    public void noteAppRestrictionEnabled(String packageName, int uid,
+            @RestrictionLevel int restrictionType, boolean enabled,
+            @ActivityManager.RestrictionReason int reason, String subReason, long threshold) {
+        if (!android.app.Flags.appRestrictionsApi()) return;
+
+        enforceCallingPermission(android.Manifest.permission.DEVICE_POWER,
+                "noteAppRestrictionEnabled()");
+
+        final int userId = UserHandle.getCallingUserId();
+        final long callingId = Binder.clearCallingIdentity();
+        try {
+            if (uid == -1) {
+                uid = mPackageManagerInt.getPackageUid(packageName, 0, userId);
+            }
+            mAppRestrictionController.noteAppRestrictionEnabled(packageName, uid, restrictionType,
+                    enabled, reason, subReason, threshold);
         } finally {
             Binder.restoreCallingIdentity(callingId);
         }

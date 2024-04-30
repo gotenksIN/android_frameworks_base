@@ -1288,6 +1288,11 @@ class Task extends TaskFragment {
                 // Pausing the resumed activity because it is occluded by other task fragment, or
                 // should not be remained in resumed state.
                 if (startPausing(false /* uiSleeping*/, resuming, reason)) {
+                    if (mActivityPluginDelegate != null
+                            && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
+                        mActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
+                                getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
+                    }
                     someActivityPaused[0]++;
                 }
             }
@@ -1295,8 +1300,14 @@ class Task extends TaskFragment {
 
         forAllLeafTaskFragments((taskFrag) -> {
             final ActivityRecord resumedActivity = taskFrag.getResumedActivity();
+            final ActivityRecord top = topRunningActivity();
             if (resumedActivity != null && !taskFrag.canBeResumed(resuming)) {
                 if (taskFrag.startPausing(false /* uiSleeping*/, resuming, reason)) {
+                    if (mActivityPluginDelegate != null
+                            && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
+                        mActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
+                                getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
+                    }
                     someActivityPaused[0]++;
                 }
             }
@@ -5213,6 +5224,10 @@ class Task extends TaskFragment {
         final boolean[] resumed = new boolean[1];
         final TaskFragment topFragment = topActivity.getTaskFragment();
         resumed[0] = topFragment.resumeTopActivity(prev, options, deferPause);
+        if (mActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
+            mActivityPluginDelegate.activityInvokeNotification(
+                    topActivity.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
+        }
         forAllLeafTaskFragments(f -> {
             if (topFragment == f) {
                 return;

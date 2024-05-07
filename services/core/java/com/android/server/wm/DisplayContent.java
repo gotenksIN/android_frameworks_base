@@ -246,6 +246,7 @@ import android.view.inputmethod.ImeTracker;
 import android.window.DisplayWindowPolicyController;
 import android.window.IDisplayAreaOrganizer;
 import android.window.ScreenCapture;
+import android.window.ScreenCapture.LayerCaptureArgs;
 import android.window.SystemPerformanceHinter;
 import android.window.TransitionRequestInfo;
 
@@ -2456,7 +2457,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         config.windowConfiguration.setBounds(mTmpRect);
         config.windowConfiguration.setMaxBounds(mTmpRect);
         config.windowConfiguration.setWindowingMode(getWindowingMode());
-        config.windowConfiguration.setDisplayWindowingMode(getWindowingMode());
 
         computeScreenAppConfiguration(config, dw, dh, displayInfo.rotation);
 
@@ -2834,11 +2834,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
     }
 
-    @Override
-    void setDisplayWindowingMode(int windowingMode) {
-        setWindowingMode(windowingMode);
-    }
-
     /**
      * See {@code WindowState#applyImeWindowsIfNeeded} for the details that we won't traverse the
      * IME window in some cases.
@@ -2956,7 +2951,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     void onDisplayChanged(DisplayContent dc) {
         super.onDisplayChanged(dc);
         updateSystemGestureExclusionLimit();
-        updateKeepClearAreas();
     }
 
     void updateSystemGestureExclusionLimit() {
@@ -4035,7 +4029,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
 
         adjustForImeIfNeeded();
-        updateKeepClearAreas();
 
         // We may need to schedule some toast windows to be removed. The toasts for an app that
         // does not have input focus are removed within a timeout to prevent apps to redress
@@ -5232,7 +5225,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     /**
      * Creates a LayerCaptureArgs object to represent the entire DisplayContent
      */
-    ScreenCapture.LayerCaptureArgs getLayerCaptureArgs() {
+    LayerCaptureArgs getLayerCaptureArgs(Set<Integer> windowTypesToExclude) {
         if (!mWmService.mPolicy.isScreenOn()) {
             if (DEBUG_SCREENSHOT) {
                 Slog.i(TAG_WM, "Attempted to take screenshot while display was off.");
@@ -5242,8 +5235,23 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         getBounds(mTmpRect);
         mTmpRect.offsetTo(0, 0);
-        return new ScreenCapture.LayerCaptureArgs.Builder(getSurfaceControl())
-                .setSourceCrop(mTmpRect).build();
+        LayerCaptureArgs.Builder builder = new LayerCaptureArgs.Builder(getSurfaceControl())
+                .setSourceCrop(mTmpRect);
+
+        if (!windowTypesToExclude.isEmpty()) {
+            ArrayList<SurfaceControl> surfaceControls = new ArrayList<>();
+            forAllWindows(
+                    window -> {
+                        if (windowTypesToExclude.contains(window.getWindowType())) {
+                            surfaceControls.add(window.mSurfaceControl);
+                        }
+                    }, true
+            );
+            if (!surfaceControls.isEmpty()) {
+                builder.setExcludeLayers(surfaceControls.toArray(new SurfaceControl[0]));
+            }
+        }
+        return builder.build();
     }
 
     @Override
@@ -6156,6 +6164,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                     Region touchableRegion = Region.obtain();
                     w.getEffectiveTouchableRegion(touchableRegion);
                     RegionUtils.forEachRect(touchableRegion, rect -> outUnrestricted.add(rect));
+                    touchableRegion.recycle();
                 }
             }
 

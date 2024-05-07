@@ -50,6 +50,7 @@ import android.view.WindowInfo;
 import android.view.WindowManager.DisplayImePolicy;
 import android.view.inputmethod.ImeTracker;
 import android.window.ScreenCapture;
+import android.window.ScreenCapture.ScreenshotHardwareBuffer;
 
 import com.android.internal.policy.KeyInterceptionInfo;
 import com.android.server.input.InputManagerService;
@@ -1043,6 +1044,13 @@ public abstract class WindowManagerInternal {
             int[] fromOrientations, int[] toOrientations);
 
     /**
+     * Set current screen capture session id that will be used during sensitive content protections.
+     *
+     * @param sessionId Session id for this screen capture protection
+     */
+    public abstract void setBlockScreenCaptureForAppsSessionId(long sessionId);
+
+    /**
      * Set whether screen capture should be disabled for all windows of a specific app windows based
      * on sensitive content protections.
      *
@@ -1073,8 +1081,9 @@ public abstract class WindowManagerInternal {
     public abstract boolean moveFocusToAdjacentEmbeddedActivityIfNeeded();
 
     /**
-     * Returns an instance of {@link ScreenCapture.ScreenshotHardwareBuffer} containing the current
+     * Returns an instance of {@link ScreenshotHardwareBuffer} containing the current
      * screenshot.
      */
-    public abstract ScreenCapture.ScreenshotHardwareBuffer takeAssistScreenshot();
+    public abstract ScreenshotHardwareBuffer takeAssistScreenshot(
+            Set<Integer> windowTypesToExclude);
 }

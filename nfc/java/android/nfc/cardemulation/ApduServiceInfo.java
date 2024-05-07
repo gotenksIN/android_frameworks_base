@@ -413,7 +413,12 @@ public final class ApduServiceInfo implements Parcelable {
                     boolean autoTransact = a.getBoolean(
                             com.android.internal.R.styleable.PollingLoopFilter_autoTransact,
                             false);
-                    mAutoTransact.put(plf, autoTransact);
+                    if (!mOnHost && !autoTransact) {
+                        Log.e(TAG, "Ignoring polling-loop-filter " + plf
+                                + " for offhost service that isn't autoTranact");
+                    } else {
+                        mAutoTransact.put(plf, autoTransact);
+                    }
                     a.recycle();
                 } else if (eventType == XmlPullParser.START_TAG
                         && "polling-loop-pattern-filter".equals(tagName) && currentGroup == null) {
@@ -425,7 +430,12 @@ public final class ApduServiceInfo implements Parcelable {
                     boolean autoTransact = a.getBoolean(
                             com.android.internal.R.styleable.PollingLoopFilter_autoTransact,
                             false);
-                    mAutoTransactPatterns.put(Pattern.compile(plf), autoTransact);
+                    if (!mOnHost && !autoTransact) {
+                        Log.e(TAG, "Ignoring polling-loop-filter " + plf
+                                + " for offhost service that isn't autoTranact");
+                    } else {
+                        mAutoTransactPatterns.put(Pattern.compile(plf), autoTransact);
+                    }
                     a.recycle();
                 }
             }
@@ -732,8 +742,10 @@ public final class ApduServiceInfo implements Parcelable {
     @FlaggedApi(Flags.FLAG_NFC_READ_POLLING_LOOP)
     public void addPollingLoopFilter(@NonNull String pollingLoopFilter,
             boolean autoTransact) {
+        if (!mOnHost && !autoTransact) {
+            return;
+        }
         mAutoTransact.put(pollingLoopFilter, autoTransact);
-
     }
 
     /**
@@ -758,8 +770,10 @@ public final class ApduServiceInfo implements Parcelable {
     @FlaggedApi(Flags.FLAG_NFC_READ_POLLING_LOOP)
     public void addPollingLoopPatternFilter(@NonNull String pollingLoopPatternFilter,
             boolean autoTransact) {
+        if (!mOnHost && !autoTransact) {
+            return;
+        }
         mAutoTransactPatterns.put(Pattern.compile(pollingLoopPatternFilter), autoTransact);
-
     }
 
     /**

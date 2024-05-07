@@ -28,8 +28,8 @@ import android.text.format.DateFormat
 import android.util.AttributeSet
 import android.util.MathUtils.constrainedMap
 import android.util.TypedValue
-import android.view.View
 import android.view.View.MeasureSpec.EXACTLY
+import android.view.View
 import android.widget.TextView
 import com.android.app.animation.Interpolators
 import com.android.internal.annotations.VisibleForTesting
@@ -88,11 +88,17 @@ class AnimatableClockView @JvmOverloads constructor(
     private var textAnimator: TextAnimator? = null
     private var onTextAnimatorInitialized: Runnable? = null
 
+    private var translateForCenterAnimation = false
+    private val parentWidth: Int
+        get() = (parent as View).measuredWidth
+
     // last text size which is not constrained by view height
     private var lastUnconstrainedTextSize: Float = Float.MAX_VALUE
     @VisibleForTesting var textAnimatorFactory: (Layout, () -> Unit) -> TextAnimator =
         { layout, invalidateCb ->
             TextAnimator(layout, NUM_CLOCK_FONT_ANIMATION_STEPS, invalidateCb) }
+
+    // Used by screenshot tests to provide stability
     @VisibleForTesting var isAnimationEnabled: Boolean = true
     @VisibleForTesting var timeOverrideInMillis: Long? = null
 
@@ -116,14 +122,14 @@ class AnimatableClockView @JvmOverloads constructor(
         try {
             dozingWeightInternal = animatableClockViewAttributes.getInt(
                 R.styleable.AnimatableClockView_dozeWeight,
-                100
+                /* default = */ 100
             )
             lockScreenWeightInternal = animatableClockViewAttributes.getInt(
                 R.styleable.AnimatableClockView_lockScreenWeight,
-                300
+                /* default = */ 300
             )
             chargeAnimationDelay = animatableClockViewAttributes.getInt(
-                R.styleable.AnimatableClockView_chargeAnimationDelay, 200
+                R.styleable.AnimatableClockView_chargeAnimationDelay, /* default = */ 200
             )
         } finally {
             animatableClockViewAttributes.recycle()
@@ -134,12 +140,12 @@ class AnimatableClockView @JvmOverloads constructor(
             defStyleAttr, defStyleRes
         )
 
-        isSingleLineInternal =
-            try {
-                textViewAttributes.getBoolean(android.R.styleable.TextView_singleLine, false)
-            } finally {
-                textViewAttributes.recycle()
-            }
+        try {
+            isSingleLineInternal = textViewAttributes.getBoolean(
+                android.R.styleable.TextView_singleLine, /* default = */ false)
+        } finally {
+            textViewAttributes.recycle()
+        }
 
         refreshFormat()
     }
@@ -206,6 +212,7 @@ class AnimatableClockView @JvmOverloads constructor(
             super.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                     min(lastUnconstrainedTextSize, MeasureSpec.getSize(heightMeasureSpec) / 2F))
         }
+
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val animator = textAnimator
         if (animator == null) {
@@ -215,30 +222,31 @@ class AnimatableClockView @JvmOverloads constructor(
         } else {
             animator.updateLayout(layout)
         }
+
         if (migratedClocks && hasCustomPositionUpdatedAnimation) {
             // Expand width to avoid clock being clipped during stepping animation
-            setMeasuredDimension(measuredWidth +
-                    MeasureSpec.getSize(widthMeasureSpec) / 2, measuredHeight)
+            val targetWidth = measuredWidth + MeasureSpec.getSize(widthMeasureSpec) / 2
+
+            // This comparison is effectively a check if we're in splitshade or not
+            translateForCenterAnimation = parentWidth > targetWidth
+            if (translateForCenterAnimation) {
+                setMeasuredDimension(targetWidth, measuredHeight)
+            }
+        } else {
+            translateForCenterAnimation = false
         }
     }
 
     override fun onDraw(canvas: Canvas) {
-        if (migratedClocks && hasCustomPositionUpdatedAnimation) {
-            canvas.save()
-            canvas.translate((parent as View).measuredWidth / 4F, 0F)
+        canvas.save()
+        if (translateForCenterAnimation) {
+            canvas.translate(parentWidth / 4f, 0f)
         }
+
         logger.d({ "onDraw($str1)"}) { str1 = text.toString() }
-        // Use textAnimator to render text if animation is enabled.
-        // Otherwise default to using standard draw functions.
-        if (isAnimationEnabled) {
-            // intentionally doesn't call super.onDraw here or else the text will be rendered twice
-            textAnimator?.draw(canvas)
-        } else {
-            super.onDraw(canvas)
-        }
-        if (migratedClocks && hasCustomPositionUpdatedAnimation) {
-            canvas.restore()
-        }
+        // intentionally doesn't call super.onDraw here or else the text will be rendered twice
+        textAnimator?.draw(canvas)
+        canvas.restore()
     }
 
     override fun invalidate() {
@@ -305,7 +313,7 @@ class AnimatableClockView @JvmOverloads constructor(
             weight = lockScreenWeight,
             textSize = -1f,
             color = lockScreenColor,
-            animate = isAnimationEnabled,
+            animate = true,
             duration = APPEAR_ANIM_DURATION,
             interpolator = Interpolators.EMPHASIZED_DECELERATE,
             delay = 0,
@@ -314,7 +322,7 @@ class AnimatableClockView @JvmOverloads constructor(
     }
 
     fun animateFoldAppear(animate: Boolean = true) {
-        if (isAnimationEnabled && textAnimator == null) {
+        if (textAnimator == null) {
             return
         }
         logger.d("animateFoldAppear")
@@ -331,7 +339,7 @@ class AnimatableClockView @JvmOverloads constructor(
             weight = dozingWeightInternal,
             textSize = -1f,
             color = dozingColor,
-            animate = animate && isAnimationEnabled,
+            animate = animate,
             interpolator = Interpolators.EMPHASIZED_DECELERATE,
             duration = ANIMATION_DURATION_FOLD_TO_AOD.toLong(),
             delay = 0,
@@ -350,7 +358,7 @@ class AnimatableClockView @JvmOverloads constructor(
                 weight = if (isDozing()) dozingWeight else lockScreenWeight,
                 textSize = -1f,
                 color = null,
-                animate = isAnimationEnabled,
+                animate = true,
                 duration = CHARGE_ANIM_DURATION_PHASE_1,
                 delay = 0,
                 onAnimationEnd = null
@@ -360,7 +368,7 @@ class AnimatableClockView @JvmOverloads constructor(
             weight = if (isDozing()) lockScreenWeight else dozingWeight,
             textSize = -1f,
             color = null,
-            animate = isAnimationEnabled,
+            animate = true,
             duration = CHARGE_ANIM_DURATION_PHASE_0,
             delay = chargeAnimationDelay.toLong(),
             onAnimationEnd = startAnimPhase2
@@ -373,7 +381,7 @@ class AnimatableClockView @JvmOverloads constructor(
             weight = if (isDozing) dozingWeight else lockScreenWeight,
             textSize = -1f,
             color = if (isDozing) dozingColor else lockScreenColor,
-            animate = animate && isAnimationEnabled,
+            animate = animate,
             duration = DOZE_ANIM_DURATION,
             delay = 0,
             onAnimationEnd = null
@@ -432,9 +440,6 @@ class AnimatableClockView @JvmOverloads constructor(
                 onAnimationEnd = onAnimationEnd
             )
             textAnimator?.glyphFilter = glyphFilter
-            if (color != null && !isAnimationEnabled) {
-                setTextColor(color)
-            }
         } else {
             // when the text animator is set, update its start values
             onTextAnimatorInitialized = Runnable {
@@ -449,9 +454,6 @@ class AnimatableClockView @JvmOverloads constructor(
                     onAnimationEnd = onAnimationEnd
                 )
                 textAnimator?.glyphFilter = glyphFilter
-                if (color != null && !isAnimationEnabled) {
-                    setTextColor(color)
-                }
             }
         }
     }
@@ -469,7 +471,7 @@ class AnimatableClockView @JvmOverloads constructor(
             weight = weight,
             textSize = textSize,
             color = color,
-            animate = animate && isAnimationEnabled,
+            animate = animate,
             interpolator = null,
             duration = duration,
             delay = delay,
@@ -527,9 +529,9 @@ class AnimatableClockView @JvmOverloads constructor(
      *   means it finished moving.
      */
     fun offsetGlyphsForStepClockAnimation(
-            clockStartLeft: Int,
-            clockMoveDirection: Int,
-            moveFraction: Float
+        clockStartLeft: Int,
+        clockMoveDirection: Int,
+        moveFraction: Float
     ) {
         val isMovingToCenter = if (isLayoutRtl) clockMoveDirection < 0 else clockMoveDirection > 0
         val currentMoveAmount = left - clockStartLeft

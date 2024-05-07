@@ -401,28 +401,37 @@
     <string name="cfTemplateRegisteredTime"><xliff:g id="bearer_service_code">{0}</xliff:g>: Not forwarded</string>
 
     <!-- Title of the cellular network security safety center source's status. -->
-    <string name="scCellularNetworkSecurityTitle">Cellular network security</string>
+    <string name="scCellularNetworkSecurityTitle">Mobile network security</string>
     <!-- Summary of the cellular network security safety center source's status. -->
-    <string name="scCellularNetworkSecuritySummary">Review settings</string>
+    <string name="scCellularNetworkSecuritySummary">Encryption, notifications for unencrypted networks</string>
     <!-- Link passed to safety center for the Learn More button on notifications -->
     <!-- DO NOT TRANSLATE -->
     <string name="scCellularNetworkSecurityLearnMore" translatable="false"></string>
     <!-- Title of the safety center issue and notification when the phone's identifier is shared over the network. -->
-    <string name="scIdentifierDisclosureIssueTitle">Device identifier accessed</string>
-    <!-- Summary of the safety center issue and notification when the phone's identifier is shared over the network. -->
-    <string name="scIdentifierDisclosureIssueSummary">A network on the <xliff:g id="disclosure_network">%4$s</xliff:g> connection recorded your device\'s unique identifier (IMSI) <xliff:g id="disclosure_count">%1$d</xliff:g> times in the period between <xliff:g id="disclosure_window_start_time">%2$tr</xliff:g> and <xliff:g id="disclosure_window_end_time">%3$tr</xliff:g>.</string>
+    <string name="scIdentifierDisclosureIssueTitle">Device ID accessed</string>
+    <!-- Summary of the safety center notification when the phone's identifier is shared over the network. -->
+    <string name="scIdentifierDisclosureIssueSummaryNotification">At <xliff:g id="disclosure_time">%1$s</xliff:g>, a nearby network recorded your device\'s unique ID (IMSI or IMEI) while using your <xliff:g id="disclosure_network">%2$s</xliff:g> SIM</string>
+    <!-- Summary of the safety center detail card when the phone's identifier is shared over the network. -->
+    <string name="scIdentifierDisclosureIssueSummary">At <xliff:g id="disclosure_time">%1$s</xliff:g>, a nearby network recorded your device\'s unique ID (IMSI or IMEI) while using your <xliff:g id="disclosure_network">%2$s</xliff:g> SIM.\n\nThis means that your location, activity, or identity have been logged. This is common practice but may be an issue for people concerned about privacy.</string>
+
     <!-- Title of the safety center issue and notification when the phone restores an encrypted connection to the network. -->
-    <string name="scNullCipherIssueEncryptedTitle">Encrypted connection to <xliff:g id="network_name">%1$s</xliff:g></string>
+    <string name="scNullCipherIssueEncryptedTitle">Connected to encrypted network <xliff:g id="network_name">%1$s</xliff:g></string>
     <!-- Summary of the safety center issue and notification when the phone restores an encrypted connection to the network. -->
-    <string name="scNullCipherIssueEncryptedSummary">You\'re now connected to a more secure cellular network.</string>
+    <string name="scNullCipherIssueEncryptedSummary"><xliff:g id="network_name">%1$s</xliff:g> SIM connection is more secure now</string>
     <!-- Title of the safety center issue and notification when a connected network is not using encryption. -->
-    <string name="scNullCipherIssueNonEncryptedTitle">Non-encrypted connection to <xliff:g id="network_name">%1$s</xliff:g></string>
-    <!-- Summary of the safety center issue and notification when a connected network is not using encryption.  -->
-    <string name="scNullCipherIssueNonEncryptedSummary">You\'re connected to a non-encrypted cellular network. Your calls, messages, and data are vulnerable to interception.</string>
+
+    <string name="scNullCipherIssueNonEncryptedTitle">Connected to unencrypted network</string>
+    <!-- Summary of the safety center notification when a connected network is not using encryption.  -->
+    <string name="scNullCipherIssueNonEncryptedSummaryNotification">Calls, messages, and data are currently more vulnerable while using your <xliff:g id="network_name">%1$s</xliff:g> SIM</string>
+    <!-- Summary of the safety center issue when a connected network is not using encryption.  -->
+    <string name="scNullCipherIssueNonEncryptedSummary">Calls, messages, and data are currently more vulnerable while using your <xliff:g id="network_name">%1$s</xliff:g> SIM.\n\nWhen your connection is encrypted again, you\'ll get another notification.</string>
+
     <!-- Label for the button that links to the cellular network security settings. -->
-    <string name="scNullCipherIssueActionSettings">Cellular security settings</string>
-    <!-- Label for the button that link to education resourcess about cellular network security settings. -->
+    <string name="scNullCipherIssueActionSettings">Mobile network security settings</string>
+    <!-- Label for the button that links to education resourcess about cellular network security settings. -->
     <string name="scNullCipherIssueActionLearnMore">Learn more</string>
+    <!-- Label for the button to acknowledge the user is connected to an encrypted network again in cellular network security settings. -->
+    <string name="scNullCipherIssueActionGotIt">Got it</string>
 
     <!-- android.net.http Error strings --> <skip />
     <!-- Displayed when a feature code (non-phone number) is dialed and completes successfully. -->
@@ -1019,6 +1028,9 @@
 
     <!-- The title to use when a dream is opened in preview mode. [CHAR LIMIT=NONE] -->
     <string name="dream_preview_title">Preview, <xliff:g id="dream_name" example="Clock">%1$s</xliff:g></string>
+
+    <!-- The title to use when a dream is open in accessibility mode to let users know to double tap to dismiss the dream  [CHAR LIMIT=32] -->
+    <string name="dream_accessibility_action_click">dismiss</string>
 
     <!--  Permissions -->
 
@@ -5190,7 +5202,7 @@
     <string name="lock_to_app_unlock_password">Ask for password before unpinning</string>
 
     <!-- Notification shown when device owner silently installs a package [CHAR LIMIT=NONE] -->
-    <string name="package_installed_device_owner">Installed by your admin</string>
+    <string name="package_installed_device_owner">Installed by your admin.\nGo to settings to view granted permissions</string>
     <!-- Notification shown when device owner silently updates a package [CHAR LIMIT=NONE] -->
     <string name="package_updated_device_owner">Updated by your admin</string>
     <!-- Notification shown when device owner silently deletes a package [CHAR LIMIT=NONE] -->
@@ -6438,10 +6450,8 @@ ul.</string>
     <!-- Communal profile label on a screen. This can be used as a tab label for this profile in tabbed views and can be used to represent the profile in sharing surfaces, etc. [CHAR LIMIT=20] -->
     <string name="profile_label_communal">Communal</string>
 
-    <!-- Notification message used when a notification's normal message contains sensitive information. -->
-    <!-- TODO b/301960090: replace with redacted message string and action title, when/if UX provides one -->
-    <!-- DO NOT TRANSLATE -->
-    <string name="redacted_notification_message"></string>
+    <!-- Notification message used when a notification's normal message contains sensitive information [CHAR_LIMIT=NOTIF_BODY] -->
+    <string name="redacted_notification_message">Sensitive notification content hidden</string>
     <!-- Notification action title used instead of a notification's normal title sensitive [CHAR_LIMIT=NOTIF_BODY] -->
     <string name="redacted_notification_action_title"></string>
 

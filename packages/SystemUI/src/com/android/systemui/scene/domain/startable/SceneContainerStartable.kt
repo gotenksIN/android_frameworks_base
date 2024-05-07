@@ -21,11 +21,13 @@ package com.android.systemui.scene.domain.startable
 import android.app.StatusBarManager
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.SceneKey
+import com.android.internal.logging.UiEventLogger
 import com.android.systemui.CoreStartable
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
 import com.android.systemui.bouncer.domain.interactor.SimBouncerInteractor
+import com.android.systemui.bouncer.shared.logging.BouncerUiEvent
 import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.classifier.FalsingCollectorActual
 import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
@@ -35,6 +37,7 @@ import com.android.systemui.dagger.qualifiers.DisplayId
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor
+import com.android.systemui.deviceentry.shared.model.DeviceUnlockSource
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.model.SceneContainerPlugin
 import com.android.systemui.model.SysUiState
@@ -107,6 +110,7 @@ constructor(
     private val occlusionInteractor: SceneContainerOcclusionInteractor,
     private val faceUnlockInteractor: DeviceEntryFaceAuthInteractor,
     private val shadeInteractor: ShadeInteractor,
+    private val uiEventLogger: UiEventLogger,
 ) : CoreStartable {
 
     override fun start() {
@@ -117,9 +121,9 @@ constructor(
             hydrateSystemUiState()
             collectFalsingSignals()
             respondToFalsingDetections()
-            hydrateWindowFocus()
             hydrateInteractionState()
             handleBouncerOverscroll()
+            hydrateWindowController()
         } else {
             sceneLogger.logFrameworkEnabled(
                 isEnabled = false,
@@ -253,7 +257,8 @@ constructor(
             // Track the previous scene (sans Bouncer), so that we know where to go when the device
             // is unlocked whilst on the bouncer.
             val previousScene =
-                sceneInteractor.previousScene
+                sceneInteractor
+                    .previousScene()
                     .filterNot { it == Scenes.Bouncer }
                     .stateIn(this, SharingStarted.Eagerly, initialValue = null)
             deviceUnlockedInteractor.deviceUnlockStatus
@@ -281,6 +286,12 @@ constructor(
                         }
                     }
 
+                    if (
+                        isOnBouncer &&
+                            deviceUnlockStatus.deviceUnlockSource == DeviceUnlockSource.TrustAgent
+                    ) {
+                        uiEventLogger.log(BouncerUiEvent.BOUNCER_DISMISS_EXTENDED_ACCESS)
+                    }
                     when {
                         isOnBouncer ->
                             // When the device becomes unlocked in Bouncer, go to previous scene,
@@ -402,6 +413,40 @@ constructor(
         }
     }
 
+    private fun hydrateWindowController() {
+        applicationScope.launch {
+            sceneInteractor.transitionState
+                .mapNotNull { transitionState ->
+                    (transitionState as? ObservableTransitionState.Idle)?.scene
+                }
+                .distinctUntilChanged()
+                .collect { sceneKey ->
+                    windowController.setNotificationShadeFocusable(sceneKey != Scenes.Gone)
+                }
+        }
+
+        applicationScope.launch {
+            deviceEntryInteractor.isDeviceEntered.collect { isDeviceEntered ->
+                windowController.setKeyguardShowing(!isDeviceEntered)
+            }
+        }
+
+        applicationScope.launch {
+            sceneInteractor.currentScene
+                .map { it == Scenes.Bouncer }
+                .distinctUntilChanged()
+                .collect { isBouncerShowing ->
+                    windowController.setBouncerShowing(isBouncerShowing)
+                }
+        }
+
+        applicationScope.launch {
+            occlusionInteractor.invisibleDueToOcclusion.collect { invisibleDueToOcclusion ->
+                windowController.setKeyguardOccluded(invisibleDueToOcclusion)
+            }
+        }
+    }
+
     /** Collects and reports signals into the falsing system. */
     private fun collectFalsingSignals() {
         applicationScope.launch {
@@ -460,20 +505,6 @@ constructor(
                     awaitClose { falsingManager.removeFalsingBeliefListener(listener) }
                 }
                 .collect { switchToScene(Scenes.Lockscreen, "Falsing detected.") }
-        }
-    }
-
-    /** Keeps the focus state of the window view up-to-date. */
-    private fun hydrateWindowFocus() {
-        applicationScope.launch {
-            sceneInteractor.transitionState
-                .mapNotNull { transitionState ->
-                    (transitionState as? ObservableTransitionState.Idle)?.scene
-                }
-                .distinctUntilChanged()
-                .collect { sceneKey ->
-                    windowController.setNotificationShadeFocusable(sceneKey != Scenes.Gone)
-                }
         }
     }
 

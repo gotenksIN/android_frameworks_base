@@ -66,15 +66,16 @@ import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
-import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 import android.widget.RemoteViews;
+
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.server.EventLogTags;
 import com.android.server.LocalServices;
 import com.android.server.uri.UriGrantsManagerInternal;
+
 import dalvik.annotation.optimization.NeverCompile;
 
 import java.io.PrintWriter;
@@ -501,8 +502,8 @@ public final class NotificationRecord {
         pw.println(prefix + "uid=" + getSbn().getUid() + " userId=" + getSbn().getUserId());
         pw.println(prefix + "opPkg=" + getSbn().getOpPkg());
         pw.println(prefix + "icon=" + notification.getSmallIcon());
-        pw.println(prefix + "flags=0x" + Integer.toHexString(notification.flags));
-        pw.println(prefix + "originalFlags=0x" + Integer.toHexString(mOriginalFlags));
+        pw.println(prefix + "flags=" + Notification.flagsToString(notification.flags));
+        pw.println(prefix + "originalFlags=" + Notification.flagsToString(mOriginalFlags));
         pw.println(prefix + "pri=" + notification.priority);
         pw.println(prefix + "key=" + getSbn().getKey());
         pw.println(prefix + "seen=" + mStats.hasSeen());
@@ -537,8 +538,7 @@ public final class NotificationRecord {
         pw.println(prefix + "mInterruptionTimeMs=" + mInterruptionTimeMs);
         pw.println(prefix + "mSuppressedVisualEffects= " + mSuppressedVisualEffects);
         if (mPreChannelsNotification) {
-            pw.println(prefix + String.format("defaults=0x%08x flags=0x%08x",
-                    notification.defaults, notification.flags));
+            pw.println(prefix + "defaults=" + Notification.defaultsToString(notification.defaults));
             pw.println(prefix + "n.sound=" + notification.sound);
             pw.println(prefix + "n.audioStreamType=" + notification.audioStreamType);
             pw.println(prefix + "n.audioAttributes=" + notification.audioAttributes);
@@ -1165,7 +1165,11 @@ public final class NotificationRecord {
             mVibration = calculateVibration();
             if (restrictAudioAttributesCall() || restrictAudioAttributesAlarm()
                     || restrictAudioAttributesMedia()) {
-                mAttributes = channel.getAudioAttributes();
+                if (channel.getAudioAttributes() != null) {
+                    mAttributes = channel.getAudioAttributes();
+                } else {
+                    mAttributes = Notification.AUDIO_ATTRIBUTES_DEFAULT;
+                }
             }
         }
     }

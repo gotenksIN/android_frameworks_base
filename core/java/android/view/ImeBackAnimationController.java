@@ -18,6 +18,7 @@ package android.view;
 
 import static android.view.InsetsController.ANIMATION_TYPE_USER;
 import static android.view.WindowInsets.Type.ime;
+import static android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
 import static android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
 import static android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;
 
@@ -31,8 +32,11 @@ import android.util.Log;
 import android.view.animation.BackGestureInterpolator;
 import android.view.animation.Interpolator;
 import android.view.animation.PathInterpolator;
+import android.view.inputmethod.ImeTracker;
 import android.window.BackEvent;
 import android.window.OnBackAnimationCallback;
+
+import com.android.internal.inputmethod.SoftInputShowHideReason;
 
 /**
  * Controller for IME predictive back animation
@@ -57,6 +61,7 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
     private float mLastProgress = 0f;
     private boolean mTriggerBack = false;
     private boolean mIsPreCommitAnimationInProgress = false;
+    private int mStartRootScrollY = 0;
 
     public ImeBackAnimationController(ViewRootImpl viewRoot) {
         mInsetsController = viewRoot.getInsetsController();
@@ -65,13 +70,13 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
 
     @Override
     public void onBackStarted(@NonNull BackEvent backEvent) {
-        if (isAdjustResize()) {
+        if (!isBackAnimationAllowed()) {
             // There is no good solution for a predictive back animation if the app uses
             // adjustResize, since we can't relayout the whole app for every frame. We also don't
             // want to reveal any black areas behind the IME. Therefore let's not play any animation
             // in that case for now.
             Log.d(TAG, "onBackStarted -> not playing predictive back animation due to softinput"
-                    + " mode adjustResize");
+                    + " mode adjustResize AND no animation callback registered");
             return;
         }
         if (isHideAnimationInProgress()) {
@@ -93,6 +98,7 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
                     public void onReady(@NonNull WindowInsetsAnimationController controller,
                             @WindowInsets.Type.InsetsType int types) {
                         mWindowInsetsAnimationController = controller;
+                        if (isAdjustPan()) mStartRootScrollY = mViewRoot.mScrollY;
                         if (mIsPreCommitAnimationInProgress) {
                             setPreCommitProgress(mLastProgress);
                         } else {
@@ -122,13 +128,13 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
 
     @Override
     public void onBackCancelled() {
-        if (isAdjustResize()) return;
+        if (!isBackAnimationAllowed()) return;
         startPostCommitAnim(/*hideIme*/ false);
     }
 
     @Override
     public void onBackInvoked() {
-        if (isAdjustResize()) {
+        if (!isBackAnimationAllowed()) {
             mInsetsController.hide(ime());
             return;
         }
@@ -143,6 +149,10 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
             float imeHeight = shownY - hiddenY;
             float interpolatedProgress = BACK_GESTURE.getInterpolation(progress);
             int newY = (int) (imeHeight - interpolatedProgress * (imeHeight * PEEK_FRACTION));
+            if (mStartRootScrollY != 0) {
+                mViewRoot.setScrollY(
+                        (int) (mStartRootScrollY * (1 - interpolatedProgress * PEEK_FRACTION)));
+            }
             mWindowInsetsAnimationController.setInsetsAndAlpha(Insets.of(0, 0, 0, newY), 1f,
                     progress);
         }
@@ -192,6 +202,37 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
         mPostCommitAnimator.setDuration(
                 triggerBack ? POST_COMMIT_DURATION_MS : POST_COMMIT_CANCEL_DURATION_MS);
         mPostCommitAnimator.start();
+        if (triggerBack) {
+            mInsetsController.setPredictiveBackImeHideAnimInProgress(true);
+            notifyHideIme();
+        }
+        if (mStartRootScrollY != 0) {
+            // RootView is panned, ensure that it is scrolled back to the intended scroll position
+            if (triggerBack) {
+                // requesting ime as invisible
+                mInsetsController.setRequestedVisibleTypes(0, ime());
+                // changes the animation state and notifies RootView of changed insets, which
+                // causes it to reset its scrollY to 0f (animated)
+                mInsetsController.onAnimationStateChanged(ime(), /*running*/ true);
+            } else {
+                // This causes RootView to update its scroll back to the panned position
+                mInsetsController.getHost().notifyInsetsChanged();
+            }
+        }
+    }
+
+    private void notifyHideIme() {
+        ImeTracker.Token statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
+                ImeTracker.ORIGIN_CLIENT,
+                SoftInputShowHideReason.HIDE_SOFT_INPUT_REQUEST_HIDE_WITH_CONTROL, true);
+        // This notifies the IME that it is being hidden. In response, the IME will unregister the
+        // animation callback, such that new back gestures happening during the post-commit phase of
+        // the hide animation can already dispatch to a new callback.
+        // Note that the IME will call hide() in InsetsController. InsetsController will not animate
+        // that hide request if it sees that ImeBackAnimationController is already animating
+        // the IME away
+        mInsetsController.getHost().getInputMethodManager()
+                .notifyImeHidden(mInsetsController.getHost().getWindowToken(), statsToken);
     }
 
     private void reset() {
@@ -200,6 +241,8 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
         mLastProgress = 0f;
         mTriggerBack = false;
         mIsPreCommitAnimationInProgress = false;
+        mInsetsController.setPredictiveBackImeHideAnimInProgress(false);
+        mStartRootScrollY = 0;
     }
 
     private void resetPostCommitAnimator() {
@@ -209,9 +252,17 @@ public class ImeBackAnimationController implements OnBackAnimationCallback {
         }
     }
 
-    private boolean isAdjustResize() {
+    private boolean isBackAnimationAllowed() {
+        // back animation is allowed in all cases except when softInputMode is adjust_resize AND
+        // there is no app-registered WindowInsetsAnimationCallback.
         return (mViewRoot.mWindowAttributes.softInputMode & SOFT_INPUT_MASK_ADJUST)
-                == SOFT_INPUT_ADJUST_RESIZE;
+                != SOFT_INPUT_ADJUST_RESIZE
+                || (mViewRoot.mView != null && mViewRoot.mView.hasWindowInsetsAnimationCallback());
+    }
+
+    private boolean isAdjustPan() {
+        return (mViewRoot.mWindowAttributes.softInputMode & SOFT_INPUT_MASK_ADJUST)
+                == SOFT_INPUT_ADJUST_PAN;
     }
 
     private boolean isHideAnimationInProgress() {

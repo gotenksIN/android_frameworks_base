@@ -31,12 +31,13 @@ import static android.app.ActivityOptions.ANIM_THUMBNAIL_SCALE_DOWN;
 import static android.app.ActivityOptions.ANIM_THUMBNAIL_SCALE_UP;
 import static android.app.ActivityOptions.ANIM_UNDEFINED;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
-import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_DISMISSED;
-import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN;
-import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_APPLIED;
-import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_SUGGESTED;
 import static android.app.AppOpsManager.MODE_ALLOWED;
 import static android.app.AppOpsManager.OP_PICTURE_IN_PICTURE;
+import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_CONTROL_DISMISSED;
+import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN;
+import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_APPLIED;
+import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_SUGGESTED;
+import static android.app.CameraCompatTaskInfo.cameraCompatControlStateToString;
 import static android.app.WaitResult.INVALID_DELAY;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_DREAM;
@@ -76,6 +77,7 @@ import static android.content.pm.ActivityInfo.FLAG_NO_HISTORY;
 import static android.content.pm.ActivityInfo.FLAG_SHOW_FOR_ALL_USERS;
 import static android.content.pm.ActivityInfo.FLAG_STATE_NOT_NEEDED;
 import static android.content.pm.ActivityInfo.FLAG_TURN_SCREEN_ON;
+import static android.content.pm.ActivityInfo.OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION;
 import static android.content.pm.ActivityInfo.INSETS_DECOUPLED_CONFIGURATION_ENFORCED;
 import static android.content.pm.ActivityInfo.LAUNCH_MULTIPLE;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
@@ -275,8 +277,7 @@ import android.annotation.Size;
 import android.app.Activity;
 import android.app.ActivityManager.TaskDescription;
 import android.app.ActivityOptions;
-import android.app.AppCompatTaskInfo;
-import android.app.AppCompatTaskInfo.CameraCompatControlState;
+import android.app.CameraCompatTaskInfo.CameraCompatControlState;
 import android.app.ICompatCameraControlCallback;
 import android.app.IScreenCaptureObserver;
 import android.app.PendingIntent;
@@ -1373,7 +1374,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         mLetterboxUiController.dump(pw, prefix);
 
         pw.println(prefix + "mCameraCompatControlState="
-                + AppCompatTaskInfo.cameraCompatControlStateToString(mCameraCompatControlState));
+                + cameraCompatControlStateToString(mCameraCompatControlState));
         pw.println(prefix + "mCameraCompatControlEnabled=" + mCameraCompatControlEnabled);
     }
 
@@ -2135,9 +2136,19 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         mCameraCompatControlEnabled = mWmService.mContext.getResources()
                 .getBoolean(R.bool.config_isCameraCompatControlForStretchedIssuesEnabled);
         mResolveConfigHint = new TaskFragment.ConfigOverrideHint();
-        mResolveConfigHint.mUseLegacyInsetsForStableBounds =
-                mWmService.mFlags.mInsetsDecoupledConfiguration
-                        && !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED);
+        if (mWmService.mFlags.mInsetsDecoupledConfiguration) {
+            // When the stable configuration is the default behavior, override for the legacy apps
+            // without forward override flag.
+            mResolveConfigHint.mUseOverrideInsetsForStableBounds =
+                    !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED)
+                            && !info.isChangeEnabled(
+                                    OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
+        } else {
+            // When the stable configuration is not the default behavior, forward overriding the
+            // listed apps.
+            mResolveConfigHint.mUseOverrideInsetsForStableBounds =
+                    info.isChangeEnabled(OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
+        }
 
         mTargetSdk = info.applicationInfo.targetSdkVersion;
 
@@ -4688,6 +4699,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // to another activity because it may be in the remove process.
                 // Don't need to remove the starting window at this point because that will happen
                 // at #postWindowRemoveCleanupLocked
+                return false;
+            }
+            // Do not transfer if the orientation doesn't match, redraw starting window while it is
+            // on top will cause flicker.
+            if (fromActivity.getRequestedConfigurationOrientation()
+                    != getRequestedConfigurationOrientation()) {
                 return false;
             }
             // In this case, the starting icon has already been displayed, so start
@@ -8538,7 +8555,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      *         aspect ratio.
      */
     boolean shouldCreateCompatDisplayInsets() {
-        if (mLetterboxUiController.shouldApplyUserFullscreenOverride()) {
+        if (mLetterboxUiController.hasFullscreenOverride()) {
             // If the user has forced the applications aspect ratio to be fullscreen, don't use size
             // compatibility mode in any situation. The user has been warned and therefore accepts
             // the risk of the application misbehaving.
@@ -8553,7 +8570,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             default:
                 // Fall through
         }
-        if (inMultiWindowMode() || getWindowConfiguration().hasWindowDecorCaption()) {
+        // Use root activity's info for tasks in multi-window mode, or fullscreen tasks in freeform
+        // task display areas, to ensure visual consistency across activity launches and exits in
+        // the same task.
+        final TaskDisplayArea tda = getTaskDisplayArea();
+        if (inMultiWindowMode() || (tda != null && tda.inFreeformWindowingMode())) {
             final ActivityRecord root = task != null ? task.getRootActivity() : null;
             if (root != null && root != this && !root.shouldCreateCompatDisplayInsets()) {
                 // If the root activity doesn't use size compatibility mode, the activities above
@@ -8631,7 +8652,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         mCompatDisplayInsets =
                 new CompatDisplayInsets(
                         mDisplayContent, this, letterboxedContainerBounds,
-                        mResolveConfigHint.mUseLegacyInsetsForStableBounds);
+                        mResolveConfigHint.mUseOverrideInsetsForStableBounds);
     }
 
     private void clearSizeCompatModeAttributes() {
@@ -8830,15 +8851,14 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mDisplayContent == null) {
             return;
         }
-        final Rect parentAppBounds = newParentConfiguration.windowConfiguration.getAppBounds();
+        final Rect parentBounds = newParentConfiguration.windowConfiguration.getBounds();
         int rotation = newParentConfiguration.windowConfiguration.getRotation();
         if (rotation == ROTATION_UNDEFINED && !isFixedRotationTransforming()) {
             rotation = mDisplayContent.getRotation();
         }
-        if (!mResolveConfigHint.mUseLegacyInsetsForStableBounds
-                || getCompatDisplayInsets() != null
-                || isFloating(parentWindowingMode) || parentAppBounds == null
-                || parentAppBounds.isEmpty() || rotation == ROTATION_UNDEFINED) {
+        if (!mResolveConfigHint.mUseOverrideInsetsForStableBounds
+                || getCompatDisplayInsets() != null || isFloating(parentWindowingMode)
+                || rotation == ROTATION_UNDEFINED) {
             // If the insets configuration decoupled logic is not enabled for the app, or the app
             // already has a compat override, or the context doesn't contain enough info to
             // calculate the override, skip the override.
@@ -8857,7 +8877,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // the value if not calculated yet.
         Rect outAppBounds = inOutConfig.windowConfiguration.getAppBounds();
         if (outAppBounds == null || outAppBounds.isEmpty()) {
-            inOutConfig.windowConfiguration.setAppBounds(parentAppBounds);
+            inOutConfig.windowConfiguration.setAppBounds(parentBounds);
             outAppBounds = inOutConfig.windowConfiguration.getAppBounds();
             outAppBounds.inset(nonDecorInsets);
         }
@@ -8868,14 +8888,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         density *= DisplayMetrics.DENSITY_DEFAULT_SCALE;
         if (inOutConfig.screenWidthDp == Configuration.SCREEN_WIDTH_DP_UNDEFINED) {
             final int overrideScreenWidthDp = (int) (outAppBounds.width() / density + 0.5f);
-            inOutConfig.screenWidthDp =
-                    Math.min(overrideScreenWidthDp, newParentConfiguration.screenWidthDp);
+            inOutConfig.screenWidthDp = overrideScreenWidthDp;
         }
         if (inOutConfig.screenHeightDp == Configuration.SCREEN_HEIGHT_DP_UNDEFINED) {
-            final int overrideScreenHeightDp =
-                    (int) (outAppBounds.height() / density + 0.5f);
-            inOutConfig.screenHeightDp =
-                    Math.min(overrideScreenHeightDp, newParentConfiguration.screenHeightDp);
+            final int overrideScreenHeightDp = (int) (outAppBounds.height() / density + 0.5f);
+            inOutConfig.screenHeightDp = overrideScreenHeightDp;
         }
         if (inOutConfig.smallestScreenWidthDp
                 == Configuration.SMALLEST_SCREEN_WIDTH_DP_UNDEFINED
@@ -9152,7 +9169,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mDisplayContent == null) {
             return true;
         }
-        if (!mResolveConfigHint.mUseLegacyInsetsForStableBounds) {
+        if (!mResolveConfigHint.mUseOverrideInsetsForStableBounds) {
             // No insets should be considered any more.
             return true;
         }
@@ -9171,7 +9188,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final Task task = getTask();
         task.calculateInsetFrames(outNonDecorBounds /* outNonDecorBounds */,
                 outStableBounds /* outStableBounds */, parentBounds /* bounds */, di,
-                mResolveConfigHint.mUseLegacyInsetsForStableBounds);
+                mResolveConfigHint.mUseOverrideInsetsForStableBounds);
         final int orientationWithInsets = outStableBounds.height() >= outStableBounds.width()
                 ? ORIENTATION_PORTRAIT : ORIENTATION_LANDSCAPE;
         // If orientation does not match the orientation with insets applied, then a
@@ -9228,7 +9245,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 getResolvedOverrideConfiguration().windowConfiguration.getBounds();
         final int stableBoundsOrientation = stableBounds.width() > stableBounds.height()
                 ? ORIENTATION_LANDSCAPE : ORIENTATION_PORTRAIT;
-        final int parentOrientation = mResolveConfigHint.mUseLegacyInsetsForStableBounds
+        final int parentOrientation = mResolveConfigHint.mUseOverrideInsetsForStableBounds
                 ? stableBoundsOrientation : newParentConfig.orientation;
 
         // If the activity requires a different orientation (either by override or activityInfo),
@@ -9253,7 +9270,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return;
         }
 
-        final Rect parentAppBounds = mResolveConfigHint.mUseLegacyInsetsForStableBounds
+        final Rect parentAppBounds = mResolveConfigHint.mUseOverrideInsetsForStableBounds
                 ? outNonDecorBounds : newParentConfig.windowConfiguration.getAppBounds();
         // TODO(b/182268157): Explore using only one type of parentBoundsWithInsets, either app
         // bounds or stable bounds to unify aspect ratio logic.

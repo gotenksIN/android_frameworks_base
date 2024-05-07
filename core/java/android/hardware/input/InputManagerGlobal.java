@@ -1467,23 +1467,22 @@ public final class InputManagerGlobal {
     }
 
     /**
-     * @see InputManager#addUniqueIdAssociationByPort(String, String)
+     * @see InputManager#addUniqueIdAssociation(String, String)
      */
-    public void addUniqueIdAssociationByPort(@NonNull String inputPort,
-                                             @NonNull String displayUniqueId) {
+    public void addUniqueIdAssociation(@NonNull String inputPort, @NonNull String displayUniqueId) {
         try {
-            mIm.addUniqueIdAssociationByPort(inputPort, displayUniqueId);
+            mIm.addUniqueIdAssociation(inputPort, displayUniqueId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     /**
-     * @see InputManager#removeUniqueIdAssociationByPort(String)
+     * @see InputManager#removeUniqueIdAssociation(String)
      */
-    public void removeUniqueIdAssociationByPort(@NonNull String inputPort) {
+    public void removeUniqueIdAssociation(@NonNull String inputPort) {
         try {
-            mIm.removeUniqueIdAssociationByPort(inputPort);
+            mIm.removeUniqueIdAssociation(inputPort);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

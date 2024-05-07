@@ -356,6 +356,8 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"ဖန်သားပြင်ဓာတ်ပုံ ရိုက်ရန်"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"ဖန်သားပြင်ပြသမှုကို ဓာတ်ပုံရိုက်နိုင်ပါသည်။"</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"<xliff:g id="DREAM_NAME">%1$s</xliff:g> အစမ်းကြည့်ခြင်း"</string>
+    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
+    <skip />
     <string name="permlab_statusBar" msgid="8798267849526214017">"အခြေအနေပြဘားအား အလုပ်မလုပ်ခိုင်းရန်သို့မဟုတ် မွမ်းမံရန်"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"အက်ပ်အား အခြေအနေပြ ဘားကို ပိတ်ခွင့် သို့မဟတ် စနစ် အိုင်ကွန်များကို ထည့်ခြင်း ဖယ်ရှားခြင်း ပြုလုပ်ခွင့် ပြုသည်။"</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"အခြေအနေပြ ဘားဖြစ်ပါစေ"</string>
@@ -662,7 +664,7 @@
   </string-array>
     <string name="fingerprint_error_not_match" msgid="4599441812893438961">"လက်ဗွေကို မသိရှိပါ"</string>
     <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"လက်ဗွေကို မသိရှိပါ"</string>
-    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="6226091888364083421">"မျက်နှာကို မမှတ်မိပါ။ လက်ဗွေကို အစားထိုးသုံးပါ။"</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"မျက်နှာကို မမှတ်မိပါ။ ၎င်းအစား လက်ဗွေသုံးပါ။"</string>
     <string name="fingerprint_authenticated" msgid="2024862866860283100">"လက်ဗွေကို အထောက်အထား စိစစ်ပြီးပါပြီ"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="8867889115112348167">"မျက်နှာ အထောက်အထားစိစစ်ပြီးပြီ"</string>
     <string name="face_authenticated_confirmation_required" msgid="6872632732508013755">"မျက်နှာ အထောက်အထားစိစစ်ပြီးပြီ၊ အတည်ပြုရန်ကို နှိပ်ပါ"</string>
@@ -828,7 +830,7 @@
     <string name="policylab_limitPassword" msgid="4851829918814422199">"စကားဝှက်စည်းမျဥ်းကိုသတ်မှတ်ရန်"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"မျက်နှာပြင်သော့ခတ်သည့် စကားဝှက်များနှင့် PINများရှိ ခွင့်ပြုထားသည့် စာလုံးအရေအတွက်နှင့် အက္ခရာများအား ထိန်းချုပ်ရန်။"</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"မျက်နှာပြင်လော့ခ်ဖွင့်ရန် ကြိုးပမ်းမှုများကို စောင့်ကြည့်ခြင်း"</string>
-    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"မျက်နှာပြင်ကို သော့ဖွင့်ရန် အတွက် စကားဝှက် မမှန်မကန် ထည့်သွင်းမှု အရေအတွက်ကို စောင့်ကြည့်လျက်၊ စကားဝှက် ရိုက်ထည့်မှု သိပ်များနေလျှင် တက်ဘလက်ကို သော့ခတ်ရန် သို့မဟုတ် တက်ဘလက် ဒေတာ အားလုံးကို ဖျက်ရန်။"</string>
+    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"မျက်နှာပြင် လော့ခ်ဖွင့်ရန် အတွက် မမှန်ကန်သော စကားဝှက် ထည့်သွင်းမှု အကြိမ်ရေကို စောင့်ကြည့်ပြီး မှားယွင်းသည့်စကားဝှက် ထည့်သွင်းမှု အလွန်များပါက တက်ဘလက်ကို လော့ခ်ချသည် (သို့) တက်ဘလက် ဒေတာ အားလုံးကို ဖျက်သည်။"</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"မျက်နှာပြင်ကို လော့ခ်ဖွင့်သည့်အခါ စကားဝှက်မှားယွင်းစွာ ရိုက်သွင်းသည့်အကြိမ်ရေကို စောင့်ကြည့်ပြီး မှားယွင်းသည့်အကြိမ်ရေ အလွန်များလာပါက သင့် Android TV စက်ပစ္စည်းကို လော့ခ်ချခြင်း သို့မဟုတ် သင့် Android TV ရှိ အသုံးပြုသူဒေတာများအားလုံးကို ဖျက်ခြင်းတို့ ပြုလုပ်သွားပါမည်။"</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"ဖန်သားပြင်လော့ခ်ဖွင့်ရန် အတွက် စကားဝှက် မမှန်မကန် ထည့်သွင်းမှု အရေအတွက်ကို စောင့်ကြည့်လျက် စကားဝှက် မမှန်မကန် ရိုက်ထည့်မှု များနေလျှင် သတင်းနှင့်ဖျော်ဖြေရေး စနစ်ကို လော့ခ်ချသည် (သို့) ၎င်း၏ ဒေတာအားလုံးကို ဖျက်သည်။"</string>
     <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"မျက်နှာပြင်ကို လောခ်ဖွင့်ရန်အတွက် ရိုက်ထည့်သည့် မှားယွင်းသောစကားဝှက် အကြိမ်ရေကို စောင့်ကြည့်ပြီး မမှန်သောစကားဝှက် ရိုက်ထည့်မှု အလွန်များနေလျှင် ဖုန်းကိုလော့ခ်ချသည် (သို့) ဖုန်း ဒေတာအားလုံးကို ဖျက်သည်။"</string>
@@ -1896,7 +1898,8 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"ပင်မဖြုတ်မီမှာ PIN ကို မေးကြည့်ရန်"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"ပင်မဖြုတ်မီ လော့ခ်ဖွင့်ပုံစံကို မေးရန်"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"ပင်မဖြုတ်မီမှာ စကားဝှက်ကို မေးကြည့်ရန်"</string>
-    <string name="package_installed_device_owner" msgid="7035926868974878525">"သင်၏ စီမံခန့်ခွဲသူက ထည့်သွင်းထားသည်"</string>
+    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
+    <skip />
     <string name="package_updated_device_owner" msgid="7560272363805506941">"သင်၏ စီမံခန့်ခွဲသူက အပ်ဒိတ်လုပ်ထားသည်"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"သင်၏ စီမံခန့်ခွဲသူက ဖျက်လိုက်ပါပြီ"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"OK"</string>
@@ -2393,6 +2396,8 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"အလုပ် ၃"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"စမ်းသပ်မှု"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"အများသုံး"</string>
+    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <skip />
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"အက်ပ်အကြောင်းအရာသည် လုံခြုံရေးအတွက် မျက်နှာပြင် မျှဝေခြင်းမှ ဖျောက်ထားသည်"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"ဂြိုဟ်တုနှင့် အလိုအလျောက် ချိတ်ဆက်ထားသည်"</string>

@@ -1,4 +1,5 @@
 package: "android.crashrecovery.flags"
+container: "system"
 
 flag {
     name: "recoverability_detection"
@@ -14,4 +15,12 @@ flag {
     namespace: "crashrecovery"
     description: "Enables various dependencies of crashrecovery module"
     bug: "289203818"
+}
+
+flag {
+    name: "allow_rescue_party_flag_resets"
+    namespace: "crashrecovery"
+    description: "Enables rescue party flag resets"
+    bug: "287618292"
+    is_fixed_read_only: true
 }

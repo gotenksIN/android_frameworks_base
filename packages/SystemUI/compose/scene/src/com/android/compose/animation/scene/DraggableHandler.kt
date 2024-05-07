@@ -280,7 +280,7 @@ private class DragControllerImpl(
             swipes.findUserActionResult(
                 fromScene = fromScene,
                 directionOffset = swipeTransition.dragOffset,
-                updateSwipesResults = isNewFromScene
+                updateSwipesResults = isNewFromScene,
             )
 
         if (result == null) {
@@ -288,13 +288,14 @@ private class DragControllerImpl(
             return
         }
 
-        swipeTransition.dragOffset += acceleratedOffset
-
         if (
             isNewFromScene ||
                 result.toScene != swipeTransition.toScene ||
                 result.transitionKey != swipeTransition.key
         ) {
+            // Make sure the current transition will finish to the right current scene.
+            swipeTransition._currentScene = fromScene
+
             val swipeTransition =
                 SwipeTransition(
                         layoutState = layoutState,
@@ -305,7 +306,7 @@ private class DragControllerImpl(
                         layoutImpl = draggableHandler.layoutImpl,
                         orientation = draggableHandler.orientation,
                     )
-                    .apply { dragOffset = swipeTransition.dragOffset }
+                    .apply { dragOffset = swipeTransition.dragOffset + acceleratedOffset }
 
             updateTransition(swipeTransition)
         }
@@ -681,6 +682,17 @@ private class SwipeTransition(
                                         }
                                     if (isBouncing) {
                                         bouncingScene = targetScene
+
+                                        // Immediately stop this transition if we are bouncing on a
+                                        // scene that does not bounce.
+                                        val overscrollSpec = currentOverscrollSpec
+                                        if (
+                                            overscrollSpec != null &&
+                                                overscrollSpec.transformationSpec.transformations
+                                                    .isEmpty()
+                                        ) {
+                                            snapToScene(targetScene)
+                                        }
                                     }
                                 }
                             }

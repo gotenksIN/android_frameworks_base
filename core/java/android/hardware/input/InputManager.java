@@ -1099,12 +1099,12 @@ public final class InputManager {
      * </p>
      * @hide
      */
-    @FlaggedApi(FLAG_DEVICE_ASSOCIATIONS)
     @RequiresPermission(android.Manifest.permission.ASSOCIATE_INPUT_DEVICE_TO_DISPLAY)
     @TestApi
-    public void addUniqueIdAssociationByPort(@NonNull String inputPort,
+    // TODO(b/324075859): Rename to addUniqueIdAssociationByPort
+    public void addUniqueIdAssociation(@NonNull String inputPort,
             @NonNull String displayUniqueId) {
-        mGlobal.addUniqueIdAssociationByPort(inputPort, displayUniqueId);
+        mGlobal.addUniqueIdAssociation(inputPort, displayUniqueId);
     }
 
     /**
@@ -1115,11 +1115,11 @@ public final class InputManager {
      * </p>
      * @hide
      */
-    @FlaggedApi(FLAG_DEVICE_ASSOCIATIONS)
     @RequiresPermission(android.Manifest.permission.ASSOCIATE_INPUT_DEVICE_TO_DISPLAY)
     @TestApi
-    public void removeUniqueIdAssociationByPort(@NonNull String inputPort) {
-        mGlobal.removeUniqueIdAssociationByPort(inputPort);
+    // TODO(b/324075859): Rename to removeUniqueIdAssociationByPort
+    public void removeUniqueIdAssociation(@NonNull String inputPort) {
+        mGlobal.removeUniqueIdAssociation(inputPort);
     }
 
     /**

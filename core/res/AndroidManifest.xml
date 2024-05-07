@@ -3301,7 +3301,7 @@
 
     <!-- @SystemApi @hide Allows privileged applications to get details about hidden profile
         users.
-        @FlaggedApi("android.multiuser.flags.enable_permission_to_access_hidden_profiles") -->
+        @FlaggedApi("android.multiuser.enable_permission_to_access_hidden_profiles") -->
     <permission
         android:name="android.permission.ACCESS_HIDDEN_PROFILES_FULL"
         android:protectionLevel="signature|privileged" />
@@ -8036,17 +8036,6 @@
     <permission android:name="android.permission.RUN_USER_INITIATED_JOBS"
                 android:protectionLevel="normal"/>
 
-    <!-- @FlaggedApi("android.app.job.backup_jobs_exemption")
-         Gives applications with a <b>major use case</b> of backing-up or syncing content increased
-         job execution allowance in order to complete the related work. The jobs must have a valid
-         content URI trigger and network constraint set.
-         <p>This is a special access permission that can be revoked by the system or the user.
-         <p>Protection level: signature|privileged|appop
-         @hide
-     -->
-    <permission android:name="android.permission.RUN_BACKUP_JOBS"
-                android:protectionLevel="signature|privileged|appop"/>
-
     <!-- Allows an app access to the installer provided app metadata.
         @SystemApi
         @hide
@@ -8475,9 +8464,11 @@
                 android:process=":ui">
         </activity>
 
+        <!-- BlockedAppStreamingActivity is launched as the system user. -->
         <activity android:name="com.android.internal.app.BlockedAppStreamingActivity"
             android:theme="@style/Theme.Dialog.Confirmation"
             android:excludeFromRecents="true"
+            android:showForAllUsers="true"
             android:process=":ui">
         </activity>
 

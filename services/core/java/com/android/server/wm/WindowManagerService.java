@@ -44,6 +44,7 @@ import static android.os.Process.myPid;
 import static android.os.Process.myUid;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.permission.flags.Flags.sensitiveContentImprovements;
+import static android.permission.flags.Flags.sensitiveContentMetricsBugfix;
 import static android.provider.Settings.Global.DEVELOPMENT_ENABLE_FREEFORM_WINDOWS_SUPPORT;
 import static android.provider.Settings.Global.DEVELOPMENT_ENABLE_NON_RESIZABLE_MULTI_WINDOW;
 import static android.provider.Settings.Global.DEVELOPMENT_FORCE_DESKTOP_MODE_ON_EXTERNAL_DISPLAYS;
@@ -113,6 +114,7 @@ import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_STARTING_WIND
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_WINDOW_MOVEMENT;
 import static com.android.internal.protolog.ProtoLogGroup.WM_ERROR;
 import static com.android.internal.protolog.ProtoLogGroup.WM_SHOW_TRANSACTIONS;
+import static com.android.internal.util.FrameworkStatsLog.SENSITIVE_NOTIFICATION_APP_PROTECTION_APPLIED;
 import static com.android.internal.util.LatencyTracker.ACTION_ROTATE_SCREEN;
 import static com.android.server.LockGuard.INDEX_WINDOW;
 import static com.android.server.LockGuard.installLock;
@@ -321,6 +323,7 @@ import android.window.ITaskFpsCallback;
 import android.window.ITrustedPresentationListener;
 import android.window.InputTransferToken;
 import android.window.ScreenCapture;
+import android.window.ScreenCapture.ScreenshotHardwareBuffer;
 import android.window.SystemPerformanceHinter;
 import android.window.TaskSnapshot;
 import android.window.TrustedPresentationThresholds;
@@ -340,6 +343,7 @@ import com.android.internal.protolog.ProtoLogGroup;
 import com.android.internal.protolog.common.ProtoLog;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FastPrintWriter;
+import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.LatencyTracker;
 import com.android.internal.view.WindowManagerPolicyThread;
 import com.android.server.AnimationThread;
@@ -385,6 +389,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -1111,6 +1116,9 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     SystemPerformanceHinter mSystemPerformanceHinter;
+
+    @GuardedBy("mGlobalLock")
+    private long mSensitiveContentProtectionSessionId = 0;
 
     @GuardedBy("mGlobalLock")
     final SensitiveContentPackages mSensitiveContentPackages = new SensitiveContentPackages();
@@ -4194,7 +4202,7 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Nullable
-    private ScreenCapture.ScreenshotHardwareBuffer takeAssistScreenshot() {
+    private ScreenshotHardwareBuffer takeAssistScreenshot(Set<Integer> windowTypesToExclude) {
         if (!checkCallingPermission(READ_FRAME_BUFFER, "requestAssistScreenshot()")) {
             throw new SecurityException("Requires READ_FRAME_BUFFER permission");
         }
@@ -4209,11 +4217,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 captureArgs = null;
             } else {
-                captureArgs = displayContent.getLayerCaptureArgs();
+                captureArgs = displayContent.getLayerCaptureArgs(windowTypesToExclude);
             }
         }
 
-        final ScreenCapture.ScreenshotHardwareBuffer screenshotBuffer;
+        final ScreenshotHardwareBuffer screenshotBuffer;
         if (captureArgs != null) {
             ScreenCapture.SynchronousScreenCaptureListener syncScreenCapture =
                     ScreenCapture.createSyncCaptureListener();
@@ -4239,7 +4247,8 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     @Override
     public boolean requestAssistScreenshot(final IAssistDataReceiver receiver) {
-        final ScreenCapture.ScreenshotHardwareBuffer shb = takeAssistScreenshot();
+        final ScreenshotHardwareBuffer shb =
+                takeAssistScreenshot(/* windowTypesToExclude= */ Set.of());
         final Bitmap bm = shb != null ? shb.asBitmap() : null;
         FgThread.getHandler().post(() -> {
             try {
@@ -4294,7 +4303,7 @@ public class WindowManagerService extends IWindowManager.Stub
             mTmpRect.offsetTo(0, 0);
 
             final SurfaceControl sc = task.getSurfaceControl();
-            final ScreenCapture.ScreenshotHardwareBuffer buffer = ScreenCapture.captureLayers(
+            final ScreenshotHardwareBuffer buffer = ScreenCapture.captureLayers(
                     layerCaptureArgsBuilder.setLayer(sc).setSourceCrop(mTmpRect).build());
             if (buffer == null) {
                 Slog.w(TAG, "Could not get screenshot buffer for taskId: " + taskId);
@@ -4538,7 +4547,8 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    int getDisplayUserRotation(int displayId) {
+    @Override
+    public int getDisplayUserRotation(int displayId) {
         synchronized (mGlobalLock) {
             final DisplayContent display = mRoot.getDisplayContent(displayId);
             if (display == null) {
@@ -8767,6 +8777,16 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
+        public void setBlockScreenCaptureForAppsSessionId(long sessionId) {
+            synchronized (mGlobalLock) {
+                if (sensitiveContentMetricsBugfix()
+                        && mSensitiveContentProtectionSessionId != sessionId) {
+                    mSensitiveContentProtectionSessionId = sessionId;
+                }
+            }
+        }
+
+        @Override
         public void addBlockScreenCaptureForApps(ArraySet<PackageInfo> packageInfos) {
             synchronized (mGlobalLock) {
                 boolean modified =
@@ -8838,9 +8858,9 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public ScreenCapture.ScreenshotHardwareBuffer takeAssistScreenshot() {
+        public ScreenshotHardwareBuffer takeAssistScreenshot(Set<Integer> windowTypesToExclude) {
             // WMS.takeAssistScreenshot takes care of the locking.
-            return WindowManagerService.this.takeAssistScreenshot();
+            return WindowManagerService.this.takeAssistScreenshot(windowTypesToExclude);
         }
     }
 
@@ -10230,6 +10250,15 @@ public class WindowManagerService extends IWindowManager.Stub
                                 Toast.LENGTH_SHORT)
                         .show();
             });
+            // If blocked due to notification protection (null window token) log protection applied
+            if (sensitiveContentMetricsBugfix()
+                    && mSensitiveContentPackages
+                    .shouldBlockScreenCaptureForApp(w.getOwningPackage(), uid, null)) {
+                FrameworkStatsLog.write(
+                        SENSITIVE_NOTIFICATION_APP_PROTECTION_APPLIED,
+                        mSensitiveContentProtectionSessionId,
+                        uid);
+            }
         }
     }
 }

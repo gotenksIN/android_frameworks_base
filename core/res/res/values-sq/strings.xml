@@ -356,6 +356,8 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"Nxirr një pamje të ekranit"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"Mund të nxjerrë një pamje e ekranit."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"Versioni paraprak, <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
+    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
+    <skip />
     <string name="permlab_statusBar" msgid="8798267849526214017">"çaktivizo ose modifiko shiritin e statusit"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"Lejon aplikacionin të çaktivizojë shiritin e statusit dhe të heqë ikonat e sistemit."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"të bëhet shiriti i statusit"</string>
@@ -662,7 +664,7 @@
   </string-array>
     <string name="fingerprint_error_not_match" msgid="4599441812893438961">"Gjurma e gishtit nuk u njoh"</string>
     <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"Gjurma e gishtit nuk u njoh"</string>
-    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="6226091888364083421">"Nuk mund ta dallojë fytyrën. Përdor më mirë gjurmën e gishtit."</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"Fytyra nuk njihet. Përdor gjurmën e gishtit."</string>
     <string name="fingerprint_authenticated" msgid="2024862866860283100">"Gjurma e gishtit u vërtetua"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="8867889115112348167">"Fytyra u vërtetua"</string>
     <string name="face_authenticated_confirmation_required" msgid="6872632732508013755">"Fytyra u vërtetua, shtyp \"Konfirmo\""</string>
@@ -828,7 +830,7 @@
     <string name="policylab_limitPassword" msgid="4851829918814422199">"Cakto rregullat e fjalëkalimit"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"Kontrollo gjatësinë dhe karakteret e lejuara në fjalëkalimet dhe kodet PIN të kyçjes së ekranit."</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"Monitoron tentativat e shkyçjes së ekranit"</string>
-    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Monitoro numrin e fjalëkalimeve të shkruar gabim kur shkyç ekranin. Kyç tabletin ose fshi të gjitha të dhënat e tij, nëse shkruhen shumë fjalëkalime të pasakta."</string>
+    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Monitoro numrin e fjalëkalimeve të shkruara gabim kur shkyç ekranin. Kyç tabletin ose fshi të gjitha të dhënat e tij, nëse shkruhen shumë fjalëkalime të pasakta."</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"Monitoro numrin e fjalëkalimeve të shkruara gabim kur shkyç ekranin dhe kyç pajisjen tënde Android TV ose spastro të gjitha të dhënat e pajisjes sate Android TV nëse shkruhen gabim shumë fjalëkalime."</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"Monitoro numrin e fjalëkalimeve të shkruara gabim kur shkyç ekranin dhe kyç sistemin info-argëtues ose spastro të gjitha të dhënat e tij nëse shkruhen shumë fjalëkalime të gabuara."</string>
     <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"Monitoron numrin e fjalëkalimeve të shkruar gabim kur shkyç ekranin. Kyç telefonin ose fshin të gjitha të dhënat e tij, nëse shkruhen shumë fjalëkalime të pasakta."</string>
@@ -1896,7 +1898,8 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Zhgozhdimi kërkon PIN-in"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Kërko motivin e shkyçjes para heqjes së gozhdimit"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Kërko fjalëkalim para heqjes nga gozhdimi."</string>
-    <string name="package_installed_device_owner" msgid="7035926868974878525">"Instaluar nga administratori"</string>
+    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
+    <skip />
     <string name="package_updated_device_owner" msgid="7560272363805506941">"Përditësuar nga administratori"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Fshirë nga administratori"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"Në rregull"</string>
@@ -2393,6 +2396,8 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"Puna 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"Test"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"I përbashkët"</string>
+    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <skip />
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Përmbajtja e aplikacionit është fshehur nga ndarja e ekranit për arsye sigurie"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"U lidh automatikisht me satelitin"</string>

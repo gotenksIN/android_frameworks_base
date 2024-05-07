@@ -529,8 +529,9 @@ class InputManagerServiceTests {
         verify(mockOnKeyListener, never()).onKey(mockSurfaceView1, KeyEvent.KEYCODE_A, upEvent)
     }
 
+    // TODO(b/324075859): Rename this method to addUniqueIdAssociationByPort_verifyAssociations
     @Test
-    fun addUniqueIdAssociationByPort_verifyAssociations() {
+    fun addUniqueIdAssociation_verifyAssociations() {
         // Overall goal is to have 2 displays and verify that events from the InputDevice are
         // sent only to the view that is on the associated display.
         // So, associate the InputDevice with display 1, then send and verify KeyEvents.
@@ -551,7 +552,7 @@ class InputManagerServiceTests {
         val inputDevice = createInputDevice()
 
         // Associate input device with display
-        service.addUniqueIdAssociationByPort(
+        service.addUniqueIdAssociation(
                 inputDevice.name,
                 virtualDisplays[0].display.displayId.toString()
         )
@@ -575,10 +576,10 @@ class InputManagerServiceTests {
         verify(mockOnKeyListener, never()).onKey(mockSurfaceView2, KeyEvent.KEYCODE_A, downEvent)
 
         // Remove association
-        service.removeUniqueIdAssociationByPort(inputDevice.name)
+        service.removeUniqueIdAssociation(inputDevice.name)
 
         // Associate with Display 2
-        service.addUniqueIdAssociationByPort(
+        service.addUniqueIdAssociation(
                 inputDevice.name,
                 virtualDisplays[1].display.displayId.toString()
         )

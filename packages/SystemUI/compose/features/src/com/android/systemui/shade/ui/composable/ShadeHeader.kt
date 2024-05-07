@@ -372,6 +372,20 @@ private fun BatteryIcon(
             val batteryIcon = BatteryMeterView(context, null)
             batteryIcon.setPercentShowMode(BatteryMeterView.MODE_ON)
 
+            val themedContext =
+                ContextThemeWrapper(context, R.style.Theme_SystemUI_QuickSettings_Header)
+            val fg = Utils.getColorAttrDefaultColor(themedContext, android.R.attr.textColorPrimary)
+            val bg =
+                Utils.getColorAttrDefaultColor(
+                    themedContext,
+                    android.R.attr.textColorPrimaryInverse,
+                )
+
+            // [BatteryMeterView.updateColors] is an old method that was built to distinguish
+            // between dual-tone colors and single-tone. The current icon is only single-tone, so
+            // the final [fg] is the only one we actually need
+            batteryIcon.updateColors(fg, bg, fg)
+
             val batteryMaterViewController =
                 createBatteryMeterViewController(batteryIcon, StatusBarLocation.QS)
             batteryMaterViewController.init()
@@ -531,8 +545,14 @@ private fun shouldUseExpandedFormat(state: TransitionState): Boolean {
             state.currentScene == Scenes.QuickSettings
         }
         is TransitionState.Transition -> {
-            (state.isTransitioning(Scenes.Shade, Scenes.QuickSettings) && state.progress >= 0.5) ||
-                (state.isTransitioning(Scenes.QuickSettings, Scenes.Shade) && state.progress < 0.5)
+            ((state.isTransitioning(Scenes.Shade, Scenes.QuickSettings) ||
+                state.isTransitioning(Scenes.Gone, Scenes.QuickSettings) ||
+                state.isTransitioning(Scenes.Lockscreen, Scenes.QuickSettings)) &&
+                state.progress >= 0.5) ||
+                ((state.isTransitioning(Scenes.QuickSettings, Scenes.Shade) ||
+                    state.isTransitioning(Scenes.QuickSettings, Scenes.Gone) ||
+                    state.isTransitioning(Scenes.QuickSettings, Scenes.Lockscreen)) &&
+                    state.progress <= 0.5)
         }
     }
 }

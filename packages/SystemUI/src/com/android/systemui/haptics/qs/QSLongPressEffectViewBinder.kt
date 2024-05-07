@@ -16,19 +16,23 @@
 
 package com.android.systemui.haptics.qs
 
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
+import android.view.MotionEvent
+import android.view.ViewConfiguration
+import android.view.animation.AccelerateDecelerateInterpolator
+import androidx.core.animation.doOnCancel
+import androidx.core.animation.doOnEnd
+import androidx.core.animation.doOnStart
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.app.tracing.coroutines.launch
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.qs.tileimpl.QSTileViewImpl
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.DisposableHandle
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.launch
 
-// TODO(b/332903800)
 object QSLongPressEffectViewBinder {
+
     fun bind(
         tile: QSTileViewImpl,
         qsLongPressEffect: QSLongPressEffect?,
@@ -36,53 +40,90 @@ object QSLongPressEffectViewBinder {
     ): DisposableHandle? {
         if (qsLongPressEffect == null) return null
 
+        // Set the touch listener as the long-press effect
+        setTouchListener(tile, qsLongPressEffect)
+
         return tile.repeatWhenAttached {
             repeatOnLifecycle(Lifecycle.State.CREATED) {
-                val tag = "${tileSpec ?: "unknownTileSpec"}#LongPressEffect"
-                // Progress of the effect
-                launch("$tag#progress") {
-                    qsLongPressEffect.effectProgress.collect { progress ->
-                        progress?.let {
-                            if (it == 0f) {
-                                tile.bringToFront()
-                            } else {
-                                tile.updateLongPressEffectProperties(it)
-                            }
-                        }
-                    }
-                }
-
                 // Action to perform
-                launch("$tag#action") {
+                launch({ "${tileSpec ?: "unknownTileSpec"}#LongPressEffect#action" }) {
+                    var effectAnimator: ValueAnimator? = null
+
                     qsLongPressEffect.actionType.collect { action ->
                         action?.let {
                             when (it) {
-                                QSLongPressEffect.ActionType.CLICK -> tile.performClick()
-                                QSLongPressEffect.ActionType.LONG_PRESS -> tile.performLongClick()
+                                QSLongPressEffect.ActionType.CLICK -> {
+                                    tile.performClick()
+                                    qsLongPressEffect.clearActionType()
+                                }
+                                QSLongPressEffect.ActionType.LONG_PRESS -> {
+                                    tile.performLongClick()
+                                    qsLongPressEffect.clearActionType()
+                                }
                                 QSLongPressEffect.ActionType.RESET_AND_LONG_PRESS -> {
                                     tile.resetLongPressEffectProperties()
                                     tile.performLongClick()
+                                    qsLongPressEffect.clearActionType()
+                                }
+                                QSLongPressEffect.ActionType.START_ANIMATOR -> {
+                                    if (effectAnimator?.isRunning == false) {
+                                        effectAnimator?.start()
+                                    }
+                                }
+                                QSLongPressEffect.ActionType.REVERSE_ANIMATOR -> {
+                                    effectAnimator?.let {
+                                        val pausedProgress = it.animatedFraction
+                                        qsLongPressEffect.playReverseHaptics(pausedProgress)
+                                        it.reverse()
+                                    }
+                                }
+                                QSLongPressEffect.ActionType.CANCEL_ANIMATOR -> {
+                                    tile.resetLongPressEffectProperties()
+                                    effectAnimator?.cancel()
+                                }
+                                QSLongPressEffect.ActionType.INITIALIZE_ANIMATOR -> {
+                                    effectAnimator =
+                                        ValueAnimator.ofFloat(0f, 1f).apply {
+                                            this.duration =
+                                                qsLongPressEffect.effectDuration.toLong()
+                                            interpolator = AccelerateDecelerateInterpolator()
+
+                                            doOnStart { qsLongPressEffect.handleAnimationStart() }
+                                            addUpdateListener {
+                                                val value = animatedValue as Float
+                                                if (value == 0f) {
+                                                    tile.bringToFront()
+                                                } else {
+                                                    tile.updateLongPressEffectProperties(value)
+                                                }
+                                            }
+                                            doOnEnd { qsLongPressEffect.handleAnimationComplete() }
+                                            doOnCancel { qsLongPressEffect.handleAnimationCancel() }
+                                        }
                                 }
                             }
-                            qsLongPressEffect.clearActionType()
                         }
                     }
                 }
-
-                // Tap timeout wait
-                launch("$tag#timeout") {
-                    qsLongPressEffect.shouldWaitForTapTimeout
-                        .filter { it }
-                        .collect {
-                            try {
-                                delay(QSLongPressEffect.PRESSED_TIMEOUT)
-                                qsLongPressEffect.handleTimeoutComplete()
-                            } catch (_: CancellationException) {
-                                qsLongPressEffect.resetEffect()
-                            }
-                        }
-                }
             }
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setTouchListener(tile: QSTileViewImpl, longPressEffect: QSLongPressEffect?) {
+        tile.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    tile.postDelayed(
+                        { longPressEffect?.handleTimeoutComplete() },
+                        ViewConfiguration.getTapTimeout().toLong(),
+                    )
+                    longPressEffect?.handleActionDown()
+                }
+                MotionEvent.ACTION_UP -> longPressEffect?.handleActionUp()
+                MotionEvent.ACTION_CANCEL -> longPressEffect?.handleActionCancel()
+            }
+            true
         }
     }
 }

@@ -26,9 +26,9 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
+import android.platform.test.flag.junit.FlagsParameterization;
 import android.testing.TestableLooper;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import com.android.internal.logging.UiEventLogger;
@@ -49,6 +49,8 @@ import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.settings.GlobalSettings;
 import com.android.systemui.util.time.SystemClock;
 
+import kotlinx.coroutines.flow.StateFlowKt;
+
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -58,10 +60,13 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import kotlinx.coroutines.flow.StateFlowKt;
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
+import platform.test.runner.parameterized.Parameters;
+
+import java.util.List;
 
 @SmallTest
-@RunWith(AndroidJUnit4.class)
+@RunWith(ParameterizedAndroidJunit4.class)
 @TestableLooper.RunWithLooper
 public class HeadsUpManagerPhoneTest extends BaseHeadsUpManagerTest {
     @Rule public MockitoRule rule = MockitoJUnit.rule();
@@ -141,12 +146,17 @@ public class HeadsUpManagerPhoneTest extends BaseHeadsUpManagerTest {
         );
     }
 
+    @Parameters(name = "{0}")
+    public static List<FlagsParameterization> getFlags() {
+        return FlagsParameterization.allCombinationsOf(NotificationThrottleHun.FLAG_NAME);
+    }
+
+    public HeadsUpManagerPhoneTest(FlagsParameterization flags) {
+        super(flags);
+    }
+
     @Before
     public void setUp() {
-        // TODO(b/315362456) create separate test with the flag disabled
-        //  then modify this file to test with the flag enabled
-        mSetFlagsRule.disableFlags(NotificationThrottleHun.FLAG_NAME);
-
         when(mShadeInteractor.isAnyExpanded()).thenReturn(StateFlowKt.MutableStateFlow(false));
         final AccessibilityManagerWrapper accessibilityMgr =
                 mDependency.injectMockDependency(AccessibilityManagerWrapper.class);

@@ -61,6 +61,16 @@ flag {
 }
 
 flag {
+   name: "notification_over_expansion_clipping_fix"
+   namespace: "systemui"
+   description: "fix NSSL clipping when over-expanding; fixes split shade bug."
+   bug: "288553572"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "notification_async_group_header_inflation"
     namespace: "systemui"
     description: "Inflates the notification group summary header views from the background thread."
@@ -487,7 +497,7 @@ flag {
 }
 
 flag {
-    name: "screenshot_shelf_ui"
+    name: "screenshot_shelf_ui2"
     namespace: "systemui"
     description: "Use new shelf UI flow for screenshots"
     bug: "329659738"
@@ -766,6 +776,13 @@ flag {
 }
 
 flag {
+    name: "keyboard_shortcut_helper_rewrite"
+    namespace: "systemui"
+    description: "A new implementation of the keyboards shortcuts helper sheet."
+    bug: "327364197"
+}
+
+flag {
   name: "dream_overlay_bouncer_swipe_direction_filtering"
   namespace: "systemui"
   description: "do not initiate bouncer swipe when the direction is opposite of the expansion"
@@ -803,4 +820,11 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enforce_brightness_base_user_restriction"
+    namespace: "systemui"
+    description: "Enforce BaseUserRestriction for DISALLOW_CONFIG_BRIGHTNESS."
+    bug: "329205638"
 }

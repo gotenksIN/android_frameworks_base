@@ -94,24 +94,41 @@
     <string name="bluetooth_connected_no_headset_battery_level" msgid="2661863370509206428">"เชื่อมต่อแล้ว (ไม่รวมโทรศัพท์) แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g><xliff:g id="ACTIVE_DEVICE">%2$s</xliff:g>"</string>
     <string name="bluetooth_connected_no_a2dp_battery_level" msgid="6499078454894324287">"เชื่อมต่อแล้ว (ไม่รวมสื่อ) แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g><xliff:g id="ACTIVE_DEVICE">%2$s</xliff:g>"</string>
     <string name="bluetooth_connected_no_headset_no_a2dp_battery_level" msgid="8477440576953067242">"เชื่อมต่อแล้ว (ไม่รวมโทรศัพท์หรือสื่อ) แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g><xliff:g id="ACTIVE_DEVICE">%2$s</xliff:g>"</string>
-    <string name="bluetooth_active_battery_level" msgid="3450745316700494425">"ใช้งานอยู่ แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
-    <string name="bluetooth_active_battery_level_untethered" msgid="2706188607604205362">"ใช้งานอยู่ L: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g>, R: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g>"</string>
+    <!-- no translation found for bluetooth_active_battery_level (2685517576209066008) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_battery_level_untethered (4961338936672922617) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_battery_level_untethered_left (5521405563527657515) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_battery_level_untethered_right (7165552824664523336) -->
+    <skip />
     <string name="bluetooth_battery_level" msgid="2893696778200201555">"แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
     <string name="tv_bluetooth_battery_level" msgid="8786353985605532846">"แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
-    <string name="bluetooth_battery_level_untethered" msgid="4002282355111504349">"L: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g>, R: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g>"</string>
-    <string name="bluetooth_battery_level_untethered_left" msgid="2952823007648782646">"ฝั่งซ้าย <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
-    <string name="bluetooth_battery_level_untethered_right" msgid="6525710737740083276">"ฝั่งขวา <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
+    <!-- no translation found for bluetooth_battery_level_untethered (1616774716076301755) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left (5725764679536058365) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right (8377995536997790142) -->
+    <skip />
     <string name="bluetooth_active_no_battery_level" msgid="4155462233006205630">"ใช้งานอยู่"</string>
     <string name="bluetooth_saved_device" msgid="4895871321722311428">"บันทึกแล้ว"</string>
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"ใช้งานอยู่ เฉพาะข้างซ้าย"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"ใช้งานอยู่ เฉพาะข้างขวา"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"ใช้งานอยู่ ข้างซ้ายและขวา"</string>
-    <string name="bluetooth_active_media_only_battery_level" msgid="1164678961213251365">"ใช้งานอยู่ (สื่อเท่านั้น), แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
-    <string name="bluetooth_active_media_only_battery_level_untethered" msgid="1345174295097854560">"ใช้งานอยู่ (สื่อเท่านั้น), L: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g>, R: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g>"</string>
-    <string name="bluetooth_battery_level_lea_support" msgid="8580950145907305436">"เชื่อมต่อแล้ว (รองรับการแชร์เสียง), แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
-    <string name="bluetooth_battery_level_untethered_lea_support" msgid="8534816721698743015">"เชื่อมต่อแล้ว (รองรับการแชร์เสียง), L: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g>, R: แบตเตอรี่ <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g>"</string>
-    <string name="bluetooth_battery_level_untethered_left_lea_support" msgid="6605320955858788855">"เชื่อมต่อแล้ว (รองรับการแชร์เสียง), ซ้าย <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
-    <string name="bluetooth_battery_level_untethered_right_lea_support" msgid="5717356160322149355">"เชื่อมต่อแล้ว (รองรับการแชร์เสียง), ขวา <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
+    <!-- no translation found for bluetooth_active_media_only_battery_level (7772517511061834073) -->
+    <skip />
+    <!-- no translation found for bluetooth_active_media_only_battery_level_untethered (7444753133664620926) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_lea_support (5968584103507988820) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_lea_support (803110681688633362) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_left_lea_support (7707464334346454950) -->
+    <skip />
+    <!-- no translation found for bluetooth_battery_level_untethered_right_lea_support (8941549024377771038) -->
+    <skip />
+    <!-- no translation found for bluetooth_no_battery_level_lea_support (5721725041048434075) -->
+    <skip />
     <string name="bluetooth_active_media_only_no_battery_level" msgid="71106861912593126">"ใช้งานอยู่ (สื่อเท่านั้น)"</string>
     <string name="bluetooth_saved_device_lea_support" msgid="7231323139968285768">"รองรับการแชร์เสียง"</string>
     <string name="bluetooth_hearing_aid_media_only_left_active" msgid="1632152540901488645">"ใช้งานอยู่ (สื่อเท่านั้น), ซ้ายเท่านั้น"</string>
@@ -250,7 +267,7 @@
     <string name="adb_wireless_settings" msgid="2295017847215680229">"การแก้ไขข้อบกพร่องผ่าน Wi-Fi"</string>
     <string name="adb_wireless_list_empty_off" msgid="1713707973837255490">"หากต้องการดูและใช้อุปกรณ์ที่มีอยู่ ให้เปิดการแก้ไขข้อบกพร่องผ่าน Wi-Fi"</string>
     <string name="adb_pair_method_qrcode_title" msgid="6982904096137468634">"จับคู่อุปกรณ์ด้วยคิวอาร์โค้ด"</string>
-    <string name="adb_pair_method_qrcode_summary" msgid="7130694277228970888">"จับคู่อุปกรณ์เครื่องใหม่โดยใช้แอปสแกนคิวอาร์โค้ด"</string>
+    <string name="adb_pair_method_qrcode_summary" msgid="7130694277228970888">"จับคู่อุปกรณ์เครื่องใหม่โดยใช้ตัวสแกนคิวอาร์โค้ด"</string>
     <string name="adb_pair_method_code_title" msgid="1122590300445142904">"จับคู่อุปกรณ์ด้วยรหัสการจับคู่"</string>
     <string name="adb_pair_method_code_summary" msgid="6370414511333685185">"จับคู่อุปกรณ์เครื่องใหม่โดยใช้รหัสตัวเลข 6 หลัก"</string>
     <string name="adb_paired_devices_title" msgid="5268997341526217362">"อุปกรณ์ที่จับคู่"</string>
@@ -487,14 +504,10 @@
     <string name="power_charging_duration" msgid="6127154952524919719">"<xliff:g id="LEVEL">%1$s</xliff:g> - อีก <xliff:g id="TIME">%2$s</xliff:g> จึงจะเต็ม"</string>
     <string name="power_charging_limited" msgid="8202147604844938236">"<xliff:g id="LEVEL">%1$s</xliff:g> - ปรับการชาร์จให้เหมาะสมแล้ว"</string>
     <string name="power_charging_future_paused" msgid="1809543660923642799">"<xliff:g id="LEVEL">%1$s</xliff:g> ‑ กำลังชาร์จ"</string>
-    <!-- no translation found for power_fast_charging_duration_v2 (3797735998640359490) -->
-    <skip />
-    <!-- no translation found for power_charging_duration_v2 (2938998284074003248) -->
-    <skip />
-    <!-- no translation found for power_remaining_charging_duration_only_v2 (5358176435722950193) -->
-    <skip />
-    <!-- no translation found for power_remaining_fast_charging_duration_only_v2 (6270950195810579563) -->
-    <skip />
+    <string name="power_fast_charging_duration_v2" msgid="3797735998640359490">"<xliff:g id="LEVEL">%1$s</xliff:g> - <xliff:g id="STATUS">%2$s</xliff:g> - จะเต็มภายใน <xliff:g id="TIME">%3$s</xliff:g>"</string>
+    <string name="power_charging_duration_v2" msgid="2938998284074003248">"<xliff:g id="LEVEL">%1$s</xliff:g> - จะชาร์จเต็มภายใน <xliff:g id="TIME">%2$s</xliff:g>"</string>
+    <string name="power_remaining_charging_duration_only_v2" msgid="5358176435722950193">"จะชาร์จเต็มภายใน <xliff:g id="TIME">%1$s</xliff:g>"</string>
+    <string name="power_remaining_fast_charging_duration_only_v2" msgid="6270950195810579563">"จะเต็มภายใน <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="battery_info_status_unknown" msgid="268625384868401114">"ไม่ทราบ"</string>
     <string name="battery_info_status_charging" msgid="4279958015430387405">"กำลังชาร์จ"</string>
     <string name="battery_info_status_charging_fast" msgid="8027559755902954885">"กำลังชาร์จอย่างเร็ว"</string>
@@ -506,10 +519,8 @@
     <string name="battery_info_status_full" msgid="1339002294876531312">"ชาร์จแล้ว"</string>
     <string name="battery_info_status_full_charged" msgid="3536054261505567948">"ชาร์จเต็มแล้ว"</string>
     <string name="battery_info_status_charging_on_hold" msgid="6364355145521694438">"หยุดการชาร์จชั่วคราว"</string>
-    <!-- no translation found for battery_info_status_charging_v2 (6118522107222245505) -->
-    <skip />
-    <!-- no translation found for battery_info_status_charging_fast_v2 (1825439848151256589) -->
-    <skip />
+    <string name="battery_info_status_charging_v2" msgid="6118522107222245505">"กำลังชาร์จ"</string>
+    <string name="battery_info_status_charging_fast_v2" msgid="1825439848151256589">"ชาร์จเร็ว"</string>
     <string name="disabled_by_admin_summary_text" msgid="5343911767402923057">"ผู้ดูแลระบบเป็นผู้ควบคุม"</string>
     <string name="disabled_by_app_ops_text" msgid="8373595926549098012">"ควบคุมโดยการตั้งค่าที่จำกัด"</string>
     <string name="disabled" msgid="8017887509554714950">"ปิดอยู่"</string>
@@ -696,8 +707,7 @@
     <string name="accessibility_phone_one_bar" msgid="5719721147018970063">"สัญญาณโทรศัพท์หนึ่งขีด"</string>
     <string name="accessibility_phone_two_bars" msgid="2531458337458953263">"สัญญาณโทรศัพท์สองขีด"</string>
     <string name="accessibility_phone_three_bars" msgid="1523967995996696619">"สัญญาณโทรศัพท์สามขีด"</string>
-    <!-- no translation found for accessibility_phone_four_bars (4477202400261338403) -->
-    <skip />
+    <string name="accessibility_phone_four_bars" msgid="4477202400261338403">"สัญญาณโทรศัพท์ 4 ขีด"</string>
     <string name="accessibility_phone_signal_full" msgid="4302338883816077134">"สัญญาณโทรศัพท์เต็ม"</string>
     <string name="accessibility_no_data" msgid="4563181886936931008">"ไม่มีข้อมูล"</string>
     <string name="accessibility_data_one_bar" msgid="6892888138070752480">"สัญญาณข้อมูลหนึ่งขีด"</string>

@@ -356,6 +356,8 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"સ્ક્રીનશૉટ લો"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"ડિસ્પ્લેનો સ્ક્રીનશૉટ લઈ શકે છે."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"પ્રીવ્યૂ, <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
+    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
+    <skip />
     <string name="permlab_statusBar" msgid="8798267849526214017">"સ્ટેટસ બારને અક્ષમ કરો અથવા તેમાં ફેરફાર કરો"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"ઍપ્લિકેશનને સ્ટેટસ બાર અક્ષમ કરવાની અથવા સિસ્ટમ આયકન્સ ઉમેરવા અને દૂર કરવાની મંજૂરી આપે છે."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"સ્ટેટસ બારમાં બતાવો"</string>
@@ -662,7 +664,7 @@
   </string-array>
     <string name="fingerprint_error_not_match" msgid="4599441812893438961">"ફિંગરપ્રિન્ટ ઓળખી શકાઈ નથી"</string>
     <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"ફિંગરપ્રિન્ટ ઓળખી શકાઈ નથી"</string>
-    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="6226091888364083421">"ચહેરો ઓળખી શકતા નથી. તેને બદલે ફિંગરપ્રિન્ટ વાપરો."</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"ચહેરો ઓળખાયો નથી. તેને બદલે ફિંગરપ્રિન્ટ વાપરો."</string>
     <string name="fingerprint_authenticated" msgid="2024862866860283100">"ફિંગરપ્રિન્ટ પ્રમાણિત કરી"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="8867889115112348167">"ચહેરા પ્રમાણિત"</string>
     <string name="face_authenticated_confirmation_required" msgid="6872632732508013755">"ચહેરા પ્રમાણિત, કૃપા કરીને કન્ફર્મ કરો"</string>
@@ -828,7 +830,7 @@
     <string name="policylab_limitPassword" msgid="4851829918814422199">"પાસવર્ડ નિયમો સેટ કરો"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"સ્ક્રીન લૉક પાસવર્ડ અને પિનમાં મંજૂર લંબાઈ અને અક્ષરોને નિયંત્રિત કરો."</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"સ્ક્રીનને અનલૉક કરવાના પ્રયત્નોને મૉનિટર કરો"</string>
-    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"સ્ક્રીનને અનલૉક કરતી વખતે લખેલા ખોટા પાસવર્ડ્સની સંખ્યાને મૉનિટર કરો અને જો ઘણા બધા ખોટા પાસવર્ડ્સ લખ્યાં છે તો ટેબ્લેટને લૉક કરો અથવા ટેબ્લેટનો તમામ ડેટા કાઢી નાખો."</string>
+    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"સ્ક્રીનને અનલૉક કરતી વખતે લખેલા ખોટા પાસવર્ડની સંખ્યાને મૉનિટર કરો અને જો ઘણા બધા ખોટા પાસવર્ડ લખ્યાં છે તો ટૅબ્લેટને લૉક કરો અથવા ટૅબ્લેટનો તમામ ડેટા કાઢી નાખો."</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"સ્ક્રીનને અનલૉક કરતી વખતે ટાઇપ કરેલા ખોટા પાસવર્ડની સંખ્યાને મૉનિટર કરો અને જો ઘણા બધા ખોટા પાસવર્ડ ટાઇપ કર્યા હોય, તો તમારા Android TV ડિવાઇસના ડેટાને લૉક કરો અથવા આ વપરાશકર્તાનો બધો ડેટા કાઢી નાખો."</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"સ્ક્રીનને અનલૉક કરતી વખતે લખેલા ખોટા પાસવર્ડની સંખ્યાને મૉનિટર કરો અને જો ઘણા બધા ખોટા પાસવર્ડ લખ્યા હોય તો ઇન્ફોટેનમેન્ટ સિસ્ટમને લૉક કરો અથવા ઇન્ફોટેનમેન્ટ સિસ્ટમનો બધો ડેટા કાઢી નાખો."</string>
     <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"સ્ક્રીનને અનલૉક કરતી વખતે લખેલા ખોટા પાસવર્ડ્સની સંખ્યાને મૉનિટર કરો અને જો ઘણા બધા ખોટા પાસવર્ડ્સ લખ્યાં છે તો ફોનને લૉક કરો અથવા ફોનનો તમામ ડેટા કાઢી નાખો."</string>
@@ -1896,7 +1898,8 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"અનપિન કરતા પહેલાં પિન માટે પૂછો"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"અનપિન કરતા પહેલાં અનલૉક પૅટર્ન માટે પૂછો"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"અનપિન કરતાં પહેલાં પાસવર્ડ માટે પૂછો"</string>
-    <string name="package_installed_device_owner" msgid="7035926868974878525">"તમારા વ્યવસ્થાપક દ્વારા ઇન્સ્ટૉલ કરવામાં આવેલ છે"</string>
+    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
+    <skip />
     <string name="package_updated_device_owner" msgid="7560272363805506941">"તમારા વ્યવસ્થાપક દ્વારા અપડેટ કરવામાં આવેલ છે"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"તમારા વ્યવસ્થાપક દ્વારા કાઢી નાખવામાં આવેલ છે"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ઓકે"</string>
@@ -2393,6 +2396,8 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"ઑફિસ 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"પરીક્ષણ કરો"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"કૉમ્યુનલ"</string>
+    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <skip />
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"સુરક્ષા માટે સ્ક્રીન શેર કરતી વખતે ઍપનું કન્ટેન્ટ છુપાવેલું છે"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"સેટેલાઇટ સાથે ઑટોમૅટિક રીતે કનેક્ટેડ"</string>

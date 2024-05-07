@@ -881,7 +881,7 @@ public class TaskFragmentOrganizerControllerTest extends WindowTestsBase {
         mTransaction.addTaskFragmentOperation(mFragmentToken, operation);
         final TaskFragmentOperation dimOperation = new TaskFragmentOperation.Builder(
                 OP_TYPE_SET_DIM_ON_TASK)
-                .setDimOnTask(true)
+                .setBooleanValue(true)
                 .build();
         mTransaction.addTaskFragmentOperation(mFragmentToken, dimOperation);
         mOrganizer.applyTransaction(mTransaction, TASK_FRAGMENT_TRANSIT_CHANGE,
@@ -1050,6 +1050,8 @@ public class TaskFragmentOrganizerControllerTest extends WindowTestsBase {
         // TaskFragment override orientation should be set for a system organizer.
         final TaskFragment taskFragment = mWindowOrganizerController.getTaskFragment(fragmentToken);
         assertNotNull(taskFragment);
+
+        taskFragment.setVisibleRequested(true);
         assertEquals(SCREEN_ORIENTATION_BEHIND, taskFragment.getOverrideOrientation());
     }
 

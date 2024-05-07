@@ -183,6 +183,7 @@ public class ViewFrameRateTest {
         mActivityRule.runOnUiThread(() -> {
             frameLayout.setFrameContentVelocity(1f);
             mMovingView.offsetTopAndBottom(100);
+            frameLayout.invalidate();
             runAfterDraw(() -> assertEquals(60f, mViewRoot.getLastPreferredFrameRate(), 0f));
         });
         waitForAfterDraw();
@@ -419,6 +420,7 @@ public class ViewFrameRateTest {
             FLAG_TOOLKIT_FRAME_RATE_VELOCITY_MAPPING_READ_ONLY
     })
     public void frameRateAndCategory() throws Throwable {
+        mMovingView.setRequestedFrameRate(View.REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE);
         waitForFrameRateCategoryToSettle();
         mActivityRule.runOnUiThread(() -> {
             mMovingView.setRequestedFrameRate(View.REQUESTED_FRAME_RATE_CATEGORY_LOW);

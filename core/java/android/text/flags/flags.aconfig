@@ -1,4 +1,5 @@
 package: "com.android.text.flags"
+container: "system"
 
 flag {
   name: "vendor_custom_locale_fallback"
@@ -166,6 +167,16 @@ flag {
   description: "There was a bug of updating system font from Android 13 to 14. This flag for fixing the migration failure."
   is_fixed_read_only: true
   bug: "331717791"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "fix_misaligned_context_menu"
+  namespace: "text"
+  description: "Fix the context menu misalignment and incosistent icon size."
+  bug: "332542108"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

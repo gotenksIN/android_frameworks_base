@@ -148,37 +148,6 @@ class MediaFilterRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    fun addMediaDataLoadingState() =
-        testScope.runTest {
-            val mediaDataLoadedStates by collectLastValue(underTest.mediaDataLoadedStates)
-            val instanceId = InstanceId.fakeInstanceId(123)
-            val mediaLoadedStates = mutableListOf(MediaDataLoadingModel.Loaded(instanceId))
-
-            underTest.addMediaDataLoadingState(MediaDataLoadingModel.Loaded(instanceId))
-
-            assertThat(mediaDataLoadedStates).isEqualTo(mediaLoadedStates)
-
-            mediaLoadedStates.remove(MediaDataLoadingModel.Loaded(instanceId))
-
-            underTest.addMediaDataLoadingState(MediaDataLoadingModel.Removed(instanceId))
-
-            assertThat(mediaDataLoadedStates).isEqualTo(mediaLoadedStates)
-        }
-
-    @Test
-    fun setRecommendationsLoadingState() =
-        testScope.runTest {
-            val recommendationsLoadingState by
-                collectLastValue(underTest.recommendationsLoadingState)
-            val recommendationsLoadingModel =
-                SmartspaceMediaLoadingModel.Loaded(KEY_MEDIA_SMARTSPACE)
-
-            underTest.setRecommendationsLoadingState(recommendationsLoadingModel)
-
-            assertThat(recommendationsLoadingState).isEqualTo(recommendationsLoadingModel)
-        }
-
-    @Test
     fun addMediaControlPlayingThenRemote() =
         testScope.runTest {
             val sortedMedia by collectLastValue(underTest.sortedMedia)
@@ -195,9 +164,10 @@ class MediaFilterRepositoryTest : SysuiTestCase() {
             assertThat(sortedMedia?.size).isEqualTo(2)
             assertThat(sortedMedia?.values)
                 .containsExactly(
-                    MediaCommonModel.MediaControl(playingInstanceId),
-                    MediaCommonModel.MediaControl(remoteInstanceId)
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(playingInstanceId)),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(remoteInstanceId))
                 )
+                .inOrder()
         }
 
     @Test
@@ -217,8 +187,8 @@ class MediaFilterRepositoryTest : SysuiTestCase() {
             assertThat(sortedMedia?.size).isEqualTo(2)
             assertThat(sortedMedia?.values)
                 .containsExactly(
-                    MediaCommonModel.MediaControl(playingInstanceId1),
-                    MediaCommonModel.MediaControl(playingInstanceId2)
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(playingInstanceId1)),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(playingInstanceId2))
                 )
                 .inOrder()
 
@@ -233,8 +203,8 @@ class MediaFilterRepositoryTest : SysuiTestCase() {
             assertThat(sortedMedia?.size).isEqualTo(2)
             assertThat(sortedMedia?.values)
                 .containsExactly(
-                    MediaCommonModel.MediaControl(playingInstanceId2),
-                    MediaCommonModel.MediaControl(playingInstanceId1)
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(playingInstanceId2)),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(playingInstanceId1))
                 )
                 .inOrder()
         }
@@ -285,14 +255,45 @@ class MediaFilterRepositoryTest : SysuiTestCase() {
             assertThat(sortedMedia?.size).isEqualTo(6)
             assertThat(sortedMedia?.values)
                 .containsExactly(
-                    MediaCommonModel.MediaControl(instanceId1),
-                    MediaCommonModel.MediaControl(instanceId2),
-                    MediaCommonModel.MediaRecommendations(KEY_MEDIA_SMARTSPACE),
-                    MediaCommonModel.MediaControl(instanceId4),
-                    MediaCommonModel.MediaControl(instanceId3),
-                    MediaCommonModel.MediaControl(instanceId5),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(instanceId1)),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(instanceId2)),
+                    MediaCommonModel.MediaRecommendations(
+                        SmartspaceMediaLoadingModel.Loaded(KEY_MEDIA_SMARTSPACE, true)
+                    ),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(instanceId4)),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(instanceId3)),
+                    MediaCommonModel.MediaControl(MediaDataLoadingModel.Loaded(instanceId5)),
                 )
                 .inOrder()
+        }
+
+    @Test
+    fun loadMediaFromRec() =
+        testScope.runTest {
+            val isMediaFromRec by collectLastValue(underTest.isMediaFromRec)
+            val instanceId1 = InstanceId.fakeInstanceId(123)
+            val instanceId2 = InstanceId.fakeInstanceId(456)
+            val data =
+                MediaData(
+                    active = true,
+                    instanceId = instanceId1,
+                    packageName = PACKAGE_NAME,
+                    isPlaying = true
+                )
+            val newData = MediaData(active = true, instanceId = instanceId2)
+
+            assertThat(isMediaFromRec).isFalse()
+
+            underTest.setMediaFromRecPackageName(PACKAGE_NAME)
+            underTest.addSelectedUserMediaEntry(data)
+            underTest.addMediaDataLoadingState(MediaDataLoadingModel.Loaded(instanceId1))
+
+            assertThat(isMediaFromRec).isTrue()
+
+            underTest.addSelectedUserMediaEntry(newData)
+            underTest.addMediaDataLoadingState(MediaDataLoadingModel.Loaded(instanceId2))
+
+            assertThat(isMediaFromRec).isFalse()
         }
 
     private fun createMediaData(
@@ -316,5 +317,6 @@ class MediaFilterRepositoryTest : SysuiTestCase() {
         private const val REMOTE = MediaData.PLAYBACK_CAST_LOCAL
         private const val KEY = "KEY"
         private const val KEY_MEDIA_SMARTSPACE = "MEDIA_SMARTSPACE_ID"
+        private const val PACKAGE_NAME = "com.android.example"
     }
 }

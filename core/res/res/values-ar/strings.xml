@@ -360,6 +360,8 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"أخذ لقطة شاشة"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"يمكن أخذ لقطة شاشة."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"نسخة حصرية، \"<xliff:g id="DREAM_NAME">%1$s</xliff:g>\""</string>
+    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
+    <skip />
     <string name="permlab_statusBar" msgid="8798267849526214017">"إيقاف شريط الحالة أو تعديله"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"للسماح للتطبيق بإيقاف شريط الحالة أو إضافة رموز نظام وإزالتها."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"العمل كشريط للحالة"</string>
@@ -666,7 +668,7 @@
   </string-array>
     <string name="fingerprint_error_not_match" msgid="4599441812893438961">"لم يتمّ التعرّف على البصمة."</string>
     <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"لم يتمّ التعرّف على بصمة الإصبع."</string>
-    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="6226091888364083421">"يتعذّر التعرّف على الوجه. استخدِم بصمة الإصبع بدلاً من ذلك."</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"لم يتم التعرّف على الوجه. استخدِم بصمة إصبعك."</string>
     <string name="fingerprint_authenticated" msgid="2024862866860283100">"تم مصادقة بصمة الإصبع"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="8867889115112348167">"تمّت مصادقة الوجه"</string>
     <string name="face_authenticated_confirmation_required" msgid="6872632732508013755">"تمّت مصادقة الوجه، يُرجى الضغط على \"تأكيد\"."</string>
@@ -1900,7 +1902,8 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"طلب إدخال رقم التعريف الشخصي قبل إزالة التثبيت"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"طلب إدخال نقش فتح القفل قبل إزالة التثبيت"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"طلب إدخال كلمة المرور قبل إزالة التثبيت"</string>
-    <string name="package_installed_device_owner" msgid="7035926868974878525">"تم التثبيت بواسطة المشرف"</string>
+    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
+    <skip />
     <string name="package_updated_device_owner" msgid="7560272363805506941">"تم التحديث بواسطة المشرف"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"تم الحذف بواسطة المشرف"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"حسنًا"</string>
@@ -2397,6 +2400,8 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"ملف العمل 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"ملف شخصي تجريبي"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"ملف شخصي مشترك"</string>
+    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <skip />
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"تم إخفاء محتوى التطبيق بعد تفعيل ميزة \"مشاركة الشاشة\" للحفاظ على أمانك"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"تم الاتصال تلقائيًا بالقمر الصناعي"</string>

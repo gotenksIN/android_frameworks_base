@@ -356,6 +356,8 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"Дэлгэцийн зургийг дарах"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"Дэлгэцийн зургийг дарах боломжтой."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"Урьдчилан үзэх, <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
+    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
+    <skip />
     <string name="permlab_statusBar" msgid="8798267849526214017">"статус самбарыг идэвхгүй болгох болон өөрчлөх"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"Апп нь статус самбарыг идэвхгүй болгох эсвэл систем дүрсийг нэмэх, хасах боломжтой."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"статусын хэсэг болох"</string>
@@ -662,7 +664,7 @@
   </string-array>
     <string name="fingerprint_error_not_match" msgid="4599441812893438961">"Хурууны хээг таньсангүй"</string>
     <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"Хурууны хээг таньсангүй"</string>
-    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="6226091888364083421">"Царай таних боломжгүй. Оронд нь хурууны хээ ашигла"</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"Царайг таньсангүй. Оронд нь хурууны хээ ашигла."</string>
     <string name="fingerprint_authenticated" msgid="2024862866860283100">"Хурууны хээг нотолсон"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="8867889115112348167">"Царайг баталгаажууллаа"</string>
     <string name="face_authenticated_confirmation_required" msgid="6872632732508013755">"Царайг баталгаажууллаа. Баталгаажуулах товчлуурыг дарна уу"</string>
@@ -828,7 +830,7 @@
     <string name="policylab_limitPassword" msgid="4851829918814422199">"Нууц үгний дүрмийг тохируулах"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"Дэлгэц түгжих нууц үг болон ПИН кодны урт болон нийт тэмдэгтийн уртыг хянах."</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"Дэлгэцийн түгжээг тайлах оролдлогыг хянах"</string>
-    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Дэлгэц түгжигдсэн үед нууц үг буруу оруулалтын тоог хянах ба хэрэв хэт олон удаа нууц үгийг буруу оруулбал таблетыг түгжих болон таблетын бүх датаг арилгана"</string>
+    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Дэлгэцийн түгжээг тайлах үед нууц үгийг буруу оруулах тоог хянах ба хэрэв хэт олон удаа нууц үгийг буруу оруулбал таблетыг түгжинэ эсвэл таблетын бүх өгөгдлийг устгана."</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"Дэлгэцийн түгжээг тайлахаар буруу оруулсан нууц үгийн тоог хянаж, нууц үгийг хэт олон удаа буруу оруулсан тохиолдолд таны Android TV төхөөрөмжийг түгжиж эсвэл үүний бүх өгөгдлийг устгана."</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"Дэлгэцийн түгжээг тайлахад буруу бичиж оруулсан нууц үгний тоог хянаж, инфотэйнмент системийг түгжих эсвэл хэт олон удаа нууц үгийг буруу бичиж оруулсан тохиолдолд инфотэйнмент системийн бүх өгөгдлийг устгана."</string>
     <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"Дэлгэц түгжигдсэн үед нууц үг буруу оруулалтын тоог хянах, ба хэрэв хэт олон удаа нууц үгийг буруу оруулбал утсыг түгжиж эсвэл утасны бүх өгөгдлийг арилгана"</string>
@@ -841,7 +843,7 @@
     <string name="policylab_forceLock" msgid="7360335502968476434">"Дэлгэц түгжих"</string>
     <string name="policydesc_forceLock" msgid="1008844760853899693">"Дэлгэц хэзээ яаж түгжихийг удирдах"</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"Бүх өгөгдлийг арилгах"</string>
-    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Үйлдвэрийн дата утгыг өгсөнөөр таблетын дата шууд арилгагдана."</string>
+    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Үйлдвэрийн өгөгдлийн төлөвт шилжсэнээр таблетын өгөгдлийг шууд арилгана уу."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"Таны Android TV төхөөрөмжийн өгөгдлийг танд анхааруулалгүйгээр үйлдвэрээс гарсан төлөвт шилжүүлэн устгана."</string>
     <string name="policydesc_wipeData" product="automotive" msgid="660804547737323300">"Үйлдвэрийн өгөгдлийн төлөвт үйлдлийг гүйцэтгэснээр инфотэйнмент системийн өгөгдлийг сануулгагүйгээр устгана."</string>
     <string name="policydesc_wipeData" product="default" msgid="8036084184768379022">"Сануулахгүйгээр утасны бүх өгөгдлийг арилгаж, үйлдвэрийн өгөгдлийн тохиргоонд шинэчилнэ"</string>
@@ -1896,7 +1898,8 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Бэхэлснийг болиулахаасаа өмнө ПИН асуух"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Бэхэлснийг болиулахаас өмнө түгжээ тайлах хээ асуух"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Тогтоосныг суллахаас өмнө нууц үг асуух"</string>
-    <string name="package_installed_device_owner" msgid="7035926868974878525">"Таны админ суулгасан"</string>
+    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
+    <skip />
     <string name="package_updated_device_owner" msgid="7560272363805506941">"Таны админ шинэчилсэн"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Таны админ устгасан"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ОК"</string>
@@ -2393,6 +2396,8 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"Ажил 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"Туршилт"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Нийтийн"</string>
+    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <skip />
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Аюулгүй байдлын улмаас аппын контентыг дэлгэц хуваалцахаас нуусан"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Хиймэл дагуулд автоматаар холбогдсон"</string>

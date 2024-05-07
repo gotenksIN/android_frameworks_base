@@ -358,6 +358,8 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"Робити знімки екрана"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"Може робити знімки екрана."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"<xliff:g id="DREAM_NAME">%1$s</xliff:g> (попередній перегляд)"</string>
+    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
+    <skip />
     <string name="permlab_statusBar" msgid="8798267849526214017">"вимикати чи змін. рядок стану"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"Дозволяє програмі вимикати рядок стану чи додавати та видаляти піктограми системи."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"відображатися як рядок стану"</string>
@@ -664,7 +666,7 @@
   </string-array>
     <string name="fingerprint_error_not_match" msgid="4599441812893438961">"Відбиток пальця не розпізнано"</string>
     <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"Відбиток пальця не розпізнано"</string>
-    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="6226091888364083421">"Обличчя не розпізнано. Скористайтеся відбитком пальця."</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"Обличчя не розпізнано. Скористайтеся відбитком."</string>
     <string name="fingerprint_authenticated" msgid="2024862866860283100">"Відбиток пальця автентифіковано"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="8867889115112348167">"Обличчя автентифіковано"</string>
     <string name="face_authenticated_confirmation_required" msgid="6872632732508013755">"Обличчя автентифіковано. Натисніть \"Підтвердити\""</string>
@@ -830,7 +832,7 @@
     <string name="policylab_limitPassword" msgid="4851829918814422199">"Устан. правила пароля"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"Укажіть максимальну довжину та кількість символів для паролів розблокування екрана та PIN-кодів."</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"Відстежувати спроби розблокування екрана"</string>
-    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Відстежувати кількість неправильних паролів, введених під час розблокування екрана, і блокувати планшетний ПК або стирати всі його дані, якщо введено забагато неправильних паролів."</string>
+    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Відстежувати кількість неправильних паролів, введених під час розблокування екрана, і блокувати планшет або стирати всі його дані, якщо введено забагато неправильних паролів."</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"Відстежуйте кількість неправильних паролів, введених під час розблокування екрана. Блокуйте пристрій Android TV або стирайте всі його дані, якщо пароль введено неправильно забагато разів."</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"Відстежуйте кількість неправильних паролів, введених під час розблокування екрана, і блокуйте інформаційно-розважальну систему або видаляйте всі її дані, якщо пароль введено неправильно забагато разів."</string>
     <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"Відстежувати кількість неправильних паролів, введених під час розблокування екрана, і блокувати  телефон або стирати всі його дані, якщо введено забагато неправильних паролів."</string>
@@ -843,7 +845,7 @@
     <string name="policylab_forceLock" msgid="7360335502968476434">"Блокувати екран"</string>
     <string name="policydesc_forceLock" msgid="1008844760853899693">"Контролювати, як і коли блокується екран."</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"Видаляти всі дані"</string>
-    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Стирати дані планшетного ПК без попередження, відновлюючи заводські налаштування."</string>
+    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Стирати дані планшета без попередження, відновлюючи заводські налаштування."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"Видаляйте дані пристрою Android TV без попередження шляхом відновлення заводських налаштувань."</string>
     <string name="policydesc_wipeData" product="automotive" msgid="660804547737323300">"Видаляйте всі дані інформаційно-розважальної системи без попередження, відновлюючи заводські налаштування."</string>
     <string name="policydesc_wipeData" product="default" msgid="8036084184768379022">"Стирати дані телефона без попередження, відновивши заводські налаштування."</string>
@@ -1898,7 +1900,8 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"PIN-код для відкріплення"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Запитувати ключ розблокування перед відкріпленням"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Запитувати пароль перед відкріпленням"</string>
-    <string name="package_installed_device_owner" msgid="7035926868974878525">"Установлено адміністратором"</string>
+    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
+    <skip />
     <string name="package_updated_device_owner" msgid="7560272363805506941">"Оновлено адміністратором"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Видалено адміністратором"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ОК"</string>
@@ -2395,6 +2398,8 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"Робочий профіль 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"Тестовий профіль"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Спільний профіль"</string>
+    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <skip />
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"З міркувань безпеки вміст додатка приховано під час показу екрана"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Автоматично підключено до супутника"</string>

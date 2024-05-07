@@ -6,7 +6,9 @@
 package com.android.systemui.qs.tiles.dialog;
 
 import static com.android.systemui.qs.tiles.dialog.InternetDialogController.MAX_WIFI_ENTRY_COUNT;
+
 import static com.google.common.truth.Truth.assertThat;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,6 +45,8 @@ import com.android.systemui.util.concurrency.FakeExecutor;
 import com.android.systemui.util.time.FakeSystemClock;
 import com.android.wifitrackerlib.WifiEntry;
 
+import kotlinx.coroutines.CoroutineScope;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -68,6 +72,8 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
 
     @Mock
     private Handler mHandler;
+    @Mock
+    CoroutineScope mScope;
     @Mock
     private TelephonyManager mTelephonyManager;
     @Mock
@@ -138,6 +144,7 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
                 true,
                 true,
                 true,
+                mScope,
                 mock(UiEventLogger.class),
                 mDialogTransitionAnimator,
                 mHandler,

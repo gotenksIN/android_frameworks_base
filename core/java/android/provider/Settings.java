@@ -1736,6 +1736,24 @@ public final class Settings {
             "android.settings.NETWORK_OPERATOR_SETTINGS";
 
     /**
+     * Activity Action: Show settings for selecting the network provider.
+     * <p>
+     * In some cases, a matching Activity may not be provided, so ensure you
+     * safeguard against this.
+     * <p>
+     * Access to this preference can be customized via Settings' app.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_NETWORK_PROVIDER_SETTINGS =
+            "android.settings.NETWORK_PROVIDER_SETTINGS";
+
+    /**
      * Activity Action: Show settings for selection of 2G/3G.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -8512,7 +8530,8 @@ public final class Settings {
 
         /**
          * Setting specifying the accessibility services, accessibility shortcut targets,
-         * or features to be toggled via the accessibility button in the navigation bar.
+         * or features to be toggled via the accessibility button in the navigation bar,
+         * or the floating accessibility button.
          *
          * <p> This is a colon-separated string list which contains the flattened
          * {@link ComponentName} and the class name of a system class implementing a supported
@@ -8524,7 +8543,7 @@ public final class Settings {
 
         /**
          * Setting specifying the accessibility services, shortcut targets or features
-         * to be toggled via the floating accessibility menu
+         * to be toggled via the gesture shortcut
          *
          * <p> This is a colon-separated string list which contains the flattened
          * {@link ComponentName} and the class name of a system class
@@ -8532,8 +8551,8 @@ public final class Settings {
          * @hide
          */
         @Readable
-        public static final String ACCESSIBILITY_FLOATING_MENU_TARGETS =
-                "accessibility_floating_menu_targets";
+        public static final String ACCESSIBILITY_GESTURE_TARGETS =
+                "accessibility_gesture_targets";
 
         /**
          * Setting specifying the accessibility services, accessibility shortcut targets,

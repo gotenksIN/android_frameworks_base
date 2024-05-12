@@ -21,6 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -70,7 +71,7 @@ public class PackageMonitorTest {
 
         spyPackageMonitor.register(mMockContext, UserHandle.ALL, mMockHandler);
         assertThat(spyPackageMonitor.getRegisteredHandler()).isEqualTo(mMockHandler);
-        verify(mMockContext, times(1)).registerReceiverAsUser(any(), eq(UserHandle.ALL), any(),
+        verify(mMockContext, never()).registerReceiverAsUser(any(), eq(UserHandle.ALL), any(),
                 eq(null), eq(mMockHandler));
 
         assertThrows(IllegalStateException.class,
@@ -92,6 +93,26 @@ public class PackageMonitorTest {
         PackageMonitor spyPackageMonitor = spy(new TestPackageMonitor());
 
         assertThrows(IllegalStateException.class, spyPackageMonitor::unregister);
+    }
+
+    @Test
+    public void testPackageMonitorNotRegisterWithoutSupportPackageRestartQuery() throws Exception {
+        PackageMonitor spyPackageMonitor = spy(new TestPackageMonitor());
+
+        spyPackageMonitor.register(mMockContext, UserHandle.ALL, mMockHandler);
+
+        verify(mMockContext, never()).registerReceiverAsUser(any(), eq(UserHandle.ALL), any(),
+                eq(null), eq(mMockHandler));
+    }
+
+    @Test
+    public void testPackageMonitorRegisterWithSupportPackageRestartQuery() throws Exception {
+        PackageMonitor spyPackageMonitor = spy(new TestPackageMonitor(true));
+
+        spyPackageMonitor.register(mMockContext, UserHandle.ALL, mMockHandler);
+
+        verify(mMockContext, times(1)).registerReceiverAsUser(any(), eq(UserHandle.ALL), any(),
+                eq(null), eq(mMockHandler));
     }
 
     @Test
@@ -471,5 +492,12 @@ public class PackageMonitorTest {
     }
 
     public static class TestPackageMonitor extends PackageMonitor {
+        public TestPackageMonitor(boolean b) {
+            super(b);
+        }
+
+        public TestPackageMonitor() {
+            super(false);
+        }
     }
 }

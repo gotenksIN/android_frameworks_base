@@ -38,8 +38,9 @@ java_test_host {
     defaults: ["AndroidLintCheckerTestDefaults"],
     srcs: ["tests/**/*.kt"],
     data: [
+        ":androidx.annotation_annotation",
+        ":dagger2",
         ":framework",
-        ":androidx.annotation_annotation-nodeps",
         ":kotlinx-coroutines-core",
     ],
     static_libs: [

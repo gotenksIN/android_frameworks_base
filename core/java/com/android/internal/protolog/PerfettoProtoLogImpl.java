@@ -99,7 +99,7 @@ public class PerfettoProtoLogImpl implements IProtoLog {
     private final Map<LogLevel, Integer> mDefaultLogLevelCounts = new ArrayMap<>();
     private final Map<IProtoLogGroup, Map<LogLevel, Integer>> mLogLevelCounts = new ArrayMap<>();
 
-    private final ExecutorService mBackgroundLoggingService = Executors.newCachedThreadPool();
+    private final ExecutorService mBackgroundLoggingService = Executors.newSingleThreadExecutor();
 
     public PerfettoProtoLogImpl(String viewerConfigFilePath,
             TreeMap<String, IProtoLogGroup> logGroups, Runnable cacheUpdater) {
@@ -131,7 +131,8 @@ public class PerfettoProtoLogImpl implements IProtoLog {
             Runnable cacheUpdater
     ) {
         Producer.init(InitArguments.DEFAULTS);
-        mDataSource.register(DataSourceParams.DEFAULTS);
+        mDataSource.register(new DataSourceParams(
+                DataSourceParams.PERFETTO_DS_BUFFER_EXHAUSTED_POLICY_STALL_AND_ABORT));
         this.mViewerConfigInputStreamProvider = viewerConfigInputStreamProvider;
         this.mViewerConfigReader = viewerConfigReader;
         this.mLogGroups = logGroups;
@@ -191,8 +192,6 @@ public class PerfettoProtoLogImpl implements IProtoLog {
                 Log.e(LOG_TAG, "Failed to read ProtoLog viewer config to dump on tracing end", e);
             }
         });
-
-        mDataSource.flush();
     }
 
     private static void writeViewerConfigGroup(

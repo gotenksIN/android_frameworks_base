@@ -217,18 +217,18 @@ internal class ElementNode(
         maybePruneMaps(layoutImpl, prevElement, prevSceneState)
     }
 
-    override fun isMeasurementApproachComplete(lookaheadSize: IntSize): Boolean {
+    override fun isMeasurementApproachInProgress(lookaheadSize: IntSize): Boolean {
         // TODO(b/324191441): Investigate whether making this check more complex (checking if this
         // element is shared or transformed) would lead to better performance.
-        return layoutImpl.state.currentTransitions.isEmpty()
+        return layoutImpl.state.isTransitioning()
     }
 
-    override fun Placeable.PlacementScope.isPlacementApproachComplete(
+    override fun Placeable.PlacementScope.isPlacementApproachInProgress(
         lookaheadCoordinates: LayoutCoordinates
     ): Boolean {
         // TODO(b/324191441): Investigate whether making this check more complex (checking if this
         // element is shared or transformed) would lead to better performance.
-        return layoutImpl.state.currentTransitions.isEmpty()
+        return layoutImpl.state.isTransitioning()
     }
 
     @ExperimentalComposeUiApi
@@ -329,10 +329,9 @@ private fun elementTransition(
 
     if (transition == null && previousTransition != null) {
         // The transition was just finished.
-        element.sceneStates.values.forEach { sceneState ->
-            sceneState.offsetInterruptionDelta = Offset.Zero
-            sceneState.scaleInterruptionDelta = Scale.Zero
-            sceneState.alphaInterruptionDelta = 0f
+        element.sceneStates.values.forEach {
+            it.clearValuesBeforeInterruption()
+            it.clearInterruptionDeltas()
         }
     }
 
@@ -375,10 +374,20 @@ private fun prepareInterruption(element: Element) {
         sceneState.scaleBeforeInterruption = lastScale
         sceneState.alphaBeforeInterruption = lastAlpha
 
-        sceneState.offsetInterruptionDelta = Offset.Zero
-        sceneState.scaleInterruptionDelta = Scale.Zero
-        sceneState.alphaInterruptionDelta = 0f
+        sceneState.clearInterruptionDeltas()
     }
+}
+
+private fun Element.SceneState.clearInterruptionDeltas() {
+    offsetInterruptionDelta = Offset.Zero
+    scaleInterruptionDelta = Scale.Zero
+    alphaInterruptionDelta = 0f
+}
+
+private fun Element.SceneState.clearValuesBeforeInterruption() {
+    offsetBeforeInterruption = Offset.Unspecified
+    scaleBeforeInterruption = Scale.Unspecified
+    alphaBeforeInterruption = Element.AlphaUnspecified
 }
 
 /**
@@ -744,7 +753,11 @@ private fun ApproachMeasureScope.place(
         // No need to place the element in this scene if we don't want to draw it anyways.
         if (!shouldPlaceElement(layoutImpl, scene, element, transition)) {
             sceneState.lastOffset = Offset.Unspecified
-            sceneState.offsetBeforeInterruption = Offset.Unspecified
+            sceneState.lastScale = Scale.Unspecified
+            sceneState.lastAlpha = Element.AlphaUnspecified
+
+            sceneState.clearValuesBeforeInterruption()
+            sceneState.clearInterruptionDeltas()
             return
         }
 

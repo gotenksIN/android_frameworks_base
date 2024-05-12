@@ -48,7 +48,7 @@
     <string name="passwords" msgid="5419394230391253816">"паролі"</string>
     <string name="sign_ins" msgid="4710739369149469208">"дані для входу"</string>
     <string name="sign_in_info" msgid="2627704710674232328">"дані для входу"</string>
-    <string name="save_credential_to_title" msgid="3172811692275634301">"Зберегти <xliff:g id="CREDENTIALTYPES">%1$s</xliff:g> в"</string>
+    <string name="save_credential_to_title" msgid="3172811692275634301">"Де слід зберегти <xliff:g id="CREDENTIALTYPES">%1$s</xliff:g>?"</string>
     <string name="create_passkey_in_other_device_title" msgid="2360053098931886245">"Створити ключ доступу на іншому пристрої?"</string>
     <string name="save_password_on_other_device_title" msgid="5829084591948321207">"Зберегти пароль на іншому пристрої?"</string>
     <string name="save_sign_in_on_other_device_title" msgid="2827990118560134692">"Зберегти дані для входу на іншому пристрої?"</string>
@@ -82,7 +82,7 @@
     <string name="get_dialog_use_saved_passkey_for" msgid="4618100798664888512">"Увійти іншим способом"</string>
     <string name="snackbar_action" msgid="37373514216505085">"Переглянути варіанти"</string>
     <string name="get_dialog_button_label_continue" msgid="6446201694794283870">"Продовжити"</string>
-    <string name="get_dialog_title_sign_in_options" msgid="2092876443114893618">"Опції входу"</string>
+    <string name="get_dialog_title_sign_in_options" msgid="2092876443114893618">"Способи входу"</string>
     <string name="button_label_view_more" msgid="3429098227286495651">"Переглянути більше"</string>
     <string name="get_dialog_heading_for_username" msgid="3456868514554204776">"Для користувача <xliff:g id="USERNAME">%1$s</xliff:g>"</string>
     <string name="get_dialog_heading_locked_password_managers" msgid="8911514851762862180">"Заблоковані менеджери паролів"</string>

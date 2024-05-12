@@ -108,7 +108,7 @@ constructor(
     private val ObservableTransitionState.canBeOccluded: Boolean
         get() =
             when (this) {
-                is ObservableTransitionState.Idle -> scene.canBeOccluded
+                is ObservableTransitionState.Idle -> currentScene.canBeOccluded
                 is ObservableTransitionState.Transition ->
                     fromScene.canBeOccluded && toScene.canBeOccluded
             }
@@ -125,7 +125,9 @@ constructor(
                 Scenes.Communal -> true
                 Scenes.Gone -> true
                 Scenes.Lockscreen -> true
+                Scenes.NotificationsShade -> false
                 Scenes.QuickSettings -> false
+                Scenes.QuickSettingsShade -> false
                 Scenes.Shade -> false
                 else -> error("SceneKey \"$this\" doesn't have a mapping for canBeOccluded!")
             }

@@ -125,6 +125,8 @@ public class ScreenDecorations implements
     private static int mDisableRoundedCorner =
             SystemProperties.getInt("vendor.display.disable_rounded_corner", 0);
 
+    private static final boolean sToolkitSetFrameRateReadOnly =
+            android.view.flags.Flags.toolkitSetFrameRateReadOnly();
     private boolean mDebug = DEBUG_SCREENSHOT_ROUNDED_CORNERS;
     private int mDebugColor = Color.RED;
 
@@ -896,6 +898,10 @@ public class ScreenDecorations implements
         lp.width = MATCH_PARENT;
         lp.height = MATCH_PARENT;
         lp.setTitle("ScreenDecorHwcOverlay");
+        if (sToolkitSetFrameRateReadOnly) {
+            lp.setFrameRateBoostOnTouchEnabled(false);
+            lp.setFrameRatePowerSavingsBalanced(false);
+        }
         lp.gravity = Gravity.TOP | Gravity.START;
         if (!mDebug) {
             lp.setColorMode(ActivityInfo.COLOR_MODE_A8);

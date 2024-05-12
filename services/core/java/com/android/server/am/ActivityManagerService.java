@@ -3605,6 +3605,12 @@ public class ActivityManagerService extends IActivityManager.Stub
                 doLowMem = false;
             }
 
+            if (doOomAdj) {
+                if (Flags.migrateFullOomadjUpdates()) {
+                    app.forEachConnectionHost((host) -> enqueueOomAdjTargetLocked(host));
+                }
+            }
+
             if (mUxPerf != null && !mForceStopKill && !app.mErrorState.isNotResponding() && !app.mErrorState.isCrashing()) {
                 if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
@@ -3619,7 +3625,11 @@ public class ActivityManagerService extends IActivityManager.Stub
             handleAppDiedLocked(app, pid, false, true, fromBinderDied);
 
             if (doOomAdj) {
-                updateOomAdjLocked(OOM_ADJ_REASON_PROCESS_END);
+                if (Flags.migrateFullOomadjUpdates()) {
+                    updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_PROCESS_END);
+                } else {
+                    updateOomAdjLocked(OOM_ADJ_REASON_PROCESS_END);
+                }
             }
             if (doLowMem) {
                 mAppProfiler.doLowMemReportIfNeededLocked(app);
@@ -4405,6 +4415,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             mServices.bringDownDisabledPackageServicesLocked(
                     packageName, null, userId, false, true, true);
+            mServices.onUidRemovedLocked(uid);
 
             if (mBooted) {
                 mAtmInternal.resumeTopActivities(true);
@@ -4435,9 +4446,10 @@ public class ActivityManagerService extends IActivityManager.Stub
             Slog.w(TAG, "Can't force stop all processes of all users, that is insane!");
         }
 
+        final int uid = getPackageManagerInternal().getPackageUid(packageName,
+                            MATCH_DEBUG_TRIAGED_MISSING | MATCH_ANY_USER, UserHandle.USER_SYSTEM);
         if (appId < 0 && packageName != null) {
-            appId = UserHandle.getAppId(getPackageManagerInternal().getPackageUid(packageName,
-                    MATCH_DEBUG_TRIAGED_MISSING | MATCH_ANY_USER, UserHandle.USER_SYSTEM));
+            appId = UserHandle.getAppId(uid);
         }
 
         boolean didSomething;
@@ -4482,6 +4494,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             didSomething = true;
         }
+        mServices.onUidRemovedLocked(uid);
 
         if (packageName == null) {
             // Remove all sticky broadcasts from this user.
@@ -4510,8 +4523,17 @@ public class ActivityManagerService extends IActivityManager.Stub
                         packageName, null, userId);
         }
 
-        final boolean clearPendingIntentsForStoppedApp = (android.content.pm.Flags.stayStopped()
-                && packageStateStopped);
+        boolean clearPendingIntentsForStoppedApp = false;
+        try {
+            clearPendingIntentsForStoppedApp = (packageStateStopped
+                    && android.content.pm.Flags.stayStopped());
+        } catch (IllegalStateException e) {
+            // It's unlikely for a package to be force-stopped early in the boot cycle. So, if we
+            // check for 'packageStateStopped' which should evaluate to 'false', then this should
+            // ensure we are not accessing the flag early in the boot cycle. As an additional
+            // safety measure, catch the exception and ignore to avoid causing a device restart.
+            clearPendingIntentsForStoppedApp = false;
+        }
         if (packageName == null || uninstalling || clearPendingIntentsForStoppedApp) {
             final int cancelReason;
             if (packageName == null) {
@@ -5102,7 +5124,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     @Override
-    public final void finishAttachApplication(long startSeq) {
+    public final void finishAttachApplication(long startSeq, long timestampApplicationOnCreateNs) {
         final int pid = Binder.getCallingPid();
         final int uid = Binder.getCallingUid();
 
@@ -5121,6 +5143,11 @@ public class ActivityManagerService extends IActivityManager.Stub
             finishAttachApplicationInner(startSeq, uid, pid);
         } finally {
             Binder.restoreCallingIdentity(origId);
+        }
+
+        if (android.app.Flags.appStartInfoTimestamps() && timestampApplicationOnCreateNs > 0) {
+            addStartInfoTimestampInternal(ApplicationStartInfo.START_TIMESTAMP_APPLICATION_ONCREATE,
+                    timestampApplicationOnCreateNs, UserHandle.getUserId(uid), uid);
         }
     }
 
@@ -10327,10 +10354,15 @@ public class ActivityManagerService extends IActivityManager.Stub
         mUserController.handleIncomingUser(Binder.getCallingPid(), callingUid, userId, true,
                 ALLOW_NON_FULL, "addStartInfoTimestamp", null);
 
-        final String packageName = Settings.getPackageNameForUid(mContext, callingUid);
+        addStartInfoTimestampInternal(key, timestampNs, userId, callingUid);
+    }
 
-        mProcessList.getAppStartInfoTracker().addTimestampToStart(packageName,
-                UserHandle.getUid(userId, UserHandle.getAppId(callingUid)), timestampNs, key);
+    private void addStartInfoTimestampInternal(int key, long timestampNs, int userId, int uid) {
+        mProcessList.getAppStartInfoTracker().addTimestampToStart(
+                Settings.getPackageNameForUid(mContext, uid),
+                UserHandle.getUid(userId, UserHandle.getAppId(uid)),
+                timestampNs,
+                key);
     }
 
     @Override
@@ -17829,11 +17861,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     @GuardedBy({"this", "mProcLock"})
-    final void setAppIdTempAllowlistStateLSP(int uid, boolean onAllowlist) {
-        mOomAdjuster.setAppIdTempAllowlistStateLSP(uid, onAllowlist);
-    }
-
-    @GuardedBy({"this", "mProcLock"})
     final void setUidTempAllowlistStateLSP(int uid, boolean onAllowlist) {
         mOomAdjuster.setUidTempAllowlistStateLSP(uid, onAllowlist);
     }
@@ -18800,7 +18827,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     } else {
                         mFgsStartTempAllowList.removeUid(changingUid);
                     }
-                    setAppIdTempAllowlistStateLSP(changingUid, adding);
+                    setUidTempAllowlistStateLSP(changingUid, adding);
                 }
             }
         }
@@ -20046,6 +20073,20 @@ public class ActivityManagerService extends IActivityManager.Stub
                 return !ActivityManagerService.this.mThemeOverlayReadyUsers.contains(userId);
             }
         }
+
+        @Override
+        public void addStartInfoTimestamp(int key, long timestampNs, int uid, int pid,
+                int userId) {
+            // For the simplification, we don't support USER_ALL nor USER_CURRENT here.
+            if (userId == UserHandle.USER_ALL || userId == UserHandle.USER_CURRENT) {
+                throw new IllegalArgumentException("Unsupported userId");
+            }
+
+            mUserController.handleIncomingUser(pid, uid, userId, true,
+                    ALLOW_NON_FULL, "addStartInfoTimestampSystem", null);
+
+            addStartInfoTimestampInternal(key, timestampNs, userId, uid);
+        }
     }
 
     long inputDispatchingTimedOut(int pid, final boolean aboveSystem, TimeoutRecord timeoutRecord) {
@@ -20362,7 +20403,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int userId = UserHandle.getCallingUserId();
         final long callingId = Binder.clearCallingIdentity();
         try {
-            if (uid == -1) {
+            if (uid == INVALID_UID) {
                 uid = mPackageManagerInt.getPackageUid(packageName, 0, userId);
             }
             mAppRestrictionController.noteAppRestrictionEnabled(packageName, uid, restrictionType,

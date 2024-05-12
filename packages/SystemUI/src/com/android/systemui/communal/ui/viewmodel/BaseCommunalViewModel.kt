@@ -18,6 +18,7 @@ package com.android.systemui.communal.ui.viewmodel
 
 import android.content.ComponentName
 import android.os.UserHandle
+import android.view.View
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.TransitionKey
@@ -37,8 +38,8 @@ abstract class BaseCommunalViewModel(
 ) {
     val currentScene: Flow<SceneKey> = communalInteractor.desiredScene
 
-    /** Whether communal hub can be focused to enable accessibility actions. */
-    val isFocusable: Flow<Boolean> = communalInteractor.isIdleOnCommunal
+    /** Whether communal hub should be focused by accessibility tools. */
+    open val isFocusable: Flow<Boolean> = MutableStateFlow(false)
 
     /** Whether widgets are currently being re-ordered. */
     open val reorderingWidgets: StateFlow<Boolean> = MutableStateFlow(false)
@@ -48,6 +49,9 @@ abstract class BaseCommunalViewModel(
     /** The key of the currently selected item, or null if no item selected. */
     val selectedKey: StateFlow<String?>
         get() = _selectedKey
+
+    /** Accessibility delegate to be set on CommunalAppWidgetHostView. */
+    open val widgetAccessibilityDelegate: View.AccessibilityDelegate? = null
 
     fun signalUserInteraction() {
         communalInteractor.signalUserInteraction()
@@ -88,14 +92,14 @@ abstract class BaseCommunalViewModel(
     /** Whether in edit mode for the communal hub. */
     open val isEditMode = false
 
-    /** Whether the popup message triggered by dismissing the CTA tile is showing. */
-    open val isPopupOnDismissCtaShowing: Flow<Boolean> = flowOf(false)
+    /** Whether the type of popup currently showing */
+    open val currentPopup: Flow<PopupType?> = flowOf(null)
 
     /** Whether the communal hub is empty with no widget available. */
     open val isEmptyState: Flow<Boolean> = flowOf(false)
 
-    /** Hide the popup message triggered by dismissing the CTA tile. */
-    open fun onHidePopupAfterDismissCta() {}
+    /** Called as the UI request to dismiss the any displaying popup */
+    open fun onHidePopup() {}
 
     /** Called as the UI requests deleting a widget. */
     open fun onDeleteWidget(id: Int) {}
@@ -126,6 +130,9 @@ abstract class BaseCommunalViewModel(
 
     /** Called as the user cancels dragging a widget to reorder. */
     open fun onReorderWidgetCancel() {}
+
+    /** Called as the user request to show the customize widget button. */
+    open fun onShowCustomizeWidgetButton() {}
 
     /** Set the key of the currently selected item */
     fun setSelectedKey(key: String?) {

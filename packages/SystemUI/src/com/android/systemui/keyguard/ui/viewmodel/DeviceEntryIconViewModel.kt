@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.stateIn
 
 /** Models the UI state for the containing device entry icon & long-press handling view. */
 @ExperimentalCoroutinesApi
@@ -110,27 +111,7 @@ constructor(
             )
         }
 
-    private val dozeAmount: Flow<Float> =
-        combine(
-            transitionInteractor.startedKeyguardTransitionStep,
-            merge(
-                transitionInteractor.transitionStepsFromState(KeyguardState.AOD).map {
-                    1f - it.value
-                },
-                transitionInteractor.transitionStepsToState(KeyguardState.AOD).map { it.value }
-            ),
-        ) { startedKeyguardTransitionStep, aodTransitionAmount ->
-            if (
-                startedKeyguardTransitionStep.to == KeyguardState.AOD ||
-                    startedKeyguardTransitionStep.from == KeyguardState.AOD
-            ) {
-                aodTransitionAmount
-            } else {
-                // in case a new transition (ie: to occluded) cancels a transition to or from
-                // aod, then we want to make sure the doze amount is still updated to 0
-                0f
-            }
-        }
+    private val dozeAmount: Flow<Float> = transitionInteractor.transitionValue(KeyguardState.AOD)
     // Burn-in offsets that animate based on the transition amount to AOD
     private val animatedBurnInOffsets: Flow<BurnInOffsets> =
         combine(nonAnimatedBurnInOffsets, dozeAmount) { burnInOffsets, dozeAmount ->
@@ -141,54 +122,57 @@ constructor(
             )
         }
 
-    val deviceEntryViewAlpha: Flow<Float> =
+    val deviceEntryViewAlpha: StateFlow<Float> =
         combine(
-            transitionAlpha,
-            alphaMultiplierFromShadeExpansion,
-        ) { alpha, alphaMultiplier ->
-            alpha * alphaMultiplier
-        }
+                transitionAlpha,
+                alphaMultiplierFromShadeExpansion,
+            ) { alpha, alphaMultiplier ->
+                alpha * alphaMultiplier
+            }
+            .stateIn(scope = scope, started = SharingStarted.WhileSubscribed(), initialValue = 0f)
     val useBackgroundProtection: StateFlow<Boolean> = isUdfpsSupported
     val burnInOffsets: Flow<BurnInOffsets> =
-        deviceEntryUdfpsInteractor.isUdfpsEnrolledAndEnabled.flatMapLatest { udfpsEnrolled ->
-            if (udfpsEnrolled) {
-                combine(
-                    transitionInteractor.startedKeyguardTransitionStep.sample(
-                        shadeInteractor.isAnyFullyExpanded,
-                        ::Pair
-                    ),
-                    animatedBurnInOffsets,
-                    nonAnimatedBurnInOffsets,
-                ) {
-                    (startedTransitionStep, shadeExpanded),
-                    animatedBurnInOffsets,
-                    nonAnimatedBurnInOffsets ->
-                    if (startedTransitionStep.to == KeyguardState.AOD) {
-                        when (startedTransitionStep.from) {
-                            KeyguardState.ALTERNATE_BOUNCER -> animatedBurnInOffsets
-                            KeyguardState.LOCKSCREEN ->
-                                if (shadeExpanded) {
-                                    nonAnimatedBurnInOffsets
-                                } else {
-                                    animatedBurnInOffsets
-                                }
-                            else -> nonAnimatedBurnInOffsets
+        deviceEntryUdfpsInteractor.isUdfpsEnrolledAndEnabled
+            .flatMapLatest { udfpsEnrolled ->
+                if (udfpsEnrolled) {
+                    combine(
+                        transitionInteractor.startedKeyguardTransitionStep.sample(
+                            shadeInteractor.isAnyFullyExpanded,
+                            ::Pair
+                        ),
+                        animatedBurnInOffsets,
+                        nonAnimatedBurnInOffsets,
+                    ) {
+                        (startedTransitionStep, shadeExpanded),
+                        animatedBurnInOffsets,
+                        nonAnimatedBurnInOffsets ->
+                        if (startedTransitionStep.to == KeyguardState.AOD) {
+                            when (startedTransitionStep.from) {
+                                KeyguardState.ALTERNATE_BOUNCER -> animatedBurnInOffsets
+                                KeyguardState.LOCKSCREEN ->
+                                    if (shadeExpanded) {
+                                        nonAnimatedBurnInOffsets
+                                    } else {
+                                        animatedBurnInOffsets
+                                    }
+                                else -> nonAnimatedBurnInOffsets
+                            }
+                        } else if (startedTransitionStep.from == KeyguardState.AOD) {
+                            when (startedTransitionStep.to) {
+                                KeyguardState.LOCKSCREEN -> animatedBurnInOffsets
+                                else -> BurnInOffsets(x = 0, y = 0, progress = 0f)
+                            }
+                        } else {
+                            BurnInOffsets(x = 0, y = 0, progress = 0f)
                         }
-                    } else if (startedTransitionStep.from == KeyguardState.AOD) {
-                        when (startedTransitionStep.to) {
-                            KeyguardState.LOCKSCREEN -> animatedBurnInOffsets
-                            else -> BurnInOffsets(x = 0, y = 0, progress = 0f)
-                        }
-                    } else {
-                        BurnInOffsets(x = 0, y = 0, progress = 0f)
                     }
+                } else {
+                    // If UDFPS isn't enrolled, we don't show any UI on AOD so there's no need
+                    // to use burn in offsets at all
+                    flowOf(BurnInOffsets(x = 0, y = 0, progress = 0f))
                 }
-            } else {
-                // If UDFPS isn't enrolled, we don't show any UI on AOD so there's no need
-                // to use burn in offsets at all
-                flowOf(BurnInOffsets(x = 0, y = 0, progress = 0f))
             }
-        }
+            .distinctUntilChanged()
 
     private val isUnlocked: Flow<Boolean> =
         keyguardInteractor.isKeyguardDismissible.flatMapLatest { isUnlocked ->
@@ -211,7 +195,14 @@ constructor(
             isUnlocked,
         ) { isListeningForUdfps, isUnlocked ->
             if (isListeningForUdfps) {
-                DeviceEntryIconView.IconType.FINGERPRINT
+                if (isUnlocked) {
+                    // Don't show any UI until isUnlocked=false. This covers the case
+                    // when the "Power button instantly locks > 0s" or the device doesn't lock
+                    // immediately after a screen time.
+                    DeviceEntryIconView.IconType.NONE
+                } else {
+                    DeviceEntryIconView.IconType.FINGERPRINT
+                }
             } else if (isUnlocked) {
                 DeviceEntryIconView.IconType.UNLOCK
             } else {
@@ -227,7 +218,8 @@ constructor(
             when (deviceEntryStatus) {
                 DeviceEntryIconView.IconType.LOCK -> isUdfps
                 DeviceEntryIconView.IconType.UNLOCK -> true
-                DeviceEntryIconView.IconType.FINGERPRINT -> false
+                DeviceEntryIconView.IconType.FINGERPRINT,
+                DeviceEntryIconView.IconType.NONE -> false
             }
         }
 
@@ -255,8 +247,8 @@ constructor(
             DeviceEntryIconView.IconType.LOCK ->
                 DeviceEntryIconView.AccessibilityHintType.AUTHENTICATE
             DeviceEntryIconView.IconType.UNLOCK -> DeviceEntryIconView.AccessibilityHintType.ENTER
-            DeviceEntryIconView.IconType.FINGERPRINT ->
-                DeviceEntryIconView.AccessibilityHintType.NONE
+            DeviceEntryIconView.IconType.FINGERPRINT,
+            DeviceEntryIconView.IconType.NONE -> DeviceEntryIconView.AccessibilityHintType.NONE
         }
     }
 

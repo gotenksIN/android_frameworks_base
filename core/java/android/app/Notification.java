@@ -18,7 +18,6 @@ package android.app;
 
 import static android.annotation.Dimension.DP;
 import static android.app.Flags.evenlyDividedCallStyleActionLayout;
-import static android.app.Flags.updateRankingTime;
 import static android.app.admin.DevicePolicyResources.Drawables.Source.NOTIFICATION;
 import static android.app.admin.DevicePolicyResources.Drawables.Style.SOLID_COLORED;
 import static android.app.admin.DevicePolicyResources.Drawables.WORK_PROFILE_ICON;
@@ -897,15 +896,16 @@ public class Notification implements Parcelable
     /**
      * Sphere of visibility of this notification, which affects how and when the SystemUI reveals
      * the notification's presence and contents in untrusted situations (namely, on the secure
-     * lockscreen).
+     * lockscreen and during screen sharing).
      *
      * The default level, {@link #VISIBILITY_PRIVATE}, behaves exactly as notifications have always
      * done on Android: The notification's {@link #icon} and {@link #tickerText} (if available) are
      * shown in all situations, but the contents are only available if the device is unlocked for
-     * the appropriate user.
+     * the appropriate user and there is no active screen sharing session.
      *
      * A more permissive policy can be expressed by {@link #VISIBILITY_PUBLIC}; such a notification
-     * can be read even in an "insecure" context (that is, above a secure lockscreen).
+     * can be read even in an "insecure" context (that is, above a secure lockscreen or while
+     * screen sharing with a remote viewer).
      * To modify the public version of this notification—for example, to redact some portions—see
      * {@link Builder#setPublicVersion(Notification)}.
      *
@@ -924,7 +924,8 @@ public class Notification implements Parcelable
     public @interface Visibility {}
 
     /**
-     * Notification visibility: Show this notification in its entirety on all lockscreens.
+     * Notification visibility: Show this notification in its entirety on all lockscreens and while
+     * screen sharing.
      *
      * {@see #visibility}
      */
@@ -932,14 +933,16 @@ public class Notification implements Parcelable
 
     /**
      * Notification visibility: Show this notification on all lockscreens, but conceal sensitive or
-     * private information on secure lockscreens.
+     * private information on secure lockscreens. Conceal sensitive or private information while
+     * screen sharing.
      *
      * {@see #visibility}
      */
     public static final int VISIBILITY_PRIVATE = 0;
 
     /**
-     * Notification visibility: Do not reveal any part of this notification on a secure lockscreen.
+     * Notification visibility: Do not reveal any part of this notification on a secure lockscreen
+     * or while screen sharing.
      *
      * {@see #visibility}
      */
@@ -2596,7 +2599,7 @@ public class Notification implements Parcelable
     public Notification()
     {
         this.when = System.currentTimeMillis();
-        if (updateRankingTime()) {
+        if (Flags.sortSectionByTime()) {
             creationTime = when;
             extras.putBoolean(EXTRA_SHOW_WHEN, true);
         } else {
@@ -2612,7 +2615,7 @@ public class Notification implements Parcelable
     public Notification(Context context, int icon, CharSequence tickerText, long when,
             CharSequence contentTitle, CharSequence contentText, Intent contentIntent)
     {
-        if (updateRankingTime()) {
+        if (Flags.sortSectionByTime()) {
             creationTime = when;
             extras.putBoolean(EXTRA_SHOW_WHEN, true);
         }
@@ -2645,7 +2648,7 @@ public class Notification implements Parcelable
         this.icon = icon;
         this.tickerText = tickerText;
         this.when = when;
-        if (updateRankingTime()) {
+        if (Flags.sortSectionByTime()) {
             creationTime = when;
             extras.putBoolean(EXTRA_SHOW_WHEN, true);
         } else {
@@ -3256,8 +3259,9 @@ public class Notification implements Parcelable
                 boolean mustClearCookie = false;
                 if (!parcel.hasClassCookie(Notification.class)) {
                     // This is the "root" notification, and not an "inner" notification (including
-                    // publicVersion or anything else that might be embedded in extras).
-                    parcel.setClassCookie(Notification.class, this);
+                    // publicVersion or anything else that might be embedded in extras). So we want
+                    // to use its token for every inner notification (might be null).
+                    parcel.setClassCookie(Notification.class, mAllowlistToken);
                     mustClearCookie = true;
                 }
                 try {
@@ -3266,7 +3270,7 @@ public class Notification implements Parcelable
                     writeToParcelImpl(parcel, flags);
                 } finally {
                     if (mustClearCookie) {
-                        parcel.removeClassCookie(Notification.class, this);
+                        parcel.removeClassCookie(Notification.class, mAllowlistToken);
                     }
                 }
             } else {
@@ -3290,14 +3294,9 @@ public class Notification implements Parcelable
         parcel.writeInt(1);
 
         if (Flags.secureAllowlistToken()) {
-            Notification rootNotification = (Notification) parcel.getClassCookie(
-                    Notification.class);
-            if (rootNotification != null && rootNotification != this) {
-                // Always use the same token as the root notification
-                parcel.writeStrongBinder(rootNotification.mAllowlistToken);
-            } else {
-                parcel.writeStrongBinder(mAllowlistToken);
-            }
+            // Always use the same token as the root notification (might be null).
+            IBinder rootNotificationToken = (IBinder) parcel.getClassCookie(Notification.class);
+            parcel.writeStrongBinder(rootNotificationToken);
         } else {
             parcel.writeStrongBinder(mAllowlistToken);
         }
@@ -4538,12 +4537,6 @@ public class Notification implements Parcelable
          */
         @NonNull
         public Builder setWhen(long when) {
-            if (updateRankingTime()) {
-                // don't show a timestamp that's decades old
-                if (mN.extras.getBoolean(EXTRA_SHOW_WHEN, true) && when == 0) {
-                    return this;
-                }
-            }
             mN.when = when;
             return this;
         }
@@ -5987,21 +5980,22 @@ public class Notification implements Parcelable
                 }
                 if (mN.extras.getBoolean(EXTRA_SHOW_CHRONOMETER)) {
                     contentView.setViewVisibility(R.id.chronometer, View.VISIBLE);
-                    contentView.setLong(R.id.chronometer, "setBase",
-                            mN.when + (SystemClock.elapsedRealtime() - System.currentTimeMillis()));
+                    contentView.setLong(R.id.chronometer, "setBase", mN.getWhen()
+                            + (SystemClock.elapsedRealtime() - System.currentTimeMillis()));
                     contentView.setBoolean(R.id.chronometer, "setStarted", true);
                     boolean countsDown = mN.extras.getBoolean(EXTRA_CHRONOMETER_COUNT_DOWN);
                     contentView.setChronometerCountDown(R.id.chronometer, countsDown);
                     setTextViewColorSecondary(contentView, R.id.chronometer, p);
                 } else {
                     contentView.setViewVisibility(R.id.time, View.VISIBLE);
-                    contentView.setLong(R.id.time, "setTime", mN.when);
+                    contentView.setLong(R.id.time, "setTime", mN.getWhen());
                     setTextViewColorSecondary(contentView, R.id.time, p);
                 }
             } else {
                 // We still want a time to be set but gone, such that we can show and hide it
                 // on demand in case it's a child notification without anything in the header
-                contentView.setLong(R.id.time, "setTime", mN.when != 0 ? mN.when : mN.creationTime);
+                contentView.setLong(R.id.time, "setTime", mN.getWhen() != 0 ? mN.getWhen() :
+                        mN.creationTime);
                 setTextViewColorSecondary(contentView, R.id.time, p);
             }
         }
@@ -7168,7 +7162,7 @@ public class Notification implements Parcelable
                 }
             }
 
-            if (!updateRankingTime()) {
+            if (!Flags.sortSectionByTime()) {
                 mN.creationTime = System.currentTimeMillis();
             }
 
@@ -7621,10 +7615,29 @@ public class Notification implements Parcelable
     }
 
     /**
+     * Returns #when, unless it's set to 0, which should be shown as/treated as a 'current'
+     * notification. 0 is treated as a special value because it was special in an old version of
+     * android, and some apps are still (incorrectly) using it.
+     *
+     * @hide
+     */
+    public long getWhen() {
+        if (Flags.sortSectionByTime()) {
+            if (when == 0) {
+                return creationTime;
+            }
+        }
+        return when;
+    }
+
+    /**
      * @return true if the notification will show the time; false otherwise
      * @hide
      */
     public boolean showsTime() {
+        if (Flags.sortSectionByTime()) {
+            return extras.getBoolean(EXTRA_SHOW_WHEN);
+        }
         return when != 0 && extras.getBoolean(EXTRA_SHOW_WHEN);
     }
 
@@ -7633,6 +7646,9 @@ public class Notification implements Parcelable
      * @hide
      */
     public boolean showsChronometer() {
+        if (Flags.sortSectionByTime()) {
+            return extras.getBoolean(EXTRA_SHOW_CHRONOMETER);
+        }
         return when != 0 && extras.getBoolean(EXTRA_SHOW_CHRONOMETER);
     }
 
@@ -9774,6 +9790,12 @@ public class Notification implements Parcelable
      * Starting at {@link android.os.Build.VERSION_CODES#O Android O} any notification that has a
      * media session attached with {@link #setMediaSession(MediaSession.Token)} will be colorized.
      * You can opt-out of this behavior by using {@link Notification.Builder#setColorized(boolean)}.
+     * <p>
+     *
+     * <p>
+     * Starting at {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM Android V} the
+     * {@link Notification#FLAG_NO_CLEAR NO_CLEAR flag} will be set for valid MediaStyle
+     * notifications.
      * <p>
      *
      * To use this style with your Notification, feed it to

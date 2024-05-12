@@ -122,6 +122,7 @@ class SceneContainerRepositoryTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     fromScene = Scenes.Lockscreen,
                     toScene = Scenes.Shade,
+                    currentScene = flowOf(Scenes.Shade),
                     progress = progress,
                     isInitiatedByUserInput = false,
                     isUserInputOngoing = flowOf(false),
@@ -139,24 +140,5 @@ class SceneContainerRepositoryTest : SysuiTestCase() {
                 .isEqualTo(
                     ObservableTransitionState.Idle(kosmos.sceneContainerConfig.initialSceneKey)
                 )
-        }
-
-    @Test
-    fun previousScene() =
-        testScope.runTest {
-            val underTest = kosmos.sceneContainerRepository
-            val currentScene by collectLastValue(underTest.currentScene)
-            val previousScene by collectLastValue(underTest.previousScene)
-
-            assertThat(previousScene).isNull()
-
-            val firstScene = currentScene
-            underTest.changeScene(Scenes.Shade)
-            assertThat(previousScene).isEqualTo(firstScene)
-            assertThat(currentScene).isEqualTo(Scenes.Shade)
-
-            underTest.changeScene(Scenes.QuickSettings)
-            assertThat(previousScene).isEqualTo(Scenes.Shade)
-            assertThat(currentScene).isEqualTo(Scenes.QuickSettings)
         }
 }

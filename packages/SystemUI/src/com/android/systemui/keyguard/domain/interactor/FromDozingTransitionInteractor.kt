@@ -24,7 +24,7 @@ import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.KeyguardWmStateRefactor
 import com.android.systemui.keyguard.data.repository.KeyguardTransitionRepository
-import com.android.systemui.keyguard.shared.model.BiometricUnlockModel.Companion.isWakeAndUnlock
+import com.android.systemui.keyguard.shared.model.BiometricUnlockMode.Companion.isWakeAndUnlock
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.util.kotlin.Utils.Companion.sample
@@ -66,7 +66,7 @@ constructor(
         listenForTransitionToCamera(scope, keyguardInteractor)
     }
 
-    private val canDismissLockScreen: Flow<Boolean> =
+    private val canTransitionToGoneOnWake: Flow<Boolean> =
         combine(
             keyguardInteractor.isKeyguardShowing,
             keyguardInteractor.isKeyguardDismissible,
@@ -87,7 +87,7 @@ constructor(
                     keyguardInteractor.biometricUnlockState,
                     keyguardInteractor.isKeyguardOccluded,
                     communalInteractor.isIdleOnCommunal,
-                    canDismissLockScreen,
+                    canTransitionToGoneOnWake,
                     keyguardInteractor.primaryBouncerShowing,
                 )
                 .collect {
@@ -96,12 +96,12 @@ constructor(
                         biometricUnlockState,
                         occluded,
                         isIdleOnCommunal,
-                        canDismissLockScreen,
+                        canTransitionToGoneOnWake,
                         primaryBouncerShowing) ->
                     startTransitionTo(
-                        if (isWakeAndUnlock(biometricUnlockState)) {
+                        if (isWakeAndUnlock(biometricUnlockState.mode)) {
                             KeyguardState.GONE
-                        } else if (canDismissLockScreen) {
+                        } else if (canTransitionToGoneOnWake) {
                             KeyguardState.GONE
                         } else if (primaryBouncerShowing) {
                             KeyguardState.PRIMARY_BOUNCER
@@ -129,7 +129,7 @@ constructor(
                 .sample(
                     communalInteractor.isIdleOnCommunal,
                     keyguardInteractor.biometricUnlockState,
-                    canDismissLockScreen,
+                    canTransitionToGoneOnWake,
                     keyguardInteractor.primaryBouncerShowing,
                 )
                 .collect {
@@ -142,7 +142,7 @@ constructor(
                     if (
                         !maybeStartTransitionToOccludedOrInsecureCamera() &&
                             // Handled by dismissFromDozing().
-                            !isWakeAndUnlock(biometricUnlockState)
+                            !isWakeAndUnlock(biometricUnlockState.mode)
                     ) {
                         startTransitionTo(
                             if (canDismissLockscreen) {

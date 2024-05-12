@@ -1677,7 +1677,6 @@ public final class InputMethodManager {
     @NonNull
     @RequiresPermission(value = Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional = true)
     @TestApi
-    @FlaggedApi(Flags.FLAG_IMM_USERHANDLE_HOSTSIDETESTS)
     @SuppressLint("UserHandle")
     public boolean isStylusHandwritingAvailableAsUser(@NonNull UserHandle user) {
         final Context fallbackContext = ActivityThread.currentApplication();
@@ -1822,7 +1821,6 @@ public final class InputMethodManager {
     @NonNull
     @RequiresPermission(value = Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional = true)
     @TestApi
-    @FlaggedApi(Flags.FLAG_IMM_USERHANDLE_HOSTSIDETESTS)
     @SuppressLint("UserHandle")
     public List<InputMethodInfo> getEnabledInputMethodListAsUser(@NonNull UserHandle user) {
         return IInputMethodManagerGlobalInvoker.getEnabledInputMethodList(user.getIdentifier());
@@ -1864,7 +1862,6 @@ public final class InputMethodManager {
     @NonNull
     @RequiresPermission(value = Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional = true)
     @TestApi
-    @FlaggedApi(Flags.FLAG_IMM_USERHANDLE_HOSTSIDETESTS)
     @SuppressLint("UserHandle")
     public List<InputMethodSubtype> getEnabledInputMethodSubtypeListAsUser(
             @NonNull String imeId, boolean allowsImplicitlyEnabledSubtypes,
@@ -2472,22 +2469,22 @@ public final class InputMethodManager {
     public boolean hideSoftInputFromView(@NonNull View view, @HideFlags int flags) {
         final boolean isFocusedAndWindowFocused = view.hasWindowFocus() && view.isFocused();
         synchronized (mH) {
-            if (!isFocusedAndWindowFocused && !hasServedByInputMethodLocked(view)) {
+            final boolean hasServedByInputMethod = hasServedByInputMethodLocked(view);
+            if (!isFocusedAndWindowFocused && !hasServedByInputMethod) {
                 // Fail early if the view is not focused and not served
                 // to avoid logging many erroneous calls.
                 return false;
             }
-        }
 
-        final int reason = SoftInputShowHideReason.HIDE_SOFT_INPUT_FROM_VIEW;
-        final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
-                ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(view));
-        ImeTracker.forLatency().onRequestHide(statsToken,
-                ImeTracker.ORIGIN_CLIENT, reason, ActivityThread::currentApplication);
-        ImeTracing.getInstance().triggerClientDump("InputMethodManager#hideSoftInputFromView",
-                this, null /* icProto */);
-        synchronized (mH) {
-            if (!hasServedByInputMethodLocked(view)) {
+            final int reason = SoftInputShowHideReason.HIDE_SOFT_INPUT_FROM_VIEW;
+            final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
+                    ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(view));
+            ImeTracker.forLatency().onRequestHide(statsToken,
+                    ImeTracker.ORIGIN_CLIENT, reason, ActivityThread::currentApplication);
+            ImeTracing.getInstance().triggerClientDump("InputMethodManager#hideSoftInputFromView",
+                    this, null /* icProto */);
+
+            if (!hasServedByInputMethod) {
                 ImeTracker.forLogging().onFailed(statsToken, ImeTracker.PHASE_CLIENT_VIEW_SERVED);
                 ImeTracker.forLatency().onShowFailed(statsToken,
                         ImeTracker.PHASE_CLIENT_VIEW_SERVED, ActivityThread::currentApplication);

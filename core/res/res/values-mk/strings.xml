@@ -153,16 +153,19 @@
     <string name="cfTemplateForwardedTime" msgid="735042369233323609">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: <xliff:g id="DIALING_NUMBER">{1}</xliff:g> по <xliff:g id="TIME_DELAY">{2}</xliff:g> секунди"</string>
     <string name="cfTemplateRegistered" msgid="5619930473441550596">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: не е препратено"</string>
     <string name="cfTemplateRegisteredTime" msgid="5222794399642525045">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: не е проследен"</string>
-    <string name="scCellularNetworkSecurityTitle" msgid="90330018476923559">"Безбедност на мобилната мрежа"</string>
-    <string name="scCellularNetworkSecuritySummary" msgid="8659128412709908263">"Преглед на поставките"</string>
-    <string name="scIdentifierDisclosureIssueTitle" msgid="3737384845335568193">"Пристапено е до идентификаторот на уредот"</string>
-    <string name="scIdentifierDisclosureIssueSummary" msgid="3870743771498510600">"Мрежа на врската <xliff:g id="DISCLOSURE_NETWORK">%4$s</xliff:g> го снимила уникатниот идентификатор (IMSI) на вашиот уред <xliff:g id="DISCLOSURE_COUNT">%1$d</xliff:g> пати во периодот меѓу <xliff:g id="DISCLOSURE_WINDOW_START_TIME">%2$tr</xliff:g> и <xliff:g id="DISCLOSURE_WINDOW_END_TIME">%3$tr</xliff:g>."</string>
-    <string name="scNullCipherIssueEncryptedTitle" msgid="8426373579673205292">"Шифрирана врска на <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
-    <string name="scNullCipherIssueEncryptedSummary" msgid="6437468449554283998">"Сега сте поврзани на побезбедна мобилна мрежа."</string>
-    <string name="scNullCipherIssueNonEncryptedTitle" msgid="2069674849204163569">"Нешифрирана врска на <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
-    <string name="scNullCipherIssueNonEncryptedSummary" msgid="3577092996366374833">"Се поврзавте на нешифрирана мобилна мрежа. Постои опасност од проследување на вашите повици, пораки и податоци."</string>
-    <string name="scNullCipherIssueActionSettings" msgid="8378372959891478470">"Поставки за безбедност на мобилната мрежа"</string>
+    <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Обезбедување на мобилна мрежа"</string>
+    <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"Шифрирање, известувања за нешифрирани мрежи"</string>
+    <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"Пристапено е до ID на уредот"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="3699930821270580416">"Во <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, мрежа во близина го сними уникатниот ID (IMSI или IMEI) на вашиот телефон со користење на вашата SIM-картичка на <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g>"</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="7283387338827749276">"Во <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, мрежа во близина го сними уникатниот ID (IMSI или IMEI) на вашиот телефон со користење на вашата SIM-картичка на <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g>.\n\nОва значи дека вашата локација, активност или идентитет се евидентирани. Ова е вообичаена практика, но може да биде проблем за луѓето кои се загрижени за приватноста."</string>
+    <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"Поврзано со шифрирана мрежа <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
+    <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"Врската со SIM-картичката на <xliff:g id="NETWORK_NAME">%1$s</xliff:g> сега е побезбедна"</string>
+    <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"Поврзано со нешифрирана мрежа"</string>
+    <string name="scNullCipherIssueNonEncryptedSummaryNotification" msgid="7386936934128110388">"Повиците, пораките и податоците во моментов се почувствителни додека ја користите вашата SIM-картичка на <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
+    <string name="scNullCipherIssueNonEncryptedSummary" msgid="5093428974513703253">"Повиците, пораките и податоците во моментов се почувствителни додека ја користите вашата SIM-картичка на <xliff:g id="NETWORK_NAME">%1$s</xliff:g>.\n\nКога вашата врска ќе биде шифрирана повторно, ќе добиете уште едно известување."</string>
+    <string name="scNullCipherIssueActionSettings" msgid="5888857706424639946">"Поставки за обезбедување на мобилна мрежа"</string>
     <string name="scNullCipherIssueActionLearnMore" msgid="7896642417214757769">"Дознајте повеќе"</string>
+    <string name="scNullCipherIssueActionGotIt" msgid="8747796640866585787">"Сфатив"</string>
     <string name="fcComplete" msgid="1080909484660507044">"Кодот за карактеристиката заврши."</string>
     <string name="fcError" msgid="5325116502080221346">"Проблем со поврзувањето или неважечки код за карактеристиката."</string>
     <string name="httpErrorOk" msgid="6206751415788256357">"Во ред"</string>
@@ -356,8 +359,7 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"Зачувување слика од екранот"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"Може да зачува слика од екранот."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"Преглед, <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
-    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
-    <skip />
+    <string name="dream_accessibility_action_click" msgid="7392398629967797805">"отфрли"</string>
     <string name="permlab_statusBar" msgid="8798267849526214017">"оневозможи или измени статусна лента"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"Дозволува апликацијата да ја оневозможи статусната лента или да додава или отстранува системски икони."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"да стане статусна лента"</string>
@@ -827,7 +829,7 @@
     <string name="permdesc_updatePackagesWithoutUserAction" msgid="4567739631260526366">"Дозволува сопственикот да ја ажурира апликацијата што претходно ја инсталирал без дејство од корисникот"</string>
     <string name="permlab_writeVerificationStateE2eeContactKeys" msgid="3990742344778360457">"ажурирање на состојбите за потврда на контактните клучеви за обострано шифрирање што се во сопственост на други апликации"</string>
     <string name="permdesc_writeVerificationStateE2eeContactKeys" msgid="8453156829747427041">"Дозволува апликацијата да ги ажурира состојбите за потврда на контактните клучеви за обострано шифрирање што се во сопственост на други апликации"</string>
-    <string name="policylab_limitPassword" msgid="4851829918814422199">"Постави правила за лозинката"</string>
+    <string name="policylab_limitPassword" msgid="4851829918814422199">"Поставување правила за лозинката"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"Контролирај ги должината и знаците што се дозволени за лозинки и PIN-броеви за отклучување екран."</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"Следење на обидите за отклучување на екранот"</string>
     <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Го следи бројот на неточни лозинки што се внесени за отклучување на екранот и го заклучува таблетот или ги брише сите податоци од него ако се внесат голем број неточни лозинки."</string>
@@ -838,31 +840,31 @@
     <string name="policydesc_watchLogin_secondaryUser" product="tv" msgid="8965224107449407052">"Го следи бројот на погрешно внесени лозинки при отклучување на екранот и го заклучува уредот Android TV или ги брише сите податоци од овој корисник доколку се внесени премногу погрешни лозинки."</string>
     <string name="policydesc_watchLogin_secondaryUser" product="automotive" msgid="7180857406058327941">"Набљудувај го бројот на погрешно внесени лозинки при отклучување на екранот и заклучи го системот за информации и забава или избриши ги сите податоци од овој профил доколку се внесени премногу погрешни лозинки."</string>
     <string name="policydesc_watchLogin_secondaryUser" product="default" msgid="9177645136475155924">"Набљудувај го бројот на погрешно внесени лозинки при отклучување на екранот и заклучи го телефонот или избриши ги сите податоци од овој корисник доколку се внесени премногу погрешни лозинки."</string>
-    <string name="policylab_resetPassword" msgid="214556238645096520">"Промени го заклучувањето на екранот"</string>
-    <string name="policydesc_resetPassword" msgid="4626419138439341851">"Промени го заклучувањето на екранот."</string>
-    <string name="policylab_forceLock" msgid="7360335502968476434">"Заклучи го екранот"</string>
-    <string name="policydesc_forceLock" msgid="1008844760853899693">"Контролирај како и кога се заклучува екранот."</string>
+    <string name="policylab_resetPassword" msgid="214556238645096520">"Менување на заклучувањето на екранот"</string>
+    <string name="policydesc_resetPassword" msgid="4626419138439341851">"Го менува заклучувањето на екранот."</string>
+    <string name="policylab_forceLock" msgid="7360335502968476434">"Заклучување на екранот"</string>
+    <string name="policydesc_forceLock" msgid="1008844760853899693">"Контролира како и кога се заклучува екранот."</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"Бришење на сите податоци"</string>
-    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Избриши ги податоците во таблетот без предупредување со ресетирање на фабрички податоци."</string>
+    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Ги брише податоците од таблетот без предупредување вршејќи ресетирање на фабрички податоци."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"Ги брише податоците на вашиот уред Android TV без предупредување, така што ќе изврши ресетирање на фабричките податоци."</string>
     <string name="policydesc_wipeData" product="automotive" msgid="660804547737323300">"Избриши ги податоците во системот за информации и забава без предупредување со ресетирање на фабрички податоци."</string>
     <string name="policydesc_wipeData" product="default" msgid="8036084184768379022">"Ги брише податоците од телефонот без предупредување вршејќи ресетирање на фабрички податоци."</string>
-    <string name="policylab_wipeData_secondaryUser" product="automotive" msgid="115034358520328373">"Избриши ги податоците на профилот"</string>
-    <string name="policylab_wipeData_secondaryUser" product="default" msgid="413813645323433166">"Избриши ги податоците на корисникот"</string>
+    <string name="policylab_wipeData_secondaryUser" product="automotive" msgid="115034358520328373">"Бришење на податоците на профилот"</string>
+    <string name="policylab_wipeData_secondaryUser" product="default" msgid="413813645323433166">"Бришење на податоците на корисникот"</string>
     <string name="policydesc_wipeData_secondaryUser" product="tablet" msgid="2336676480090926470">"Избриши ги податоците на овој корисник на таблетот без предупредување."</string>
     <string name="policydesc_wipeData_secondaryUser" product="tv" msgid="2293713284515865200">"Ги брише податоците на овој корисник на уредов Android TV без предупредување."</string>
     <string name="policydesc_wipeData_secondaryUser" product="automotive" msgid="4658832487305780879">"Избриши ги податоците на профилов во системот за информации и забава без предупредување."</string>
     <string name="policydesc_wipeData_secondaryUser" product="default" msgid="2788325512167208654">"Избриши ги податоците на овој корисник на телефонот без предупредување."</string>
-    <string name="policylab_setGlobalProxy" msgid="215332221188670221">"Постави го глобалниот прокси на уредот"</string>
+    <string name="policylab_setGlobalProxy" msgid="215332221188670221">"Поставување глобален прокси на уредот"</string>
     <string name="policydesc_setGlobalProxy" msgid="7149665222705519604">"Поставете го глобалниот прокси на уредот да се користи додека политиката е овозможена. Само сопственикот на уредот може да го поставува глобалниот прокси."</string>
     <string name="policylab_expirePassword" msgid="6015404400532459169">"Рок на лозинка за закл. екран"</string>
     <string name="policydesc_expirePassword" msgid="9136524319325960675">"Измени колку често мора да се менува лозинката, PIN-бројот или шемата за заклучување екран."</string>
     <string name="policylab_encryptedStorage" msgid="9012936958126670110">"Постави шифрирање на меморија"</string>
     <string name="policydesc_encryptedStorage" msgid="1102516950740375617">"Барај зачуваните податоци за апликација да се шифрирани."</string>
-    <string name="policylab_disableCamera" msgid="5749486347810162018">"Оневозможи фотоапарати"</string>
+    <string name="policylab_disableCamera" msgid="5749486347810162018">"Оневозможување на камерите"</string>
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"Спречи употреба на сите камери на уредот."</string>
-    <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Онев. функции од заклуч. екран"</string>
-    <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Спречи користење на некои функции од заклучување на екранот."</string>
+    <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Оневозможување функции за заклучување на екранот"</string>
+    <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Го спречува користењето на некои функции за заклучување на екранот."</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"Дома"</item>
     <item msgid="7740243458912727194">"Мобилен"</item>
@@ -1898,8 +1900,7 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Побарај PIN пред откачување"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Побарај шема за откл. пред откачување"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Побарај лозинка пред откачување"</string>
-    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
-    <skip />
+    <string name="package_installed_device_owner" msgid="8684974629306529138">"Инсталирано од администраторот.\nОдете во „Поставки“ за да ги прегледате доделените дозволи"</string>
     <string name="package_updated_device_owner" msgid="7560272363805506941">"Ажурирано од администраторот"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Избришано од администраторот"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"Во ред"</string>
@@ -2143,6 +2144,10 @@
     <string name="dynamic_mode_notification_channel_name" msgid="2986926422100223328">"Известување за информации за режимот за рутини"</string>
     <string name="dynamic_mode_notification_title" msgid="1388718452788985481">"„Штедачот на батерија“ е вклучен"</string>
     <string name="dynamic_mode_notification_summary" msgid="1639031262484979689">"Се намалува користењето на батеријата за нејзино подолго траење"</string>
+    <!-- no translation found for dynamic_mode_notification_title_v2 (5072385242078021152) -->
+    <skip />
+    <!-- no translation found for dynamic_mode_notification_summary_v2 (2142444344663147938) -->
+    <skip />
     <string name="battery_saver_notification_channel_name" msgid="3918243458067916913">"Штедач на батерија"</string>
     <string name="battery_saver_off_notification_title" msgid="7637255960468032515">"Штедачот на батерија е исклучен"</string>
     <string name="battery_saver_charged_notification_summary" product="default" msgid="5544457317418624367">"Телефонот е доволно полн. Функциите веќе не се ограничени."</string>
@@ -2217,6 +2222,8 @@
     <string name="miniresolver_switch_to_work" msgid="1042640606122638596">"Да се префрли на работна апликација?"</string>
     <string name="miniresolver_call_information" msgid="6739417525304184083">"Вашата организација ви дозволува да упатувате повици само од работни апликации"</string>
     <string name="miniresolver_sms_information" msgid="4311292661329483088">"Вашата организација ви дозволува да испраќате пораки само од работни апликации"</string>
+    <string name="miniresolver_private_space_phone_information" msgid="4469511223312488570">"Може да упатувате телефонски повици само од вашата лична апликација „Телефон“. Повиците упатени со личен телефон ќе се додадат во вашата лична историја на повици."</string>
+    <string name="miniresolver_private_space_messages_information" msgid="111285656327622118">"Може да испраќате SMS-пораки само од вашата лична апликација Messages."</string>
     <string name="miniresolver_use_personal_browser" msgid="776072682871133308">"Користи личен прелистувач"</string>
     <string name="miniresolver_use_work_browser" msgid="543575306251952994">"Користи работен прелистувач"</string>
     <string name="miniresolver_call" msgid="6386870060423480765">"Повикај"</string>
@@ -2396,8 +2403,15 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"Работен профил 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"Профил за тестирање"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Профил на заедницата"</string>
-    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <!-- no translation found for accessibility_label_managed_profile (3366526886209832641) -->
     <skip />
+    <!-- no translation found for accessibility_label_private_profile (1436459319135548969) -->
+    <skip />
+    <!-- no translation found for accessibility_label_clone_profile (7579118375042398784) -->
+    <skip />
+    <!-- no translation found for accessibility_label_communal_profile (1437173163111334791) -->
+    <skip />
+    <string name="redacted_notification_message" msgid="1520587845842228816">"Содржината на чувствителните известувања е скриена"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Од безбедносни причини, содржините на апликацијата се скриени од споделувањето екран"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Поврзано со сателит автоматски"</string>

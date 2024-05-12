@@ -353,8 +353,8 @@ public class Camera {
             throw new RuntimeException("Unknown camera ID");
         }
         Context context = ActivityThread.currentApplication().getApplicationContext();
-        boolean overrideToPortrait = CameraManager.shouldOverrideToPortrait(context);
-        getCameraInfo(cameraId, context, overrideToPortrait, cameraInfo);
+        final int rotationOverride = CameraManager.getRotationOverride(context);
+        getCameraInfo(cameraId, context, rotationOverride, cameraInfo);
     }
 
     /**
@@ -365,8 +365,8 @@ public class Camera {
     @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
     @TestApi
     public static void getCameraInfo(int cameraId, @NonNull Context context,
-            boolean overrideToPortrait, CameraInfo cameraInfo) {
-        _getCameraInfo(cameraId, overrideToPortrait, context.getDeviceId(),
+            int rotationOverride, CameraInfo cameraInfo) {
+        _getCameraInfo(cameraId, rotationOverride, context.getDeviceId(),
                 getDevicePolicyFromContext(context), cameraInfo);
         IBinder b = ServiceManager.getService(Context.AUDIO_SERVICE);
         IAudioService audioService = IAudioService.Stub.asInterface(b);
@@ -381,7 +381,7 @@ public class Camera {
         }
     }
 
-    private native static void _getCameraInfo(int cameraId, boolean overrideToPortrait,
+    private native static void _getCameraInfo(int cameraId, int rotationOverride,
             int deviceId, int devicePolicy, CameraInfo cameraInfo);
 
     private static int getDevicePolicyFromContext(Context context) {
@@ -497,8 +497,8 @@ public class Camera {
      */
     public static Camera open(int cameraId) {
         Context context = ActivityThread.currentApplication().getApplicationContext();
-        boolean overrideToPortrait = CameraManager.shouldOverrideToPortrait(context);
-        return open(cameraId, context, overrideToPortrait);
+        final int rotationOverride = CameraManager.getRotationOverride(context);
+        return open(cameraId, context, rotationOverride);
     }
 
     /**
@@ -508,8 +508,8 @@ public class Camera {
      */
     @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
     @TestApi
-    public static Camera open(int cameraId, @NonNull Context context, boolean overrideToPortrait) {
-        return new Camera(cameraId, context, overrideToPortrait);
+    public static Camera open(int cameraId, @NonNull Context context, int rotationOverride) {
+        return new Camera(cameraId, context, rotationOverride);
     }
 
     /**
@@ -580,7 +580,7 @@ public class Camera {
         return open(cameraId);
     }
 
-    private int cameraInit(int cameraId, Context context, boolean overrideToPortrait) {
+    private int cameraInit(int cameraId, Context context, int rotationOverride) {
         mShutterCallback = null;
         mRawImageCallback = null;
         mJpegCallback = null;
@@ -604,7 +604,7 @@ public class Camera {
 
         boolean forceSlowJpegMode = shouldForceSlowJpegMode();
         return native_setup(new WeakReference<>(this), cameraId,
-                ActivityThread.currentOpPackageName(), overrideToPortrait, forceSlowJpegMode,
+                ActivityThread.currentOpPackageName(), rotationOverride, forceSlowJpegMode,
                 context.getDeviceId(), getDevicePolicyFromContext(context));
     }
 
@@ -622,12 +622,12 @@ public class Camera {
     }
 
     /** used by Camera#open, Camera#open(int) */
-    Camera(int cameraId, @NonNull Context context, boolean overrideToPortrait) {
+    Camera(int cameraId, @NonNull Context context, int rotationOverride) {
         if(cameraId >= getNumberOfCameras()){
              throw new RuntimeException("Unknown camera ID");
         }
         Objects.requireNonNull(context);
-        int err = cameraInit(cameraId, context, overrideToPortrait);
+        final int err = cameraInit(cameraId, context, rotationOverride);
         if (checkInitErrors(err)) {
             if (err == -EACCES) {
                 throw new RuntimeException("Fail to connect to camera service");
@@ -692,7 +692,7 @@ public class Camera {
 
     @UnsupportedAppUsage
     private native int native_setup(Object cameraThis, int cameraId, String packageName,
-            boolean overrideToPortrait, boolean forceSlowJpegMode, int deviceId, int devicePolicy);
+            int rotationOverride, boolean forceSlowJpegMode, int deviceId, int devicePolicy);
 
     private native final void native_release();
 

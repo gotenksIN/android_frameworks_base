@@ -75,6 +75,10 @@ constructor(
     /** The height in px of the contents of the HUN. */
     val headsUpHeight: StateFlow<Float> = viewHeightRepository.headsUpHeight.asStateFlow()
 
+    /** The alpha of the Notification Stack for the brightness mirror */
+    val alphaForBrightnessMirror: StateFlow<Float> =
+        placeholderRepository.alphaForBrightnessMirror.asStateFlow()
+
     /** The y-coordinate in px of top of the contents of the notification stack. */
     val stackTop: StateFlow<Float> = placeholderRepository.stackTop.asStateFlow()
 
@@ -100,6 +104,18 @@ constructor(
      * necessary to scroll up to keep expanding the notification.
      */
     val syntheticScroll: Flow<Float> = viewHeightRepository.syntheticScroll.asStateFlow()
+
+    /**
+     * Whether the current touch gesture is overscroll. If true, it means the NSSL has already
+     * consumed part of the gesture.
+     */
+    val isCurrentGestureOverscroll: Flow<Boolean> =
+        viewHeightRepository.isCurrentGestureOverscroll.asStateFlow()
+
+    /** Sets the alpha to apply to the NSSL for the brightness mirror */
+    fun setAlphaForBrightnessMirror(alpha: Float) {
+        placeholderRepository.alphaForBrightnessMirror.value = alpha
+    }
 
     /** Sets the position of the notification stack in the current scene. */
     fun setShadeScrimBounds(bounds: ShadeScrimBounds?) {
@@ -135,6 +151,11 @@ constructor(
     /** Sets the amount (px) that the notification stack should scroll due to internal expansion. */
     fun setSyntheticScroll(delta: Float) {
         viewHeightRepository.syntheticScroll.value = delta
+    }
+
+    /** Sets whether the current touch gesture is overscroll. */
+    fun setCurrentGestureOverscroll(isOverscroll: Boolean) {
+        viewHeightRepository.isCurrentGestureOverscroll.value = isOverscroll
     }
 
     fun setConstrainedAvailableSpace(height: Int) {

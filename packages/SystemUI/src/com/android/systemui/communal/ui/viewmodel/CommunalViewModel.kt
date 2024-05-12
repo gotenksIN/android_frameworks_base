@@ -16,12 +16,18 @@
 
 package com.android.systemui.communal.ui.viewmodel
 
+import android.content.res.Resources
+import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.domain.interactor.CommunalTutorialInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
+import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.Logger
 import com.android.systemui.log.dagger.CommunalLog
@@ -29,7 +35,9 @@ import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
 import com.android.systemui.media.controls.ui.view.MediaHost
 import com.android.systemui.media.controls.ui.view.MediaHostState
 import com.android.systemui.media.dagger.MediaModule
+import com.android.systemui.res.R
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
+import com.android.systemui.util.kotlin.BooleanFlowOperators.not
 import javax.inject.Inject
 import javax.inject.Named
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +62,8 @@ class CommunalViewModel
 @Inject
 constructor(
     @Application private val scope: CoroutineScope,
+    @Main private val resources: Resources,
+    keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val communalInteractor: CommunalInteractor,
     tutorialInteractor: CommunalTutorialInteractor,
     private val shadeInteractor: ShadeInteractor,
@@ -90,9 +100,39 @@ constructor(
             .distinctUntilChanged()
             .onEach { logger.d("isEmptyState: $it") }
 
-    private val _isPopupOnDismissCtaShowing: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    override val isPopupOnDismissCtaShowing: Flow<Boolean> =
-        _isPopupOnDismissCtaShowing.asStateFlow()
+    private val _currentPopup: MutableStateFlow<PopupType?> = MutableStateFlow(null)
+    override val currentPopup: Flow<PopupType?> = _currentPopup.asStateFlow()
+
+    // The widget is focusable for accessibility when the hub is fully visible and shade is not
+    // opened.
+    override val isFocusable: Flow<Boolean> =
+        combine(
+                keyguardTransitionInteractor.isFinishedInState(KeyguardState.GLANCEABLE_HUB),
+                communalInteractor.isIdleOnCommunal,
+                shadeInteractor.isAnyFullyExpanded,
+            ) { transitionedToGlanceableHub, isIdleOnCommunal, isAnyFullyExpanded ->
+                transitionedToGlanceableHub && isIdleOnCommunal && !isAnyFullyExpanded
+            }
+            .distinctUntilChanged()
+
+    override val widgetAccessibilityDelegate =
+        object : View.AccessibilityDelegate() {
+            override fun onInitializeAccessibilityNodeInfo(
+                host: View,
+                info: AccessibilityNodeInfo
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                // Hint user to long press in order to enter edit mode
+                info.addAction(
+                    AccessibilityNodeInfo.AccessibilityAction(
+                        AccessibilityNodeInfo.AccessibilityAction.ACTION_LONG_CLICK.id,
+                        resources
+                            .getString(R.string.accessibility_action_label_edit_widgets)
+                            .lowercase()
+                    )
+                )
+            }
+        }
 
     private val _isEnableWidgetDialogShowing: MutableStateFlow<Boolean> = MutableStateFlow(false)
     val isEnableWidgetDialogShowing: Flow<Boolean> = _isEnableWidgetDialogShowing.asStateFlow()
@@ -124,14 +164,16 @@ constructor(
     override fun onDismissCtaTile() {
         scope.launch {
             communalInteractor.dismissCtaTile()
-            setPopupOnDismissCtaVisibility(true)
-            schedulePopupHiding()
+            setCurrentPopupType(PopupType.CtaTile)
         }
     }
 
-    override fun onHidePopupAfterDismissCta() {
-        cancelDelayedPopupHiding()
-        setPopupOnDismissCtaVisibility(false)
+    override fun onShowCustomizeWidgetButton() {
+        setCurrentPopupType(PopupType.CustomizeWidgetButton)
+    }
+
+    override fun onHidePopup() {
+        setCurrentPopupType(null)
     }
 
     override fun onOpenEnableWidgetDialog() {
@@ -168,32 +210,42 @@ constructor(
         _isEnableWorkProfileDialogShowing.value = isVisible
     }
 
-    private fun setPopupOnDismissCtaVisibility(isVisible: Boolean) {
-        _isPopupOnDismissCtaShowing.value = isVisible
+    private fun setCurrentPopupType(popupType: PopupType?) {
+        _currentPopup.value = popupType
+        delayedHideCurrentPopupJob?.cancel()
+
+        if (popupType != null) {
+            delayedHideCurrentPopupJob =
+                scope.launch {
+                    delay(POPUP_AUTO_HIDE_TIMEOUT_MS)
+                    setCurrentPopupType(null)
+                }
+        } else {
+            delayedHideCurrentPopupJob = null
+        }
     }
 
-    private var delayedHidePopupJob: Job? = null
-
-    private fun schedulePopupHiding() {
-        cancelDelayedPopupHiding()
-        delayedHidePopupJob =
-            scope.launch {
-                delay(POPUP_AUTO_HIDE_TIMEOUT_MS)
-                onHidePopupAfterDismissCta()
-            }
-    }
-
-    private fun cancelDelayedPopupHiding() {
-        delayedHidePopupJob?.cancel()
-        delayedHidePopupJob = null
-    }
+    private var delayedHideCurrentPopupJob: Job? = null
 
     /** Whether we can transition to a new scene based on a user gesture. */
     fun canChangeScene(): Boolean {
         return !shadeInteractor.isAnyFullyExpanded.value
     }
 
+    /**
+     * Whether touches should be disabled in communal.
+     *
+     * This is needed because the notification shade does not block touches in blank areas and these
+     * fall through to the glanceable hub, which we don't want.
+     */
+    val touchesAllowed: Flow<Boolean> = not(shadeInteractor.isAnyFullyExpanded)
+
     companion object {
         const val POPUP_AUTO_HIDE_TIMEOUT_MS = 12000L
     }
+}
+
+sealed class PopupType {
+    object CtaTile : PopupType()
+    object CustomizeWidgetButton : PopupType()
 }

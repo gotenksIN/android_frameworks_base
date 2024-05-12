@@ -25,6 +25,7 @@ import static com.android.app.animation.Interpolators.EMPHASIZED_DECELERATE;
 import static com.android.keyguard.KeyguardClockSwitch.LARGE;
 import static com.android.keyguard.KeyguardClockSwitch.SMALL;
 import static com.android.systemui.Flags.predictiveBackAnimateShade;
+import static com.android.systemui.Flags.shadeCollapseActivityLaunchFix;
 import static com.android.systemui.Flags.smartspaceRelocateToBottom;
 import static com.android.systemui.classifier.Classifier.BOUNCER_UNLOCK;
 import static com.android.systemui.classifier.Classifier.GENERIC;
@@ -246,6 +247,7 @@ import kotlin.Unit;
 
 import kotlinx.coroutines.CoroutineDispatcher;
 import kotlinx.coroutines.flow.Flow;
+import kotlinx.coroutines.flow.StateFlow;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -4003,7 +4005,12 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 mExpandLatencyTracking = false;
             }
             float maxPanelHeight = getMaxPanelTransitionDistance();
-            if (mHeightAnimator == null) {
+            if (mHeightAnimator == null && !MigrateClocksToBlueprint.isEnabled()) {
+                // MigrateClocksToBlueprint - There is an edge case where swiping up slightly,
+                // and then swiping down will trigger overscroll logic. Even without this flag
+                // enabled, the notifications can then run into UDFPS. At this point it is
+                // safer to remove overscroll for this one case to prevent overlap.
+
                 // Split shade has its own overscroll logic
                 if (isTracking()) {
                     float overExpansionPixels = Math.max(0, h - maxPanelHeight);
@@ -4067,6 +4074,11 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     @Override
+    public StateFlow<Float> getUdfpsTransitionToFullShadeProgress() {
+        return mShadeRepository.getUdfpsTransitionToFullShadeProgress();
+    }
+
+    @Override
     public Flow<Float> getLegacyPanelExpansion() {
         return  mShadeRepository.getLegacyShadeExpansion();
     }
@@ -4103,7 +4115,11 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     @Override
     public boolean canBeCollapsed() {
-        return !isFullyCollapsed() && !isTracking() && !isClosing();
+        return !isFullyCollapsed() && !isTracking() && !isClosing()
+                // Don't try to collapse if on keyguard, as the expansion fraction is 1 in this
+                // case.
+                && !(shadeCollapseActivityLaunchFix() && mExpandedFraction == 1f
+                && mBarState == KEYGUARD);
     }
 
     public void instantCollapse() {

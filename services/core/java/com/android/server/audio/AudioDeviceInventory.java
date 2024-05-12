@@ -871,9 +871,25 @@ public class AudioDeviceInventory {
         }
     }
 
+    // Additional delay added to the music mute duration when a codec config change is executed.
+    static final int BT_CONFIG_CHANGE_MUTE_DELAY_MS = 500;
 
+    /**
+     * Handles a Bluetooth link codec configuration change communicated by the Bluetooth stack.
+     * Called when either A2DP or LE Audio codec encoding or sampling rate changes:
+     * the change is communicated to native audio policy to eventually reconfigure the audio
+     * path.
+     * Also used to notify a change in preferred mode (duplex or output) for Bluetooth profiles.
+     *
+     * @param btInfo contains all information on the Bluetooth device and profile
+     * @param codec the requested audio encoding (e.g SBC)
+     * @param codecChanged true if a codec parameter changed, false for preferred mode change
+     * @param event currently only EVENT_DEVICE_CONFIG_CHANGE
+     * @return an optional additional delay in milliseconds to add to the music mute period in
+     * case of an actual codec reconfiguration.
+     */
     @GuardedBy("mDeviceBroker.mDeviceStateLock")
-    /*package*/ void onBluetoothDeviceConfigChange(
+    /*package*/ int onBluetoothDeviceConfigChange(
             @NonNull AudioDeviceBroker.BtDeviceInfo btInfo,
             @AudioSystem.AudioFormatNativeEnumForBtCodec int codec,
             boolean codecChanged, int event) {
@@ -881,10 +897,11 @@ public class AudioDeviceInventory {
                 + "onBluetoothDeviceConfigChange")
                 .set(MediaMetrics.Property.EVENT, BtHelper.deviceEventToString(event));
         boolean a2dpCodecChange = false;
+        int delayMs = 0;
         final BluetoothDevice btDevice = btInfo.mDevice;
         if (btDevice == null) {
             mmi.set(MediaMetrics.Property.EARLY_RETURN, "btDevice null").record();
-            return;
+            return delayMs;
         }
         if (AudioService.DEBUG_DEVICES) {
             Log.d(TAG, "onBluetoothDeviceConfigChange btDevice=" + btDevice);
@@ -919,7 +936,7 @@ public class AudioDeviceInventory {
                         .printSlog(EventLogger.Event.ALOGI, TAG));
                 mmi.set(MediaMetrics.Property.EARLY_RETURN, "A2dp config change ignored")
                         .record();
-                return;
+                return delayMs;
             }
 
             if (di == null) {
@@ -995,6 +1012,7 @@ public class AudioDeviceInventory {
             }
         }
         mmi.record();
+        return delayMs;
     }
 
     /*package*/ void onMakeA2dpDeviceUnavailableNow(String address, int a2dpCodec) {

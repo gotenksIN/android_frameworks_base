@@ -26,7 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.intermediateLayout
+import androidx.compose.ui.layout.approachLayout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.zIndex
@@ -74,7 +74,9 @@ internal class Scene(
         Box(
             modifier
                 .zIndex(zIndex)
-                .intermediateLayout { measurable, constraints ->
+                .approachLayout(
+                    isMeasurementApproachInProgress = { scope.layoutState.isTransitioning() }
+                ) { measurable, constraints ->
                     targetSize = lookaheadSize
                     val placeable = measurable.measure(constraints)
                     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
@@ -139,23 +141,27 @@ internal class SceneScopeImpl(
     override fun Modifier.horizontalNestedScrollToScene(
         leftBehavior: NestedScrollBehavior,
         rightBehavior: NestedScrollBehavior,
+        isExternalOverscrollGesture: () -> Boolean,
     ): Modifier =
         nestedScrollToScene(
             layoutImpl = layoutImpl,
             orientation = Orientation.Horizontal,
             topOrLeftBehavior = leftBehavior,
             bottomOrRightBehavior = rightBehavior,
+            isExternalOverscrollGesture = isExternalOverscrollGesture,
         )
 
     override fun Modifier.verticalNestedScrollToScene(
         topBehavior: NestedScrollBehavior,
-        bottomBehavior: NestedScrollBehavior
+        bottomBehavior: NestedScrollBehavior,
+        isExternalOverscrollGesture: () -> Boolean,
     ): Modifier =
         nestedScrollToScene(
             layoutImpl = layoutImpl,
             orientation = Orientation.Vertical,
             topOrLeftBehavior = topBehavior,
             bottomOrRightBehavior = bottomBehavior,
+            isExternalOverscrollGesture = isExternalOverscrollGesture,
         )
 
     override fun Modifier.noResizeDuringTransitions(): Modifier {

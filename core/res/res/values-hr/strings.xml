@@ -154,16 +154,19 @@
     <string name="cfTemplateForwardedTime" msgid="735042369233323609">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: <xliff:g id="DIALING_NUMBER">{1}</xliff:g> nakon <xliff:g id="TIME_DELAY">{2}</xliff:g> s"</string>
     <string name="cfTemplateRegistered" msgid="5619930473441550596">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: Nije proslijeđeno"</string>
     <string name="cfTemplateRegisteredTime" msgid="5222794399642525045">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: nije proslijeđeno"</string>
-    <string name="scCellularNetworkSecurityTitle" msgid="90330018476923559">"Sigurnost mobilne mreže"</string>
-    <string name="scCellularNetworkSecuritySummary" msgid="8659128412709908263">"Pregledaj postavke"</string>
-    <string name="scIdentifierDisclosureIssueTitle" msgid="3737384845335568193">"Pristupljeno je identifikatoru uređaja"</string>
-    <string name="scIdentifierDisclosureIssueSummary" msgid="3870743771498510600">"Mreža na vezi <xliff:g id="DISCLOSURE_NETWORK">%4$s</xliff:g> zabilježila je jedinstveni identifikacijski broj vašeg uređaja (IMSI) sljedeći broj puta: <xliff:g id="DISCLOSURE_COUNT">%1$d</xliff:g> u razdoblju između <xliff:g id="DISCLOSURE_WINDOW_START_TIME">%2$tr</xliff:g> i <xliff:g id="DISCLOSURE_WINDOW_END_TIME">%3$tr</xliff:g>."</string>
-    <string name="scNullCipherIssueEncryptedTitle" msgid="8426373579673205292">"Šifrirana je veza s mrežom <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
-    <string name="scNullCipherIssueEncryptedSummary" msgid="6437468449554283998">"Sad ste povezani sa sigurnijom mobilnom mrežom."</string>
-    <string name="scNullCipherIssueNonEncryptedTitle" msgid="2069674849204163569">"Nešifrirana veza s mobilnom mrežom <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
-    <string name="scNullCipherIssueNonEncryptedSummary" msgid="3577092996366374833">"Sad ste povezani s nešifriranom mobilnom mrežom. Vaši su pozivi, poruke i podaci ranjivi na presretanje."</string>
-    <string name="scNullCipherIssueActionSettings" msgid="8378372959891478470">"Postavke sigurnosti mobilne mreže"</string>
+    <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Sigurnost mobilne mreže"</string>
+    <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"Šifriranje i obavijesti za nešifrirane mreže"</string>
+    <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"Pristupljeno je ID-ju uređaja"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="3699930821270580416">"U <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> mreža u blizini zabilježila je jedinstveni ID (IMSI ili IMEI) vašeg uređaja tijekom upotrebe SIM-a iz mreže <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g>"</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="7283387338827749276">"U <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> mreža u blizini zabilježila je jedinstveni ID (IMSI ili IMEI) vašeg uređaja tijekom upotrebe SIM-a iz mreže <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g>.\n\nTo znači da je vaša lokacija, aktivnost ili identitet zapisan. To je uobičajena praksa, no može predstavljati problem za osobe koje brine privatnost."</string>
+    <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"Telefon je povezan sa šifriranom mrežom <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
+    <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"Veza SIM-a s mrežom <xliff:g id="NETWORK_NAME">%1$s</xliff:g> sada je sigurnija"</string>
+    <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"Uređaj je povezan s nešifriranom mrežom"</string>
+    <string name="scNullCipherIssueNonEncryptedSummaryNotification" msgid="7386936934128110388">"Pozivi, poruke i podaci trenutačno su ranjiviji dok se upotrebljava SIM iz mreže <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
+    <string name="scNullCipherIssueNonEncryptedSummary" msgid="5093428974513703253">"Pozivi, poruke i podaci trenutačno su ranjiviji dok se upotrebljava SIM iz mreže <xliff:g id="NETWORK_NAME">%1$s</xliff:g>.\n\nKada se vaša veza ponovno šifrira, dobit ćete još jednu obavijest."</string>
+    <string name="scNullCipherIssueActionSettings" msgid="5888857706424639946">"Postavke sigurnosti mobilne mreže"</string>
     <string name="scNullCipherIssueActionLearnMore" msgid="7896642417214757769">"Saznajte više"</string>
+    <string name="scNullCipherIssueActionGotIt" msgid="8747796640866585787">"Shvaćam"</string>
     <string name="fcComplete" msgid="1080909484660507044">"Kôd značajke je potpun."</string>
     <string name="fcError" msgid="5325116502080221346">"Problem s vezom ili nevažeći kôd značajke."</string>
     <string name="httpErrorOk" msgid="6206751415788256357">"U redu"</string>
@@ -357,8 +360,7 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"Snimi zaslon"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"Možete napraviti snimku zaslona."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"Pregled, <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
-    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
-    <skip />
+    <string name="dream_accessibility_action_click" msgid="7392398629967797805">"odbaci"</string>
     <string name="permlab_statusBar" msgid="8798267849526214017">"onemogućavanje ili izmjena trake statusa"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"Aplikaciji omogućuje onemogućavanje trake statusa ili dodavanje i uklanjanje sistemskih ikona."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"biti traka statusa"</string>
@@ -831,7 +833,7 @@
     <string name="policylab_limitPassword" msgid="4851829918814422199">"Postavi pravila zaporke"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"Upravlja duljinom i znakovima koji su dopušteni u zaporkama i PIN-ovima zaključavanja zaslona."</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"Nadzor pokušaja otključavanja zaslona"</string>
-    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Nadziri broj netočnih zaporki unesenih pri otključavanju zaslona i zaključaj tabletno računalo ili izbriši sve podatke na njemu ako je uneseno previše netočnih zaporki."</string>
+    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Nadzire se broj netočnih zaporki unesenih pri otključavanju zaslona, a tablet se zaključava ili se s njega brišu svi podaci ako je uneseno previše netočnih zaporki."</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"Prati broj netočnih zaporki unesenih prilikom otključavanja zaslona i zaključava Android TV uređaj ili s njega briše sve podatke ako se unese previše netočnih zaporki."</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"Prati broj netočnih zaporki unesenih prilikom otključavanja zaslona i zaključava sustav za informiranje i zabavu ili briše sve njegove podatke ako se unese previše netočnih zaporki."</string>
     <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"Nadzire broj netočno unesenih zaporki pri otključavanju zaslona i zaključava telefon ili briše sve podatke na telefonu ako je uneseno previše netočnih zaporki."</string>
@@ -844,7 +846,7 @@
     <string name="policylab_forceLock" msgid="7360335502968476434">"Zaključavanje zaslona"</string>
     <string name="policydesc_forceLock" msgid="1008844760853899693">"Upravlja se načinom i vremenom zaključavanja zaslona."</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"Brisanje svih podataka"</string>
-    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Vraćanjem u tvorničko stanje izbriši podatke tabletnog računala bez upozorenja."</string>
+    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Vraćanjem na tvorničke postavke brišu se podaci tableta bez upozorenja."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"Podatke Android TV uređaja izbrišite bez upozorenja vraćanjem uređaja na tvorničke postavke."</string>
     <string name="policydesc_wipeData" product="automotive" msgid="660804547737323300">"Briše podatke sustava za informiranje i zabavu bez upozorenja vraćanjem na tvorničko stanje."</string>
     <string name="policydesc_wipeData" product="default" msgid="8036084184768379022">"Vraćanjem na tvorničke postavke brišu se podaci s telefona bez upozorenja."</string>
@@ -1210,7 +1212,7 @@
     <string name="rating_label" msgid="1837085249662154601">"{rating,plural, =1{Jedna zvjezdica od {max}}one{# zvjezdica od {max}}few{# zvjezdice od {max}}other{# zvjezdica od {max}}}"</string>
     <string name="in_progress" msgid="2149208189184319441">"u tijeku"</string>
     <string name="whichApplication" msgid="5432266899591255759">"Radnju dovrši pomoću stavke"</string>
-    <string name="whichApplicationNamed" msgid="6969946041713975681">"Dovršavanje radnje pomoću aplikacije %1$s"</string>
+    <string name="whichApplicationNamed" msgid="6969946041713975681">"Dovršite radnju putem aplikacije %1$s"</string>
     <string name="whichApplicationLabel" msgid="7852182961472531728">"Dovrši radnju"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"Otvaranje pomoću aplikacije"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"Otvaranje pomoću aplikacije %1$s"</string>
@@ -1537,7 +1539,7 @@
     <string name="vpn_lockdown_config" msgid="8331697329868252169">"Promijenite mrežu ili postavke VPN-a"</string>
     <string name="upload_file" msgid="8651942222301634271">"Odaberite datoteku"</string>
     <string name="no_file_chosen" msgid="4146295695162318057">"Nema odabranih datoteka"</string>
-    <string name="reset" msgid="3865826612628171429">"Ponovo postavi"</string>
+    <string name="reset" msgid="3865826612628171429">"Poništi"</string>
     <string name="submit" msgid="862795280643405865">"Pošalji"</string>
     <string name="car_mode_disable_notification_title" msgid="8450693275833142896">"Pokrenuta je aplikacija za vožnju"</string>
     <string name="car_mode_disable_notification_message" msgid="8954550232288567515">"Dodirnite za zatvaranje aplikacije za vožnju."</string>
@@ -1899,8 +1901,7 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Traži PIN radi otkvačivanja"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Traži uzorak za otključavanje radi otkvačivanja"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Traži zaporku radi otkvačivanja"</string>
-    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
-    <skip />
+    <string name="package_installed_device_owner" msgid="8684974629306529138">"Instalirao vaš administrator.\nOtvorite postavke da biste pregledali dodijeljena dopuštenja"</string>
     <string name="package_updated_device_owner" msgid="7560272363805506941">"Ažurirao administrator"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Izbrisao administrator"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"U redu"</string>
@@ -2144,6 +2145,10 @@
     <string name="dynamic_mode_notification_channel_name" msgid="2986926422100223328">"Obavještavanje o informacijama u Rutinskom načinu rada"</string>
     <string name="dynamic_mode_notification_title" msgid="1388718452788985481">"Uključena je štednja baterije"</string>
     <string name="dynamic_mode_notification_summary" msgid="1639031262484979689">"Smanjuje se potrošnja baterije radi produženja njezinog trajanja"</string>
+    <!-- no translation found for dynamic_mode_notification_title_v2 (5072385242078021152) -->
+    <skip />
+    <!-- no translation found for dynamic_mode_notification_summary_v2 (2142444344663147938) -->
+    <skip />
     <string name="battery_saver_notification_channel_name" msgid="3918243458067916913">"Štednja baterije"</string>
     <string name="battery_saver_off_notification_title" msgid="7637255960468032515">"Isključena je Štednja baterije"</string>
     <string name="battery_saver_charged_notification_summary" product="default" msgid="5544457317418624367">"Baterija mobilnog telefona dovoljno je napunjena. Značajke više nisu ograničene."</string>
@@ -2218,6 +2223,8 @@
     <string name="miniresolver_switch_to_work" msgid="1042640606122638596">"Želite li prebaciti na poslovnu aplikaciju?"</string>
     <string name="miniresolver_call_information" msgid="6739417525304184083">"Vaša organizacija dopušta upućivanje poziva samo iz poslovnih aplikacija"</string>
     <string name="miniresolver_sms_information" msgid="4311292661329483088">"Vaša organizacija dopušta slanje poruka samo iz poslovnih aplikacija"</string>
+    <string name="miniresolver_private_space_phone_information" msgid="4469511223312488570">"Pozive možete upućivati samo iz svoje privatne aplikacije Telefon. Pozivi koji se upućuju iz privatne aplikacije Telefon dodat će se u vašu privatnu povijest poziva."</string>
+    <string name="miniresolver_private_space_messages_information" msgid="111285656327622118">"SMS poruke možete slati samo iz svoje privatne aplikacije Poruke."</string>
     <string name="miniresolver_use_personal_browser" msgid="776072682871133308">"Koristi osobni preglednik"</string>
     <string name="miniresolver_use_work_browser" msgid="543575306251952994">"Koristi poslovni preglednik"</string>
     <string name="miniresolver_call" msgid="6386870060423480765">"Nazovi"</string>
@@ -2397,8 +2404,15 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"Posao 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"Test"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Zajedničko"</string>
-    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <!-- no translation found for accessibility_label_managed_profile (3366526886209832641) -->
     <skip />
+    <!-- no translation found for accessibility_label_private_profile (1436459319135548969) -->
+    <skip />
+    <!-- no translation found for accessibility_label_clone_profile (7579118375042398784) -->
+    <skip />
+    <!-- no translation found for accessibility_label_communal_profile (1437173163111334791) -->
+    <skip />
+    <string name="redacted_notification_message" msgid="1520587845842228816">"Skriven je osjetljiv sadržaj obavijesti"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Sadržaj aplikacije sakriven je od dijeljenja zaslona radi sigurnosti"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Automatski povezano sa satelitom"</string>

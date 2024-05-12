@@ -3386,6 +3386,12 @@ public interface WindowManager extends ViewManager {
         public static final int PRIVATE_FLAG_IMMERSIVE_CONFIRMATION_WINDOW = 1 << 17;
 
         /**
+         * Flag to indicate that the window is forcibly to layout under the display cutout.
+         * @hide
+         */
+        public static final int PRIVATE_FLAG_OVERRIDE_LAYOUT_IN_DISPLAY_CUTOUT_MODE = 1 << 18;
+
+        /**
          * Flag to indicate that any window added by an application process that is of type
          * {@link #TYPE_TOAST} or that requires
          * {@link android.app.AppOpsManager#OP_SYSTEM_ALERT_WINDOW} permission should be hidden when
@@ -3505,6 +3511,7 @@ public interface WindowManager extends ViewManager {
                 PRIVATE_FLAG_FORCE_DRAW_BAR_BACKGROUNDS,
                 PRIVATE_FLAG_SUSTAINED_PERFORMANCE_MODE,
                 PRIVATE_FLAG_IMMERSIVE_CONFIRMATION_WINDOW,
+                PRIVATE_FLAG_OVERRIDE_LAYOUT_IN_DISPLAY_CUTOUT_MODE,
                 SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS,
                 PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY,
                 PRIVATE_FLAG_EXCLUDE_FROM_SCREEN_MAGNIFICATION,
@@ -3586,6 +3593,10 @@ public interface WindowManager extends ViewManager {
                         mask = PRIVATE_FLAG_IMMERSIVE_CONFIRMATION_WINDOW,
                         equals = PRIVATE_FLAG_IMMERSIVE_CONFIRMATION_WINDOW,
                         name = "IMMERSIVE_CONFIRMATION_WINDOW"),
+                @ViewDebug.FlagToString(
+                        mask = PRIVATE_FLAG_OVERRIDE_LAYOUT_IN_DISPLAY_CUTOUT_MODE,
+                        equals = PRIVATE_FLAG_OVERRIDE_LAYOUT_IN_DISPLAY_CUTOUT_MODE,
+                        name = "OVERRIDE_LAYOUT_IN_DISPLAY_CUTOUT_MODE"),
                 @ViewDebug.FlagToString(
                         mask = SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS,
                         equals = SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS,
@@ -4354,7 +4365,8 @@ public interface WindowManager extends ViewManager {
         public static final int INPUT_FEATURE_SPY = 1 << 2;
 
         /**
-         * Input feature used to indicate that this window is sensitive for tracing.
+         * Input feature used to indicate that this window is privacy sensitive. This may be used
+         * to redact input interactions from tracing or screen mirroring.
          * <p>
          * A window that uses {@link LayoutParams#FLAG_SECURE} will automatically be treated as
          * a sensitive for input tracing, but this input feature can be set on windows that don't
@@ -4367,7 +4379,7 @@ public interface WindowManager extends ViewManager {
          *
          * @hide
          */
-        public static final int INPUT_FEATURE_SENSITIVE_FOR_TRACING = 1 << 3;
+        public static final int INPUT_FEATURE_SENSITIVE_FOR_PRIVACY = 1 << 3;
 
         /**
          * An internal annotation for flags that can be specified to {@link #inputFeatures}.
@@ -4381,7 +4393,7 @@ public interface WindowManager extends ViewManager {
                 INPUT_FEATURE_NO_INPUT_CHANNEL,
                 INPUT_FEATURE_DISABLE_USER_ACTIVITY,
                 INPUT_FEATURE_SPY,
-                INPUT_FEATURE_SENSITIVE_FOR_TRACING,
+                INPUT_FEATURE_SENSITIVE_FOR_PRIVACY,
         })
         public @interface InputFeatureFlags {
         }

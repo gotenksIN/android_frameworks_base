@@ -5861,6 +5861,10 @@
     <string name="dynamic_mode_notification_title">Battery Saver turned on</string>
     <!-- Summary of notification letting users know why battery saver was turned on automatically [CHAR_LIMIT=NONE]-->
     <string name="dynamic_mode_notification_summary">Reducing battery usage to extend battery life</string>
+    <!-- Title of notification letting users know why battery saver was turned on automatically [CHAR_LIMIT=NONE]-->
+    <string name="dynamic_mode_notification_title_v2">Battery Saver is on</string>
+    <!-- Summary of notification letting users know why battery saver was turned on automatically [CHAR_LIMIT=NONE]-->
+    <string name="dynamic_mode_notification_summary_v2">Battery Saver is turned on to extend battery life</string>
 
     <!-- Battery saver strings -->
     <!-- The user visible name of the notification channel for battery saver notifications [CHAR_LIMIT=80] -->
@@ -6052,6 +6056,10 @@
     <!-- Dialog text.  Shown when the user is unable to send a text message from a personal app due to restrictions set
          by their organization, and so must switch to a work app or cancel. [CHAR LIMIT=NONE] -->
     <string name="miniresolver_sms_information">Your organization only allows you to send messages from work apps</string>
+    <!-- Dialog text. Shown as when redirecting Calls from Private Space to the main user. [CHAR LIMIT=NONE] -->
+    <string name="miniresolver_private_space_phone_information">"You can only make phone calls from your personal Phone app. Calls made with personal Phone will be added to your personal call history."</string>
+    <!-- Dialog text. Shown as when redirecting SMS and MMS messages from Private Space to the main user. [CHAR LIMIT=NONE] -->
+    <string name="miniresolver_private_space_messages_information">"You can only send SMS messages from your personal Messages app."</string>
     <!-- Button option. Open the link in the personal browser. [CHAR LIMIT=NONE] -->
     <string name="miniresolver_use_personal_browser">Use personal browser</string>
     <!-- Button option. Open the link in the work browser. [CHAR LIMIT=NONE] -->
@@ -6449,6 +6457,15 @@ ul.</string>
     <string name="profile_label_test">Test</string>
     <!-- Communal profile label on a screen. This can be used as a tab label for this profile in tabbed views and can be used to represent the profile in sharing surfaces, etc. [CHAR LIMIT=20] -->
     <string name="profile_label_communal">Communal</string>
+
+    <!-- Accessibility label for managed profile user type [CHAR LIMIT=30] -->
+    <string name="accessibility_label_managed_profile">Work profile</string>
+    <!-- Accessibility label for private profile user type [CHAR LIMIT=30] -->
+    <string name="accessibility_label_private_profile">Private space</string>
+    <!-- Accessibility label for clone profile user type [CHAR LIMIT=30] -->
+    <string name="accessibility_label_clone_profile">Clone</string>
+    <!-- Accessibility label for clone profile user type [CHAR LIMIT=30] -->
+    <string name="accessibility_label_communal_profile">Communal</string>
 
     <!-- Notification message used when a notification's normal message contains sensitive information [CHAR_LIMIT=NOTIF_BODY] -->
     <string name="redacted_notification_message">Sensitive notification content hidden</string>

@@ -17,6 +17,8 @@
 
 package com.android.keyguard
 
+import android.app.admin.DevicePolicyManager
+import android.app.admin.flags.Flags as DevicePolicyFlags
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.telephony.TelephonyManager
@@ -148,6 +150,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     @Mock private lateinit var faceAuthAccessibilityDelegate: FaceAuthAccessibilityDelegate
     @Mock private lateinit var deviceProvisionedController: DeviceProvisionedController
     @Mock private lateinit var postureController: DevicePostureController
+    @Mock private lateinit var devicePolicyManager: DevicePolicyManager
 
     @Captor
     private lateinit var swipeListenerArgumentCaptor:
@@ -211,7 +214,6 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
         if (!SceneContainerFlag.isEnabled) {
             mSetFlagsRule.disableFlags(
                 AConfigFlags.FLAG_KEYGUARD_WM_STATE_REFACTOR,
-                AConfigFlags.FLAG_REFACTOR_KEYGUARD_DISMISS_INTENT,
             )
         }
 
@@ -274,6 +276,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 mSelectedUserInteractor,
                 deviceProvisionedController,
                 faceAuthAccessibilityDelegate,
+                devicePolicyManager,
                 keyguardTransitionInteractor,
                 { primaryBouncerInteractor },
             ) {
@@ -796,6 +799,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     Scenes.Lockscreen,
                     Scenes.Bouncer,
+                    flowOf(Scenes.Bouncer),
                     flowOf(.5f),
                     false,
                     isUserInputOngoing = flowOf(false),
@@ -819,6 +823,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     Scenes.Bouncer,
                     Scenes.Gone,
+                    flowOf(Scenes.Gone),
                     flowOf(.5f),
                     false,
                     isUserInputOngoing = flowOf(false),
@@ -838,6 +843,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     Scenes.Gone,
                     Scenes.Bouncer,
+                    flowOf(Scenes.Bouncer),
                     flowOf(.5f),
                     false,
                     isUserInputOngoing = flowOf(false),
@@ -859,6 +865,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     Scenes.Bouncer,
                     Scenes.Gone,
+                    flowOf(Scenes.Gone),
                     flowOf(.5f),
                     false,
                     isUserInputOngoing = flowOf(false),
@@ -877,6 +884,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     Scenes.Gone,
                     Scenes.Lockscreen,
+                    flowOf(Scenes.Lockscreen),
                     flowOf(.5f),
                     false,
                     isUserInputOngoing = flowOf(false),
@@ -897,6 +905,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     Scenes.Lockscreen,
                     Scenes.Gone,
+                    flowOf(Scenes.Gone),
                     flowOf(.5f),
                     false,
                     isUserInputOngoing = flowOf(false),
@@ -927,6 +936,45 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
             .addUserSwitchCallback(capture(userSwitchCallbackArgumentCaptor))
         userSwitchCallbackArgumentCaptor.value.onUserSwitched()
         verify(viewFlipperController).asynchronouslyInflateView(any(), any(), any())
+    }
+
+    @Test
+    fun showAlmostAtWipeDialog_calledOnMainUser_setsCorrectUserType() {
+        mSetFlagsRule.enableFlags(DevicePolicyFlags.FLAG_HEADLESS_SINGLE_USER_FIXES)
+        val mainUserId = 10
+
+        underTest.showMessageForFailedUnlockAttempt(
+            /* userId = */ mainUserId,
+            /* expiringUserId = */ mainUserId,
+            /* mainUserId = */ mainUserId,
+            /* remainingBeforeWipe = */ 1,
+            /* failedAttempts = */ 1
+        )
+
+        verify(view)
+            .showAlmostAtWipeDialog(any(), any(), eq(KeyguardSecurityContainer.USER_TYPE_PRIMARY))
+    }
+
+    @Test
+    fun showAlmostAtWipeDialog_calledOnNonMainUser_setsCorrectUserType() {
+        mSetFlagsRule.enableFlags(DevicePolicyFlags.FLAG_HEADLESS_SINGLE_USER_FIXES)
+        val secondaryUserId = 10
+        val mainUserId = 0
+
+        underTest.showMessageForFailedUnlockAttempt(
+            /* userId = */ secondaryUserId,
+            /* expiringUserId = */ secondaryUserId,
+            /* mainUserId = */ mainUserId,
+            /* remainingBeforeWipe = */ 1,
+            /* failedAttempts = */ 1
+        )
+
+        verify(view)
+            .showAlmostAtWipeDialog(
+                any(),
+                any(),
+                eq(KeyguardSecurityContainer.USER_TYPE_SECONDARY_USER)
+            )
     }
 
     private val registeredSwipeListener: KeyguardSecurityContainer.SwipeListener

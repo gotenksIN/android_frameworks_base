@@ -248,7 +248,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 .thenReturn(mock(Flow.class));
         when(mDreamViewModel.getTransitionEnded())
                 .thenReturn(mock(Flow.class));
-        when(mCommunalTransitionViewModel.getShowByDefault())
+        when(mCommunalTransitionViewModel.getShowCommunalFromOccluded())
                 .thenReturn(mock(Flow.class));
         when(mCommunalTransitionViewModel.getTransitionFromOccludedEnded())
                 .thenReturn(mock(Flow.class));
@@ -269,7 +269,6 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 mColorExtractor,
                 mDumpManager,
                 mKeyguardStateController,
-                mScreenOffAnimationController,
                 mAuthController,
                 () -> mShadeInteractor,
                 mShadeWindowLogger,

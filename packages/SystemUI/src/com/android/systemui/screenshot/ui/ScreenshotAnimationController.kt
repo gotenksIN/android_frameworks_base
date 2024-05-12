@@ -25,6 +25,7 @@ import android.graphics.Rect
 import android.util.MathUtils
 import android.view.View
 import android.view.animation.AnimationUtils
+import android.widget.ImageView
 import androidx.core.animation.doOnEnd
 import androidx.core.animation.doOnStart
 import com.android.systemui.res.R
@@ -34,7 +35,7 @@ import kotlin.math.sign
 
 class ScreenshotAnimationController(private val view: ScreenshotShelfView) {
     private var animator: Animator? = null
-    private val screenshotPreview = view.requireViewById<View>(R.id.screenshot_preview)
+    private val screenshotPreview = view.requireViewById<ImageView>(R.id.screenshot_preview)
     private val flashView = view.requireViewById<View>(R.id.screenshot_flash)
     private val actionContainer = view.requireViewById<View>(R.id.actions_container_background)
     private val fastOutSlowIn =
@@ -42,7 +43,6 @@ class ScreenshotAnimationController(private val view: ScreenshotShelfView) {
     private val staticUI =
         listOf<View>(
             view.requireViewById(R.id.screenshot_preview_border),
-            view.requireViewById(R.id.actions_container_background),
             view.requireViewById(R.id.screenshot_badge),
             view.requireViewById(R.id.screenshot_dismiss_button)
         )
@@ -69,6 +69,8 @@ class ScreenshotAnimationController(private val view: ScreenshotShelfView) {
             entranceAnimation.play(previewAnimator).with(flashOutAnimator)
             entranceAnimation.doOnStart { screenshotPreview.visibility = View.INVISIBLE }
         }
+
+        entranceAnimation.play(getActionsAnimator()).with(previewAnimator)
 
         val fadeInAnimator = ValueAnimator.ofFloat(0f, 1f)
         fadeInAnimator.addUpdateListener {
@@ -122,6 +124,20 @@ class ScreenshotAnimationController(private val view: ScreenshotShelfView) {
         animator?.cancel()
     }
 
+    private fun getActionsAnimator(): Animator {
+        val startingOffset = view.height - actionContainer.top
+        val actionsYAnimator =
+            ValueAnimator.ofFloat(startingOffset.toFloat(), 0f).apply {
+                duration = PREVIEW_Y_ANIMATION_DURATION_MS
+                interpolator = fastOutSlowIn
+            }
+        actionsYAnimator.addUpdateListener {
+            actionContainer.translationY = it.animatedValue as Float
+        }
+        actionContainer.translationY = startingOffset.toFloat()
+        return actionsYAnimator
+    }
+
     private fun getPreviewAnimator(bounds: Rect): Animator {
         val targetPosition = Rect()
         screenshotPreview.getHitRect(targetPosition)
@@ -155,6 +171,12 @@ class ScreenshotAnimationController(private val view: ScreenshotShelfView) {
 
         val previewAnimator = AnimatorSet()
         previewAnimator.play(previewXAndScaleAnimator).with(previewYAnimator)
+        previewAnimator.doOnEnd {
+            screenshotPreview.scaleX = 1f
+            screenshotPreview.scaleY = 1f
+            screenshotPreview.x = endPos.x - screenshotPreview.width / 2f
+            screenshotPreview.y = endPos.y - screenshotPreview.height / 2f
+        }
 
         previewAnimator.doOnStart { screenshotPreview.visibility = View.VISIBLE }
         return previewAnimator

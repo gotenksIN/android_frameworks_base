@@ -25,6 +25,7 @@ import static android.app.AppOpsManager.MODE_ALLOWED;
 import static android.app.AppOpsManager.MODE_DEFAULT;
 import static android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR;
 import static android.app.Flags.lifetimeExtensionRefactor;
+import static android.app.Flags.sortSectionByTime;
 import static android.app.Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION;
 import static android.app.Notification.EXTRA_BUILDER_APPLICATION_INFO;
 import static android.app.Notification.EXTRA_LARGE_ICON_BIG;
@@ -266,7 +267,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.WorkSource;
 import android.permission.PermissionManager;
-import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.provider.Settings.Secure;
 import android.service.notification.Adjustment;
@@ -313,7 +313,6 @@ import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.compat.IPlatformCompat;
-import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
 import com.android.internal.config.sysui.SystemUiSystemPropertiesFlags;
 import com.android.internal.config.sysui.SystemUiSystemPropertiesFlags.NotificationFlags;
 import com.android.internal.logging.InstanceId;
@@ -704,7 +703,6 @@ public class NotificationManagerService extends SystemService {
     private ConditionProviders mConditionProviders;
     private NotificationUsageStats mUsageStats;
     private boolean mLockScreenAllowSecureNotifications = true;
-    boolean mSystemExemptFromDismissal = false;
     final ArrayMap<String, ArrayMap<Integer,
             RemoteCallbackList<ICallNotificationEventCallback>>>
             mCallNotificationEventCallbacks = new ArrayMap<>();
@@ -722,7 +720,6 @@ public class NotificationManagerService extends SystemService {
     private GroupHelper mGroupHelper;
     private int mAutoGroupAtCount;
     private boolean mIsTelevision;
-    private DeviceConfig.OnPropertiesChangedListener mDeviceConfigChangedListener;
     protected NotificationAttentionHelper mAttentionHelper;
 
     private int mWarnRemoteViewsSizeBytes;
@@ -973,18 +970,6 @@ public class NotificationManagerService extends SystemService {
     }
 
     protected void setDefaultAssistantForUser(int userId) {
-        String overrideDefaultAssistantString = DeviceConfig.getProperty(
-                DeviceConfig.NAMESPACE_SYSTEMUI,
-                SystemUiDeviceConfigFlags.NAS_DEFAULT_SERVICE);
-        if (overrideDefaultAssistantString != null) {
-            ArraySet<ComponentName> approved = mAssistants.queryPackageForServices(
-                    overrideDefaultAssistantString,
-                    MATCH_DIRECT_BOOT_AWARE | MATCH_DIRECT_BOOT_UNAWARE,
-                    userId);
-            for (int i = 0; i < approved.size(); i++) {
-                if (allowAssistant(userId, approved.valueAt(i))) return;
-            }
-        }
         ArraySet<ComponentName> defaults = mAssistants.getDefaultComponents();
         // We should have only one default assistant by default
         // allowAssistant should execute once in practice
@@ -2670,10 +2655,6 @@ public class NotificationManagerService extends SystemService {
         mStatsManager.clearPullAtomCallback(DND_MODE_RULE);
         mAppOps.stopWatchingMode(mAppOpsListener);
         mAlarmManager.cancelAll();
-
-        if (mDeviceConfigChangedListener != null) {
-            DeviceConfig.removeOnPropertiesChangedListener(mDeviceConfigChangedListener);
-        }
     }
 
     protected String[] getStringArrayResource(int key) {
@@ -2744,27 +2725,6 @@ public class NotificationManagerService extends SystemService {
         publishLocalService(NotificationManagerInternal.class, mInternalService);
     }
 
-    void registerDeviceConfigChange() {
-        mDeviceConfigChangedListener = properties -> {
-            if (!DeviceConfig.NAMESPACE_SYSTEMUI.equals(properties.getNamespace())) {
-                return;
-            }
-            for (String name : properties.getKeyset()) {
-                if (SystemUiDeviceConfigFlags.NAS_DEFAULT_SERVICE.equals(name)) {
-                    mAssistants.resetDefaultAssistantsIfNecessary();
-                }
-            }
-        };
-        mSystemExemptFromDismissal = DeviceConfig.getBoolean(
-                DeviceConfig.NAMESPACE_DEVICE_POLICY_MANAGER,
-                /* name= */ "application_exemptions",
-                /* defaultValue= */ true);
-        DeviceConfig.addOnPropertiesChangedListener(
-                DeviceConfig.NAMESPACE_SYSTEMUI,
-                new HandlerExecutor(mHandler),
-                mDeviceConfigChangedListener);
-    }
-
     private void registerNotificationPreferencesPullers() {
         mPullAtomCallback = new StatsPullAtomCallbackImpl();
         mStatsManager.setPullAtomCallback(
@@ -2833,10 +2793,10 @@ public class NotificationManagerService extends SystemService {
         return new GroupHelper(getContext(), getContext().getPackageManager(),
                 mAutoGroupAtCount, new GroupHelper.Callback() {
             @Override
-            public void addAutoGroup(String key) {
-                synchronized (mNotificationLock) {
-                    addAutogroupKeyLocked(key);
-                }
+            public void addAutoGroup(String key, boolean requestSort) {
+                        synchronized (mNotificationLock) {
+                            addAutogroupKeyLocked(key, requestSort);
+                        }
             }
 
             @Override
@@ -2938,7 +2898,6 @@ public class NotificationManagerService extends SystemService {
             mAssistants.onBootPhaseAppsCanStart();
             mConditionProviders.onBootPhaseAppsCanStart();
             mHistoryManager.onBootPhaseAppsCanStart();
-            registerDeviceConfigChange();
             migrateDefaultNAS();
             maybeShowInitialReviewPermissionsNotification();
 
@@ -6579,7 +6538,7 @@ public class NotificationManagerService extends SystemService {
     }
 
     @GuardedBy("mNotificationLock")
-    void addAutogroupKeyLocked(String key) {
+    void addAutogroupKeyLocked(String key, boolean requestSort) {
         NotificationRecord r = mNotificationsByKey.get(key);
         if (r == null) {
             return;
@@ -6587,7 +6546,9 @@ public class NotificationManagerService extends SystemService {
         if (r.getSbn().getOverrideGroupKey() == null) {
             addAutoGroupAdjustment(r, GroupHelper.AUTOGROUP_KEY);
             EventLogTags.writeNotificationAutogrouped(key);
-            mRankingHandler.requestSort();
+            if (!android.app.Flags.checkAutogroupBeforePost() || requestSort) {
+                mRankingHandler.requestSort();
+            }
         }
     }
 
@@ -7738,7 +7699,7 @@ public class NotificationManagerService extends SystemService {
             return true;
         }
         // Check if an app has been given system exemption
-        return mSystemExemptFromDismissal && mAppOps.checkOpNoThrow(
+        return mAppOps.checkOpNoThrow(
                 AppOpsManager.OP_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS, ai.uid,
                 ai.packageName) == MODE_ALLOWED;
     }
@@ -8635,7 +8596,7 @@ public class NotificationManagerService extends SystemService {
                         r.isUpdate = true;
                         final boolean isInterruptive = isVisuallyInterruptive(old, r);
                         r.setTextChanged(isInterruptive);
-                        if (android.app.Flags.updateRankingTime()) {
+                        if (sortSectionByTime()) {
                             if (isInterruptive) {
                                 r.resetRankingTime();
                             }
@@ -8648,6 +8609,29 @@ public class NotificationManagerService extends SystemService {
                     // flags are set.
                     if ((notification.flags & FLAG_FOREGROUND_SERVICE) != 0) {
                         notification.flags |= FLAG_NO_CLEAR;
+                    }
+
+                    // Posts the notification if it has a small icon, and potentially autogroup
+                    // the new notification.
+                    if (android.app.Flags.checkAutogroupBeforePost()) {
+                        if (notification.getSmallIcon() != null && !isCritical(r)) {
+                            StatusBarNotification oldSbn = (old != null) ? old.getSbn() : null;
+                            if (oldSbn == null || !Objects.equals(oldSbn.getGroup(), n.getGroup())
+                                    || oldSbn.getNotification().flags
+                                    != n.getNotification().flags) {
+                                synchronized (mNotificationLock) {
+                                    boolean willBeAutogrouped = mGroupHelper.onNotificationPosted(n,
+                                            hasAutoGroupSummaryLocked(n));
+                                    if (willBeAutogrouped) {
+                                        // The newly posted notification will be autogrouped, but
+                                        // was not autogrouped onPost, to avoid an unnecessary sort.
+                                        // We add the autogroup key to the notification without a
+                                        // sort here, and it'll be sorted below with extractSignals.
+                                        addAutogroupKeyLocked(key, /*requestSort=*/false);
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     mRankingHelper.extractSignals(r);
@@ -8670,17 +8654,20 @@ public class NotificationManagerService extends SystemService {
                         notifyListenersPostedAndLogLocked(r, old, mTracker, maybeReport);
                         posted = true;
 
-                        StatusBarNotification oldSbn = (old != null) ? old.getSbn() : null;
-                        if (oldSbn == null
-                                || !Objects.equals(oldSbn.getGroup(), n.getGroup())
-                                || oldSbn.getNotification().flags != n.getNotification().flags) {
-                            if (!isCritical(r)) {
-                                mHandler.post(() -> {
-                                    synchronized (mNotificationLock) {
-                                        mGroupHelper.onNotificationPosted(
-                                                n, hasAutoGroupSummaryLocked(n));
-                                    }
-                                });
+                        if (!android.app.Flags.checkAutogroupBeforePost()) {
+                            StatusBarNotification oldSbn = (old != null) ? old.getSbn() : null;
+                            if (oldSbn == null
+                                    || !Objects.equals(oldSbn.getGroup(), n.getGroup())
+                                    || oldSbn.getNotification().flags
+                                        != n.getNotification().flags) {
+                                if (!isCritical(r)) {
+                                    mHandler.post(() -> {
+                                        synchronized (mNotificationLock) {
+                                            mGroupHelper.onNotificationPosted(
+                                                    n, hasAutoGroupSummaryLocked(n));
+                                        }
+                                    });
+                                }
                             }
                         }
                     } else {
@@ -8780,7 +8767,7 @@ public class NotificationManagerService extends SystemService {
             return false;
         }
 
-        if (android.app.Flags.updateRankingTime()) {
+        if (sortSectionByTime()) {
             // Ignore visual interruptions from FGS/UIJs because users
             // consider them one 'session'. Count them for everything else.
             if (r.getSbn().getNotification().isFgsOrUij()) {

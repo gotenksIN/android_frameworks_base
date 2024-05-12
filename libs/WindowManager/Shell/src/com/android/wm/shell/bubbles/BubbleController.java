@@ -474,11 +474,16 @@ public class BubbleController implements ConfigurationChangeListener,
 
         mDisplayController.addDisplayChangingController(
                 (displayId, fromRotation, toRotation, newDisplayAreaInfo, t) -> {
-                    // This is triggered right before the rotation is applied
-                    if (fromRotation != toRotation) {
+                    Rect newScreenBounds = new Rect();
+                    if (newDisplayAreaInfo != null) {
+                        newScreenBounds =
+                                newDisplayAreaInfo.configuration.windowConfiguration.getBounds();
+                    }
+                    // This is triggered right before the rotation or new screen size is applied
+                    if (fromRotation != toRotation || !newScreenBounds.equals(mScreenBounds)) {
                         if (mStackView != null) {
                             // Layout listener set on stackView will update the positioner
-                            // once the rotation is applied
+                            // once the rotation or screen change is applied
                             mStackView.onOrientationChanged();
                         }
                     }
@@ -722,6 +727,17 @@ public class BubbleController implements ConfigurationChangeListener,
             BubbleBarUpdate bubbleBarUpdate = new BubbleBarUpdate();
             bubbleBarUpdate.bubbleBarLocation = bubbleBarLocation;
             mBubbleStateListener.onBubbleStateChange(bubbleBarUpdate);
+        }
+    }
+
+    /**
+     * Animate bubble bar to the given location. The location change is transient. It does not
+     * update the state of the bubble bar.
+     * To update bubble bar pinned location, use {@link #setBubbleBarLocation(BubbleBarLocation)}.
+     */
+    public void animateBubbleBarLocation(BubbleBarLocation bubbleBarLocation) {
+        if (canShowAsBubbleBar()) {
+            mBubbleStateListener.animateBubbleBarLocation(bubbleBarLocation);
         }
     }
 
@@ -1146,12 +1162,29 @@ public class BubbleController implements ConfigurationChangeListener,
     }
 
     /**
-     * Update expanded state when a single bubble is dragged in Launcher.
+     * A bubble is being dragged in Launcher.
      * Will be called only when bubble bar is expanded.
-     * @param bubbleKey key of the bubble to collapse/expand
-     * @param isBeingDragged whether the bubble is being dragged
+     *
+     * @param bubbleKey key of the bubble being dragged
      */
-    public void onBubbleDrag(String bubbleKey, boolean isBeingDragged) {
+    public void startBubbleDrag(String bubbleKey) {
+        onBubbleDrag(bubbleKey, true /* isBeingDragged */);
+    }
+
+    /**
+     * A bubble is no longer being dragged in Launcher. As was released in given location.
+     * Will be called only when bubble bar is expanded.
+     *
+     * @param bubbleKey key of the bubble being dragged
+     * @param location  location where bubble was released
+     */
+    public void stopBubbleDrag(String bubbleKey, BubbleBarLocation location) {
+        mBubblePositioner.setBubbleBarLocation(location);
+        onBubbleDrag(bubbleKey, false /* isBeingDragged */);
+    }
+
+    private void onBubbleDrag(String bubbleKey, boolean isBeingDragged) {
+        // TODO(b/330585402): collapse stack if any bubble is dragged
         if (mBubbleData.getSelectedBubble() != null
                 && mBubbleData.getSelectedBubble().getKey().equals(bubbleKey)) {
             // Should collapse/expand only if equals to selected bubble.
@@ -2250,15 +2283,19 @@ public class BubbleController implements ConfigurationChangeListener,
         private final SingleInstanceRemoteListener<BubbleController, IBubblesListener> mListener;
         private final Bubbles.BubbleStateListener mBubbleListener =
                 new Bubbles.BubbleStateListener() {
+                    @Override
+                    public void onBubbleStateChange(BubbleBarUpdate update) {
+                        Bundle b = new Bundle();
+                        b.setClassLoader(BubbleBarUpdate.class.getClassLoader());
+                        b.putParcelable(BubbleBarUpdate.BUNDLE_KEY, update);
+                        mListener.call(l -> l.onBubbleStateChange(b));
+                    }
 
-            @Override
-            public void onBubbleStateChange(BubbleBarUpdate update) {
-                Bundle b = new Bundle();
-                b.setClassLoader(BubbleBarUpdate.class.getClassLoader());
-                b.putParcelable(BubbleBarUpdate.BUNDLE_KEY, update);
-                mListener.call(l -> l.onBubbleStateChange(b));
-            }
-        };
+                    @Override
+                    public void animateBubbleBarLocation(BubbleBarLocation location) {
+                        mListener.call(l -> l.animateBubbleBarLocation(location));
+                    }
+                };
 
         IBubblesImpl(BubbleController controller) {
             mController = controller;
@@ -2309,8 +2346,13 @@ public class BubbleController implements ConfigurationChangeListener,
         }
 
         @Override
-        public void onBubbleDrag(String bubbleKey, boolean isBeingDragged) {
-            mMainExecutor.execute(() -> mController.onBubbleDrag(bubbleKey, isBeingDragged));
+        public void startBubbleDrag(String bubbleKey) {
+            mMainExecutor.execute(() -> mController.startBubbleDrag(bubbleKey));
+        }
+
+        @Override
+        public void stopBubbleDrag(String bubbleKey, BubbleBarLocation location) {
+            mMainExecutor.execute(() -> mController.stopBubbleDrag(bubbleKey, location));
         }
 
         @Override

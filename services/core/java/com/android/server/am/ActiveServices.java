@@ -529,6 +529,18 @@ public final class ActiveServices {
      */
     final SparseArray<SparseArray<TimeLimitedFgsInfo>> mTimeLimitedFgsInfo = new SparseArray<>();
 
+    /**
+     * Foreground services of certain types will now have a time limit. If the foreground service
+     * of the offending type is not stopped within the allocated time limit, it will receive a
+     * callback via {@link Service#onTimeout(int, int)} and it must then be stopped within a few
+     * seconds. If an app fails to do so, it will be declared an ANR.
+     *
+     * @see Service#onTimeout(int, int) onTimeout callback for additional details
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = VERSION_CODES.VANILLA_ICE_CREAM)
+    static final long FGS_INTRODUCE_TIME_LIMITS = 317799821L;
+
     // allowlisted packageName.
     ArraySet<String> mAllowListWhileInUsePermissionInFgs = new ArraySet<>();
 
@@ -2472,11 +2484,16 @@ public final class ActiveServices {
                                 // "if (r.mAllowStartForeground == REASON_DENIED...)" block below.
                             }
                         }
-                    } else if (getTimeLimitedFgsType(foregroundServiceType)
-                                    != ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
+                    } else if (CompatChanges.isChangeEnabled(
+                                    FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)
+                                && android.app.Flags.introduceNewServiceOntimeoutCallback()
+                                && getTimeLimitedFgsType(foregroundServiceType)
+                                        != ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
                         // Calling startForeground on a FGS type which has a time limit will only be
                         // allowed if the app is in a state where it can normally start another FGS
-                        // and it hasn't hit the time limit for that type in the past 24hrs.
+                        // and it hasn't hit its time limit in the past 24hrs, or it has been in the
+                        // foreground after it hit its time limit, or it is currently in the
+                        // TOP (or better) proc state.
 
                         // See if the app could start an FGS or not.
                         r.clearFgsAllowStart();
@@ -2501,12 +2518,14 @@ public final class ActiveServices {
                                 final long before24Hr = Math.max(0,
                                             SystemClock.elapsedRealtime() - (24 * 60 * 60 * 1000));
                                 final long lastTimeOutAt = fgsTypeInfo.getTimeLimitExceededAt();
-                                if (fgsTypeInfo.getFirstFgsStartTime() < before24Hr
+                                if (fgsTypeInfo.getFirstFgsStartRealtime() < before24Hr
+                                        || r.app.mState.getCurProcState() <= PROCESS_STATE_TOP
                                         || (lastTimeOutAt != Long.MIN_VALUE
                                             && r.app.mState.getLastTopTime() > lastTimeOutAt)) {
                                     // Reset the time limit info for this fgs type if it has been
-                                    // more than 24hrs since the first fgs start or if the app was
-                                    // in the TOP state after time limit was exhausted.
+                                    // more than 24hrs since the first fgs start or if the app is
+                                    // currently in the TOP state or was in the TOP state after
+                                    // the time limit was exhausted previously.
                                     fgsTypeInfo.reset();
                                 } else if (lastTimeOutAt > 0) {
                                     // Time limit was exhausted within the past 24 hours and the app
@@ -2762,7 +2781,10 @@ public final class ActiveServices {
                     mAm.notifyPackageUse(r.serviceInfo.packageName,
                             PackageManager.NOTIFY_PACKAGE_USE_FOREGROUND_SERVICE);
 
-                    maybeUpdateFgsTrackingLocked(r, previousFgsType);
+                    if (CompatChanges.isChangeEnabled(FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)
+                            && android.app.Flags.introduceNewServiceOntimeoutCallback()) {
+                        maybeUpdateFgsTrackingLocked(r, previousFgsType);
+                    }
                 } else {
                     if (DEBUG_FOREGROUND_SERVICE) {
                         Slog.d(TAG, "Suppressing startForeground() for FAS " + r);
@@ -3932,7 +3954,7 @@ public final class ActiveServices {
     void onFgsTimeout(ServiceRecord sr) {
         synchronized (mAm) {
             final int fgsType = getTimeLimitedFgsType(sr.foregroundServiceType);
-            if (fgsType == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
+            if (fgsType == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE || sr.app == null) {
                 mFGSAnrTimer.discard(sr);
                 return;
             }
@@ -3940,10 +3962,12 @@ public final class ActiveServices {
             final long lastTopTime = sr.app.mState.getLastTopTime();
             final long constantTimeLimit = getTimeLimitForFgsType(fgsType);
             final long nowUptime = SystemClock.uptimeMillis();
-            if (constantTimeLimit > (nowUptime - lastTopTime)) {
+            if (lastTopTime != Long.MIN_VALUE && constantTimeLimit > (nowUptime - lastTopTime)) {
+                // Discard any other messages for this service
+                mFGSAnrTimer.discard(sr);
+                mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_FGS_TIMEOUT_MSG, sr);
                 // The app was in the TOP state after the FGS was started so its time allowance
                 // should be counted from that time since this is considered a user interaction
-                mFGSAnrTimer.discard(sr);
                 final Message msg = mAm.mHandler.obtainMessage(
                                         ActivityManagerService.SERVICE_FGS_TIMEOUT_MSG, sr);
                 mAm.mHandler.sendMessageAtTime(msg, lastTopTime + constantTimeLimit);
@@ -3981,10 +4005,8 @@ public final class ActiveServices {
                 Slog.w(TAG_SERVICE, "Exception from scheduleTimeoutServiceForType: " + e);
             }
 
-            if (android.app.Flags.introduceNewServiceOntimeoutCallback()) {
-                // ANR the service after giving the service some time to clean up.
-                mFGSAnrTimer.start(sr, mAm.mConstants.mFgsAnrExtraWaitDuration);
-            }
+            // ANR the service after giving the service some time to clean up.
+            mFGSAnrTimer.start(sr, mAm.mConstants.mFgsAnrExtraWaitDuration);
         }
     }
 
@@ -4004,7 +4026,9 @@ public final class ActiveServices {
 
             Slog.e(TAG_SERVICE, "FGS ANR'ed: " + sr);
             traceInstant("FGS ANR: ", sr);
-            mAm.appNotResponding(sr.app, tr);
+            if (sr.app != null) {
+                mAm.appNotResponding(sr.app, tr);
+            }
 
             // TODO: Can we close the ANR dialog here, if it's still shown? Currently, the ANR
             // dialog really doesn't remember the "cause" (especially if there have been multiple
@@ -7913,8 +7937,14 @@ public final class ActiveServices {
             super(Objects.requireNonNull(am).mHandler, msg, label);
         }
 
-        void start(@NonNull ProcessRecord proc, long millis) {
-            start(proc, proc.getPid(), proc.uid, millis);
+        @Override
+        public int getPid(@NonNull ProcessRecord proc) {
+            return proc.getPid();
+        }
+
+        @Override
+        public int getUid(@NonNull ProcessRecord proc) {
+            return proc.uid;
         }
     }
 
@@ -7924,11 +7954,14 @@ public final class ActiveServices {
             super(Objects.requireNonNull(am).mHandler, msg, label);
         }
 
-        void start(@NonNull ServiceRecord service, long millis) {
-            start(service,
-                    (service.app != null) ? service.app.getPid() : 0,
-                    service.appInfo.uid,
-                    millis);
+        @Override
+        public int getPid(@NonNull ServiceRecord service) {
+            return (service.app != null) ? service.app.getPid() : 0;
+        }
+
+        @Override
+        public int getUid(@NonNull ServiceRecord service) {
+            return (service.appInfo != null) ? service.appInfo.uid : 0;
         }
     }
 

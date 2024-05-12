@@ -78,6 +78,11 @@ constructor(
         interactor.setHeadsUpTop(headsUpTop)
     }
 
+    /** Sets the content alpha for the current state of the brightness mirror */
+    fun setAlphaForBrightnessMirror(alpha: Float) {
+        interactor.setAlphaForBrightnessMirror(alpha)
+    }
+
     /** Corner rounding of the stack */
     val shadeScrimRounding: Flow<ShadeScrimRounding> =
         interactor.shadeScrimRounding.dumpWhileCollecting("shadeScrimRounding")
@@ -105,6 +110,13 @@ constructor(
      */
     val syntheticScroll: Flow<Float> =
         interactor.syntheticScroll.dumpWhileCollecting("syntheticScroll")
+
+    /**
+     * Whether the current touch gesture is overscroll. If true, it means the NSSL has already
+     * consumed part of the gesture.
+     */
+    val isCurrentGestureOverscroll: Flow<Boolean> =
+        interactor.isCurrentGestureOverscroll.dumpWhileCollecting("isCurrentGestureOverScroll")
 
     /** Sets whether the notification stack is scrolled to the top. */
     fun setScrolledToTop(scrolledToTop: Boolean) {

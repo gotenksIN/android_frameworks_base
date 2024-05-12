@@ -17,20 +17,26 @@
 package com.android.systemui.screenshot.ui
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Insets
 import android.graphics.Rect
 import android.graphics.Region
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.WindowInsets
+import android.widget.FrameLayout
 import android.widget.ImageView
-import androidx.constraintlayout.widget.ConstraintLayout
 import com.android.systemui.res.R
 import com.android.systemui.screenshot.FloatingWindowUtil
+import kotlin.math.max
 
 class ScreenshotShelfView(context: Context, attrs: AttributeSet? = null) :
-    ConstraintLayout(context, attrs) {
+    FrameLayout(context, attrs) {
     lateinit var screenshotPreview: ImageView
+    lateinit var blurredScreenshotPreview: ImageView
+    private lateinit var screenshotStatic: ViewGroup
     var onTouchInterceptListener: ((MotionEvent) -> Boolean)? = null
 
     private val displayMetrics = context.resources.displayMetrics
@@ -43,6 +49,8 @@ class ScreenshotShelfView(context: Context, attrs: AttributeSet? = null) :
         // Get focus so that the key events go to the layout.
         isFocusableInTouchMode = true
         screenshotPreview = requireViewById(R.id.screenshot_preview)
+        blurredScreenshotPreview = requireViewById(R.id.screenshot_preview_blur)
+        screenshotStatic = requireViewById(R.id.screenshot_static)
         actionsContainerBackground = requireViewById(R.id.actions_container_background)
         dismissButton = requireViewById(R.id.screenshot_dismiss_button)
     }
@@ -64,6 +72,37 @@ class ScreenshotShelfView(context: Context, attrs: AttributeSet? = null) :
         region.op(insetRect, Region.Op.UNION)
 
         return region
+    }
+
+    fun updateInsets(insets: WindowInsets) {
+        val orientation = mContext.resources.configuration.orientation
+        val inPortrait = orientation == Configuration.ORIENTATION_PORTRAIT
+        val cutout = insets.displayCutout
+        val navBarInsets = insets.getInsets(WindowInsets.Type.navigationBars())
+        if (cutout == null) {
+            screenshotStatic.setPadding(0, 0, 0, navBarInsets.bottom)
+        } else {
+            val waterfall = cutout.waterfallInsets
+            if (inPortrait) {
+                screenshotStatic.setPadding(
+                    waterfall.left,
+                    max(cutout.safeInsetTop.toDouble(), waterfall.top.toDouble()).toInt(),
+                    waterfall.right,
+                    max(
+                            cutout.safeInsetBottom.toDouble(),
+                            max(navBarInsets.bottom.toDouble(), waterfall.bottom.toDouble())
+                        )
+                        .toInt()
+                )
+            } else {
+                screenshotStatic.setPadding(
+                    max(cutout.safeInsetLeft.toDouble(), waterfall.left.toDouble()).toInt(),
+                    waterfall.top,
+                    max(cutout.safeInsetRight.toDouble(), waterfall.right.toDouble()).toInt(),
+                    max(navBarInsets.bottom.toDouble(), waterfall.bottom.toDouble()).toInt()
+                )
+            }
+        }
     }
 
     private fun getSwipeRegion(): Region {

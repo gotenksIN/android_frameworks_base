@@ -63,16 +63,17 @@ import com.android.systemui.battery.BatteryMeterView
 import com.android.systemui.battery.BatteryMeterViewController
 import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
 import com.android.systemui.common.ui.compose.windowinsets.LocalDisplayCutout
+import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.privacy.OngoingPrivacyChip
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ui.composable.ShadeHeader.Dimensions.CollapsedHeight
 import com.android.systemui.shade.ui.composable.ShadeHeader.Values.ClockScale
 import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
-import com.android.systemui.statusbar.phone.StatusBarIconController
-import com.android.systemui.statusbar.phone.StatusBarIconController.TintedIconManager
 import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.phone.StatusIconContainer
+import com.android.systemui.statusbar.phone.ui.StatusBarIconController
+import com.android.systemui.statusbar.phone.ui.TintedIconManager
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernShadeCarrierGroupMobileView
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.ShadeCarrierGroupMobileIconViewModel
 import com.android.systemui.statusbar.policy.Clock
@@ -99,6 +100,10 @@ object ShadeHeader {
     object Colors {
         val ColorScheme.shadeHeaderText: Color
             get() = Color.White
+    }
+
+    object TestTags {
+        const val Root = "shade_header_root"
     }
 }
 
@@ -131,7 +136,7 @@ fun SceneScope.CollapsedShadeHeader(
     // This layout assumes it is globally positioned at (0, 0) and is the
     // same size as the screen.
     Layout(
-        modifier = modifier,
+        modifier = modifier.sysuiResTag(ShadeHeader.TestTags.Root),
         contents =
             listOf(
                 {
@@ -261,7 +266,7 @@ fun SceneScope.ExpandedShadeHeader(
 
     val isPrivacyChipVisible by viewModel.isPrivacyChipVisible.collectAsState()
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier.sysuiResTag(ShadeHeader.TestTags.Root)) {
         if (isPrivacyChipVisible) {
             Box(modifier = Modifier.height(CollapsedHeight).fillMaxWidth()) {
                 PrivacyChip(

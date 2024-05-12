@@ -33,7 +33,6 @@ import android.content.Intent;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageInfo;
 import android.content.pm.ResolveInfo;
-import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
@@ -80,7 +79,7 @@ import java.util.List;
 public final class KeyboardShortcuts {
     private static final String TAG = KeyboardShortcuts.class.getSimpleName();
     private static final Object sLock = new Object();
-    @VisibleForTesting static KeyboardShortcuts sInstance;
+    @VisibleForTesting public static KeyboardShortcuts sInstance;
     private WindowManager mWindowManager;
 
     private final SparseArray<String> mSpecialCharacterNames = new SparseArray<>();
@@ -94,7 +93,7 @@ public final class KeyboardShortcuts {
     };
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
-    @VisibleForTesting Context mContext;
+    @VisibleForTesting public Context mContext;
     private final IPackageManager mPackageManager;
     private final OnClickListener mDialogCloseListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
@@ -374,7 +373,7 @@ public final class KeyboardShortcuts {
     }
 
     @VisibleForTesting
-    void showKeyboardShortcuts(int deviceId) {
+    public void showKeyboardShortcuts(int deviceId) {
         retrieveKeyCharacterMap(deviceId);
         mReceivedAppShortcutGroups = null;
         mReceivedImeShortcutGroups = null;
@@ -408,7 +407,8 @@ public final class KeyboardShortcuts {
         showKeyboardShortcutsDialog(shortcutGroups);
     }
 
-    private void dismissKeyboardShortcuts() {
+    @VisibleForTesting
+    public void dismissKeyboardShortcuts() {
         if (mKeyboardShortcutsDialog != null) {
             mKeyboardShortcutsDialog.dismiss();
             mKeyboardShortcutsDialog = null;
@@ -636,8 +636,7 @@ public final class KeyboardShortcuts {
             TextView categoryTitle = (TextView) inflater.inflate(
                     R.layout.keyboard_shortcuts_category_title, keyboardShortcutsLayout, false);
             categoryTitle.setText(group.getLabel());
-            categoryTitle.setTextColor(group.isSystemGroup() ? Utils.getColorAccent(mContext) :
-                    ColorStateList.valueOf(mContext.getColor(R.color.ksh_application_group_color)));
+            categoryTitle.setTextColor(Utils.getColorAccent(mContext));
             keyboardShortcutsLayout.addView(categoryTitle);
 
             LinearLayout shortcutContainer = (LinearLayout) inflater.inflate(

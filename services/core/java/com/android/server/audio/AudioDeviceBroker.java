@@ -279,8 +279,11 @@ public class AudioDeviceBroker {
     }
 
     /*package*/ void setBluetoothA2dpOn_Async(boolean on, String source) {
-        mBluetoothA2dpEnabled.set(on);
-        sendLMsgNoDelay(MSG_L_SET_FORCE_BT_A2DP_USE, SENDMSG_REPLACE, source);
+        boolean wasOn = mBluetoothA2dpEnabled.getAndSet(on);
+        // do not mute music if we do not anticipate a change in A2DP ON state
+        sendLMsgNoDelay(wasOn == on
+                ? MSG_L_SET_FORCE_BT_A2DP_USE_NO_MUTE : MSG_L_SET_FORCE_BT_A2DP_USE,
+                SENDMSG_REPLACE, source);
     }
 
     /**
@@ -1802,6 +1805,7 @@ public class AudioDeviceBroker {
 
         @Override
         public void handleMessage(Message msg) {
+            int muteCheckDelayMs = BTA2DP_MUTE_CHECK_DELAY_MS;
             switch (msg.what) {
                 case MSG_RESTORE_DEVICES:
                     synchronized (mSetModeLock) {
@@ -1832,6 +1836,7 @@ public class AudioDeviceBroker {
                     onSetForceUse(msg.arg1, msg.arg2, false, (String) msg.obj);
                     break;
                 case MSG_L_SET_FORCE_BT_A2DP_USE:
+                case MSG_L_SET_FORCE_BT_A2DP_USE_NO_MUTE:
                     int forcedUsage = mBluetoothA2dpEnabled.get()
                             ? AudioSystem.FORCE_NONE : AudioSystem.FORCE_NO_BT_A2DP;
                     onSetForceUse(AudioSystem.FOR_MEDIA, forcedUsage, true, (String) msg.obj);
@@ -1900,7 +1905,7 @@ public class AudioDeviceBroker {
                             btInfo.mDevice, btInfo.mProfile, btInfo.mIsLeOutput,
                             "MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE");
                     synchronized (mDeviceStateLock) {
-                        mDeviceInventory.onBluetoothDeviceConfigChange(btInfo,
+                        muteCheckDelayMs += mDeviceInventory.onBluetoothDeviceConfigChange(btInfo,
                                 codecAndChanged.first, codecAndChanged.second,
                                 BtHelper.EVENT_DEVICE_CONFIG_CHANGE);
                     }
@@ -2119,7 +2124,7 @@ public class AudioDeviceBroker {
             // Give some time to Bluetooth service to post a connection message
             // in case of active device switch
             if (MESSAGES_MUTE_MUSIC.contains(msg.what)) {
-                sendMsg(MSG_CHECK_MUTE_MUSIC, SENDMSG_REPLACE, BTA2DP_MUTE_CHECK_DELAY_MS);
+                sendMsg(MSG_CHECK_MUTE_MUSIC, SENDMSG_REPLACE, muteCheckDelayMs);
             }
 
             if (isMessageHandledUnderWakelock(msg.what)) {
@@ -2201,8 +2206,7 @@ public class AudioDeviceBroker {
     private static final int MSG_I_UPDATE_LE_AUDIO_GROUP_ADDRESSES = 57;
     private static final int MSG_L_SYNCHRONIZE_ADI_DEVICES_IN_INVENTORY = 58;
     private static final int MSG_IL_UPDATED_ADI_DEVICE_STATE = 59;
-
-
+    private static final int MSG_L_SET_FORCE_BT_A2DP_USE_NO_MUTE = 60;
 
     private static boolean isMessageHandledUnderWakelock(int msgId) {
         switch(msgId) {

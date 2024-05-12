@@ -114,6 +114,8 @@ import android.metrics.LogMaker;
 import android.os.Binder;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.UserHandle;
+import android.os.UserManager;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsDisabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
@@ -1071,6 +1073,7 @@ public class DisplayContentTests extends WindowTestsBase {
     @Test
     public void testAllowsTopmostFullscreenOrientation() {
         final DisplayContent dc = createNewDisplay();
+        assertEquals(SCREEN_ORIENTATION_UNSPECIFIED, dc.getOrientation());
         dc.getDisplayRotation().setFixedToUserRotation(
                 IWindowManager.FIXED_TO_USER_ROTATION_DISABLED);
 
@@ -1717,7 +1720,6 @@ public class DisplayContentTests extends WindowTestsBase {
         // The display should be rotated after the launch is finished.
         doReturn(false).when(app).isAnimating(anyInt(), anyInt());
         mDisplayContent.mAppTransition.notifyAppTransitionFinishedLocked(app.token);
-        waitHandlerIdle(mWm.mH);
         mStatusBarWindow.finishSeamlessRotation(t);
         mNavBarWindow.finishSeamlessRotation(t);
 
@@ -2811,6 +2813,41 @@ public class DisplayContentTests extends WindowTestsBase {
         // The returned keep-clear areas contain the areas from all visible windows
         assertEquals(new ArraySet(Arrays.asList(rect1, rect2)),
                 mDisplayContent.getKeepClearAreas());
+    }
+
+    @Test
+    public void testHasAccessConsidersUserVisibilityForBackgroundVisibleUsers() {
+        doReturn(true).when(() -> UserManager.isVisibleBackgroundUsersEnabled());
+        final int appId = 1234;
+        final int userId1 = 11;
+        final int userId2 = 12;
+        final int uid1 = UserHandle.getUid(userId1, appId);
+        final int uid2 = UserHandle.getUid(userId2, appId);
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        int displayId = dc.getDisplayId();
+        doReturn(true).when(mWm.mUmInternal).isUserVisible(userId1, displayId);
+        doReturn(false).when(mWm.mUmInternal).isUserVisible(userId2, displayId);
+
+        assertTrue(dc.hasAccess(uid1));
+        assertFalse(dc.hasAccess(uid2));
+    }
+
+    @Test
+    public void testHasAccessIgnoresUserVisibilityForPrivateDisplay() {
+        doReturn(true).when(() -> UserManager.isVisibleBackgroundUsersEnabled());
+        final int appId = 1234;
+        final int userId2 = 12;
+        final int uid2 = UserHandle.getUid(userId2, appId);
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.flags = FLAG_PRIVATE;
+        displayInfo.ownerUid = uid2;
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        int displayId = dc.getDisplayId();
+
+        assertTrue(dc.hasAccess(uid2));
+
+        verify(mWm.mUmInternal, never()).isUserVisible(userId2, displayId);
     }
 
     private void removeRootTaskTests(Runnable runnable) {

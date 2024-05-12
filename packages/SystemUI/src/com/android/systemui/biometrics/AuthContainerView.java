@@ -29,6 +29,8 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.res.TypedArray;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.hardware.biometrics.BiometricAuthenticator.Modality;
 import android.hardware.biometrics.BiometricConstants;
@@ -230,9 +232,13 @@ public class AuthContainerView extends LinearLayout
         @Override
         public void onUseDeviceCredential() {
             mConfig.mCallback.onDeviceCredentialPressed(getRequestId());
-            mHandler.postDelayed(() -> {
+            if (constraintBp()) {
                 addCredentialView(false /* animatePanel */, true /* animateContents */);
-            }, mConfig.mSkipAnimation ? 0 : ANIMATE_CREDENTIAL_START_DELAY_MS);
+            } else {
+                mHandler.postDelayed(() -> {
+                    addCredentialView(false /* animatePanel */, true /* animateContents */);
+                }, mConfig.mSkipAnimation ? 0 : ANIMATE_CREDENTIAL_START_DELAY_MS);
+            }
 
             // TODO(b/313469218): Remove Config
             mConfig.mPromptInfo.setAuthenticators(Authenticators.DEVICE_CREDENTIAL);
@@ -382,6 +388,12 @@ public class AuthContainerView extends LinearLayout
         });
 
         mPanelView = mLayout.findViewById(R.id.panel);
+        if (!constraintBp()) {
+            final TypedArray ta = mContext.obtainStyledAttributes(new int[]{
+                    android.R.attr.colorBackgroundFloating});
+            mPanelView.setBackgroundColor(ta.getColor(0, Color.WHITE));
+            ta.recycle();
+        }
         mPanelController = new AuthPanelController(mContext, mPanelView);
         mBackgroundExecutor = bgExecutor;
         mInteractionJankMonitor = jankMonitor;

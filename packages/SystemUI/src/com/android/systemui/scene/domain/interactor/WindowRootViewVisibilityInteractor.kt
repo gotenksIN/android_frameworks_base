@@ -51,7 +51,7 @@ constructor(
     private val windowRootViewVisibilityRepository: WindowRootViewVisibilityRepository,
     private val keyguardRepository: KeyguardRepository,
     private val headsUpManager: HeadsUpManager,
-    private val powerInteractor: PowerInteractor,
+    powerInteractor: PowerInteractor,
     private val activeNotificationsInteractor: ActiveNotificationsInteractor,
     sceneInteractorProvider: Provider<SceneInteractor>,
 ) : CoreStartable {
@@ -76,11 +76,18 @@ constructor(
                 .map { state ->
                     when (state) {
                         is ObservableTransitionState.Idle ->
-                            state.scene == Scenes.Shade || state.scene == Scenes.Lockscreen
+                            state.currentScene == Scenes.Shade ||
+                                state.currentScene == Scenes.NotificationsShade ||
+                                state.currentScene == Scenes.QuickSettingsShade ||
+                                state.currentScene == Scenes.Lockscreen
                         is ObservableTransitionState.Transition ->
                             state.toScene == Scenes.Shade ||
+                                state.toScene == Scenes.NotificationsShade ||
+                                state.toScene == Scenes.QuickSettingsShade ||
                                 state.toScene == Scenes.Lockscreen ||
                                 state.fromScene == Scenes.Shade ||
+                                state.fromScene == Scenes.NotificationsShade ||
+                                state.fromScene == Scenes.QuickSettingsShade ||
                                 state.fromScene == Scenes.Lockscreen
                     }
                 }

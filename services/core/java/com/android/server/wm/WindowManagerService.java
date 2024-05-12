@@ -20,7 +20,6 @@ import static android.Manifest.permission.ACCESS_SURFACE_FLINGER;
 import static android.Manifest.permission.CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS;
 import static android.Manifest.permission.INPUT_CONSUMER;
 import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
-import static android.Manifest.permission.MANAGE_ACTIVITY_TASKS;
 import static android.Manifest.permission.MANAGE_APP_TOKENS;
 import static android.Manifest.permission.MODIFY_TOUCH_MODE_STATE;
 import static android.Manifest.permission.READ_FRAME_BUFFER;
@@ -45,6 +44,7 @@ import static android.os.Process.myUid;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.permission.flags.Flags.sensitiveContentImprovements;
 import static android.permission.flags.Flags.sensitiveContentMetricsBugfix;
+import static android.permission.flags.Flags.sensitiveContentRecentsScreenshotBugfix;
 import static android.provider.Settings.Global.DEVELOPMENT_ENABLE_FREEFORM_WINDOWS_SUPPORT;
 import static android.provider.Settings.Global.DEVELOPMENT_ENABLE_NON_RESIZABLE_MULTI_WINDOW;
 import static android.provider.Settings.Global.DEVELOPMENT_FORCE_DESKTOP_MODE_ON_EXTERNAL_DISPLAYS;
@@ -54,6 +54,7 @@ import static android.service.dreams.Flags.dreamHandlesConfirmKeys;
 import static android.view.ContentRecordingSession.RECORD_CONTENT_TASK;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
+import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.view.WindowManager.DISPLAY_IME_POLICY_FALLBACK_DISPLAY;
 import static android.view.WindowManager.DISPLAY_IME_POLICY_LOCAL;
 import static android.view.WindowManager.LayoutParams.FIRST_APPLICATION_WINDOW;
@@ -68,7 +69,7 @@ import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED;
 import static android.view.WindowManager.LayoutParams.FLAG_SLIPPERY;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL;
-import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SENSITIVE_FOR_TRACING;
+import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SPY;
 import static android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE;
 import static android.view.WindowManager.LayoutParams.LAST_APPLICATION_WINDOW;
@@ -148,6 +149,7 @@ import static com.android.server.wm.WindowManagerDebugConfig.SHOW_STACK_CRAWLS;
 import static com.android.server.wm.WindowManagerDebugConfig.SHOW_VERBOSE_TRANSACTIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
+import static com.android.server.wm.WindowManagerInternal.OnWindowRemovedListener;
 import static com.android.server.wm.WindowManagerServiceDumpProto.BACK_NAVIGATION;
 import static com.android.server.wm.WindowManagerServiceDumpProto.DISPLAY_FROZEN;
 import static com.android.server.wm.WindowManagerServiceDumpProto.FOCUSED_APP;
@@ -296,7 +298,6 @@ import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceControlViewHost;
 import android.view.SurfaceSession;
-import android.view.TaskTransitionSpec;
 import android.view.View;
 import android.view.View.FocusDirection;
 import android.view.ViewDebug;
@@ -309,6 +310,7 @@ import android.view.WindowManager.LayoutParams;
 import android.view.WindowManager.RemoveContentMode;
 import android.view.WindowManagerGlobal;
 import android.view.WindowManagerPolicyConstants.PointerEventListener;
+import android.view.WindowRelayoutResult;
 import android.view.displayhash.DisplayHash;
 import android.view.displayhash.VerifiedDisplayHash;
 import android.view.inputmethod.ImeTracker;
@@ -350,6 +352,7 @@ import com.android.server.AnimationThread;
 import com.android.server.DisplayThread;
 import com.android.server.FgThread;
 import com.android.server.LocalServices;
+import com.android.server.SystemConfig;
 import com.android.server.UiThread;
 import com.android.server.Watchdog;
 import com.android.server.input.InputManagerService;
@@ -457,13 +460,12 @@ public class WindowManagerService extends IWindowManager.Stub
     /**
      * Use WMShell for app transition.
      */
-    public static final String ENABLE_SHELL_TRANSITIONS = "persist.wm.debug.shell_transit";
+    private static final String ENABLE_SHELL_TRANSITIONS = "persist.wm.debug.shell_transit";
 
     /**
      * @see #ENABLE_SHELL_TRANSITIONS
      */
-    public static final boolean sEnableShellTransitions =
-            SystemProperties.getBoolean(ENABLE_SHELL_TRANSITIONS, true);
+    public static final boolean sEnableShellTransitions = getShellTransitEnabled();
 
     /**
      * Allows a fullscreen windowing mode activity to launch in its desired orientation directly
@@ -495,6 +497,9 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private final RemoteCallbackList<IKeyguardLockedStateListener> mKeyguardLockedStateListeners =
             new RemoteCallbackList<>();
+
+    private final List<OnWindowRemovedListener> mOnWindowRemovedListeners = new ArrayList<>();
+
     private boolean mDispatchedKeyguardLockedState = false;
 
     // VR Vr2d Display Id.
@@ -537,6 +542,21 @@ public class WindowManagerService extends IWindowManager.Stub
         public void dumpCritical(FileDescriptor fd, PrintWriter pw, String[] args,
                 boolean asProto) {
             doDump(fd, pw, new String[] {"-a"}, asProto);
+        }
+
+        @Override
+        public void dumpHigh(FileDescriptor fd, PrintWriter pw, String[] args,
+                boolean asProto) {
+            if (asProto) {
+                return;
+            }
+            mAtmService.dumpActivity(fd, pw, /* name= */ "all", /* args= */ new String[]{},
+                    /* opti= */ 0,
+                    /* dumpAll= */ true,
+                    /* dumpVisibleRootTasksOnly= */ true,
+                    /* dumpFocusedRootTaskOnly= */ false, INVALID_DISPLAY, UserHandle.USER_ALL,
+                    /* timeout= */ 1000
+            );
         }
 
         @Override
@@ -766,11 +786,6 @@ public class WindowManagerService extends IWindowManager.Stub
      * not as critical.
      */
     final Handler mAnimationHandler = new Handler(AnimationThread.getHandler().getLooper());
-
-    /**
-     * Used during task transitions to allow SysUI and launcher to customize task transitions.
-     */
-    TaskTransitionSpec mTaskTransitionSpec;
 
     boolean mHardKeyboardAvailable;
     WindowManagerInternal.OnHardKeyboardStatusChangeListener mHardKeyboardStatusChangeListener;
@@ -2085,7 +2100,11 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     void postWindowRemoveCleanupLocked(WindowState win) {
         ProtoLog.v(WM_DEBUG_ADD_REMOVE, "postWindowRemoveCleanupLocked: %s", win);
-        mWindowMap.remove(win.mClient.asBinder());
+        final IBinder client = win.mClient.asBinder();
+        mWindowMap.remove(client);
+        if (sensitiveContentAppProtection()) {
+            notifyWindowRemovedListeners(client);
+        }
 
         final DisplayContent dc = win.getDisplayContent();
         dc.getDisplayRotation().markForSeamlessRotation(win, false /* seamlesslyRotated */);
@@ -2274,12 +2293,54 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    /** Relayouts window. */
+    public int relayoutWindow(Session session, IWindow client, LayoutParams attrs,
+            int requestedWidth, int requestedHeight, int viewVisibility, int flags, int seq,
+            int lastSyncSeqId, WindowRelayoutResult outRelayoutResult) {
+        final ClientWindowFrames outFrames;
+        final MergedConfiguration outMergedConfiguration;
+        final SurfaceControl outSurfaceControl;
+        final InsetsState outInsetsState;
+        final InsetsSourceControl.Array outActiveControls;
+        if (outRelayoutResult != null) {
+            outFrames = outRelayoutResult.frames;
+            outMergedConfiguration = outRelayoutResult.mergedConfiguration;
+            outSurfaceControl = outRelayoutResult.surfaceControl;
+            outInsetsState = outRelayoutResult.insetsState;
+            outActiveControls = outRelayoutResult.activeControls;
+        } else {
+            outFrames = null;
+            outMergedConfiguration = null;
+            outSurfaceControl = null;
+            outInsetsState = null;
+            outActiveControls = null;
+        }
+        return relayoutWindowInner(session, client, attrs, requestedWidth, requestedHeight,
+                viewVisibility, flags, seq, lastSyncSeqId, outFrames, outMergedConfiguration,
+                outSurfaceControl, outInsetsState, outActiveControls, null /* outBundle */,
+                outRelayoutResult);
+    }
+
+    /** @deprecated */
+    @Deprecated
     public int relayoutWindow(Session session, IWindow client, LayoutParams attrs,
             int requestedWidth, int requestedHeight, int viewVisibility, int flags, int seq,
             int lastSyncSeqId, ClientWindowFrames outFrames,
             MergedConfiguration outMergedConfiguration, SurfaceControl outSurfaceControl,
             InsetsState outInsetsState, InsetsSourceControl.Array outActiveControls,
             Bundle outBundle) {
+        return relayoutWindowInner(session, client, attrs, requestedWidth, requestedHeight,
+                viewVisibility, flags, seq, lastSyncSeqId, outFrames, outMergedConfiguration,
+                outSurfaceControl, outInsetsState, outActiveControls, outBundle,
+                null /* outRelayoutResult */);
+    }
+
+    private int relayoutWindowInner(Session session, IWindow client, LayoutParams attrs,
+            int requestedWidth, int requestedHeight, int viewVisibility, int flags, int seq,
+            int lastSyncSeqId, ClientWindowFrames outFrames,
+            MergedConfiguration outMergedConfiguration, SurfaceControl outSurfaceControl,
+            InsetsState outInsetsState, InsetsSourceControl.Array outActiveControls,
+            Bundle outBundle, WindowRelayoutResult outRelayoutResult) {
         if (outActiveControls != null) {
             outActiveControls.set(null);
         }
@@ -2614,8 +2675,14 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             if (outFrames != null && outMergedConfiguration != null) {
-                final boolean shouldReportActivityWindowInfo = outBundle != null
-                        && win.mLastReportedActivityWindowInfo != null;
+                final boolean shouldReportActivityWindowInfo;
+                if (Flags.windowSessionRelayoutInfo()) {
+                    shouldReportActivityWindowInfo = outRelayoutResult != null
+                            && win.mLastReportedActivityWindowInfo != null;
+                } else {
+                    shouldReportActivityWindowInfo = outBundle != null
+                            && win.mLastReportedActivityWindowInfo != null;
+                }
                 final ActivityWindowInfo outActivityWindowInfo = shouldReportActivityWindowInfo
                         ? new ActivityWindowInfo()
                         : null;
@@ -2624,8 +2691,13 @@ public class WindowManagerService extends IWindowManager.Stub
                         outActivityWindowInfo, false /* useLatestConfig */, shouldRelayout);
 
                 if (shouldReportActivityWindowInfo) {
-                    outBundle.putParcelable(IWindowSession.KEY_RELAYOUT_BUNDLE_ACTIVITY_WINDOW_INFO,
-                            outActivityWindowInfo);
+                    if (Flags.windowSessionRelayoutInfo()) {
+                        outRelayoutResult.activityWindowInfo = outActivityWindowInfo;
+                    } else {
+                        outBundle.putParcelable(
+                                IWindowSession.KEY_RELAYOUT_BUNDLE_ACTIVITY_WINDOW_INFO,
+                                outActivityWindowInfo);
+                    }
                 }
 
                 // Set resize-handled here because the values are sent back to the client.
@@ -2656,7 +2728,19 @@ public class WindowManagerService extends IWindowManager.Stub
                         win.isVisible() /* visible */, false /* removed */);
             }
 
-            if (outBundle != null) {
+            if (Flags.windowSessionRelayoutInfo()) {
+                if (outRelayoutResult != null) {
+                    if (win.syncNextBuffer() && viewVisibility == View.VISIBLE
+                            && win.mSyncSeqId > lastSyncSeqId) {
+                        outRelayoutResult.syncSeqId = win.shouldSyncWithBuffers()
+                                ? win.mSyncSeqId
+                                : -1;
+                        win.markRedrawForSyncReported();
+                    } else {
+                        outRelayoutResult.syncSeqId = -1;
+                    }
+                }
+            } else if (outBundle != null) {
                 final int maybeSyncSeqId;
                 if (win.syncNextBuffer() && viewVisibility == View.VISIBLE
                         && win.mSyncSeqId > lastSyncSeqId) {
@@ -5296,6 +5380,23 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             mWindowChangeListeners.remove(listener);
         }
+    }
+
+    private void notifyWindowRemovedListeners(IBinder client) {
+        OnWindowRemovedListener[] windowRemovedListeners;
+        synchronized (mGlobalLock) {
+            if (mOnWindowRemovedListeners.isEmpty()) {
+                return;
+            }
+            windowRemovedListeners = new OnWindowRemovedListener[mOnWindowRemovedListeners.size()];
+            mOnWindowRemovedListeners.toArray(windowRemovedListeners);
+        }
+        mH.post(() -> {
+            int size = windowRemovedListeners.length;
+            for (int i = 0; i < size; i++) {
+                windowRemovedListeners[i].onWindowRemoved(client);
+            }
+        });
     }
 
     private void notifyWindowsChanged() {
@@ -8799,11 +8900,25 @@ public class WindowManagerService extends IWindowManager.Stub
                         mRoot.forAllWindows((w) -> {
                             if (w.isVisible()) {
                                 WindowManagerService.this.showToastIfBlockingScreenCapture(w);
+                            } else if (sensitiveContentRecentsScreenshotBugfix()
+                                    && shouldInvalidateSnapshot(w)) {
+                                final Task task = w.getTask();
+                                // preventing from showing up in starting window.
+                                mTaskSnapshotController.removeAndDeleteSnapshot(
+                                        task.mTaskId, task.mUserId);
+                                // Refresh TaskThumbnailCache
+                                task.onSnapshotInvalidated();
                             }
                         }, /* traverseTopToBottom= */ true);
                     }
                 }
             }
+        }
+
+        private boolean shouldInvalidateSnapshot(WindowState w) {
+            return w.getTask() != null
+                    && mSensitiveContentPackages.shouldBlockScreenCaptureForApp(
+                    w.getOwningPackage(), w.getOwningUid(), w.getWindowToken());
         }
 
         @Override
@@ -8836,6 +8951,20 @@ public class WindowManagerService extends IWindowManager.Stub
                 if (sensitiveContentImprovements()) {
                     mCaptureBlockedToastShownUids.clear();
                 }
+            }
+        }
+
+        @Override
+        public void registerOnWindowRemovedListener(OnWindowRemovedListener listener) {
+            synchronized (mGlobalLock) {
+                mOnWindowRemovedListeners.add(listener);
+            }
+        }
+
+        @Override
+        public void unregisterOnWindowRemovedListener(OnWindowRemovedListener listener) {
+            synchronized (mGlobalLock) {
+                mOnWindowRemovedListeners.remove(listener);
             }
         }
 
@@ -9213,11 +9342,11 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         }
 
-        // You can only use INPUT_FEATURE_SENSITIVE_FOR_TRACING on a trusted overlay.
-        if ((inputFeatures & INPUT_FEATURE_SENSITIVE_FOR_TRACING) != 0 && !isTrustedOverlay) {
-            Slog.w(TAG, "Removing INPUT_FEATURE_SENSITIVE_FOR_TRACING from '" + windowName
+        // You can only use INPUT_FEATURE_SENSITIVE_FOR_PRIVACY on a trusted overlay.
+        if ((inputFeatures & INPUT_FEATURE_SENSITIVE_FOR_PRIVACY) != 0 && !isTrustedOverlay) {
+            Slog.w(TAG, "Removing INPUT_FEATURE_SENSITIVE_FOR_PRIVACY from '" + windowName
                     + "' because it isn't a trusted overlay");
-            return inputFeatures & ~INPUT_FEATURE_SENSITIVE_FOR_TRACING;
+            return inputFeatures & ~INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
         }
         return inputFeatures;
     }
@@ -9897,24 +10026,6 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
-    public void setTaskTransitionSpec(TaskTransitionSpec spec) {
-        if (!checkCallingPermission(MANAGE_ACTIVITY_TASKS, "setTaskTransitionSpec()")) {
-            throw new SecurityException("Requires MANAGE_ACTIVITY_TASKS permission");
-        }
-
-        mTaskTransitionSpec = spec;
-    }
-
-    @Override
-    public void clearTaskTransitionSpec() {
-        if (!checkCallingPermission(MANAGE_ACTIVITY_TASKS, "clearTaskTransitionSpec()")) {
-            throw new SecurityException("Requires MANAGE_ACTIVITY_TASKS permission");
-        }
-
-        mTaskTransitionSpec = null;
-    }
-
-    @Override
     @RequiresPermission(Manifest.permission.ACCESS_FPS_COUNTER)
     public void registerTaskFpsCallback(@IntRange(from = 0) int taskId,
             ITaskFpsCallback callback) {
@@ -10260,5 +10371,14 @@ public class WindowManagerService extends IWindowManager.Stub
                         uid);
             }
         }
+    }
+
+    private static boolean getShellTransitEnabled() {
+        android.content.pm.FeatureInfo autoFeature = SystemConfig.getInstance()
+                .getAvailableFeatures().get(PackageManager.FEATURE_AUTOMOTIVE);
+        if (autoFeature != null && autoFeature.version >= 0) {
+            return SystemProperties.getBoolean(ENABLE_SHELL_TRANSITIONS, true);
+        }
+        return true;
     }
 }

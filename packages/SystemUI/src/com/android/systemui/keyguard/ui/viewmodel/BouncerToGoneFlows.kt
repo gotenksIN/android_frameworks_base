@@ -19,11 +19,11 @@ package com.android.systemui.keyguard.ui.viewmodel
 import com.android.app.animation.Interpolators.EMPHASIZED_ACCELERATE
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardDismissActionInteractor
-import com.android.systemui.keyguard.shared.RefactorKeyguardDismissIntent
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.KeyguardState.GONE
 import com.android.systemui.keyguard.shared.model.ScrimAlpha
 import com.android.systemui.keyguard.ui.KeyguardTransitionAnimationFlow
+import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.SysuiStatusBarStateController
 import dagger.Lazy
@@ -48,7 +48,7 @@ constructor(
 ) {
     /** Common fade for scrim alpha values during *BOUNCER->GONE */
     fun scrimAlpha(duration: Duration, fromState: KeyguardState): Flow<ScrimAlpha> {
-        return if (RefactorKeyguardDismissIntent.isEnabled) {
+        return if (SceneContainerFlag.isEnabled) {
             keyguardDismissActionInteractor
                 .get()
                 .willAnimateDismissActionOnLockscreen
@@ -102,37 +102,40 @@ constructor(
                 to = GONE,
             )
 
-        return shadeInteractor.isAnyExpanded.flatMapLatest { isAnyExpanded ->
-            transitionAnimation
-                .sharedFlow(
-                    duration = duration,
-                    interpolator = EMPHASIZED_ACCELERATE,
-                    onStart = {
-                        leaveShadeOpen = statusBarStateController.leaveOpenOnKeyguardHide()
-                        willRunDismissFromKeyguard = willRunAnimationOnKeyguard()
-                        isShadeExpanded = isAnyExpanded
-                    },
-                    onStep = { 1f - it },
-                )
-                .map {
-                    if (willRunDismissFromKeyguard) {
-                        if (isShadeExpanded) {
+        return shadeInteractor.anyExpansion
+            .map { it > 0f }
+            .distinctUntilChanged()
+            .flatMapLatest { isAnyExpanded ->
+                transitionAnimation
+                    .sharedFlow(
+                        duration = duration,
+                        interpolator = EMPHASIZED_ACCELERATE,
+                        onStart = {
+                            leaveShadeOpen = statusBarStateController.leaveOpenOnKeyguardHide()
+                            willRunDismissFromKeyguard = willRunAnimationOnKeyguard()
+                            isShadeExpanded = isAnyExpanded
+                        },
+                        onStep = { 1f - it },
+                    )
+                    .map {
+                        if (willRunDismissFromKeyguard) {
+                            if (isShadeExpanded) {
+                                ScrimAlpha(
+                                    behindAlpha = it,
+                                    notificationsAlpha = it,
+                                )
+                            } else {
+                                ScrimAlpha()
+                            }
+                        } else if (leaveShadeOpen) {
                             ScrimAlpha(
-                                behindAlpha = it,
-                                notificationsAlpha = it,
+                                behindAlpha = 1f,
+                                notificationsAlpha = 1f,
                             )
                         } else {
-                            ScrimAlpha()
+                            ScrimAlpha(behindAlpha = it)
                         }
-                    } else if (leaveShadeOpen) {
-                        ScrimAlpha(
-                            behindAlpha = 1f,
-                            notificationsAlpha = 1f,
-                        )
-                    } else {
-                        ScrimAlpha(behindAlpha = it)
                     }
-                }
-        }
+            }
     }
 }

@@ -1146,9 +1146,15 @@ public class NotificationStackScrollLayout
         }
     }
 
+    @NonNull
     @Override
     public View asView() {
         return this;
+    }
+
+    @Override
+    public void setMaxAlpha(float alpha) {
+        mController.setMaxAlphaFromView(alpha);
     }
 
     @Override
@@ -1176,6 +1182,11 @@ public class NotificationStackScrollLayout
     @Override
     public void setSyntheticScrollConsumer(@Nullable Consumer<Float> consumer) {
         mScrollViewFields.setSyntheticScrollConsumer(consumer);
+    }
+
+    @Override
+    public void setCurrentGestureOverscrollConsumer(@Nullable Consumer<Boolean> consumer) {
+        mScrollViewFields.setCurrentGestureOverscrollConsumer(consumer);
     }
 
     @Override
@@ -2399,12 +2410,13 @@ public class NotificationStackScrollLayout
     private void updateContentHeight() {
         final float scrimTopPadding = mAmbientState.isOnKeyguard() ? 0 : mMinimumPaddings;
         final int shelfIntrinsicHeight = mShelf != null ? mShelf.getIntrinsicHeight() : 0;
+        final int footerIntrinsicHeight = mFooterView != null ? mFooterView.getIntrinsicHeight() : 0;
         final float height =
                 (int) scrimTopPadding + (int) mNotificationStackSizeCalculator.computeHeight(
                         /* notificationStackScrollLayout= */ this, mMaxDisplayedNotifications,
                         shelfIntrinsicHeight);
         mIntrinsicContentHeight = height;
-        mScrollViewFields.sendStackHeight(height);
+        mScrollViewFields.sendStackHeight(height + footerIntrinsicHeight);
 
         // The topPadding can be bigger than the regular padding when qs is expanded, in that
         // state the maxPanelHeight and the contentHeight should be bigger
@@ -3396,6 +3408,8 @@ public class NotificationStackScrollLayout
             boolean isUpOrCancel = action == ACTION_UP || action == ACTION_CANCEL;
             if (mSendingTouchesToSceneFramework) {
                 mController.sendTouchToSceneFramework(ev);
+                mScrollViewFields.sendCurrentGestureOverscroll(
+                        getExpandedInThisMotion() && !isUpOrCancel);
             } else if (!isUpOrCancel) {
                 // if this is the first touch being sent to the scene framework,
                 // convert it into a synthetic DOWN event.
@@ -3403,6 +3417,7 @@ public class NotificationStackScrollLayout
                 MotionEvent downEvent = MotionEvent.obtain(ev);
                 downEvent.setAction(MotionEvent.ACTION_DOWN);
                 mController.sendTouchToSceneFramework(downEvent);
+                mScrollViewFields.sendCurrentGestureOverscroll(getExpandedInThisMotion());
                 downEvent.recycle();
             }
 
@@ -3419,6 +3434,14 @@ public class NotificationStackScrollLayout
         downEvent.setAction(MotionEvent.ACTION_DOWN);
         onScrollTouch(downEvent);
         downEvent.recycle();
+    }
+
+    // Only when scene container is enabled, mark that we are being dragged so that we start
+    // dispatching the rest of the gesture to scene container.
+    void startOverscrollAfterExpanding() {
+        SceneContainerFlag.isUnexpectedlyInLegacyMode();
+        getExpandHelper().finishExpanding();
+        setIsBeingDragged(true);
     }
 
     @Override
@@ -5538,6 +5561,11 @@ public class NotificationStackScrollLayout
         return mExpandingNotification;
     }
 
+    @VisibleForTesting
+    void setExpandingNotification(boolean isExpanding) {
+        mExpandingNotification = isExpanding;
+    }
+
     boolean getDisallowScrollingInThisMotion() {
         return mDisallowScrollingInThisMotion;
     }
@@ -5548,6 +5576,11 @@ public class NotificationStackScrollLayout
 
     boolean getExpandedInThisMotion() {
         return mExpandedInThisMotion;
+    }
+
+    @VisibleForTesting
+    void setExpandedInThisMotion(boolean expandedInThisMotion) {
+        mExpandedInThisMotion = expandedInThisMotion;
     }
 
     boolean getDisallowDismissInThisMotion() {

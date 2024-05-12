@@ -21,6 +21,7 @@ import static android.app.StatusBarManager.SESSION_KEYGUARD;
 import static android.provider.Settings.Secure.LOCK_SCREEN_LOCK_AFTER_TIMEOUT;
 import static android.provider.Settings.System.LOCKSCREEN_SOUNDS_ENABLED;
 import static android.provider.Settings.System.SCREEN_OFF_TIMEOUT;
+import static android.service.dreams.Flags.dismissDreamOnKeyguardDismiss;
 import static android.view.RemoteAnimationTarget.MODE_OPENING;
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_NO_WINDOW_ANIMATIONS;
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT;
@@ -177,10 +178,6 @@ import com.android.systemui.util.time.SystemClock;
 import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
-import dagger.Lazy;
-
-import kotlinx.coroutines.CoroutineDispatcher;
-
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -189,6 +186,9 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
+
+import dagger.Lazy;
+import kotlinx.coroutines.CoroutineDispatcher;
 
 /**
  * Mediates requests related to the keyguard.  This includes queries about the
@@ -1236,7 +1236,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                             mUnoccludeAnimator.cancel();
                         }
 
-                        if (isDream || mShowCommunalByDefault) {
+                        if (isDream || mShowCommunalWhenUnoccluding) {
                             initAlphaForAnimationTargets(wallpapers);
                             if (isDream) {
                                 mDreamViewModel.get().startTransitionFromDream();
@@ -1370,7 +1370,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private final Lazy<DreamViewModel> mDreamViewModel;
     private final Lazy<CommunalTransitionViewModel> mCommunalTransitionViewModel;
     private RemoteAnimationTarget mRemoteAnimationTarget;
-    private boolean mShowCommunalByDefault = false;
+    private boolean mShowCommunalWhenUnoccluding = false;
 
     private final Lazy<WindowManagerLockscreenVisibilityManager> mWmLockscreenVisibilityManager;
 
@@ -1628,8 +1628,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     getRemoteSurfaceAlphaApplier());
             mJavaAdapter.alwaysCollectFlow(dreamViewModel.getTransitionEnded(),
                     getFinishedCallbackConsumer());
-            mJavaAdapter.alwaysCollectFlow(communalViewModel.getShowByDefault(),
-                    (showByDefault) -> mShowCommunalByDefault = showByDefault);
+            mJavaAdapter.alwaysCollectFlow(communalViewModel.getShowCommunalFromOccluded(),
+                    (showCommunalFromOccluded) -> {
+                        mShowCommunalWhenUnoccluding = showCommunalFromOccluded;
+                    });
             mJavaAdapter.alwaysCollectFlow(communalViewModel.getTransitionFromOccludedEnded(),
                     getFinishedCallbackConsumer());
         }
@@ -3096,13 +3098,22 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                         createInteractionJankMonitorConf(
                                 CUJ_LOCKSCREEN_UNLOCK_ANIMATION, "DismissPanel"));
 
+                // Filter out any closing apps, such as the dream.
+                RemoteAnimationTarget[] openingApps = apps;
+                if (dismissDreamOnKeyguardDismiss()) {
+                    openingApps = Arrays.stream(apps)
+                            .filter(a -> a.mode == RemoteAnimationTarget.MODE_OPENING)
+                            .toArray(RemoteAnimationTarget[]::new);
+                }
+
                 // Pass the surface and metadata to the unlock animation controller.
                 RemoteAnimationTarget[] openingWallpapers = Arrays.stream(wallpapers).filter(
                         w -> w.mode == RemoteAnimationTarget.MODE_OPENING).toArray(
                         RemoteAnimationTarget[]::new);
+
                 mKeyguardUnlockAnimationControllerLazy.get()
                         .notifyStartSurfaceBehindRemoteAnimation(
-                                apps, openingWallpapers, startTime,
+                                openingApps, openingWallpapers, startTime,
                                 mSurfaceBehindRemoteAnimationRequested);
             } else {
                 mInteractionJankMonitor.begin(
@@ -3208,6 +3219,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mHideAnimationRun = false;
         adjustStatusBarLocked();
         sendUserPresentBroadcast();
+
+        if (!KeyguardWmStateRefactor.isEnabled()) {
+            mKeyguardInteractor.dismissKeyguard();
+        }
     }
 
     private Configuration.Builder createInteractionJankMonitorConf(int cuj) {

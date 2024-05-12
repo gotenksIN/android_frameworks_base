@@ -154,16 +154,19 @@
     <string name="cfTemplateForwardedTime" msgid="735042369233323609">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: <xliff:g id="DIALING_NUMBER">{1}</xliff:g> након <xliff:g id="TIME_DELAY">{2}</xliff:g> секунде/и"</string>
     <string name="cfTemplateRegistered" msgid="5619930473441550596">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: Није прослеђено"</string>
     <string name="cfTemplateRegisteredTime" msgid="5222794399642525045">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: Није прослеђено"</string>
-    <string name="scCellularNetworkSecurityTitle" msgid="90330018476923559">"Безбедност мобилне мреже"</string>
-    <string name="scCellularNetworkSecuritySummary" msgid="8659128412709908263">"Прегледајте подешавања"</string>
-    <string name="scIdentifierDisclosureIssueTitle" msgid="3737384845335568193">"Приступљено је идентификатору уређаја"</string>
-    <string name="scIdentifierDisclosureIssueSummary" msgid="3870743771498510600">"Мрежа на <xliff:g id="DISCLOSURE_NETWORK">%4$s</xliff:g> вези је забележила јединствени идентификатор (IMSI) уређаја <xliff:g id="DISCLOSURE_COUNT">%1$d</xliff:g> пут/а у периоду од <xliff:g id="DISCLOSURE_WINDOW_START_TIME">%2$tr</xliff:g> до <xliff:g id="DISCLOSURE_WINDOW_END_TIME">%3$tr</xliff:g>."</string>
-    <string name="scNullCipherIssueEncryptedTitle" msgid="8426373579673205292">"Шифрована веза са: <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
-    <string name="scNullCipherIssueEncryptedSummary" msgid="6437468449554283998">"Повезани сте на безбеднију мобилну мрежу."</string>
-    <string name="scNullCipherIssueNonEncryptedTitle" msgid="2069674849204163569">"Нешифрована веза са: <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
-    <string name="scNullCipherIssueNonEncryptedSummary" msgid="3577092996366374833">"Повезани сте на мобилну мрежу која није шифрована. Позиви, поруке и подаци су подложни пресретању."</string>
-    <string name="scNullCipherIssueActionSettings" msgid="8378372959891478470">"Подешавања безбедности мобилне мреже"</string>
+    <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Безбедност на мобилној мрежи"</string>
+    <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"Шифровање, обавештења за нешифроване мреже"</string>
+    <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"Приступљено је ИД-у уређаја"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="3699930821270580416">"Мрежа у близини је у <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> евидентирала јединствени ИД вашег уређаја (IMSI или IMEI) док сте користили <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g> SIM"</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="7283387338827749276">"Мрежа у близини је у <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> евидентирала јединствени ИД вашег уређаја (IMSI или IMEI) док сте користили <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g> SIM.\n\nТо значи да је евидентирала вашу локацију, активност и идентитет. То је уобичајена пракса, али може да буде проблем људима који су забринути за приватност."</string>
+    <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"Повезани сте на шифровану мрежу <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
+    <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"Веза <xliff:g id="NETWORK_NAME">%1$s</xliff:g> SIM-а је сада безбеднија"</string>
+    <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"Повезани сте на шифровану мрежу"</string>
+    <string name="scNullCipherIssueNonEncryptedSummaryNotification" msgid="7386936934128110388">"Позиви, поруке и подаци су тренутно рањивији док користите <xliff:g id="NETWORK_NAME">%1$s</xliff:g> SIM"</string>
+    <string name="scNullCipherIssueNonEncryptedSummary" msgid="5093428974513703253">"Позиви, поруке и подаци су тренутно рањивији док користите <xliff:g id="NETWORK_NAME">%1$s</xliff:g> SIM.\n\nКада веза поново буде шифрована, послаћемо вам друго обавештење."</string>
+    <string name="scNullCipherIssueActionSettings" msgid="5888857706424639946">"Подешавања безбедности на мобилној мрежи"</string>
     <string name="scNullCipherIssueActionLearnMore" msgid="7896642417214757769">"Сазнајте више"</string>
+    <string name="scNullCipherIssueActionGotIt" msgid="8747796640866585787">"Важи"</string>
     <string name="fcComplete" msgid="1080909484660507044">"Кôд функције је извршен."</string>
     <string name="fcError" msgid="5325116502080221346">"Проблеми са везом или неважећи кôд функције."</string>
     <string name="httpErrorOk" msgid="6206751415788256357">"Потврди"</string>
@@ -324,7 +327,7 @@
     <string name="permgroupdesc_storage" msgid="5378659041354582769">"приступ фајловима на уређају"</string>
     <string name="permgrouplab_readMediaAural" msgid="1858331312624942053">"Музика и звук"</string>
     <string name="permgroupdesc_readMediaAural" msgid="7565467343667089595">"приступ музици и аудио садржају на уређају"</string>
-    <string name="permgrouplab_readMediaVisual" msgid="4724874717811908660">"Слике и видео снимци"</string>
+    <string name="permgrouplab_readMediaVisual" msgid="4724874717811908660">"Слике и видеи"</string>
     <string name="permgroupdesc_readMediaVisual" msgid="4080463241903508688">"приступ сликама и видеима на уређају"</string>
     <string name="permgrouplab_microphone" msgid="2480597427667420076">"Микрофон"</string>
     <string name="permgroupdesc_microphone" msgid="1047786732792487722">"снима звук"</string>
@@ -357,8 +360,7 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"Направи снимак екрана"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"Може да направи снимак екрана."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"Преглед, <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
-    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
-    <skip />
+    <string name="dream_accessibility_action_click" msgid="7392398629967797805">"одбаци"</string>
     <string name="permlab_statusBar" msgid="8798267849526214017">"онемогућавање или измена статусне траке"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"Дозвољава апликацији да онемогући статусну траку или да додаје и уклања системске иконе."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"функционисање као статусна трака"</string>
@@ -1899,8 +1901,7 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Тражи PIN пре откачињања"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Тражи шаблон за откључавање пре откачињања"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Тражи лозинку пре откачињања"</string>
-    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
-    <skip />
+    <string name="package_installed_device_owner" msgid="8684974629306529138">"Инсталирао је администратор.\nИдите у подешавања да бисте видели одобрене дозволе"</string>
     <string name="package_updated_device_owner" msgid="7560272363805506941">"Ажурирао је администратор"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Избрисао је администратор"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"Потврди"</string>
@@ -2144,6 +2145,10 @@
     <string name="dynamic_mode_notification_channel_name" msgid="2986926422100223328">"Обавештење о информацијама Рутинског режима"</string>
     <string name="dynamic_mode_notification_title" msgid="1388718452788985481">"Уштеда батерије је укључена"</string>
     <string name="dynamic_mode_notification_summary" msgid="1639031262484979689">"Смањује се потрошња батерије да би се продужило њено трајање"</string>
+    <!-- no translation found for dynamic_mode_notification_title_v2 (5072385242078021152) -->
+    <skip />
+    <!-- no translation found for dynamic_mode_notification_summary_v2 (2142444344663147938) -->
+    <skip />
     <string name="battery_saver_notification_channel_name" msgid="3918243458067916913">"Уштеда батерије"</string>
     <string name="battery_saver_off_notification_title" msgid="7637255960468032515">"Уштеда батерије је искључена"</string>
     <string name="battery_saver_charged_notification_summary" product="default" msgid="5544457317418624367">"Батерија телефона је довољно напуњена. Функције више нису ограничене."</string>
@@ -2218,6 +2223,8 @@
     <string name="miniresolver_switch_to_work" msgid="1042640606122638596">"Желите да пребаците на пословну апликацију?"</string>
     <string name="miniresolver_call_information" msgid="6739417525304184083">"Ваша организација дозвољава позивање само из пословних апликација"</string>
     <string name="miniresolver_sms_information" msgid="4311292661329483088">"Ваша организација дозвољава слање порука само из пословних апликација"</string>
+    <string name="miniresolver_private_space_phone_information" msgid="4469511223312488570">"Телефонске позиве можете да упућујете само из личне апликације Телефон. Позиви упућени помоћу личне апликације Телефон додају се у личну историју позива."</string>
+    <string name="miniresolver_private_space_messages_information" msgid="111285656327622118">"SMS поруке можете да шаљете само из личне апликације Messages."</string>
     <string name="miniresolver_use_personal_browser" msgid="776072682871133308">"Користи лични прегледач"</string>
     <string name="miniresolver_use_work_browser" msgid="543575306251952994">"Користи пословни прегледач"</string>
     <string name="miniresolver_call" msgid="6386870060423480765">"Позови"</string>
@@ -2397,8 +2404,11 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"Посао 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"Тест"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"Заједничко"</string>
-    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
-    <skip />
+    <string name="accessibility_label_managed_profile" msgid="3366526886209832641">"Пословни профил"</string>
+    <string name="accessibility_label_private_profile" msgid="1436459319135548969">"Приватан простор"</string>
+    <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Клонирано"</string>
+    <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Заједничко"</string>
+    <string name="redacted_notification_message" msgid="1520587845842228816">"Осетљив садржај обавештења је скривен"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Садржај апликације је скривен за дељење садржаја екрана због безбедности"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Аутоматски повезано са сателитом"</string>

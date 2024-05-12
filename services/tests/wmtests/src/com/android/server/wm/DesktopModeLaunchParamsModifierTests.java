@@ -21,18 +21,16 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.server.wm.DesktopModeLaunchParamsModifier.DESKTOP_MODE_INITIAL_BOUNDS_SCALE;
 import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.PHASE_BOUNDS;
 import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.PHASE_DISPLAY;
 import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.RESULT_CONTINUE;
-import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.RESULT_DONE;
 import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.RESULT_SKIP;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 
 import android.graphics.Rect;
 import android.platform.test.annotations.DisableFlags;
@@ -71,44 +69,54 @@ public class DesktopModeLaunchParamsModifierTests extends WindowTestsBase {
     @Before
     public void setUp() throws Exception {
         mActivity = new ActivityBuilder(mAtm).build();
-        mTarget = spy(new DesktopModeLaunchParamsModifier(mContext));
-        doReturn(true).when(mTarget).isDesktopModeSupported(any());
         mCurrent = new LaunchParamsController.LaunchParams();
         mCurrent.reset();
         mResult = new LaunchParamsController.LaunchParams();
         mResult.reset();
+
+        mTarget = new DesktopModeLaunchParamsModifier(mContext);
     }
 
     @Test
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsContinueIfDesktopWindowingIsDisabled() {
+        setupDesktopModeLaunchParamsModifier();
+
         assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(null).calculate());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsContinueIfDesktopWindowingIsEnabledOnUnsupportedDevice() {
-        doReturn(false).when(mTarget).isDesktopModeSupported(any());
+        setupDesktopModeLaunchParamsModifier(/*isDesktopModeSupported=*/ false,
+                /*enforceDeviceRestrictions=*/ true);
+
         assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(null).calculate());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
-    public void testReturnsDoneIfDesktopWindowingIsEnabledAndUnsupportedDeviceOverridden() {
-        doReturn(false).when(mTarget).enforceDeviceRestrictions();
+    public void testReturnsContinueIfDesktopWindowingIsEnabledAndUnsupportedDeviceOverridden() {
+        setupDesktopModeLaunchParamsModifier(/*isDesktopModeSupported=*/ true,
+                /*enforceDeviceRestrictions=*/ false);
+
         final Task task = new TaskBuilder(mSupervisor).build();
-        assertEquals(RESULT_DONE, new CalculateRequestBuilder().setTask(task).calculate());
+        assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).calculate());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsSkipIfTaskIsNull() {
+        setupDesktopModeLaunchParamsModifier();
+
         assertEquals(RESULT_SKIP, new CalculateRequestBuilder().setTask(null).calculate());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsSkipIfNotBoundsPhase() {
+        setupDesktopModeLaunchParamsModifier();
+
         final Task task = new TaskBuilder(mSupervisor).build();
         assertEquals(RESULT_SKIP, new CalculateRequestBuilder().setTask(task).setPhase(
                 PHASE_DISPLAY).calculate());
@@ -117,6 +125,8 @@ public class DesktopModeLaunchParamsModifierTests extends WindowTestsBase {
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsSkipIfTaskNotUsingActivityTypeStandardOrUndefined() {
+        setupDesktopModeLaunchParamsModifier();
+
         final Task task = new TaskBuilder(mSupervisor).setActivityType(
                 ACTIVITY_TYPE_ASSISTANT).build();
         assertEquals(RESULT_SKIP, new CalculateRequestBuilder().setTask(task).calculate());
@@ -124,23 +134,29 @@ public class DesktopModeLaunchParamsModifierTests extends WindowTestsBase {
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
-    public void testReturnsDoneIfTaskUsingActivityTypeStandard() {
+    public void testReturnsContinueIfTaskUsingActivityTypeStandard() {
+        setupDesktopModeLaunchParamsModifier();
+
         final Task task = new TaskBuilder(mSupervisor).setActivityType(
                 ACTIVITY_TYPE_STANDARD).build();
-        assertEquals(RESULT_DONE, new CalculateRequestBuilder().setTask(task).calculate());
+        assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).calculate());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
-    public void testReturnsDoneIfTaskUsingActivityTypeUndefined() {
+    public void testReturnsContinueIfTaskUsingActivityTypeUndefined() {
+        setupDesktopModeLaunchParamsModifier();
+
         final Task task = new TaskBuilder(mSupervisor).setActivityType(
                 ACTIVITY_TYPE_UNDEFINED).build();
-        assertEquals(RESULT_DONE, new CalculateRequestBuilder().setTask(task).calculate());
+        assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).calculate());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsSkipIfCurrentParamsHasBounds() {
+        setupDesktopModeLaunchParamsModifier();
+
         final Task task = new TaskBuilder(mSupervisor).setActivityType(
                 ACTIVITY_TYPE_STANDARD).build();
         mCurrent.mBounds.set(/* left */ 0, /* top */ 0, /* right */ 100, /* bottom */ 100);
@@ -150,6 +166,8 @@ public class DesktopModeLaunchParamsModifierTests extends WindowTestsBase {
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testUsesDefaultBounds() {
+        setupDesktopModeLaunchParamsModifier();
+
         final Task task = new TaskBuilder(mSupervisor).setActivityType(
                 ACTIVITY_TYPE_STANDARD).build();
         final int displayHeight = 1600;
@@ -157,7 +175,7 @@ public class DesktopModeLaunchParamsModifierTests extends WindowTestsBase {
         task.getDisplayArea().setBounds(new Rect(0, 0, displayWidth, displayHeight));
         final int desiredWidth = (int) (displayWidth * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
         final int desiredHeight = (int) (displayHeight * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
-        assertEquals(RESULT_DONE, new CalculateRequestBuilder().setTask(task).calculate());
+        assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).calculate());
         assertEquals(desiredWidth, mResult.mBounds.width());
         assertEquals(desiredHeight, mResult.mBounds.height());
     }
@@ -165,15 +183,30 @@ public class DesktopModeLaunchParamsModifierTests extends WindowTestsBase {
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testUsesDisplayAreaAndWindowingModeFromSource() {
+        setupDesktopModeLaunchParamsModifier();
+
         final Task task = new TaskBuilder(mSupervisor).setActivityType(
                 ACTIVITY_TYPE_STANDARD).build();
         TaskDisplayArea mockTaskDisplayArea = mock(TaskDisplayArea.class);
         mCurrent.mPreferredTaskDisplayArea = mockTaskDisplayArea;
         mCurrent.mWindowingMode = WINDOWING_MODE_FREEFORM;
 
-        assertEquals(RESULT_DONE, new CalculateRequestBuilder().setTask(task).calculate());
+        assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).calculate());
         assertEquals(mockTaskDisplayArea, mResult.mPreferredTaskDisplayArea);
         assertEquals(WINDOWING_MODE_FREEFORM, mResult.mWindowingMode);
+    }
+
+    private void setupDesktopModeLaunchParamsModifier() {
+        setupDesktopModeLaunchParamsModifier(/*isDesktopModeSupported=*/ true,
+                /*enforceDeviceRestrictions=*/ true);
+    }
+
+    private void setupDesktopModeLaunchParamsModifier(boolean isDesktopModeSupported,
+            boolean enforceDeviceRestrictions) {
+        doReturn(isDesktopModeSupported)
+                .when(() -> DesktopModeLaunchParamsModifier.isDesktopModeSupported(any()));
+        doReturn(enforceDeviceRestrictions)
+                .when(DesktopModeLaunchParamsModifier::enforceDeviceRestrictions);
     }
 
     private class CalculateRequestBuilder {

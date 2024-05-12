@@ -412,6 +412,7 @@
   <java-symbol type="bool" name="config_supportsSplitScreenMultiWindow" />
   <java-symbol type="bool" name="config_supportsMultiDisplay" />
   <java-symbol type="bool" name="config_leftRightSplitInPortrait" />
+  <java-symbol type="bool" name="config_flexibleSplitRatios" />
   <java-symbol type="integer" name="config_supportsNonResizableMultiWindow" />
   <java-symbol type="integer" name="config_respectsActivityMinWidthHeightMultiWindow" />
   <java-symbol type="dimen" name="config_minPercentageMultiWindowSupportHeight" />
@@ -1115,6 +1116,10 @@
   <java-symbol type="string" name="profile_label_work_3" />
   <java-symbol type="string" name="profile_label_test" />
   <java-symbol type="string" name="profile_label_communal" />
+  <java-symbol type="string" name="accessibility_label_managed_profile" />
+  <java-symbol type="string" name="accessibility_label_private_profile" />
+  <java-symbol type="string" name="accessibility_label_clone_profile" />
+  <java-symbol type="string" name="accessibility_label_communal_profile" />
   <java-symbol type="string" name="mediasize_unknown_portrait" />
   <java-symbol type="string" name="mediasize_unknown_landscape" />
   <java-symbol type="string" name="mediasize_iso_a0" />
@@ -1387,6 +1392,7 @@
   <java-symbol type="drawable" name="platlogo" />
   <java-symbol type="drawable" name="stat_notify_sync_error" />
   <java-symbol type="drawable" name="stat_notify_wifi_in_range" />
+  <java-symbol type="drawable" name="ic_thread_network" />
   <java-symbol type="drawable" name="ic_wifi_signal_0" />
   <java-symbol type="drawable" name="ic_wifi_signal_1" />
   <java-symbol type="drawable" name="ic_wifi_signal_2" />
@@ -1653,6 +1659,8 @@
   <java-symbol type="string" name="miniresolver_switch" />
   <java-symbol type="string" name="miniresolver_call_information" />
   <java-symbol type="string" name="miniresolver_sms_information" />
+  <java-symbol type="string" name="miniresolver_private_space_phone_information" />
+  <java-symbol type="string" name="miniresolver_private_space_messages_information" />
   <java-symbol type="id" name="miniresolver_info_section" />
   <java-symbol type="id" name="miniresolver_info_section_text" />
   <java-symbol type="id" name="button_open" />
@@ -4248,6 +4256,7 @@
   <java-symbol type="bool" name="config_supportsConcurrentInternalDisplays" />
   <java-symbol type="bool" name="config_unfoldTransitionEnabled" />
   <java-symbol type="bool" name="config_unfoldTransitionHingeAngle" />
+  <java-symbol type="bool" name="config_unfoldTransitionHapticsEnabled" />
   <java-symbol type="integer" name="config_unfoldTransitionHalfFoldedTimeout" />
   <java-symbol type="array" name="config_perDeviceStateRotationLockDefaults" />
 
@@ -4289,7 +4298,9 @@
   <java-symbol type="string" name="battery_saver_charged_notification_summary" />
   <java-symbol type="string" name="dynamic_mode_notification_channel_name" />
   <java-symbol type="string" name="dynamic_mode_notification_title" />
+  <java-symbol type="string" name="dynamic_mode_notification_title_v2" />
   <java-symbol type="string" name="dynamic_mode_notification_summary" />
+  <java-symbol type="string" name="dynamic_mode_notification_summary_v2" />
   <java-symbol type="drawable" name="ic_battery" />
 
   <java-symbol type="bool" name="config_skipSensorAvailable" />
@@ -5453,4 +5464,7 @@
   <!-- Back swipe thresholds -->
   <java-symbol type="dimen" name="navigation_edge_action_progress_threshold" />
   <java-symbol type="dimen" name="back_progress_non_linear_factor" />
+
+  <!-- For PowerManagerService to determine whether to use auto-suspend mode -->
+  <java-symbol type="bool" name="config_useAutoSuspend" />
 </resources>

@@ -16,6 +16,7 @@ import com.android.systemui.scene.ui.composable.transitions.lockscreenToGoneTran
 import com.android.systemui.scene.ui.composable.transitions.lockscreenToQuickSettingsTransition
 import com.android.systemui.scene.ui.composable.transitions.lockscreenToShadeTransition
 import com.android.systemui.scene.ui.composable.transitions.shadeToQuickSettingsTransition
+import com.android.systemui.shade.ui.composable.Shade
 
 /**
  * Comprehensive definition of all transitions between scenes in [SceneContainer].
@@ -41,6 +42,13 @@ val SceneContainerTransitions = transitions {
         key = CollapseShadeInstantly,
     ) {
         goneToShadeTransition(durationScale = 0.0)
+    }
+    from(
+        Scenes.Gone,
+        to = Scenes.QuickSettings,
+        key = CollapseShadeInstantly,
+    ) {
+        goneToQuickSettingsTransition(durationScale = 0.0)
     }
     from(
         Scenes.Gone,
@@ -73,10 +81,14 @@ val SceneContainerTransitions = transitions {
 
     // Scene overscroll
 
+    overscroll(Scenes.Gone, Orientation.Vertical) {}
     overscroll(Scenes.Bouncer, Orientation.Vertical) {
         translate(Bouncer.Elements.Content, y = { absoluteDistance })
     }
     overscroll(Scenes.Shade, Orientation.Vertical) {
-        translate(Notifications.Elements.NotificationScrim, y = { absoluteDistance })
+        translate(
+            Notifications.Elements.NotificationScrim,
+            y = { Shade.Dimensions.ScrimOverscrollLimit }
+        )
     }
 }

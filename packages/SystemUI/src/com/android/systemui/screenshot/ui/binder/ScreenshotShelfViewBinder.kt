@@ -16,8 +16,11 @@
 
 package com.android.systemui.screenshot.ui.binder
 
+import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.lifecycle.Lifecycle
@@ -52,8 +55,10 @@ object ScreenshotShelfViewBinder {
         view.onTouchInterceptListener = { swipeGestureListener.onMotionEvent(it) }
 
         val previewView: ImageView = view.requireViewById(R.id.screenshot_preview)
+        val previewViewBlur: ImageView = view.requireViewById(R.id.screenshot_preview_blur)
         val previewBorder = view.requireViewById<View>(R.id.screenshot_preview_border)
         previewView.clipToOutline = true
+        previewViewBlur.clipToOutline = true
         val actionsContainer: LinearLayout = view.requireViewById(R.id.screenshot_actions)
         val dismissButton = view.requireViewById<View>(R.id.screenshot_dismiss_button)
         dismissButton.visibility = if (viewModel.showDismissButton) View.VISIBLE else View.GONE
@@ -68,7 +73,8 @@ object ScreenshotShelfViewBinder {
                     launch {
                         viewModel.preview.collect { bitmap ->
                             if (bitmap != null) {
-                                previewView.setImageBitmap(bitmap)
+                                setScreenshotBitmap(previewView, bitmap)
+                                setScreenshotBitmap(previewViewBlur, bitmap)
                                 previewView.visibility = View.VISIBLE
                                 previewBorder.visibility = View.VISIBLE
                             } else {
@@ -127,5 +133,24 @@ object ScreenshotShelfViewBinder {
                 }
             }
         }
+    }
+
+    private fun setScreenshotBitmap(screenshotPreview: ImageView, bitmap: Bitmap) {
+        screenshotPreview.setImageBitmap(bitmap)
+        val hasPortraitAspectRatio = bitmap.width < bitmap.height
+        val fixedSize = screenshotPreview.resources.getDimensionPixelSize(R.dimen.overlay_x_scale)
+        val params: ViewGroup.LayoutParams = screenshotPreview.layoutParams
+        if (hasPortraitAspectRatio) {
+            params.width = fixedSize
+            params.height = FrameLayout.LayoutParams.WRAP_CONTENT
+            screenshotPreview.scaleType = ImageView.ScaleType.FIT_START
+        } else {
+            params.width = FrameLayout.LayoutParams.WRAP_CONTENT
+            params.height = fixedSize
+            screenshotPreview.scaleType = ImageView.ScaleType.FIT_END
+        }
+
+        screenshotPreview.layoutParams = params
+        screenshotPreview.requestLayout()
     }
 }

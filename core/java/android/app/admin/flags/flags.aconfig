@@ -275,13 +275,23 @@ flag {
 }
 
 flag {
-    name: "headless_single_user_bad_device_admin_state_fix"
-    namespace: "enterprise"
-    description: "Fix the bad state in DPMS caused by an earlier bug related to the headless single user change"
-    bug: "332477138"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
+  name: "headless_single_user_bad_device_admin_state_fix"
+  namespace: "enterprise"
+  description: "Fix the bad state in DPMS caused by an earlier bug related to the headless single user change"
+  bug: "332477138"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "onboarding_bugreport_storage_bug_fix"
+  namespace: "enterprise"
+  description: "Add a separate storage limit for deferred bugreports"
+  bug: "330177040"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -289,6 +299,27 @@ flag {
     namespace: "enterprise"
     description: "Various fixes for headless single user mode"
     bug: "289515470"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "headless_single_user_compatibility_fix"
+    namespace: "enterprise"
+    description: "Fix for compatibility issue introduced from using single_user mode on pre-Android V builds"
+    bug: "338050276"
+    is_exported: true
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "headless_single_min_target_sdk"
+    namespace: "enterprise"
+    description: "Only allow DPCs targeting Android V to provision into single user mode"
+    bug: "338588825"
     metadata {
       purpose: PURPOSE_BUGFIX
     }

@@ -27,7 +27,9 @@ import kotlinx.coroutines.test.TestScope
 fun transition(
     from: SceneKey,
     to: SceneKey,
+    current: () -> SceneKey = { from },
     progress: () -> Float = { 0f },
+    progressVelocity: () -> Float = { 0f },
     interruptionProgress: () -> Float = { 100f },
     isInitiatedByUserInput: Boolean = false,
     isUserInputOngoing: Boolean = false,
@@ -37,9 +39,12 @@ fun transition(
     onFinish: ((TransitionState.Transition) -> Job)? = null,
 ): TransitionState.Transition {
     return object : TransitionState.Transition(from, to), TransitionState.HasOverscrollProperties {
-        override val currentScene: SceneKey = from
+        override val currentScene: SceneKey
+            get() = current()
         override val progress: Float
             get() = progress()
+        override val progressVelocity: Float
+            get() = progressVelocity()
 
         override val isInitiatedByUserInput: Boolean = isInitiatedByUserInput
         override val isUserInputOngoing: Boolean = isUserInputOngoing

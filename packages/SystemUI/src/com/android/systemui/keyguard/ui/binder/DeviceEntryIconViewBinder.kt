@@ -25,6 +25,7 @@ import android.view.View
 import androidx.core.view.isInvisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.android.app.tracing.coroutines.launch
 import com.android.systemui.common.ui.view.LongPressHandlingView
 import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor
 import com.android.systemui.keyguard.ui.view.DeviceEntryIconView
@@ -33,6 +34,7 @@ import com.android.systemui.keyguard.ui.viewmodel.DeviceEntryForegroundViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DeviceEntryIconViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.plugins.FalsingManager
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.VibratorHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +42,7 @@ import kotlinx.coroutines.launch
 
 @ExperimentalCoroutinesApi
 object DeviceEntryIconViewBinder {
+    private const val TAG = "DeviceEntryIconViewBinder"
 
     /**
      * Updates UI for:
@@ -82,22 +85,40 @@ object DeviceEntryIconViewBinder {
             // GONE => AOD transition (even though the view may not be visible until the middle
             // of the transition.
             repeatOnLifecycle(Lifecycle.State.CREATED) {
-                launch {
+                launch("$TAG#viewModel.isVisible") {
                     viewModel.isVisible.collect { isVisible ->
                         longPressHandlingView.isInvisible = !isVisible
                     }
                 }
-                launch {
+                launch("$TAG#viewModel.isLongPressEnabled") {
                     viewModel.isLongPressEnabled.collect { isEnabled ->
                         longPressHandlingView.setLongPressHandlingEnabled(isEnabled)
                     }
                 }
-                launch {
+                launch("$TAG#viewModel.isUdfpsSupported") {
+                    viewModel.isUdfpsSupported.collect { udfpsSupported ->
+                        longPressHandlingView.longPressDuration =
+                            if (udfpsSupported) {
+                                {
+                                    view.resources
+                                        .getInteger(R.integer.config_udfpsDeviceEntryIconLongPress)
+                                        .toLong()
+                                }
+                            } else {
+                                {
+                                    view.resources
+                                        .getInteger(R.integer.config_lockIconLongPress)
+                                        .toLong()
+                                }
+                            }
+                    }
+                }
+                launch("$TAG#viewModel.accessibilityDelegateHint") {
                     viewModel.accessibilityDelegateHint.collect { hint ->
                         view.accessibilityHintType = hint
                     }
                 }
-                launch {
+                launch("$TAG#viewModel.useBackgroundProtection") {
                     viewModel.useBackgroundProtection.collect { useBackgroundProtection ->
                         if (useBackgroundProtection) {
                             bgView.visibility = View.VISIBLE
@@ -106,7 +127,7 @@ object DeviceEntryIconViewBinder {
                         }
                     }
                 }
-                launch {
+                launch("$TAG#viewModel.burnInOffsets") {
                     viewModel.burnInOffsets.collect { burnInOffsets ->
                         view.translationX = burnInOffsets.x.toFloat()
                         view.translationY = burnInOffsets.y.toFloat()
@@ -114,7 +135,9 @@ object DeviceEntryIconViewBinder {
                     }
                 }
 
-                launch { viewModel.deviceEntryViewAlpha.collect { alpha -> view.alpha = alpha } }
+                launch("$TAG#viewModel.deviceEntryViewAlpha") {
+                    viewModel.deviceEntryViewAlpha.collect { alpha -> view.alpha = alpha }
+                }
             }
         }
 
@@ -122,14 +145,18 @@ object DeviceEntryIconViewBinder {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 // Start with an empty state
                 fgIconView.setImageState(StateSet.NOTHING, /* merge */ false)
-                launch {
+                launch("$TAG#fpIconView.viewModel") {
                     fgViewModel.viewModel.collect { viewModel ->
                         fgIconView.setImageState(
                             view.getIconState(viewModel.type, viewModel.useAodVariant),
                             /* merge */ false
                         )
-                        fgIconView.contentDescription =
-                            fgIconView.resources.getString(viewModel.type.contentDescriptionResId)
+                        if (viewModel.type.contentDescriptionResId != -1) {
+                            fgIconView.contentDescription =
+                                fgIconView.resources.getString(
+                                    viewModel.type.contentDescriptionResId
+                                )
+                        }
                         fgIconView.imageTintList = ColorStateList.valueOf(viewModel.tint)
                         fgIconView.setPadding(
                             viewModel.padding,
@@ -144,8 +171,10 @@ object DeviceEntryIconViewBinder {
 
         bgView.repeatWhenAttached {
             repeatOnLifecycle(Lifecycle.State.CREATED) {
-                launch { bgViewModel.alpha.collect { alpha -> bgView.alpha = alpha } }
-                launch {
+                launch("$TAG#bgViewModel.alpha") {
+                    bgViewModel.alpha.collect { alpha -> bgView.alpha = alpha }
+                }
+                launch("$TAG#bgViewModel.color") {
                     bgViewModel.color.collect { color ->
                         bgView.imageTintList = ColorStateList.valueOf(color)
                     }

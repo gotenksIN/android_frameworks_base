@@ -4132,6 +4132,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         boolean removedFromHistory = false;
 
         cleanUp(false /* cleanServices */, false /* setState */);
+        setVisibleRequested(false);
 
         if (hasProcess()) {
             app.removeActivity(this, true /* keepAssociation */);
@@ -8020,10 +8021,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     @Override
     void prepareSurfaces() {
+        final boolean isDecorSurfaceBoosted =
+                getTask() != null && getTask().isDecorSurfaceBoosted();
         final boolean show = (isVisible()
                 // Ensure that the activity content is hidden when the decor surface is boosted to
                 // prevent UI redressing attack.
-                && !getTask().isDecorSurfaceBoosted())
+                && !isDecorSurfaceBoosted)
                 || isAnimating(PARENTS, ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_RECENTS
                         | ANIMATION_TYPE_PREDICT_BACK);
 
@@ -8864,6 +8867,15 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             // calculate the override, skip the override.
             return;
         }
+        // Make sure the orientation related fields will be updated by the override insets, because
+        // fixed rotation has assigned the fields from display's configuration.
+        if (hasFixedRotationTransform()) {
+            inOutConfig.windowConfiguration.setAppBounds(null);
+            inOutConfig.screenWidthDp = Configuration.SCREEN_WIDTH_DP_UNDEFINED;
+            inOutConfig.screenHeightDp = Configuration.SCREEN_HEIGHT_DP_UNDEFINED;
+            inOutConfig.smallestScreenWidthDp = Configuration.SMALLEST_SCREEN_WIDTH_DP_UNDEFINED;
+            inOutConfig.orientation = ORIENTATION_UNDEFINED;
+        }
 
         // Override starts here.
         final boolean rotated = (rotation == ROTATION_90 || rotation == ROTATION_270);
@@ -8900,8 +8912,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             // For the case of PIP transition and multi-window environment, the
             // smallestScreenWidthDp is handled already. Override only if the app is in
             // fullscreen.
-            DisplayInfo info = new DisplayInfo();
-            mDisplayContent.getDisplay().getDisplayInfo(info);
+            final DisplayInfo info = new DisplayInfo(mDisplayContent.getDisplayInfo());
             mDisplayContent.computeSizeRanges(info, rotated, dw, dh,
                     mDisplayContent.getDisplayMetrics().density,
                     inOutConfig, true /* overrideConfig */);
@@ -9658,6 +9669,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         return false;
     }
 
+    @Override
+    protected boolean setOverrideGender(Configuration requestsTmpConfig, int gender) {
+        return WindowProcessController.applyConfigGenderOverride(
+                requestsTmpConfig, gender, mAtmService.mGrammaticalManagerInternal, getUid());
+    }
+
     @VisibleForTesting
     @Override
     Rect getAnimationBounds(int appRootTaskClipMode) {
@@ -9983,10 +10000,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mLetterboxUiController.shouldApplyUserMinAspectRatioOverride()) {
             return mLetterboxUiController.getUserMinAspectRatio();
         }
-        if (!mLetterboxUiController.shouldOverrideMinAspectRatio()) {
+        if (!mLetterboxUiController.shouldOverrideMinAspectRatio()
+                && !mLetterboxUiController.shouldOverrideMinAspectRatioForCamera()) {
             return info.getMinAspectRatio();
         }
-
         if (info.isChangeEnabled(OVERRIDE_MIN_ASPECT_RATIO_PORTRAIT_ONLY)
                 && !ActivityInfo.isFixedOrientationPortrait(
                         getOverrideOrientation())) {
@@ -10105,6 +10122,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
 
         return updateReportedConfigurationAndSend();
+    }
+
+    /**
+     * @return {@code true} if the Camera is active for the current activity
+     */
+    boolean isCameraActive() {
+        return mDisplayContent != null
+                && mDisplayContent.getDisplayRotationCompatPolicy() != null
+                && mDisplayContent.getDisplayRotationCompatPolicy()
+                    .isCameraActive(this, /* mustBeFullscreen */ true);
     }
 
     boolean updateReportedConfigurationAndSend() {

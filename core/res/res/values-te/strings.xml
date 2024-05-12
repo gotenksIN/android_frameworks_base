@@ -153,16 +153,19 @@
     <string name="cfTemplateForwardedTime" msgid="735042369233323609">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: <xliff:g id="TIME_DELAY">{2}</xliff:g> సెకన్ల తర్వాత <xliff:g id="DIALING_NUMBER">{1}</xliff:g>"</string>
     <string name="cfTemplateRegistered" msgid="5619930473441550596">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: ఫార్వర్డ్ చేయబడలేదు"</string>
     <string name="cfTemplateRegisteredTime" msgid="5222794399642525045">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: ఫార్వర్డ్ చేయబడలేదు"</string>
-    <string name="scCellularNetworkSecurityTitle" msgid="90330018476923559">"సెల్యులర్ నెట్‌వర్క్ సెక్యూరిటీ"</string>
-    <string name="scCellularNetworkSecuritySummary" msgid="8659128412709908263">"సెట్టింగ్‌లను రివ్యూ చేయండి"</string>
-    <string name="scIdentifierDisclosureIssueTitle" msgid="3737384845335568193">"పరికర ఐడెంటిఫయర్ యాక్సెస్ చేయబడింది"</string>
-    <string name="scIdentifierDisclosureIssueSummary" msgid="3870743771498510600">"<xliff:g id="DISCLOSURE_NETWORK">%4$s</xliff:g> కనెక్షన్‌లోని నెట్‌వర్క్ మీ పరికరంకు సంబంధించిన ప్రత్యేక ఐడెంటిఫయర్‌ను (IMSI) <xliff:g id="DISCLOSURE_WINDOW_START_TIME">%2$tr</xliff:g> నుండి <xliff:g id="DISCLOSURE_WINDOW_END_TIME">%3$tr</xliff:g> మధ్య కాలంలో <xliff:g id="DISCLOSURE_COUNT">%1$d</xliff:g> సార్లు రికార్డ్ చేసింది."</string>
-    <string name="scNullCipherIssueEncryptedTitle" msgid="8426373579673205292">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g>‌కు ఎన్‌క్రిప్ట్ చేసిన కనెక్షన్"</string>
-    <string name="scNullCipherIssueEncryptedSummary" msgid="6437468449554283998">"మీరు ఇప్పుడు మరింత సురక్షితమైన సెల్యులార్ నెట్‌వర్క్‌కు కనెక్ట్ చేయబడ్డారు."</string>
-    <string name="scNullCipherIssueNonEncryptedTitle" msgid="2069674849204163569">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g>‌కు ఎన్‌క్రిప్ట్ చేయని కనెక్షన్"</string>
-    <string name="scNullCipherIssueNonEncryptedSummary" msgid="3577092996366374833">"మీరు ఎన్‌క్రిప్ట్ చేయని సెల్యులార్ నెట్‌వర్క్‌కు కనెక్ట్ చేయబడ్డారు. మీ కాల్స్, మెసేజ్‌లు, అలాగే డేటా అంతరాయానికి ఎక్కువగా గురవుతాయి."</string>
-    <string name="scNullCipherIssueActionSettings" msgid="8378372959891478470">"సెల్యులార్ సెక్యూరిటీ సెట్టింగ్‌లు"</string>
+    <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"మొబైల్ నెట్‌వర్క్ సెక్యూరిటీ"</string>
+    <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"ఎన్‌క్రిప్షన్, ఎన్‌క్రిప్ట్ చేయని నెట్‌వర్క్‌లకు సంబంధించిన నోటిఫికేషన్‌లు"</string>
+    <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"పరికర IDని యాక్సెస్ చేశారు"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="3699930821270580416">"మీ <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g> SIMను ఉపయోగిస్తున్నప్పుడు, సమీపంలోని నెట్‌వర్క్ <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> సమయానికి మీ పరికర యూనిక్ ID (IMSI లేదా IMEI)ని రికార్డ్ చేసింది"</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="7283387338827749276">"మీ <xliff:g id="DISCLOSURE_NETWORK">%2$s</xliff:g> SIMను ఉపయోగిస్తున్నప్పుడు, సమీపంలోని నెట్‌వర్క్ <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> సమయానికి మీ పరికర యూనిక్ ID (IMSI లేదా IMEI)ని రికార్డ్ చేసింది.\n\nమీ లొకేషన్, యాక్టివిటీ, లేదా గుర్తింపు లాగ్ అయ్యాయని దీని అర్థం. దీనిని తరచుగా అమలు చేస్తుంటారు, కానీ గోప్యత గురించి ఆందోళనపడే వ్యక్తులకు ఇది సమస్య కావచ్చు,"</string>
+    <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"ఎన్‌క్రిప్ట్ చేసిన నెట్‌వర్క్ <xliff:g id="NETWORK_NAME">%1$s</xliff:g>‌కు కనెక్ట్ అయింది"</string>
+    <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> SIM కనెక్షన్ ఇప్పుడు మరింత సురక్షితంగా ఉంది"</string>
+    <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"ఎన్‌క్రిప్ట్ చేయని నెట్‌వర్క్‌కు కనెక్ట్ అయింది"</string>
+    <string name="scNullCipherIssueNonEncryptedSummaryNotification" msgid="7386936934128110388">"మీరు ప్రస్తుతం <xliff:g id="NETWORK_NAME">%1$s</xliff:g> SIMను ఉపయోగిస్తున్నప్పుడు కాల్స్, మెసేజ్‌లు, డేటా చోరీకి గురయ్యే అవకాశం ఎక్కువ"</string>
+    <string name="scNullCipherIssueNonEncryptedSummary" msgid="5093428974513703253">"మీరు <xliff:g id="NETWORK_NAME">%1$s</xliff:g> SIMను ఉపయోగిస్తున్నప్పుడు, ప్రస్తుతం కాల్స్, మెసేజ్‌లు, డేటా చోరీకి గురయ్యే అవకాశం ఎక్కువ.\n\nమీ కనెక్షన్‌ను మళ్లీ ఎన్‌క్రిప్ట్ చేసినప్పుడు, మీకు మరొక నోటిఫికేషన్ అందుతుంది."</string>
+    <string name="scNullCipherIssueActionSettings" msgid="5888857706424639946">"మొబైల్ నెట్‌వర్క్ సెక్యూరిటీ సెట్టింగ్‌లు"</string>
     <string name="scNullCipherIssueActionLearnMore" msgid="7896642417214757769">"మరింత తెలుసుకోండి"</string>
+    <string name="scNullCipherIssueActionGotIt" msgid="8747796640866585787">"అర్థమైంది"</string>
     <string name="fcComplete" msgid="1080909484660507044">"లక్షణం కోడ్ పూర్తయింది."</string>
     <string name="fcError" msgid="5325116502080221346">"కనెక్షన్ సమస్య లేదా లక్షణం కోడ్ చెల్లదు."</string>
     <string name="httpErrorOk" msgid="6206751415788256357">"సరే"</string>
@@ -356,8 +359,7 @@
     <string name="capability_title_canTakeScreenshot" msgid="3895812893130071930">"స్క్రీన్‌షాట్‌ను తీయండి"</string>
     <string name="capability_desc_canTakeScreenshot" msgid="7762297374317934052">"డిస్‌ప్లే యొక్క స్క్రీన్‌షాట్ తీసుకోవచ్చు."</string>
     <string name="dream_preview_title" msgid="5570751491996100804">"ప్రివ్యూ, <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
-    <!-- no translation found for dream_accessibility_action_click (7392398629967797805) -->
-    <skip />
+    <string name="dream_accessibility_action_click" msgid="7392398629967797805">"విస్మరించండి"</string>
     <string name="permlab_statusBar" msgid="8798267849526214017">"స్టేటస్‌ బార్‌ను డిజేబుల్ చేయడం లేదా మార్చడం"</string>
     <string name="permdesc_statusBar" msgid="5809162768651019642">"స్టేటస్‌ బార్‌ను డిజేబుల్ చేయడానికి లేదా సిస్టమ్ చిహ్నాలను జోడించడానికి మరియు తీసివేయడానికి యాప్‌ను అనుమతిస్తుంది."</string>
     <string name="permlab_statusBarService" msgid="2523421018081437981">"స్టేటస్‌ పట్టీగా ఉండటం"</string>
@@ -843,7 +845,7 @@
     <string name="policylab_forceLock" msgid="7360335502968476434">"స్క్రీన్‌ను లాక్ చేయడానికి"</string>
     <string name="policydesc_forceLock" msgid="1008844760853899693">"స్క్రీన్‌ను ఎలా మరియు ఎప్పుడు లాక్ చేయాలనే దాన్ని నియంత్రిస్తుంది."</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"మొత్తం డేటాను ఎరేజ్ చేయడానికి"</string>
-    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"ఫ్యాక్టరీ డేటా రీసెట్‌ను అమలు చేయడం ద్వారా హెచ్చరించకుండానే టాబ్లెట్ డేటాను ఎరేజ్ చేయండి."</string>
+    <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"\'ఫ్యాక్టరీ డేటా రీసెట్‌\'ను అమలు చేయడం ద్వారా వార్నింగ్‌తో పని లేకుండా టాబ్లెట్ డేటాను ఎరేజ్ చేయండి."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"హెచ్చరించకుండానే మీ Android TV పరికరం డేటాను ఫ్యాక్టరీ డేటా రీసెట్ ద్వారా తొలగిస్తుంది."</string>
     <string name="policydesc_wipeData" product="automotive" msgid="660804547737323300">"ఫ్యాక్టరీ డేటా రీసెట్‌ను అమలు చేయడం ద్వారా, హెచ్చరిక లేకుండానే సమాచారంతో కూడిన వినోదం సిస్టమ్ డేటాను తొలగించి ఫ్యాక్టరీ రీసెట్ చేయబడుతుంది."</string>
     <string name="policydesc_wipeData" product="default" msgid="8036084184768379022">"ఫ్యాక్టరీ డేటా రీసెట్‌ను అమలు చేయడం ద్వారా హెచ్చరించకుండానే ఫోన్ డేటాను ఎరేజ్ చేస్తుంది."</string>
@@ -1209,7 +1211,7 @@
     <string name="rating_label" msgid="1837085249662154601">"{rating,plural, =1{{max}కి ఒక స్టార్}other{{max}కి # స్టార్‌లు}}"</string>
     <string name="in_progress" msgid="2149208189184319441">"ప్రోగ్రెస్‌లో ఉంది"</string>
     <string name="whichApplication" msgid="5432266899591255759">"దీన్ని ఉపయోగించి చర్యను పూర్తి చేయండి"</string>
-    <string name="whichApplicationNamed" msgid="6969946041713975681">"%1$sను ఉపయోగించి చర్యను పూర్తి చేయి"</string>
+    <string name="whichApplicationNamed" msgid="6969946041713975681">"%1$sను ఉపయోగించి చర్యను పూర్తి చేయండి"</string>
     <string name="whichApplicationLabel" msgid="7852182961472531728">"చర్యను పూర్తి చేయి"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"దీనితో తెరువు"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"%1$sతో తెరువు"</string>
@@ -1898,8 +1900,7 @@
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"అన్‌పిన్ చేయడానికి ముందు పిన్‌ కోసం అడుగు"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"అన్‌పిన్ చేయడానికి ముందు అన్‌లాక్ ఆకృతి కోసం అడుగు"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"అన్‌పిన్ చేయడానికి ముందు పాస్‌వర్డ్ కోసం అడుగు"</string>
-    <!-- no translation found for package_installed_device_owner (8684974629306529138) -->
-    <skip />
+    <string name="package_installed_device_owner" msgid="8684974629306529138">"మీ అడ్మిన్ ఇన్‌స్టాల్ చేశారు.\nసెట్టింగ్‌లకు వెళ్లి, మంజూరు చేసిన అనుమతులు చూడండి"</string>
     <string name="package_updated_device_owner" msgid="7560272363805506941">"మీ నిర్వాహకులు అప్‌డేట్ చేశారు"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"మీ నిర్వాహకులు తొలగించారు"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"సరే"</string>
@@ -2143,6 +2144,10 @@
     <string name="dynamic_mode_notification_channel_name" msgid="2986926422100223328">"రొటీన్ మోడ్ సమాచార నోటిఫికేషన్"</string>
     <string name="dynamic_mode_notification_title" msgid="1388718452788985481">"బ్యాటరీ సేవర్ ఆన్ చేయబడింది"</string>
     <string name="dynamic_mode_notification_summary" msgid="1639031262484979689">"బ్యాటరీ జీవితకాలాన్ని పొడిగించడానికి బ్యాటరీ వినియోగాన్ని తగ్గించడం"</string>
+    <!-- no translation found for dynamic_mode_notification_title_v2 (5072385242078021152) -->
+    <skip />
+    <!-- no translation found for dynamic_mode_notification_summary_v2 (2142444344663147938) -->
+    <skip />
     <string name="battery_saver_notification_channel_name" msgid="3918243458067916913">"బ్యాటరీ సేవర్"</string>
     <string name="battery_saver_off_notification_title" msgid="7637255960468032515">"బ్యాటరీ సేవర్ ఆఫ్ చేయబడింది"</string>
     <string name="battery_saver_charged_notification_summary" product="default" msgid="5544457317418624367">"ఫోన్‌కు తగినంత ఛార్జింగ్ ఉంది. ఫీచర్‌లు ఇప్పటి నుండి పరిమితం చేయబడవు."</string>
@@ -2217,6 +2222,8 @@
     <string name="miniresolver_switch_to_work" msgid="1042640606122638596">"వర్క్ యాప్‌నకు మారాలా?"</string>
     <string name="miniresolver_call_information" msgid="6739417525304184083">"మీ సంస్థ, వర్క్ యాప్‌ల నుండి మాత్రమే కాల్స్ చేయడానికి మిమ్మల్ని అనుమతిస్తుంది"</string>
     <string name="miniresolver_sms_information" msgid="4311292661329483088">"మీ సంస్థ, వర్క్ యాప్‌ల నుండి మాత్రమే మెసేజ్‌లను పంపడానికి మిమ్మల్ని అనుమతిస్తుంది"</string>
+    <string name="miniresolver_private_space_phone_information" msgid="4469511223312488570">"మీ వ్యక్తిగత ఫొన్ యాప్ నుండి మీరు ఫోన్ కాల్స్ మాత్రమే చేయగలరు. వ్యక్తిగత ఫోన్‌తో చేసిన కాల్స్ మీ వ్యక్తిగత కాల్ హిస్టరీకి జోడించబడతాయి."</string>
+    <string name="miniresolver_private_space_messages_information" msgid="111285656327622118">"మీ వ్యక్తిగత Messages యాప్ నుండి మీరు SMS మెసేజ్‌లను పంపగలరు."</string>
     <string name="miniresolver_use_personal_browser" msgid="776072682871133308">"వ్యక్తిగత బ్రౌజర్‌ను ఉపయోగించండి"</string>
     <string name="miniresolver_use_work_browser" msgid="543575306251952994">"వర్క్ బ్రౌజర్‌ను ఉపయోగించండి"</string>
     <string name="miniresolver_call" msgid="6386870060423480765">"కాల్ చేయండి"</string>
@@ -2396,8 +2403,15 @@
     <string name="profile_label_work_3" msgid="4834572253956798917">"ఆఫీస్ 3"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"పరీక్ష"</string>
     <string name="profile_label_communal" msgid="8743921499944800427">"కమ్యూనల్"</string>
-    <!-- no translation found for redacted_notification_message (1520587845842228816) -->
+    <!-- no translation found for accessibility_label_managed_profile (3366526886209832641) -->
     <skip />
+    <!-- no translation found for accessibility_label_private_profile (1436459319135548969) -->
+    <skip />
+    <!-- no translation found for accessibility_label_clone_profile (7579118375042398784) -->
+    <skip />
+    <!-- no translation found for accessibility_label_communal_profile (1437173163111334791) -->
+    <skip />
+    <string name="redacted_notification_message" msgid="1520587845842228816">"గోప్యమైన నోటిఫికేషన్ కంటెంట్ దాచబడింది"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"సెక్యూరిటీ కోసం స్క్రీన్ షేర్ నుండి యాప్ కంటెంట్ దాచబడింది"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"శాటిలైట్‌కు ఆటోమేటిక్‌గా కనెక్ట్ చేయబడింది"</string>

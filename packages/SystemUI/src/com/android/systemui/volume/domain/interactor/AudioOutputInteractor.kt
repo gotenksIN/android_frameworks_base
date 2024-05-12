@@ -68,13 +68,9 @@ constructor(
                         communicationDevice?.toAudioOutputDevice()
                     }
                 } else {
-                    mediaOutputInteractor.defaultActiveMediaSession
-                        .flatMapLatest {
-                            localMediaRepositoryFactory
-                                .create(it?.packageName)
-                                .currentConnectedDevice
-                        }
-                        .map { mediaDevice -> mediaDevice?.toAudioOutputDevice() }
+                    mediaOutputInteractor.currentConnectedDevice.map { mediaDevice ->
+                        mediaDevice?.toAudioOutputDevice()
+                    }
                 }
             }
             .map { it ?: AudioOutputDevice.Unknown }

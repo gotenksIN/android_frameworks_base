@@ -951,7 +951,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         configuration.setGrammaticalGender(
-                mGrammaticalManagerInternal.retrieveSystemGrammaticalGender(configuration));
+                mGrammaticalManagerInternal.mergedFinalSystemGrammaticalGender());
 
         synchronized (mGlobalLock) {
             mForceResizableActivities = forceResizable;
@@ -1376,13 +1376,14 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
             final boolean debug = ((intent.getFlags() & Intent.FLAG_DEBUG_LOG_RESOLUTION) != 0);
 
+            final int userId = UserHandle.getCallingUserId();
             ActivityInfo aInfo = null;
             try {
                 List<ResolveInfo> resolves =
                         AppGlobals.getPackageManager().queryIntentActivities(
                                 intent, r.resolvedType,
                                 PackageManager.MATCH_DEFAULT_ONLY | STOCK_PM_FLAGS,
-                                UserHandle.getCallingUserId()).getList();
+                                userId).getList();
 
                 // Look for the original activity in the list...
                 final int N = resolves != null ? resolves.size() : 0;
@@ -1467,6 +1468,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                         .setRealCallingPid(-1)
                         .setRealCallingUid(r.launchedFromUid)
                         .setActivityOptions(options)
+                        .setUserId(userId)
                         .execute();
                 r.finishing = wasFinishing;
                 return res == ActivityManager.START_SUCCESS;
@@ -4381,7 +4383,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      */
     protected boolean dumpActivity(FileDescriptor fd, PrintWriter pw, String name, String[] args,
             int opti, boolean dumpAll, boolean dumpVisibleRootTasksOnly,
-            boolean dumpFocusedRootTaskOnly, int displayIdFilter, @UserIdInt int userId) {
+            boolean dumpFocusedRootTaskOnly, int displayIdFilter, @UserIdInt int userId,
+            long timeout) {
         ArrayList<ActivityRecord> activities;
 
         synchronized (mGlobalLock) {
@@ -4426,7 +4429,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     }
                 }
             }
-            dumpActivity("  ", fd, pw, activities.get(i), newArgs, dumpAll);
+            dumpActivity("  ", fd, pw, activities.get(i), newArgs, dumpAll, timeout);
         }
         if (!printedAnything) {
             // Typically happpens when no task matches displayIdFilter
@@ -4440,7 +4443,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * there is a thread associated with the activity.
      */
     private void dumpActivity(String prefix, FileDescriptor fd, PrintWriter pw,
-            ActivityRecord r, String[] args, boolean dumpAll) {
+            ActivityRecord r, String[] args, boolean dumpAll, long timeout) {
         String innerPrefix = prefix + "  ";
         IApplicationThread appThread = null;
         synchronized (mGlobalLock) {
@@ -4471,7 +4474,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             pw.flush();
             try (TransferPipe tp = new TransferPipe()) {
                 appThread.dumpActivity(tp.getWriteFd(), r.token, innerPrefix, args);
-                tp.go(fd);
+                tp.go(fd, timeout);
             } catch (IOException e) {
                 pw.println(innerPrefix + "Failure while dumping the activity: " + e);
             } catch (RemoteException e) {
@@ -6982,7 +6985,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 boolean dumpFocusedRootTaskOnly, int displayIdFilter,
                 @UserIdInt int userId) {
             return ActivityTaskManagerService.this.dumpActivity(fd, pw, name, args, opti, dumpAll,
-                    dumpVisibleRootTasksOnly, dumpFocusedRootTaskOnly, displayIdFilter, userId);
+                    dumpVisibleRootTasksOnly, dumpFocusedRootTaskOnly, displayIdFilter, userId,
+                    /* timeout= */ 5000);
         }
 
         @Override

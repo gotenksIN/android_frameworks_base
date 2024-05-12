@@ -41,6 +41,10 @@ import com.android.systemui.qs.tiles.impl.inversion.domain.ColorInversionTileMap
 import com.android.systemui.qs.tiles.impl.inversion.domain.interactor.ColorInversionTileDataInteractor
 import com.android.systemui.qs.tiles.impl.inversion.domain.interactor.ColorInversionUserActionInteractor
 import com.android.systemui.qs.tiles.impl.inversion.domain.model.ColorInversionTileModel
+import com.android.systemui.qs.tiles.impl.onehanded.domain.OneHandedModeTileDataInteractor
+import com.android.systemui.qs.tiles.impl.onehanded.domain.OneHandedModeTileUserActionInteractor
+import com.android.systemui.qs.tiles.impl.onehanded.domain.model.OneHandedModeTileModel
+import com.android.systemui.qs.tiles.impl.onehanded.ui.OneHandedModeTileMapper
 import com.android.systemui.qs.tiles.impl.reducebrightness.domain.interactor.ReduceBrightColorsTileDataInteractor
 import com.android.systemui.qs.tiles.impl.reducebrightness.domain.interactor.ReduceBrightColorsTileUserActionInteractor
 import com.android.systemui.qs.tiles.impl.reducebrightness.domain.model.ReduceBrightColorsTileModel
@@ -112,6 +116,7 @@ interface QSAccessibilityModule {
         const val COLOR_INVERSION_TILE_SPEC = "inversion"
         const val FONT_SCALING_TILE_SPEC = "font_scaling"
         const val REDUCE_BRIGHTNESS_TILE_SPEC = "reduce_brightness"
+        const val ONE_HANDED_TILE_SPEC = "onehanded"
 
         @Provides
         @IntoMap
@@ -236,6 +241,39 @@ interface QSAccessibilityModule {
             if (Flags.qsNewTilesFuture())
                 factory.create(
                     TileSpec.create(REDUCE_BRIGHTNESS_TILE_SPEC),
+                    userActionInteractor,
+                    stateInteractor,
+                    mapper,
+                )
+            else StubQSTileViewModel
+
+        @Provides
+        @IntoMap
+        @StringKey(ONE_HANDED_TILE_SPEC)
+        fun provideOneHandedTileConfig(uiEventLogger: QsEventLogger): QSTileConfig =
+            QSTileConfig(
+                tileSpec = TileSpec.create(ONE_HANDED_TILE_SPEC),
+                uiConfig =
+                    QSTileUIConfig.Resource(
+                        iconRes = com.android.internal.R.drawable.ic_qs_one_handed_mode,
+                        labelRes = R.string.quick_settings_onehanded_label,
+                    ),
+                instanceId = uiEventLogger.getNewInstanceId(),
+            )
+
+        /** Inject One Handed Mode Tile into tileViewModelMap in QSModule. */
+        @Provides
+        @IntoMap
+        @StringKey(ONE_HANDED_TILE_SPEC)
+        fun provideOneHandedModeTileViewModel(
+            factory: QSTileViewModelFactory.Static<OneHandedModeTileModel>,
+            mapper: OneHandedModeTileMapper,
+            stateInteractor: OneHandedModeTileDataInteractor,
+            userActionInteractor: OneHandedModeTileUserActionInteractor
+        ): QSTileViewModel =
+            if (Flags.qsNewTilesFuture())
+                factory.create(
+                    TileSpec.create(ONE_HANDED_TILE_SPEC),
                     userActionInteractor,
                     stateInteractor,
                     mapper,

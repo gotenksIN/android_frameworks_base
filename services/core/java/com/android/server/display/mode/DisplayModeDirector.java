@@ -222,7 +222,7 @@ public class DisplayModeDirector {
                 displayManagerFlags.isRefreshRateVotingTelemetryEnabled());
         mSupportedModesByDisplay = new SparseArray<>();
         mDefaultModeByDisplay = new SparseArray<>();
-        mAppRequestObserver = new AppRequestObserver();
+        mAppRequestObserver = new AppRequestObserver(displayManagerFlags);
         mConfigParameterProvider = new DeviceConfigParameterProvider(injector.getDeviceConfig());
         mDeviceConfigDisplaySettings = new DeviceConfigDisplaySettings();
         mSettingsObserver = new SettingsObserver(context, handler, displayManagerFlags);
@@ -940,6 +940,7 @@ public class DisplayModeDirector {
                 Settings.Secure.getUriFor(Settings.Secure.MATCH_CONTENT_FRAME_RATE);
 
         private final boolean mVsynLowPowerVoteEnabled;
+        private final boolean mPeakRefreshRatePhysicalLimitEnabled;
 
         private final Context mContext;
         private float mDefaultPeakRefreshRate;
@@ -950,6 +951,7 @@ public class DisplayModeDirector {
             super(handler);
             mContext = context;
             mVsynLowPowerVoteEnabled = flags.isVsyncLowPowerVoteEnabled();
+            mPeakRefreshRatePhysicalLimitEnabled = flags.isPeakRefreshRatePhysicalLimitEnabled();
             // We don't want to load from the DeviceConfig while constructing since this leads to
             // a spike in the latency of DisplayManagerService startup. This happens because
             // reading from the DeviceConfig is an intensive IO operation and having it in the
@@ -1127,11 +1129,19 @@ public class DisplayModeDirector {
             // used to predict if we're going to be doing frequent refresh rate switching, and if
             // so, enable the brightness observer. The logic here is more complicated and fragile
             // than necessary, and we should improve it. See b/156304339 for more info.
-            Vote peakVote = peakRefreshRate == 0f
+            if (mPeakRefreshRatePhysicalLimitEnabled) {
+                Vote peakVote = peakRefreshRate == 0f
+                        ? null
+                        : Vote.forPhysicalRefreshRates(0f,
+                                Math.max(minRefreshRate, peakRefreshRate));
+                mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_PEAK_REFRESH_RATE,
+                        peakVote);
+            }
+            Vote peakRenderVote = peakRefreshRate == 0f
                     ? null
                     : Vote.forRenderFrameRates(0f, Math.max(minRefreshRate, peakRefreshRate));
             mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_PEAK_RENDER_FRAME_RATE,
-                    peakVote);
+                    peakRenderVote);
             mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_MIN_RENDER_FRAME_RATE,
                     Vote.forRenderFrameRates(minRefreshRate, Float.POSITIVE_INFINITY));
             Vote defaultVote =
@@ -1195,22 +1205,54 @@ public class DisplayModeDirector {
     public final class AppRequestObserver {
         private final SparseArray<Display.Mode> mAppRequestedModeByDisplay;
         private final SparseArray<RefreshRateRange> mAppPreferredRefreshRateRangeByDisplay;
+        private final boolean mIgnorePreferredRefreshRate;
 
-        AppRequestObserver() {
+        AppRequestObserver(DisplayManagerFlags flags) {
             mAppRequestedModeByDisplay = new SparseArray<>();
             mAppPreferredRefreshRateRangeByDisplay = new SparseArray<>();
+            mIgnorePreferredRefreshRate = flags.ignoreAppPreferredRefreshRateRequest();
         }
 
         /**
          * Sets refresh rates from app request
          */
-        public void setAppRequest(int displayId, int modeId,
+        public void setAppRequest(int displayId, int modeId, float requestedRefreshRate,
                 float requestedMinRefreshRateRange, float requestedMaxRefreshRateRange) {
+
+            if (modeId == 0 && requestedRefreshRate != 0 && !mIgnorePreferredRefreshRate) {
+                // Scan supported modes returned to find a mode with the same
+                // size as the default display mode but with the specified refresh rate instead.
+                Display.Mode mode = findDefaultModeByRefreshRate(displayId, requestedRefreshRate);
+                if (mode != null) {
+                    modeId = mode.getModeId();
+                } else {
+                    Slog.e(TAG, "Couldn't find a mode for the requestedRefreshRate: "
+                            + requestedRefreshRate + " on Display: " + displayId);
+                }
+            }
+
             synchronized (mLock) {
                 setAppRequestedModeLocked(displayId, modeId);
                 setAppPreferredRefreshRateRangeLocked(displayId, requestedMinRefreshRateRange,
                         requestedMaxRefreshRateRange);
             }
+        }
+
+        @Nullable
+        private Display.Mode findDefaultModeByRefreshRate(int displayId, float refreshRate) {
+            Display.Mode[] modes;
+            Display.Mode defaultMode;
+            synchronized (mLock) {
+                modes = mSupportedModesByDisplay.get(displayId);
+                defaultMode = mDefaultModeByDisplay.get(displayId);
+            }
+            for (int i = 0; i < modes.length; i++) {
+                if (modes[i].matches(defaultMode.getPhysicalWidth(),
+                        defaultMode.getPhysicalHeight(), refreshRate)) {
+                    return modes[i];
+                }
+            }
+            return null;
         }
 
         private void setAppRequestedModeLocked(int displayId, int modeId) {

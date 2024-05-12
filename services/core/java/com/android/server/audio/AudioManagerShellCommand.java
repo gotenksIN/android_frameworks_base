@@ -22,7 +22,10 @@ import static android.media.AudioManager.ADJUST_RAISE;
 import static android.media.AudioManager.ADJUST_UNMUTE;
 
 import android.content.Context;
+import android.media.AudioDeviceAttributes;
+import android.media.AudioDeviceVolumeManager;
 import android.media.AudioManager;
+import android.media.VolumeInfo;
 import android.os.ShellCommand;
 
 import java.io.PrintWriter;
@@ -58,8 +61,12 @@ class AudioManagerShellCommand extends ShellCommand {
                 return getSoundDoseValue();
             case "reset-sound-dose-timeout":
                 return resetSoundDoseTimeout();
+            case "set-ringer-mode":
+                return setRingerMode();
             case "set-volume":
                 return setVolume();
+            case "set-device-volume":
+                return setDeviceVolume();
             case "adj-mute":
                 return adjMute();
             case "adj-unmute":
@@ -95,8 +102,12 @@ class AudioManagerShellCommand extends ShellCommand {
         pw.println("    Returns the current sound dose value");
         pw.println("  reset-sound-dose-timeout");
         pw.println("    Resets the sound dose timeout used for momentary exposure");
+        pw.println("  set-ringer-mode NORMAL|SILENT|VIBRATE");
+        pw.println("    Sets the Ringer mode to one of NORMAL|SILENT|VIBRATE");
         pw.println("  set-volume STREAM_TYPE VOLUME_INDEX");
         pw.println("    Sets the volume for STREAM_TYPE to VOLUME_INDEX");
+        pw.println("  set-device-volume STREAM_TYPE VOLUME_INDEX NATIVE_DEVICE_TYPE");
+        pw.println("    Sets for NATIVE_DEVICE_TYPE the STREAM_TYPE volume to VOLUME_INDEX");
         pw.println("  adj-mute STREAM_TYPE");
         pw.println("    mutes the STREAM_TYPE");
         pw.println("  adj-unmute STREAM_TYPE");
@@ -141,6 +152,34 @@ class AudioManagerShellCommand extends ShellCommand {
         final AudioManager am = context.getSystemService(AudioManager.class);
         am.setSurroundFormatEnabled(surroundFormat, isSurroundFormatEnabled);
         return 0;
+    }
+
+    private int setRingerMode() {
+        String ringerModeText = getNextArg();
+        if (ringerModeText == null) {
+            getErrPrintWriter().println("Error: no ringer mode specified");
+            return 1;
+        }
+
+        final int ringerMode = getRingerMode(ringerModeText);
+        if (!AudioManager.isValidRingerMode(ringerMode)) {
+            getErrPrintWriter().println(
+                    "Error: invalid value of ringerMode, should be one of NORMAL|SILENT|VIBRATE");
+            return 1;
+        }
+
+        final AudioManager am = mService.mContext.getSystemService(AudioManager.class);
+        am.setRingerModeInternal(ringerMode);
+        return 0;
+    }
+
+    private int getRingerMode(String ringerModeText) {
+        return switch (ringerModeText) {
+            case "NORMAL" -> AudioManager.RINGER_MODE_NORMAL;
+            case "VIBRATE" -> AudioManager.RINGER_MODE_VIBRATE;
+            case "SILENT" -> AudioManager.RINGER_MODE_SILENT;
+            default -> -1;
+        };
     }
 
     private int getIsSurroundFormatEnabled() {
@@ -254,6 +293,23 @@ class AudioManagerShellCommand extends ShellCommand {
         getOutPrintWriter().println("calling AudioManager.setStreamVolume("
                 + stream + ", " + index + ", 0)");
         am.setStreamVolume(stream, index, 0);
+        return 0;
+    }
+
+    private int setDeviceVolume() {
+        final Context context = mService.mContext;
+        final AudioDeviceVolumeManager advm = (AudioDeviceVolumeManager) context.getSystemService(
+                Context.AUDIO_DEVICE_VOLUME_SERVICE);
+        final int stream = readIntArg();
+        final int index = readIntArg();
+        final int device = readIntArg();
+
+        final VolumeInfo volume = new VolumeInfo.Builder(stream).setVolumeIndex(index).build();
+        final AudioDeviceAttributes ada = new AudioDeviceAttributes(
+                /*native type*/ device, /*address*/ "foo");
+        getOutPrintWriter().println(
+                "calling AudioDeviceVolumeManager.setDeviceVolume(" + volume + ", " + ada + ")");
+        advm.setDeviceVolume(volume, ada);
         return 0;
     }
 

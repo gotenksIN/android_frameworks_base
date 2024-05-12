@@ -44,13 +44,10 @@ import static android.content.pm.ActivityInfo.RESIZE_MODE_FORCE_RESIZEABLE;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE_AND_PIPABLE_DEPRECATED;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION;
-import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
-
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.provider.Settings.Secure.USER_SETUP_COMPLETE;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
-import static android.view.InsetsSource.FLAG_INSETS_ROUNDED_CORNER;
 import static android.view.SurfaceControl.METADATA_TASK_ID;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -175,12 +172,10 @@ import android.util.DisplayMetrics;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.DisplayInfo;
-import android.view.InsetsSource;
 import android.view.InsetsState;
 import android.view.RemoteAnimationAdapter;
 import android.view.Surface;
 import android.view.SurfaceControl;
-import android.view.TaskTransitionSpec;
 import android.view.WindowManager;
 import android.view.WindowManager.TransitionOldType;
 import android.window.ITaskOrganizer;
@@ -203,6 +198,7 @@ import com.android.server.Watchdog;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.am.AppTimeTracker;
 import com.android.server.uri.NeededUriGrants;
+import com.android.window.flags.Flags;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -647,8 +643,6 @@ class Task extends TaskFragment {
         mLastTaskSnapshotData = _lastSnapshotData != null
                 ? _lastSnapshotData
                 : new PersistedTaskSnapshotData();
-        // Tasks have no set orientation value (including SCREEN_ORIENTATION_UNSPECIFIED).
-        setOrientation(SCREEN_ORIENTATION_UNSET);
         affinityIntent = _affinityIntent;
         affinity = _affinity;
         rootAffinity = _rootAffinity;
@@ -2959,33 +2953,6 @@ class Task extends TaskFragment {
         return;
     }
 
-    /**
-     * Account for specified insets to crop the animation bounds by to avoid the animation
-     * occurring over "out of bounds" regions
-     *
-     * For example this is used to make sure the tasks are cropped to be fully above the expanded
-     * taskbar when animating.
-     *
-     * TEMPORARY FIELD (b/202383002)
-     * TODO: Remove once we use surfaceflinger rounded corners on tasks rather than taskbar overlays
-     *       or when shell transitions are fully enabled
-     *
-     * @param animationBounds The animation bounds to adjust to account for the custom spec insets.
-     */
-    void adjustAnimationBoundsForTransition(Rect animationBounds) {
-        TaskTransitionSpec spec = mWmService.mTaskTransitionSpec;
-        if (spec != null) {
-            final InsetsState state =
-                    getDisplayContent().getInsetsStateController().getRawInsetsState();
-            for (int i = state.sourceSize() - 1; i >= 0; i--) {
-                final InsetsSource source = state.sourceAt(i);
-                if (source.hasFlags(FLAG_INSETS_ROUNDED_CORNER)) {
-                    animationBounds.inset(source.calculateVisibleInsets(animationBounds));
-                }
-            }
-        }
-    }
-
     void setDragResizing(boolean dragResizing) {
         if (mDragResizing != dragResizing) {
             // No need to check if allowed if it's leaving dragResize
@@ -3226,6 +3193,11 @@ class Task extends TaskFragment {
                 mTaskId, snapshot);
     }
 
+    void onSnapshotInvalidated() {
+        mAtmService.getTaskChangeNotificationController().notifyTaskSnapshotInvalidated(mTaskId);
+    }
+
+
     TaskDescription getTaskDescription() {
         return mTaskDescription;
     }
@@ -3381,7 +3353,8 @@ class Task extends TaskFragment {
         // If true, we want to get the Dimmer from the level above since we don't want to animate
         // the dim with the Task.
         if (!isRootTask() || (Dimmer.DIMMER_REFACTOR && isTranslucentAndVisible())
-                || isTranslucent(null)) {
+                || (Flags.getDimmerOnClosing() ? isTranslucentForTransition()
+                                                : isTranslucent(null))) {
             return super.getDimmer();
         }
 
@@ -3707,6 +3680,9 @@ class Task extends TaskFragment {
                 info.requestedVisibleTypes = topMainWin.getRequestedVisibleTypes();
             }
         }
+        final Rect rotatedBounds = activity.getFixedRotationTransformDisplayBounds();
+        info.taskBounds.set(rotatedBounds != null ? rotatedBounds
+                : info.taskInfo.configuration.windowConfiguration.getBounds());
         // If the developer has persist a different configuration, we need to override it to the
         // starting window because persisted configuration does not effect to Task.
         info.taskInfo.configuration.setTo(activity.getConfiguration());

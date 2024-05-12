@@ -246,6 +246,7 @@ java_library_static {
         "vendor.qti.hardware.servicetracker-V1.2-java",
         "vendor.qti.hardware.servicetrackeraidl-V1-java",
         "apache-commons-math",
+        "battery_saver_flag_lib",
         "notification_flags_lib",
         "power_hint_flags_lib",
         "biometrics_flags_lib",
@@ -260,6 +261,7 @@ java_library_static {
         "stats_flags_lib",
         "core_os_flags_lib",
         "connectivity_flags_lib",
+        "dreams_flags_lib",
     ],
     javac_shard_size: 50,
     javacflags: [

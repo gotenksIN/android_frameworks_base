@@ -40,6 +40,7 @@ import java.lang.ref.WeakReference;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Objects;
 
 /**
@@ -47,7 +48,7 @@ import java.util.Objects;
  * mode, the timer just sends a delayed message.  In modern mode, the timer is implemented in
  * native code; on expiration, the message is sent without delay.
  *
- * <p>There are four external operations on a timer:
+ * <p>There are five external operations on a timer:
  * <ul>
  *
  * <li>{@link #start} starts a timer.  The timer is started with an object that the message
@@ -74,9 +75,13 @@ import java.util.Objects;
  * exit. (So, instances in system server generally need not be explicitly closed since they are
  * created during process start and will last until process exit.)
  *
+ * <p>AnrTimer parameterized by the type <code>V</code>.  The public methods on AnrTimer require
+ * an instance of <code>V</code>; the instance of <code>V</code> is a key that identifies a
+ * specific timer.
+ *
  * @hide
  */
-public class AnrTimer<V> implements AutoCloseable {
+public abstract class AnrTimer<V> implements AutoCloseable {
 
     /**
      * The log tag.
@@ -99,6 +104,20 @@ public class AnrTimer<V> implements AutoCloseable {
      * The trace tag is the same usd by ActivityManager.
      */
     private static final long TRACE_TAG = Trace.TRACE_TAG_ACTIVITY_MANAGER;
+
+    /**
+     * Fetch the Linux pid from the object. The returned value may be zero to indicate that there
+     * is no valid pid available.
+     * @return a valid pid or zero.
+     */
+    public abstract int getPid(V obj);
+
+    /**
+     * Fetch the Linux uid from the object. The returned value may be zero to indicate that there
+     * is no valid uid available.
+     * @return a valid uid or zero.
+     */
+    public abstract int getUid(V obj);
 
     /**
      * Return true if the feature is enabled.  By default, the value is take from the Flags class
@@ -192,10 +211,6 @@ public class AnrTimer<V> implements AutoCloseable {
     /** The total number of timers started. */
     @GuardedBy("mLock")
     private int mTotalStarted = 0;
-
-    /** The total number of timers that were restarted without an explicit cancel. */
-    @GuardedBy("mLock")
-    private int mTotalRestarted = 0;
 
     /** The total number of errors detected. */
     @GuardedBy("mLock")
@@ -350,7 +365,7 @@ public class AnrTimer<V> implements AutoCloseable {
 
         abstract boolean enabled();
 
-        abstract void dump(PrintWriter pw, boolean verbose);
+        abstract void dump(IndentingPrintWriter pw, boolean verbose);
 
         abstract void close();
     }
@@ -392,9 +407,14 @@ public class AnrTimer<V> implements AutoCloseable {
             return false;
         }
 
-        /** dump() is a no-op when the feature is disabled. */
+        /** Dump the limited statistics captured when the feature is disabled. */
         @Override
-        void dump(PrintWriter pw, boolean verbose) {
+        void dump(IndentingPrintWriter pw, boolean verbose) {
+            synchronized (mLock) {
+                pw.format("started=%d maxStarted=%d running=%d expired=%d errors=%d\n",
+                        mTotalStarted, mMaxStarted, mTimerIdMap.size(),
+                        mTotalExpired, mTotalErrors);
+            }
         }
 
         /** close() is a no-op when the feature is disabled. */
@@ -422,6 +442,10 @@ public class AnrTimer<V> implements AutoCloseable {
          * native timer is created and it is set back to zero when the native timer is freed.
          */
         private long mNative = 0;
+
+        /** The total number of timers that were restarted without an explicit cancel. */
+        @GuardedBy("mLock")
+        private int mTotalRestarted = 0;
 
         /** Fetch the native tag (an integer) for the given label. */
         FeatureEnabled() {
@@ -519,13 +543,22 @@ public class AnrTimer<V> implements AutoCloseable {
 
         /** Dump statistics from the native layer. */
         @Override
-        void dump(PrintWriter pw, boolean verbose) {
+        void dump(IndentingPrintWriter pw, boolean verbose) {
             synchronized (mLock) {
-                if (mNative != 0) {
-                    nativeAnrTimerDump(mNative, verbose);
-                } else {
+                if (mNative == 0) {
                     pw.println("closed");
+                    return;
                 }
+                String[] nativeDump = nativeAnrTimerDump(mNative);
+                if (nativeDump == null) {
+                    pw.println("no-data");
+                    return;
+                }
+                for (String s : nativeDump) {
+                    pw.println(s);
+                }
+                // The following counter is only available at the Java level.
+                pw.println("restarted:" + mTotalRestarted);
             }
         }
 
@@ -564,13 +597,11 @@ public class AnrTimer<V> implements AutoCloseable {
      * allows a client to deliver an immediate timeout via the AnrTimer.
      *
      * @param arg The key by which the timer is known.  This is never examined or modified.
-     * @param pid The Linux process ID of the target being timed.
-     * @param uid The Linux user ID of the target being timed.
      * @param timeoutMs The timer timeout, in milliseconds.
      */
-    public void start(@NonNull V arg, int pid, int uid, long timeoutMs) {
+    public void start(@NonNull V arg, long timeoutMs) {
         if (timeoutMs < 0) timeoutMs = 0;
-        mFeature.start(arg, pid, uid, timeoutMs);
+        mFeature.start(arg, getPid(arg), getUid(arg), timeoutMs);
     }
 
     /**
@@ -674,11 +705,8 @@ public class AnrTimer<V> implements AutoCloseable {
         synchronized (mLock) {
             pw.format("timer: %s\n", mLabel);
             pw.increaseIndent();
-            pw.format("started=%d maxStarted=%d  restarted=%d running=%d expired=%d errors=%d\n",
-                    mTotalStarted, mMaxStarted, mTotalRestarted, mTimerIdMap.size(),
-                    mTotalExpired, mTotalErrors);
-            pw.decreaseIndent();
             mFeature.dump(pw, false);
+            pw.decreaseIndent();
         }
     }
 
@@ -739,6 +767,14 @@ public class AnrTimer<V> implements AutoCloseable {
         recordErrorLocked(operation, "notFound", arg);
     }
 
+    /** Compare two AnrTimers in display order. */
+    private static final Comparator<AnrTimer> sComparator =
+            Comparator.nullsLast(new Comparator<>() {
+                    @Override
+                    public int compare(AnrTimer o1, AnrTimer o2) {
+                        return o1.mLabel.compareTo(o2.mLabel);
+                    }});
+
     /** Dumpsys output, allowing for overrides. */
     @VisibleForTesting
     static void dump(@NonNull PrintWriter pw, boolean verbose, @NonNull Injector injector) {
@@ -748,11 +784,18 @@ public class AnrTimer<V> implements AutoCloseable {
         ipw.println("AnrTimer statistics");
         ipw.increaseIndent();
         synchronized (sAnrTimerList) {
+            // Find the currently live instances and sort them by their label.  The goal is to
+            // have consistent output ordering.
             final int size = sAnrTimerList.size();
-            ipw.println("reporting " + size + " timers");
+            AnrTimer[] active = new AnrTimer[size];
+            int valid = 0;
             for (int i = 0; i < size; i++) {
                 AnrTimer a = sAnrTimerList.valueAt(i).get();
-                if (a != null) a.dump(ipw);
+                if (a != null) active[valid++] = a;
+            }
+            Arrays.sort(active, 0, valid, sComparator);
+            for (int i = 0; i < valid; i++) {
+                if (active[i] != null) active[i].dump(ipw);
             }
         }
         if (verbose) dumpErrors(ipw);
@@ -811,6 +854,6 @@ public class AnrTimer<V> implements AutoCloseable {
     /** Discard an expired timer by ID.  Return true if the timer was found.  */
     private static native boolean nativeAnrTimerDiscard(long service, int timerId);
 
-    /** Prod the native library to log a few statistics. */
-    private static native void nativeAnrTimerDump(long service, boolean verbose);
+    /** Retrieve runtime dump information from the native layer. */
+    private static native String[] nativeAnrTimerDump(long service);
 }

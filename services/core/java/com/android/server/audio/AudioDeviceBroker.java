@@ -989,30 +989,9 @@ public class AudioDeviceBroker {
                     .set(MediaMetrics.Property.STATUS, data.mInfo.getProfile())
                     .record();
             synchronized (mDeviceStateLock) {
-                if (mDeviceInventory.isA2dpDeviceConnected(data.mPreviousDevice)) {
-                    postBluetoothDeviceConfigChange(createBtDeviceInfo(data, data.mNewDevice,
-                            BluetoothProfile.STATE_CONNECTED));
-
-                } else {
-                    btMediaMetricRecord(data.mNewDevice, MediaMetrics.Value.CONNECTED, data);
-                    sendLMsgNoDelay(MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT, SENDMSG_QUEUE,
-                            createBtDeviceInfo(data, data.mNewDevice,
-                                    BluetoothProfile.STATE_CONNECTED));
-                }
+                postBluetoothDeviceConfigChange(createBtDeviceInfo(data, data.mNewDevice,
+                        BluetoothProfile.STATE_CONNECTED));
             }
-        } else if (data.mPreviousDevice != null && data.mNewDevice != null
-                && data.mInfo.getProfile() == BluetoothProfile.A2DP
-                && mDeviceInventory.isA2dpDeviceConnected(data.mPreviousDevice)) {
-            final String name = TextUtils.emptyIfNull(data.mNewDevice.getName());
-            new MediaMetrics.Item(MediaMetrics.Name.AUDIO_DEVICE + MediaMetrics.SEPARATOR
-                    + "queueOnBluetoothActiveDeviceChanged_update")
-                    .set(MediaMetrics.Property.NAME, name)
-                    .set(MediaMetrics.Property.STATUS, data.mInfo.getProfile())
-                    .record();
-            synchronized (mDeviceStateLock) {
-                    postBluetoothDeviceConfigChange(createBtDeviceInfo(data, data.mNewDevice,
-                            BluetoothProfile.STATE_CONNECTED));
-                }
         } else {
             synchronized (mDeviceStateLock) {
                 if (data.mPreviousDevice != null) {
@@ -1266,10 +1245,6 @@ public class AudioDeviceBroker {
 
     /*package*/ void postBluetoothDeviceConfigChange(@NonNull BtDeviceInfo info) {
         sendLMsgNoDelay(MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE, SENDMSG_QUEUE, info);
-    }
-
-    /*package*/ void postBluetoothA2dpDeviceConfigChange(@NonNull BtDeviceInfo info) {
-        sendLMsgNoDelay(MSG_L_A2DP_DEVICE_CONFIG_CHANGE_SHO, SENDMSG_QUEUE, info);
     }
 
     /*package*/ void startBluetoothScoForClient(IBinder cb, int uid, int scoAudioMode,
@@ -1910,19 +1885,6 @@ public class AudioDeviceBroker {
                                 BtHelper.EVENT_DEVICE_CONFIG_CHANGE);
                     }
                 } break;
-                case MSG_L_A2DP_DEVICE_CONFIG_CHANGE_SHO: {
-                    final BtDeviceInfo btInfo = (BtDeviceInfo) msg.obj;
-                    if (btInfo.mDevice == null) break;
-                    synchronized (mDeviceStateLock) {
-                        final Pair<Integer, Boolean> codecAndChanged =
-                                mBtHelper.getCodecWithFallback(
-                                        btInfo.mDevice, btInfo.mProfile, btInfo.mIsLeOutput,
-                                        "MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE");
-                        mDeviceInventory.onBluetoothDeviceConfigChange(btInfo,
-                                codecAndChanged.first, codecAndChanged.second,
-                                BtHelper.EVENT_DEVICE_CONFIG_CHANGE);
-                    }
-                }    break;
                 case MSG_BROADCAST_AUDIO_BECOMING_NOISY:
                     onSendBecomingNoisyIntent();
                     break;
@@ -2025,22 +1987,6 @@ public class AudioDeviceBroker {
                             "msg: MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT " + btInfo)).printLog(TAG));
                     synchronized (mDeviceStateLock) {
                         mDeviceInventory.setBluetoothActiveDevice(btInfo);
-                    }
-                } break;
-                case MSG_L_A2DP_ACTIVE_DEVICE_CHANGE_EXT: {
-                    final BtDeviceInfo info = (BtDeviceInfo) msg.obj;
-                    AudioService.sDeviceLogger.enqueue((new EventLogger.StringEvent(
-                    "handleBluetoothA2dpActiveDeviceChangeExt "
-                           + " state=" + info.mState
-                           // only querying address as this is the only readily available
-                           // field on the device
-                           + " addr=" + info.mDevice.getAddress()
-                           + " prof=" + info.mProfile + " supprNoisy=" + info.mSupprNoisy
-                           + " vol=" + info.mVolume)).printLog(TAG));
-                    synchronized (mDeviceStateLock) {
-                        mDeviceInventory.handleBluetoothA2dpActiveDeviceChangeExt(
-                                info.mDevice, info.mState, info.mProfile,
-                                info.mSupprNoisy, info.mVolume, info.mIsLeOutput);
                     }
                 } break;
                 case MSG_IL_SAVE_PREF_DEVICES_FOR_STRATEGY: {
@@ -2163,9 +2109,6 @@ public class AudioDeviceBroker {
     private static final int MSG_I_BT_SERVICE_DISCONNECTED_PROFILE = 22;
     private static final int MSG_IL_BT_SERVICE_CONNECTED_PROFILE = 23;
 
-    // process external command to (dis)connect an A2DP device, obj is BtDeviceInfo
-    private static final int MSG_L_A2DP_DEVICE_CONNECTION_CHANGE_EXT = 29;
-
     // process external command to (dis)connect a hearing aid device
     private static final int MSG_L_HEARING_AID_DEVICE_CONNECTION_CHANGE_EXT = 31;
 
@@ -2182,14 +2125,10 @@ public class AudioDeviceBroker {
     private static final int MSG_L_SET_COMMUNICATION_DEVICE_FOR_CLIENT = 42;
     private static final int MSG_IL_UPDATE_COMMUNICATION_ROUTE_CLIENT = 43;
 
-    // process external command to (dis)connect or change active A2DP device
-    private static final int MSG_L_A2DP_ACTIVE_DEVICE_CHANGE_EXT = 64;
-
     private static final int MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT = 45;
     //
     // process set volume for Le Audio, obj is BleVolumeInfo
     private static final int MSG_II_SET_LE_AUDIO_OUT_VOLUME = 46;
-    private static final int MSG_L_A2DP_DEVICE_CONFIG_CHANGE_SHO = 41;
 
     private static final int MSG_IL_SAVE_NDEF_DEVICE_FOR_STRATEGY = 47;
     private static final int MSG_IL_SAVE_REMOVE_NDEF_DEVICE_FOR_STRATEGY = 48;
@@ -2215,12 +2154,9 @@ public class AudioDeviceBroker {
             case MSG_IL_BTA2DP_TIMEOUT:
             case MSG_IIL_BTLEAUDIO_TIMEOUT:
             case MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE:
-            case MSG_L_A2DP_DEVICE_CONFIG_CHANGE_SHO:
             case MSG_TOGGLE_HDMI:
-            case MSG_L_A2DP_DEVICE_CONNECTION_CHANGE_EXT:
             case MSG_L_HEARING_AID_DEVICE_CONNECTION_CHANGE_EXT:
             case MSG_CHECK_MUTE_MUSIC:
-            case MSG_L_A2DP_ACTIVE_DEVICE_CHANGE_EXT:
                 return true;
             default:
                 return false;
@@ -2309,7 +2245,6 @@ public class AudioDeviceBroker {
                 case MSG_IL_BTA2DP_TIMEOUT:
                 case MSG_IIL_BTLEAUDIO_TIMEOUT:
                 case MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE:
-                case MSG_L_A2DP_DEVICE_CONFIG_CHANGE_SHO:
                     if (sLastDeviceConnectMsgTime >= time) {
                         // add a little delay to make sure messages are ordered as expected
                         time = sLastDeviceConnectMsgTime + 30;
@@ -2347,8 +2282,6 @@ public class AudioDeviceBroker {
         MESSAGES_MUTE_MUSIC = new HashSet<>();
         MESSAGES_MUTE_MUSIC.add(MSG_L_SET_BT_ACTIVE_DEVICE);
         MESSAGES_MUTE_MUSIC.add(MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE);
-        MESSAGES_MUTE_MUSIC.add(MSG_L_A2DP_DEVICE_CONFIG_CHANGE_SHO);
-        MESSAGES_MUTE_MUSIC.add(MSG_L_A2DP_DEVICE_CONNECTION_CHANGE_EXT);
         MESSAGES_MUTE_MUSIC.add(MSG_L_SET_FORCE_BT_A2DP_USE);
     }
 
@@ -2367,9 +2300,7 @@ public class AudioDeviceBroker {
         }
         // Do not mute on bluetooth event if music is playing on a wired headset.
         if ((message == MSG_L_SET_BT_ACTIVE_DEVICE
-                || message == MSG_L_A2DP_DEVICE_CONNECTION_CHANGE_EXT
-                || message == MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE
-                || message == MSG_L_A2DP_DEVICE_CONFIG_CHANGE_SHO)
+                || message == MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE)
                 && AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0)
                 && hasIntersection(mDeviceInventory.DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG_SET,
                         mAudioService.getDeviceSetForStream(AudioSystem.STREAM_MUSIC))) {

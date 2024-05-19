@@ -73,7 +73,6 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
     private final SelectedUserInteractor mSelectedUserInteractor;
 
     private EmergencyButtonCallback mEmergencyButtonCallback;
-    private HashMap<Integer, ServiceState> mServiceStates = new HashMap<>();
 
     private final KeyguardUpdateMonitorCallback mInfoCallback =
             new KeyguardUpdateMonitorCallback() {
@@ -89,7 +88,6 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
 
         @Override
         public void onServiceStateChanged(int subId, ServiceState state) {
-            mServiceStates.put(subId, state);
             updateEmergencyCallButton();
         }
     };
@@ -216,13 +214,16 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
     }
 
     private boolean isEmergencyCapable() {
-        if (!mKeyguardUpdateMonitor.isOOS()){
-            return true;
-        }
-        for (int subId : mServiceStates.keySet()) {
-            ServiceState ss = mServiceStates.get(subId);
+        int slotCount = mKeyguardUpdateMonitor.getActiveSlots();
+        Log.d(TAG, "isEmergencyCapable slotCount:" + slotCount);
+        for (int slotId = 0; slotId < slotCount; slotId++) {
+            ServiceState ss = mKeyguardUpdateMonitor.getServiceStateWithSlotid(slotId);
+            Log.d(TAG, "mServiceStates list slotid:" + slotId + ";;ss:" + ss);
             if (ss != null) {
                 if (ss.isEmergencyOnly()) {
+                    return true;
+                } else if ((ss.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
+                        && (ss.getVoiceRegState() != ServiceState.STATE_POWER_OFF)) {
                     return true;
                 }
             }

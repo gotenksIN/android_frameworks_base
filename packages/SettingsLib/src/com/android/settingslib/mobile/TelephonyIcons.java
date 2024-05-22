@@ -17,7 +17,7 @@
 /*
   Changes from Qualcomm Innovation Center are provided under the following license:
 
-  Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+  Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
   SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 
@@ -58,6 +58,9 @@ public class TelephonyIcons {
     public static final int ICON_5G_PLUS_PLUS = R.drawable.ic_5g_plus_plus_mobiledata;
     public static final int ICON_VOWIFI = R.drawable.ic_vowifi;
     public static final int ICON_VOWIFI_CALLING = R.drawable.ic_vowifi_calling;
+    public static final int ICON_5G_BASIC_6RX = R.drawable.ic_5g_6rx_mobiledata;
+    public static final int ICON_5G_UWB_6RX = R.drawable.ic_5g_uwb_6rx_mobiledata;
+    public static final int ICON_5G_PLUS_PLUS_6RX = R.drawable.ic_5g_plus_plus_6rx_mobiledata;
 
     public static final MobileIconGroup CARRIER_NETWORK_CHANGE = new MobileIconGroup(
             "CARRIER_NETWORK_CHANGE",
@@ -220,6 +223,21 @@ public class TelephonyIcons {
             "VoWIFICall",
             0,
             TelephonyIcons.ICON_VOWIFI_CALLING);
+
+    public static final MobileIconGroup FIVE_G_BASIC_6RX = new MobileIconGroup(
+            "5GBasic_6Rx",
+            R.string.data_connection_5g_basic_6rx,
+            TelephonyIcons.ICON_5G_BASIC_6RX);
+
+    public static final MobileIconGroup FIVE_G_UWB_6RX = new MobileIconGroup(
+            "5GUWB_6Rx",
+            R.string.data_connection_5g_uwb_6rx,
+            TelephonyIcons.ICON_5G_UWB_6RX);
+
+    public static final MobileIconGroup FIVE_G_PLUS_PLUS_6RX = new MobileIconGroup(
+            "5G_PLUS_PLUS_6Rx",
+            R.string.data_connection_5g_plus_plus_6rx,
+            TelephonyIcons.ICON_5G_PLUS_PLUS_6RX);
 
     /** Mapping icon name(lower case) to the icon object. */
     public static final Map<String, MobileIconGroup> ICON_NAME_TO_ICON;

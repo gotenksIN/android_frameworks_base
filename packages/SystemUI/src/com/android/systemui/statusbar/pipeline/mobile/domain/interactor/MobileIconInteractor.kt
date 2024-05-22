@@ -16,7 +16,7 @@
 
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -355,14 +355,15 @@ class MobileIconInteractorImpl(
         combine(
             signalStrengthCustomization,
             connectionRepository.nrIconType,
+            connectionRepository.is6Rx,
             networkTypeIconCustomization,
             connectionRepository.originNetworkType,
-        ) { signalStrengthCustomization, nrIconType, networkTypeIconCustomization,
+        ) { signalStrengthCustomization, nrIconType, is6Rx, networkTypeIconCustomization,
             originNetworkType ->
             MobileIconCustomizationMode(
                 dataNetworkType = signalStrengthCustomization.dataNetworkType,
                 voiceNetworkType = signalStrengthCustomization.voiceNetworkType,
-                fiveGServiceState = FiveGServiceState(nrIconType),
+                fiveGServiceState = FiveGServiceState(nrIconType, is6Rx, context),
                 isRatCustomization = networkTypeIconCustomization.isRatCustomization,
                 alwaysShowNetworkTypeIcon =
                     networkTypeIconCustomization.alwaysShowNetworkTypeIcon,

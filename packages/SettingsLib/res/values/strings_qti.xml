@@ -29,7 +29,7 @@
 <!--
 Changes from Qualcomm Innovation Center are provided under the following license:
 
-Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 SPDX-License-Identifier: BSD-3-Clause-Clear
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
@@ -55,6 +55,15 @@ SPDX-License-Identifier: BSD-3-Clause-Clear
 
     <!-- Content description of the data connection type 5G stand alone. [CHAR LIMIT=NONE] -->
     <string name="data_connection_5g_sa" translate="false">5GSA</string>
+
+    <!-- Content description of the data connection type 5G Basic 6Rx. [CHAR LIMIT=NONE] -->
+    <string name="data_connection_5g_basic_6rx" translate="false">5GBasic6Rx</string>
+
+    <!-- Content description of the data connection type 5G UWB 6Rx. [CHAR LIMIT=NONE] -->
+    <string name="data_connection_5g_uwb_6rx" translate="false">5GUWB6Rx</string>
+
+    <!-- Content description of the data connection type 5G ++ 6Rx. [CHAR LIMIT=NONE] -->
+    <string name="data_connection_5g_plus_plus_6rx" translate="false">5G++6Rx</string>
 
     <!--
     The customization for last puk prompt

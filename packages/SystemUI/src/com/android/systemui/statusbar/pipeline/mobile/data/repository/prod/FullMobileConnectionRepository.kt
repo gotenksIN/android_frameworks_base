@@ -16,7 +16,7 @@
 
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -394,6 +394,20 @@ class FullMobileConnectionRepository(
                 scope,
                 SharingStarted.WhileSubscribed(),
                 activeRepo.value.nrIconType.value
+            )
+
+    override val is6Rx =
+        activeRepo.flatMapLatest { it.is6Rx }
+            .logDiffsForTable(
+                tableLogBuffer,
+                columnPrefix = "",
+                columnName = "is6Rx",
+                initialValue = activeRepo.value.is6Rx.value,
+            )
+            .stateIn(
+                scope,
+                SharingStarted.WhileSubscribed(),
+                activeRepo.value.is6Rx.value
             )
 
     override val dataRoamingEnabled =

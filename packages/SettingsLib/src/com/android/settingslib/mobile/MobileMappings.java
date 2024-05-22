@@ -227,6 +227,7 @@ public class MobileMappings {
         public boolean showVowifiIcon = false;
         public boolean enableDdsRatIconEnhancement = false;
         public boolean crossSimdisplaySingnalLevel = false;
+        public boolean show6RxIcon = true;
 
         /**
          * Reads the latest configs.
@@ -272,6 +273,7 @@ public class MobileMappings {
             if ( config.alwaysShowNetworkTypeIcon ) {
                 config.hideLtePlus = false;
             }
+            config.show6RxIcon = res.getBoolean(R.bool.config_display_6Rx);
 
             config.enableRatIconEnhancement =
                     SystemProperties.getBoolean("persist.sysui.rat_icon_enhancement", false);

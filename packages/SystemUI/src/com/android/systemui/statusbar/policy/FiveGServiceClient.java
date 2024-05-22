@@ -30,7 +30,7 @@
 /*
   Changes from Qualcomm Innovation Center are provided under the following license:
 
-  Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+  Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
   SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 
@@ -60,13 +60,14 @@ import javax.inject.Inject;
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
 import com.android.settingslib.mobile.TelephonyIcons;
 import com.android.settingslib.SignalIcon.MobileIconGroup;
-import com.android.systemui.res.R;
+import com.android.settingslib.R;
 import com.android.systemui.dagger.SysUISingleton;
 
 import com.qti.extphone.Client;
 import com.qti.extphone.ExtTelephonyManager;
 import com.qti.extphone.IExtPhoneCallback;
 import com.qti.extphone.ExtPhoneCallbackListener;
+import com.qti.extphone.NrIcon;
 import com.qti.extphone.NrIconType;
 import com.qti.extphone.Status;
 import com.qti.extphone.ServiceCallback;
@@ -82,7 +83,6 @@ public class FiveGServiceClient {
     private static final int MAX_RETRY = 4;
     private static final int DELAY_MILLISECOND = 3000;
     private static final int DELAY_INCREMENT = 2000;
-    private static final int TYPE_5G_PLUS_PLUS = 3;//TODO, wait for interface change
 
     private static FiveGServiceClient sInstance;
     private final ArrayList<WeakReference<KeyguardUpdateMonitorCallback>>
@@ -104,17 +104,20 @@ public class FiveGServiceClient {
     public static class FiveGServiceState{
         private static final String COL_NR_ICON_TYPE = "NrIconType";
         private int mNrIconType;
+        private boolean mIs6Rx;
         private MobileIconGroup mIconGroup;
 
         public FiveGServiceState(){
             mNrIconType = NrIconType.INVALID;
+            mIs6Rx = false;
             mIconGroup = TelephonyIcons.UNKNOWN;
         }
 
         @VisibleForTesting
-        public FiveGServiceState(int nrIconType){
+        public FiveGServiceState(int nrIconType, boolean is6Rx, Context context) {
             mNrIconType = nrIconType;
-            mIconGroup = getNrIconGroup(nrIconType);
+            mIs6Rx = is6Rx;
+            mIconGroup = getNrIconGroup(nrIconType, is6Rx, context);
         }
 
         public boolean isNrIconTypeValid() {
@@ -131,19 +134,28 @@ public class FiveGServiceClient {
             return mNrIconType;
         }
 
+        @VisibleForTesting
+        public boolean getIs6Rx() {
+            return mIs6Rx;
+        }
+
         public void copyFrom(FiveGServiceState state) {
             this.mIconGroup = state.mIconGroup;
             this.mNrIconType = state.mNrIconType;
+            this.mIs6Rx = state.mIs6Rx;
         }
 
         public boolean equals(FiveGServiceState state) {
             return this.mIconGroup == state.mIconGroup
-                    && this.mNrIconType == state.mNrIconType;
+                    && this.mNrIconType == state.mNrIconType
+                    && this.mIs6Rx == state.mIs6Rx;
         }
+
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append("mNrIconType=").append(mNrIconType).append(", ").
+                    append("is6Rx=").append(mIs6Rx).append(", ").
                     append("mIconGroup=").append(mIconGroup);
 
             return builder.toString();
@@ -202,10 +214,12 @@ public class FiveGServiceClient {
         Log.d(TAG, "resetState phoneId=" + phoneId);
         FiveGServiceState currentState = getCurrentServiceState(phoneId);
         currentState.mNrIconType = NrIconType.INVALID;
+        currentState.mIs6Rx = false;
         currentState.mIconGroup = TelephonyIcons.UNKNOWN;
 
         FiveGServiceState lastState = getLastServiceState(phoneId);
         lastState.mNrIconType = NrIconType.INVALID;
+        lastState.mIs6Rx = false;
         lastState.mIconGroup = TelephonyIcons.UNKNOWN;
     }
 
@@ -241,6 +255,8 @@ public class FiveGServiceClient {
             Log.d(TAG, "ExtTelephony Service connected");
             int[] events = new int[] {
                     ExtPhoneCallbackListener.EVENT_ON_NR_ICON_TYPE,
+                    ExtPhoneCallbackListener.EVENT_QUERY_NR_ICON_RESPONSE,
+                    ExtPhoneCallbackListener.EVENT_ON_NR_ICON_CHANGE,
                     ExtPhoneCallbackListener.EVENT_ON_CIWLAN_AVAILABLE};
             mServiceConnected = true;
             mIsConnectInProgress = false;
@@ -320,7 +336,7 @@ public class FiveGServiceClient {
         if ( mServiceConnected && mClient != null) {
             Log.d(TAG, "query 5G service state for phoneId " + phoneId);
             try {
-                Token token = mExtTelephonyManager.queryNrIconType(phoneId, mClient);
+                Token token = mExtTelephonyManager.queryNrIcon(phoneId, mClient);
                 Log.d(TAG, "queryNrIconType result:" + token);
             } catch (Exception e) {
                 Log.d(TAG, "initFiveGServiceState: Exception = " + e);
@@ -342,20 +358,26 @@ public class FiveGServiceClient {
 
     @VisibleForTesting
     void update5GIcon(FiveGServiceState state) {
-        state.mIconGroup = getNrIconGroup(state.mNrIconType);
+        state.mIconGroup = getNrIconGroup(state.mNrIconType, state.mIs6Rx, mContext);
     }
 
-    private static MobileIconGroup getNrIconGroup(int nrIconType) {
+    private static MobileIconGroup getNrIconGroup(int nrIconType , boolean is6Rx, Context context) {
+        boolean show6RxConfig = context.getResources().getBoolean(R.bool.config_display_6Rx);
+        Log.d(TAG, "getNrIconGroup nrIconType:" + nrIconType +
+            "; is6Rx:" + is6Rx + "; show6RxConfig:" + show6RxConfig);
         MobileIconGroup iconGroup = TelephonyIcons.UNKNOWN;
         switch (nrIconType){
             case NrIconType.TYPE_5G_BASIC:
-                iconGroup = TelephonyIcons.FIVE_G_BASIC;
+                iconGroup = (show6RxConfig && is6Rx) ?
+                        TelephonyIcons.FIVE_G_BASIC_6RX : TelephonyIcons.FIVE_G_BASIC;
                 break;
             case NrIconType.TYPE_5G_UWB:
-                iconGroup = TelephonyIcons.FIVE_G_UWB;
+                iconGroup = (show6RxConfig && is6Rx) ?
+                        TelephonyIcons.FIVE_G_UWB_6RX : TelephonyIcons.FIVE_G_UWB;
                 break;
-            case TYPE_5G_PLUS_PLUS:
-                iconGroup = TelephonyIcons.FIVE_G_PLUS_PLUS;
+            case NrIconType.TYPE_5G_PLUS_PLUS:
+                iconGroup = (show6RxConfig && is6Rx) ?
+                        TelephonyIcons.FIVE_G_PLUS_PLUS_6RX : TelephonyIcons.FIVE_G_PLUS_PLUS;
                 break;
         }
         return iconGroup;
@@ -393,6 +415,7 @@ public class FiveGServiceClient {
 
     @VisibleForTesting
     protected ExtPhoneCallbackListener mExtPhoneCallbackListener = new ExtPhoneCallbackListener() {
+
         @Override
         public void onNrIconType(int slotId, Token token, Status status, NrIconType
                 nrIconType) throws RemoteException {
@@ -405,6 +428,32 @@ public class FiveGServiceClient {
                 update5GIcon(state);
                 notifyListenersIfNecessary(slotId);
             }
+        }
+
+        @Override
+        public void onNrIconResponse(int slotId, Token token, Status status, NrIcon
+                icon) throws RemoteException {
+            Log.d(TAG,
+                    "onNrIconResponse: slotId = " + slotId + " token = " + token + " " + "status"
+                            + status + " NrIcon = " + icon);
+            if (status.get() == Status.SUCCESS) {
+                FiveGServiceState state = getCurrentServiceState(slotId);
+                state.mNrIconType = icon.getType();
+                state.mIs6Rx = icon.getRxCount() > 0;
+                update5GIcon(state);
+                notifyListenersIfNecessary(slotId);
+            }
+        }
+
+        @Override
+        public void onNrIconChange(int slotId, NrIcon icon) throws RemoteException {
+            Log.d(TAG,
+                    "onNrIconChange: slotId = " + slotId + " icon = " + icon);
+            FiveGServiceState state = getCurrentServiceState(slotId);
+            state.mNrIconType = icon.getType();
+            state.mIs6Rx = icon.getRxCount() > 0;
+            update5GIcon(state);
+            notifyListenersIfNecessary(slotId);
         }
 
         @Override

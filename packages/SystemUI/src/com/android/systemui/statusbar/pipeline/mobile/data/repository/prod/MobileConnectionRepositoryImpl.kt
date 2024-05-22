@@ -16,7 +16,7 @@
 
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -264,8 +264,10 @@ class MobileConnectionRepositoryImpl(
             val listener =
                 object : IFiveGStateListener {
                     override fun onStateChanged(serviceState: FiveGServiceState) {
-                        logger.logOnNrIconTypeChanged(serviceState.nrIconType, subId)
-                        trySend(CallbackEvent.OnNrIconTypeChanged(serviceState.nrIconType))
+                        logger.logOnNrIconTypeChanged(serviceState.nrIconType,
+                            serviceState.is6Rx, subId)
+                        trySend(CallbackEvent.OnNrIconTypeChanged(serviceState.nrIconType,
+                            serviceState.is6Rx))
                     }
 
                     override fun onCiwlanAvailableChanged(available: Boolean) {
@@ -283,7 +285,7 @@ class MobileConnectionRepositoryImpl(
 
     private val fiveGState: Flow<TelephonyCallbackState> = run {
         val initial = flowOf(TelephonyCallbackState()
-            .applyEvent(CallbackEvent.OnNrIconTypeChanged(NrIconType.TYPE_NONE))
+            .applyEvent(CallbackEvent.OnNrIconTypeChanged(NrIconType.TYPE_NONE, false))
             .applyEvent(CallbackEvent.OnCiwlanAvailableChanged(false)))
         if (slotIndexForSubId == null) {
             initial
@@ -600,6 +602,12 @@ class MobileConnectionRepositoryImpl(
             .map { it.nrIconType}
             .stateIn(scope, SharingStarted.WhileSubscribed(), NrIconType.TYPE_NONE)
 
+    override val is6Rx: StateFlow<Boolean> =
+        fiveGState
+            .mapNotNull {it.onNrIconTypeChanged }
+            .map { it.is6Rx}
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
     private val dataRoamingSettingChangedEvent: Flow<Unit> = conflatedCallbackFlow {
         val observer =
             object : ContentObserver(null) {
@@ -872,7 +880,7 @@ sealed interface CallbackEvent {
 
     data class OnSignalStrengthChanged(val signalStrength: SignalStrength) : CallbackEvent
 
-    data class OnNrIconTypeChanged(val nrIconType: Int) : CallbackEvent
+    data class OnNrIconTypeChanged(val nrIconType: Int, val is6Rx: Boolean) : CallbackEvent
 
     data class OnCiwlanAvailableChanged(val available: Boolean): CallbackEvent
 }

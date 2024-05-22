@@ -16,7 +16,7 @@
 
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -201,6 +201,7 @@ class CarrierMergedConnectionRepository(
     override val voiceNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
     override val dataNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
     override val nrIconType = MutableStateFlow(NrIconType.TYPE_NONE)
+    override val is6Rx = MutableStateFlow(false)
     override val dataRoamingEnabled = MutableStateFlow(true).asStateFlow()
     override val originNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
     override val voiceCapable = MutableStateFlow(false)

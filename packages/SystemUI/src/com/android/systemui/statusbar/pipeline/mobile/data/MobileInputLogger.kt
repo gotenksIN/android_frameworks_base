@@ -14,6 +14,13 @@
  * limitations under the License.
  */
 
+/*
+  Changes from Qualcomm Innovation Center are provided under the following license:
+
+  Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause-Clear
+*/
+
 package com.android.systemui.statusbar.pipeline.mobile.data
 
 import android.content.Intent
@@ -145,15 +152,16 @@ constructor(
         )
     }
 
-    fun logOnNrIconTypeChanged(nrIconType: Int, subId: Int) {
+    fun logOnNrIconTypeChanged(nrIconType: Int, is6Rx : Boolean, subId: Int) {
         buffer.log(
             TAG,
             LogLevel.INFO,
             {
                 int1 = subId
                 str1 = nrIconType.toString()
+                bool1 = is6Rx
             },
-            { "onNrIconTypeChanged: subId=$int1 nrIconType=$str1" },
+            { "onNrIconTypeChanged: subId=$int1 nrIconType=$str1 is6Rx=$bool1" },
         )
     }
 

@@ -36,4 +36,5 @@
     <bool name="config_hideNoInternetState">false</bool>
     <bool name="config_display_volte">true</bool>
     <bool name="config_display_vowifi">false</bool>
+    <bool name="config_display_6Rx">true</bool>
 </resources>

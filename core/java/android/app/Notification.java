@@ -114,6 +114,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.graphics.ColorUtils;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.ContrastColorUtil;
+import com.android.internal.util.NewlineNormalizer;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -3190,7 +3191,7 @@ public class Notification implements Parcelable
             return charSequence;
         }
 
-        return charSequence.toString().replaceAll("[\r\n]+", "\n");
+        return NewlineNormalizer.normalizeNewlines(charSequence.toString());
     }
 
     private static CharSequence removeTextSizeSpans(CharSequence charSequence) {
@@ -6490,7 +6491,8 @@ public class Notification implements Parcelable
         // visual regressions.
         @SuppressWarnings("AndroidFrameworkCompatChange")
         private boolean bigContentViewRequired() {
-            if (mContext.getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.S) {
+            if (!Flags.notificationExpansionOptional()
+                    && mContext.getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.S) {
                 return true;
             }
             // Notifications with contentView and without a bigContentView, style, or actions would
@@ -6593,12 +6595,12 @@ public class Notification implements Parcelable
          * @hide
          */
         public RemoteViews createCompactHeadsUpContentView() {
-            // TODO(b/336225281): re-evaluate custom view usage.
-            if (useExistingRemoteView(mN.headsUpContentView)) {
-                return fullyCustomViewRequiresDecoration(false /* fromStyle */)
-                        ? minimallyDecoratedHeadsUpContentView(mN.headsUpContentView)
-                        : mN.headsUpContentView;
-            } else if (mStyle != null) {
+            // Don't show compact heads up for FSI notifications.
+            if (mN.fullScreenIntent != null) {
+                return createHeadsUpContentView(/* increasedHeight= */ false);
+            }
+
+            if (mStyle != null) {
                 final RemoteViews styleView = mStyle.makeCompactHeadsUpContentView();
                 if (styleView != null) {
                     return styleView;
@@ -6611,7 +6613,7 @@ public class Notification implements Parcelable
             // Notification text is shown as secondary header text
             // for the minimal hun when it is provided.
             // Time(when and chronometer) is not shown for the minimal hun.
-            p.headerTextSecondary(p.mText).text(null).hideTime(true);
+            p.headerTextSecondary(p.mText).text(null).hideTime(true).summaryText("");
 
             return applyStandardTemplate(
                     getCompactHeadsUpBaseLayoutResource(), p,
@@ -7153,13 +7155,7 @@ public class Notification implements Parcelable
             // Adds any new extras provided by the user.
             if (mUserExtras != null) {
                 final Bundle saveExtras = (Bundle) mUserExtras.clone();
-                if (SystemProperties.getBoolean(
-                        "persist.sysui.notification.builder_extras_override", false)) {
-                    mN.extras.putAll(saveExtras);
-                } else {
-                    saveExtras.putAll(mN.extras);
-                    mN.extras = saveExtras;
-                }
+                mN.extras.putAll(saveExtras);
             }
 
             if (!Flags.sortSectionByTime()) {
@@ -10355,7 +10351,7 @@ public class Notification implements Parcelable
         @Nullable
         @Override
         public RemoteViews makeCompactHeadsUpContentView() {
-            // TODO(b/336228700): Apply minimal HUN treatment for Call Style.
+            // Use existing heads up for call style.
             return makeHeadsUpContentView(false);
         }
 

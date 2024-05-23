@@ -47,6 +47,7 @@ import android.window.TransitionInfo
 import android.window.TransitionRequestInfo
 import android.window.WindowContainerTransaction
 import androidx.annotation.BinderThread
+import com.android.internal.annotations.VisibleForTesting
 import com.android.internal.policy.ScreenDecorationsUtils
 import com.android.window.flags.Flags
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
@@ -85,7 +86,6 @@ import com.android.wm.shell.util.KtProtoLog
 import com.android.wm.shell.windowdecor.DragPositioningCallbackUtility
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
 import com.android.wm.shell.windowdecor.OnTaskResizeAnimationListener
-import com.android.wm.shell.windowdecor.extension.isFreeform
 import com.android.wm.shell.windowdecor.extension.isFullscreen
 import java.io.PrintWriter
 import java.util.Optional
@@ -167,7 +167,7 @@ class DesktopTasksController(
 
     init {
         desktopMode = DesktopModeImpl()
-        if (DesktopModeStatus.isEnabled()) {
+        if (DesktopModeStatus.canEnterDesktopMode(context)) {
             shellInit.addInitCallback({ onInit() }, this)
         }
     }
@@ -203,6 +203,11 @@ class DesktopTasksController(
         dragAndDropController.addListener(this)
     }
 
+    @VisibleForTesting
+    fun getVisualIndicator(): DesktopModeVisualIndicator? {
+        return visualIndicator
+    }
+
     fun setOnTaskResizeAnimationListener(listener: OnTaskResizeAnimationListener) {
         toggleResizeDesktopTaskTransitionHandler.setOnTaskResizeAnimationListener(listener)
         enterDesktopTaskTransitionHandler.setOnTaskResizeAnimationListener(listener)
@@ -232,34 +237,6 @@ class DesktopTasksController(
             }
         } else {
             shellTaskOrganizer.applyTransaction(wct)
-        }
-    }
-
-    /**
-     * Stash desktop tasks on display with id [displayId].
-     *
-     * When desktop tasks are stashed, launcher home screen icons are fully visible. New apps
-     * launched in this state will be added to the desktop. Existing desktop tasks will be brought
-     * back to front during the launch.
-     */
-    fun stashDesktopApps(displayId: Int) {
-        if (DesktopModeStatus.isStashingEnabled()) {
-            KtProtoLog.v(WM_SHELL_DESKTOP_MODE, "DesktopTasksController: stashDesktopApps")
-            desktopModeTaskRepository.setStashed(displayId, true)
-        }
-    }
-
-    /**
-     * Clear the stashed state for the given display
-     */
-    fun hideStashedDesktopApps(displayId: Int) {
-        if (DesktopModeStatus.isStashingEnabled()) {
-            KtProtoLog.v(
-                    WM_SHELL_DESKTOP_MODE,
-                    "DesktopTasksController: hideStashedApps displayId=%d",
-                    displayId
-            )
-            desktopModeTaskRepository.setStashed(displayId, false)
         }
     }
 
@@ -605,8 +582,9 @@ class DesktopTasksController(
     }
 
     /**
-     * Quick-resizes a desktop task, toggling between the stable bounds and the last saved bounds
-     * if available or the default bounds otherwise.
+     * Quick-resizes a desktop task, toggling between a fullscreen state (represented by the
+     * stable bounds) and a free floating state (either the last saved bounds if available or the
+     * default bounds otherwise).
      */
     fun toggleDesktopTaskSize(taskInfo: RunningTaskInfo) {
         val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
@@ -623,7 +601,11 @@ class DesktopTasksController(
             if (taskBoundsBeforeMaximize != null) {
                 destinationBounds.set(taskBoundsBeforeMaximize)
             } else {
-                destinationBounds.set(getDefaultDesktopTaskBounds(displayLayout))
+                if (Flags.enableWindowingDynamicInitialBounds()){
+                    destinationBounds.set(calculateInitialBounds(displayLayout, taskInfo))
+                } else {
+                    destinationBounds.set(getDefaultDesktopTaskBounds(displayLayout))
+                }
             }
         } else {
             // Save current bounds so that task can be restored back to original bounds if necessary
@@ -861,8 +843,6 @@ class DesktopTasksController(
         val result = triggerTask?.let { task ->
             when {
                 request.type == TRANSIT_TO_BACK -> handleBackNavigation(task)
-                // If display has tasks stashed, handle as stashed launch
-                task.isStashed -> handleStashedTaskLaunch(task, transition)
                 // Check if the task has a top transparent activity
                 shouldLaunchAsModal(task) -> handleTransparentTaskLaunch(task)
                 // Check if fullscreen task should be updated
@@ -901,12 +881,8 @@ class DesktopTasksController(
                 .forEach { finishTransaction.setCornerRadius(it.leash, cornerRadius) }
     }
 
-    private val TaskInfo.isStashed: Boolean
-        get() = desktopModeTaskRepository.isStashed(displayId)
-
-    private fun shouldLaunchAsModal(task: TaskInfo): Boolean {
-        return Flags.enableDesktopWindowingModalsPolicy() && isSingleTopActivityTranslucent(task)
-    }
+    private fun shouldLaunchAsModal(task: TaskInfo) =
+        Flags.enableDesktopWindowingModalsPolicy() && isSingleTopActivityTranslucent(task)
 
     private fun shouldRemoveWallpaper(request: TransitionRequestInfo): Boolean {
         return Flags.enableDesktopWindowingWallpaperActivity() &&
@@ -966,24 +942,6 @@ class DesktopTasksController(
         return null
     }
 
-    private fun handleStashedTaskLaunch(
-            task: RunningTaskInfo,
-            transition: IBinder
-    ): WindowContainerTransaction {
-        KtProtoLog.d(
-                WM_SHELL_DESKTOP_MODE,
-                "DesktopTasksController: launch apps with stashed on transition taskId=%d",
-                task.taskId
-        )
-        val wct = WindowContainerTransaction()
-        val taskToMinimize =
-                bringDesktopAppsToFrontBeforeShowingNewTask(task.displayId, wct, task.taskId)
-        addMoveToDesktopChanges(wct, task)
-        desktopModeTaskRepository.setStashed(task.displayId, false)
-        addPendingMinimizeTransition(transition, taskToMinimize)
-        return wct
-    }
-
     // Always launch transparent tasks in fullscreen.
     private fun handleTransparentTaskLaunch(task: RunningTaskInfo): WindowContainerTransaction? {
         // Already fullscreen, no-op.
@@ -1011,6 +969,7 @@ class DesktopTasksController(
         wct: WindowContainerTransaction,
         taskInfo: RunningTaskInfo
     ) {
+        val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
         val tdaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(taskInfo.displayId)!!
         val tdaWindowingMode = tdaInfo.configuration.windowConfiguration.windowingMode
         val targetWindowingMode = if (tdaWindowingMode == WINDOWING_MODE_FREEFORM) {
@@ -1018,6 +977,9 @@ class DesktopTasksController(
             WINDOWING_MODE_UNDEFINED
         } else {
             WINDOWING_MODE_FREEFORM
+        }
+        if (Flags.enableWindowingDynamicInitialBounds()) {
+            wct.setBounds(taskInfo.token, calculateInitialBounds(displayLayout, taskInfo))
         }
         wct.setWindowingMode(taskInfo.token, targetWindowingMode)
         wct.reorder(taskInfo.token, true /* onTop */)
@@ -1239,13 +1201,17 @@ class DesktopTasksController(
      * @param y height of drag, to be checked against status bar height.
      */
     fun onDragPositioningEndThroughStatusBar(inputCoordinates: PointF, taskInfo: RunningTaskInfo) {
-        val indicator = visualIndicator ?: return
+        val indicator = getVisualIndicator() ?: return
         val indicatorType = indicator
             .updateIndicatorType(inputCoordinates, taskInfo.windowingMode)
         when (indicatorType) {
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR -> {
                 val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
-                finalizeDragToDesktop(taskInfo, getDefaultDesktopTaskBounds(displayLayout))
+                if (Flags.enableWindowingDynamicInitialBounds()) {
+                    finalizeDragToDesktop(taskInfo, calculateInitialBounds(displayLayout, taskInfo))
+                } else {
+                    finalizeDragToDesktop(taskInfo, getDefaultDesktopTaskBounds(displayLayout))
+                }
             }
             DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR,
             DesktopModeVisualIndicator.IndicatorType.TO_FULLSCREEN_INDICATOR -> {
@@ -1449,25 +1415,25 @@ class DesktopTasksController(
             ) { c -> c.showDesktopApps(displayId, remoteTransition) }
         }
 
-        override fun stashDesktopApps(displayId: Int) {
-            ExecutorUtils.executeRemoteCallWithTaskPermission(
-                    controller,
-                    "stashDesktopApps"
-            ) { c -> c.stashDesktopApps(displayId) }
-        }
-
-        override fun hideStashedDesktopApps(displayId: Int) {
-            ExecutorUtils.executeRemoteCallWithTaskPermission(
-                    controller,
-                    "hideStashedDesktopApps"
-            ) { c -> c.hideStashedDesktopApps(displayId) }
-        }
-
         override fun showDesktopApp(taskId: Int) {
             ExecutorUtils.executeRemoteCallWithTaskPermission(
                     controller,
                     "showDesktopApp"
             ) { c -> c.moveTaskToFront(taskId) }
+        }
+
+        override fun stashDesktopApps(displayId: Int) {
+            KtProtoLog.w(
+                WM_SHELL_DESKTOP_MODE,
+                "IDesktopModeImpl: stashDesktopApps is deprecated"
+            )
+        }
+
+        override fun hideStashedDesktopApps(displayId: Int) {
+            KtProtoLog.w(
+                WM_SHELL_DESKTOP_MODE,
+                "IDesktopModeImpl: hideStashedDesktopApps is deprecated"
+            )
         }
 
         override fun getVisibleTaskCount(displayId: Int): Int {

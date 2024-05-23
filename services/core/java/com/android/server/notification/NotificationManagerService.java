@@ -245,7 +245,6 @@ import android.os.DeadObjectException;
 import android.os.DeviceIdleManager;
 import android.os.Environment;
 import android.os.Handler;
-import android.os.HandlerExecutor;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.IInterface;
@@ -593,6 +592,8 @@ public class NotificationManagerService extends SystemService {
     private static final Duration POST_WAKE_LOCK_TIMEOUT = Duration.ofSeconds(30);
 
     static final long NOTIFICATION_TTL = Duration.ofDays(3).toMillis();
+
+    static final long NOTIFICATION_MAX_AGE_AT_POST = Duration.ofDays(14).toMillis();
 
     private IActivityManager mAm;
     private ActivityTaskManagerInternal mAtm;
@@ -2038,19 +2039,21 @@ public class NotificationManagerService extends SystemService {
                     mSnoozeHelper.clearData(userHandle);
                 }
             } else if (action.equals(Intent.ACTION_USER_SWITCHED)) {
-                final int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, USER_NULL);
-                mUserProfiles.updateCache(context);
-                if (!mUserProfiles.isProfileUser(userId, context)) {
-                    // reload per-user settings
-                    mSettingsObserver.update(null);
-                    // Refresh managed services
-                    mConditionProviders.onUserSwitched(userId);
-                    mListeners.onUserSwitched(userId);
-                    mZenModeHelper.onUserSwitched(userId);
-                    mPreferencesHelper.syncChannelsBypassingDnd();
+                if (!Flags.useSsmUserSwitchSignal()) {
+                    final int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, USER_NULL);
+                    mUserProfiles.updateCache(context);
+                    if (!mUserProfiles.isProfileUser(userId, context)) {
+                        // reload per-user settings
+                        mSettingsObserver.update(null);
+                        // Refresh managed services
+                        mConditionProviders.onUserSwitched(userId);
+                        mListeners.onUserSwitched(userId);
+                        mZenModeHelper.onUserSwitched(userId);
+                        mPreferencesHelper.syncChannelsBypassingDnd();
+                    }
+                    // assistant is the only thing that cares about managed profiles specifically
+                    mAssistants.onUserSwitched(userId);
                 }
-                // assistant is the only thing that cares about managed profiles specifically
-                mAssistants.onUserSwitched(userId);
             } else if (action.equals(Intent.ACTION_USER_ADDED)) {
                 final int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, USER_NULL);
                 if (userId != USER_NULL) {
@@ -2570,7 +2573,9 @@ public class NotificationManagerService extends SystemService {
         // calling onDestroy()
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_USER_STOPPED);
-        filter.addAction(Intent.ACTION_USER_SWITCHED);
+        if (!Flags.useSsmUserSwitchSignal()) {
+            filter.addAction(Intent.ACTION_USER_SWITCHED);
+        }
         filter.addAction(Intent.ACTION_USER_ADDED);
         filter.addAction(Intent.ACTION_USER_REMOVED);
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
@@ -2634,27 +2639,48 @@ public class NotificationManagerService extends SystemService {
      * Cleanup broadcast receivers change listeners.
      */
     public void onDestroy() {
-        getContext().unregisterReceiver(mIntentReceiver);
-        getContext().unregisterReceiver(mPackageIntentReceiver);
-        if (Flags.allNotifsNeedTtl()) {
-            mTtlHelper.destroy();
-        } else {
-            getContext().unregisterReceiver(mNotificationTimeoutReceiver);
+        if (mIntentReceiver != null) {
+            getContext().unregisterReceiver(mIntentReceiver);
         }
-        getContext().unregisterReceiver(mRestoreReceiver);
-        getContext().unregisterReceiver(mLocaleChangeReceiver);
-
-        mSettingsObserver.destroy();
-        mRoleObserver.destroy();
+        if (mPackageIntentReceiver != null) {
+            getContext().unregisterReceiver(mPackageIntentReceiver);
+        }
+        if (Flags.allNotifsNeedTtl()) {
+            if (mTtlHelper != null) {
+                mTtlHelper.destroy();
+            }
+        } else {
+            if (mNotificationTimeoutReceiver != null) {
+                getContext().unregisterReceiver(mNotificationTimeoutReceiver);
+            }
+        }
+        if (mRestoreReceiver != null) {
+            getContext().unregisterReceiver(mRestoreReceiver);
+        }
+        if (mLocaleChangeReceiver != null) {
+            getContext().unregisterReceiver(mLocaleChangeReceiver);
+        }
+        if (mSettingsObserver != null) {
+            mSettingsObserver.destroy();
+        }
+        if (mRoleObserver != null) {
+            mRoleObserver.destroy();
+        }
         if (mShortcutHelper != null) {
             mShortcutHelper.destroy();
         }
-        mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_PREFERENCES);
-        mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_CHANNEL_PREFERENCES);
-        mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_CHANNEL_GROUP_PREFERENCES);
-        mStatsManager.clearPullAtomCallback(DND_MODE_RULE);
-        mAppOps.stopWatchingMode(mAppOpsListener);
-        mAlarmManager.cancelAll();
+        if (mStatsManager != null) {
+            mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_PREFERENCES);
+            mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_CHANNEL_PREFERENCES);
+            mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_CHANNEL_GROUP_PREFERENCES);
+            mStatsManager.clearPullAtomCallback(DND_MODE_RULE);
+        }
+        if (mAppOps != null) {
+            mAppOps.stopWatchingMode(mAppOpsListener);
+        }
+        if (mAlarmManager != null) {
+            mAlarmManager.cancelAll();
+        }
     }
 
     protected String[] getStringArrayResource(int key) {
@@ -2963,6 +2989,26 @@ public class NotificationManagerService extends SystemService {
                 Slog.w(TAG, "Can't notify app about app block change", e);
             }
         }, 500);
+    }
+
+    @Override
+    public void onUserSwitching(@Nullable TargetUser from, @NonNull TargetUser to) {
+        if (!Flags.useSsmUserSwitchSignal()) {
+            return;
+        }
+        final int userId = to.getUserIdentifier();
+        mUserProfiles.updateCache(getContext());
+        if (!mUserProfiles.isProfileUser(userId, getContext())) {
+            // reload per-user settings
+            mSettingsObserver.update(null);
+            // Refresh managed services
+            mConditionProviders.onUserSwitched(userId);
+            mListeners.onUserSwitched(userId);
+            mZenModeHelper.onUserSwitched(userId);
+            mPreferencesHelper.syncChannelsBypassingDnd();
+        }
+        // assistant is the only thing that cares about managed profiles specifically
+        mAssistants.onUserSwitched(userId);
     }
 
     @Override
@@ -7699,6 +7745,9 @@ public class NotificationManagerService extends SystemService {
             return true;
         }
         // Check if an app has been given system exemption
+        if (ai.uid == Process.SYSTEM_UID) {
+            return false;
+        }
         return mAppOps.checkOpNoThrow(
                 AppOpsManager.OP_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS, ai.uid,
                 ai.packageName) == MODE_ALLOWED;
@@ -7990,6 +8039,13 @@ public class NotificationManagerService extends SystemService {
                         + " by user request.");
             }
             mUsageStats.registerBlocked(r);
+            return false;
+        }
+
+        if (Flags.rejectOldNotifications() && n.hasAppProvidedWhen() && n.getWhen() > 0
+                && (System.currentTimeMillis() - n.getWhen()) > NOTIFICATION_MAX_AGE_AT_POST) {
+            Slog.d(TAG, "Ignored enqueue for old " + n.getWhen() + " notification " + r.getKey());
+            mUsageStats.registerTooOldBlocked(r);
             return false;
         }
 
@@ -11248,6 +11304,9 @@ public class NotificationManagerService extends SystemService {
 
             // Lifetime extended notifications don't need to alert on state change.
             record.setPostSilently(true);
+            // We also set FLAG_ONLY_ALERT_ONCE to avoid the notification from HUN-ing again.
+            record.getNotification().flags |= FLAG_ONLY_ALERT_ONCE;
+
             mHandler.post(new EnqueueNotificationRunnable(record.getUser().getIdentifier(),
                     record, isAppForeground,
                     mPostNotificationTrackerFactory.newTracker(null)));

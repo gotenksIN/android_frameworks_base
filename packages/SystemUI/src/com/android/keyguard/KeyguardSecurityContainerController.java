@@ -42,7 +42,6 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.media.AudioManager;
 import android.metrics.LogMaker;
-import android.os.Looper;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.telephony.TelephonyManager;
@@ -98,15 +97,12 @@ import com.android.systemui.util.ViewController;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.settings.GlobalSettings;
 
-import com.google.common.util.concurrent.ListenableFuture;
-
 import dagger.Lazy;
 
 import kotlinx.coroutines.Job;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.concurrent.ExecutionException;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -1127,22 +1123,9 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
             // attempts.
             final int expiringUser =
                     mDevicePolicyManager.getProfileWithMinimumFailedPasswordsForWipe(userId);
-            ListenableFuture<Integer> getMainUserIdFuture =
-                    mSelectedUserInteractor.getMainUserIdAsync();
-            getMainUserIdFuture.addListener(() -> {
-                Looper.prepare();
-                Integer mainUser;
-                try {
-                    mainUser = getMainUserIdFuture.get();
-                } catch (InterruptedException | ExecutionException e) {
-                    // Nothing we can, keep using the system user as the primary
-                    // user.
-                    mainUser = null;
-                }
-                showMessageForFailedUnlockAttempt(
-                        userId, expiringUser, mainUser, remainingBeforeWipe, failedAttempts);
-                Looper.loop();
-            }, ThreadUtils.getBackgroundExecutor());
+            Integer mainUser = mSelectedUserInteractor.getMainUserId();
+            showMessageForFailedUnlockAttempt(
+                    userId, expiringUser, mainUser, remainingBeforeWipe, failedAttempts);
         }
         mLockPatternUtils.reportFailedPasswordAttempt(userId);
         if (timeoutMs > 0) {

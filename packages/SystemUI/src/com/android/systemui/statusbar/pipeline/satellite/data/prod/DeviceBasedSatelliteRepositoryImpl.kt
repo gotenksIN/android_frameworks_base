@@ -249,11 +249,17 @@ constructor(
                 try {
                     sm.registerForNtnSignalStrengthChanged(bgDispatcher.asExecutor(), cb)
                     registered = true
+                    logBuffer.i { "Registered for signal strength successfully" }
                 } catch (e: Exception) {
                     logBuffer.e("error registering for signal strength", e)
                 }
 
-                awaitClose { if (registered) sm.unregisterForNtnSignalStrengthChanged(cb) }
+                awaitClose {
+                    if (registered) {
+                        sm.unregisterForNtnSignalStrengthChanged(cb)
+                        logBuffer.i { "Unregistered for signal strength successfully" }
+                    }
+                }
             }
             .flowOn(bgDispatcher)
 
@@ -318,8 +324,8 @@ constructor(
         }
 
     companion object {
-        // TTL for satellite polling is one hour
-        const val POLLING_INTERVAL_MS: Long = 1000 * 60 * 60
+        // TTL for satellite polling is twenty minutes
+        const val POLLING_INTERVAL_MS: Long = 1000 * 60 * 20
 
         // Let the system boot up and stabilize before we check for system support
         const val MIN_UPTIME: Long = 1000 * 60

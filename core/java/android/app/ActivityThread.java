@@ -50,6 +50,7 @@ import android.app.RemoteServiceException.BadUserInitiatedJobNotificationExcepti
 import android.app.RemoteServiceException.CannotPostForegroundServiceNotificationException;
 import android.app.RemoteServiceException.CrashedByAdbException;
 import android.app.RemoteServiceException.ForegroundServiceDidNotStartInTimeException;
+import android.app.RemoteServiceException.ForegroundServiceDidNotStopInTimeException;
 import android.app.RemoteServiceException.MissingRequestPasswordComplexityPermissionException;
 import android.app.assist.AssistContent;
 import android.app.assist.AssistStructure;
@@ -2237,6 +2238,9 @@ public final class ActivityThread extends ClientTransactionHandler
             case ForegroundServiceDidNotStartInTimeException.TYPE_ID:
                 throw generateForegroundServiceDidNotStartInTimeException(message, extras);
 
+            case ForegroundServiceDidNotStopInTimeException.TYPE_ID:
+                throw generateForegroundServiceDidNotStopInTimeException(message, extras);
+
             case CannotPostForegroundServiceNotificationException.TYPE_ID:
                 throw new CannotPostForegroundServiceNotificationException(message);
 
@@ -2265,6 +2269,15 @@ public final class ActivityThread extends ClientTransactionHandler
         final Exception inner = (serviceClassName == null) ? null
                 : Service.getStartForegroundServiceStackTrace(serviceClassName);
         throw new ForegroundServiceDidNotStartInTimeException(message, inner);
+    }
+
+    private ForegroundServiceDidNotStopInTimeException
+            generateForegroundServiceDidNotStopInTimeException(String message, Bundle extras) {
+        final String serviceClassName =
+                ForegroundServiceDidNotStopInTimeException.getServiceClassNameFromExtras(extras);
+        final Exception inner = (serviceClassName == null) ? null
+                : Service.getStartForegroundServiceStackTrace(serviceClassName);
+        throw new ForegroundServiceDidNotStopInTimeException(message, inner);
     }
 
     class H extends Handler {

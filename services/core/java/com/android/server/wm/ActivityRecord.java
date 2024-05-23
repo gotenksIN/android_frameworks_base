@@ -11039,8 +11039,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             final Rect filledContainerBounds = mIsInFixedOrientationOrAspectRatioLetterbox
                     ? letterboxedContainerBounds
                     : task != null ? task.getBounds() : display.getBounds();
-            final int filledContainerRotation = task != null
-                    ? task.getConfiguration().windowConfiguration.getRotation()
+            final boolean useActivityRotation = container.hasFixedRotationTransform()
+                    && mIsInFixedOrientationOrAspectRatioLetterbox;
+            final int filledContainerRotation = useActivityRotation
+                    ? container.getWindowConfiguration().getRotation()
                     : display.getConfiguration().windowConfiguration.getRotation();
             final Point dimensions = getRotationZeroDimensions(
                     filledContainerBounds, filledContainerRotation);

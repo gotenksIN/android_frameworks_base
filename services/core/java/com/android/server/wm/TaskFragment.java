@@ -326,9 +326,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     /** Organizer that organizing this TaskFragment. */
     @Nullable
     private ITaskFragmentOrganizer mTaskFragmentOrganizer;
-    @VisibleForTesting
+
     int mTaskFragmentOrganizerUid = INVALID_UID;
-    private @Nullable String mTaskFragmentOrganizerProcessName;
+    @Nullable String mTaskFragmentOrganizerProcessName;
 
     /** Client assigned unique token for this TaskFragment if this is created by an organizer. */
     @Nullable
@@ -491,14 +491,16 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      */
     @Nullable
     private WindowProcessController getOrganizerProcessIfDifferent(@Nullable ActivityRecord r) {
-        if ((r == null || mTaskFragmentOrganizerProcessName == null)
-                || (mTaskFragmentOrganizerProcessName.equals(r.processName)
-                && mTaskFragmentOrganizerUid == r.getUid())) {
-            // No organizer or the process is the same.
+        final Task task = getTask();
+        if (r == null || task == null || task.mTaskFragmentHostProcessName == null) {
             return null;
         }
-        return mAtmService.getProcessController(mTaskFragmentOrganizerProcessName,
-                mTaskFragmentOrganizerUid);
+        if (task.mTaskFragmentHostProcessName.equals(r.processName)
+                && task.mTaskFragmentHostUid == r.getUid()) {
+            return null;
+        }
+        return mAtmService.getProcessController(task.mTaskFragmentHostProcessName,
+                task.mTaskFragmentHostUid);
     }
 
     void setAnimationParams(@NonNull TaskFragmentAnimationParams animationParams) {

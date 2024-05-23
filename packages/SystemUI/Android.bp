@@ -362,7 +362,6 @@ android_library {
         "device_state_flags_lib",
         "kotlinx_coroutines_android",
         "kotlinx_coroutines",
-        "kotlinx_coroutines_guava",
         "//frameworks/libs/systemui:iconloader_base",
         "SystemUI-tags",
         "SystemUI-proto",
@@ -552,7 +551,6 @@ android_library {
         "androidx.activity_activity-compose",
         "androidx.compose.animation_animation-graphics",
         "TraceurCommon",
-        "kotlinx_coroutines_guava",
     ],
 }
 
@@ -580,7 +578,7 @@ android_library {
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "mockito-target-extended-minus-junit4",
-        "mockito-kotlin2",
+        "mockito-kotlin-nodeps",
         "androidx.test.ext.junit",
         "androidx.test.ext.truth",
         "kotlin-test",
@@ -669,6 +667,7 @@ java_library {
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
         "inline-mockito-robolectric-prebuilt",
+        "mockito-kotlin-nodeps",
         "platform-parametric-runner-lib",
         "SystemUICustomizationTestUtils",
         "kotlin-test",
@@ -753,6 +752,7 @@ android_ravenwood_test {
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
         "kosmos",
+        "mockito-kotlin-nodeps",
     ],
     libs: [
         "android.test.runner",

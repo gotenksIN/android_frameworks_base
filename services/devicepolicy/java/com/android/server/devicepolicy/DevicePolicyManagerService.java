@@ -339,6 +339,7 @@ import android.app.admin.ManagedProfileProvisioningParams;
 import android.app.admin.ManagedSubscriptionsPolicy;
 import android.app.admin.NetworkEvent;
 import android.app.admin.PackagePolicy;
+import android.app.admin.PackageSetPolicyValue;
 import android.app.admin.ParcelableGranteeMap;
 import android.app.admin.ParcelableResource;
 import android.app.admin.PasswordMetrics;
@@ -350,7 +351,6 @@ import android.app.admin.PreferentialNetworkServiceConfig;
 import android.app.admin.SecurityLog;
 import android.app.admin.SecurityLog.SecurityEvent;
 import android.app.admin.StartInstallingUpdateCallback;
-import android.app.admin.StringSetPolicyValue;
 import android.app.admin.SystemUpdateInfo;
 import android.app.admin.SystemUpdatePolicy;
 import android.app.admin.UnsafeStateException;
@@ -2718,6 +2718,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                     mDevicePolicyEngine.getResolvedPolicy(
                             PolicyDefinition.SECURITY_LOGGING, UserHandle.USER_ALL));
             setLoggingConfiguration(securityLoggingEnabled, auditLoggingEnabled);
+            mInjector.runCryptoSelfTest();
         } else {
             synchronized (getLockObject()) {
                 mSecurityLogMonitor.start(getSecurityLoggingEnabledUser());
@@ -12073,7 +12074,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 mDevicePolicyEngine.setLocalPolicy(
                         PolicyDefinition.PERMITTED_INPUT_METHODS,
                         admin,
-                        new StringSetPolicyValue(new HashSet<>(packageList)),
+                        new PackageSetPolicyValue(new HashSet<>(packageList)),
                         userId);
             }
         }
@@ -15172,10 +15173,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             if (statusBarService != null) {
                 int flags1 = disabled ? STATUS_BAR_DISABLE_MASK : StatusBarManager.DISABLE_NONE;
                 int flags2 = disabled ? STATUS_BAR_DISABLE2_MASK : StatusBarManager.DISABLE2_NONE;
-                StatusBarManager.DisableInfo info = new StatusBarManager.DisableInfo(flags1,
-                        flags2);
-                statusBarService.disableForUser(info, mToken, mContext.getPackageName(), userId,
-                        "setStatusBarDisabledInternal");
+                statusBarService.disableForUser(flags1, mToken, mContext.getPackageName(), userId);
+                statusBarService.disable2ForUser(flags2, mToken, mContext.getPackageName(), userId);
                 return true;
             }
         } catch (RemoteException e) {
@@ -20358,12 +20357,12 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             mDevicePolicyEngine.setGlobalPolicy(
                     PolicyDefinition.USER_CONTROLLED_DISABLED_PACKAGES,
                     enforcingAdmin,
-                    new StringSetPolicyValue(packages));
+                    new PackageSetPolicyValue(packages));
         } else {
             mDevicePolicyEngine.setLocalPolicy(
                     PolicyDefinition.USER_CONTROLLED_DISABLED_PACKAGES,
                     enforcingAdmin,
-                    new StringSetPolicyValue(packages),
+                    new PackageSetPolicyValue(packages),
                     caller.getUserId());
         }
     }
@@ -24045,7 +24044,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         mDevicePolicyEngine.setLocalPolicy(
                                 PolicyDefinition.PERMITTED_INPUT_METHODS,
                                 enforcingAdmin,
-                                new StringSetPolicyValue(
+                                new PackageSetPolicyValue(
                                         new HashSet<>(admin.permittedInputMethods)),
                                 admin.getUserHandle().getIdentifier());
                     }
@@ -24054,7 +24053,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         mDevicePolicyEngine.setLocalPolicy(
                                 PolicyDefinition.PERMITTED_INPUT_METHODS,
                                 enforcingAdmin,
-                                new StringSetPolicyValue(
+                                new PackageSetPolicyValue(
                                         new HashSet<>(admin.getParentActiveAdmin()
                                                 .permittedInputMethods)),
                                 getProfileParentId(admin.getUserHandle().getIdentifier()));
@@ -24110,12 +24109,14 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         mDevicePolicyEngine.setGlobalPolicy(
                                 PolicyDefinition.USER_CONTROLLED_DISABLED_PACKAGES,
                                 enforcingAdmin,
-                                new StringSetPolicyValue(new HashSet<>(admin.protectedPackages)));
+                                new PackageSetPolicyValue(
+                                        new HashSet<>(admin.protectedPackages)));
                     } else {
                         mDevicePolicyEngine.setLocalPolicy(
                                 PolicyDefinition.USER_CONTROLLED_DISABLED_PACKAGES,
                                 enforcingAdmin,
-                                new StringSetPolicyValue(new HashSet<>(admin.protectedPackages)),
+                                new PackageSetPolicyValue(
+                                        new HashSet<>(admin.protectedPackages)),
                                 admin.getUserHandle().getIdentifier());
                     }
                 }

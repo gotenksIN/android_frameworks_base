@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
-import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.flags.FeatureFlagsClassic
@@ -57,18 +56,6 @@ constructor(
         interactor.setShadeScrimBounds(bounds)
     }
 
-    /** Notifies that the bounds of the notification placeholder have changed. */
-    fun onStackBoundsChanged(
-        top: Float,
-        bottom: Float,
-    ) {
-        keyguardInteractor.setNotificationContainerBounds(
-            NotificationContainerBounds(top = top, bottom = bottom)
-        )
-        interactor.setStackTop(top)
-        interactor.setStackBottom(bottom)
-    }
-
     /** Sets the available space */
     fun onConstrainedAvailableSpaceChanged(height: Int) {
         interactor.setConstrainedAvailableSpace(height)
@@ -86,13 +73,6 @@ constructor(
     /** Corner rounding of the stack */
     val shadeScrimRounding: Flow<ShadeScrimRounding> =
         interactor.shadeScrimRounding.dumpWhileCollecting("shadeScrimRounding")
-
-    /**
-     * The height in px of the contents of notification stack. Depending on the number of
-     * notifications, this can exceed the space available on screen to show notifications, at which
-     * point the notification stack should become scrollable.
-     */
-    val stackHeight: StateFlow<Float> = interactor.stackHeight.dumpValue("stackHeight")
 
     /** The height in px of the contents of the HUN. */
     val headsUpHeight: StateFlow<Float> = interactor.headsUpHeight.dumpValue("headsUpHeight")

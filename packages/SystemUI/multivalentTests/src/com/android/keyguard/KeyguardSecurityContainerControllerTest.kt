@@ -21,6 +21,7 @@ import android.app.admin.DevicePolicyManager
 import android.app.admin.flags.Flags as DevicePolicyFlags
 import android.content.res.Configuration
 import android.media.AudioManager
+import android.platform.test.annotations.EnableFlags
 import android.telephony.TelephonyManager
 import android.testing.TestableLooper.RunWithLooper
 import android.testing.TestableResources
@@ -939,8 +940,8 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     }
 
     @Test
+    @EnableFlags(DevicePolicyFlags.FLAG_HEADLESS_SINGLE_USER_FIXES)
     fun showAlmostAtWipeDialog_calledOnMainUser_setsCorrectUserType() {
-        mSetFlagsRule.enableFlags(DevicePolicyFlags.FLAG_HEADLESS_SINGLE_USER_FIXES)
         val mainUserId = 10
 
         underTest.showMessageForFailedUnlockAttempt(
@@ -956,8 +957,8 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     }
 
     @Test
+    @EnableFlags(DevicePolicyFlags.FLAG_HEADLESS_SINGLE_USER_FIXES)
     fun showAlmostAtWipeDialog_calledOnNonMainUser_setsCorrectUserType() {
-        mSetFlagsRule.enableFlags(DevicePolicyFlags.FLAG_HEADLESS_SINGLE_USER_FIXES)
         val secondaryUserId = 10
         val mainUserId = 0
 

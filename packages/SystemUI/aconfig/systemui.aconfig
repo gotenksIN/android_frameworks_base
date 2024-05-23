@@ -171,16 +171,6 @@ flag {
 }
 
 flag {
-    name: "nssl_falsing_fix"
-    namespace: "systemui"
-    description: "Minor touch changes to prevent falsing errors in NSSL"
-    bug: "316551193"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "refactor_get_current_user"
     namespace: "systemui"
     description: "KeyguardUpdateMonitor.getCurrentUser() was providing outdated results."
@@ -480,6 +470,17 @@ flag {
 }
 
 flag {
+    name: "fix_screenshot_action_dismiss_system_windows"
+    namespace: "systemui"
+    description: "Dismiss existing system windows when starting action from screenshot UI"
+    bug: "309933761"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+
+flag {
     name: "screenshot_private_profile_behavior_fix"
     namespace: "systemui"
     description: "Private profile support for screenshots"
@@ -560,6 +561,13 @@ flag {
 }
 
 flag {
+    name: "enable_contextual_tip_for_mute_volume"
+    namespace: "systemui"
+    description: "Enables the contextual tip for muting the volume."
+    bug: "337737048"
+}
+
+flag {
    name: "disable_contextual_tips_frequency_check"
    description: "Disables frequency capping check for contextual tips."
    namespace: "systemui"
@@ -578,6 +586,16 @@ flag {
    description: "Enables showing contextual tips."
    namespace: "systemui"
    bug: "322891421"
+}
+
+flag {
+   name: "contextual_tips_assistant_dismiss_fix"
+   namespace: "systemui"
+   description: "Improve assistant dismiss signal accuracy for contextual tips."
+   bug: "334759504"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
 }
 
 flag {
@@ -796,7 +814,7 @@ flag {
     name: "dream_input_session_pilfer_once"
     namespace: "systemui"
     description: "Pilfer at most once per input session"
-    bug: "324600132"
+    bug: "333596426"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -850,10 +868,47 @@ flag {
 }
 
 flag {
+   name: "restart_dream_on_unocclude"
+   namespace: "systemui"
+   description: "re-enters dreaming upon unocclude when dreaming when originally occluding"
+   bug: "338051457"
+   metadata {
+     purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
   name: "communal_bouncer_do_not_modify_plugin_open"
   namespace: "systemui"
   description: "do not modify notification shade when handling bouncer expansion."
   bug: "338252661"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "app_clips_backlinks"
+  namespace: "systemui"
+  description: "Enables Backlinks improvement feature in App Clips"
+  bug: "300307759"
+}
+
+flag {
+  name: "qs_custom_tile_click_guaranteed_bug_fix"
+  namespace: "systemui"
+  description: "Guarantee that clicks on a tile always happen by postponing onStopListening until after the click."
+  bug: "339290820"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "media_controls_user_initiated_dismiss"
+  namespace: "systemui"
+  description: "Only dismiss media notifications when the control was removed by the user."
+  bug: "335875159"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

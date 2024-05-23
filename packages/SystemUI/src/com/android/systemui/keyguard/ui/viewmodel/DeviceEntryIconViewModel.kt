@@ -19,6 +19,7 @@ package com.android.systemui.keyguard.ui.viewmodel
 import android.animation.FloatEvaluator
 import android.animation.IntEvaluator
 import com.android.keyguard.KeyguardViewController
+import com.android.systemui.accessibility.domain.interactor.AccessibilityInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
@@ -68,6 +69,7 @@ constructor(
     private val keyguardViewController: Lazy<KeyguardViewController>,
     private val deviceEntryInteractor: DeviceEntryInteractor,
     private val deviceEntrySourceInteractor: DeviceEntrySourceInteractor,
+    private val accessibilityInteractor: AccessibilityInteractor,
     @Application private val scope: CoroutineScope,
 ) {
     val isUdfpsSupported: StateFlow<Boolean> = deviceEntryUdfpsInteractor.isUdfpsSupported
@@ -84,19 +86,21 @@ constructor(
             .map { it.deviceEntryParentViewAlpha }
             .merge()
             .shareIn(scope, SharingStarted.WhileSubscribed())
+            .onStart { emit(initialAlphaFromKeyguardState(transitionInteractor.getCurrentState())) }
     private val alphaMultiplierFromShadeExpansion: Flow<Float> =
         combine(
-            showingAlternateBouncer,
-            shadeExpansion,
-            qsProgress,
-        ) { showingAltBouncer, shadeExpansion, qsProgress ->
-            val interpolatedQsProgress = (qsProgress * 2).coerceIn(0f, 1f)
-            if (showingAltBouncer) {
-                1f
-            } else {
-                (1f - shadeExpansion) * (1f - interpolatedQsProgress)
+                showingAlternateBouncer,
+                shadeExpansion,
+                qsProgress,
+            ) { showingAltBouncer, shadeExpansion, qsProgress ->
+                val interpolatedQsProgress = (qsProgress * 2).coerceIn(0f, 1f)
+                if (showingAltBouncer) {
+                    1f
+                } else {
+                    (1f - shadeExpansion) * (1f - interpolatedQsProgress)
+                }
             }
-        }
+            .onStart { emit(1f) }
     // Burn-in offsets in AOD
     private val nonAnimatedBurnInOffsets: Flow<BurnInOffsets> =
         combine(
@@ -122,14 +126,35 @@ constructor(
             )
         }
 
-    val deviceEntryViewAlpha: StateFlow<Float> =
+    val deviceEntryViewAlpha: Flow<Float> =
         combine(
                 transitionAlpha,
                 alphaMultiplierFromShadeExpansion,
             ) { alpha, alphaMultiplier ->
                 alpha * alphaMultiplier
             }
-            .stateIn(scope = scope, started = SharingStarted.WhileSubscribed(), initialValue = 0f)
+            .stateIn(
+                scope = scope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = 0f,
+            )
+
+    private fun initialAlphaFromKeyguardState(keyguardState: KeyguardState): Float {
+        return when (keyguardState) {
+            KeyguardState.OFF,
+            KeyguardState.PRIMARY_BOUNCER,
+            KeyguardState.DOZING,
+            KeyguardState.DREAMING,
+            KeyguardState.GLANCEABLE_HUB,
+            KeyguardState.GONE,
+            KeyguardState.OCCLUDED,
+            KeyguardState.DREAMING_LOCKSCREEN_HOSTED,
+            KeyguardState.UNDEFINED, -> 0f
+            KeyguardState.AOD,
+            KeyguardState.ALTERNATE_BOUNCER,
+            KeyguardState.LOCKSCREEN, -> 1f
+        }
+    }
     val useBackgroundProtection: StateFlow<Boolean> = isUdfpsSupported
     val burnInOffsets: Flow<BurnInOffsets> =
         deviceEntryUdfpsInteractor.isUdfpsEnrolledAndEnabled
@@ -210,7 +235,8 @@ constructor(
             }
         }
     val isVisible: Flow<Boolean> = deviceEntryViewAlpha.map { it > 0f }.distinctUntilChanged()
-    val isLongPressEnabled: Flow<Boolean> =
+
+    private val isInteractive: Flow<Boolean> =
         combine(
             iconType,
             isUdfpsSupported,
@@ -222,17 +248,24 @@ constructor(
                 DeviceEntryIconView.IconType.NONE -> false
             }
         }
-
     val accessibilityDelegateHint: Flow<DeviceEntryIconView.AccessibilityHintType> =
-        combine(iconType, isLongPressEnabled) { deviceEntryStatus, longPressEnabled ->
-            if (longPressEnabled) {
-                deviceEntryStatus.toAccessibilityHintType()
+        accessibilityInteractor.isEnabled.flatMapLatest { touchExplorationEnabled ->
+            if (touchExplorationEnabled) {
+                combine(iconType, isInteractive) { iconType, isInteractive ->
+                    if (isInteractive) {
+                        iconType.toAccessibilityHintType()
+                    } else {
+                        DeviceEntryIconView.AccessibilityHintType.NONE
+                    }
+                }
             } else {
-                DeviceEntryIconView.AccessibilityHintType.NONE
+                flowOf(DeviceEntryIconView.AccessibilityHintType.NONE)
             }
         }
 
-    suspend fun onLongPress() {
+    val isLongPressEnabled: Flow<Boolean> = isInteractive
+
+    suspend fun onUserInteraction() {
         if (SceneContainerFlag.isEnabled) {
             deviceEntryInteractor.attemptDeviceEntry()
         } else {

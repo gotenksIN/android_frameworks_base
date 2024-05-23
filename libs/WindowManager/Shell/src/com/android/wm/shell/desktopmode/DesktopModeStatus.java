@@ -41,15 +41,6 @@ public class DesktopModeStatus {
     public static final boolean IS_DISPLAY_CHANGE_ENABLED = SystemProperties.getBoolean(
             "persist.wm.debug.desktop_change_display", false);
 
-
-    /**
-     * Flag to indicate that desktop stashing is enabled.
-     * When enabled, swiping home from desktop stashes the open apps. Next app that launches,
-     * will be added to the desktop.
-     */
-    private static final boolean IS_STASHING_ENABLED = SystemProperties.getBoolean(
-            "persist.wm.debug.desktop_stashing", false);
-
     /**
      * Flag to indicate whether to apply shadows to windows in desktop mode.
      */
@@ -65,7 +56,7 @@ public class DesktopModeStatus {
             "persist.wm.debug.desktop_use_window_shadows_focused_window", false);
 
     /**
-     * Flag to indicate whether to apply shadows to windows in desktop mode.
+     * Flag to indicate whether to use rounded corners for windows in desktop mode.
      */
     private static final boolean USE_ROUNDED_CORNERS = SystemProperties.getBoolean(
             "persist.wm.debug.desktop_use_rounded_corners", true);
@@ -93,8 +84,10 @@ public class DesktopModeStatus {
             "persist.wm.debug.desktop_max_task_limit", DEFAULT_MAX_TASK_LIMIT);
 
     /**
-     * Return {@code true} if desktop windowing is enabled
+     * Return {@code true} if desktop windowing is enabled. Only to be used for testing. Callers
+     * should use {@link #canEnterDesktopMode(Context)} to query the state of desktop windowing.
      */
+    @VisibleForTesting
     public static boolean isEnabled() {
         return Flags.enableDesktopWindowingMode();
     }
@@ -104,14 +97,6 @@ public class DesktopModeStatus {
      */
     public static boolean isVeiledResizeEnabled() {
         return IS_VEILED_RESIZE_ENABLED;
-    }
-
-    /**
-     * Return {@code true} if desktop task stashing is enabled when going home.
-     * Allows users to use home screen to add tasks to desktop.
-     */
-    public static boolean isStashingEnabled() {
-        return IS_STASHING_ENABLED;
     }
 
     /**
@@ -155,9 +140,9 @@ public class DesktopModeStatus {
     }
 
     /**
-     * Return {@code true} if desktop mode can be entered on the current device.
+     * Return {@code true} if desktop mode is enabled and can be entered on the current device.
      */
     public static boolean canEnterDesktopMode(@NonNull Context context) {
-        return !enforceDeviceRestrictions() || isDesktopModeSupported(context);
+        return (!enforceDeviceRestrictions() || isDesktopModeSupported(context)) && isEnabled();
     }
 }

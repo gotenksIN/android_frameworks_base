@@ -434,6 +434,7 @@ constructor(
         SubscriptionModel(
             subscriptionId = subscriptionId,
             isOpportunistic = isOpportunistic,
+            isExclusivelyNonTerrestrial = isOnlyNonTerrestrialNetwork,
             groupUuid = groupUuid,
             carrierName = carrierName.toString(),
             profileClass = profileClass,

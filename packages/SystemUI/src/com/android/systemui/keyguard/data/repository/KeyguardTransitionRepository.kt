@@ -134,7 +134,7 @@ constructor(
             TransitionInfo(
                 ownerName = "",
                 from = KeyguardState.OFF,
-                to = KeyguardState.LOCKSCREEN,
+                to = KeyguardState.OFF,
                 animator = null
             )
         )
@@ -247,7 +247,7 @@ constructor(
         state: TransitionState
     ) {
         if (updateTransitionId != transitionId) {
-            Log.wtf(TAG, "Attempting to update with old/invalid transitionId: $transitionId")
+            Log.w(TAG, "Attempting to update with old/invalid transitionId: $transitionId")
             return
         }
 
@@ -266,6 +266,14 @@ constructor(
     }
 
     override suspend fun emitInitialStepsFromOff(to: KeyguardState) {
+        _currentTransitionInfo.value =
+            TransitionInfo(
+                ownerName = "KeyguardTransitionRepository(boot)",
+                from = KeyguardState.OFF,
+                to = to,
+                animator = null
+            )
+
         emitTransition(
             TransitionStep(
                 KeyguardState.OFF,

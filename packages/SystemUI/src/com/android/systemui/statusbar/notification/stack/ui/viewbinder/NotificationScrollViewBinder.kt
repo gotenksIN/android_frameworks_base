@@ -79,8 +79,6 @@ constructor(
         }
 
         launch { viewModel.maxAlpha.collect { view.setMaxAlpha(it) } }
-        launch { viewModel.stackTop.collect { view.setStackTop(it) } }
-        launch { viewModel.stackBottom.collect { view.setStackBottom(it) } }
         launch { viewModel.scrolledToTop.collect { view.setScrolledToTop(it) } }
         launch { viewModel.headsUpTop.collect { view.setHeadsUpTop(it) } }
         launch { viewModel.expandFraction.collect { view.setExpandFraction(it.coerceIn(0f, 1f)) } }
@@ -90,12 +88,10 @@ constructor(
         launchAndDispose {
             view.setSyntheticScrollConsumer(viewModel.syntheticScrollConsumer)
             view.setCurrentGestureOverscrollConsumer(viewModel.currentGestureOverscrollConsumer)
-            view.setStackHeightConsumer(viewModel.stackHeightConsumer)
             view.setHeadsUpHeightConsumer(viewModel.headsUpHeightConsumer)
             DisposableHandle {
                 view.setSyntheticScrollConsumer(null)
                 view.setCurrentGestureOverscrollConsumer(null)
-                view.setStackHeightConsumer(null)
                 view.setHeadsUpHeightConsumer(null)
             }
         }

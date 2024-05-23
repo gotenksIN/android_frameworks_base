@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,6 +68,9 @@ import com.android.compose.animation.scene.animateSceneFloatAsState
 import com.android.compose.modifiers.padding
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.battery.BatteryMeterViewController
+import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
+import com.android.systemui.common.ui.compose.windowinsets.LocalDisplayCutout
+import com.android.systemui.common.ui.compose.windowinsets.LocalScreenCornerRadius
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.media.controls.ui.composable.MediaCarousel
 import com.android.systemui.media.controls.ui.controller.MediaCarouselController
@@ -79,13 +83,16 @@ import com.android.systemui.qs.footer.ui.compose.FooterActionsWithAnimatedVisibi
 import com.android.systemui.qs.ui.composable.BrightnessMirror
 import com.android.systemui.qs.ui.composable.QuickSettings
 import com.android.systemui.res.R
+import com.android.systemui.scene.session.ui.composable.SaveableSession
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.composable.ComposableScene
 import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.shade.ui.viewmodel.ShadeSceneViewModel
+import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView
 import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.phone.ui.TintedIconManager
+import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Named
 import kotlin.math.roundToInt
@@ -96,6 +103,7 @@ object Shade {
         val MediaCarousel = ElementKey("ShadeMediaCarousel")
         val BackgroundScrim =
             ElementKey("ShadeBackgroundScrim", scenePicker = LowestZIndexScenePicker)
+        val SplitShadeStartColumn = ElementKey("SplitShadeStartColumn")
     }
 
     object Dimensions {
@@ -119,6 +127,8 @@ object Shade {
 class ShadeScene
 @Inject
 constructor(
+    private val shadeSession: SaveableSession,
+    private val notificationStackScrollView: Lazy<NotificationScrollView>,
     private val viewModel: ShadeSceneViewModel,
     private val tintedIconManagerFactory: TintedIconManager.Factory,
     private val batteryMeterViewControllerFactory: BatteryMeterViewController.Factory,
@@ -126,6 +136,7 @@ constructor(
     private val mediaCarouselController: MediaCarouselController,
     @Named(QUICK_QS_PANEL) private val mediaHost: MediaHost,
 ) : ComposableScene {
+
     override val key = Scenes.Shade
 
     override val destinationScenes: StateFlow<Map<UserAction, UserActionResult>> =
@@ -136,6 +147,7 @@ constructor(
         modifier: Modifier,
     ) =
         ShadeScene(
+            notificationStackScrollView.get(),
             viewModel = viewModel,
             createTintedIconManager = tintedIconManagerFactory::create,
             createBatteryMeterViewController = batteryMeterViewControllerFactory::create,
@@ -143,6 +155,7 @@ constructor(
             mediaCarouselController = mediaCarouselController,
             mediaHost = mediaHost,
             modifier = modifier,
+            shadeSession = shadeSession,
         )
 
     init {
@@ -154,6 +167,7 @@ constructor(
 
 @Composable
 private fun SceneScope.ShadeScene(
+    notificationStackScrollView: NotificationScrollView,
     viewModel: ShadeSceneViewModel,
     createTintedIconManager: (ViewGroup, StatusBarLocation) -> TintedIconManager,
     createBatteryMeterViewController: (ViewGroup, StatusBarLocation) -> BatteryMeterViewController,
@@ -161,11 +175,13 @@ private fun SceneScope.ShadeScene(
     mediaCarouselController: MediaCarouselController,
     mediaHost: MediaHost,
     modifier: Modifier = Modifier,
+    shadeSession: SaveableSession,
 ) {
     val shadeMode by viewModel.shadeMode.collectAsState()
     when (shadeMode) {
         is ShadeMode.Single ->
             SingleShade(
+                notificationStackScrollView = notificationStackScrollView,
                 viewModel = viewModel,
                 createTintedIconManager = createTintedIconManager,
                 createBatteryMeterViewController = createBatteryMeterViewController,
@@ -173,9 +189,11 @@ private fun SceneScope.ShadeScene(
                 mediaCarouselController = mediaCarouselController,
                 mediaHost = mediaHost,
                 modifier = modifier,
+                shadeSession = shadeSession,
             )
         is ShadeMode.Split ->
             SplitShade(
+                notificationStackScrollView = notificationStackScrollView,
                 viewModel = viewModel,
                 createTintedIconManager = createTintedIconManager,
                 createBatteryMeterViewController = createBatteryMeterViewController,
@@ -183,6 +201,7 @@ private fun SceneScope.ShadeScene(
                 mediaCarouselController = mediaCarouselController,
                 mediaHost = mediaHost,
                 modifier = modifier,
+                shadeSession = shadeSession,
             )
         is ShadeMode.Dual -> error("Dual shade is not yet implemented!")
     }
@@ -190,6 +209,7 @@ private fun SceneScope.ShadeScene(
 
 @Composable
 private fun SceneScope.SingleShade(
+    notificationStackScrollView: NotificationScrollView,
     viewModel: ShadeSceneViewModel,
     createTintedIconManager: (ViewGroup, StatusBarLocation) -> TintedIconManager,
     createBatteryMeterViewController: (ViewGroup, StatusBarLocation) -> BatteryMeterViewController,
@@ -197,7 +217,10 @@ private fun SceneScope.SingleShade(
     mediaCarouselController: MediaCarouselController,
     mediaHost: MediaHost,
     modifier: Modifier = Modifier,
+    shadeSession: SaveableSession,
 ) {
+    val cutoutLocation = LocalDisplayCutout.current.location
+
     val maxNotifScrimTop = remember { mutableStateOf(0f) }
     val tileSquishiness by
         animateSceneFloatAsState(
@@ -206,6 +229,7 @@ private fun SceneScope.SingleShade(
             canOverflow = false
         )
     val isClickable by viewModel.isClickable.collectAsState()
+    val isMediaVisible by viewModel.isMediaVisible.collectAsState()
 
     val shouldPunchHoleBehindScrim =
         layoutState.isTransitioningBetween(Scenes.Gone, Scenes.Shade) ||
@@ -233,19 +257,21 @@ private fun SceneScope.SingleShade(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier =
-                                Modifier.fillMaxWidth().thenIf(isClickable) {
-                                    Modifier.clickable(onClick = { viewModel.onContentClicked() })
-                                }
+                                Modifier.fillMaxWidth()
+                                    .thenIf(isClickable) {
+                                        Modifier.clickable(
+                                            onClick = { viewModel.onContentClicked() }
+                                        )
+                                    }
+                                    .thenIf(cutoutLocation != CutoutLocation.CENTER) {
+                                        Modifier.displayCutoutPadding()
+                                    },
                         ) {
                             CollapsedShadeHeader(
                                 viewModel = viewModel.shadeHeaderViewModel,
                                 createTintedIconManager = createTintedIconManager,
                                 createBatteryMeterViewController = createBatteryMeterViewController,
                                 statusBarIconController = statusBarIconController,
-                                modifier =
-                                    Modifier.padding(
-                                        horizontal = Shade.Dimensions.HorizontalPadding
-                                    )
                             )
                             Box(Modifier.element(QuickSettings.Elements.QuickQuickSettings)) {
                                 QuickSettings(
@@ -257,7 +283,7 @@ private fun SceneScope.SingleShade(
                             }
 
                             MediaCarousel(
-                                isVisible = viewModel::isMediaVisible,
+                                isVisible = isMediaVisible,
                                 mediaHost = mediaHost,
                                 modifier = Modifier.fillMaxWidth(),
                                 carouselController = mediaCarouselController,
@@ -268,8 +294,11 @@ private fun SceneScope.SingleShade(
                     },
                     {
                         NotificationScrollingStack(
+                            shadeSession = shadeSession,
+                            stackScrollView = notificationStackScrollView,
                             viewModel = viewModel.notifications,
                             maxScrimTop = { maxNotifScrimTop.value },
+                            shadeMode = ShadeMode.Single,
                             shouldPunchHoleBehindScrim = shouldPunchHoleBehindScrim,
                         )
                     },
@@ -294,6 +323,7 @@ private fun SceneScope.SingleShade(
 
 @Composable
 private fun SceneScope.SplitShade(
+    notificationStackScrollView: NotificationScrollView,
     viewModel: ShadeSceneViewModel,
     createTintedIconManager: (ViewGroup, StatusBarLocation) -> TintedIconManager,
     createBatteryMeterViewController: (ViewGroup, StatusBarLocation) -> BatteryMeterViewController,
@@ -301,7 +331,10 @@ private fun SceneScope.SplitShade(
     mediaCarouselController: MediaCarouselController,
     mediaHost: MediaHost,
     modifier: Modifier = Modifier,
+    shadeSession: SaveableSession,
 ) {
+    val screenCornerRadius = LocalScreenCornerRadius.current
+
     val isCustomizing by viewModel.qsSceneAdapter.isCustomizing.collectAsState()
     val isCustomizerShowing by viewModel.qsSceneAdapter.isCustomizerShowing.collectAsState()
     val customizingAnimationDuration by
@@ -310,7 +343,11 @@ private fun SceneScope.SplitShade(
     val footerActionsViewModel =
         remember(lifecycleOwner, viewModel) { viewModel.getFooterActionsViewModel(lifecycleOwner) }
     val tileSquishiness by
-        animateSceneFloatAsState(value = 1f, key = QuickSettings.SharedValues.TilesSquishiness)
+        animateSceneFloatAsState(
+            value = 1f,
+            key = QuickSettings.SharedValues.TilesSquishiness,
+            canOverflow = false,
+        )
     val unfoldTranslationXForStartSide by
         viewModel
             .unfoldTranslationX(
@@ -356,6 +393,8 @@ private fun SceneScope.SplitShade(
     viewModel.notifications.setAlphaForBrightnessMirror(contentAlpha)
     DisposableEffect(Unit) { onDispose { viewModel.notifications.setAlphaForBrightnessMirror(1f) } }
 
+    val isMediaVisible by viewModel.isMediaVisible.collectAsState()
+
     val brightnessMirrorShowingModifier = Modifier.graphicsLayer { alpha = contentAlpha }
 
     Box(
@@ -378,8 +417,7 @@ private fun SceneScope.SplitShade(
                 createBatteryMeterViewController = createBatteryMeterViewController,
                 statusBarIconController = statusBarIconController,
                 modifier =
-                    Modifier.padding(horizontal = Shade.Dimensions.HorizontalPadding)
-                        .then(brightnessMirrorShowingModifier)
+                    Modifier.then(brightnessMirrorShowingModifier)
                         .padding(
                             horizontal = { unfoldTranslationXForStartSide.roundToInt() },
                         )
@@ -388,9 +426,9 @@ private fun SceneScope.SplitShade(
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 Box(
                     modifier =
-                        Modifier.weight(1f).graphicsLayer {
-                            translationX = unfoldTranslationXForStartSide
-                        },
+                        Modifier.element(Shade.Elements.SplitShadeStartColumn)
+                            .weight(1f)
+                            .graphicsLayer { translationX = unfoldTranslationXForStartSide },
                 ) {
                     BrightnessMirror(
                         viewModel = viewModel.brightnessMirrorViewModel,
@@ -431,7 +469,7 @@ private fun SceneScope.SplitShade(
                             }
 
                             MediaCarousel(
-                                isVisible = viewModel::isMediaVisible,
+                                isVisible = isMediaVisible,
                                 mediaHost = mediaHost,
                                 modifier = Modifier.fillMaxWidth(),
                                 carouselController = mediaCarouselController,
@@ -450,13 +488,16 @@ private fun SceneScope.SplitShade(
                 }
 
                 NotificationScrollingStack(
+                    shadeSession = shadeSession,
+                    stackScrollView = notificationStackScrollView,
                     viewModel = viewModel.notifications,
                     maxScrimTop = { 0f },
                     shouldPunchHoleBehindScrim = false,
+                    shadeMode = ShadeMode.Split,
                     modifier =
                         Modifier.weight(1f)
                             .fillMaxHeight()
-                            .padding(bottom = navBarBottomHeight)
+                            .padding(end = screenCornerRadius / 2f, bottom = navBarBottomHeight)
                             .then(brightnessMirrorShowingModifier)
                 )
             }

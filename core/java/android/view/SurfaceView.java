@@ -1005,7 +1005,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
             updateBackgroundVisibility(surfaceUpdateTransaction);
             updateBackgroundColor(surfaceUpdateTransaction);
-            if (mLimitedHdrEnabled && hdrHeadroomChanged) {
+            if (mLimitedHdrEnabled && (hdrHeadroomChanged || creating)) {
                 surfaceUpdateTransaction.setDesiredHdrHeadroom(
                         mBlastSurfaceControl, mHdrHeadroom);
             }

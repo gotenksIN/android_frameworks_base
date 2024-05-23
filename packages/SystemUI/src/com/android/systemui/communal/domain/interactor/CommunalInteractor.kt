@@ -60,9 +60,9 @@ import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.settings.UserTracker
 import com.android.systemui.smartspace.data.repository.SmartspaceRepository
-import com.android.systemui.util.kotlin.BooleanFlowOperators.and
+import com.android.systemui.util.kotlin.BooleanFlowOperators.allOf
+import com.android.systemui.util.kotlin.BooleanFlowOperators.anyOf
 import com.android.systemui.util.kotlin.BooleanFlowOperators.not
-import com.android.systemui.util.kotlin.BooleanFlowOperators.or
 import com.android.systemui.util.kotlin.emitOnStart
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -127,10 +127,10 @@ constructor(
 
     /** Whether communal features are enabled and available. */
     val isCommunalAvailable: Flow<Boolean> =
-        and(
+        allOf(
                 communalSettingsInteractor.isCommunalEnabled,
                 not(keyguardInteractor.isEncryptedOrLockdown),
-                or(keyguardInteractor.isKeyguardShowing, keyguardInteractor.isDreaming)
+                anyOf(keyguardInteractor.isKeyguardShowing, keyguardInteractor.isDreaming)
             )
             .distinctUntilChanged()
             .onEach { available ->
@@ -162,6 +162,13 @@ constructor(
                 started = SharingStarted.WhileSubscribed(),
                 initialValue = false,
             )
+
+    /** Whether to start dreaming when returning from occluded */
+    val dreamFromOccluded: Flow<Boolean> =
+        keyguardTransitionInteractor
+            .transitionStepsToState(KeyguardState.OCCLUDED)
+            .map { it.from == KeyguardState.DREAMING }
+            .stateIn(scope = applicationScope, SharingStarted.Eagerly, false)
 
     /**
      * Target scene as requested by the underlying [SceneTransitionLayout] or through [changeScene].
@@ -403,19 +410,30 @@ constructor(
             updateOnWorkProfileBroadcastReceived,
         ) { widgets, allowedCategories, _ ->
             widgets.map { widget ->
-                if (widget.providerInfo.widgetCategory and allowedCategories != 0) {
-                    // At least one category this widget specified is allowed, so show it
-                    WidgetContent.Widget(
-                        appWidgetId = widget.appWidgetId,
-                        providerInfo = widget.providerInfo,
-                        appWidgetHost = appWidgetHost,
-                        inQuietMode = isQuietModeEnabled(widget.providerInfo.profile)
-                    )
-                } else {
-                    WidgetContent.DisabledWidget(
-                        appWidgetId = widget.appWidgetId,
-                        providerInfo = widget.providerInfo,
-                    )
+                when (widget) {
+                    is CommunalWidgetContentModel.Available -> {
+                        if (widget.providerInfo.widgetCategory and allowedCategories != 0) {
+                            // At least one category this widget specified is allowed, so show it
+                            WidgetContent.Widget(
+                                appWidgetId = widget.appWidgetId,
+                                providerInfo = widget.providerInfo,
+                                appWidgetHost = appWidgetHost,
+                                inQuietMode = isQuietModeEnabled(widget.providerInfo.profile)
+                            )
+                        } else {
+                            WidgetContent.DisabledWidget(
+                                appWidgetId = widget.appWidgetId,
+                                providerInfo = widget.providerInfo,
+                            )
+                        }
+                    }
+                    is CommunalWidgetContentModel.Pending -> {
+                        WidgetContent.PendingWidget(
+                            appWidgetId = widget.appWidgetId,
+                            packageName = widget.packageName,
+                            icon = widget.icon,
+                        )
+                    }
                 }
             }
         }
@@ -430,7 +448,15 @@ constructor(
         } else {
             // Get associated work profile for the currently selected user.
             val workProfile = userTracker.userProfiles.find { it.isManagedProfile }
-            list.filter { it.providerInfo.profile.identifier != workProfile?.id }
+            list.filter { model ->
+                val uid =
+                    when (model) {
+                        is CommunalWidgetContentModel.Available ->
+                            model.providerInfo.profile.identifier
+                        is CommunalWidgetContentModel.Pending -> model.user.identifier
+                    }
+                uid != workProfile?.id
+            }
         }
 
     /** A flow of available smartspace targets. Currently only showing timers. */
@@ -513,7 +539,11 @@ constructor(
     ): List<CommunalWidgetContentModel> {
         val currentUserIds = userTracker.userProfiles.map { it.id }.toSet()
         return list.filter { widget ->
-            currentUserIds.contains(widget.providerInfo.profile?.identifier)
+            when (widget) {
+                is CommunalWidgetContentModel.Available ->
+                    currentUserIds.contains(widget.providerInfo.profile?.identifier)
+                is CommunalWidgetContentModel.Pending -> true
+            }
         }
     }
 

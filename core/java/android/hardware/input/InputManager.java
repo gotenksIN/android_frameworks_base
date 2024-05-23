@@ -992,21 +992,14 @@ public final class InputManager {
     }
 
     /**
-     * Changes the mouse pointer's icon shape into the specified id.
+     * This method exists for backwards-compatibility, and is a no-op.
      *
-     * @param iconId The id of the pointer graphic, as a value between
-     * {@link PointerIcon#TYPE_ARROW} and {@link PointerIcon#TYPE_HANDWRITING}.
-     *
+     * @deprecated
      * @hide
      */
     @UnsupportedAppUsage
     public void setPointerIconType(int iconId) {
-        mGlobal.setPointerIconType(iconId);
-    }
-
-    /** @hide */
-    public void setCustomPointerIcon(PointerIcon icon) {
-        mGlobal.setCustomPointerIcon(icon);
+        Log.e(TAG, "setPointerIcon: Unsupported app usage!");
     }
 
     /** @hide */
@@ -1101,10 +1094,9 @@ public final class InputManager {
      */
     @RequiresPermission(android.Manifest.permission.ASSOCIATE_INPUT_DEVICE_TO_DISPLAY)
     @TestApi
-    // TODO(b/324075859): Rename to addUniqueIdAssociationByPort
-    public void addUniqueIdAssociation(@NonNull String inputPort,
+    public void addUniqueIdAssociationByPort(@NonNull String inputPort,
             @NonNull String displayUniqueId) {
-        mGlobal.addUniqueIdAssociation(inputPort, displayUniqueId);
+        mGlobal.addUniqueIdAssociationByPort(inputPort, displayUniqueId);
     }
 
     /**
@@ -1117,9 +1109,8 @@ public final class InputManager {
      */
     @RequiresPermission(android.Manifest.permission.ASSOCIATE_INPUT_DEVICE_TO_DISPLAY)
     @TestApi
-    // TODO(b/324075859): Rename to removeUniqueIdAssociationByPort
-    public void removeUniqueIdAssociation(@NonNull String inputPort) {
-        mGlobal.removeUniqueIdAssociation(inputPort);
+    public void removeUniqueIdAssociationByPort(@NonNull String inputPort) {
+        mGlobal.removeUniqueIdAssociationByPort(inputPort);
     }
 
     /**

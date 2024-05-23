@@ -35,6 +35,7 @@ import static androidx.window.extensions.embedding.SplitPresenter.CONTAINER_POSI
 
 import android.annotation.DimenRes;
 import android.annotation.Nullable;
+import android.app.Activity;
 import android.app.ActivityThread;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
@@ -42,6 +43,7 @@ import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.RotateDrawable;
 import android.hardware.display.DisplayManager;
@@ -213,7 +215,11 @@ class DividerPresenter implements View.OnTouchListener {
                             isVerticalSplit,
                             isReversedLayout,
                             parentInfo.getDisplayId(),
-                            isDraggableExpandType
+                            isDraggableExpandType,
+                            getContainerBackgroundColor(topSplitContainer.getPrimaryContainer(),
+                                    DEFAULT_PRIMARY_VEIL_COLOR),
+                            getContainerBackgroundColor(topSplitContainer.getSecondaryContainer(),
+                                    DEFAULT_SECONDARY_VEIL_COLOR)
                     ));
         }
     }
@@ -239,6 +245,27 @@ class DividerPresenter implements View.OnTouchListener {
             // Otherwise, update the renderer for the new properties.
             mRenderer.update(mProperties);
         }
+    }
+
+    /**
+     * Returns the window background color of the top activity in the container if set, or the
+     * default color if the background color of the top activity is unavailable.
+     */
+    @VisibleForTesting
+    @NonNull
+    static Color getContainerBackgroundColor(
+            @NonNull TaskFragmentContainer container, @NonNull Color defaultColor) {
+        final Activity activity = container.getTopNonFinishingActivity();
+        if (activity == null || !activity.isResumed()) {
+            // This can happen when the top activity in the container is from a different process.
+            return defaultColor;
+        }
+
+        final Drawable drawable = activity.getWindow().getDecorView().getBackground();
+        if (drawable instanceof ColorDrawable colorDrawable) {
+            return Color.valueOf(colorDrawable.getColor());
+        }
+        return defaultColor;
     }
 
     /**
@@ -439,10 +466,6 @@ class DividerPresenter implements View.OnTouchListener {
         }
 
         if (dividerAttributes.getDividerType() == DividerAttributes.DIVIDER_TYPE_DRAGGABLE) {
-            // Draggable divider width must be larger than the drag handle size.
-            widthDp = Math.max(widthDp,
-                    getDimensionDp(R.dimen.activity_embedding_divider_touch_target_width));
-
             // Update minRatio and maxRatio only when it is a draggable divider.
             if (minRatio == RATIO_SYSTEM_DEFAULT) {
                 minRatio = DEFAULT_MIN_RATIO;
@@ -800,6 +823,8 @@ class DividerPresenter implements View.OnTouchListener {
         private final int mDisplayId;
         private final boolean mIsReversedLayout;
         private final boolean mIsDraggableExpandType;
+        private final Color mPrimaryVeilColor;
+        private final Color mSecondaryVeilColor;
 
         @VisibleForTesting
         Properties(
@@ -810,7 +835,9 @@ class DividerPresenter implements View.OnTouchListener {
                 boolean isVerticalSplit,
                 boolean isReversedLayout,
                 int displayId,
-                boolean isDraggableExpandType) {
+                boolean isDraggableExpandType,
+                @NonNull Color primaryVeilColor,
+                @NonNull Color secondaryVeilColor) {
             mConfiguration = configuration;
             mDividerAttributes = dividerAttributes;
             mDecorSurface = decorSurface;
@@ -819,6 +846,8 @@ class DividerPresenter implements View.OnTouchListener {
             mIsReversedLayout = isReversedLayout;
             mDisplayId = displayId;
             mIsDraggableExpandType = isDraggableExpandType;
+            mPrimaryVeilColor = primaryVeilColor;
+            mSecondaryVeilColor = secondaryVeilColor;
         }
 
         /**
@@ -840,7 +869,9 @@ class DividerPresenter implements View.OnTouchListener {
                     && a.mIsVerticalSplit == b.mIsVerticalSplit
                     && a.mDisplayId == b.mDisplayId
                     && a.mIsReversedLayout == b.mIsReversedLayout
-                    && a.mIsDraggableExpandType == b.mIsDraggableExpandType;
+                    && a.mIsDraggableExpandType == b.mIsDraggableExpandType
+                    && a.mPrimaryVeilColor.equals(b.mPrimaryVeilColor)
+                    && a.mSecondaryVeilColor.equals(b.mSecondaryVeilColor);
         }
 
         private static boolean areSameSurfaces(
@@ -877,17 +908,21 @@ class DividerPresenter implements View.OnTouchListener {
         @NonNull
         private final FrameLayout mDividerLayout;
         @NonNull
+        private final View mDividerLine;
+        private View mDragHandle;
+        @NonNull
         private final View.OnTouchListener mListener;
         @NonNull
         private Properties mProperties;
         private int mDividerWidthPx;
+        private int mHandleWidthPx;
         @Nullable
         private SurfaceControl mPrimaryVeil;
         @Nullable
         private SurfaceControl mSecondaryVeil;
         private boolean mIsDragging;
         private int mDividerPosition;
-        private View mDragHandle;
+        private int mDividerSurfaceWidthPx;
 
         private Renderer(@NonNull Properties properties, @NonNull View.OnTouchListener listener) {
             mProperties = properties;
@@ -905,6 +940,7 @@ class DividerPresenter implements View.OnTouchListener {
                     context, displayManager.getDisplay(mProperties.mDisplayId),
                     mWindowlessWindowManager, "DividerContainer");
             mDividerLayout = new FrameLayout(context);
+            mDividerLine = new View(context);
 
             update();
         }
@@ -921,6 +957,17 @@ class DividerPresenter implements View.OnTouchListener {
             mDividerWidthPx = getDividerWidthPx(mProperties.mDividerAttributes);
             mDividerPosition = mProperties.mInitialDividerPosition;
             mWindowlessWindowManager.setConfiguration(mProperties.mConfiguration);
+
+            if (mProperties.mDividerAttributes.getDividerType()
+                    == DividerAttributes.DIVIDER_TYPE_DRAGGABLE) {
+                // TODO(b/329193115) support divider on secondary display
+                final Context context = ActivityThread.currentActivityThread().getApplication();
+                mHandleWidthPx = context.getResources().getDimensionPixelSize(
+                        R.dimen.activity_embedding_divider_touch_target_width);
+            } else {
+                mHandleWidthPx = 0;
+            }
+
             // TODO handle synchronization between surface transactions and WCT.
             final SurfaceControl.Transaction t = new SurfaceControl.Transaction();
             updateSurface(t);
@@ -950,13 +997,45 @@ class DividerPresenter implements View.OnTouchListener {
          */
         private void updateSurface(@NonNull SurfaceControl.Transaction t) {
             final Rect taskBounds = mProperties.mConfiguration.windowConfiguration.getBounds();
-            if (mProperties.mIsVerticalSplit) {
-                t.setPosition(mDividerSurface, mDividerPosition, 0.0f);
-                t.setWindowCrop(mDividerSurface, mDividerWidthPx, taskBounds.height());
+
+            int dividerSurfacePosition;
+            if (mProperties.mDividerAttributes.getDividerType()
+                    == DividerAttributes.DIVIDER_TYPE_DRAGGABLE) {
+                // When the divider drag handle width is larger than the divider width, the position
+                // of the divider surface is adjusted so that it is large enough to host both the
+                // divider line and the divider drag handle.
+                mDividerSurfaceWidthPx = Math.max(mDividerWidthPx, mHandleWidthPx);
+                dividerSurfacePosition =
+                        mProperties.mIsReversedLayout
+                                ? mDividerPosition
+                                : mDividerPosition + mDividerWidthPx - mDividerSurfaceWidthPx;
+                dividerSurfacePosition = Math.clamp(dividerSurfacePosition, 0,
+                        mProperties.mIsVerticalSplit ? taskBounds.width() : taskBounds.height());
             } else {
-                t.setPosition(mDividerSurface, 0.0f, mDividerPosition);
-                t.setWindowCrop(mDividerSurface, taskBounds.width(), mDividerWidthPx);
+                mDividerSurfaceWidthPx = mDividerWidthPx;
+                dividerSurfacePosition = mDividerPosition;
             }
+
+            if (mProperties.mIsVerticalSplit) {
+                t.setPosition(mDividerSurface, dividerSurfacePosition, 0.0f);
+                t.setWindowCrop(mDividerSurface, mDividerSurfaceWidthPx, taskBounds.height());
+            } else {
+                t.setPosition(mDividerSurface, 0.0f, dividerSurfacePosition);
+                t.setWindowCrop(mDividerSurface, taskBounds.width(), mDividerSurfaceWidthPx);
+            }
+
+            // Update divider line position in the surface
+            if (!mProperties.mIsReversedLayout) {
+                final int offset = mDividerPosition - dividerSurfacePosition;
+                mDividerLine.setX(mProperties.mIsVerticalSplit ? offset : 0);
+                mDividerLine.setY(mProperties.mIsVerticalSplit ? 0 : offset);
+            } else {
+                // For reversed layout, the divider line is always at the start of the divider
+                // surface.
+                mDividerLine.setX(0);
+                mDividerLine.setY(0);
+            }
+
             if (mIsDragging) {
                 updateVeils(t);
             }
@@ -971,14 +1050,14 @@ class DividerPresenter implements View.OnTouchListener {
             final Rect taskBounds = mProperties.mConfiguration.windowConfiguration.getBounds();
             final WindowManager.LayoutParams lp = mProperties.mIsVerticalSplit
                     ? new WindowManager.LayoutParams(
-                            mDividerWidthPx,
+                            mDividerSurfaceWidthPx,
                             taskBounds.height(),
                             TYPE_APPLICATION_PANEL,
                             FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL | FLAG_SLIPPERY,
                             PixelFormat.TRANSLUCENT)
                     : new WindowManager.LayoutParams(
                             taskBounds.width(),
-                            mDividerWidthPx,
+                            mDividerSurfaceWidthPx,
                             TYPE_APPLICATION_PANEL,
                             FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL | FLAG_SLIPPERY,
                             PixelFormat.TRANSLUCENT);
@@ -995,12 +1074,19 @@ class DividerPresenter implements View.OnTouchListener {
          */
         private void updateDivider(@NonNull SurfaceControl.Transaction t) {
             mDividerLayout.removeAllViews();
-            if (mProperties.mIsDraggableExpandType) {
+            mDividerLayout.addView(mDividerLine);
+            if (mProperties.mIsDraggableExpandType && !mIsDragging) {
                 // If a container is fully expanded, the divider overlays on the expanded container.
-                mDividerLayout.setBackgroundColor(Color.TRANSPARENT);
+                mDividerLine.setBackgroundColor(Color.TRANSPARENT);
             } else {
-                mDividerLayout.setBackgroundColor(mProperties.mDividerAttributes.getDividerColor());
+                mDividerLine.setBackgroundColor(mProperties.mDividerAttributes.getDividerColor());
             }
+            final Rect taskBounds = mProperties.mConfiguration.windowConfiguration.getBounds();
+            mDividerLine.setLayoutParams(
+                    mProperties.mIsVerticalSplit
+                            ? new FrameLayout.LayoutParams(mDividerWidthPx, taskBounds.height())
+                            : new FrameLayout.LayoutParams(taskBounds.width(), mDividerWidthPx)
+            );
             if (mProperties.mDividerAttributes.getDividerType()
                     == DividerAttributes.DIVIDER_TYPE_DRAGGABLE) {
                 createVeils();
@@ -1027,7 +1113,7 @@ class DividerPresenter implements View.OnTouchListener {
                                     R.dimen.activity_embedding_divider_touch_target_width));
             params.gravity = Gravity.CENTER;
             button.setLayoutParams(params);
-            button.setBackgroundColor(R.color.transparent);
+            button.setBackgroundColor(Color.TRANSPARENT);
 
             final Drawable handle = context.getResources().getDrawable(
                     R.drawable.activity_embedding_divider_handle, context.getTheme());
@@ -1087,8 +1173,8 @@ class DividerPresenter implements View.OnTouchListener {
         }
 
         private void showVeils(@NonNull SurfaceControl.Transaction t) {
-            t.setColor(mPrimaryVeil, colorToFloatArray(DEFAULT_PRIMARY_VEIL_COLOR))
-                    .setColor(mSecondaryVeil, colorToFloatArray(DEFAULT_SECONDARY_VEIL_COLOR))
+            t.setColor(mPrimaryVeil, colorToFloatArray(mProperties.mPrimaryVeilColor))
+                    .setColor(mSecondaryVeil, colorToFloatArray(mProperties.mSecondaryVeilColor))
                     .setLayer(mDividerSurface, DIVIDER_LAYER)
                     .setLayer(mPrimaryVeil, VEIL_LAYER)
                     .setLayer(mSecondaryVeil, VEIL_LAYER)

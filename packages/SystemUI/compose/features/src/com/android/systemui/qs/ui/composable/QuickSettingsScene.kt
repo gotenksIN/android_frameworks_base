@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -68,6 +69,8 @@ import com.android.compose.animation.scene.animateSceneFloatAsState
 import com.android.compose.modifiers.thenIf
 import com.android.compose.windowsizeclass.LocalWindowSizeClass
 import com.android.systemui.battery.BatteryMeterViewController
+import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
+import com.android.systemui.common.ui.compose.windowinsets.LocalDisplayCutout
 import com.android.systemui.common.ui.compose.windowinsets.LocalRawScreenHeight
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
@@ -80,16 +83,20 @@ import com.android.systemui.notifications.ui.composable.NotificationScrollingSta
 import com.android.systemui.qs.footer.ui.compose.FooterActionsWithAnimatedVisibility
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsSceneViewModel
 import com.android.systemui.res.R
+import com.android.systemui.scene.session.ui.composable.SaveableSession
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.composable.ComposableScene
+import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.shade.ui.composable.CollapsedShadeHeader
 import com.android.systemui.shade.ui.composable.ExpandedShadeHeader
 import com.android.systemui.shade.ui.composable.Shade
 import com.android.systemui.shade.ui.composable.ShadeHeader
+import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
 import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.phone.ui.TintedIconManager
+import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Named
 import kotlin.math.roundToInt
@@ -103,6 +110,8 @@ class QuickSettingsScene
 @Inject
 constructor(
     @Application private val applicationScope: CoroutineScope,
+    private val shadeSession: SaveableSession,
+    private val notificationStackScrollView: Lazy<NotificationScrollView>,
     private val viewModel: QuickSettingsSceneViewModel,
     private val notificationsPlaceholderViewModel: NotificationsPlaceholderViewModel,
     private val tintedIconManagerFactory: TintedIconManager.Factory,
@@ -125,6 +134,7 @@ constructor(
         modifier: Modifier,
     ) {
         QuickSettingsScene(
+            notificationStackScrollView = notificationStackScrollView.get(),
             viewModel = viewModel,
             notificationsPlaceholderViewModel = notificationsPlaceholderViewModel,
             createTintedIconManager = tintedIconManagerFactory::create,
@@ -133,12 +143,14 @@ constructor(
             mediaCarouselController = mediaCarouselController,
             mediaHost = mediaHost,
             modifier = modifier,
+            shadeSession = shadeSession,
         )
     }
 }
 
 @Composable
 private fun SceneScope.QuickSettingsScene(
+    notificationStackScrollView: NotificationScrollView,
     viewModel: QuickSettingsSceneViewModel,
     notificationsPlaceholderViewModel: NotificationsPlaceholderViewModel,
     createTintedIconManager: (ViewGroup, StatusBarLocation) -> TintedIconManager,
@@ -147,7 +159,10 @@ private fun SceneScope.QuickSettingsScene(
     mediaCarouselController: MediaCarouselController,
     mediaHost: MediaHost,
     modifier: Modifier = Modifier,
+    shadeSession: SaveableSession,
 ) {
+    val cutoutLocation = LocalDisplayCutout.current.location
+
     val brightnessMirrorShowing by viewModel.brightnessMirrorViewModel.isShowing.collectAsState()
     val contentAlpha by
         animateFloatAsState(
@@ -179,6 +194,9 @@ private fun SceneScope.QuickSettingsScene(
                     // scene (and not the one under it) during a scene transition.
                     Modifier.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                 }
+                .thenIf(cutoutLocation != CutoutLocation.CENTER) {
+                    Modifier.displayCutoutPadding()
+                },
     ) {
         val isCustomizing by viewModel.qsSceneAdapter.isCustomizing.collectAsState()
         val isCustomizerShowing by viewModel.qsSceneAdapter.isCustomizerShowing.collectAsState()
@@ -276,7 +294,8 @@ private fun SceneScope.QuickSettingsScene(
                     }
 
                 Column(
-                    modifier = shadeHeaderAndQuickSettingsModifier,
+                    modifier =
+                        shadeHeaderAndQuickSettingsModifier.sysuiResTag("expanded_qs_scroll_view"),
                 ) {
                     when (LocalWindowSizeClass.current.widthSizeClass) {
                         WindowWidthSizeClass.Compact ->
@@ -316,7 +335,6 @@ private fun SceneScope.QuickSettingsScene(
                                 createTintedIconManager = createTintedIconManager,
                                 createBatteryMeterViewController = createBatteryMeterViewController,
                                 statusBarIconController = statusBarIconController,
-                                modifier = Modifier.padding(horizontal = 16.dp),
                             )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -325,11 +343,13 @@ private fun SceneScope.QuickSettingsScene(
                         viewModel.qsSceneAdapter,
                         { viewModel.qsSceneAdapter.qsHeight },
                         isSplitShade = false,
-                        modifier = Modifier.sysuiResTag("expanded_qs_scroll_view")
+                        modifier = Modifier.sysuiResTag("quick_settings_panel")
                     )
 
+                    val isMediaVisible by viewModel.isMediaVisible.collectAsState()
+
                     MediaCarousel(
-                        isVisible = viewModel::isMediaVisible,
+                        isVisible = isMediaVisible,
                         mediaHost = mediaHost,
                         modifier = Modifier.fillMaxWidth(),
                         carouselController = mediaCarouselController,
@@ -346,9 +366,12 @@ private fun SceneScope.QuickSettingsScene(
             )
         }
         NotificationScrollingStack(
+            stackScrollView = notificationStackScrollView,
             viewModel = notificationsPlaceholderViewModel,
+            shadeSession = shadeSession,
             maxScrimTop = { screenHeight },
             shouldPunchHoleBehindScrim = shouldPunchHoleBehindScrim,
+            shadeMode = ShadeMode.Single,
             modifier =
                 Modifier.fillMaxWidth().offset { IntOffset(x = 0, y = screenHeight.roundToInt()) },
         )

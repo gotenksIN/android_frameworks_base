@@ -16,7 +16,11 @@
 
 package com.android.systemui.screenshot.ui.binder
 
+import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.graphics.Rect
+import android.util.LayoutDirection
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -29,22 +33,26 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.res.R
 import com.android.systemui.screenshot.ScreenshotEvent
+import com.android.systemui.screenshot.ui.ScreenshotAnimationController
 import com.android.systemui.screenshot.ui.ScreenshotShelfView
 import com.android.systemui.screenshot.ui.SwipeGestureListener
 import com.android.systemui.screenshot.ui.viewmodel.ActionButtonViewModel
 import com.android.systemui.screenshot.ui.viewmodel.AnimationState
 import com.android.systemui.screenshot.ui.viewmodel.ScreenshotViewModel
 import com.android.systemui.util.children
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-object ScreenshotShelfViewBinder {
+class ScreenshotShelfViewBinder
+@Inject
+constructor(private val buttonViewBinder: ActionButtonViewBinder) {
     fun bind(
         view: ScreenshotShelfView,
         viewModel: ScreenshotViewModel,
+        animationController: ScreenshotAnimationController,
         layoutInflater: LayoutInflater,
         onDismissalRequested: (event: ScreenshotEvent, velocity: Float?) -> Unit,
-        onDismissalCancelled: () -> Unit,
         onUserInteraction: () -> Unit
     ) {
         val swipeGestureListener =
@@ -53,7 +61,7 @@ object ScreenshotShelfViewBinder {
                 onDismiss = {
                     onDismissalRequested(ScreenshotEvent.SCREENSHOT_SWIPE_DISMISSED, it)
                 },
-                onCancel = onDismissalCancelled
+                onCancel = { animationController.getSwipeReturnAnimation().start() }
             )
         view.onTouchInterceptListener = { swipeGestureListener.onMotionEvent(it) }
         view.userInteractionCallback = onUserInteraction
@@ -63,11 +71,15 @@ object ScreenshotShelfViewBinder {
         val previewBorder = view.requireViewById<View>(R.id.screenshot_preview_border)
         previewView.clipToOutline = true
         previewViewBlur.clipToOutline = true
+        val actionsContainer: LinearLayout = view.requireViewById(R.id.screenshot_actions)
         val dismissButton = view.requireViewById<View>(R.id.screenshot_dismiss_button)
         dismissButton.visibility = if (viewModel.showDismissButton) View.VISIBLE else View.GONE
         dismissButton.setOnClickListener {
             onDismissalRequested(ScreenshotEvent.SCREENSHOT_EXPLICIT_DISMISSAL, null)
         }
+        val scrollingScrim: ImageView = view.requireViewById(R.id.screenshot_scrolling_scrim)
+        val scrollablePreview: ImageView = view.requireViewById(R.id.screenshot_scrollable_preview)
+        val badgeView = view.requireViewById<ImageView>(R.id.screenshot_badge)
 
         // use immediate dispatcher to ensure screenshot bitmap is set before animation
         view.repeatWhenAttached(Dispatchers.Main.immediate) {
@@ -87,8 +99,45 @@ object ScreenshotShelfViewBinder {
                         }
                     }
                     launch {
+                        viewModel.scrollingScrim.collect { bitmap ->
+                            if (bitmap != null) {
+                                scrollingScrim.setImageBitmap(bitmap)
+                                scrollingScrim.visibility = View.VISIBLE
+                            } else {
+                                scrollingScrim.visibility = View.GONE
+                            }
+                        }
+                    }
+                    launch {
+                        viewModel.scrollableRect.collect { rect ->
+                            if (rect != null) {
+                                setScrollablePreview(
+                                    scrollablePreview,
+                                    viewModel.preview.value,
+                                    rect
+                                )
+                            } else {
+                                scrollablePreview.visibility = View.GONE
+                            }
+                        }
+                    }
+                    launch {
+                        viewModel.badge.collect { badge ->
+                            badgeView.setImageDrawable(badge)
+                            badgeView.visibility = if (badge != null) View.VISIBLE else View.GONE
+                        }
+                    }
+                    launch {
                         viewModel.previewAction.collect { onClick ->
                             previewView.setOnClickListener { onClick?.invoke() }
+                        }
+                    }
+                    launch {
+                        viewModel.isAnimating.collect { isAnimating ->
+                            previewView.isClickable = !isAnimating
+                            for (child in actionsContainer.children) {
+                                child.isClickable = !isAnimating
+                            }
                         }
                     }
                     launch {
@@ -151,14 +200,14 @@ object ScreenshotShelfViewBinder {
             val currentView: View? = actionsContainer.getChildAt(index)
             if (action.id == currentView?.tag) {
                 // Same ID, update the display
-                ActionButtonViewBinder.bind(currentView, action)
+                buttonViewBinder.bind(currentView, action)
             } else {
                 // Different ID. Removals have already happened so this must
                 // mean that the new action must be inserted here.
                 val actionButton =
                     layoutInflater.inflate(R.layout.shelf_action_chip, actionsContainer, false)
                 actionsContainer.addView(actionButton, index)
-                ActionButtonViewBinder.bind(actionButton, action)
+                buttonViewBinder.bind(actionButton, action)
             }
         }
     }
@@ -180,5 +229,36 @@ object ScreenshotShelfViewBinder {
 
         screenshotPreview.layoutParams = params
         screenshotPreview.requestLayout()
+    }
+
+    private fun setScrollablePreview(
+        scrollablePreview: ImageView,
+        bitmap: Bitmap?,
+        scrollableRect: Rect
+    ) {
+        if (bitmap == null) {
+            return
+        }
+        val fixedSize = scrollablePreview.resources.getDimensionPixelSize(R.dimen.overlay_x_scale)
+        val inPortrait =
+            scrollablePreview.resources.configuration.orientation ==
+                Configuration.ORIENTATION_PORTRAIT
+        val scale: Float = fixedSize / ((if (inPortrait) bitmap.width else bitmap.height).toFloat())
+        val params = scrollablePreview.layoutParams
+
+        params.width = (scale * scrollableRect.width()).toInt()
+        params.height = (scale * scrollableRect.height()).toInt()
+        val matrix = Matrix()
+        matrix.setScale(scale, scale)
+        matrix.postTranslate(-scrollableRect.left * scale, -scrollableRect.top * scale)
+
+        scrollablePreview.translationX =
+            (scale *
+                if (scrollablePreview.layoutDirection == LayoutDirection.LTR) scrollableRect.left
+                else scrollableRect.right - (scrollablePreview.parent as View).width)
+        scrollablePreview.translationY = scale * scrollableRect.top
+        scrollablePreview.setImageMatrix(matrix)
+        scrollablePreview.setImageBitmap(bitmap)
+        scrollablePreview.setVisibility(View.VISIBLE)
     }
 }

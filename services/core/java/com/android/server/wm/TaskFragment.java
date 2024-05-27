@@ -360,12 +360,19 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     /**
      * Whether the activity navigation should be isolated. That is, Activities cannot be launched
-     * on an isolated TaskFragment, unless the activity is launched from an Activity in the same
-     * isolated TaskFragment, or explicitly requested to be launched to.
-     * <p>
-     * Note that only an embedded TaskFragment can be isolated.
+     * on an isolated TaskFragment unless explicitly requested to be launched to.
      */
     private boolean mIsolatedNav;
+
+    /**
+     * Whether the TaskFragment to be pinned.
+     * <p>
+     * If a TaskFragment is pinned, the TaskFragment should be the top-most TaskFragment among other
+     * sibling TaskFragments. Any newly launched and embeddable activity should not be placed in the
+     * pinned TaskFragment, unless the activity is launched from the pinned TaskFragment or
+     * explicitly requested to. Non-embeddable activities are not restricted to.
+     */
+    private boolean mPinned;
 
     /**
      * Whether the TaskFragment should move to bottom of task when any activity below it is
@@ -521,6 +528,18 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     }
 
     /**
+     * Sets whether this TaskFragment {@link #isPinned()}.
+     * <p>
+     * Note that this is no-op if the TaskFragment is not {@link #isEmbedded() embedded}.
+     */
+    void setPinned(boolean pinned) {
+        if (!isEmbedded()) {
+            return;
+        }
+        mPinned = pinned;
+    }
+
+    /**
      * Sets whether transitions are allowed when the TaskFragment is empty. If {@code true},
      * transitions are allowed when the TaskFragment is empty. If {@code false}, transitions
      * will wait until the TaskFragment becomes non-empty or other conditions are met. Default
@@ -536,6 +555,15 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     /** @see #mIsolatedNav */
     boolean isIsolatedNav() {
         return isEmbedded() && mIsolatedNav;
+    }
+
+    /**
+     * Indicates whether this TaskFragment is pinned.
+     *
+     * @see android.window.TaskFragmentOperation#OP_TYPE_SET_PINNED
+     */
+    boolean isPinned() {
+        return isEmbedded() && mPinned;
     }
 
     TaskFragment getAdjacentTaskFragment() {
@@ -570,7 +598,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     }
 
     void setResumedActivity(ActivityRecord r, String reason) {
-        warnForNonLeafTaskFragment("setResumedActivity");
         if (mResumedActivity == r) {
             return;
         }
@@ -856,15 +883,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         return parentTaskFragment != null ? parentTaskFragment.getOrganizedTaskFragment() : null;
     }
 
-    /**
-     * Simply check and give warning logs if this is not operated on leaf {@link TaskFragment}.
-     */
-    private void warnForNonLeafTaskFragment(String func) {
-        if (!isLeafTaskFragment()) {
-            Slog.w(TAG, func + " on non-leaf task fragment " + this);
-        }
-    }
-
     boolean hasDirectChildActivities() {
         for (int i = mChildren.size() - 1; i >= 0; --i) {
             if (mChildren.get(i).asActivityRecord() != null) {
@@ -941,7 +959,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      */
     void onActivityStateChanged(ActivityRecord record, ActivityRecord.State state,
             String reason) {
-        warnForNonLeafTaskFragment("onActivityStateChanged");
         if (record == mResumedActivity && state != RESUMED) {
             setResumedActivity(null, reason + " - onActivityStateChanged");
         }
@@ -971,7 +988,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      * @return {@code true} if the process of the pausing activity is died.
      */
     boolean handleAppDied(WindowProcessController app) {
-        warnForNonLeafTaskFragment("handleAppDied");
         boolean isPausingDied = false;
         if (mPausingActivity != null && mPausingActivity.app == app) {
             ProtoLog.v(WM_DEBUG_STATES, "App died while pausing: %s",
@@ -2938,6 +2954,13 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     boolean shouldRemoveSelfOnLastChildRemoval() {
         return !mCreatedByOrganizer || mIsRemovalRequested;
+    }
+
+    /**
+     * Returns whether this TaskFragment is going to be removed.
+     */
+    boolean isRemovalRequested() {
+        return mIsRemovalRequested;
     }
 
     @Override

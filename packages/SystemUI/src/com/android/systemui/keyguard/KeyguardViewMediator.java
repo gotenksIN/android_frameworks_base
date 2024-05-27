@@ -1079,6 +1079,33 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         }
     };
 
+    /**
+     * For now, the keyguard-appearing animation is a no-op, because we assume that this is
+     * happening while the screen is already off or turning off.
+     *
+     * TODO(b/278086361): create an animation for keyguard appearing over a non-showWhenLocked
+     * activity.
+     */
+    private final IRemoteAnimationRunner.Stub mAppearAnimationRunner =
+            new IRemoteAnimationRunner.Stub() {
+        @Override
+        public void onAnimationStart(@WindowManager.TransitionOldType int transit,
+                RemoteAnimationTarget[] apps,
+                RemoteAnimationTarget[] wallpapers,
+                RemoteAnimationTarget[] nonApps,
+                IRemoteAnimationFinishedCallback finishedCallback) {
+            try {
+                finishedCallback.onAnimationFinished();
+            } catch (RemoteException e) {
+                Log.e(TAG, "Failed to finish transition", e);
+            }
+        }
+
+        @Override
+        public void onAnimationCancelled() {
+        }
+    };
+
     private final IRemoteAnimationRunner mOccludeAnimationRunner =
             new OccludeActivityLaunchRemoteAnimationRunner(mOccludeAnimationController);
 
@@ -1167,7 +1194,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                                     finishedCallback.onAnimationFinished();
                                     mOccludeByDreamAnimator = null;
                                 } catch (RemoteException e) {
-                                    e.printStackTrace();
+                                    Log.e(TAG, "Failed to finish transition", e);
                                 }
                             }
                         });
@@ -1282,7 +1309,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
                                     mInteractionJankMonitor.end(CUJ_LOCKSCREEN_OCCLUSION);
                                 } catch (RemoteException e) {
-                                    e.printStackTrace();
+                                    Log.e(TAG, "Failed to finish transition", e);
                                 }
                             }
                         });
@@ -1544,6 +1571,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
         mKeyguardTransitions.register(
                 KeyguardService.wrap(this, getExitAnimationRunner()),
+                KeyguardService.wrap(this, getAppearAnimationRunner()),
                 KeyguardService.wrap(this, getOccludeAnimationRunner()),
                 KeyguardService.wrap(this, getOccludeByDreamAnimationRunner()),
                 KeyguardService.wrap(this, getUnoccludeAnimationRunner()));
@@ -2120,6 +2148,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     public IRemoteAnimationRunner getExitAnimationRunner() {
         return validatingRemoteAnimationRunner(mExitAnimationRunner);
+    }
+
+    public IRemoteAnimationRunner getAppearAnimationRunner() {
+        return validatingRemoteAnimationRunner(mAppearAnimationRunner);
     }
 
     public IRemoteAnimationRunner getOccludeAnimationRunner() {
@@ -3360,7 +3392,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             }
         } catch (RemoteException e) {
             mSurfaceBehindRemoteAnimationRequested = false;
-            e.printStackTrace();
+            Log.e(TAG, "Failed to report keyguardGoingAway", e);
         }
     }
 

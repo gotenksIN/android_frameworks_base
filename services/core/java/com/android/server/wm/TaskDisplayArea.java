@@ -225,7 +225,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
 
     @VisibleForTesting
     Task getTopRootTask() {
-        return getRootTask(t -> true);
+        return getRootTask(alwaysTruePredicate());
     }
 
     @Nullable

@@ -3295,8 +3295,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         mOccludesParent = occludesParent;
         setMainWindowOpaque(occludesParent);
 
-        if (changed && task != null && !occludesParent) {
-            getRootTask().convertActivityToTranslucent(this);
+        if (changed && task != null) {
+            if (!occludesParent) {
+                getRootTask().convertActivityToTranslucent(this);
+            } else {
+                getRootTask().convertActivityFromTranslucent(this);
+            }
         }
         // Always ensure visibility if this activity doesn't occlude parent, so the
         // {@link #returningOptions} of the activity under this one can be applied in
@@ -4296,6 +4300,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     void cleanUp(boolean cleanServices, boolean setState) {
         getTaskFragment().cleanUpActivityReferences(this);
         clearLastParentBeforePip();
+
+        // Abort and reset state if the scence transition is playing.
+        final Task rootTask = getRootTask();
+        if (rootTask != null) {
+            rootTask.abortTranslucentActivityWaiting(this);
+        }
 
         // Clean up the splash screen if it was still displayed.
         cleanUpSplashScreen();
@@ -11288,7 +11298,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      * Otherwise, return the creation time of the top window.
      */
     long getLastWindowCreateTime() {
-        final WindowState window = getWindow(win -> true);
+        final WindowState window = getWindow(alwaysTruePredicate());
         return window != null && window.mAttrs.type != TYPE_BASE_APPLICATION
                 ? window.getCreateTime()
                 : createTime;

@@ -65,6 +65,9 @@ SPDX-License-Identifier: BSD-3-Clause-Clear
     <!-- Content description of the data connection type 5G ++ 6Rx. [CHAR LIMIT=NONE] -->
     <string name="data_connection_5g_plus_plus_6rx" translate="false">5G++6Rx</string>
 
+    <!-- Content description of the data connection type 5GA. [CHAR LIMIT=NONE] -->
+    <string name="data_connection_5g_a" translate="false">5GA</string>
+
     <!--
     The customization for last puk prompt
     The format of array item:

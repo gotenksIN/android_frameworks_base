@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -78,7 +79,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,8 +88,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -121,9 +119,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.times
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Popup
-import androidx.core.view.setPadding
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.layout.WindowMetricsCalculator
 import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.LocalAndroidColorScheme
@@ -156,20 +156,21 @@ fun CommunalHub(
     onOpenWidgetPicker: (() -> Unit)? = null,
     onEditDone: (() -> Unit)? = null,
 ) {
-    val communalContent by viewModel.communalContent.collectAsState(initial = emptyList())
-    val currentPopup by viewModel.currentPopup.collectAsState(initial = null)
+    val communalContent by
+        viewModel.communalContent.collectAsStateWithLifecycle(initialValue = emptyList())
+    val currentPopup by viewModel.currentPopup.collectAsStateWithLifecycle(initialValue = null)
     var removeButtonCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
     var toolbarSize: IntSize? by remember { mutableStateOf(null) }
     var gridCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
     var isDraggingToRemove by remember { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
     val contentListState = rememberContentListState(widgetConfigurator, communalContent, viewModel)
-    val reorderingWidgets by viewModel.reorderingWidgets.collectAsState()
-    val selectedKey = viewModel.selectedKey.collectAsState()
+    val reorderingWidgets by viewModel.reorderingWidgets.collectAsStateWithLifecycle()
+    val selectedKey = viewModel.selectedKey.collectAsStateWithLifecycle()
     val removeButtonEnabled by remember {
         derivedStateOf { selectedKey.value != null || reorderingWidgets }
     }
-    val isEmptyState by viewModel.isEmptyState.collectAsState(initial = false)
+    val isEmptyState by viewModel.isEmptyState.collectAsStateWithLifecycle(initialValue = false)
 
     val contentPadding = gridContentPadding(viewModel.isEditMode, toolbarSize)
     val contentOffset = beforeContentPadding(contentPadding).toOffset()
@@ -303,9 +304,9 @@ fun CommunalHub(
 
         if (viewModel is CommunalViewModel && dialogFactory != null) {
             val isEnableWidgetDialogShowing by
-                viewModel.isEnableWidgetDialogShowing.collectAsState(false)
+                viewModel.isEnableWidgetDialogShowing.collectAsStateWithLifecycle(false)
             val isEnableWorkProfileDialogShowing by
-                viewModel.isEnableWorkProfileDialogShowing.collectAsState(false)
+                viewModel.isEnableWorkProfileDialogShowing.collectAsStateWithLifecycle(false)
 
             EnableWidgetDialog(
                 isEnableWidgetDialogVisible = isEnableWidgetDialogShowing,
@@ -426,8 +427,8 @@ private fun BoxScope.CommunalHubLazyGrid(
         state = gridState,
         rows = GridCells.Fixed(CommunalContentSize.FULL.span),
         contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(32.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimensions.ItemSpacing),
+        verticalArrangement = Arrangement.spacedBy(Dimensions.ItemSpacing),
     ) {
         items(
             count = list.size,
@@ -440,7 +441,7 @@ private fun BoxScope.CommunalHubLazyGrid(
                     Dimensions.CardWidth.value,
                     list[index].size.dp().value,
                 )
-            val cardModifier = Modifier.size(width = size.width.dp, height = size.height.dp)
+            val cardModifier = Modifier.requiredSize(width = size.width.dp, height = size.height.dp)
             if (viewModel.isEditMode && dragDropState != null) {
                 val selected by
                     remember(index) { derivedStateOf { list[index].key == selectedKey.value } }
@@ -794,12 +795,10 @@ private fun CtaTileInViewModeContent(
                 containerColor = colors.primary,
                 contentColor = colors.onPrimary,
             ),
-        shape = RoundedCornerShape(80.dp, 40.dp, 80.dp, 40.dp)
+        shape = RoundedCornerShape(68.dp, 34.dp, 68.dp, 34.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 82.dp),
-            verticalArrangement =
-                Arrangement.spacedBy(Dimensions.Spacing, Alignment.CenterVertically),
+            modifier = Modifier.fillMaxSize().padding(vertical = 38.dp, horizontal = 70.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(
@@ -807,11 +806,13 @@ private fun CtaTileInViewModeContent(
                 contentDescription = stringResource(R.string.cta_label_to_open_widget_picker),
                 modifier = Modifier.size(Dimensions.IconSize),
             )
+            Spacer(modifier = Modifier.size(6.dp))
             Text(
                 text = stringResource(R.string.cta_label_to_edit_widget),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
             )
+            Spacer(modifier = Modifier.size(20.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -827,9 +828,10 @@ private fun CtaTileInViewModeContent(
                 ) {
                     Text(
                         text = stringResource(R.string.cta_tile_button_to_dismiss),
+                        fontSize = 12.sp,
                     )
                 }
-                Spacer(modifier = Modifier.size(Dimensions.Spacing))
+                Spacer(modifier = Modifier.size(14.dp))
                 Button(
                     colors =
                         ButtonDefaults.buttonColors(
@@ -841,6 +843,7 @@ private fun CtaTileInViewModeContent(
                 ) {
                     Text(
                         text = stringResource(R.string.cta_tile_button_to_open_widget_editor),
+                        fontSize = 12.sp,
                     )
                 }
             }
@@ -860,7 +863,7 @@ private fun WidgetContent(
     contentListState: ContentListState,
 ) {
     val context = LocalContext.current
-    val isFocusable by viewModel.isFocusable.collectAsState(initial = false)
+    val isFocusable by viewModel.isFocusable.collectAsStateWithLifecycle(initialValue = false)
     val accessibilityLabel =
         remember(model, context) {
             model.providerInfo.loadLabel(context.packageManager).toString().trim()
@@ -868,7 +871,7 @@ private fun WidgetContent(
     val clickActionLabel = stringResource(R.string.accessibility_action_label_select_widget)
     val removeWidgetActionLabel = stringResource(R.string.accessibility_action_label_remove_widget)
     val placeWidgetActionLabel = stringResource(R.string.accessibility_action_label_place_widget)
-    val selectedKey by viewModel.selectedKey.collectAsState()
+    val selectedKey by viewModel.selectedKey.collectAsStateWithLifecycle()
     val selectedIndex =
         selectedKey?.let { key -> contentListState.list.indexOfFirst { it.key == key } }
     Box(
@@ -926,10 +929,14 @@ private fun WidgetContent(
                 model.appWidgetHost
                     .createViewForCommunal(context, model.appWidgetId, model.providerInfo)
                     .apply {
-                        updateAppWidgetSize(Bundle.EMPTY, listOf(size))
-                        // Remove the extra padding applied to AppWidgetHostView to allow widgets to
-                        // occupy the entire box.
-                        setPadding(0)
+                        updateAppWidgetSize(
+                            /* newOptions = */ Bundle(),
+                            /* minWidth = */ size.width.toInt(),
+                            /* minHeight = */ size.height.toInt(),
+                            /* maxWidth = */ size.width.toInt(),
+                            /* maxHeight = */ size.height.toInt(),
+                            /* ignorePadding = */ true
+                        )
                         accessibilityDelegate = viewModel.widgetAccessibilityDelegate
                     }
             },
@@ -1109,7 +1116,7 @@ private fun Umo(viewModel: BaseCommunalViewModel, modifier: Modifier = Modifier)
 @Composable
 fun AccessibilityContainer(viewModel: BaseCommunalViewModel, content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val isFocusable by viewModel.isFocusable.collectAsState(initial = false)
+    val isFocusable by viewModel.isFocusable.collectAsStateWithLifecycle(initialValue = false)
     Box(
         modifier =
             Modifier.fillMaxWidth().wrapContentHeight().thenIf(
@@ -1152,7 +1159,11 @@ fun AccessibilityContainer(viewModel: BaseCommunalViewModel, content: @Composabl
 @Composable
 private fun gridContentPadding(isEditMode: Boolean, toolbarSize: IntSize?): PaddingValues {
     if (!isEditMode || toolbarSize == null) {
-        return PaddingValues(start = 48.dp, end = 48.dp, top = Dimensions.GridTopSpacing)
+        return PaddingValues(
+            start = Dimensions.ItemSpacing,
+            end = Dimensions.ItemSpacing,
+            top = Dimensions.GridTopSpacing,
+        )
     }
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -1215,18 +1226,19 @@ data class ContentPaddingInPx(val start: Float, val top: Float) {
 }
 
 object Dimensions {
-    val CardWidth = 424.dp
-    val CardHeightFull = 596.dp
-    val CardHeightHalf = 282.dp
-    val CardHeightThird = 177.33.dp
-    val CardOutlineWidth = 3.dp
-    val GridTopSpacing = 64.dp
+    val CardHeightFull = 530.dp
+    val GridTopSpacing = 114.dp
     val GridHeight = CardHeightFull + GridTopSpacing
-    val Spacing = 16.dp
+    val ItemSpacing = 50.dp
+    val CardHeightHalf = (CardHeightFull - ItemSpacing) / 2
+    val CardHeightThird = (CardHeightFull - (2 * ItemSpacing)) / 3
+    val CardWidth = 360.dp
+    val CardOutlineWidth = 3.dp
+    val Spacing = ItemSpacing / 2
 
     // The sizing/padding of the toolbar in glanceable hub edit mode
     val ToolbarPaddingTop = 27.dp
-    val ToolbarPaddingHorizontal = 16.dp
+    val ToolbarPaddingHorizontal = ItemSpacing
     val ToolbarButtonPaddingHorizontal = 24.dp
     val ToolbarButtonPaddingVertical = 16.dp
     val ButtonPadding =
@@ -1234,10 +1246,7 @@ object Dimensions {
             vertical = ToolbarButtonPaddingVertical,
             horizontal = ToolbarButtonPaddingHorizontal,
         )
-    val IconSize = 48.dp
-
-    val LockIconSize = 52.dp
-    val LockIconBottomPadding = 70.dp
+    val IconSize = 40.dp
 }
 
 private object Colors {

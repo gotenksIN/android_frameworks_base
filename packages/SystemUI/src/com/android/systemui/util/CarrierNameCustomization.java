@@ -249,6 +249,12 @@ public class CarrierNameCustomization {
                 || (nrIconType != NrIconType.INVALID
                 && nrIconType != NrIconType.TYPE_NONE
                 && isDataRegisteredOnLte(dataType))) {
+            if (nrIconType == NrIconType.TYPE_5G_UWB
+                    && mContext.getResources().getBoolean(
+                    com.android.settingslib.R.bool.config_display_5g_a)) {
+                return mContext.getResources().getString(
+                        com.android.settingslib.R.string.data_connection_5g_a);
+            }
             return mContext.getResources().getString(
                     com.android.settingslib.R.string.data_connection_5g);
         }

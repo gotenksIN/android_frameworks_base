@@ -25,6 +25,7 @@ import static android.telephony.NetworkRegistrationInfo.DOMAIN_PS;
 import static android.telephony.ims.feature.ImsFeature.FEATURE_MMTEL;
 import static android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM;
 
+import static com.android.settingslib.satellite.SatelliteDialogUtils.TYPE_IS_WIFI;
 import static com.android.systemui.Prefs.Key.QS_HAS_TURNED_OFF_MOBILE_DATA;
 import static com.android.systemui.qs.tiles.dialog.InternetDialogController.MAX_WIFI_ENTRY_COUNT;
 
@@ -76,6 +77,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.internal.logging.UiEvent;
 import com.android.internal.logging.UiEventLogger;
+import com.android.internal.telephony.flags.Flags;
+import com.android.settingslib.satellite.SatelliteDialogUtils;
 import com.android.settingslib.wifi.WifiEnterpriseRestrictionUtils;
 import com.android.systemui.Prefs;
 import com.android.systemui.accessibility.floatingmenu.AnnotationLinkSpan;
@@ -98,6 +101,7 @@ import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
 
 import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.Job;
 
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -189,6 +193,9 @@ public class InternetDialogDelegate implements
     // Wi-Fi scanning progress bar
     protected boolean mIsProgressBarVisible;
     private SystemUIDialog mDialog;
+    private final CoroutineScope mCoroutineScope;
+    @Nullable
+    private Job mClickJob;
 
     private static String mPackageName;
     private ExtTelephonyManager mExtTelephonyManager;
@@ -285,6 +292,7 @@ public class InternetDialogDelegate implements
         mKeyguard = keyguardStateController;
         mImsManager = context.getSystemService(ImsManager.class);
 
+        mCoroutineScope = coroutineScope;
         mUiEventLogger = uiEventLogger;
         mDialogTransitionAnimator = dialogTransitionAnimator;
         mAdapter = new InternetAdapter(mInternetDialogController, coroutineScope);
@@ -483,11 +491,9 @@ public class InternetDialogDelegate implements
         });
         mConnectedWifListLayout.setOnClickListener(this::onClickConnectedWifi);
         mSeeAllLayout.setOnClickListener(this::onClickSeeMoreButton);
-        mWiFiToggle.setOnCheckedChangeListener(
-                (buttonView, isChecked) -> {
-                    if (mInternetDialogController.isWifiEnabled() == isChecked) return;
-                    mInternetDialogController.setWifiEnabled(isChecked);
-                });
+        mWiFiToggle.setOnClickListener(v -> {
+            handleWifiToggleClicked(mWiFiToggle.isChecked());
+        });
         mDoneButton.setOnClickListener(v -> dialog.dismiss());
         mShareWifiButton.setOnClickListener(v -> {
             if (mInternetDialogController.mayLaunchShareWifiSettings(mConnectedWifiEntry, v)) {
@@ -497,6 +503,32 @@ public class InternetDialogDelegate implements
         mAirplaneModeButton.setOnClickListener(v -> {
             mInternetDialogController.setAirplaneModeDisabled();
         });
+    }
+
+    private void handleWifiToggleClicked(boolean isChecked) {
+        if (Flags.oemEnabledSatelliteFlag()) {
+            if (mClickJob != null && !mClickJob.isCompleted()) {
+                return;
+            }
+            mClickJob = SatelliteDialogUtils.mayStartSatelliteWarningDialog(
+                    mDialog.getContext(), mCoroutineScope, TYPE_IS_WIFI, isAllowClick -> {
+                        if (isAllowClick) {
+                            setWifiEnable(isChecked);
+                        } else {
+                            mWiFiToggle.setChecked(!isChecked);
+                        }
+                        return null;
+                    });
+            return;
+        }
+        setWifiEnable(isChecked);
+    }
+
+    private void setWifiEnable(boolean isChecked) {
+        if (mInternetDialogController.isWifiEnabled() == isChecked) {
+            return;
+        }
+        mInternetDialogController.setWifiEnabled(isChecked);
     }
 
     @MainThread

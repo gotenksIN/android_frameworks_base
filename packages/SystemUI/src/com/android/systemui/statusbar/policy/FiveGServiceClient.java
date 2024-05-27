@@ -363,6 +363,7 @@ public class FiveGServiceClient {
 
     private static MobileIconGroup getNrIconGroup(int nrIconType , boolean is6Rx, Context context) {
         boolean show6RxConfig = context.getResources().getBoolean(R.bool.config_display_6Rx);
+        boolean show5Ga = context.getResources().getBoolean(R.bool.config_display_5g_a);
         Log.d(TAG, "getNrIconGroup nrIconType:" + nrIconType +
             "; is6Rx:" + is6Rx + "; show6RxConfig:" + show6RxConfig);
         MobileIconGroup iconGroup = TelephonyIcons.UNKNOWN;
@@ -372,8 +373,12 @@ public class FiveGServiceClient {
                         TelephonyIcons.FIVE_G_BASIC_6RX : TelephonyIcons.FIVE_G_BASIC;
                 break;
             case NrIconType.TYPE_5G_UWB:
-                iconGroup = (show6RxConfig && is6Rx) ?
-                        TelephonyIcons.FIVE_G_UWB_6RX : TelephonyIcons.FIVE_G_UWB;
+                if (show5Ga) {
+                    iconGroup = TelephonyIcons.FIVE_G_A;
+                } else {
+                    iconGroup = (show6RxConfig && is6Rx) ?
+                            TelephonyIcons.FIVE_G_UWB_6RX : TelephonyIcons.FIVE_G_UWB;
+                }
                 break;
             case NrIconType.TYPE_5G_PLUS_PLUS:
                 iconGroup = (show6RxConfig && is6Rx) ?

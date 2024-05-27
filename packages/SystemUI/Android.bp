@@ -397,9 +397,6 @@ android_library {
         "device_policy_aconfig_flags_lib",
     ],
     manifest: "AndroidManifest.xml",
-    defaults: [
-       "framework-wifi-vendor-hide-access-defaults",
-    ],
     libs: [
         "android.car",
         "extphonelib",
@@ -483,9 +480,6 @@ android_library {
     name: "SystemUI-tests-base",
     use_resource_processor: true,
     manifest: "tests/AndroidManifest-base.xml",
-    defaults: [
-       "framework-wifi-vendor-hide-access-defaults",
-    ],
     resource_dirs: [
         "tests/res",
     ],

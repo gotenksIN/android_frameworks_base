@@ -143,7 +143,6 @@ genrule {
 java_library_static {
     name: "services.core.unboosted",
     defaults: [
-        "framework-wifi-vendor-hide-access-defaults",
         "platform_service_defaults",
         "android.hardware.power-java_shared",
         "latest_android_hardware_broadcastradio_java_static",

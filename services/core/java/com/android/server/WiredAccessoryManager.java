@@ -47,6 +47,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * <p>WiredAccessoryManager monitors for a wired headset on the main board or dock using
@@ -55,7 +57,7 @@ import java.util.Locale;
  */
 final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private static final String TAG = WiredAccessoryManager.class.getSimpleName();
-    private static final boolean LOG = false;
+    private static final boolean LOG = true;
 
     private static final int BIT_HEADSET = (1 << 0);
     private static final int BIT_HEADSET_NO_MIC = (1 << 1);
@@ -104,6 +106,10 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private final InputManagerService mInputManager;
 
     private final boolean mUseDevInputEventForAudioJack;
+
+    private static final int MAX_DP_COUNT = 2;
+    private boolean []streamsInUse = new boolean[MAX_DP_COUNT];
+    private Map<String, Integer > streamIndexMap = new HashMap();
 
     public WiredAccessoryManager(Context context, InputManagerService inputManager) {
         PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
@@ -229,6 +235,7 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
         if (LOG) {
             Slog.v(TAG, "newName=" + newName
                     + " newState=" + newState
+                    + " address=" + address
                     + " headsetState=" + headsetState
                     + " prev headsetState=" + mHeadsetState
                     + " num of active dp conns= " + mDpCount);
@@ -495,14 +502,10 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
             for (String conn : DP_AUDIO_CONNS) {
                 // Monitor DisplayPort
-                if (LOG) {
-                    Slog.v(TAG, "Monitor DP conn " + conn);
-                }
                 uei = new UEventInfo(conn, BIT_HDMI_AUDIO, 0, 0);
                 if (uei.checkSwitchExists()) {
+                    Slog.i(TAG, "Adding " + conn + " with " + uei.toString() + " to monitor list");
                     retVal.add(uei);
-                } else {
-                    Slog.w(TAG, "Conn " + conn + " does not have DP audio support");
                 }
             }
             return retVal;
@@ -513,7 +516,9 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             String devPath = event.get("DEVPATH");
             String name = event.get("NAME");
             int state = 0;
-
+            if (LOG) {
+                Slog.v(TAG, "onUEvent event=" + event.toString());
+            }
             if (name == null)
                 name = event.get("SWITCH_NAME");
 
@@ -586,26 +591,49 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             }
         }
 
+        private int getStreamIndex(String devPath) {
+            // find first valid stream index
+            for (int i =0; i < MAX_DP_COUNT; i++) {
+                if (!streamsInUse[i]) {
+                    streamsInUse[i] = true;
+                    Slog.v(TAG, "getStreamIndex for " + devPath + " got " + i);
+                    streamIndexMap.put(devPath, i);
+                    return i;
+                }
+            }
+            return 0;
+        }
+
+        private void removeDevice(String devPath) {
+            if (streamIndexMap.containsKey(devPath)) {
+                int index = streamIndexMap.get(devPath);
+                streamsInUse[index] = false;
+                streamIndexMap.remove(devPath);
+                Slog.v(TAG, "removeDevice for " + devPath + " for stream " + index);
+            }
+        }
+
         private void updateStateLocked(String devPath, String name, int state) {
             for (int i = 0; i < mUEventInfo.size(); ++i) {
                 UEventInfo uei = mUEventInfo.get(i);
-                if (LOG) {
-                    Slog.v(TAG, "uei.getDevPath=" + uei.getDevPath());
-                    Slog.v(TAG, "uevent.getDevPath=" + devPath);
-                }
+                Slog.v(TAG, "uei.getDevPath=" + uei.getDevPath() + " uei=" + uei.toString());
+                Slog.v(TAG, "uevent.devPath=" + devPath + ";name=" + name + ";state=" + state);
 
                 if (devPath.equals(uei.getDevPath())) {
-                    if (state == 1 && mDpCount > 0) {
-                        uei.setStreamIndex(mDpCount);
-                    }
-
                     if (state == 1) {
+                        int stream = getStreamIndex(devPath);
+                        Slog.v(TAG, "devPath" + devPath + ";stream=" + stream);
+                        uei.setStreamIndex(stream);
                         int newControllerIdx = (mDetectedIntf.equals(INTF_DP)) ? 0 : 1;
                         uei.setCableIndex(newControllerIdx);
                     }
                     updateLocked(name, uei.getDevAddress(),
                                  uei.computeNewHeadsetState(mHeadsetState,
                                                             state));
+
+                    if (state == 0) {
+                        removeDevice(devPath);
+                    }
                     return;
                 }
             }
@@ -637,11 +665,12 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                         assert(idx2 != -1);
                         int dev = Integer.parseInt(mDevName.substring(idx+1, idx2));
                         int cable = Integer.parseInt(mDevName.substring(idx2+1));
-                        if (LOG) {
-                            Slog.v(TAG, "UEvent dev address " + mDevAddress);
-                        }
                         checkDevIndex(dev);
                         checkCableIndex(cable);
+                        if (LOG) {
+                            Slog.v(TAG, "UEventInfo name" + mDevName + "mDevAddress=" + mDevAddress
+                                        + "mDevIndex="+ mDevIndex + "mCableIndex="+mCableIndex);
+                        }
                     }
                 }
             }
@@ -668,7 +697,7 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
                         String devName = (new String(buffer, 0, len)).trim();
                         if (devName.startsWith(NAME_DP_AUDIO) && index == dev_index) {
-                            Slog.e(TAG, "set dev_index " + dev_index);
+                            Slog.e(TAG, "set dev_index " + dev_index + " devPath " + devPath);
                             mDevIndex = dev_index;
                             break;
                         } else {
@@ -708,14 +737,17 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                         String cableName = (new String(buffer, 0, len)).trim();
                         if (cableName.equals("HDMI") && index == cable_index) {
                             mCableIndex = index;
-                            Slog.w(TAG, "checkCableIndex set cable " + cable_index);
+                            Slog.i(TAG, "checkCableIndex set cable for HDMI " + cable_index +
+                                        " cable " + cablePath);
                             break;
                         } else if (cableName.equals("DP") && index == cable_index) {
                             mCableIndex = index;
-                            Slog.w(TAG, "checkCableIndex set cable " + cable_index);
+                            Slog.i(TAG, "checkCableIndex set cable for DP " + cable_index +
+                                        " cable " + cablePath);
                             break;
                         } else {
-                            Slog.w(TAG, "checkCableIndex no name match, skip ");
+                            Slog.i(TAG, "checkCableIndex no name match, skip for cable " +
+                                        cablePath);
                             index++;
                         }
                     } catch (Exception e) {
@@ -726,18 +758,24 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             }
 
             public void setStreamIndex(int streamIndex) {
+                String devAddress = mDevAddress;
                 int index1 = mDevAddress.indexOf("=");
                 int index2 = mDevAddress.indexOf("=", index1 + 1);
 
                 String allExceptStreamIdx = mDevAddress.substring(0, index2 + 1);
                 mDevAddress = allExceptStreamIdx + String.valueOf(streamIndex);
+                Slog.i(TAG, "setStreamIndex streamIndex" + streamIndex + " devAddress " +
+                            devAddress + " updated to " + mDevAddress);
             }
 
             public void setCableIndex(int cableIndex) {
                 int index = mDevAddress.indexOf("=");
+                String devAddress = mDevAddress;
                 String changeControllerIdx = mDevAddress.substring(0, index + 1) + cableIndex
                                               + mDevAddress.substring(index + 2);
                 mDevAddress = changeControllerIdx;
+                Slog.i(TAG, "setCableIndex cableIndex" + cableIndex + " devAddress " +
+                            devAddress + " updated to " + mDevAddress);
             }
 
             public String getDevName() {
@@ -783,6 +821,14 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                                 ((switchState == mStateNbits) ? mStateNbits : 0)));
 
                 return ((headsetState & preserveMask) | setBits);
+            }
+
+            public String toString() {
+                return "UEventInfo " +
+                       " name=" + mDevName +
+                       " mDevAddress=" + mDevAddress +
+                       " mDevIndex=" + mDevIndex +
+                       " mCableIndex=" + mCableIndex;
             }
         }
     }

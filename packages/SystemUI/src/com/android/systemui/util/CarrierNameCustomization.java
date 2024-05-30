@@ -145,21 +145,26 @@ public class CarrierNameCustomization {
     }
 
     public String getCustomizeCarrierNameOld(CharSequence originCarrierName, SubscriptionInfo sub) {
+        String networkClass = getNetworkTypeDescription(sub.getSubscriptionId());
+        return getCustomizeCarrierNameInternal(originCarrierName, networkClass);
+    }
+
+    public String getNetworkTypeDescription(int subId) {
         int dataNetworkType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
         int voiceNetworkType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
         boolean isInService = false;
-        ServiceState ss = mKeyguardUpdateMonitor.getServiceState(sub.getSubscriptionId());
+        ServiceState ss = mKeyguardUpdateMonitor.getServiceState(subId);
         if (ss != null) {
             dataNetworkType = ss.getVoiceNetworkType();
             voiceNetworkType = ss.getDataNetworkType();
             isInService = (ss.getDataRegState() == ServiceState.STATE_IN_SERVICE
                     || ss.getVoiceRegState() == ServiceState.STATE_IN_SERVICE);
         }
+        SubscriptionInfo sub = mKeyguardUpdateMonitor.getSubscriptionInfoForSubId(subId);
         FiveGServiceClient.FiveGServiceState fiveGServiceState =
                 mFiveGServiceClient.getCurrentServiceState(sub.getSimSlotIndex());
-        String networkClass = getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
+        return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
                 fiveGServiceState.getNrIconType());
-        return getCustomizeCarrierNameInternal(originCarrierName, networkClass);
     }
 
     public String getCustomizeCarrierNameModern(int subId, String originCarrierName,
@@ -276,5 +281,9 @@ public class CarrierNameCustomization {
             }
         }
         return originalString;
+    }
+
+    public boolean showCustomizeName() {
+        return mShowCustomizeName;
     }
 }

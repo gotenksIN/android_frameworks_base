@@ -764,6 +764,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
 
     String getMobileNetworkSummary(int subId) {
         String description = getNetworkTypeDescription(mContext, mConfig, subId);
+        if (mCarrierNameCustomization.showCustomizeName()) {
+            description = mCarrierNameCustomization.getNetworkTypeDescription(subId);
+        }
         return getMobileSummary(mContext, description, subId);
     }
 

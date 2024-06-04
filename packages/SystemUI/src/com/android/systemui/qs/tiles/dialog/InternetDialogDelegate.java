@@ -929,8 +929,14 @@ public class InternetDialogDelegate implements
     }
 
     private boolean isCiwlanWarningConditionSatisfied(int subId) {
-        // Store the call state of all active subscriptions
-        int[] activeSubIdList = SubscriptionManager.from(mDialog.getContext()).getActiveSubscriptionIdList();
+        // For targets that support MSIM C_IWLAN, the warning is to be shown only for the DDS when
+        // either sub is in a call. For other targets, it will be shown only when there is a call on
+        // the DDS.
+        if (subId != mDefaultDataSubId) {
+            return false;
+        }
+        int[] activeSubIdList = SubscriptionManager.from(
+                mDialog.getContext()).getActiveSubscriptionIdList();
         mIsSubInCall = new SparseBooleanArray(activeSubIdList.length);
         mIsCiwlanModeSupported = new SparseBooleanArray(activeSubIdList.length);
         mIsCiwlanEnabled = new SparseBooleanArray(activeSubIdList.length);
@@ -946,26 +952,16 @@ public class InternetDialogDelegate implements
             mIsInCiwlanOnlyMode.put(subscriptionId, isInCiwlanOnlyMode(tm, subscriptionId));
             mIsImsRegisteredOnCiwlan.put(subscriptionId, isImsRegisteredOnCiwlan(subscriptionId));
         }
-        // For targets that support MSIM C_IWLAN, the warning is to be shown only for the DDS when
-        // either sub is in a call. For other targets, it will be shown only when there is a call on
-        // the DDS.
         boolean isMsimCiwlanSupported = mExtTelephonyManager.isFeatureSupported(
                 ExtTelephonyManager.FEATURE_CIWLAN_MODE_PREFERENCE);
         int subToCheck = mDefaultDataSubId;
         if (isMsimCiwlanSupported) {
-            if (subId != mDefaultDataSubId) {
-                // If the code comes here, the user is trying to change the mobile data toggle
-                // of the nDDS which we don't care about.
-                return false;
-            } else {
-                // Otherwise, the user is trying to toggle the mobile data of the DDS. In this
-                // case, we need to check if the nDDS is in a C_IWLAN call. If it is, we will check
-                // the C_IWLAN related settings belonging to the nDDS. Otherwise, we will check
-                // those of the DDS.
-                subToCheck = subToCheckForCiwlanWarningDialog();
-                Log.d(TAG, "isCiwlanWarningConditionSatisfied DDS = " + mDefaultDataSubId +
-                        ", subToCheck = " + subToCheck);
-            }
+            // The user is trying to toggle the mobile data of the DDS. In this case, we need to
+            // check if the nDDS is in a C_IWLAN call. If it is, we will check the C_IWLAN related
+            // settings of the nDDS. Otherwise, we will check those of the DDS.
+            subToCheck = subToCheckForCiwlanWarningDialog();
+            Log.d(TAG, "isCiwlanWarningConditionSatisfied DDS = " + mDefaultDataSubId +
+                    ", subToCheck = " + subToCheck);
         }
         if (mIsSubInCall.get(subToCheck)) {
             boolean isCiwlanModeSupported = mIsCiwlanModeSupported.get(subToCheck);

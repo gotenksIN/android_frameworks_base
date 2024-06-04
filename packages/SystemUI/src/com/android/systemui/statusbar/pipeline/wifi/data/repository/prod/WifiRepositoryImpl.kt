@@ -297,6 +297,7 @@ constructor(
             isPasspointAccessPoint = false,
             isOnlineSignUpForPasspointAccessPoint = false,
             passpointProviderFriendlyName = null,
+            wifiStandard = this.wifiStandard,
         )
     }
 

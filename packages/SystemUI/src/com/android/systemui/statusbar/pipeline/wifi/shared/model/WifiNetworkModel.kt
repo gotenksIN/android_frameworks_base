@@ -229,6 +229,9 @@ sealed class WifiNetworkModel : Diffable<WifiNetworkModel> {
 
         /** See [android.net.wifi.WifiInfo.passpointProviderFriendlyName]. */
         val passpointProviderFriendlyName: String? = null,
+
+        /** See [android.net.wifi.WifiInfo.getWifiStandard]. */
+        val wifiStandard: Int? = 0,
     ) : WifiNetworkModel() {
         init {
             require(level in MIN_VALID_LEVEL..MAX_VALID_LEVEL) {

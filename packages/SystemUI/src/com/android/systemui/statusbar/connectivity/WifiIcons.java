@@ -76,7 +76,7 @@ public class WifiIcons {
         }
     }
 
-    static final int[] WIFI_4_FULL_ICONS = {
+    public static final int[] WIFI_4_FULL_ICONS = {
             com.android.internal.R.drawable.ic_wifi_4_signal_0,
             com.android.internal.R.drawable.ic_wifi_4_signal_1,
             com.android.internal.R.drawable.ic_wifi_4_signal_2,
@@ -84,7 +84,7 @@ public class WifiIcons {
             com.android.internal.R.drawable.ic_wifi_4_signal_4
     };
 
-    private static final int[] WIFI_4_NO_INTERNET_ICONS = {
+    public static final int[] WIFI_4_NO_INTERNET_ICONS = {
             R.drawable.ic_qs_wifi_4_0,
             R.drawable.ic_qs_wifi_4_1,
             R.drawable.ic_qs_wifi_4_2,
@@ -92,7 +92,7 @@ public class WifiIcons {
             R.drawable.ic_qs_wifi_4_4
     };
 
-    static final int[] WIFI_5_FULL_ICONS = {
+    public static final int[] WIFI_5_FULL_ICONS = {
             com.android.internal.R.drawable.ic_wifi_5_signal_0,
             com.android.internal.R.drawable.ic_wifi_5_signal_1,
             com.android.internal.R.drawable.ic_wifi_5_signal_2,
@@ -100,7 +100,7 @@ public class WifiIcons {
             com.android.internal.R.drawable.ic_wifi_5_signal_4
     };
 
-    private static final int[] WIFI_5_NO_INTERNET_ICONS = {
+    public static final int[] WIFI_5_NO_INTERNET_ICONS = {
             R.drawable.ic_qs_wifi_5_0,
             R.drawable.ic_qs_wifi_5_1,
             R.drawable.ic_qs_wifi_5_2,
@@ -108,7 +108,7 @@ public class WifiIcons {
             R.drawable.ic_qs_wifi_5_4
     };
 
-    static final int[] WIFI_6_FULL_ICONS = {
+    public static final int[] WIFI_6_FULL_ICONS = {
             com.android.internal.R.drawable.ic_wifi_6_signal_0,
             com.android.internal.R.drawable.ic_wifi_6_signal_1,
             com.android.internal.R.drawable.ic_wifi_6_signal_2,
@@ -116,7 +116,7 @@ public class WifiIcons {
             com.android.internal.R.drawable.ic_wifi_6_signal_4
     };
 
-    private static final int[] WIFI_6_NO_INTERNET_ICONS = {
+    public static final int[] WIFI_6_NO_INTERNET_ICONS = {
             R.drawable.ic_qs_wifi_6_0,
             R.drawable.ic_qs_wifi_6_1,
             R.drawable.ic_qs_wifi_6_2,
@@ -124,7 +124,7 @@ public class WifiIcons {
             R.drawable.ic_qs_wifi_6_4
     };
 
-    static final int[] WIFI_7_FULL_ICONS = {
+    public static final int[] WIFI_7_FULL_ICONS = {
             com.android.internal.R.drawable.ic_wifi_7_signal_0,
             com.android.internal.R.drawable.ic_wifi_7_signal_1,
             com.android.internal.R.drawable.ic_wifi_7_signal_2,
@@ -132,7 +132,7 @@ public class WifiIcons {
             com.android.internal.R.drawable.ic_wifi_7_signal_4
     };
 
-    private static final int[] WIFI_7_NO_INTERNET_ICONS = {
+    public static final int[] WIFI_7_NO_INTERNET_ICONS = {
             R.drawable.ic_qs_wifi_7_0,
             R.drawable.ic_qs_wifi_7_1,
             R.drawable.ic_qs_wifi_7_2,

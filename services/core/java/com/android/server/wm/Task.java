@@ -1273,7 +1273,7 @@ class Task extends TaskFragment {
                 // Pausing the resumed activity because it is occluded by other task fragment, or
                 // should not be remained in resumed state.
                 if (startPausing(false /* uiSleeping*/, resuming, reason)) {
-                    if (mActivityPluginDelegate != null
+                    if (mActivityPluginDelegate != null && top != null && top.info != null
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
                         mActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
@@ -1288,7 +1288,7 @@ class Task extends TaskFragment {
             final ActivityRecord top = topRunningActivity();
             if (resumedActivity != null && !taskFrag.canBeResumed(resuming)) {
                 if (taskFrag.startPausing(false /* uiSleeping*/, resuming, reason)) {
-                    if (mActivityPluginDelegate != null
+                    if (mActivityPluginDelegate != null && top != null && top.info != null
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
                         mActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
@@ -5189,7 +5189,8 @@ class Task extends TaskFragment {
         final boolean[] resumed = new boolean[1];
         final TaskFragment topFragment = topActivity.getTaskFragment();
         resumed[0] = topFragment.resumeTopActivity(prev, options, deferPause);
-        if (mActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
+        if (mActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED
+                    && topActivity.info != null) {
             mActivityPluginDelegate.activityInvokeNotification(
                     topActivity.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
         }

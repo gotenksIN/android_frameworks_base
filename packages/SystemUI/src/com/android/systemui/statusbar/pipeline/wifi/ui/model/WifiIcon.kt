@@ -131,14 +131,26 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
 
         private fun WifiNetworkModel.Active.toBasicIcon(context: Context): Visible {
             val levelDesc = context.getString(WIFI_CONNECTION_STRENGTH[this.level])
+            val wifiStandard = this.wifiStandard
+
             return if (this.isValidated) {
-                Visible(
-                    WifiIcons.WIFI_FULL_ICONS[this.level],
-                    ContentDescription.Loaded(levelDesc),
-                )
+                val icon = when (wifiStandard) {
+                    4 -> WifiIcons.WIFI_4_FULL_ICONS[this.level]
+                    5 -> WifiIcons.WIFI_5_FULL_ICONS[this.level]
+                    6 -> WifiIcons.WIFI_6_FULL_ICONS[this.level]
+                    7 -> WifiIcons.WIFI_7_FULL_ICONS[this.level]
+                    else -> WifiIcons.WIFI_FULL_ICONS[this.level]
+                }
+                Visible(icon, ContentDescription.Loaded(levelDesc))
             } else {
-                Visible(
-                    WifiIcons.WIFI_NO_INTERNET_ICONS[this.level],
+                val icon = when (wifiStandard) {
+                    4 -> WifiIcons.WIFI_4_NO_INTERNET_ICONS[this.level]
+                    5 -> WifiIcons.WIFI_5_NO_INTERNET_ICONS[this.level]
+                    6 -> WifiIcons.WIFI_6_NO_INTERNET_ICONS[this.level]
+                    7 -> WifiIcons.WIFI_7_NO_INTERNET_ICONS[this.level]
+                    else -> WifiIcons.WIFI_NO_INTERNET_ICONS[this.level]
+                }
+                Visible(icon,
                     ContentDescription.Loaded("$levelDesc,${context.getString(NO_INTERNET)}"),
                 )
             }

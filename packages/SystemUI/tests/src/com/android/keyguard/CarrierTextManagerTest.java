@@ -461,7 +461,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                         /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE,
                         /* isPasspointAccessPoint= */ false,
                         /* isOnlineSignUpForPasspointAccessPoint= */ false,
-                        /* passpointProviderFriendlyName= */ null));
+                        /* passpointProviderFriendlyName= */ null,
+                        /* wifiStandard= */ 0));
         assertTrue(mWifiRepository.isWifiConnectedWithValidSsid());
 
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();

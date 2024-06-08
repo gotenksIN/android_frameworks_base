@@ -40,6 +40,8 @@ import static android.app.ActivityManager.PROCESS_STATE_TOP;
 import static android.app.ActivityManager.RESTRICTION_LEVEL_FORCE_STOPPED;
 import static android.app.ActivityManager.RESTRICTION_REASON_DEFAULT;
 import static android.app.ActivityManager.RESTRICTION_REASON_USAGE;
+import static android.app.ActivityManager.RESTRICTION_SOURCE_SYSTEM;
+import static android.app.ActivityManager.RESTRICTION_SOURCE_USER;
 import static android.app.ActivityManager.StopUserOnSwitch;
 import static android.app.ActivityManager.UidFrozenStateChangedCallback.UID_FROZEN_STATE_FROZEN;
 import static android.app.ActivityManager.UidFrozenStateChangedCallback.UID_FROZEN_STATE_UNFROZEN;
@@ -372,6 +374,8 @@ import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.server.ServerProtoEnums;
 import android.sysprop.InitProperties;
+import android.system.Os;
+import android.system.OsConstants;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.text.style.SuggestionSpan;
@@ -5233,7 +5237,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (android.app.Flags.appRestrictionsApi() && wasForceStopped) {
             noteAppRestrictionEnabled(app.info.packageName, app.uid,
                     RESTRICTION_LEVEL_FORCE_STOPPED, false,
-                    RESTRICTION_REASON_USAGE, "unknown", 0L);
+                    RESTRICTION_REASON_USAGE, "unknown", RESTRICTION_SOURCE_USER, 0L);
         }
 
         if (!sendBroadcast) {
@@ -5681,32 +5685,30 @@ public class ActivityManagerService extends IActivityManager.Stub
             // security checking for it above.
             userId = UserHandle.USER_CURRENT;
         }
-        try {
-            if (owningUid != 0 && owningUid != SYSTEM_UID) {
-                final int uid = AppGlobals.getPackageManager().getPackageUid(packageName,
-                        MATCH_DEBUG_TRIAGED_MISSING, UserHandle.getUserId(owningUid));
-                if (!UserHandle.isSameApp(owningUid, uid)) {
-                    String msg = "Permission Denial: getIntentSender() from pid="
-                            + Binder.getCallingPid()
-                            + ", uid=" + owningUid
-                            + ", (need uid=" + uid + ")"
-                            + " is not allowed to send as package " + packageName;
-                    Slog.w(TAG, msg);
-                    throw new SecurityException(msg);
-                }
-            }
 
-            if (type == ActivityManager.INTENT_SENDER_ACTIVITY_RESULT) {
-                return mAtmInternal.getIntentSender(type, packageName, featureId, owningUid,
-                        userId, token, resultWho, requestCode, intents, resolvedTypes, flags,
-                        bOptions);
+        if (owningUid != 0 && owningUid != SYSTEM_UID) {
+            if (!getPackageManagerInternal().isSameApp(
+                    packageName,
+                    MATCH_DEBUG_TRIAGED_MISSING,
+                    owningUid,
+                    UserHandle.getUserId(owningUid))) {
+                String msg = "Permission Denial: getIntentSender() from pid="
+                        + Binder.getCallingPid()
+                        + ", uid=" + owningUid
+                        + " is not allowed to send as package " + packageName;
+                Slog.w(TAG, msg);
+                throw new SecurityException(msg);
             }
-            return mPendingIntentController.getIntentSender(type, packageName, featureId,
-                    owningUid, userId, token, resultWho, requestCode, intents, resolvedTypes,
-                    flags, bOptions);
-        } catch (RemoteException e) {
-            throw new SecurityException(e);
         }
+
+        if (type == ActivityManager.INTENT_SENDER_ACTIVITY_RESULT) {
+            return mAtmInternal.getIntentSender(type, packageName, featureId, owningUid,
+                    userId, token, resultWho, requestCode, intents, resolvedTypes, flags,
+                    bOptions);
+        }
+        return mPendingIntentController.getIntentSender(type, packageName, featureId,
+                owningUid, userId, token, resultWho, requestCode, intents, resolvedTypes,
+                flags, bOptions);
     }
 
     @Override
@@ -6116,44 +6118,45 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         synchronized (mProcLock) {
-            synchronized (mPidsSelfLocked) {
-                int newestTimeIndex = -1;
-                long newestTime = Long.MIN_VALUE;
-                for (int i = 0; i < pids.length; i++) {
-                    ProcessRecord pr = mPidsSelfLocked.get(pids[i]);
-                    if (pr != null) {
-                        final long pendingTopTime =
-                                mPendingStartActivityUids.getPendingTopPidTime(pr.uid, pids[i]);
-                        if (pendingTopTime != PendingStartActivityUids.INVALID_TIME) {
-                            // The uid in mPendingStartActivityUids gets the TOP process state.
-                            states[i] = PROCESS_STATE_TOP;
-                            if (scores != null) {
-                                // The uid in mPendingStartActivityUids gets a better score.
-                                scores[i] = ProcessList.FOREGROUND_APP_ADJ - 1;
-                            }
-                            if (pendingTopTime > newestTime) {
-                                newestTimeIndex = i;
-                                newestTime = pendingTopTime;
-                            }
-                        } else {
-                            states[i] = pr.mState.getCurProcState();
-                            if (scores != null) {
-                                scores[i] = pr.mState.getCurAdj();
-                            }
+            int newestTimeIndex = -1;
+            long newestTime = Long.MIN_VALUE;
+            for (int i = 0; i < pids.length; i++) {
+                final ProcessRecord pr;
+                synchronized (mPidsSelfLocked) {
+                    pr = mPidsSelfLocked.get(pids[i]);
+                }
+                if (pr != null) {
+                    final long pendingTopTime =
+                            mPendingStartActivityUids.getPendingTopPidTime(pr.uid, pids[i]);
+                    if (pendingTopTime != PendingStartActivityUids.INVALID_TIME) {
+                        // The uid in mPendingStartActivityUids gets the TOP process state.
+                        states[i] = PROCESS_STATE_TOP;
+                        if (scores != null) {
+                            // The uid in mPendingStartActivityUids gets a better score.
+                            scores[i] = ProcessList.FOREGROUND_APP_ADJ - 1;
+                        }
+                        if (pendingTopTime > newestTime) {
+                            newestTimeIndex = i;
+                            newestTime = pendingTopTime;
                         }
                     } else {
-                        states[i] = PROCESS_STATE_NONEXISTENT;
+                        states[i] = pr.mState.getCurProcState();
                         if (scores != null) {
-                            scores[i] = ProcessList.INVALID_ADJ;
+                            scores[i] = pr.mState.getCurAdj();
                         }
                     }
-                }
-                // The uid with the newest timestamp in mPendingStartActivityUids gets the best
-                // score.
-                if (newestTimeIndex != -1) {
+                } else {
+                    states[i] = PROCESS_STATE_NONEXISTENT;
                     if (scores != null) {
-                        scores[newestTimeIndex] = ProcessList.FOREGROUND_APP_ADJ - 2;
+                        scores[i] = ProcessList.INVALID_ADJ;
                     }
+                }
+            }
+            // The uid with the newest timestamp in mPendingStartActivityUids gets the best
+            // score.
+            if (newestTimeIndex != -1) {
+                if (scores != null) {
+                    scores[newestTimeIndex] = ProcessList.FOREGROUND_APP_ADJ - 2;
                 }
             }
         }
@@ -10004,6 +10007,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             sb.append("ErrorId: ").append(errorId.toString()).append("\n");
         }
         sb.append("Build: ").append(Build.FINGERPRINT).append("\n");
+
+        // If device is not using 4KB pages, add the PageSize
+        long pageSize = Os.sysconf(OsConstants._SC_PAGESIZE);
+        if (pageSize != 4096) {
+            sb.append("PageSize: ").append(pageSize).append("\n");
+        }
+
         if (Debug.isDebuggerConnected()) {
             sb.append("Debugger: Connected\n");
         }
@@ -10390,7 +10400,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         command.add("/system/bin/logcat");
         command.add("-v");
         // This adds a timestamp and thread info to each log line.
-        command.add("threadtime");
+        // Also change the timestamps to use UTC time.
+        command.add("threadtime,UTC");
         for (String buffer : buffers) {
             command.add("-b");
             command.add(buffer);
@@ -14507,7 +14518,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                     if (wasStopped) {
                         noteAppRestrictionEnabled(app.packageName, app.uid,
                                 RESTRICTION_LEVEL_FORCE_STOPPED, false,
-                                RESTRICTION_REASON_DEFAULT, "restore", 0L);
+                                RESTRICTION_REASON_DEFAULT, "restore",
+                                RESTRICTION_SOURCE_SYSTEM, 0L);
                     }
                 } catch (NameNotFoundException e) {
                     Slog.w(TAG, "No such package", e);
@@ -17060,6 +17072,18 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         int userId = UserHandle.getCallingUserId();
+
+        if (UserManager.isVisibleBackgroundUsersEnabled() && userId != getCurrentUserId()) {
+            // The check is added mainly for auto devices. On auto devices, it is possible that
+            // multiple users are visible simultaneously using visible background users.
+            // In such cases, it is desired that only the current user (not the visible background
+            // user) can change the locale and other persistent settings of the device.
+            Slog.w(TAG, "Only current user is allowed to update persistent configuration if "
+                    + "visible background users are enabled. Current User" + getCurrentUserId()
+                    + ". Calling User: " + userId);
+            throw new SecurityException("Only current user is allowed to update persistent "
+                    + "configuration.");
+        }
 
         mActivityTaskManager.updatePersistentConfiguration(values, userId);
     }
@@ -20095,6 +20119,26 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             addStartInfoTimestampInternal(key, timestampNs, userId, uid);
         }
+
+        @Override
+        public void killApplicationSync(String pkgName, int appId, int userId,
+                String reason, int exitInfoReason) {
+            if (pkgName == null) {
+                return;
+            }
+            // Make sure the uid is valid.
+            if (appId < 0) {
+                Slog.w(TAG, "Invalid appid specified for pkg : " + pkgName);
+                return;
+            }
+            synchronized (ActivityManagerService.this) {
+                ActivityManagerService.this.forceStopPackageLocked(pkgName, appId,
+                        /* callerWillRestart= */ false, /*purgeCache= */ false,
+                        /* doit= */ true, /* evenPersistent= */ false,
+                        /* uninstalling= */ false, /* packageStateStopped= */ false,
+                        userId, reason, exitInfoReason);
+            }
+        }
     }
 
     long inputDispatchingTimedOut(int pid, final boolean aboveSystem, TimeoutRecord timeoutRecord) {
@@ -20397,12 +20441,14 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Log the reason for changing an app restriction. Purely used for logging purposes and does not
      * cause any change to app state.
      *
-     * @see ActivityManager#noteAppRestrictionEnabled(String, int, int, boolean, int, String, long)
+     * @see ActivityManager#noteAppRestrictionEnabled(String, int, int, boolean, int,
+     *          String, int, long)
      */
     @Override
     public void noteAppRestrictionEnabled(String packageName, int uid,
             @RestrictionLevel int restrictionType, boolean enabled,
-            @ActivityManager.RestrictionReason int reason, String subReason, long threshold) {
+            @ActivityManager.RestrictionReason int reason, String subReason,
+            @ActivityManager.RestrictionSource int source, long threshold) {
         if (!android.app.Flags.appRestrictionsApi()) return;
 
         enforceCallingPermission(android.Manifest.permission.DEVICE_POWER,
@@ -20415,7 +20461,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 uid = mPackageManagerInt.getPackageUid(packageName, 0, userId);
             }
             mAppRestrictionController.noteAppRestrictionEnabled(packageName, uid, restrictionType,
-                    enabled, reason, subReason, threshold);
+                    enabled, reason, subReason, source, threshold);
         } finally {
             Binder.restoreCallingIdentity(callingId);
         }

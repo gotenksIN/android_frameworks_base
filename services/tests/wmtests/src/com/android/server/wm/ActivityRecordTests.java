@@ -2057,7 +2057,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         final ActivityRecord activity = createActivityWithTask();
         // TaskSnapshotSurface requires a fullscreen opaque window.
         final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.TYPE_APPLICATION_STARTING);
+                TYPE_BASE_APPLICATION);
         params.width = params.height = WindowManager.LayoutParams.MATCH_PARENT;
         final TestWindowState w = new TestWindowState(
                 mAtm.mWindowManager, getTestSession(), new TestIWindow(), params, activity);
@@ -2504,25 +2504,6 @@ public class ActivityRecordTests extends WindowTestsBase {
         activity.removeImmediately();
     }
 
-    @Test
-    @Presubmit
-    public void testGetTopFullscreenOpaqueWindow() {
-        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
-        assertNull(activity.getTopFullscreenOpaqueWindow());
-
-        final WindowState window1 = createWindow(null, TYPE_BASE_APPLICATION, activity, "window1");
-        final WindowState window11 = createWindow(null, TYPE_APPLICATION, activity, "window11");
-        final WindowState window12 = createWindow(null, TYPE_APPLICATION, activity, "window12");
-        assertEquals(window12, activity.getTopFullscreenOpaqueWindow());
-        window12.mAttrs.width = 500;
-        assertEquals(window11, activity.getTopFullscreenOpaqueWindow());
-        window11.mAttrs.width = 500;
-        assertEquals(window1, activity.getTopFullscreenOpaqueWindow());
-        window1.mAttrs.alpha = 0f;
-        assertNull(activity.getTopFullscreenOpaqueWindow());
-        activity.removeImmediately();
-    }
-
     @SetupWindows(addWindows = W_ACTIVITY)
     @Test
     public void testLandscapeSeascapeRotationByApp() {
@@ -2800,24 +2781,6 @@ public class ActivityRecordTests extends WindowTestsBase {
                 false, true, false, false, false);
         waitUntilHandlersIdle();
         assertFalse(mDisplayContent.mSkipAppTransitionAnimation);
-        assertNoStartingWindow(activity1);
-        assertHasStartingWindow(activity2);
-    }
-
-    @Test
-    public void testTransferStartingWindowWhileCreating() {
-        final TestStartingWindowOrganizer organizer = registerTestStartingWindowOrganizer();
-        final ActivityRecord activity1 = new ActivityBuilder(mAtm).setCreateTask(true).build();
-        final ActivityRecord activity2 = new ActivityBuilder(mAtm).setCreateTask(true).build();
-        organizer.setRunnableWhenAddingSplashScreen(
-                () -> {
-                    // Surprise, ...! Transfer window in the middle of the creation flow.
-                    activity2.addStartingWindow(mPackageName, android.R.style.Theme, activity1,
-                            true, true, false, true, false, false, false);
-                });
-        activity1.addStartingWindow(mPackageName, android.R.style.Theme, null, true, true, false,
-                true, false, false, false);
-        waitUntilHandlersIdle();
         assertNoStartingWindow(activity1);
         assertHasStartingWindow(activity2);
     }

@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.notification.interruption
 
+import android.Manifest.permission.RECEIVE_EMERGENCY_BROADCAST
 import android.app.Notification
 import android.app.Notification.BubbleMetadata
 import android.app.Notification.CATEGORY_EVENT
@@ -23,6 +24,8 @@ import android.app.Notification.CATEGORY_REMINDER
 import android.app.Notification.VISIBILITY_PRIVATE
 import android.app.NotificationManager.IMPORTANCE_DEFAULT
 import android.app.NotificationManager.IMPORTANCE_HIGH
+import android.content.pm.PackageManager
+import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.database.ContentObserver
 import android.hardware.display.AmbientDisplayConfiguration
 import android.os.Handler
@@ -45,6 +48,9 @@ import com.android.systemui.statusbar.policy.HeadsUpManager
 import com.android.systemui.util.settings.GlobalSettings
 import com.android.systemui.util.settings.SystemSettings
 import com.android.systemui.util.time.SystemClock
+import com.android.wm.shell.bubbles.Bubbles
+import java.util.Optional
+import kotlin.jvm.optionals.getOrElse
 
 class PeekDisabledSuppressor(
     private val globalSettings: GlobalSettings,
@@ -116,12 +122,18 @@ class PeekPackageSnoozedSuppressor(private val headsUpManager: HeadsUpManager) :
         }
 }
 
-class PeekAlreadyBubbledSuppressor(private val statusBarStateController: StatusBarStateController) :
-    VisualInterruptionFilter(types = setOf(PEEK), reason = "already bubbled") {
+class PeekAlreadyBubbledSuppressor(
+    private val statusBarStateController: StatusBarStateController,
+    private val bubbles: Optional<Bubbles>
+) : VisualInterruptionFilter(types = setOf(PEEK), reason = "already bubbled") {
     override fun shouldSuppress(entry: NotificationEntry) =
         when {
             statusBarStateController.state != SHADE -> false
-            else -> entry.isBubble
+            else -> {
+                val bubblesCanShowNotification =
+                    bubbles.map { it.canShowBubbleNotification() }.getOrElse { false }
+                entry.isBubble && bubblesCanShowNotification
+            }
         }
 }
 
@@ -234,6 +246,7 @@ class AvalancheSuppressor(
     private val avalancheProvider: AvalancheProvider,
     private val systemClock: SystemClock,
     private val systemSettings: SystemSettings,
+    private val packageManager: PackageManager,
 ) :
     VisualInterruptionFilter(
         types = setOf(PEEK, PULSE),
@@ -249,6 +262,7 @@ class AvalancheSuppressor(
         ALLOW_CATEGORY_EVENT,
         ALLOW_FSI_WITH_PERMISSION_ON,
         ALLOW_COLORIZED,
+        ALLOW_EMERGENCY,
         SUPPRESS
     }
 
@@ -299,13 +313,20 @@ class AvalancheSuppressor(
         if (entry.sbn.notification.isColorized) {
             return State.ALLOW_COLORIZED
         }
+        if (entry.sbn.notification.isColorized) {
+            return State.ALLOW_COLORIZED
+        }
+        if (
+            packageManager.checkPermission(RECEIVE_EMERGENCY_BROADCAST, entry.sbn.packageName) ==
+                PERMISSION_GRANTED
+        ) {
+            return State.ALLOW_EMERGENCY
+        }
         return State.SUPPRESS
     }
 
     private fun isCooldownEnabled(): Boolean {
-        return systemSettings.getInt(
-            Settings.System.NOTIFICATION_COOLDOWN_ENABLED,
-            /* def */ 1
-        ) == 1
+        return systemSettings.getInt(Settings.System.NOTIFICATION_COOLDOWN_ENABLED, /* def */ 1) ==
+            1
     }
 }

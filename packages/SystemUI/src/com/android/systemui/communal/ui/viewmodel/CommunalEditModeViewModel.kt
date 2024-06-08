@@ -25,6 +25,7 @@ import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import com.android.internal.logging.UiEventLogger
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
+import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor
 import com.android.systemui.communal.domain.interactor.CommunalSettingsInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.log.CommunalUiEvent
@@ -35,7 +36,6 @@ import com.android.systemui.log.core.Logger
 import com.android.systemui.log.dagger.CommunalLog
 import com.android.systemui.media.controls.ui.view.MediaHost
 import com.android.systemui.media.dagger.MediaModule
-import com.android.systemui.res.R
 import javax.inject.Inject
 import javax.inject.Named
 import kotlinx.coroutines.CoroutineDispatcher
@@ -51,13 +51,14 @@ import kotlinx.coroutines.withContext
 class CommunalEditModeViewModel
 @Inject
 constructor(
+    communalSceneInteractor: CommunalSceneInteractor,
     private val communalInteractor: CommunalInteractor,
     private val communalSettingsInteractor: CommunalSettingsInteractor,
     @Named(MediaModule.COMMUNAL_HUB) mediaHost: MediaHost,
     private val uiEventLogger: UiEventLogger,
     @CommunalLog logBuffer: LogBuffer,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
-) : BaseCommunalViewModel(communalInteractor, mediaHost) {
+) : BaseCommunalViewModel(communalSceneInteractor, communalInteractor, mediaHost) {
 
     private val logger = Logger(logBuffer, "CommunalEditModeViewModel")
 
@@ -95,6 +96,8 @@ constructor(
         _reorderingWidgets.value = false
         uiEventLogger.log(CommunalUiEvent.COMMUNAL_HUB_REORDER_WIDGET_CANCEL)
     }
+
+    val isIdleOnCommunal: StateFlow<Boolean> = communalInteractor.isIdleOnCommunal
 
     /** Launch the widget picker activity using the given {@link ActivityResultLauncher}. */
     suspend fun onOpenWidgetPicker(
@@ -136,14 +139,6 @@ constructor(
         return Intent(Intent.ACTION_PICK).apply {
             setPackage(packageName)
             putExtra(
-                EXTRA_DESIRED_WIDGET_WIDTH,
-                resources.getDimensionPixelSize(R.dimen.communal_widget_picker_desired_width)
-            )
-            putExtra(
-                EXTRA_DESIRED_WIDGET_HEIGHT,
-                resources.getDimensionPixelSize(R.dimen.communal_widget_picker_desired_height)
-            )
-            putExtra(
                 AppWidgetManager.EXTRA_CATEGORY_FILTER,
                 communalSettingsInteractor.communalWidgetCategories.value
             )
@@ -168,8 +163,6 @@ constructor(
     companion object {
         private const val TAG = "CommunalEditModeViewModel"
 
-        private const val EXTRA_DESIRED_WIDGET_WIDTH = "desired_widget_width"
-        private const val EXTRA_DESIRED_WIDGET_HEIGHT = "desired_widget_height"
         private const val EXTRA_UI_SURFACE_KEY = "ui_surface"
         private const val EXTRA_UI_SURFACE_VALUE = "widgets_hub"
         const val EXTRA_ADDED_APP_WIDGETS_KEY = "added_app_widgets"

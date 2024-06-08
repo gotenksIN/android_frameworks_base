@@ -18,6 +18,7 @@ package android.app;
 
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.app.ConfigurationController.createNewConfigAndUpdateIfNotNull;
+import static android.app.Flags.skipBgMemTrimOnFgApp;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.app.servertransaction.ActivityLifecycleItem.ON_CREATE;
@@ -355,7 +356,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
     private static final String DEFAULT_FULL_BACKUP_AGENT = "android.app.backup.FullBackupAgent";
 
-    private static final long BINDER_CALLBACK_THROTTLE = 10_100L;
+    private static final long BINDER_CALLBACK_THROTTLE_MS = 10_100L;
     private long mBinderCallbackLast = -1;
 
     /**
@@ -7079,6 +7080,11 @@ public final class ActivityThread extends ClientTransactionHandler
         if (DEBUG_MEMORY_TRIM) Slog.v(TAG, "Trimming memory to level: " + level);
 
         try {
+            if (skipBgMemTrimOnFgApp()
+                    && mLastProcessState <= ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND
+                    && level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+                return;
+            }
             if (level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE) {
                 PropertyInvalidatedCache.onTrimMemory();
             }
@@ -7591,12 +7597,13 @@ public final class ActivityThread extends ClientTransactionHandler
             @Override
             public void onTransactionError(int pid, int code, int flags, int err) {
                 final long now = SystemClock.uptimeMillis();
-                if (now < mBinderCallbackLast + BINDER_CALLBACK_THROTTLE) {
+                if (now < mBinderCallbackLast + BINDER_CALLBACK_THROTTLE_MS) {
                     Slog.d(TAG, "Too many transaction errors, throttling freezer binder callback.");
                     return;
                 }
                 mBinderCallbackLast = now;
                 try {
+                    Log.wtfStack(TAG, "Binder Transaction Error");
                     mgr.frozenBinderTransactionDetected(pid, code, flags, err);
                 } catch (RemoteException ex) {
                     throw ex.rethrowFromSystemServer();

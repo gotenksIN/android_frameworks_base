@@ -30,7 +30,9 @@ import static com.android.window.flags.Flags.FLAG_ALWAYS_DRAW_MAGNIFICATION_FULL
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -42,6 +44,7 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -102,6 +105,7 @@ import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutT
 import com.android.internal.accessibility.util.AccessibilityUtils;
 import com.android.internal.accessibility.util.ShortcutUtils;
 import com.android.internal.compat.IPlatformCompat;
+import com.android.internal.content.PackageMonitor;
 import com.android.server.LocalServices;
 import com.android.server.accessibility.AccessibilityManagerService.AccessibilityDisplayListener;
 import com.android.server.accessibility.magnification.FullScreenMagnificationController;
@@ -910,6 +914,38 @@ public class AccessibilityManagerServiceTest {
     }
 
     @Test
+    public void onPackageChanged_disableComponent_updateInstalledServices() {
+        // Sets up two accessibility services as installed services
+        setupShortcutTargetServices();
+        assertThat(mA11yms.getCurrentUserState().mInstalledServices).hasSize(2);
+        AccessibilityServiceInfo installedService1 =
+                mA11yms.getCurrentUserState().mInstalledServices.getFirst();
+        ResolveInfo resolveInfo1 = installedService1.getResolveInfo();
+        AccessibilityServiceInfo installedService2 =
+                mA11yms.getCurrentUserState().mInstalledServices.getLast();
+
+        // Disables `installedService2`
+        when(mMockPackageManager.queryIntentServicesAsUser(any(), anyInt(), anyInt()))
+                .thenReturn(List.of(resolveInfo1));
+        when(mMockSecurityPolicy.canRegisterService(any())).thenReturn(true);
+        final Intent packageIntent = new Intent(Intent.ACTION_PACKAGE_CHANGED);
+        packageIntent.setData(
+                Uri.parse("package:" + installedService2.getResolveInfo().serviceInfo.packageName));
+        packageIntent.putExtra(Intent.EXTRA_UID, UserHandle.myUserId());
+        packageIntent.putExtra(Intent.EXTRA_USER_HANDLE, mA11yms.getCurrentUserIdLocked());
+        packageIntent.putExtra(Intent.EXTRA_CHANGED_COMPONENT_NAME_LIST,
+                new String[]{
+                        installedService2.getComponentName().flattenToString()});
+        mA11yms.getPackageMonitor().doHandlePackageEvent(packageIntent);
+
+        assertThat(mA11yms.getCurrentUserState().mInstalledServices).hasSize(1);
+        ComponentName installedService =
+                mA11yms.getCurrentUserState().mInstalledServices.getFirst().getComponentName();
+        assertThat(installedService)
+                .isEqualTo(installedService1.getComponentName());
+    }
+
+    @Test
     public void testSwitchUserScanPackages_scansWithoutHoldingLock() {
         setupAccessibilityServiceConnection(0);
         final AtomicReference<Set<Boolean>> lockState = collectLockStateWhilePackageScanning();
@@ -1586,12 +1622,10 @@ public class AccessibilityManagerServiceTest {
         userState.updateA11yQsTargetLocked(Set.of(daltonizerTile));
         mA11yms.mUserStates.put(UserHandle.USER_SYSTEM, userState);
 
-        Intent intent = new Intent(Intent.ACTION_SETTING_RESTORED)
-                .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY)
-                .putExtra(Intent.EXTRA_SETTING_NAME, Settings.Secure.ACCESSIBILITY_QS_TARGETS)
-                .putExtra(Intent.EXTRA_SETTING_NEW_VALUE, colorInversionTile);
-        sendBroadcastToAccessibilityManagerService(intent);
-        mTestableLooper.processAllMessages();
+        broadcastSettingRestored(
+                Settings.Secure.ACCESSIBILITY_QS_TARGETS,
+                /*previousValue=*/null,
+                /*newValue=*/colorInversionTile);
 
         assertThat(mA11yms.mUserStates.get(UserHandle.USER_SYSTEM).getA11yQsTargets())
                 .containsExactlyElementsIn(Set.of(daltonizerTile, colorInversionTile));
@@ -1609,15 +1643,175 @@ public class AccessibilityManagerServiceTest {
         userState.updateA11yQsTargetLocked(Set.of(daltonizerTile));
         mA11yms.mUserStates.put(UserHandle.USER_SYSTEM, userState);
 
-        Intent intent = new Intent(Intent.ACTION_SETTING_RESTORED)
-                .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY)
-                .putExtra(Intent.EXTRA_SETTING_NAME, Settings.Secure.ACCESSIBILITY_QS_TARGETS)
-                .putExtra(Intent.EXTRA_SETTING_NEW_VALUE, colorInversionTile);
-        sendBroadcastToAccessibilityManagerService(intent);
-        mTestableLooper.processAllMessages();
+        broadcastSettingRestored(
+                Settings.Secure.ACCESSIBILITY_QS_TARGETS,
+                /*previousValue=*/null,
+                /*newValue=*/colorInversionTile);
 
         assertThat(userState.getA11yQsTargets())
                 .containsExactlyElementsIn(Set.of(daltonizerTile));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MANAGER_PACKAGE_MONITOR_LOGIC_FIX)
+    public void onHandleForceStop_dontDoIt_packageEnabled_returnsTrue() {
+        setupShortcutTargetServices();
+        AccessibilityUserState userState = mA11yms.getCurrentUserState();
+        userState.mEnabledServices.addAll(
+                userState.mInstalledServices.stream().map(
+                        (AccessibilityServiceInfo::getComponentName)).toList());
+        String[] packages = userState.mEnabledServices.stream().map(
+                ComponentName::getPackageName).toList().toArray(new String[0]);
+
+        PackageMonitor monitor = spy(mA11yms.getPackageMonitor());
+        when(monitor.getChangingUserId()).thenReturn(UserHandle.USER_SYSTEM);
+        mA11yms.setPackageMonitor(monitor);
+
+        assertTrue(mA11yms.getPackageMonitor().onHandleForceStop(
+                new Intent(),
+                packages,
+                UserHandle.USER_SYSTEM,
+                false
+        ));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MANAGER_PACKAGE_MONITOR_LOGIC_FIX)
+    public void onHandleForceStop_doIt_packageEnabled_returnsFalse() {
+        setupShortcutTargetServices();
+        AccessibilityUserState userState = mA11yms.getCurrentUserState();
+        userState.mEnabledServices.addAll(
+                userState.mInstalledServices.stream().map(
+                        (AccessibilityServiceInfo::getComponentName)).toList());
+        String[] packages = userState.mEnabledServices.stream().map(
+                ComponentName::getPackageName).toList().toArray(new String[0]);
+
+        PackageMonitor monitor = spy(mA11yms.getPackageMonitor());
+        when(monitor.getChangingUserId()).thenReturn(UserHandle.USER_SYSTEM);
+        mA11yms.setPackageMonitor(monitor);
+
+        assertFalse(mA11yms.getPackageMonitor().onHandleForceStop(
+                new Intent(),
+                packages,
+                UserHandle.USER_SYSTEM,
+                true
+        ));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MANAGER_PACKAGE_MONITOR_LOGIC_FIX)
+    public void onHandleForceStop_dontDoIt_packageNotEnabled_returnsFalse() {
+        PackageMonitor monitor = spy(mA11yms.getPackageMonitor());
+        when(monitor.getChangingUserId()).thenReturn(UserHandle.USER_SYSTEM);
+        mA11yms.setPackageMonitor(monitor);
+
+        assertFalse(mA11yms.getPackageMonitor().onHandleForceStop(
+                new Intent(),
+                new String[]{"FOO", "BAR"},
+                UserHandle.USER_SYSTEM,
+                false
+        ));
+    }
+
+    @Test
+    @EnableFlags(android.view.accessibility.Flags.FLAG_RESTORE_A11Y_SHORTCUT_TARGET_SERVICE)
+    public void restoreA11yShortcutTargetService_targetsMerged() {
+        final String servicePrevious = TARGET_ALWAYS_ON_A11Y_SERVICE.flattenToString();
+        final String otherPrevious = TARGET_MAGNIFICATION;
+        final String combinedPrevious = String.join(":", servicePrevious, otherPrevious);
+        final String serviceRestored = TARGET_STANDARD_A11Y_SERVICE.flattenToString();
+        final AccessibilityUserState userState = new AccessibilityUserState(
+                UserHandle.USER_SYSTEM, mTestableContext, mA11yms);
+        mA11yms.mUserStates.put(UserHandle.USER_SYSTEM, userState);
+        setupShortcutTargetServices(userState);
+
+        broadcastSettingRestored(
+                Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE,
+                /*previousValue=*/combinedPrevious,
+                /*newValue=*/serviceRestored);
+
+        final Set<String> expected = Set.of(servicePrevious, otherPrevious, serviceRestored);
+        assertThat(readStringsFromSetting(
+                Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE))
+                .containsExactlyElementsIn(expected);
+        assertThat(mA11yms.mUserStates.get(UserHandle.USER_SYSTEM)
+                .getShortcutTargetsLocked(UserShortcutType.HARDWARE))
+                .containsExactlyElementsIn(expected);
+    }
+
+    @Test
+    @EnableFlags({
+            android.view.accessibility.Flags.FLAG_RESTORE_A11Y_SHORTCUT_TARGET_SERVICE,
+            Flags.FLAG_CLEAR_DEFAULT_FROM_A11Y_SHORTCUT_TARGET_SERVICE_RESTORE})
+    public void restoreA11yShortcutTargetService_alreadyHadDefaultService_doesNotClear() {
+        final String serviceDefault = TARGET_STANDARD_A11Y_SERVICE.flattenToString();
+        mTestableContext.getOrCreateTestableResources().addOverride(
+                R.string.config_defaultAccessibilityService, serviceDefault);
+        final AccessibilityUserState userState = new AccessibilityUserState(
+                UserHandle.USER_SYSTEM, mTestableContext, mA11yms);
+        mA11yms.mUserStates.put(UserHandle.USER_SYSTEM, userState);
+        setupShortcutTargetServices(userState);
+
+        broadcastSettingRestored(
+                Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE,
+                /*previousValue=*/serviceDefault,
+                /*newValue=*/serviceDefault);
+
+        final Set<String> expected = Set.of(serviceDefault);
+        assertThat(readStringsFromSetting(
+                Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE))
+                .containsExactlyElementsIn(expected);
+        assertThat(mA11yms.mUserStates.get(UserHandle.USER_SYSTEM)
+                .getShortcutTargetsLocked(UserShortcutType.HARDWARE))
+                .containsExactlyElementsIn(expected);
+    }
+
+    @Test
+    @EnableFlags({
+            android.view.accessibility.Flags.FLAG_RESTORE_A11Y_SHORTCUT_TARGET_SERVICE,
+            Flags.FLAG_CLEAR_DEFAULT_FROM_A11Y_SHORTCUT_TARGET_SERVICE_RESTORE})
+    public void restoreA11yShortcutTargetService_didNotHaveDefaultService_clearsDefaultService() {
+        final String serviceDefault = TARGET_STANDARD_A11Y_SERVICE.flattenToString();
+        final String serviceRestored = TARGET_ALWAYS_ON_A11Y_SERVICE.flattenToString();
+        // Restored value from the broadcast contains both default and non-default service.
+        final String combinedRestored = String.join(":", serviceDefault, serviceRestored);
+        mTestableContext.getOrCreateTestableResources().addOverride(
+                R.string.config_defaultAccessibilityService, serviceDefault);
+        final AccessibilityUserState userState = new AccessibilityUserState(
+                UserHandle.USER_SYSTEM, mTestableContext, mA11yms);
+        mA11yms.mUserStates.put(UserHandle.USER_SYSTEM, userState);
+        setupShortcutTargetServices(userState);
+
+        broadcastSettingRestored(
+                Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE,
+                /*previousValue=*/null,
+                /*newValue=*/combinedRestored);
+
+        // The default service is cleared from the final restored value.
+        final Set<String> expected = Set.of(serviceRestored);
+        assertThat(readStringsFromSetting(
+                Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE))
+                .containsExactlyElementsIn(expected);
+        assertThat(mA11yms.mUserStates.get(UserHandle.USER_SYSTEM)
+                .getShortcutTargetsLocked(UserShortcutType.HARDWARE))
+                .containsExactlyElementsIn(expected);
+    }
+
+    private Set<String> readStringsFromSetting(String setting) {
+        final Set<String> result = new ArraySet<>();
+        mA11yms.readColonDelimitedSettingToSet(
+                setting, UserHandle.USER_SYSTEM, str -> str, result);
+        return result;
+    }
+
+    private void broadcastSettingRestored(String setting, String previousValue, String newValue) {
+        Intent intent = new Intent(Intent.ACTION_SETTING_RESTORED)
+                .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY)
+                .putExtra(Intent.EXTRA_SETTING_NAME, setting)
+                .putExtra(Intent.EXTRA_SETTING_PREVIOUS_VALUE, previousValue)
+                .putExtra(Intent.EXTRA_SETTING_NEW_VALUE, newValue);
+        sendBroadcastToAccessibilityManagerService(intent);
+        mTestableLooper.processAllMessages();
     }
 
     private static AccessibilityServiceInfo mockAccessibilityServiceInfo(
@@ -1630,7 +1824,7 @@ public class AccessibilityManagerServiceTest {
             ComponentName componentName,
             boolean isSystemApp, boolean isAlwaysOnService) {
         AccessibilityServiceInfo accessibilityServiceInfo =
-                Mockito.spy(new AccessibilityServiceInfo());
+                spy(new AccessibilityServiceInfo());
         accessibilityServiceInfo.setComponentName(componentName);
         ResolveInfo mockResolveInfo = Mockito.mock(ResolveInfo.class);
         when(accessibilityServiceInfo.getResolveInfo()).thenReturn(mockResolveInfo);
@@ -1673,6 +1867,10 @@ public class AccessibilityManagerServiceTest {
     }
 
     private void setupShortcutTargetServices() {
+        setupShortcutTargetServices(mA11yms.getCurrentUserState());
+    }
+
+    private void setupShortcutTargetServices(AccessibilityUserState userState) {
         AccessibilityServiceInfo alwaysOnServiceInfo = mockAccessibilityServiceInfo(
                 TARGET_ALWAYS_ON_A11Y_SERVICE,
                 /* isSystemApp= */ false,
@@ -1683,9 +1881,9 @@ public class AccessibilityManagerServiceTest {
                 TARGET_STANDARD_A11Y_SERVICE,
                 /* isSystemApp= */ false,
                 /* isAlwaysOnService= */ false);
-        mA11yms.getCurrentUserState().mInstalledServices.addAll(
+        userState.mInstalledServices.addAll(
                 List.of(alwaysOnServiceInfo, standardServiceInfo));
-        mA11yms.getCurrentUserState().updateTileServiceMapForAccessibilityServiceLocked();
+        userState.updateTileServiceMapForAccessibilityServiceLocked();
     }
 
     private void sendBroadcastToAccessibilityManagerService(Intent intent) {

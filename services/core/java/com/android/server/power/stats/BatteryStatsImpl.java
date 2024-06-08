@@ -32,6 +32,8 @@ import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.usage.NetworkStatsManager;
 import android.bluetooth.BluetoothActivityEnergyInfo;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.UidTraffic;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -172,6 +174,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -294,6 +297,7 @@ public class BatteryStatsImpl extends BatteryStats {
     private final CpuPowerStatsCollector mCpuPowerStatsCollector;
     private final MobileRadioPowerStatsCollector mMobileRadioPowerStatsCollector;
     private final WifiPowerStatsCollector mWifiPowerStatsCollector;
+    private final BluetoothPowerStatsCollector mBluetoothPowerStatsCollector;
     private final SparseBooleanArray mPowerStatsCollectorEnabled = new SparseBooleanArray();
     private final WifiPowerStatsCollector.WifiStatsRetriever mWifiStatsRetriever =
             new WifiPowerStatsCollector.WifiStatsRetriever() {
@@ -312,6 +316,38 @@ public class BatteryStatsImpl extends BatteryStats {
                     }
                 }
             };
+
+    private class BluetoothStatsRetrieverImpl implements
+            BluetoothPowerStatsCollector.BluetoothStatsRetriever {
+        private final BluetoothManager mBluetoothManager;
+
+        BluetoothStatsRetrieverImpl(BluetoothManager bluetoothManager) {
+            mBluetoothManager = bluetoothManager;
+        }
+
+        @Override
+        public void retrieveBluetoothScanTimes(Callback callback) {
+            synchronized (BatteryStatsImpl.this) {
+                retrieveBluetoothScanTimesLocked(callback);
+            }
+        }
+
+        @Override
+        public boolean requestControllerActivityEnergyInfo(Executor executor,
+                BluetoothAdapter.OnBluetoothActivityEnergyInfoCallback callback) {
+            if (mBluetoothManager == null) {
+                return false;
+            }
+
+            BluetoothAdapter adapter = mBluetoothManager.getAdapter();
+            if (adapter == null) {
+                return false;
+            }
+
+            adapter.requestControllerActivityEnergyInfo(executor, callback);
+            return true;
+        }
+    }
 
     public LongSparseArray<SamplingTimer> getKernelMemoryStats() {
         return mKernelMemoryStats;
@@ -463,11 +499,17 @@ public class BatteryStatsImpl extends BatteryStats {
     public static class BatteryStatsConfig {
         static final int RESET_ON_UNPLUG_HIGH_BATTERY_LEVEL_FLAG = 1 << 0;
         static final int RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG = 1 << 1;
-        static final long DEFAULT_POWER_STATS_COLLECTION_THROTTLE_PERIOD =
-                TimeUnit.HOURS.toMillis(1);
 
         private final int mFlags;
-        private SparseLongArray mPowerStatsThrottlePeriods;
+        private final Long mDefaultPowerStatsThrottlePeriod;
+        private final Map<String, Long> mPowerStatsThrottlePeriods;
+
+        @VisibleForTesting
+        public BatteryStatsConfig() {
+            mFlags = 0;
+            mDefaultPowerStatsThrottlePeriod = 0L;
+            mPowerStatsThrottlePeriods = Map.of();
+        }
 
         private BatteryStatsConfig(Builder builder) {
             int flags = 0;
@@ -478,6 +520,7 @@ public class BatteryStatsImpl extends BatteryStats {
                 flags |= RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG;
             }
             mFlags = flags;
+            mDefaultPowerStatsThrottlePeriod = builder.mDefaultPowerStatsThrottlePeriod;
             mPowerStatsThrottlePeriods = builder.mPowerStatsThrottlePeriods;
         }
 
@@ -485,7 +528,7 @@ public class BatteryStatsImpl extends BatteryStats {
          * Returns whether a BatteryStats reset should occur on unplug when the battery level is
          * high.
          */
-        boolean shouldResetOnUnplugHighBatteryLevel() {
+        public boolean shouldResetOnUnplugHighBatteryLevel() {
             return (mFlags & RESET_ON_UNPLUG_HIGH_BATTERY_LEVEL_FLAG)
                     == RESET_ON_UNPLUG_HIGH_BATTERY_LEVEL_FLAG;
         }
@@ -494,14 +537,18 @@ public class BatteryStatsImpl extends BatteryStats {
          * Returns whether a BatteryStats reset should occur on unplug if the battery charge a
          * significant amount since it has been plugged in.
          */
-        boolean shouldResetOnUnplugAfterSignificantCharge() {
+        public boolean shouldResetOnUnplugAfterSignificantCharge() {
             return (mFlags & RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG)
                     == RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG;
         }
 
-        long getPowerStatsThrottlePeriod(@BatteryConsumer.PowerComponent int powerComponent) {
-            return mPowerStatsThrottlePeriods.get(powerComponent,
-                    DEFAULT_POWER_STATS_COLLECTION_THROTTLE_PERIOD);
+        /**
+         * Returns  the minimum amount of time (in millis) to wait between passes
+         * of power stats collection for the specified power component.
+         */
+        public long getPowerStatsThrottlePeriod(String powerComponentName) {
+            return mPowerStatsThrottlePeriods.getOrDefault(powerComponentName,
+                    mDefaultPowerStatsThrottlePeriod);
         }
 
         /**
@@ -510,18 +557,19 @@ public class BatteryStatsImpl extends BatteryStats {
         public static class Builder {
             private boolean mResetOnUnplugHighBatteryLevel;
             private boolean mResetOnUnplugAfterSignificantCharge;
-            private SparseLongArray mPowerStatsThrottlePeriods;
+            public static final long DEFAULT_POWER_STATS_THROTTLE_PERIOD =
+                    TimeUnit.HOURS.toMillis(1);
+            public static final long DEFAULT_POWER_STATS_THROTTLE_PERIOD_CPU =
+                    TimeUnit.MINUTES.toMillis(1);
+            private long mDefaultPowerStatsThrottlePeriod = DEFAULT_POWER_STATS_THROTTLE_PERIOD;
+            private final Map<String, Long> mPowerStatsThrottlePeriods = new HashMap<>();
 
             public Builder() {
                 mResetOnUnplugHighBatteryLevel = true;
                 mResetOnUnplugAfterSignificantCharge = true;
-                mPowerStatsThrottlePeriods = new SparseLongArray();
-                setPowerStatsThrottlePeriodMillis(BatteryConsumer.POWER_COMPONENT_CPU,
-                        TimeUnit.MINUTES.toMillis(1));
-                setPowerStatsThrottlePeriodMillis(BatteryConsumer.POWER_COMPONENT_MOBILE_RADIO,
-                        TimeUnit.HOURS.toMillis(1));
-                setPowerStatsThrottlePeriodMillis(BatteryConsumer.POWER_COMPONENT_WIFI,
-                        TimeUnit.HOURS.toMillis(1));
+                setPowerStatsThrottlePeriodMillis(BatteryConsumer.powerComponentIdToString(
+                                BatteryConsumer.POWER_COMPONENT_CPU),
+                        DEFAULT_POWER_STATS_THROTTLE_PERIOD_CPU);
             }
 
             /**
@@ -553,9 +601,18 @@ public class BatteryStatsImpl extends BatteryStats {
              * Sets the minimum amount of time (in millis) to wait between passes
              * of power stats collection for the specified power component.
              */
-            public Builder setPowerStatsThrottlePeriodMillis(
-                    @BatteryConsumer.PowerComponent int powerComponent, long periodMs) {
-                mPowerStatsThrottlePeriods.put(powerComponent, periodMs);
+            public Builder setPowerStatsThrottlePeriodMillis(String powerComponentName,
+                    long periodMs) {
+                mPowerStatsThrottlePeriods.put(powerComponentName, periodMs);
+                return this;
+            }
+
+            /**
+             * Sets the minimum amount of time (in millis) to wait between passes
+             * of power stats collection for any components not configured explicitly.
+             */
+            public Builder setDefaultPowerStatsThrottlePeriodMillis(long periodMs) {
+                mDefaultPowerStatsThrottlePeriod = periodMs;
                 return this;
             }
         }
@@ -1586,8 +1643,7 @@ public class BatteryStatsImpl extends BatteryStats {
     protected final Constants mConstants;
 
     @VisibleForTesting
-    @GuardedBy("this")
-    protected BatteryStatsConfig mBatteryStatsConfig;
+    protected final BatteryStatsConfig mBatteryStatsConfig;
 
     @GuardedBy("this")
     private AlarmManager mAlarmManager = null;
@@ -1906,12 +1962,14 @@ public class BatteryStatsImpl extends BatteryStats {
     }
 
     private class PowerStatsCollectorInjector implements CpuPowerStatsCollector.Injector,
-            MobileRadioPowerStatsCollector.Injector, WifiPowerStatsCollector.Injector {
+            MobileRadioPowerStatsCollector.Injector, WifiPowerStatsCollector.Injector,
+            BluetoothPowerStatsCollector.Injector {
         private PackageManager mPackageManager;
         private PowerStatsCollector.ConsumedEnergyRetriever mConsumedEnergyRetriever;
         private NetworkStatsManager mNetworkStatsManager;
         private TelephonyManager mTelephonyManager;
         private WifiManager mWifiManager;
+        private BluetoothPowerStatsCollector.BluetoothStatsRetriever mBluetoothStatsRetriever;
 
         void setContext(Context context) {
             mPackageManager = context.getPackageManager();
@@ -1920,6 +1978,8 @@ public class BatteryStatsImpl extends BatteryStats {
             mNetworkStatsManager = context.getSystemService(NetworkStatsManager.class);
             mTelephonyManager = context.getSystemService(TelephonyManager.class);
             mWifiManager = context.getSystemService(WifiManager.class);
+            mBluetoothStatsRetriever = new BluetoothStatsRetrieverImpl(
+                    context.getSystemService(BluetoothManager.class));
         }
 
         @Override
@@ -1930,6 +1990,11 @@ public class BatteryStatsImpl extends BatteryStats {
         @Override
         public Clock getClock() {
             return mClock;
+        }
+
+        @Override
+        public long getPowerStatsCollectionThrottlePeriod(String powerComponentName) {
+            return mBatteryStatsConfig.getPowerStatsThrottlePeriod(powerComponentName);
         }
 
         @Override
@@ -1990,6 +2055,11 @@ public class BatteryStatsImpl extends BatteryStats {
         @Override
         public WifiManager getWifiManager() {
             return mWifiManager;
+        }
+
+        @Override
+        public BluetoothPowerStatsCollector.BluetoothStatsRetriever getBluetoothStatsRetriever() {
+            return mBluetoothStatsRetriever;
         }
 
         @Override
@@ -6749,6 +6819,24 @@ public class BatteryStatsImpl extends BatteryStats {
         }
     }
 
+    private void retrieveBluetoothScanTimesLocked(
+            BluetoothPowerStatsCollector.BluetoothStatsRetriever.Callback callback) {
+        long elapsedTimeUs = mClock.elapsedRealtime() * 1000;
+        for (int i = mUidStats.size() - 1; i >= 0; i--) {
+            Uid uidStats = mUidStats.valueAt(i);
+            if (uidStats.mBluetoothScanTimer == null) {
+                continue;
+            }
+
+            long scanTimeUs = mBluetoothScanTimer.getTotalTimeLocked(elapsedTimeUs,
+                    STATS_SINCE_CHARGED);
+            if (scanTimeUs != 0) {
+                int uid = mUidStats.keyAt(i);
+                callback.onBluetoothScanTime(uid, (scanTimeUs + 500) / 1000);
+            }
+        }
+    }
+
     @GuardedBy("this")
     private void noteWifiRadioApWakeupLocked(final long elapsedRealtimeMillis,
             final long uptimeMillis, int uid) {
@@ -11167,20 +11255,19 @@ public class BatteryStatsImpl extends BatteryStats {
                 mConstants.MAX_HISTORY_FILES, mConstants.MAX_HISTORY_BUFFER, mStepDetailsCalculator,
                 mClock, mMonotonicClock, traceDelegate, eventLogger);
 
-        mCpuPowerStatsCollector = new CpuPowerStatsCollector(mPowerStatsCollectorInjector,
-                mBatteryStatsConfig.getPowerStatsThrottlePeriod(
-                        BatteryConsumer.POWER_COMPONENT_CPU));
+        mCpuPowerStatsCollector = new CpuPowerStatsCollector(mPowerStatsCollectorInjector);
         mCpuPowerStatsCollector.addConsumer(this::recordPowerStats);
 
         mMobileRadioPowerStatsCollector = new MobileRadioPowerStatsCollector(
-                mPowerStatsCollectorInjector, mBatteryStatsConfig.getPowerStatsThrottlePeriod(
-                BatteryConsumer.POWER_COMPONENT_MOBILE_RADIO));
+                mPowerStatsCollectorInjector);
         mMobileRadioPowerStatsCollector.addConsumer(this::recordPowerStats);
 
-        mWifiPowerStatsCollector = new WifiPowerStatsCollector(
-                mPowerStatsCollectorInjector, mBatteryStatsConfig.getPowerStatsThrottlePeriod(
-                BatteryConsumer.POWER_COMPONENT_WIFI));
+        mWifiPowerStatsCollector = new WifiPowerStatsCollector(mPowerStatsCollectorInjector);
         mWifiPowerStatsCollector.addConsumer(this::recordPowerStats);
+
+        mBluetoothPowerStatsCollector = new BluetoothPowerStatsCollector(
+                mPowerStatsCollectorInjector);
+        mBluetoothPowerStatsCollector.addConsumer(this::recordPowerStats);
 
         mStartCount++;
         initTimersAndCounters();
@@ -13126,6 +13213,10 @@ public class BatteryStatsImpl extends BatteryStats {
     @GuardedBy("this")
     public void updateBluetoothStateLocked(@Nullable final BluetoothActivityEnergyInfo info,
             final long consumedChargeUC, long elapsedRealtimeMs, long uptimeMs) {
+        if (mBluetoothPowerStatsCollector.isEnabled()) {
+            return;
+        }
+
         if (DEBUG_ENERGY) {
             Slog.d(TAG, "Updating bluetooth stats: " + info);
         }
@@ -13133,6 +13224,7 @@ public class BatteryStatsImpl extends BatteryStats {
         if (info == null) {
             return;
         }
+
         if (!mOnBatteryInternal || mIgnoreNextExternalStats) {
             mLastBluetoothActivityInfo.set(info);
             return;
@@ -13167,7 +13259,6 @@ public class BatteryStatsImpl extends BatteryStats {
                 (mGlobalEnergyConsumerStats != null
                         && mBluetoothPowerCalculator != null && consumedChargeUC > 0) ?
                         new SparseDoubleArray() : null;
-
         long totalScanTimeMs = 0;
 
         final int uidCount = mUidStats.size();
@@ -14596,6 +14687,10 @@ public class BatteryStatsImpl extends BatteryStats {
                 mPowerStatsCollectorEnabled.get(BatteryConsumer.POWER_COMPONENT_WIFI));
         mWifiPowerStatsCollector.schedule();
 
+        mBluetoothPowerStatsCollector.setEnabled(
+                mPowerStatsCollectorEnabled.get(BatteryConsumer.POWER_COMPONENT_BLUETOOTH));
+        mBluetoothPowerStatsCollector.schedule();
+
         mSystemReady = true;
     }
 
@@ -14612,6 +14707,8 @@ public class BatteryStatsImpl extends BatteryStats {
                 return mMobileRadioPowerStatsCollector;
             case BatteryConsumer.POWER_COMPONENT_WIFI:
                 return mWifiPowerStatsCollector;
+            case BatteryConsumer.POWER_COMPONENT_BLUETOOTH:
+                return mBluetoothPowerStatsCollector;
         }
         return null;
     }
@@ -16148,6 +16245,7 @@ public class BatteryStatsImpl extends BatteryStats {
         mCpuPowerStatsCollector.forceSchedule();
         mMobileRadioPowerStatsCollector.forceSchedule();
         mWifiPowerStatsCollector.forceSchedule();
+        mBluetoothPowerStatsCollector.forceSchedule();
     }
 
     /**
@@ -16167,6 +16265,7 @@ public class BatteryStatsImpl extends BatteryStats {
         mCpuPowerStatsCollector.collectAndDump(pw);
         mMobileRadioPowerStatsCollector.collectAndDump(pw);
         mWifiPowerStatsCollector.collectAndDump(pw);
+        mBluetoothPowerStatsCollector.collectAndDump(pw);
     }
 
     private final Runnable mWriteAsyncRunnable = () -> {

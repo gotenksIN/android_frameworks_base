@@ -121,6 +121,13 @@ interface MobileIconsInteractor {
     val isForceHidden: Flow<Boolean>
 
     /**
+     * True if the device-level service state (with -1 subscription id) reports emergency calls
+     * only. This value is only useful when there are no other subscriptions OR all existing
+     * subscriptions report that they are not in service.
+     */
+    val isDeviceInEmergencyCallsOnlyMode: Flow<Boolean>
+
+    /**
      * Vends out a [MobileIconInteractor] tracking the [MobileConnectionRepository] for the given
      * subId.
      */
@@ -410,6 +417,9 @@ constructor(
         connectivityRepository.forceHiddenSlots
             .map { it.contains(ConnectivitySlot.MOBILE) }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
+    override val isDeviceInEmergencyCallsOnlyMode: Flow<Boolean> =
+        mobileConnectionsRepo.deviceServiceState.map { it?.isEmergencyOnly ?: false }
 
     override val alwaysUseRsrpLevelForLte: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig

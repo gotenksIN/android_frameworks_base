@@ -5637,6 +5637,10 @@ public class Notification implements Parcelable
                     contentView.setDrawableTint(R.id.profile_badge, false,
                             getPrimaryTextColor(p), PorterDuff.Mode.SRC_ATOP);
                 }
+                contentView.setContentDescription(
+                        R.id.profile_badge,
+                        mContext.getSystemService(UserManager.class)
+                                .getProfileAccessibilityString(mContext.getUserId()));
             }
         }
 
@@ -8725,6 +8729,12 @@ public class Notification implements Parcelable
          * <p>The messages should be added in chronologic order, i.e. the oldest first,
          * the newest last.
          *
+         * <p>Multiple Messages in a row with the same timestamp and sender may be grouped as a
+         * single message. This means an app should represent a message that has both an image and
+         * text as two Message objects, one with the image (and fallback text), and the other with
+         * the message text. For consistency, a text message (if any) should be provided after Uri
+         * content.
+         *
          * @param message The {@link Message} to be displayed
          * @return this object for method chaining
          */
@@ -8890,6 +8900,61 @@ public class Notification implements Parcelable
             if (text != null) {
                 extras.putCharSequence(EXTRA_TEXT, text);
             }
+        }
+
+        private void fixTitleAndTextForCompactMessaging(StandardTemplateParams p) {
+            Message m = findLatestIncomingMessage();
+            final CharSequence text = (m == null) ? null : m.mText;
+            CharSequence sender = m == null ? null
+                    : m.mSender == null || TextUtils.isEmpty(m.mSender.getName())
+                            ? mUser.getName() : m.mSender.getName();
+
+            CharSequence conversationTitle = mIsGroupConversation ? mConversationTitle : null;
+
+            // we want to have colon for possible title for conversation.
+            final BidiFormatter bidi = BidiFormatter.getInstance();
+            if (sender != null) {
+                sender = mBuilder.mContext.getString(
+                        com.android.internal.R.string.notification_messaging_title_template,
+                        bidi.unicodeWrap(sender), "");
+            } else if (conversationTitle != null) {
+                conversationTitle = mBuilder.mContext.getString(
+                        com.android.internal.R.string.notification_messaging_title_template,
+                        bidi.unicodeWrap(conversationTitle), "");
+            }
+
+            if (Flags.cleanUpSpansAndNewLines()) {
+                conversationTitle = stripStyling(conversationTitle);
+                sender = stripStyling(sender);
+            }
+
+            final CharSequence title;
+            final boolean isConversationTitleAvailable = showConversationTitle()
+                    && conversationTitle != null;
+            if (isConversationTitleAvailable) {
+                title = conversationTitle;
+            } else {
+                title = sender;
+            }
+
+            p.title(title);
+            // when the conversation title is available, use headerTextSecondary for sender and
+            // summaryText for text
+            if (isConversationTitleAvailable) {
+                p.headerTextSecondary(sender);
+                p.summaryText(text);
+            } else {
+                // when it is not, use headerTextSecondary for text and don't use summaryText
+                p.headerTextSecondary(text);
+                p.summaryText(null);
+            }
+        }
+
+        /** (b/342370742) Developer settings to show conversation title. */
+        private boolean showConversationTitle() {
+            return SystemProperties.getBoolean(
+                    "persist.compact_heads_up_notification.show_conversation_title_for_group",
+                    false);
         }
 
         /**
@@ -9211,24 +9276,34 @@ public class Notification implements Parcelable
                 }
             }
 
-            // This method fills title and text
-            fixTitleAndTextExtras(mBuilder.mN.extras);
             final StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_HEADS_UP)
                     .highlightExpander(isConversationLayout)
                     .fillTextsFrom(mBuilder)
-                    .hideTime(true)
-                    .summaryText("");
-            p.headerTextSecondary(p.mText);
+                    .hideTime(true);
+
+            fixTitleAndTextForCompactMessaging(p);
             TemplateBindResult bindResult = new TemplateBindResult();
 
             RemoteViews contentView = mBuilder.applyStandardTemplate(
                     mBuilder.getMessagingCompactHeadsUpLayoutResource(), p, bindResult);
+            contentView.setViewVisibility(R.id.header_text_secondary_divider, View.GONE);
+            contentView.setViewVisibility(R.id.header_text_divider, View.GONE);
             if (conversationIcon != null) {
                 contentView.setViewVisibility(R.id.icon, View.GONE);
+                contentView.setViewVisibility(R.id.conversation_face_pile, View.GONE);
                 contentView.setViewVisibility(R.id.conversation_icon, View.VISIBLE);
                 contentView.setBoolean(R.id.conversation_icon, "setApplyCircularCrop", true);
                 contentView.setImageViewIcon(R.id.conversation_icon, conversationIcon);
+            } else if (mIsGroupConversation) {
+                contentView.setViewVisibility(R.id.icon, View.GONE);
+                contentView.setViewVisibility(R.id.conversation_icon, View.GONE);
+                contentView.setInt(R.id.status_bar_latest_event_content,
+                        "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+                contentView.setInt(R.id.status_bar_latest_event_content, "setLayoutColor",
+                        mBuilder.getSmallIconColor(p));
+                contentView.setBundle(R.id.status_bar_latest_event_content, "setGroupFacePile",
+                        mBuilder.mN.extras);
             }
 
             if (remoteInputAction != null) {
@@ -9293,6 +9368,15 @@ public class Notification implements Parcelable
             }
         }
 
+        /*
+         * An object representing a simple message or piece of media within a mixed-media message.
+         *
+         * This object can only represent text or a single binary piece of media. For apps which
+         * support mixed-media messages (e.g. text + image), multiple Messages should be used, one
+         * to represent each piece of the message, and they should all be given the same timestamp.
+         * For consistency, a text message should be added last of all Messages with the same
+         * timestamp.
+         */
         public static final class Message {
             /** @hide */
             public static final String KEY_TEXT = "text";
@@ -9381,8 +9465,9 @@ public class Notification implements Parcelable
 
             /**
              * Sets a binary blob of data and an associated MIME type for a message. In the case
-             * where the platform doesn't support the MIME type, the original text provided in the
-             * constructor will be used.
+             * where the platform or the UI state doesn't support the MIME type, the original text
+             * provided in the constructor will be used.  When this data can be presented to the
+             * user, the original text will only be used as accessibility text.
              * @param dataMimeType The MIME type of the content. See
              * {@link android.graphics.ImageDecoder#isMimeTypeSupported(String)} for a list of
              * supported image MIME types.

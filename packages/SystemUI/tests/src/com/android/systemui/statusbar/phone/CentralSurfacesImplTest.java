@@ -57,6 +57,7 @@ import android.app.WallpaperManager;
 import android.app.trust.TrustManager;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.hardware.devicestate.DeviceState;
@@ -75,7 +76,6 @@ import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.service.dreams.IDreamManager;
 import android.support.test.metricshelper.MetricsAsserts;
-import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
 import android.util.DisplayMetrics;
@@ -85,6 +85,7 @@ import android.view.ViewGroup.LayoutParams;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import com.android.compose.animation.scene.ObservableTransitionState;
@@ -137,6 +138,7 @@ import com.android.systemui.settings.UserTracker;
 import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.settings.brightness.domain.interactor.BrightnessMirrorShowingInteractor;
 import com.android.systemui.shade.CameraLauncher;
+import com.android.systemui.shade.GlanceableHubContainerController;
 import com.android.systemui.shade.NotificationPanelView;
 import com.android.systemui.shade.NotificationPanelViewController;
 import com.android.systemui.shade.NotificationShadeWindowViewController;
@@ -171,7 +173,6 @@ import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.interruption.AvalancheProvider;
 import com.android.systemui.statusbar.notification.interruption.KeyguardNotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptLogger;
-import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl;
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionLogger;
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProviderTestUtil;
@@ -188,7 +189,6 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
-import com.android.systemui.util.EventLog;
 import com.android.systemui.util.FakeEventLog;
 import com.android.systemui.util.WallpaperController;
 import com.android.systemui.util.concurrency.FakeExecutor;
@@ -196,10 +196,8 @@ import com.android.systemui.util.concurrency.MessageRouterImpl;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.settings.FakeGlobalSettings;
 import com.android.systemui.util.settings.FakeSettings;
-import com.android.systemui.util.settings.GlobalSettings;
 import com.android.systemui.util.settings.SystemSettings;
 import com.android.systemui.util.time.FakeSystemClock;
-import com.android.systemui.util.time.SystemClock;
 import com.android.systemui.volume.VolumeComponent;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.startingsurface.StartingSurface;
@@ -223,7 +221,7 @@ import java.util.Optional;
 import javax.inject.Provider;
 
 @SmallTest
-@RunWith(AndroidTestingRunner.class)
+@RunWith(AndroidJUnit4.class)
 @RunWithLooper(setAsMainLooper = true)
 @EnableFlags(FLAG_LIGHT_REVEAL_MIGRATION)
 public class CentralSurfacesImplTest extends SysuiTestCase {
@@ -339,6 +337,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     @Mock private WindowRootViewVisibilityInteractor mWindowRootViewVisibilityInteractor;
     @Mock private KeyboardShortcuts mKeyboardShortcuts;
     @Mock private KeyboardShortcutListSearch mKeyboardShortcutListSearch;
+    @Mock private PackageManager mPackageManager;
+    @Mock private GlanceableHubContainerController mGlanceableHubContainerController;
 
     private ShadeController mShadeController;
     private final FakeSystemClock mFakeSystemClock = new FakeSystemClock();
@@ -372,6 +372,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
 
         mFakeGlobalSettings.putInt(HEADS_UP_NOTIFICATIONS_ENABLED, HEADS_UP_ON);
 
+        when(mBubbles.canShowBubbleNotification()).thenReturn(true);
+
         mVisualInterruptionDecisionProvider =
                 VisualInterruptionDecisionProviderTestUtil.INSTANCE.createProviderByFlag(
                         mAmbientDisplayConfiguration,
@@ -392,7 +394,9 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                         mock(UiEventLogger.class),
                         mUserTracker,
                         mAvalancheProvider,
-                        mSystemSettings);
+                        mSystemSettings,
+                        mPackageManager,
+                        Optional.of(mBubbles));
         mVisualInterruptionDecisionProvider.start();
 
         mContext.addMockSystemService(TrustManager.class, mock(TrustManager.class));
@@ -588,7 +592,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mUserTracker,
                 () -> mFingerprintManager,
                 mActivityStarter,
-                mBrightnessMirrorShowingInteractor
+                mBrightnessMirrorShowingInteractor,
+                mGlanceableHubContainerController
         );
         mScreenLifecycle.addObserver(mCentralSurfaces.mScreenObserver);
         mCentralSurfaces.initShadeVisibilityListener();
@@ -1414,47 +1419,5 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 ArgumentCaptor.forClass(StatusBarStateController.StateListener.class);
         verify(mStatusBarStateController).addCallback(callbackCaptor.capture(), anyInt());
         callbackCaptor.getValue().onDozingChanged(isDozing);
-    }
-
-    public static class TestableNotificationInterruptStateProviderImpl extends
-            NotificationInterruptStateProviderImpl {
-
-        TestableNotificationInterruptStateProviderImpl(
-                PowerManager powerManager,
-                AmbientDisplayConfiguration ambientDisplayConfiguration,
-                StatusBarStateController controller,
-                KeyguardStateController keyguardStateController,
-                BatteryController batteryController,
-                HeadsUpManager headsUpManager,
-                NotificationInterruptLogger logger,
-                Handler mainHandler,
-                NotifPipelineFlags flags,
-                KeyguardNotificationVisibilityProvider keyguardNotificationVisibilityProvider,
-                UiEventLogger uiEventLogger,
-                UserTracker userTracker,
-                DeviceProvisionedController deviceProvisionedController,
-                SystemClock systemClock,
-                GlobalSettings globalSettings,
-                EventLog eventLog) {
-            super(
-                    powerManager,
-                    ambientDisplayConfiguration,
-                    batteryController,
-                    controller,
-                    keyguardStateController,
-                    headsUpManager,
-                    logger,
-                    mainHandler,
-                    flags,
-                    keyguardNotificationVisibilityProvider,
-                    uiEventLogger,
-                    userTracker,
-                    deviceProvisionedController,
-                    systemClock,
-                    globalSettings,
-                    eventLog
-            );
-            mUseHeadsUp = true;
-        }
     }
 }

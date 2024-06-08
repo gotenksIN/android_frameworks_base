@@ -260,7 +260,7 @@ final class LetterboxUiController {
     // Whether activity "refresh" was requested but not finished in
     // ActivityRecord#activityResumedLocked following the camera compat force rotation in
     // DisplayRotationCompatPolicy.
-    private boolean mIsRefreshAfterRotationRequested;
+    private boolean mIsRefreshRequested;
 
     @NonNull
     private final OptProp mIgnoreRequestedOrientationOptProp;
@@ -571,15 +571,14 @@ final class LetterboxUiController {
     }
 
     /**
-     * Whether activity "refresh" was requested but not finished in {@link #activityResumedLocked}
-     * following the camera compat force rotation in {@link DisplayRotationCompatPolicy}.
+     * Whether activity "refresh" was requested but not finished in {@link #activityResumedLocked}.
      */
-    boolean isRefreshAfterRotationRequested() {
-        return mIsRefreshAfterRotationRequested;
+    boolean isRefreshRequested() {
+        return mIsRefreshRequested;
     }
 
-    void setIsRefreshAfterRotationRequested(boolean isRequested) {
-        mIsRefreshAfterRotationRequested = isRequested;
+    void setIsRefreshRequested(boolean isRequested) {
+        mIsRefreshRequested = isRequested;
     }
 
     boolean isOverrideRespectRequestedOrientationEnabled() {
@@ -1068,7 +1067,7 @@ final class LetterboxUiController {
      * thin letteboxing
      */
     boolean allowVerticalReachabilityForThinLetterbox() {
-        if (!Flags.disableThinLetterboxingReachability()) {
+        if (!Flags.disableThinLetterboxingPolicy()) {
             return true;
         }
         // When the flag is enabled we allow vertical reachability only if the
@@ -1081,7 +1080,7 @@ final class LetterboxUiController {
      * thin letteboxing
      */
     boolean allowHorizontalReachabilityForThinLetterbox() {
-        if (!Flags.disableThinLetterboxingReachability()) {
+        if (!Flags.disableThinLetterboxingPolicy()) {
             return true;
         }
         // When the flag is enabled we allow horizontal reachability only if the
@@ -1150,6 +1149,17 @@ final class LetterboxUiController {
     }
 
     boolean shouldApplyUserFullscreenOverride() {
+        // Do not override orientation to fullscreen for camera activities.
+        // Fixed-orientation activities are rarely tested in other orientations, and it often
+        // results in sideways or stretched previews. As the camera compat treatment targets
+        // fixed-orientation activities, overriding the orientation disables the treatment.
+        final DisplayContent displayContent = mActivityRecord.mDisplayContent;
+        if (displayContent != null && displayContent.mDisplayRotationCompatPolicy != null
+                && displayContent.mDisplayRotationCompatPolicy
+                .isCameraActive(mActivityRecord, /* mustBeFullscreen= */ true)) {
+            return false;
+        }
+
         if (isUserFullscreenOverrideEnabled()) {
             mUserAspectRatio = getUserMinAspectRatioOverrideCode();
 
@@ -1694,7 +1704,7 @@ final class LetterboxUiController {
         if (mainWin.isLetterboxedForDisplayCutout()) {
             return "DISPLAY_CUTOUT";
         }
-        if (mActivityRecord.isAspectRatioApplied()) {
+        if (mActivityRecord.isLetterboxedForAspectRatioOnly()) {
             return "ASPECT_RATIO";
         }
         return "UNKNOWN_REASON";

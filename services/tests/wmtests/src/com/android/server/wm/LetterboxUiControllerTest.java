@@ -908,6 +908,24 @@ public class LetterboxUiControllerTest extends WindowTestsBase {
     }
 
     @Test
+    public void testOverrideOrientationIfNeeded_fullscreenOverride_cameraActivity_unchanged() {
+        doReturn(true).when(mLetterboxConfiguration).isCameraCompatTreatmentEnabled();
+        doReturn(true).when(mLetterboxConfiguration)
+                .isCameraCompatTreatmentEnabledAtBuildTime();
+
+        // Recreate DisplayContent with DisplayRotationCompatPolicy
+        mActivity = setUpActivityWithComponent();
+        mController = new LetterboxUiController(mWm, mActivity);
+        spyOn(mDisplayContent.mDisplayRotationCompatPolicy);
+
+        doReturn(false).when(mDisplayContent.mDisplayRotationCompatPolicy)
+                .isCameraActive(mActivity, /* mustBeFullscreen= */ true);
+
+        assertEquals(SCREEN_ORIENTATION_PORTRAIT, mController.overrideOrientationIfNeeded(
+                /* candidate */ SCREEN_ORIENTATION_PORTRAIT));
+    }
+
+    @Test
     public void testOverrideOrientationIfNeeded_respectOrientationRequestOverUserFullScreen() {
         spyOn(mController);
         doReturn(true).when(mController).shouldApplyUserFullscreenOverride();
@@ -1594,7 +1612,7 @@ public class LetterboxUiControllerTest extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_DISABLE_THIN_LETTERBOXING_REACHABILITY)
+    @EnableFlags(Flags.FLAG_DISABLE_THIN_LETTERBOXING_POLICY)
     public void testAllowReachabilityForThinLetterboxWithFlagEnabled() {
         spyOn(mController);
         doReturn(true).when(mController).isVerticalThinLetterboxed();
@@ -1609,7 +1627,7 @@ public class LetterboxUiControllerTest extends WindowTestsBase {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_DISABLE_THIN_LETTERBOXING_REACHABILITY)
+    @DisableFlags(Flags.FLAG_DISABLE_THIN_LETTERBOXING_POLICY)
     public void testAllowReachabilityForThinLetterboxWithFlagDisabled() {
         spyOn(mController);
         doReturn(true).when(mController).isVerticalThinLetterboxed();

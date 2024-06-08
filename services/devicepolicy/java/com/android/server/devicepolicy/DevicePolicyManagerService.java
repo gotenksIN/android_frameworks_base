@@ -569,6 +569,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -1300,6 +1301,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 Bundle prevRestrictions) {
             resetCrossProfileIntentFiltersIfNeeded(userId, newRestrictions, prevRestrictions);
             resetUserVpnIfNeeded(userId, newRestrictions, prevRestrictions);
+            if (Flags.deletePrivateSpaceUnderRestriction()) {
+                removePrivateSpaceIfRestrictionIsSet(userId, newRestrictions, prevRestrictions);
+            }
         }
 
         private void resetUserVpnIfNeeded(
@@ -1331,6 +1335,17 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         UserHandle.of(userId));
             }
         }
+        private void removePrivateSpaceIfRestrictionIsSet(
+                int userId, Bundle newRestrictions, Bundle prevRestrictions) {
+            final boolean newlyEnforced =
+                    !prevRestrictions.getBoolean(UserManager.DISALLOW_ADD_PRIVATE_PROFILE)
+                            && newRestrictions.getBoolean(UserManager.DISALLOW_ADD_PRIVATE_PROFILE);
+            if (!newlyEnforced) {
+                return;
+            }
+            mDpms.removePrivateSpaceWithinUserGroupIfExists(userId);
+        }
+
     }
 
     private void clearUserConfiguredVpns(int userId) {
@@ -1373,6 +1388,42 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         pkgOps.getPackageName(), MODE_DEFAULT);
             }
         }
+    }
+
+    /**
+     * Given a parent userId, try removing all private space profiles with its profile group, and
+     * post a notification if at least one private space profile is removed.
+     */
+    private void removePrivateSpaceWithinUserGroupIfExists(int userId) {
+        boolean removed = false;
+        if (mUserManager.isProfile(userId)) return;
+        for (int profileId : mUserManager.getProfileIdsWithDisabled(userId)) {
+            if (profileId == userId) continue;
+            if (mUserManager.getUserInfo(profileId).isPrivateProfile()) {
+                Slogf.i(LOG_TAG, "Removing private space %d due to DISALLOW_ADD_PRIVATE_PROFILE",
+                        profileId);
+                removed |= mUserManager.removeUserEvenWhenDisallowed(profileId);
+            }
+        }
+        if (removed) {
+            mHandler.post(() -> sendPrivateSpaceRemovedNotification(userId));
+        }
+    }
+
+    private void sendPrivateSpaceRemovedNotification(int parentUserId) {
+        String notification_details = mContext.getString(
+                R.string.private_space_deleted_by_admin_details);
+        Notification notification =
+                new Notification.Builder(mContext, SystemNotificationChannels.DEVICE_ADMIN)
+                        .setSmallIcon(android.R.drawable.stat_sys_warning)
+                        .setContentTitle(mContext.getString(
+                                R.string.private_space_deleted_by_admin))
+                        .setContentText(notification_details)
+                        .setColor(mContext.getColor(R.color.system_notification_accent_color))
+                        .setStyle(new Notification.BigTextStyle().bigText(notification_details))
+                        .build();
+        mInjector.getNotificationManager().notifyAsUser(/* tag= */ null,
+                SystemMessage.NOTE_PROFILE_WIPED, notification, UserHandle.of(parentUserId));
     }
 
     private final class UserLifecycleListener implements UserManagerInternal.UserLifecycleListener {
@@ -2128,9 +2179,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         mDevicePolicyEngine.load();
 
         mContactSystemRoleHolders = fetchOemSystemHolders(/* roleResIds...= */
-                com.android.internal.R.string.config_defaultSms,
-                com.android.internal.R.string.config_defaultDialer,
-                com.android.internal.R.string.config_systemContacts
+                R.string.config_defaultSms,
+                R.string.config_defaultDialer,
+                R.string.config_systemContacts
         );
 
         // The binder caches are not enabled until the first invalidation.
@@ -2169,32 +2220,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         return packageNameAndSignature;
-    }
-
-    private void unsuspendAppsForQuietProfiles() {
-        PackageManagerInternal pmi = mInjector.getPackageManagerInternal();
-        List<UserInfo> users = mUserManagerInternal.getUsers(true /* excludeDying */);
-
-        for (UserInfo user : users) {
-            if (!user.isManagedProfile() || !user.isQuietModeEnabled()) {
-                continue;
-            }
-            int userId = user.id;
-            var suspendedByAdmin = getPackagesSuspendedByAdmin(userId);
-            var packagesToUnsuspend = mInjector.getPackageManager(userId)
-                    .getInstalledPackages(PackageManager.PackageInfoFlags.of(
-                            MATCH_DIRECT_BOOT_AWARE | MATCH_DIRECT_BOOT_UNAWARE))
-                    .stream()
-                    .map(packageInfo -> packageInfo.packageName)
-                    .filter(pkg -> !suspendedByAdmin.contains(pkg))
-                    .toArray(String[]::new);
-
-            Slogf.i(LOG_TAG, "Unsuspending work apps for user %d", userId);
-            // When app suspension was used for quiet mode, the apps were suspended by platform
-            // package, just like when admin suspends them. So although it wasn't admin who
-            // suspended, this method will remove the right suspension record.
-            pmi.setPackagesSuspendedByAdmin(userId, packagesToUnsuspend, false /* suspended */);
-        }
     }
 
     private Owners makeOwners(Injector injector, PolicyPathProvider pathProvider) {
@@ -3351,7 +3376,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 break;
             case SystemService.PHASE_SYSTEM_SERVICES_READY:
                 synchronized (getLockObject()) {
-                    mDevicePolicyEngine.reapplyAllPoliciesLocked();
+                    mDevicePolicyEngine.reapplyAllPoliciesOnBootLocked();
                 }
                 break;
             case SystemService.PHASE_ACTIVITY_MANAGER_READY:
@@ -3419,6 +3444,79 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 enforcingAdmin,
                 new BooleanPolicyValue(true));
     }
+
+    @GuardedBy("getLockObject()")
+    private boolean maybeMigrateRequiredPasswordComplexityLocked(String backupId) {
+        Slog.i(LOG_TAG, "Migrating password complexity to policy engine");
+        if (!Flags.unmanagedModeMigration()) {
+            return false;
+        }
+        if (mOwners.isRequiredPasswordComplexityMigrated()) {
+            return false;
+        }
+        // Create backup if none exists
+        mDevicePolicyEngine.createBackup(backupId);
+        try {
+            iterateThroughDpcAdminsLocked((admin, enforcingAdmin) -> {
+                int userId = enforcingAdmin.getUserId();
+                if (admin.mPasswordComplexity != PASSWORD_COMPLEXITY_NONE) {
+                    mDevicePolicyEngine.setLocalPolicy(
+                            PolicyDefinition.PASSWORD_COMPLEXITY,
+                            enforcingAdmin,
+                            new IntegerPolicyValue(admin.mPasswordComplexity),
+                            userId);
+                }
+                ActiveAdmin parentAdmin = admin.getParentActiveAdmin();
+                if (parentAdmin != null
+                        && parentAdmin.mPasswordComplexity != PASSWORD_COMPLEXITY_NONE) {
+                    mDevicePolicyEngine.setLocalPolicy(
+                            PolicyDefinition.PASSWORD_COMPLEXITY,
+                            enforcingAdmin,
+                            new IntegerPolicyValue(parentAdmin.mPasswordComplexity),
+                            getProfileParentId(userId));
+                }
+            });
+        } catch (Exception e) {
+            Slog.wtf(LOG_TAG, "Failed to migrate password complexity to policy engine", e);
+        }
+
+        Slog.i(LOG_TAG, "Marking password complexity migration complete");
+        mOwners.markRequiredPasswordComplexityMigrated();
+        return true;
+    }
+
+    @GuardedBy("getLockObject()")
+    private boolean maybeMigrateSuspendedPackagesLocked(String backupId) {
+        Slog.i(LOG_TAG, "Migrating suspended packages to policy engine");
+        if (!Flags.unmanagedModeMigration()) {
+            return false;
+        }
+        if (mOwners.isSuspendedPackagesMigrated()) {
+            return false;
+        }
+        // Create backup if none exists
+        mDevicePolicyEngine.createBackup(backupId);
+        try {
+            iterateThroughDpcAdminsLocked((admin, enforcingAdmin) -> {
+                if (admin.suspendedPackages == null || admin.suspendedPackages.size() == 0) {
+                    return;
+                }
+                int userId = enforcingAdmin.getUserId();
+                mDevicePolicyEngine.setLocalPolicy(
+                        PolicyDefinition.PACKAGES_SUSPENDED,
+                        enforcingAdmin,
+                        new PackageSetPolicyValue(new ArraySet<>(admin.suspendedPackages)),
+                        userId);
+            });
+        } catch (Exception e) {
+            Slog.wtf(LOG_TAG, "Failed to migrate suspended packages to policy engine", e);
+        }
+
+        Slog.i(LOG_TAG, "Marking suspended packages migration complete");
+        mOwners.markSuspendedPackagesMigrated();
+        return true;
+    }
+
 
     private void applyManagedSubscriptionsPolicyIfRequired() {
         int copeProfileUserId = getOrganizationOwnedProfileUserId();
@@ -4204,27 +4302,50 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         final int userId = caller.getUserId();
+        EnforcingAdmin enforcingAdmin = null;
         synchronized (getLockObject()) {
             ActiveAdmin ap = getActiveAdminForCallerLocked(
                     who, DeviceAdminInfo.USES_POLICY_LIMIT_PASSWORD, parent);
 
+            if (Flags.unmanagedModeMigration()) {
+                enforcingAdmin = EnforcingAdmin.createEnterpriseEnforcingAdmin(who,
+                        userId,
+                        getActiveAdminForCallerLocked(who,
+                                DeviceAdminInfo.USES_POLICY_LIMIT_PASSWORD));
+            }
             // If setPasswordQuality is called on the parent, ensure that
             // the primary admin does not have password complexity state (this is an
             // unsupported state).
             if (parent) {
-                final ActiveAdmin primaryAdmin = getActiveAdminForCallerLocked(
-                        who, DeviceAdminInfo.USES_POLICY_LIMIT_PASSWORD, false);
-                final boolean hasComplexitySet =
-                        primaryAdmin.mPasswordComplexity != PASSWORD_COMPLEXITY_NONE;
+                final boolean hasComplexitySet;
+                if (Flags.unmanagedModeMigration()) {
+                    Integer complexity = mDevicePolicyEngine.getLocalPolicySetByAdmin(
+                            PolicyDefinition.PASSWORD_COMPLEXITY,
+                            enforcingAdmin,
+                            userId);
+                    hasComplexitySet = complexity != null && complexity != PASSWORD_COMPLEXITY_NONE;
+                } else {
+                    final ActiveAdmin primaryAdmin = getActiveAdminForCallerLocked(
+                            who, DeviceAdminInfo.USES_POLICY_LIMIT_PASSWORD, false);
+                    hasComplexitySet = primaryAdmin.mPasswordComplexity != PASSWORD_COMPLEXITY_NONE;
+                }
+
                 Preconditions.checkState(!hasComplexitySet,
                         "Cannot set password quality when complexity is set on the primary admin."
                         + " Set the primary admin's complexity to NONE first.");
             }
+            final EnforcingAdmin enforcingAdminFinal = enforcingAdmin;
             mInjector.binderWithCleanCallingIdentity(() -> {
                 final PasswordPolicy passwordPolicy = ap.mPasswordPolicy;
                 if (passwordPolicy.quality != quality) {
                     passwordPolicy.quality = quality;
-                    ap.mPasswordComplexity = PASSWORD_COMPLEXITY_NONE;
+                    if (Flags.unmanagedModeMigration()) {
+                        int affectedUser = parent ? getProfileParentId(userId) : userId;
+                        mDevicePolicyEngine.removeLocalPolicy(PolicyDefinition.PASSWORD_COMPLEXITY,
+                                enforcingAdminFinal, affectedUser);
+                    } else {
+                        ap.mPasswordComplexity = PASSWORD_COMPLEXITY_NONE;
+                    }
                     resetInactivePasswordRequirementsIfRPlus(userId, ap);
                     updatePasswordValidityCheckpointLocked(userId, parent);
                     updatePasswordQualityCacheForUserGroup(userId);
@@ -4355,6 +4476,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
     }
 
+    /**
+     * @deprecated  use {@link #getResolvedLockscreenPolicy(PolicyDefinition, int)} for
+     * coexistable policies
+     */
     @GuardedBy("getLockObject()")
     private List<ActiveAdmin> getActiveAdminsForLockscreenPoliciesLocked(int userHandle) {
         if (isSeparateProfileChallengeEnabled(userHandle)) {
@@ -4377,6 +4502,25 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
     }
 
+    /**
+     * Returns a user's resolved lockscreen policy from all admins. This is different from normal
+     * policy resolution because if the specified user has a work profile with unified challenge,
+     * all policies set on the profile will also affect that user.
+     */
+    private <V> V getResolvedLockscreenPolicy(PolicyDefinition<V> policyDefinition, int userId) {
+        if (isSeparateProfileChallengeEnabled(userId)) {
+            // If this profile has a separate challenge, only return policies targeting itself.
+            return mDevicePolicyEngine.getResolvedPolicy(policyDefinition, userId);
+        }
+        // Otherwise, this user is either a full user, or it's a profile with unified challenge.
+        // In both cases we query the parent user who owns the credential (the parent user of a full
+        // user is itself), plus any profile of the parent user who has unified challenge since
+        // the policy of a unified challenge profile is enforced on the parent.
+        return getResolvedPolicyForUserAndItsManagedProfiles(policyDefinition,
+                getProfileParentId(userId),
+                (user) -> mLockPatternUtils.isProfileWithUnifiedChallenge(user.id));
+
+    }
     /**
      * Get the list of active admins for an affected user:
      * <ul>
@@ -4410,6 +4554,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
      * profile associated with the given user. Optionally also include the admin of each managed
      * profile.
      * <p> Should not be called on a profile user.
+     *
+     * For coexistable policy, please use
+     * {@link #getResolvedPolicyForUserAndItsManagedProfiles(PolicyDefinition, int, Predicate)}
      */
     @GuardedBy("getLockObject()")
     private List<ActiveAdmin> getActiveAdminsForUserAndItsManagedProfilesLocked(int userHandle,
@@ -4434,6 +4581,23 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             }
         });
         return admins;
+    }
+
+    private <V> V getResolvedPolicyForUserAndItsManagedProfiles(
+            PolicyDefinition<V> policyDefinition, int userHandle,
+            Predicate<UserInfo> shouldIncludeProfile) {
+        List<Integer> users = new ArrayList<>();
+
+        mInjector.binderWithCleanCallingIdentity(() -> {
+            for (UserInfo userInfo : mUserManager.getProfiles(userHandle)) {
+                if (userInfo.id == userHandle) {
+                    users.add(userInfo.id);
+                } else if (userInfo.isManagedProfile() && shouldIncludeProfile.test(userInfo)) {
+                    users.add(userInfo.id);
+                }
+            }
+        });
+        return mDevicePolicyEngine.getResolvedPolicyAcrossUsers(policyDefinition, users);
     }
 
     /**
@@ -5216,13 +5380,30 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                     /* shouldIncludeProfileAdmins */ (user) -> user.id == profileUser
                     || !mLockPatternUtils.isSeparateProfileChallengeEnabled(user.id));
             ArrayList<PasswordMetrics> adminMetrics = new ArrayList<>(admins.size());
-            int maxRequiredComplexity = PASSWORD_COMPLEXITY_NONE;
-            for (ActiveAdmin admin : admins) {
-                adminMetrics.add(admin.mPasswordPolicy.getMinMetrics());
-                maxRequiredComplexity = Math.max(maxRequiredComplexity, admin.mPasswordComplexity);
+            if (Flags.unmanagedModeMigration()) {
+                for (ActiveAdmin admin: admins) {
+                    adminMetrics.add(admin.mPasswordPolicy.getMinMetrics());
+                }
+                Integer maxRequiredComplexity = getResolvedPolicyForUserAndItsManagedProfiles(
+                        PolicyDefinition.PASSWORD_COMPLEXITY,
+                        userHandle,
+                        /* shouldIncludeProfileAdmins */ (user) -> user.id == profileUser
+                                || !mLockPatternUtils.isSeparateProfileChallengeEnabled(user.id));
+                return PasswordMetrics.validatePasswordMetrics(
+                        PasswordMetrics.merge(adminMetrics),
+                        maxRequiredComplexity != null
+                                ? maxRequiredComplexity : PASSWORD_COMPLEXITY_NONE,
+                        metrics).isEmpty();
+            } else {
+                int maxRequiredComplexity = PASSWORD_COMPLEXITY_NONE;
+                for (ActiveAdmin admin : admins) {
+                    adminMetrics.add(admin.mPasswordPolicy.getMinMetrics());
+                    maxRequiredComplexity = Math.max(maxRequiredComplexity,
+                            admin.mPasswordComplexity);
+                }
+                return PasswordMetrics.validatePasswordMetrics(PasswordMetrics.merge(adminMetrics),
+                        maxRequiredComplexity, metrics).isEmpty();
             }
-            return PasswordMetrics.validatePasswordMetrics(PasswordMetrics.merge(adminMetrics),
-                    maxRequiredComplexity, metrics).isEmpty();
         }
     }
 
@@ -5313,6 +5494,76 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         Preconditions.checkArgument(allowedModes.contains(passwordComplexity),
                 "Provided complexity is not one of the allowed values.");
 
+        if (!Flags.unmanagedModeMigration()) {
+            setRequiredPasswordComplexityPreCoexistence(callerPackageName, passwordComplexity,
+                    calledOnParent);
+            return;
+        }
+
+        CallerIdentity caller = getCallerIdentity(callerPackageName);
+        int affectedUser = calledOnParent
+                ? getProfileParentId(caller.getUserId()) : caller.getUserId();
+        EnforcingAdmin admin = enforcePermissionAndGetEnforcingAdmin(null,
+                MANAGE_DEVICE_POLICY_LOCK_CREDENTIALS, caller.getPackageName(),
+                caller.getUserId());
+        Preconditions.checkArgument(!calledOnParent || isProfileOwner(caller));
+
+        ActiveAdmin activeAdmin = admin.getActiveAdmin();
+
+        // We require the caller to explicitly clear any password quality requirements set
+        // on the parent DPM instance, to avoid the case where password requirements are
+        // specified in the form of quality on the parent but complexity on the profile
+        // itself.
+        if (!calledOnParent) {
+            final boolean hasQualityRequirementsOnParent = activeAdmin.hasParentActiveAdmin()
+                    && activeAdmin.getParentActiveAdmin().mPasswordPolicy.quality
+                    != PASSWORD_QUALITY_UNSPECIFIED;
+            Preconditions.checkState(!hasQualityRequirementsOnParent,
+                    "Password quality is set on the parent when attempting to set password"
+                            + "complexity. Clear the quality by setting the password quality "
+                            + "on the parent to PASSWORD_QUALITY_UNSPECIFIED first");
+        }
+
+        if (passwordComplexity != PASSWORD_COMPLEXITY_NONE) {
+            mDevicePolicyEngine.setLocalPolicy(
+                    PolicyDefinition.PASSWORD_COMPLEXITY,
+                    admin,
+                    new IntegerPolicyValue(passwordComplexity),
+                    affectedUser);
+        } else {
+            mDevicePolicyEngine.removeLocalPolicy(
+                    PolicyDefinition.PASSWORD_COMPLEXITY,
+                    admin,
+                    affectedUser);
+        }
+
+        mInjector.binderWithCleanCallingIdentity(() -> {
+            // Reset the password policy.
+            if (calledOnParent) {
+                activeAdmin.getParentActiveAdmin().mPasswordPolicy = new PasswordPolicy();
+            } else {
+                activeAdmin.mPasswordPolicy = new PasswordPolicy();
+            }
+            synchronized (getLockObject()) {
+                updatePasswordValidityCheckpointLocked(caller.getUserId(), calledOnParent);
+            }
+            updatePasswordQualityCacheForUserGroup(caller.getUserId());
+            saveSettingsLocked(caller.getUserId());
+        });
+
+
+        DevicePolicyEventLogger
+                .createEvent(DevicePolicyEnums.SET_PASSWORD_COMPLEXITY)
+                .setAdmin(caller.getPackageName())
+                .setInt(passwordComplexity)
+                .setBoolean(calledOnParent)
+                .write();
+        logPasswordComplexityRequiredIfSecurityLogEnabled(caller.getPackageName(),
+                caller.getUserId(), calledOnParent, passwordComplexity);
+    }
+
+    private void setRequiredPasswordComplexityPreCoexistence(
+            String callerPackageName, int passwordComplexity, boolean calledOnParent) {
         CallerIdentity caller = getCallerIdentity(callerPackageName);
         if (!isPermissionCheckFlagEnabled()) {
             Preconditions.checkCallAuthorization(
@@ -5391,6 +5642,30 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     @GuardedBy("getLockObject()")
     private int getAggregatedPasswordComplexityLocked(@UserIdInt int userHandle,
             boolean deviceWideOnly) {
+        if (Flags.unmanagedModeMigration()) {
+            return getAggregatedPasswordComplexity(userHandle, deviceWideOnly);
+        } else {
+            return getAggregatedPasswordComplexityPreCoexistenceLocked(userHandle, deviceWideOnly);
+        }
+    }
+
+    private int getAggregatedPasswordComplexity(@UserIdInt int userHandle, boolean deviceWideOnly) {
+        ensureLocked();
+        Integer result;
+        if (deviceWideOnly) {
+            result = getResolvedPolicyForUserAndItsManagedProfiles(
+                    PolicyDefinition.PASSWORD_COMPLEXITY,
+                    userHandle,
+                    /* shouldIncludeProfile */ (user) -> false);
+        } else {
+            result = getResolvedLockscreenPolicy(PolicyDefinition.PASSWORD_COMPLEXITY, userHandle);
+        }
+        return result != null ? result : PASSWORD_COMPLEXITY_NONE;
+    }
+
+    @GuardedBy("getLockObject()")
+    private int getAggregatedPasswordComplexityPreCoexistenceLocked(@UserIdInt int userHandle,
+            boolean deviceWideOnly) {
         ensureLocked();
         final List<ActiveAdmin> admins;
         if (deviceWideOnly) {
@@ -5412,24 +5687,30 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             return PASSWORD_COMPLEXITY_NONE;
         }
 
-        final CallerIdentity caller = getCallerIdentity();
-
-        if (isPermissionCheckFlagEnabled()) {
+        if (Flags.unmanagedModeMigration()) {
+            final CallerIdentity caller = getCallerIdentity(callerPackageName);
             int affectedUser = calledOnParent ? getProfileParentId(caller.getUserId())
                     : caller.getUserId();
             enforcePermission(MANAGE_DEVICE_POLICY_LOCK_CREDENTIALS,
                     callerPackageName, affectedUser);
+
+            Integer complexity = mDevicePolicyEngine.getResolvedPolicy(
+                    PolicyDefinition.PASSWORD_COMPLEXITY,
+                    affectedUser);
+            return complexity != null ? complexity : PASSWORD_COMPLEXITY_NONE;
         } else {
+            final CallerIdentity caller = getCallerIdentity();
+
             Preconditions.checkCallAuthorization(
                     isDefaultDeviceOwner(caller) || isProfileOwner(caller));
 
             Preconditions.checkArgument(!calledOnParent || isProfileOwner(caller));
-        }
 
-        synchronized (getLockObject()) {
-            final ActiveAdmin requiredAdmin = getParentOfAdminIfRequired(
-                    getDeviceOrProfileOwnerAdminLocked(caller.getUserId()), calledOnParent);
-            return requiredAdmin.mPasswordComplexity;
+            synchronized (getLockObject()) {
+                final ActiveAdmin requiredAdmin = getParentOfAdminIfRequired(
+                        getDeviceOrProfileOwnerAdminLocked(caller.getUserId()), calledOnParent);
+                return requiredAdmin.mPasswordComplexity;
+            }
         }
     }
 
@@ -9238,6 +9519,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 }
             }
 
+            // TODO: with a quick glance this logic seems incomplete that it doesn't properly handle
+            // the different behaviour between a profile with separate challenge vs a profile with
+            // unified challenge, which was part of getActiveAdminsForLockscreenPoliciesLocked()
+            // before the migration.
             if (isUnicornFlagEnabled()) {
                 Integer features = mDevicePolicyEngine.getResolvedPolicy(
                         PolicyDefinition.KEYGUARD_DISABLED_FEATURES,
@@ -10459,7 +10744,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         final String configComponent = mContext.getResources().getString(
-                com.android.internal.R.string.config_defaultSupervisionProfileOwnerComponent);
+                R.string.config_defaultSupervisionProfileOwnerComponent);
         if (configComponent != null) {
             final ComponentName componentName = ComponentName.unflattenFromString(configComponent);
             if (who.equals(componentName)) {
@@ -10469,7 +10754,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
         // Check the system supervision role.
         final String configPackage = mContext.getResources().getString(
-                com.android.internal.R.string.config_systemSupervision);
+                R.string.config_systemSupervision);
 
         return who.getPackageName().equals(configPackage);
     }
@@ -11443,7 +11728,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             }
             setBackwardsCompatibleAppRestrictions(
                     caller, packageName, restrictions, caller.getUserHandle());
-        } else if (Flags.dmrhCanSetAppRestriction()) {
+        } else if (Flags.dmrhSetAppRestrictions()) {
             final boolean isRoleHolder;
             if (who != null) {
                 // DO or PO
@@ -11484,10 +11769,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                             new BundlePolicyValue(restrictions),
                             affectedUserId);
                 }
-                Intent changeIntent = new Intent(Intent.ACTION_APPLICATION_RESTRICTIONS_CHANGED);
-                changeIntent.setPackage(packageName);
-                changeIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
-                mContext.sendBroadcastAsUser(changeIntent, UserHandle.of(affectedUserId));
             } else {
                 mInjector.binderWithCleanCallingIdentity(() -> {
                     mUserManager.setApplicationRestrictions(packageName, restrictions,
@@ -12845,7 +13126,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 return Bundle.EMPTY;
             }
             return policies.get(enforcingAdmin).getValue();
-        } else if (Flags.dmrhCanSetAppRestriction()) {
+        } else if (Flags.dmrhSetAppRestrictions()) {
             final boolean isRoleHolder;
             if (who != null) {
                 // Caller is DO or PO. They cannot call this on parent
@@ -12937,8 +13218,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         return result;
     }
 
-    @Override
-    public String[] setPackagesSuspended(ComponentName who, String callerPackage,
+    private String[] setPackagesSuspendedPreCoexistence(ComponentName who, String callerPackage,
             String[] packageNames, boolean suspended) {
         final CallerIdentity caller = getCallerIdentity(who, callerPackage);
         ActiveAdmin admin;
@@ -13019,6 +13299,78 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         return result;
     }
 
+    @Override
+    public String[] setPackagesSuspended(ComponentName who, String callerPackage,
+            String[] packageNames, boolean suspended) {
+        if (!Flags.unmanagedModeMigration()) {
+            return setPackagesSuspendedPreCoexistence(who, callerPackage, packageNames, suspended);
+        }
+
+        final CallerIdentity caller = getCallerIdentity(who, callerPackage);
+
+        EnforcingAdmin enforcingAdmin = enforcePermissionAndGetEnforcingAdmin(
+                who,
+                MANAGE_DEVICE_POLICY_PACKAGE_STATE,
+                caller.getPackageName(),
+                caller.getUserId());
+        checkCanExecuteOrThrowUnsafe(DevicePolicyManager.OPERATION_SET_PACKAGES_SUSPENDED);
+
+        Set<String> packages = new ArraySet<>(packageNames);
+        Set<String> suspendedPackagesBefore = mDevicePolicyEngine.getResolvedPolicy(
+                PolicyDefinition.PACKAGES_SUSPENDED, caller.getUserId());
+
+        Set<String> currentPackages = mDevicePolicyEngine.getLocalPolicySetByAdmin(
+                PolicyDefinition.PACKAGES_SUSPENDED,
+                enforcingAdmin,
+                caller.getUserId());
+        if (currentPackages == null) currentPackages = new ArraySet<>();
+        if (suspended) {
+            currentPackages.addAll(packages);
+        } else {
+            currentPackages.removeAll(packages);
+        }
+        if (currentPackages.isEmpty()) {
+            mDevicePolicyEngine.removeLocalPolicy(
+                    PolicyDefinition.PACKAGES_SUSPENDED,
+                    enforcingAdmin,
+                    caller.getUserId());
+        } else {
+            mDevicePolicyEngine.setLocalPolicy(
+                    PolicyDefinition.PACKAGES_SUSPENDED,
+                    enforcingAdmin,
+                    new PackageSetPolicyValue(currentPackages),
+                    caller.getUserId());
+        }
+
+        Set<String> suspendedPackagesAfter = mDevicePolicyEngine.getResolvedPolicy(
+                PolicyDefinition.PACKAGES_SUSPENDED, caller.getUserId());
+
+        PackageSuspender suspender = new PackageSuspender(
+                suspendedPackagesBefore, suspendedPackagesAfter,
+                listPolicyExemptAppsUnchecked(mContext),
+                mInjector.getPackageManagerInternal(), caller.getUserId());
+
+        String[] result;
+        synchronized (getLockObject()) {
+            long id = mInjector.binderClearCallingIdentity();
+            try {
+                result = suspended ? suspender.suspend(packages) : suspender.unsuspend(packages);
+            } finally {
+                mInjector.binderRestoreCallingIdentity(id);
+            }
+        }
+
+        DevicePolicyEventLogger
+                .createEvent(DevicePolicyEnums.SET_PACKAGES_SUSPENDED)
+                .setAdmin(caller.getPackageName())
+                .setBoolean(/* isDelegate */ who == null)
+                .setStrings(packageNames)
+                .write();
+
+        if (VERBOSE_LOG) Slogf.v(LOG_TAG, "Returning %s", Arrays.toString(result));
+        return result;
+    }
+
     /**
      * Returns an array containing the union of the given non-suspended packages and
      * exempt apps. Assumes both parameters are non-null and non-empty.
@@ -13040,7 +13392,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     public boolean isPackageSuspended(ComponentName who, String callerPackage, String packageName) {
         final CallerIdentity caller = getCallerIdentity(who, callerPackage);
 
-        if (isUnicornFlagEnabled()) {
+        if (Flags.unmanagedModeMigration()) {
             enforcePermission(
                     MANAGE_DEVICE_POLICY_PACKAGE_STATE,
                     caller.getPackageName(),
@@ -15211,17 +15563,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
     }
 
-    private Set<String> getPackagesSuspendedByAdmin(@UserIdInt int userId) {
-        synchronized (getLockObject()) {
-            ActiveAdmin admin = getDeviceOrProfileOwnerAdminLocked(userId);
-            if (admin == null || admin.suspendedPackages == null) {
-                return Collections.emptySet();
-            } else {
-                return new ArraySet<>(admin.suspendedPackages);
-            }
-        }
-    }
-
     /**
      * We need to update the internal state of whether a user has completed setup or a
      * device has paired once. After that, we ignore any changes that reset the
@@ -15770,8 +16111,13 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                             PolicyDefinition.APPLICATION_RESTRICTIONS(packageName),
                             userId);
             List<Bundle> restrictions = new ArrayList<>();
-            for (EnforcingAdmin admin : policies.keySet()) {
-                restrictions.add(policies.get(admin).getValue());
+            for (PolicyValue<Bundle> policyValue: policies.values()) {
+                Bundle value = policyValue.getValue();
+                // Probably not necessary since setApplicationRestrictions only sets non-empty
+                // Bundle, but just in case.
+                if (value != null && !value.isEmpty()) {
+                    restrictions.add(value);
+                }
             }
 
             return mInjector.binderWithCleanCallingIdentity(() -> {
@@ -22559,7 +22905,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
         private String[] getDefaultRoleHolderPackageNameAndSignature() {
             String packageNameAndSignature = mContext.getString(
-                    com.android.internal.R.string.config_devicePolicyManagement);
+                    R.string.config_devicePolicyManagement);
             if (TextUtils.isEmpty(packageNameAndSignature)) {
                 return null;
             }
@@ -23472,7 +23818,39 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         Slog.w(LOG_TAG, "Work apps may have been paused via suspension previously.");
-        unsuspendAppsForQuietProfiles();
+        PackageManagerInternal pmi = mInjector.getPackageManagerInternal();
+        List<UserInfo> users = mUserManagerInternal.getUsers(true /* excludeDying */);
+
+        for (UserInfo user : users) {
+            if (!user.isManagedProfile() || !user.isQuietModeEnabled()) {
+                continue;
+            }
+            int userId = user.id;
+            Set<String> suspendedByAdmin;
+            synchronized (getLockObject()) {
+                ActiveAdmin admin = getDeviceOrProfileOwnerAdminLocked(userId);
+                // This is legacy code from Turn off Work 2.0 which is before setPackagesSuspended
+                // is migrated to PolicyEngine, so we only need to query the legacy ActiveAdmin here
+                if (admin == null || admin.suspendedPackages == null) {
+                    suspendedByAdmin = Collections.emptySet();
+                } else {
+                    suspendedByAdmin = new ArraySet<>(admin.suspendedPackages);
+                }
+            }
+            var packagesToUnsuspend = mInjector.getPackageManager(userId)
+                    .getInstalledPackages(PackageManager.PackageInfoFlags.of(
+                            MATCH_DIRECT_BOOT_AWARE | MATCH_DIRECT_BOOT_UNAWARE))
+                    .stream()
+                    .map(packageInfo -> packageInfo.packageName)
+                    .filter(pkg -> !suspendedByAdmin.contains(pkg))
+                    .toArray(String[]::new);
+
+            Slogf.i(LOG_TAG, "Unsuspending work apps for user %d", userId);
+            // When app suspension was used for quiet mode, the apps were suspended by platform
+            // package, just like when admin suspends them. So although it wasn't admin who
+            // suspended, this method will remove the right suspension record.
+            pmi.setPackagesSuspendedByAdmin(userId, packagesToUnsuspend, false /* suspended */);
+        }
     }
 
     public void setMtePolicy(int flags, String callerPackageName) {
@@ -23896,6 +24274,15 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     @GuardedBy("getLockObject()")
     private void migratePoliciesToPolicyEngineLocked() {
         maybeMigrateSecurityLoggingPolicyLocked();
+        // ID format: <sdk-int>.<auto_increment_id>.<descriptions>'
+        String unmanagedBackupId = "35.1.unmanaged-mode";
+        boolean migrated = false;
+        migrated = migrated | maybeMigrateRequiredPasswordComplexityLocked(unmanagedBackupId);
+        migrated = migrated | maybeMigrateSuspendedPackagesLocked(unmanagedBackupId);
+        if (migrated) {
+            Slogf.i(LOG_TAG, "Backup made: " + unmanagedBackupId);
+        }
+        // Additional migration steps should repeat the pattern above with a new backupId.
     }
 
     private void migrateAutoTimezonePolicy() {
@@ -24156,6 +24543,23 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                     setBackwardCompatibleUserRestrictionLocked(ownerType, enforcingAdmin, userId,
                             restriction, /* enabled */ true, /* parent */ true);
                 }
+            }
+        });
+    }
+
+    @GuardedBy("getLockObject()")
+    private void iterateThroughDpcAdminsLocked(BiConsumer<ActiveAdmin, EnforcingAdmin> runner) {
+        Binder.withCleanCallingIdentity(() -> {
+            List<UserInfo> users = mUserManager.getUsers();
+            for (UserInfo userInfo : users) {
+                ActiveAdmin admin = getProfileOwnerOrDeviceOwnerLocked(userInfo.id);
+                if (admin == null) continue;
+                EnforcingAdmin enforcingAdmin = EnforcingAdmin.createEnterpriseEnforcingAdmin(
+                        admin.info.getComponent(),
+                        userInfo.id,
+                        admin);
+
+                runner.accept(admin, enforcingAdmin);
             }
         });
     }

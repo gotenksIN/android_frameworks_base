@@ -114,6 +114,11 @@ public class MobileRadioPowerStatsProcessorTest {
                 }
 
                 @Override
+                public long getPowerStatsCollectionThrottlePeriod(String powerComponentName) {
+                    return 0;
+                }
+
+                @Override
                 public PackageManager getPackageManager() {
                     return mPackageManager;
                 }
@@ -186,7 +191,7 @@ public class MobileRadioPowerStatsProcessorTest {
         aggregatedStats.setUidState(APP_UID, STATE_PROCESS_STATE, PROCESS_STATE_FOREGROUND, 0);
         aggregatedStats.setUidState(APP_UID2, STATE_PROCESS_STATE, PROCESS_STATE_CACHED, 0);
 
-        MobileRadioPowerStatsCollector collector = new MobileRadioPowerStatsCollector(mInjector, 0);
+        MobileRadioPowerStatsCollector collector = new MobileRadioPowerStatsCollector(mInjector);
         collector.setEnabled(true);
 
         // Initial empty ModemActivityInfo.
@@ -223,7 +228,7 @@ public class MobileRadioPowerStatsProcessorTest {
 
         aggregatedStats.addPowerStats(powerStats, 10_000);
 
-        processor.finish(aggregatedStats);
+        processor.finish(aggregatedStats, 10_000);
 
         MobileRadioPowerStatsLayout statsLayout =
                 new MobileRadioPowerStatsLayout(
@@ -425,7 +430,7 @@ public class MobileRadioPowerStatsProcessorTest {
         aggregatedStats.setUidState(APP_UID, STATE_PROCESS_STATE, PROCESS_STATE_FOREGROUND, 0);
         aggregatedStats.setUidState(APP_UID2, STATE_PROCESS_STATE, PROCESS_STATE_CACHED, 0);
 
-        MobileRadioPowerStatsCollector collector = new MobileRadioPowerStatsCollector(mInjector, 0);
+        MobileRadioPowerStatsCollector collector = new MobileRadioPowerStatsCollector(mInjector);
         collector.setEnabled(true);
 
         // Initial empty ModemActivityInfo.
@@ -470,7 +475,7 @@ public class MobileRadioPowerStatsProcessorTest {
 
         aggregatedStats.addPowerStats(powerStats, 10_000);
 
-        processor.finish(aggregatedStats);
+        processor.finish(aggregatedStats, 10_000);
         return aggregatedStats;
     }
 

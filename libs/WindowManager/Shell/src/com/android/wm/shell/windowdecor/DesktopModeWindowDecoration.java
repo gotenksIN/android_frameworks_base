@@ -60,13 +60,13 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.launcher3.icons.BaseIconFactory;
 import com.android.launcher3.icons.IconProvider;
+import com.android.window.flags.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayLayout;
 import com.android.wm.shell.common.SyncTransactionQueue;
-import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.shared.DesktopModeStatus;
 import com.android.wm.shell.windowdecor.extension.TaskInfoKt;
 import com.android.wm.shell.windowdecor.viewholder.DesktopModeAppControlsWindowDecorationViewHolder;
@@ -124,12 +124,11 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             ShellTaskOrganizer taskOrganizer,
             ActivityManager.RunningTaskInfo taskInfo,
             SurfaceControl taskSurface,
-            Configuration windowDecorConfig,
             Handler handler,
             Choreographer choreographer,
             SyncTransactionQueue syncQueue,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer) {
-        this (context, displayController, taskOrganizer, taskInfo, taskSurface, windowDecorConfig,
+        this (context, displayController, taskOrganizer, taskInfo, taskSurface,
                 handler, choreographer, syncQueue, rootTaskDisplayAreaOrganizer,
                 SurfaceControl.Builder::new, SurfaceControl.Transaction::new,
                 WindowContainerTransaction::new, SurfaceControl::new,
@@ -142,7 +141,6 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             ShellTaskOrganizer taskOrganizer,
             ActivityManager.RunningTaskInfo taskInfo,
             SurfaceControl taskSurface,
-            Configuration windowDecorConfig,
             Handler handler,
             Choreographer choreographer,
             SyncTransactionQueue syncQueue,
@@ -152,7 +150,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             Supplier<WindowContainerTransaction> windowContainerTransactionSupplier,
             Supplier<SurfaceControl> surfaceControlSupplier,
             SurfaceControlViewHostFactory surfaceControlViewHostFactory) {
-        super(context, displayController, taskOrganizer, taskInfo, taskSurface, windowDecorConfig,
+        super(context, displayController, taskOrganizer, taskInfo, taskSurface,
                 surfaceControlBuilderSupplier, surfaceControlTransactionSupplier,
                 windowContainerTransactionSupplier, surfaceControlSupplier,
                 surfaceControlViewHostFactory);
@@ -332,13 +330,16 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             boolean applyStartTransactionOnDraw,
             boolean shouldSetTaskPositionAndCrop) {
         final int captionLayoutId = getDesktopModeWindowDecorLayoutId(taskInfo.getWindowingMode());
+        final boolean isAppHeader =
+                captionLayoutId == R.layout.desktop_mode_app_controls_window_decor;
+        final boolean isAppHandle = captionLayoutId == R.layout.desktop_mode_focused_window_decor;
         relayoutParams.reset();
         relayoutParams.mRunningTaskInfo = taskInfo;
         relayoutParams.mLayoutResId = captionLayoutId;
         relayoutParams.mCaptionHeightId = getCaptionHeightIdStatic(taskInfo.getWindowingMode());
         relayoutParams.mCaptionWidthId = getCaptionWidthId(relayoutParams.mLayoutResId);
 
-        if (captionLayoutId == R.layout.desktop_mode_app_controls_window_decor) {
+        if (isAppHeader) {
             if (TaskInfoKt.isTransparentCaptionBarAppearance(taskInfo)) {
                 // If the app is requesting to customize the caption bar, allow input to fall
                 // through to the windows below so that the app can respond to input events on
@@ -359,7 +360,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             controlsElement.mWidthResId = R.dimen.desktop_mode_customizable_caption_margin_end;
             controlsElement.mAlignment = RelayoutParams.OccludingCaptionElement.Alignment.END;
             relayoutParams.mOccludingCaptionElements.add(controlsElement);
-        } else if (captionLayoutId == R.layout.desktop_mode_focused_window_decor) {
+        } else if (isAppHandle) {
             // The focused decor (fullscreen/split) does not need to handle input because input in
             // the App Handle is handled by the InputMonitor in DesktopModeWindowDecorViewModel.
             relayoutParams.mInputFeatures
@@ -372,19 +373,25 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         }
         relayoutParams.mApplyStartTransactionOnDraw = applyStartTransactionOnDraw;
         relayoutParams.mSetTaskPositionAndCrop = shouldSetTaskPositionAndCrop;
-        // The configuration used to lay out the window decoration. The system context's config is
-        // used when the task density has been overridden to a custom density so that the resources
-        // and views of the decoration aren't affected and match the rest of the System UI, if not
-        // then just use the task's configuration. A copy is made instead of using the original
-        // reference so that the configuration isn't mutated on config changes and diff checks can
-        // be made in WindowDecoration#relayout using the pre/post-relayout configuration.
-        // See b/301119301.
+
+        // The configuration used to layout the window decoration. A copy is made instead of using
+        // the original reference so that the configuration isn't mutated on config changes and
+        // diff checks can be made in WindowDecoration#relayout using the pre/post-relayout
+        // configuration. See b/301119301.
         // TODO(b/301119301): consider moving the config data needed for diffs to relayout params
         // instead of using a whole Configuration as a parameter.
         final Configuration windowDecorConfig = new Configuration();
-        windowDecorConfig.setTo(DesktopTasksController.isDesktopDensityOverrideSet()
-                ? context.getResources().getConfiguration() // Use system context.
-                : taskInfo.configuration); // Use task configuration.
+        if (Flags.enableAppHeaderWithTaskDensity() && isAppHeader) {
+            // Should match the density of the task. The task may have had its density overridden
+            // to be different that SysUI's.
+            windowDecorConfig.setTo(taskInfo.configuration);
+        } else if (DesktopModeStatus.isDesktopDensityOverrideSet()) {
+            // The task has had its density overridden, but keep using the system's density to
+            // layout the header.
+            windowDecorConfig.setTo(context.getResources().getConfiguration());
+        } else {
+            windowDecorConfig.setTo(taskInfo.configuration);
+        }
         relayoutParams.mWindowDecorConfig = windowDecorConfig;
 
         if (DesktopModeStatus.useRoundedCorners()) {
@@ -937,17 +944,12 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 Choreographer choreographer,
                 SyncTransactionQueue syncQueue,
                 RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer) {
-            final Configuration windowDecorConfig =
-                    DesktopTasksController.isDesktopDensityOverrideSet()
-                    ? context.getResources().getConfiguration() // Use system context
-                    : taskInfo.configuration; // Use task configuration
             return new DesktopModeWindowDecoration(
                     context,
                     displayController,
                     taskOrganizer,
                     taskInfo,
                     taskSurface,
-                    windowDecorConfig,
                     handler,
                     choreographer,
                     syncQueue,

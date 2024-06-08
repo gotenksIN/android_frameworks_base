@@ -655,13 +655,8 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
          * device state and touch handling. The bouncer MUST have been notified that it is about to
          * show if any subsequent events are to be handled.
          */
-        if (beginShowingBouncer(event)) {
-            if (SceneContainerFlag.isEnabled()) {
-                mSceneInteractorLazy.get().changeScene(
-                        Scenes.Bouncer, "StatusBarKeyguardViewManager.onPanelExpansionChanged");
-            } else {
-                mPrimaryBouncerInteractor.show(/* isScrimmed= */false);
-            }
+        if (!SceneContainerFlag.isEnabled() && beginShowingBouncer(event)) {
+            mPrimaryBouncerInteractor.show(/* isScrimmed= */false);
         }
 
         if (!primaryBouncerIsOrWillBeShowing()) {
@@ -695,11 +690,6 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     public void show(Bundle options) {
         Trace.beginSection("StatusBarKeyguardViewManager#show");
         mNotificationShadeWindowController.setKeyguardShowing(true);
-        if (SceneContainerFlag.isEnabled()) {
-            // TODO(b/336581871): add sceneState?
-            mSceneInteractorLazy.get().changeScene(
-                    Scenes.Lockscreen, "StatusBarKeyguardViewManager.show");
-        }
         mKeyguardStateController.notifyKeyguardState(true, mKeyguardStateController.isOccluded());
         reset(true /* hideBouncerWhenShowing */);
         SysUiStatsLog.write(SysUiStatsLog.KEYGUARD_STATE_CHANGED,
@@ -1081,12 +1071,17 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
             SysUiStatsLog.write(SysUiStatsLog.KEYGUARD_STATE_CHANGED,
                     SysUiStatsLog.KEYGUARD_STATE_CHANGED__STATE__OCCLUDED);
             if (mCentralSurfaces.isLaunchingActivityOverLockscreen()) {
-                // When isLaunchingActivityOverLockscreen() is true, we know for sure that the post
-                // collapse runnables will be run.
-                mShadeController.get().addPostCollapseAction(() -> {
+                final Runnable postCollapseAction = () -> {
                     mNotificationShadeWindowController.setKeyguardOccluded(isOccluded);
                     reset(true /* hideBouncerWhenShowing */);
-                });
+                };
+                if (mCentralSurfaces.isDismissingShadeForActivityLaunch()) {
+                    // When isDismissingShadeForActivityLaunch() is true, we know for sure that the
+                    // post collapse runnables will be run.
+                    mShadeController.get().addPostCollapseAction(postCollapseAction);
+                } else {
+                    postCollapseAction.run();
+                }
                 return;
             }
         } else if (isShowing && isUnOccluding) {

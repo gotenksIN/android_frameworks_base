@@ -115,6 +115,16 @@ flag {
 }
 
 flag {
+  name: "hsum_unlock_notification_fix"
+  namespace: "enterprise"
+  description: "Using the right userId when starting the work profile unlock flow "
+  bug: "327350831"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "dumpsys_policy_engine_migration_enabled"
   namespace: "enterprise"
   description: "Update DumpSys to include information about migrated APIs in DPE"
@@ -244,10 +254,13 @@ flag {
 }
 
 flag {
-  name: "dmrh_can_set_app_restriction"
+  name: "dmrh_set_app_restrictions"
   namespace: "enterprise"
   description: "Allow DMRH to set application restrictions (both on the profile and the parent)"
   bug: "328758346"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -305,6 +318,26 @@ flag {
 }
 
 flag {
+  name: "delete_private_space_under_restriction"
+  namespace: "enterprise"
+  description: "Delete private space if user restriction is set"
+  bug: "328758346"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+    name: "unmanaged_mode_migration"
+    namespace: "enterprise"
+    description: "Migrate APIs for unmanaged mode"
+    bug: "335624297"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "headless_single_user_fixes"
     namespace: "enterprise"
     description: "Various fixes for headless single user mode"
@@ -312,6 +345,13 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "backup_connected_apps_settings"
+    namespace: "enterprise"
+    description: "backup and restore connected work and personal apps user settings across devices"
+    bug: "175067666"
 }
 
 flag {
@@ -332,4 +372,14 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+  name: "onboarding_consentless_bugreports"
+  namespace: "enterprise"
+  description: "Allow subsequent bugreports to skip user consent within a time frame"
+  bug: "340439309"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

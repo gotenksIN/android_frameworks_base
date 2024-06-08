@@ -58,7 +58,8 @@ import java.util.function.Consumer;
  * A helper to animate and manipulate the PiP.
  */
 public class PipMotionHelper implements PipAppOpsListener.Callback,
-        FloatingContentCoordinator.FloatingContent {
+        FloatingContentCoordinator.FloatingContent,
+        PipTransitionState.PipTransitionStateChangedListener {
     private static final String TAG = "PipMotionHelper";
     private static final String FLING_BOUNDS_CHANGE = "fling_bounds_change";
     private static final boolean DEBUG = false;
@@ -181,7 +182,7 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
             }
         };
         mPipTransitionState = pipTransitionState;
-        mPipTransitionState.addPipTransitionStateChangedListener(this::onPipTransitionStateChanged);
+        mPipTransitionState.addPipTransitionStateChangedListener(this);
     }
 
     void init() {
@@ -687,12 +688,26 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
         // setAnimatingToBounds(toBounds);
     }
 
-    private void onPipTransitionStateChanged(@PipTransitionState.TransitionState int oldState,
+    @Override
+    public void onPipTransitionStateChanged(@PipTransitionState.TransitionState int oldState,
             @PipTransitionState.TransitionState int newState,
             @Nullable Bundle extra) {
         switch (newState) {
             case PipTransitionState.SCHEDULED_BOUNDS_CHANGE:
                 if (!extra.getBoolean(FLING_BOUNDS_CHANGE)) break;
+
+                if (mPipBoundsState.getBounds().equals(
+                        mPipBoundsState.getMotionBoundsState().getBoundsInMotion())) {
+                    // Avoid scheduling transitions for bounds that don't change, such transition is
+                    // a no-op and would be aborted.
+                    settlePipBoundsAfterPhysicsAnimation(false /* animatingAfter */);
+                    cleanUpHighPerfSessionMaybe();
+                    // SCHEDULED_BOUNDS_CHANGE can have multiple active listeners making
+                    // actual changes (e.g. PipTouchHandler). So post state update onto handler,
+                    // to run after synchronous dispatch is complete.
+                    mPipTransitionState.postState(PipTransitionState.CHANGED_PIP_BOUNDS);
+                    break;
+                }
 
                 // If touch is turned off and we are in a fling animation, schedule a transition.
                 mWaitingForBoundsChangeTransition = true;

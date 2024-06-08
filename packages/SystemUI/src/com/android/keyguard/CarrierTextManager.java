@@ -311,6 +311,7 @@ public class CarrierTextManager {
                 });
                 mTelephonyListenerManager.addActiveDataSubscriptionIdListener(mPhoneStateListener);
                 cancelSatelliteCollectionJob(/* reason= */ "Starting new job");
+                mLogger.logStartListeningForSatelliteCarrierText();
                 mSatelliteConnectionJob =
                     mJavaAdapter.alwaysCollectFlow(
                         mDeviceBasedSatelliteViewModel.getCarrierText(),
@@ -328,7 +329,7 @@ public class CarrierTextManager {
                 mCarrierNameCustomization.removeCallback(mCallback);
             });
             mTelephonyListenerManager.removeActiveDataSubscriptionIdListener(mPhoneStateListener);
-            cancelSatelliteCollectionJob(/* reason= */ "Stopping listening");
+            cancelSatelliteCollectionJob(/* reason= */ "#handleSetListening has null callback");
         }
     }
 
@@ -348,6 +349,7 @@ public class CarrierTextManager {
 
     private void onSatelliteCarrierTextChanged(@Nullable String text) {
         mLogger.logUpdateCarrierTextForReason(REASON_SATELLITE_CHANGED);
+        mLogger.logNewSatelliteCarrierText(text);
         mSatelliteCarrierText = text;
         updateCarrierText();
     }
@@ -680,6 +682,7 @@ public class CarrierTextManager {
     private void cancelSatelliteCollectionJob(String reason) {
         Job job = mSatelliteConnectionJob;
         if (job != null) {
+            mLogger.logStopListeningForSatelliteCarrierText(reason);
             job.cancel(new CancellationException(reason));
         }
     }

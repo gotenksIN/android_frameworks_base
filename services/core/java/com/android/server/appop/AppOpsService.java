@@ -71,6 +71,7 @@ import static android.content.Intent.ACTION_PACKAGE_REMOVED;
 import static android.content.Intent.EXTRA_REPLACING;
 import static android.content.pm.PermissionInfo.PROTECTION_DANGEROUS;
 import static android.content.pm.PermissionInfo.PROTECTION_FLAG_APPOP;
+import static android.permission.flags.Flags.deviceAwareAppOpNewSchemaEnabled;
 
 import static com.android.server.appop.AppOpsService.ModeCallback.ALL_OPS;
 
@@ -261,6 +262,7 @@ public class AppOpsService extends IAppOpsService.Stub {
     private final @Nullable File mNoteOpCallerStacktracesFile;
     final Handler mHandler;
 
+    private final AppOpsRecentAccessPersistence mRecentAccessPersistence;
     /**
      * Pool for {@link AttributedOp.OpEventProxyInfoPool} to avoid to constantly reallocate new
      * objects
@@ -408,7 +410,7 @@ public class AppOpsService extends IAppOpsService.Stub {
     private @Nullable UserManagerInternal mUserManagerInternal;
 
     /** Interface for app-op modes.*/
-    @VisibleForTesting
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     AppOpsCheckingServiceInterface mAppOpsCheckingService;
 
     /** Interface for app-op restrictions.*/
@@ -528,7 +530,7 @@ public class AppOpsService extends IAppOpsService.Stub {
     @VisibleForTesting
     final Constants mConstants;
 
-    @VisibleForTesting
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     final class UidState {
         public final int uid;
 
@@ -642,7 +644,7 @@ public class AppOpsService extends IAppOpsService.Stub {
             }
         }
 
-        private @NonNull AttributedOp getOrCreateAttribution(@NonNull Op parent,
+        @NonNull AttributedOp getOrCreateAttribution(@NonNull Op parent,
                 @Nullable String attributionTag, String persistentDeviceId) {
             ArrayMap<String, AttributedOp> attributedOps = mDeviceAttributedOps.get(
                     persistentDeviceId);
@@ -1003,6 +1005,7 @@ public class AppOpsService extends IAppOpsService.Stub {
         LockGuard.installLock(this, LockGuard.INDEX_APP_OPS);
         mStorageFile = new AtomicFile(storageFile, "appops_legacy");
         mRecentAccessesFile = new AtomicFile(recentAccessesFile, "appops_accesses");
+        mRecentAccessPersistence = new AppOpsRecentAccessPersistence(mRecentAccessesFile, this);
 
         if (AppOpsManager.NOTE_OP_COLLECTION_ENABLED) {
             mNoteOpCallerStacktracesFile = new File(SystemServiceManager.ensureSystemDir(),
@@ -1110,12 +1113,12 @@ public class AppOpsService extends IAppOpsService.Stub {
                         final String changedPkg = changedPkgs[i];
                         // We trust packagemanager to insert matching uid and packageNames in the
                         // extras
-                        Set<String> devices;
+                        Set<String> devices = new ArraySet<>();
+                        devices.add(PERSISTENT_DEVICE_ID_DEFAULT);
+
                         if (mVirtualDeviceManagerInternal != null) {
-                            devices = mVirtualDeviceManagerInternal.getAllPersistentDeviceIds();
-                        } else {
-                            devices = new ArraySet<>();
-                            devices.add(PERSISTENT_DEVICE_ID_DEFAULT);
+                            devices.addAll(
+                                    mVirtualDeviceManagerInternal.getAllPersistentDeviceIds());
                         }
                         for (String device: devices) {
                             notifyOpChanged(onModeChangedListeners, code, changedUid, changedPkg,
@@ -1549,6 +1552,9 @@ public class AppOpsService extends IAppOpsService.Stub {
         final SparseLongArray chainsToFinish = new SparseLongArray();
         doForAllAttributedOpsInUidLocked(uid, (attributedOp) -> {
             attributedOp.doForAllInProgressStartOpEvents((event) -> {
+                if (event == null) {
+                    return;
+                }
                 int chainId = event.getAttributionChainId();
                 if (chainId != ATTRIBUTION_CHAIN_ID_NONE) {
                     long currentEarliestStartTime =
@@ -2609,12 +2615,10 @@ public class AppOpsService extends IAppOpsService.Stub {
                 ArrayList<ChangeRec> reports = ent.getValue();
                 for (int i=0; i<reports.size(); i++) {
                     ChangeRec rep = reports.get(i);
-                    Set<String> devices;
+                    Set<String> devices = new ArraySet<>();
+                    devices.add(PERSISTENT_DEVICE_ID_DEFAULT);
                     if (mVirtualDeviceManagerInternal != null) {
-                        devices = mVirtualDeviceManagerInternal.getAllPersistentDeviceIds();
-                    } else {
-                        devices = new ArraySet<>();
-                        devices.add(PERSISTENT_DEVICE_ID_DEFAULT);
+                        devices.addAll(mVirtualDeviceManagerInternal.getAllPersistentDeviceIds());
                     }
                     for (String device: devices) {
                         mHandler.sendMessage(PooledLambda.obtainMessage(
@@ -4909,7 +4913,13 @@ public class AppOpsService extends IAppOpsService.Stub {
         if (!mRecentAccessesFile.exists()) {
             readRecentAccesses(mStorageFile);
         } else {
-            readRecentAccesses(mRecentAccessesFile);
+            if (deviceAwareAppOpNewSchemaEnabled()) {
+                synchronized (this) {
+                    mRecentAccessPersistence.readRecentAccesses(mUidStates);
+                }
+            } else {
+                readRecentAccesses(mRecentAccessesFile);
+            }
         }
     }
 
@@ -5090,6 +5100,14 @@ public class AppOpsService extends IAppOpsService.Stub {
 
     @VisibleForTesting
     void writeRecentAccesses() {
+        if (deviceAwareAppOpNewSchemaEnabled()) {
+            synchronized (this) {
+                mRecentAccessPersistence.writeRecentAccesses(mUidStates);
+            }
+            mHistoricalRegistry.writeAndClearDiscreteHistory();
+            return;
+        }
+
         synchronized (mRecentAccessesFile) {
             FileOutputStream stream;
             try {

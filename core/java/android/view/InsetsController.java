@@ -303,7 +303,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
     }
 
     /** Not running an animation. */
-    @VisibleForTesting
+    @VisibleForTesting(visibility = PACKAGE)
     public static final int ANIMATION_TYPE_NONE = -1;
 
     /** Running animation will show insets */
@@ -317,7 +317,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
     public static final int ANIMATION_TYPE_USER = 2;
 
     /** Running animation will resize insets */
-    @VisibleForTesting
+    @VisibleForTesting(visibility = PACKAGE)
     public static final int ANIMATION_TYPE_RESIZE = 3;
 
     @Retention(RetentionPolicy.SOURCE)
@@ -1262,10 +1262,11 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
                     mHost.getInputMethodManager(), null /* icProto */);
         }
 
+        // TODO(b/342111149): Create statsToken here once ImeTracker#onStart becomes async.
         controlAnimationUnchecked(types, cancellationSignal, listener, mFrame, fromIme, durationMs,
                 interpolator, animationType,
                 getLayoutInsetsDuringAnimationMode(types, fromPredictiveBack),
-                false /* useInsetsAnimationThread */, null /* statsToken */);
+                false /* useInsetsAnimationThread */, null);
     }
 
     private void controlAnimationUnchecked(@InsetsType int types,
@@ -1567,7 +1568,9 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
             return;
         }
         final ImeTracker.Token statsToken = runner.getStatsToken();
-        if (shown) {
+        if (runner.getAnimationType() == ANIMATION_TYPE_USER) {
+            ImeTracker.forLogging().onUserFinished(statsToken, shown);
+        } else if (shown) {
             ImeTracker.forLogging().onProgress(statsToken,
                     ImeTracker.PHASE_CLIENT_ANIMATION_FINISHED_SHOW);
             ImeTracker.forLogging().onShown(statsToken);
@@ -1709,7 +1712,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         mImeSourceConsumer.onWindowFocusLost();
     }
 
-    @VisibleForTesting
+    @VisibleForTesting(visibility = PACKAGE)
     public @AnimationType int getAnimationType(@InsetsType int type) {
         for (int i = mRunningAnimations.size() - 1; i >= 0; i--) {
             InsetsAnimationControlRunner control = mRunningAnimations.get(i).runner;
@@ -1838,6 +1841,9 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
             Trace.asyncTraceEnd(TRACE_TAG_VIEW, "IC.pendingAnim", 0);
             mHost.dispatchWindowInsetsAnimationStart(animation, bounds);
             mStartingAnimation = true;
+            if (runner.getAnimationType() == ANIMATION_TYPE_USER) {
+                ImeTracker.forLogging().onDispatched(runner.getStatsToken());
+            }
             runner.setReadyDispatched(true);
             listener.onReady(runner, types);
             mStartingAnimation = false;

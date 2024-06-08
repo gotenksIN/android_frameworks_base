@@ -478,6 +478,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     final DisplayRotationCompatPolicy mDisplayRotationCompatPolicy;
     @Nullable
     final CameraStateMonitor mCameraStateMonitor;
+    @Nullable
+    final ActivityRefresher mActivityRefresher;
 
     DisplayFrames mDisplayFrames;
     final DisplayUpdater mDisplayUpdater;
@@ -1233,13 +1235,15 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mWmService.mLetterboxConfiguration.isCameraCompatTreatmentEnabledAtBuildTime();
         if (shouldCreateDisplayRotationCompatPolicy) {
             mCameraStateMonitor = new CameraStateMonitor(this, mWmService.mH);
+            mActivityRefresher = new ActivityRefresher(mWmService, mWmService.mH);
             mDisplayRotationCompatPolicy = new DisplayRotationCompatPolicy(
-                    this, mWmService.mH, mCameraStateMonitor);
+                    this, mCameraStateMonitor, mActivityRefresher);
 
             mCameraStateMonitor.startListeningToCameraState();
         } else {
             // These are to satisfy the `final` check.
             mCameraStateMonitor = null;
+            mActivityRefresher = null;
             mDisplayRotationCompatPolicy = null;
         }
 
@@ -5703,7 +5707,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 // VR virtual display will be used to run and render 2D app within a VR experience.
                 && mDisplayId != mWmService.mVr2dDisplayId
                 // Do not show system decorations on untrusted virtual display.
-                && isTrusted();
+                && isTrusted()
+                // No system decoration on rear display.
+                && (mDisplay.getFlags() & Display.FLAG_REAR) == 0;
     }
 
     /**

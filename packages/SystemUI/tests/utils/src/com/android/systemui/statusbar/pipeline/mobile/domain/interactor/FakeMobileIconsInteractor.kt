@@ -88,6 +88,8 @@ class FakeMobileIconsInteractor(
 
     override val isForceHidden = MutableStateFlow(false)
 
+    override val isDeviceInEmergencyCallsOnlyMode = MutableStateFlow(false)
+
     private val _alwaysUseRsrpLevelForLte = MutableStateFlow(false)
     override val alwaysUseRsrpLevelForLte = _alwaysUseRsrpLevelForLte
 

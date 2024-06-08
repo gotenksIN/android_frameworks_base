@@ -681,8 +681,19 @@ public final class MediaRouter2 {
     /**
      * Registers a callback to discover routes and to receive events when they change.
      *
+     * <p>Clients can register multiple callbacks, as long as the {@link RouteCallback} instances
+     * are different. Each callback can provide a unique {@link RouteDiscoveryPreference preference}
+     * and will only receive updates related to that set preference.
+     *
      * <p>If the specified callback is already registered, its registration will be updated for the
      * given {@link Executor executor} and {@link RouteDiscoveryPreference discovery preference}.
+     *
+     * <p>{@link #getInstance(Context) Local routers} must register a route callback to register in
+     * the system and start receiving updates. Otherwise, all operations will be no-ops.
+     *
+     * <p>Any discovery preference passed by a {@link #getInstance(Context, String) proxy router}
+     * will be ignored and will receive route updates based on the preference set by its matching
+     * local router.
      */
     public void registerRouteCallback(
             @NonNull @CallbackExecutor Executor executor,
@@ -991,9 +1002,7 @@ public final class MediaRouter2 {
     void requestCreateController(
             @NonNull RoutingController controller,
             @NonNull MediaRoute2Info route,
-            long managerRequestId,
-            @NonNull UserHandle transferInitiatorUserHandle,
-            @NonNull String transferInitiatorPackageName) {
+            long managerRequestId) {
 
         final int requestId = mNextRequestId.getAndIncrement();
 
@@ -1022,9 +1031,7 @@ public final class MediaRouter2 {
                         managerRequestId,
                         controller.getRoutingSessionInfo(),
                         route,
-                        controllerHints,
-                        transferInitiatorUserHandle,
-                        transferInitiatorPackageName);
+                        controllerHints);
             } catch (RemoteException ex) {
                 Log.e(TAG, "createControllerForTransfer: "
                                 + "Failed to request for creating a controller.", ex);
@@ -1366,11 +1373,7 @@ public final class MediaRouter2 {
     }
 
     void onRequestCreateControllerByManagerOnHandler(
-            RoutingSessionInfo oldSession,
-            MediaRoute2Info route,
-            long managerRequestId,
-            @NonNull UserHandle transferInitiatorUserHandle,
-            @NonNull String transferInitiatorPackageName) {
+            RoutingSessionInfo oldSession, MediaRoute2Info route, long managerRequestId) {
         Log.i(
                 TAG,
                 TextUtils.formatSimple(
@@ -1387,8 +1390,7 @@ public final class MediaRouter2 {
         if (controller == null) {
             return;
         }
-        requestCreateController(controller, route, managerRequestId, transferInitiatorUserHandle,
-                transferInitiatorPackageName);
+        requestCreateController(controller, route, managerRequestId);
     }
 
     private List<MediaRoute2Info> getSortedRoutes(
@@ -2423,20 +2425,14 @@ public final class MediaRouter2 {
 
         @Override
         public void requestCreateSessionByManager(
-                long managerRequestId,
-                RoutingSessionInfo oldSession,
-                MediaRoute2Info route,
-                UserHandle transferInitiatorUserHandle,
-                String transferInitiatorPackageName) {
+                long managerRequestId, RoutingSessionInfo oldSession, MediaRoute2Info route) {
             mHandler.sendMessage(
                     obtainMessage(
                             MediaRouter2::onRequestCreateControllerByManagerOnHandler,
                             MediaRouter2.this,
                             oldSession,
                             route,
-                            managerRequestId,
-                            transferInitiatorUserHandle,
-                            transferInitiatorPackageName));
+                            managerRequestId));
         }
     }
 
@@ -3581,12 +3577,7 @@ public final class MediaRouter2 {
 
             RoutingController controller = getCurrentController();
             if (!controller.tryTransferWithinProvider(route)) {
-                requestCreateController(
-                        controller,
-                        route,
-                        MANAGER_REQUEST_ID_NONE,
-                        Process.myUserHandle(),
-                        mContext.getPackageName());
+                requestCreateController(controller, route, MANAGER_REQUEST_ID_NONE);
             }
         }
 

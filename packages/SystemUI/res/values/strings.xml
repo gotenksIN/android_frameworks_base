@@ -219,6 +219,8 @@
     <string name="screenshot_saving_title">Saving screenshot\u2026</string>
     <!-- Informs the user that a screenshot is being saved. [CHAR LIMIT=50] -->
     <string name="screenshot_saving_work_profile_title">Saving screenshot to work profile\u2026</string>
+    <!-- Informs the user that a screenshot is being saved to the private profile. [CHAR LIMIT=100] -->
+    <string name="screenshot_saving_private_profile">Saving screenshot to private</string>
     <!-- Notification title displayed when a screenshot is saved to the Gallery. [CHAR LIMIT=50] -->
     <string name="screenshot_saved_title">Screenshot saved</string>
     <!-- Notification title displayed when we fail to take a screenshot. [CHAR LIMIT=50] -->
@@ -770,7 +772,7 @@
     <!-- QuickSettings: Wifi secondary label shown when the wifi is being enabled [CHAR LIMIT=NONE] -->
     <string name="quick_settings_wifi_secondary_label_transient">Turning on&#8230;</string>
     <!-- QuickSettings: Cast title [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_cast_title">Screen Cast</string>
+    <string name="quick_settings_cast_title">Cast</string>
     <!-- QuickSettings: Cast detail panel, status text when casting [CHAR LIMIT=NONE] -->
     <string name="quick_settings_casting">Casting</string>
     <!-- QuickSettings: Cast detail panel, default device name [CHAR LIMIT=NONE] -->
@@ -907,15 +909,6 @@
     <!-- QuickSettings: Label for the toggle that controls whether One-handed mode is enabled. [CHAR LIMIT=NONE] -->
     <string name="quick_settings_onehanded_label">One-handed mode</string>
 
-    <!-- QuickSettings: Contrast tile [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_contrast_label">Contrast</string>
-    <!-- QuickSettings: Contrast tile description: standard [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_contrast_standard">Standard</string>
-    <!-- QuickSettings: Contrast tile description: medium [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_contrast_medium">Medium</string>
-    <!-- QuickSettings: Contrast tile description: high [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_contrast_high">High</string>
-
     <!-- Hearing devices -->
     <!-- QuickSettings: Hearing devices [CHAR LIMIT=NONE] -->
     <string name="quick_settings_hearing_devices_label">Hearing devices</string>
@@ -925,8 +918,12 @@
     <string name="quick_settings_pair_hearing_devices">Pair new device</string>
     <!-- QuickSettings: Content description of the hearing devices dialog pair new device [CHAR LIMIT=NONE] -->
     <string name="accessibility_hearing_device_pair_new_device">Click to pair new device</string>
-    <!-- Message when selecting hearing aids presets failed. [CHAR LIMIT=NONE] -->
+    <!-- QuickSettings: Message when selecting hearing aids presets failed. [CHAR LIMIT=NONE] -->
     <string name="hearing_devices_presets_error">Couldn\'t update preset</string>
+    <!-- QuickSettings: Title for hearing aids presets. Preset is a set of hearing aid settings. User can apply different settings in different environments (e.g. Outdoor, Restaurant, Home) [CHAR LIMIT=40]-->
+    <string name="hearing_devices_preset_label">Preset</string>
+    <!-- QuickSettings: Tool name for hearing devices dialog related tools [CHAR LIMIT=40]-->
+    <string name="live_caption_title">Live Caption</string>
 
     <!--- Title of dialog triggered if the microphone is disabled but an app tried to access it. [CHAR LIMIT=150] -->
     <string name="sensor_privacy_start_use_mic_dialog_title">Unblock device microphone?</string>

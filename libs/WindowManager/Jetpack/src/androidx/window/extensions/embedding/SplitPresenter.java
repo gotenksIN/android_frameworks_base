@@ -186,8 +186,9 @@ class SplitPresenter extends JetpackTaskFragmentOrganizer {
 
         // Create new empty task fragment
         final int taskId = primaryContainer.getTaskId();
-        final TaskFragmentContainer secondaryContainer = mController.newContainer(
-                secondaryIntent, primaryActivity, taskId);
+        final TaskFragmentContainer secondaryContainer =
+                new TaskFragmentContainer.Builder(mController, taskId, primaryActivity)
+                        .setPendingAppearedIntent(secondaryIntent).build();
         final Rect secondaryRelBounds = getRelBoundsForPosition(POSITION_END, taskProperties,
                 splitAttributes);
         final int windowingMode = mController.getTaskContainer(taskId)
@@ -261,7 +262,8 @@ class SplitPresenter extends JetpackTaskFragmentOrganizer {
         TaskFragmentContainer container = mController.getContainerWithActivity(activity);
         final int taskId = container != null ? container.getTaskId() : activity.getTaskId();
         if (container == null || container == containerToAvoid) {
-            container = mController.newContainer(activity, taskId);
+            container = new TaskFragmentContainer.Builder(mController, taskId, activity)
+                    .setPendingAppearedActivity(activity).build();
             final int windowingMode = mController.getTaskContainer(taskId)
                     .getWindowingModeForTaskFragment(relBounds);
             final IBinder reparentActivityToken = activity.getActivityToken();
@@ -304,15 +306,19 @@ class SplitPresenter extends JetpackTaskFragmentOrganizer {
         TaskFragmentContainer primaryContainer = mController.getContainerWithActivity(
                 launchingActivity);
         if (primaryContainer == null) {
-            primaryContainer = mController.newContainer(launchingActivity,
-                    launchingActivity.getTaskId());
+            primaryContainer = new TaskFragmentContainer.Builder(mController,
+                    launchingActivity.getTaskId(), launchingActivity)
+                    .setPendingAppearedActivity(launchingActivity).build();
         }
 
         final int taskId = primaryContainer.getTaskId();
-        final TaskFragmentContainer secondaryContainer = mController.newContainer(activityIntent,
-                launchingActivity, taskId,
-                // Pass in the primary container to make sure it is added right above the primary.
-                primaryContainer);
+        final TaskFragmentContainer secondaryContainer =
+                new TaskFragmentContainer.Builder(mController, taskId, launchingActivity)
+                        .setPendingAppearedIntent(activityIntent)
+                        // Pass in the primary container to make sure it is added right above the
+                        // primary.
+                        .setPairedPrimaryContainer(primaryContainer)
+                        .build();
         final TaskContainer taskContainer = mController.getTaskContainer(taskId);
         final int windowingMode = taskContainer.getWindowingModeForTaskFragment(
                 primaryRelBounds);
@@ -672,27 +678,6 @@ class SplitPresenter extends JetpackTaskFragmentOrganizer {
             // Expand the bounds if the bounds exceed the task bounds.
             return new Rect();
         }
-
-        if (!container.isOverlay()) {
-            // Stop here if the container is not an overlay.
-            return bounds;
-        }
-
-        final IBinder associatedActivityToken = container.getAssociatedActivityToken();
-
-        if (associatedActivityToken == null) {
-            // Stop here if the container is an always-on-top overlay.
-            return bounds;
-        }
-
-        // Expand the overlay with activity association if the associated activity is part of a
-        // split, or we may need to handle three change transition together.
-        final TaskFragmentContainer associatedContainer = taskContainer
-                .getContainerWithActivity(associatedActivityToken);
-        if (taskContainer.getActiveSplitForContainer(associatedContainer) != null) {
-            return new Rect();
-        }
-
         return bounds;
     }
 

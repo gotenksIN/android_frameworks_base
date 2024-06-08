@@ -406,7 +406,6 @@
   <java-symbol type="bool" name="config_supportMicNearUltrasound" />
   <java-symbol type="bool" name="config_supportSpeakerNearUltrasound" />
   <java-symbol type="bool" name="config_supportAudioSourceUnprocessed" />
-  <java-symbol type="bool" name="config_freeformWindowManagement" />
   <java-symbol type="bool" name="config_supportsBubble" />
   <java-symbol type="bool" name="config_supportsMultiWindow" />
   <java-symbol type="bool" name="config_supportsSplitScreenMultiWindow" />
@@ -1271,7 +1270,6 @@
   <java-symbol type="array" name="networkAttributes" />
   <java-symbol type="array" name="preloaded_color_state_lists" />
   <java-symbol type="array" name="preloaded_drawables" />
-  <java-symbol type="array" name="preloaded_freeform_multi_window_drawables" />
   <java-symbol type="array" name="sim_colors" />
   <java-symbol type="array" name="special_locale_codes" />
   <java-symbol type="array" name="special_locale_names" />
@@ -1829,6 +1827,7 @@
   <java-symbol type="dimen" name="taskbar_frame_height" />
   <java-symbol type="dimen" name="status_bar_height" />
   <java-symbol type="dimen" name="display_cutout_touchable_region_size" />
+  <java-symbol type="dimen" name="system_gestures_distance_threshold" />
   <java-symbol type="dimen" name="system_gestures_start_threshold" />
   <java-symbol type="dimen" name="quick_qs_offset_height" />
   <java-symbol type="drawable" name="ic_jog_dial_sound_off" />
@@ -1885,7 +1884,7 @@
   <java-symbol type="integer" name="config_lidNavigationAccessibility" />
   <java-symbol type="integer" name="config_lidOpenRotation" />
   <java-symbol type="integer" name="config_longPressOnHomeBehavior" />
-  <java-symbol type="integer" name="config_shortPressOnSettingsBehavior" />
+  <java-symbol type="integer" name="config_settingsKeyBehavior" />
   <java-symbol type="layout" name="global_actions" />
   <java-symbol type="layout" name="global_actions_item" />
   <java-symbol type="layout" name="global_actions_silent_mode" />
@@ -2496,16 +2495,6 @@
 
   <!-- From Phone -->
   <java-symbol type="bool" name="config_built_in_sip_phone" />
-  <java-symbol type="id" name="maximize_window" />
-  <java-symbol type="id" name="close_window" />
-  <java-symbol type="layout" name="decor_caption" />
-  <java-symbol type="drawable" name="decor_caption_title_focused" />
-  <java-symbol type="drawable" name="decor_close_button_dark" />
-  <java-symbol type="drawable" name="decor_close_button_light" />
-  <java-symbol type="drawable" name="decor_maximize_button_dark" />
-  <java-symbol type="drawable" name="decor_maximize_button_light" />
-  <java-symbol type="color" name="decor_button_dark_color" />
-  <java-symbol type="color" name="decor_button_light_color" />
   <java-symbol type="array" name="unloggable_phone_numbers" />
 
   <!-- From TelephonyProvider -->
@@ -3974,6 +3963,7 @@
   <java-symbol type="string" name="config_defaultOnDeviceSandboxedInferenceService" />
   <java-symbol type="string" name="config_onDeviceIntelligenceModelLoadedBroadcastKey" />
   <java-symbol type="string" name="config_onDeviceIntelligenceModelUnloadedBroadcastKey" />
+  <java-symbol type="string" name="config_defaultOnDeviceIntelligenceDeviceConfigNamespace" />
   <java-symbol type="string" name="config_retailDemoPackage" />
   <java-symbol type="string" name="config_retailDemoPackageSignature" />
 
@@ -4504,8 +4494,6 @@
   <java-symbol type="string" name="accessibility_system_action_dpad_right_label" />
   <java-symbol type="string" name="accessibility_system_action_dpad_center_label" />
 
-  <java-symbol type="string" name="accessibility_freeform_caption" />
-
   <!-- For Wide Color Gamut -->
   <java-symbol type="bool" name="config_enableWcgMode" />
 
@@ -4524,6 +4512,8 @@
 
   <!-- For device policy -->
   <java-symbol type="array" name="config_packagesExemptFromSuspension" />
+  <java-symbol type="string" name="private_space_deleted_by_admin" />
+  <java-symbol type="string" name="private_space_deleted_by_admin_details" />
 
   <!-- Accessibility take screenshot -->
   <java-symbol type="string" name="capability_desc_canTakeScreenshot" />
@@ -4578,6 +4568,9 @@
   <java-symbol type="dimen" name="conversation_avatar_size_group_expanded" />
   <java-symbol type="dimen" name="conversation_face_pile_avatar_size" />
   <java-symbol type="dimen" name="conversation_face_pile_avatar_size_group_expanded" />
+  <java-symbol type="dimen" name="conversation_compact_face_pile_size" />
+  <java-symbol type="dimen" name="conversation_compact_face_pile_avatar_size" />
+  <java-symbol type="dimen" name="conversation_compact_face_pile_protection_width" />
   <java-symbol type="dimen" name="conversation_face_pile_protection_width" />
   <java-symbol type="dimen" name="conversation_face_pile_protection_width_expanded" />
   <java-symbol type="dimen" name="conversation_badge_protrusion_group_expanded" />
@@ -5260,9 +5253,6 @@
   <java-symbol type="bool" name="config_hotspotNetworksEnabledForService"/>
   <java-symbol type="bool" name="config_knownNetworksEnabledForService"/>
 
-  <!-- Whether to show weather on the lockscreen by default. -->
-  <java-symbol type="bool" name="config_lockscreenWeatherEnabledByDefault" />
-
   <!-- For keyboard notification -->
   <java-symbol type="string" name="keyboard_layout_notification_selected_title"/>
   <java-symbol type="string" name="keyboard_layout_notification_one_selected_message"/>
@@ -5280,9 +5270,7 @@
   <java-symbol type="integer" name="config_maximumDelayTimeToDeactivateDataCall" />
   <java-symbol type="bool" name="config_batteryStatsResetOnUnplugHighBatteryLevel" />
   <java-symbol type="bool" name="config_batteryStatsResetOnUnplugAfterSignificantCharge" />
-  <java-symbol type="integer" name="config_defaultPowerStatsThrottlePeriodCpu" />
-  <java-symbol type="integer" name="config_defaultPowerStatsThrottlePeriodMobileRadio" />
-  <java-symbol type="integer" name="config_defaultPowerStatsThrottlePeriodWifi" />
+  <java-symbol type="string" name="config_powerStatsThrottlePeriods" />
   <java-symbol type="integer" name="config_powerStatsAggregationPeriod" />
   <java-symbol type="integer" name="config_aggregatedPowerStatsSpanDuration" />
 

@@ -241,6 +241,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     @VisibleForTesting
     ArrayList<Runnable> mTransactionCompletedListeners = null;
 
+    private ArrayList<Runnable> mTransitionEndedListeners = null;
+
     /** Custom activity-level animation options and callbacks. */
     private TransitionInfo.AnimationOptions mOverrideOptions;
     private IRemoteCallback mClientAnimationStartCallback = null;
@@ -1492,6 +1494,18 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mController.mSnapshotController.onTransitionFinish(mType, mTargets);
         // Resume snapshot persist thread after snapshot controller analysis this transition.
         mController.updateAnimatingState();
+
+        invokeTransitionEndedListeners();
+    }
+
+    private void invokeTransitionEndedListeners() {
+        if (mTransitionEndedListeners == null) {
+            return;
+        }
+        for (int i = 0; i < mTransitionEndedListeners.size(); i++) {
+            mTransitionEndedListeners.get(i).run();
+        }
+        mTransitionEndedListeners = null;
     }
 
     private void commitConfigAtEndActivities() {
@@ -1603,6 +1617,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // Syncengine abort will call through to onTransactionReady()
         mSyncEngine.abort(mSyncId);
         mController.dispatchLegacyAppTransitionCancelled();
+        invokeTransitionEndedListeners();
     }
 
     /** Immediately moves this to playing even if it isn't started yet. */
@@ -1918,6 +1933,20 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mTransactionCompletedListeners = new ArrayList<>();
         }
         mTransactionCompletedListeners.add(listener);
+    }
+
+    /**
+     * Adds a listener that will be executed after the transition is finished or aborted.
+     */
+    void addTransitionEndedListener(Runnable listener) {
+        if (mState != STATE_COLLECTING && mState != STATE_STARTED) {
+            throw new IllegalStateException(
+                    "Can't register listeners if the transition isn't collecting. state=" + mState);
+        }
+        if (mTransitionEndedListeners == null) {
+            mTransitionEndedListeners = new ArrayList<>();
+        }
+        mTransitionEndedListeners.add(listener);
     }
 
     /**
@@ -2658,7 +2687,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 }
             }
             final SurfaceControl rootLeash = leashReference.makeAnimationLeash().setName(
-                    "Transition Root: " + leashReference.getName()).build();
+                    "Transition Root: " + leashReference.getName())
+                    .setCallsite("Transition.calculateTransitionRoots").build();
             rootLeash.setUnreleasedWarningCallSite("Transition.calculateTransitionRoots");
             // Update layers to start transaction because we prevent assignment during collect, so
             // the layer of transition root can be correct.

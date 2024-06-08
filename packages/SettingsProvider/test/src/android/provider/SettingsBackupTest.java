@@ -63,7 +63,6 @@ public class SettingsBackupTest {
                     Settings.Global.ADB_ENABLED,
                     Settings.Global.ADB_WIFI_ENABLED,
                     Settings.Global.ADB_DISCONNECT_SESSIONS_ON_REVOKE,
-                    Settings.Global.ADD_USERS_WHEN_LOCKED,
                     Settings.Global.AIRPLANE_MODE_ON,
                     Settings.Global.AIRPLANE_MODE_RADIOS,
                     Settings.Global.ALLOW_WORK_PROFILE_TELEPHONY_FOR_NON_DPM_ROLE_HOLDERS,
@@ -381,7 +380,6 @@ public class SettingsBackupTest {
                     Settings.Global.RADIO_WIFI,
                     Settings.Global.RADIO_WIMAX,
                     Settings.Global.RADIO_UWB,
-                    Settings.Global.REMOVE_GUEST_ON_EXIT,
                     Settings.Global.RECOMMENDED_NETWORK_EVALUATOR_CACHE_EXPIRY_MS,
                     Settings.Global.READ_EXTERNAL_STORAGE_ENFORCED_DEFAULT,
                     Settings.Global.RESTRICTED_NETWORKING_MODE,
@@ -485,7 +483,6 @@ public class SettingsBackupTest {
                     Settings.Global.ENABLE_GNSS_RAW_MEAS_FULL_TRACKING,
                     Settings.Global.INSTALL_CARRIER_APP_NOTIFICATION_PERSISTENT,
                     Settings.Global.INSTALL_CARRIER_APP_NOTIFICATION_SLEEP_MILLIS,
-                    Settings.Global.USER_SWITCHER_ENABLED,
                     Settings.Global.WARNING_TEMPERATURE,
                     Settings.Global.WEBVIEW_DATA_REDUCTION_PROXY_KEY,
                     Settings.Global.WEBVIEW_MULTIPROCESS,
@@ -900,6 +897,7 @@ public class SettingsBackupTest {
                         Settings.System.APPEND_FOR_LAST_AUDIBLE, // suffix deprecated since API 2
                         Settings.System.EGG_MODE, // I am the lolrus
                         Settings.System.END_BUTTON_BEHAVIOR, // bug?
+                        Settings.System.DEFAULT_DEVICE_FONT_SCALE, // Non configurable
                         Settings.System
                                 .HIDE_ROTATION_LOCK_TOGGLE_FOR_ACCESSIBILITY,
                         // candidate for backup?

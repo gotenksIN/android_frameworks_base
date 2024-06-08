@@ -383,6 +383,12 @@
         <item name="android:textColor">?androidprv:attr/materialColorPrimary</item>
     </style>
 
+    <style name="AuthCredentialNegativeButtonStyle" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">@*android:string/config_bodyFontFamilyMedium</item>
+        <item name="android:background">@color/transparent</item>
+        <item name="android:textColor">?androidprv:attr/materialColorPrimary</item>
+    </style>
+
     <style name="DeviceManagementDialogTitle">
         <item name="android:gravity">center</item>
         <item name="android:textAppearance">@style/TextAppearance.Dialog.Title</item>
@@ -529,10 +535,6 @@
 
     <style name="Animation.BrightnessDialog">
         <item name="android:windowExitAnimation">@anim/instant_fade_out</item>
-    </style>
-
-    <style name="Theme.SystemUI.ContrastDialog" parent="@android:style/Theme.DeviceDefault.Dialog">
-        <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
     <style name="Theme.SystemUI.QuickSettings.Dialog" parent="@style/Theme.SystemUI.Dialog.QuickSettings">
@@ -1267,6 +1269,7 @@
         <item name="android:lineHeight">32sp</item>
         <item name="android:gravity">center</item>
         <item name="android:textAlignment">center</item>
+        <item name="android:hyphenationFrequency">full</item>
     </style>
 
     <style name="TextAppearance.Dialog.Body" parent="@android:style/TextAppearance.DeviceDefault.Medium">

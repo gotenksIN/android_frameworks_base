@@ -20,6 +20,7 @@ import android.animation.FloatEvaluator
 import android.animation.IntEvaluator
 import com.android.keyguard.KeyguardViewController
 import com.android.systemui.accessibility.domain.interactor.AccessibilityInteractor
+import com.android.systemui.biometrics.shared.model.SensorLocation
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
@@ -73,6 +74,12 @@ constructor(
     @Application private val scope: CoroutineScope,
 ) {
     val isUdfpsSupported: StateFlow<Boolean> = deviceEntryUdfpsInteractor.isUdfpsSupported
+    val udfpsLocation: StateFlow<SensorLocation?> =
+        deviceEntryUdfpsInteractor.udfpsLocation.stateIn(
+            scope = scope,
+            started = SharingStarted.Eagerly,
+            initialValue = null,
+        )
     private val intEvaluator = IntEvaluator()
     private val floatEvaluator = FloatEvaluator()
     private val showingAlternateBouncer: Flow<Boolean> =
@@ -200,19 +207,24 @@ constructor(
             .distinctUntilChanged()
 
     private val isUnlocked: Flow<Boolean> =
-        keyguardInteractor.isKeyguardDismissible.flatMapLatest { isUnlocked ->
-            if (!isUnlocked) {
-                flowOf(false)
+        if (SceneContainerFlag.isEnabled) {
+                deviceEntryInteractor.isUnlocked
             } else {
-                flow {
-                    // delay in case device ends up transitioning away from the lock screen;
-                    // we don't want to animate to the unlocked icon and just let the
-                    // icon fade with the transition to GONE
-                    delay(UNLOCKED_DELAY_MS)
-                    emit(true)
+                keyguardInteractor.isKeyguardDismissible
+            }
+            .flatMapLatest { isUnlocked ->
+                if (!isUnlocked) {
+                    flowOf(false)
+                } else {
+                    flow {
+                        // delay in case device ends up transitioning away from the lock screen;
+                        // we don't want to animate to the unlocked icon and just let the
+                        // icon fade with the transition to GONE
+                        delay(UNLOCKED_DELAY_MS)
+                        emit(true)
+                    }
                 }
             }
-        }
 
     val iconType: Flow<DeviceEntryIconView.IconType> =
         combine(

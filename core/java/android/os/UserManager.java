@@ -368,17 +368,18 @@ public class UserManager {
     public static final String DISALLOW_WIFI_TETHERING = "no_wifi_tethering";
 
     /**
-     * Specifies if a user is disallowed from being granted admin privileges.
+     * Restricts a user's ability to possess or grant admin privileges.
      *
-     * <p>This restriction limits ability of other admin users to grant admin
-     * privileges to selected user.
+     * <p>When set to <code>true</code>, this prevents the user from:
+     *     <ul>
+     *         <li>Becoming an admin</li>
+     *         <li>Giving other users admin privileges</li>
+     *     </ul>
      *
-     * <p>This restriction has no effect in a mode that does not allow multiple admins.
+     * <p>This restriction is only effective in environments where multiple admins are allowed.
      *
-     * <p>The default value is <code>false</code>.
+     * <p>Key for user restrictions. Type: Boolean. Default: <code>false</code>.
      *
-     * <p>Key for user restrictions.
-     * <p>Type: Boolean
      * @see DevicePolicyManager#addUserRestriction(ComponentName, String)
      * @see DevicePolicyManager#clearUserRestriction(ComponentName, String)
      * @see #getUserRestrictions()
@@ -5957,19 +5958,22 @@ public class UserManager {
     /**
      * Returns the string used to represent the profile associated with the given userId. This
      * string typically includes the profile name used by accessibility services like TalkBack.
-     * @hide
      *
      * @return String representing the accessibility label for the given profile user.
      *
      * @throws android.content.res.Resources.NotFoundException if the user does not have a label
      * defined.
+     *
+     * @see #getBadgedLabelForUser(CharSequence, UserHandle)
+     *
+     * @hide
      */
     @UserHandleAware(
             requiresAnyOfPermissionsIfNotCallerProfileGroup = {
                     Manifest.permission.MANAGE_USERS,
                     Manifest.permission.QUERY_USERS,
                     Manifest.permission.INTERACT_ACROSS_USERS})
-    public String getProfileAccessibilityString(int userId) {
+    public String getProfileAccessibilityString(@UserIdInt int userId) {
         if (isManagedProfile(mUserId)) {
             DevicePolicyManager dpm = mContext.getSystemService(DevicePolicyManager.class);
             dpm.getResources().getString(
@@ -5979,7 +5983,7 @@ public class UserManager {
         return getProfileAccessibilityLabel(userId);
     }
 
-    private String getProfileAccessibilityLabel(int userId) {
+    private String getProfileAccessibilityLabel(@UserIdInt int userId) {
         try {
             final int resourceId = mService.getProfileAccessibilityLabelResId(userId);
             return Resources.getSystem().getString(resourceId);

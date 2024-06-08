@@ -1736,24 +1736,6 @@ public final class Settings {
             "android.settings.NETWORK_OPERATOR_SETTINGS";
 
     /**
-     * Activity Action: Show settings for selecting the network provider.
-     * <p>
-     * In some cases, a matching Activity may not be provided, so ensure you
-     * safeguard against this.
-     * <p>
-     * Access to this preference can be customized via Settings' app.
-     * <p>
-     * Input: Nothing.
-     * <p>
-     * Output: Nothing.
-     *
-     * @hide
-     */
-    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
-    public static final String ACTION_NETWORK_PROVIDER_SETTINGS =
-            "android.settings.NETWORK_PROVIDER_SETTINGS";
-
-    /**
      * Activity Action: Show settings for selection of 2G/3G.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -7449,6 +7431,12 @@ public final class Settings {
          */
         public static final String BLUETOOTH_LE_BROADCAST_PROGRAM_INFO =
                 "bluetooth_le_broadcast_program_info";
+
+        /**
+         * This is used by LocalBluetoothLeBroadcast to store the broadcast name.
+         * @hide
+         */
+        public static final String BLUETOOTH_LE_BROADCAST_NAME = "bluetooth_le_broadcast_name";
 
         /**
          * This is used by LocalBluetoothLeBroadcast to store the broadcast code.
@@ -17054,6 +17042,28 @@ public final class Settings {
          * @hide
          */
         public static final String ENABLE_BACK_ANIMATION = "enable_back_animation";
+
+        /**
+         * An allow list of packages for which the user has granted the permission to communicate
+         * across profiles.
+         *
+         * @hide
+         */
+        @Readable
+        @FlaggedApi(android.app.admin.flags.Flags.FLAG_BACKUP_CONNECTED_APPS_SETTINGS)
+        public static final String CONNECTED_APPS_ALLOWED_PACKAGES =
+                "connected_apps_allowed_packages";
+
+        /**
+         * A block list of packages for which the user has denied the permission to communicate
+         * across profiles.
+         *
+         * @hide
+         */
+        @Readable
+        @FlaggedApi(android.app.admin.flags.Flags.FLAG_BACKUP_CONNECTED_APPS_SETTINGS)
+        public static final String CONNECTED_APPS_DISALLOWED_PACKAGES =
+                "connected_apps_disallowed_packages";
 
         /** @hide */ public static String zenModeToString(int mode) {
             if (mode == ZEN_MODE_IMPORTANT_INTERRUPTIONS) return "ZEN_MODE_IMPORTANT_INTERRUPTIONS";

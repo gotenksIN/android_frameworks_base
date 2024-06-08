@@ -103,6 +103,8 @@
     <string name="bluetooth_battery_level_untethered" msgid="1616774716076301755">"Baterie: L <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g>, P <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g>."</string>
     <string name="bluetooth_battery_level_untethered_left" msgid="5725764679536058365">"Levá strana: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> baterie"</string>
     <string name="bluetooth_battery_level_untethered_right" msgid="8377995536997790142">"Pravá strana: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> baterie"</string>
+    <string name="tv_bluetooth_battery_level_untethered_left" msgid="337629670583744410">"Levá část: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
+    <string name="tv_bluetooth_battery_level_untethered_right" msgid="8610019317279155595">"Pravá část: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
     <string name="bluetooth_active_no_battery_level" msgid="4155462233006205630">"Aktivní"</string>
     <string name="bluetooth_saved_device" msgid="4895871321722311428">"Uloženo"</string>
     <string name="bluetooth_hearing_aid_left_active" msgid="8330226430756799572">"Aktivní (pouze levé)"</string>
@@ -235,7 +237,7 @@
     <string name="choose_profile" msgid="343803890897657450">"Vyberte profil"</string>
     <string name="category_personal" msgid="6236798763159385225">"Osobní"</string>
     <string name="category_work" msgid="4014193632325996115">"Pracovní"</string>
-    <string name="category_private" msgid="4244892185452788977">"Soukromé"</string>
+    <string name="category_private" msgid="4244892185452788977">"Soukromý"</string>
     <string name="category_clone" msgid="1554511758987195974">"Klon"</string>
     <string name="development_settings_title" msgid="140296922921597393">"Pro vývojáře"</string>
     <string name="development_settings_enable" msgid="4285094651288242183">"Aktivovat možnosti pro vývojáře"</string>
@@ -285,7 +287,7 @@
     <string name="oem_unlock_enable_summary" msgid="5857388174390953829">"Povolit odemknutí zavaděče"</string>
     <string name="confirm_enable_oem_unlock_title" msgid="8249318129774367535">"Povolit odemknutí OEM?"</string>
     <string name="confirm_enable_oem_unlock_text" msgid="854131050791011970">"UPOZORNĚNÍ: Pokud bude toto nastavení zapnuto, nebudou v tomto zařízení fungovat funkce ochrany zařízení."</string>
-    <string name="mock_location_app" msgid="6269380172542248304">"Vybrat aplikaci k simulování polohy"</string>
+    <string name="mock_location_app" msgid="6269380172542248304">"Vybrat aplikaci k simulování polohy"</string>
     <string name="mock_location_app_not_set" msgid="6972032787262831155">"Aplikace k simulování polohy není nastavena"</string>
     <string name="mock_location_app_set" msgid="4706722469342913843">"Aplikace k simulování polohy: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="debug_networking_category" msgid="6829757985772659599">"Sítě"</string>
@@ -600,7 +602,7 @@
     <string name="shared_data_no_blobs_text" msgid="3108114670341737434">"Pro tohoto uživatele nejsou k dispozici žádná sdílená data."</string>
     <string name="shared_data_query_failure_text" msgid="3489828881998773687">"Při načítání sdílených dat došlo k chybě. Zkuste to znovu."</string>
     <string name="blob_id_text" msgid="8680078988996308061">"ID sdílených dat: <xliff:g id="BLOB_ID">%d</xliff:g>"</string>
-    <string name="blob_expires_text" msgid="7882727111491739331">"Platnost vyprší <xliff:g id="DATE">%s</xliff:g>"</string>
+    <string name="blob_expires_text" msgid="7882727111491739331">"Platnost skončí <xliff:g id="DATE">%s</xliff:g>"</string>
     <string name="shared_data_delete_failure_text" msgid="3842701391009628947">"Při mazání sdílených dat došlo k chybě."</string>
     <string name="shared_data_no_accessors_dialog_text" msgid="8903738462570715315">"Pro tato sdílená data nejsou k dispozici žádné smlouvy. Chcete je smazat?"</string>
     <string name="accessor_info_title" msgid="8289823651512477787">"Aplikace, které sdílejí data"</string>
@@ -706,7 +708,7 @@
     <string name="physical_keyboard_title" msgid="4811935435315835220">"Fyzická klávesnice"</string>
     <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"Zvolte rozložení klávesnice"</string>
     <string name="keyboard_layout_default_label" msgid="1997292217218546957">"Výchozí"</string>
-    <string name="turn_screen_on_title" msgid="3266937298097573424">"Zapínání obrazovky"</string>
+    <string name="turn_screen_on_title" msgid="2662312432042116026">"Ovládání zapnutí obrazovky"</string>
     <string name="allow_turn_screen_on" msgid="6194845766392742639">"Povolit zapínání obrazovky"</string>
     <string name="allow_turn_screen_on_description" msgid="43834403291575164">"Aplikaci můžete povolit zapínat obrazovku. Pokud bude mít toto oprávnění, může kdykoli zapnout obrazovku bez požadavku uživatele."</string>
     <string name="bt_le_audio_broadcast_dialog_title" msgid="5392738488989777074">"Zastavit vysílání v aplikaci <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>

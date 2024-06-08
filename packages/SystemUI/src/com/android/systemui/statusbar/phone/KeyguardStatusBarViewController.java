@@ -660,10 +660,12 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
      * whether heads up is visible.
      */
     public void updateForHeadsUp() {
+        // [KeyguardStatusBarViewBinder] handles visibility when SceneContainerFlag is on.
+        SceneContainerFlag.assertInLegacyMode();
         updateForHeadsUp(true);
     }
 
-    // TODO(b/328579846) bind the StatusBar visibility to heads up events
+    @VisibleForTesting
     void updateForHeadsUp(boolean animate) {
         boolean showingKeyguardHeadsUp =
                 isKeyguardShowing() && mShadeViewStateProvider.shouldHeadsUpBeVisible();

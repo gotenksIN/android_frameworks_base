@@ -188,6 +188,7 @@ import android.annotation.Nullable;
 import android.app.ActivityTaskManager;
 import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyCache;
+import android.app.servertransaction.WindowStateInsetsControlChangeItem;
 import android.app.servertransaction.WindowStateResizeItem;
 import android.content.Context;
 import android.content.res.Configuration;
@@ -224,6 +225,7 @@ import android.view.IWindowId;
 import android.view.InputChannel;
 import android.view.InputWindowHandle;
 import android.view.InsetsSource;
+import android.view.InsetsSourceControl;
 import android.view.InsetsState;
 import android.view.Surface;
 import android.view.Surface.Rotation;
@@ -431,6 +433,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     /** @see #isLastConfigReportedToClient() */
     private boolean mLastConfigReportedToClient;
+
+    // TODO(b/339380439): Ensure to use the same object for IWindowSession#relayout
+    private final InsetsSourceControl.Array mLastReportedActiveControls =
+            new InsetsSourceControl.Array();
 
     private final Configuration mTempConfiguration = new Configuration();
 
@@ -3813,11 +3819,17 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         final InsetsStateController stateController =
                 getDisplayContent().getInsetsStateController();
-        try {
-            mClient.insetsControlChanged(getCompatInsetsState(),
-                    stateController.getControlsForDispatch(this));
-        } catch (RemoteException e) {
-            Slog.w(TAG, "Failed to deliver inset control state change to w=" + this, e);
+        final InsetsState insetsState = getCompatInsetsState();
+        mLastReportedActiveControls.set(stateController.getControlsForDispatch(this));
+        if (Flags.insetsControlChangedItem()) {
+            getProcess().scheduleClientTransactionItem(WindowStateInsetsControlChangeItem.obtain(
+                    mClient, insetsState, mLastReportedActiveControls));
+        } else {
+            try {
+                mClient.insetsControlChanged(insetsState, mLastReportedActiveControls);
+            } catch (RemoteException e) {
+                Slog.w(TAG, "Failed to deliver inset control state change to w=" + this, e);
+            }
         }
     }
 

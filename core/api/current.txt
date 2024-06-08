@@ -3344,9 +3344,9 @@ package android.accessibilityservice {
   public abstract class AccessibilityService extends android.app.Service {
     ctor public AccessibilityService();
     method public void attachAccessibilityOverlayToDisplay(int, @NonNull android.view.SurfaceControl);
-    method @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public void attachAccessibilityOverlayToDisplay(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
+    method @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public final void attachAccessibilityOverlayToDisplay(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
     method public void attachAccessibilityOverlayToWindow(int, @NonNull android.view.SurfaceControl);
-    method @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public void attachAccessibilityOverlayToWindow(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
+    method @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public final void attachAccessibilityOverlayToWindow(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
     method public boolean clearCache();
     method public boolean clearCachedSubtree(@NonNull android.view.accessibility.AccessibilityNodeInfo);
     method public final void disableSelf();
@@ -3354,7 +3354,7 @@ package android.accessibilityservice {
     method public android.view.accessibility.AccessibilityNodeInfo findFocus(int);
     method @NonNull public final android.accessibilityservice.AccessibilityButtonController getAccessibilityButtonController();
     method @NonNull public final android.accessibilityservice.AccessibilityButtonController getAccessibilityButtonController(int);
-    method @FlaggedApi("android.view.accessibility.braille_display_hid") @NonNull public android.accessibilityservice.BrailleDisplayController getBrailleDisplayController();
+    method @FlaggedApi("android.view.accessibility.braille_display_hid") @NonNull public final android.accessibilityservice.BrailleDisplayController getBrailleDisplayController();
     method @NonNull @RequiresPermission(android.Manifest.permission.USE_FINGERPRINT) public final android.accessibilityservice.FingerprintGestureController getFingerprintGestureController();
     method @Nullable public final android.accessibilityservice.InputMethod getInputMethod();
     method @NonNull public final android.accessibilityservice.AccessibilityService.MagnificationController getMagnificationController();
@@ -13040,6 +13040,7 @@ package android.content.pm {
     method @CheckResult public abstract boolean isPermissionRevokedByPolicy(@NonNull String, @NonNull String);
     method public abstract boolean isSafeMode();
     method @FlaggedApi("android.content.pm.get_package_info") @WorkerThread public <T> T parseAndroidManifest(@NonNull java.io.File, @NonNull java.util.function.Function<android.content.res.XmlResourceParser,T>) throws java.io.IOException;
+    method @FlaggedApi("android.content.pm.get_package_info_with_fd") @WorkerThread public <T> T parseAndroidManifest(@NonNull android.os.ParcelFileDescriptor, @NonNull java.util.function.Function<android.content.res.XmlResourceParser,T>) throws java.io.IOException;
     method @NonNull public java.util.List<android.content.pm.PackageManager.Property> queryActivityProperty(@NonNull String);
     method @NonNull public java.util.List<android.content.pm.PackageManager.Property> queryApplicationProperty(@NonNull String);
     method @NonNull public abstract java.util.List<android.content.pm.ResolveInfo> queryBroadcastReceivers(@NonNull android.content.Intent, int);
@@ -18087,6 +18088,11 @@ package android.graphics.text {
 
   public class LineBreaker {
     method @NonNull public android.graphics.text.LineBreaker.Result computeLineBreaks(@NonNull android.graphics.text.MeasuredText, @NonNull android.graphics.text.LineBreaker.ParagraphConstraints, @IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.missing_getter_apis") public int getBreakStrategy();
+    method @FlaggedApi("com.android.text.flags.missing_getter_apis") public int getHyphenationFrequency();
+    method @FlaggedApi("com.android.text.flags.missing_getter_apis") @Nullable public int[] getIndents();
+    method @FlaggedApi("com.android.text.flags.missing_getter_apis") public int getJustificationMode();
+    method @FlaggedApi("com.android.text.flags.missing_getter_apis") public boolean getUseBoundsForWidth();
     field public static final int BREAK_STRATEGY_BALANCED = 2; // 0x2
     field public static final int BREAK_STRATEGY_HIGH_QUALITY = 1; // 0x1
     field public static final int BREAK_STRATEGY_SIMPLE = 0; // 0x0
@@ -26593,7 +26599,7 @@ package android.media.session {
     method public long getFlags();
     method @Nullable public android.media.MediaMetadata getMetadata();
     method public String getPackageName();
-    method @Nullable public android.media.session.MediaController.PlaybackInfo getPlaybackInfo();
+    method @NonNull public android.media.session.MediaController.PlaybackInfo getPlaybackInfo();
     method @Nullable public android.media.session.PlaybackState getPlaybackState();
     method @Nullable public java.util.List<android.media.session.MediaSession.QueueItem> getQueue();
     method @Nullable public CharSequence getQueueTitle();
@@ -26612,7 +26618,7 @@ package android.media.session {
 
   public abstract static class MediaController.Callback {
     ctor public MediaController.Callback();
-    method public void onAudioInfoChanged(android.media.session.MediaController.PlaybackInfo);
+    method public void onAudioInfoChanged(@NonNull android.media.session.MediaController.PlaybackInfo);
     method public void onExtrasChanged(@Nullable android.os.Bundle);
     method public void onMetadataChanged(@Nullable android.media.MediaMetadata);
     method public void onPlaybackStateChanged(@Nullable android.media.session.PlaybackState);

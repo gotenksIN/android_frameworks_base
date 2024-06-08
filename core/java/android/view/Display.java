@@ -916,6 +916,12 @@ public final class Display {
      *         {@code getWindowManager()} or {@code getSystemService(Context.WINDOW_SERVICE)}), the
      *         size of the current app window is returned. As a result, in multi-window mode, the
      *         returned size can be smaller than the size of the device screen.
+     *         The returned window size can vary depending on API level:
+     *         <ul>
+     *             <li>API level 35 and above, the window size will be returned.
+     *             <li>API level 34 and below, the window size minus system decoration areas and
+     *             display cutout is returned.
+     *         </ul>
      *     <li>If size is requested from a non-activity context (for example, the application
      *         context, where the WindowManager is accessed by
      *         {@code getApplicationContext().getSystemService(Context.WINDOW_SERVICE)}), the
@@ -924,9 +930,10 @@ public final class Display {
      *             <li>API level 29 and below &mdash; The size of the entire display (based on
      *                 current rotation) minus system decoration areas is returned.
      *             <li>API level 30 and above &mdash; The size of the top running activity in the
-     *                 current process is returned. If the current process has no running
-     *                 activities, the size of the device default display, including system
-     *                 decoration areas, is returned.
+     *                 current process is returned, system decoration areas exclusion follows the
+     *                 behavior defined above, based on the caller's API level. If the current
+     *                 process has no running activities, the size of the device default display,
+     *                 including system decoration areas, is returned.
      *         </ul>
      * </ul>
      *
@@ -1218,9 +1225,22 @@ public final class Display {
     }
 
     /**
-     * Gets the supported modes of this display.
+     * Gets the supported modes of this display, might include synthetic modes
      */
     public Mode[] getSupportedModes() {
+        synchronized (mLock) {
+            updateDisplayInfoLocked();
+            final Display.Mode[] modes = mDisplayInfo.appsSupportedModes;
+            return Arrays.copyOf(modes, modes.length);
+        }
+    }
+
+    /**
+     * Gets system supported modes of this display,
+     * @hide
+     */
+    @SuppressLint("ArrayReturn")
+    public @NonNull Mode[] getSystemSupportedModes() {
         synchronized (mLock) {
             updateDisplayInfoLocked();
             final Display.Mode[] modes = mDisplayInfo.supportedModes;
@@ -2206,6 +2226,7 @@ public final class Display {
         @NonNull
         @HdrCapabilities.HdrType
         private final int[] mSupportedHdrTypes;
+        private final boolean mIsSynthetic;
 
         /**
          * @hide
@@ -2214,13 +2235,6 @@ public final class Display {
         public Mode(int width, int height, float refreshRate) {
             this(INVALID_MODE_ID, width, height, refreshRate, refreshRate, new float[0],
                     new int[0]);
-        }
-
-        /**
-         * @hide
-         */
-        public Mode(int width, int height, float refreshRate, float vsyncRate) {
-            this(INVALID_MODE_ID, width, height, refreshRate, vsyncRate, new float[0], new int[0]);
         }
 
         /**
@@ -2246,11 +2260,21 @@ public final class Display {
          */
         public Mode(int modeId, int width, int height, float refreshRate, float vsyncRate,
                 float[] alternativeRefreshRates, @HdrCapabilities.HdrType int[] supportedHdrTypes) {
+            this(modeId, width, height, refreshRate, vsyncRate, false, alternativeRefreshRates,
+                    supportedHdrTypes);
+        }
+        /**
+         * @hide
+         */
+        public Mode(int modeId, int width, int height, float refreshRate, float vsyncRate,
+                boolean isSynthetic, float[] alternativeRefreshRates,
+                @HdrCapabilities.HdrType int[] supportedHdrTypes) {
             mModeId = modeId;
             mWidth = width;
             mHeight = height;
             mPeakRefreshRate = refreshRate;
             mVsyncRate = vsyncRate;
+            mIsSynthetic = isSynthetic;
             mAlternativeRefreshRates =
                     Arrays.copyOf(alternativeRefreshRates, alternativeRefreshRates.length);
             Arrays.sort(mAlternativeRefreshRates);
@@ -2312,6 +2336,15 @@ public final class Display {
          */
         public float getVsyncRate() {
             return mVsyncRate;
+        }
+
+        /**
+         * Returns true if mode is synthetic and does not have corresponding
+         * SurfaceControl.DisplayMode
+         * @hide
+         */
+        public boolean isSynthetic() {
+            return mIsSynthetic;
         }
 
         /**
@@ -2449,6 +2482,7 @@ public final class Display {
                     .append(", height=").append(mHeight)
                     .append(", fps=").append(mPeakRefreshRate)
                     .append(", vsync=").append(mVsyncRate)
+                    .append(", synthetic=").append(mIsSynthetic)
                     .append(", alternativeRefreshRates=")
                     .append(Arrays.toString(mAlternativeRefreshRates))
                     .append(", supportedHdrTypes=")
@@ -2464,7 +2498,7 @@ public final class Display {
 
         private Mode(Parcel in) {
             this(in.readInt(), in.readInt(), in.readInt(), in.readFloat(), in.readFloat(),
-                    in.createFloatArray(), in.createIntArray());
+                    in.readBoolean(), in.createFloatArray(), in.createIntArray());
         }
 
         @Override
@@ -2474,6 +2508,7 @@ public final class Display {
             out.writeInt(mHeight);
             out.writeFloat(mPeakRefreshRate);
             out.writeFloat(mVsyncRate);
+            out.writeBoolean(mIsSynthetic);
             out.writeFloatArray(mAlternativeRefreshRates);
             out.writeIntArray(mSupportedHdrTypes);
         }

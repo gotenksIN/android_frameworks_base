@@ -79,20 +79,8 @@
       "group": "WM_DEBUG_STARTING_WINDOW",
       "at": "com\/android\/server\/wm\/ActivityRecord.java"
     },
-    "1789854065584848502": {
-      "message": "startingData was nulled out before handling mAddStartingWindow: %s",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_STARTING_WINDOW",
-      "at": "com\/android\/server\/wm\/ActivityRecord.java"
-    },
     "5659016061937922595": {
       "message": "Add starting %s: startingData=%s",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_STARTING_WINDOW",
-      "at": "com\/android\/server\/wm\/ActivityRecord.java"
-    },
-    "-9066702108316454290": {
-      "message": "Aborted starting %s: startingData=%s",
       "level": "VERBOSE",
       "group": "WM_DEBUG_STARTING_WINDOW",
       "at": "com\/android\/server\/wm\/ActivityRecord.java"
@@ -582,6 +570,12 @@
       "level": "DEBUG",
       "group": "WM_DEBUG_STATES",
       "at": "com\/android\/server\/wm\/ActivityRecord.java"
+    },
+    "7211222997110112110": {
+      "message": "Refreshing activity for freeform camera compatibility treatment, activityRecord=%s",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_STATES",
+      "at": "com\/android\/server\/wm\/ActivityRefresher.java"
     },
     "1665699123574159131": {
       "message": "Starting activity when config will change = %b",
@@ -1116,12 +1110,6 @@
       "level": "INFO",
       "group": "WM_SHOW_SURFACE_ALLOC",
       "at": "com\/android\/server\/wm\/BlackFrame.java"
-    },
-    "5256889109971284149": {
-      "message": "CameraManager cannot be found.",
-      "level": "ERROR",
-      "group": "WM_DEBUG_STATES",
-      "at": "com\/android\/server\/wm\/CameraStateMonitor.java"
     },
     "8116030277393789125": {
       "message": "Display id=%d is notified that Camera %s is open for package %s",
@@ -1769,12 +1757,6 @@
       "message": "Display id=%d is ignoring all orientation requests, camera is active and the top activity is eligible for force rotation, return %s,portrait activity: %b, is natural orientation portrait: %b.",
       "level": "VERBOSE",
       "group": "WM_DEBUG_ORIENTATION",
-      "at": "com\/android\/server\/wm\/DisplayRotationCompatPolicy.java"
-    },
-    "-7756685416834187936": {
-      "message": "Refreshing activity for camera compatibility treatment, activityRecord=%s",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_STATES",
       "at": "com\/android\/server\/wm\/DisplayRotationCompatPolicy.java"
     },
     "-5176775281239247368": {
@@ -3241,6 +3223,36 @@
       "group": "WM_DEBUG_WINDOW_TRANSITIONS",
       "at": "com\/android\/server\/wm\/TransitionController.java"
     },
+    "-4546322749928357965": {
+      "message": "Registering transition player %s over %d other players",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WINDOW_TRANSITIONS_MIN",
+      "at": "com\/android\/server\/wm\/TransitionController.java"
+    },
+    "-4250307779892136611": {
+      "message": "Registering transition player %s ",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WINDOW_TRANSITIONS_MIN",
+      "at": "com\/android\/server\/wm\/TransitionController.java"
+    },
+    "3242771541905259983": {
+      "message": "Attempt to unregister transition player %s but it isn't registered",
+      "level": "WARN",
+      "group": "WM_DEBUG_WINDOW_TRANSITIONS_MIN",
+      "at": "com\/android\/server\/wm\/TransitionController.java"
+    },
+    "3691912781236221027": {
+      "message": "Unregistering active transition player %s at index=%d leaving %d in stack",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WINDOW_TRANSITIONS_MIN",
+      "at": "com\/android\/server\/wm\/TransitionController.java"
+    },
+    "-2879980134100946679": {
+      "message": "Unregistering transition player %s at index=%d leaving %d in stack",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_WINDOW_TRANSITIONS_MIN",
+      "at": "com\/android\/server\/wm\/TransitionController.java"
+    },
     "-4235778637051052061": {
       "message": "Disabling player for transition #%d because display isn't enabled yet",
       "level": "VERBOSE",
@@ -4185,18 +4197,6 @@
     },
     "1278715281433572858": {
       "message": "Bad requesting window %s",
-      "level": "WARN",
-      "group": "WM_ERROR",
-      "at": "com\/android\/server\/wm\/WindowManagerService.java"
-    },
-    "-707915937966769475": {
-      "message": "unable to update pointer icon",
-      "level": "WARN",
-      "group": "WM_ERROR",
-      "at": "com\/android\/server\/wm\/WindowManagerService.java"
-    },
-    "-8663841671650918687": {
-      "message": "unable to restore pointer icon",
       "level": "WARN",
       "group": "WM_ERROR",
       "at": "com\/android\/server\/wm\/WindowManagerService.java"

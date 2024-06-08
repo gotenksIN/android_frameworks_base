@@ -26,14 +26,6 @@ flag {
 }
 
 flag {
-
-    name: "notification_heads_up_cycling"
-    namespace: "systemui"
-    description: "Heads-up notification cycling animation for the Notification Avalanche feature."
-    bug: "316404716"
-}
-
-flag {
    name: "priority_people_section"
    namespace: "systemui"
    description: "Add a new section for priority people (aka important conversations)."
@@ -51,7 +43,7 @@ flag {
 }
 
 flag {
-   name: "notification_view_flipper_pausing"
+   name: "notification_view_flipper_pausing_v2"
    namespace: "systemui"
    description: "Pause ViewFlippers inside Notification custom layouts when the shade is closed."
    bug: "309146176"
@@ -192,6 +184,13 @@ flag {
 }
 
 flag {
+    name: "notification_avalanche_throttle_hun"
+    namespace: "systemui"
+    description: "(currently unused) During notification avalanche, throttle HUNs showing in fast succession."
+    bug: "307288824"
+}
+
+flag {
     name: "notification_avalanche_suppression"
     namespace: "systemui"
     description: "After notification avalanche floodgate event, suppress HUNs completely."
@@ -204,7 +203,16 @@ flag {
     description: "Re-enable the codepath that removed tinting of notifications when the"
         " standard background color is desired.  This was the behavior before we discovered"
         " a resources threading issue, which we worked around by tinting the notification"
-        " backgrounds and footer buttons."
+        " backgrounds."
+    bug: "294830092"
+}
+
+flag {
+    name: "notification_footer_background_tint_optimization"
+    namespace: "systemui"
+    description: "Remove duplicative tinting of notification footer buttons. This was the behavior"
+        " before we discovered a resources threading issue, which we worked around by applying the"
+        " same color as a tint to the background drawable of footer buttons."
     bug: "294830092"
 }
 
@@ -413,6 +421,13 @@ flag {
 }
 
 flag {
+   name: "confine_notification_touch_to_view_width"
+   namespace: "systemui"
+   description: "Use notification view width when detecting gestures."
+   bug: "335828150"
+}
+
+flag {
   name: "fix_image_wallpaper_crash_surface_already_released"
   namespace: "systemui"
   description: "Make sure ImageWallpaper doesn't return from OnSurfaceDestroyed until any drawing is finished"
@@ -504,6 +519,25 @@ flag {
     }
 }
 
+flag {
+    name: "screenshot_scroll_crop_view_crash_fix"
+    namespace: "systemui"
+    description: "Mitigate crash on invalid computed range in CropView"
+    bug: "232633995"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "screenshot_private_profile_accessibility_announcement_fix"
+    namespace: "systemui"
+    description: "Modified a11y announcement for private space screenshots"
+    bug: "326941376"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
 
 flag {
     name: "screenshot_private_profile_behavior_fix"
@@ -933,10 +967,20 @@ flag {
 }
 
 flag {
-  name: "media_controls_user_initiated_dismiss"
+  name: "media_controls_user_initiated_deleteintent"
   namespace: "systemui"
   description: "Only dismiss media notifications when the control was removed by the user."
   bug: "335875159"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  namespace: "systemui"
+  name: "enable_view_capture_tracing"
+  description: "Enables view capture tracing in System UI."
+  bug: "336521992"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -953,8 +997,32 @@ flag {
 }
 
 flag {
+  name: "glanceable_hub_shortcut_button"
+  namespace: "systemui"
+  description: "Shows a button over the dream and lock screen to open the glanceable hub"
+  bug: "339667383"
+}
+
+flag {
   name: "glanceable_hub_gesture_handle"
   namespace: "systemui"
   description: "Shows a vertical bar at the right edge to indicate the user can swipe to open the glanceable hub"
   bug: "339667383"
+}
+
+flag {
+  name: "new_touchpad_gestures_tutorial"
+  namespace: "systemui"
+  description: "Enables new interactive tutorial for learning touchpad gestures"
+  bug: "309928033"
+}
+
+flag {
+   name: "register_wallpaper_notifier_background"
+   namespace: "systemui"
+   description: "Decide whether to register wallpaper change broadcast receiver on background executor."
+   bug: "327315860"
+   metadata {
+     purpose: PURPOSE_BUGFIX
+   }
 }

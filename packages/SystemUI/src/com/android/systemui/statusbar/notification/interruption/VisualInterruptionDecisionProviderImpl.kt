@@ -15,6 +15,7 @@
  */
 package com.android.systemui.statusbar.notification.interruption
 
+import android.content.pm.PackageManager
 import android.hardware.display.AmbientDisplayConfiguration
 import android.os.Handler
 import android.os.PowerManager
@@ -42,6 +43,8 @@ import com.android.systemui.util.EventLog
 import com.android.systemui.util.settings.GlobalSettings
 import com.android.systemui.util.settings.SystemSettings
 import com.android.systemui.util.time.SystemClock
+import com.android.wm.shell.bubbles.Bubbles
+import java.util.Optional
 import javax.inject.Inject
 
 class VisualInterruptionDecisionProviderImpl
@@ -63,7 +66,9 @@ constructor(
     private val uiEventLogger: UiEventLogger,
     private val userTracker: UserTracker,
     private val avalancheProvider: AvalancheProvider,
-    private val systemSettings: SystemSettings
+    private val systemSettings: SystemSettings,
+    private val packageManager: PackageManager,
+    private val bubbles: Optional<Bubbles>
 ) : VisualInterruptionDecisionProvider {
 
     init {
@@ -156,7 +161,7 @@ constructor(
         addCondition(PulseDisabledSuppressor(ambientDisplayConfiguration, userTracker))
         addCondition(PulseBatterySaverSuppressor(batteryController))
         addFilter(PeekPackageSnoozedSuppressor(headsUpManager))
-        addFilter(PeekAlreadyBubbledSuppressor(statusBarStateController))
+        addFilter(PeekAlreadyBubbledSuppressor(statusBarStateController, bubbles))
         addFilter(PeekDndSuppressor())
         addFilter(PeekNotImportantSuppressor())
         addCondition(PeekDeviceNotInUseSuppressor(powerManager, statusBarStateController))
@@ -172,7 +177,9 @@ constructor(
         addFilter(AlertKeyguardVisibilitySuppressor(keyguardNotificationVisibilityProvider))
 
         if (NotificationAvalancheSuppression.isEnabled) {
-            addFilter(AvalancheSuppressor(avalancheProvider, systemClock, systemSettings))
+            addFilter(
+                AvalancheSuppressor(avalancheProvider, systemClock, systemSettings, packageManager)
+            )
             avalancheProvider.register()
         }
         started = true
@@ -232,14 +239,17 @@ constructor(
 
     private fun makeLoggablePeekDecision(entry: NotificationEntry): LoggableDecision =
         checkConditions(PEEK)
-            ?: checkFilters(PEEK, entry) ?: checkSuppressInterruptions(entry)
-                ?: checkSuppressAwakeInterruptions(entry) ?: checkSuppressAwakeHeadsUp(entry)
-                ?: LoggableDecision.unsuppressed
+            ?: checkFilters(PEEK, entry)
+            ?: checkSuppressInterruptions(entry)
+            ?: checkSuppressAwakeInterruptions(entry)
+            ?: checkSuppressAwakeHeadsUp(entry)
+            ?: LoggableDecision.unsuppressed
 
     private fun makeLoggablePulseDecision(entry: NotificationEntry): LoggableDecision =
         checkConditions(PULSE)
-            ?: checkFilters(PULSE, entry) ?: checkSuppressInterruptions(entry)
-                ?: LoggableDecision.unsuppressed
+            ?: checkFilters(PULSE, entry)
+            ?: checkSuppressInterruptions(entry)
+            ?: LoggableDecision.unsuppressed
 
     override fun makeAndLogBubbleDecision(entry: NotificationEntry): Decision =
         traceSection("VisualInterruptionDecisionProviderImpl#makeAndLogBubbleDecision") {
@@ -252,8 +262,10 @@ constructor(
 
     private fun makeLoggableBubbleDecision(entry: NotificationEntry): LoggableDecision =
         checkConditions(BUBBLE)
-            ?: checkFilters(BUBBLE, entry) ?: checkSuppressInterruptions(entry)
-                ?: checkSuppressAwakeInterruptions(entry) ?: LoggableDecision.unsuppressed
+            ?: checkFilters(BUBBLE, entry)
+            ?: checkSuppressInterruptions(entry)
+            ?: checkSuppressAwakeInterruptions(entry)
+            ?: LoggableDecision.unsuppressed
 
     private fun logDecision(
         type: VisualInterruptionType,

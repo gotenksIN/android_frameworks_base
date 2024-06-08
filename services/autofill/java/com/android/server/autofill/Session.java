@@ -88,6 +88,7 @@ import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_HAS_EMP
 import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_NONE;
 import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_NO_SAVE_INFO;
 import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_NO_VALUE_CHANGED;
+import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_SCREEN_HAS_CREDMAN_FIELD;
 import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_SESSION_DESTROYED;
 import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_WITH_DELAY_SAVE_FLAG;
 import static com.android.server.autofill.SaveEventLogger.NO_SAVE_REASON_WITH_DONT_SAVE_ON_FINISH_FLAG;

@@ -608,7 +608,8 @@ public class BackgroundActivityStartController {
             return mOnlyCreatorAllows;
         }
 
-        private BalVerdict setBasedOnRealCaller() {
+        @VisibleForTesting
+        BalVerdict setBasedOnRealCaller() {
             mBasedOnRealCaller = true;
             return this;
         }
@@ -714,9 +715,6 @@ public class BackgroundActivityStartController {
 
         if (!state.hasRealCaller()) {
             if (resultForCaller.allows()) {
-                if (DEBUG_ACTIVITY_STARTS) {
-                    Slog.d(TAG, "Background activity start allowed. " + state);
-                }
                 return allowBasedOnCaller(state);
             }
             return abortLaunch(state);
@@ -742,15 +740,9 @@ public class BackgroundActivityStartController {
 
         // Handle cases with explicit opt-in
         if (resultForCaller.allows() && state.callerExplicitOptInOrAutoOptIn()) {
-            if (DEBUG_ACTIVITY_STARTS) {
-                Slog.d(TAG, "Activity start explicitly allowed by caller. " + state);
-            }
             return allowBasedOnCaller(state);
         }
         if (resultForRealCaller.allows() && state.realCallerExplicitOptInOrAutoOptIn()) {
-            if (DEBUG_ACTIVITY_STARTS) {
-                Slog.d(TAG, "Activity start explicitly allowed by real caller. " + state);
-            }
             return allowBasedOnRealCaller(state);
         }
         // Handle PendingIntent cases with default behavior next
@@ -1695,16 +1687,15 @@ public class BackgroundActivityStartController {
 
     @VisibleForTesting
     boolean shouldLogStats(BalVerdict finalVerdict, BalState state) {
-        if (finalVerdict.blocks()) {
-            return false;
-        }
-        if (!state.isPendingIntent() && finalVerdict.getRawCode() == BAL_ALLOW_VISIBLE_WINDOW) {
-            return false;
-        }
-        if (state.mBalAllowedByPiSender.allowsBackgroundActivityStarts()
-                && state.mResultForRealCaller != null
-                && state.mResultForRealCaller.getRawCode() == BAL_ALLOW_VISIBLE_WINDOW) {
-            return false;
+        if (finalVerdict.getRawCode() == BAL_ALLOW_VISIBLE_WINDOW) {
+            if (!state.isPendingIntent()) {
+                // regular activity start by visible app
+                return false;
+            }
+            if (finalVerdict.mBasedOnRealCaller) {
+                // PendingIntent started by visible app
+                return false;
+            }
         }
         return true;
     }

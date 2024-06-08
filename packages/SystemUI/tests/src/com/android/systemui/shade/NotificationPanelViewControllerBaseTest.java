@@ -24,6 +24,7 @@ import static com.android.systemui.log.LogBufferHelperKt.logcatLogBuffer;
 import static com.google.common.truth.Truth.assertThat;
 
 import static kotlinx.coroutines.flow.FlowKt.emptyFlow;
+import static kotlinx.coroutines.flow.SharedFlowKt.MutableSharedFlow;
 import static kotlinx.coroutines.flow.StateFlowKt.MutableStateFlow;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -40,6 +41,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.animation.Animator;
 import android.annotation.IdRes;
 import android.content.ContentResolver;
 import android.content.res.Configuration;
@@ -204,16 +206,20 @@ import com.android.wm.shell.animation.FlingAnimationUtils;
 import dagger.Lazy;
 
 import kotlinx.coroutines.CoroutineDispatcher;
+import kotlinx.coroutines.channels.BufferOverflow;
 import kotlinx.coroutines.test.TestScope;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 import org.mockito.stubbing.Answer;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -349,7 +355,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock private KeyguardClockPositionAlgorithm mKeyguardClockPositionAlgorithm;
     @Mock private NaturalScrollingSettingObserver mNaturalScrollingSettingObserver;
     @Mock private LargeScreenHeaderHelper mLargeScreenHeaderHelper;
-
     protected final int mMaxUdfpsBurnInOffsetY = 5;
     protected FakeFeatureFlagsClassic mFeatureFlags = new FakeFeatureFlagsClassic();
     protected KeyguardBottomAreaInteractor mKeyguardBottomAreaInteractor;
@@ -364,8 +369,11 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected PowerInteractor mPowerInteractor;
     protected FakeHeadsUpNotificationRepository mFakeHeadsUpNotificationRepository =
             new FakeHeadsUpNotificationRepository();
-    protected HeadsUpNotificationInteractor mHeadsUpNotificationInteractor =
-            new HeadsUpNotificationInteractor(mFakeHeadsUpNotificationRepository);
+    protected NotificationsKeyguardViewStateRepository mNotificationsKeyguardViewStateRepository =
+            new NotificationsKeyguardViewStateRepository();
+    protected NotificationsKeyguardInteractor mNotificationsKeyguardInteractor =
+            new NotificationsKeyguardInteractor(mNotificationsKeyguardViewStateRepository);
+    protected HeadsUpNotificationInteractor mHeadsUpNotificationInteractor;
     protected NotificationPanelViewController.TouchHandler mTouchHandler;
     protected ConfigurationController mConfigurationController;
     protected SysuiStatusBarStateController mStatusBarStateController;
@@ -389,9 +397,11 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
 
     protected FragmentHostManager.FragmentListener mFragmentListener;
 
+    @Rule(order = 200)
+    public MockitoRule mMockitoRule = MockitoJUnit.rule();
+
     @Before
     public void setup() {
-        MockitoAnnotations.initMocks(this);
         mFeatureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false);
         mFeatureFlags.set(Flags.QS_USER_DETAIL_SHORTCUT, false);
 
@@ -413,11 +423,14 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mPowerInteractor = keyguardInteractorDeps.getPowerInteractor();
         when(mKeyguardTransitionInteractor.isInTransitionToStateWhere(any())).thenReturn(
                 MutableStateFlow(false));
+        when(mKeyguardTransitionInteractor.isInTransition(any(), any()))
+                .thenReturn(emptyFlow());
+        when(mKeyguardTransitionInteractor.getCurrentKeyguardState()).thenReturn(
+                MutableSharedFlow(0, 0, BufferOverflow.SUSPEND));
+        when(mDeviceEntryFaceAuthInteractor.isBypassEnabled()).thenReturn(MutableStateFlow(false));
         DeviceEntryUdfpsInteractor deviceEntryUdfpsInteractor =
                 mock(DeviceEntryUdfpsInteractor.class);
         when(deviceEntryUdfpsInteractor.isUdfpsSupported()).thenReturn(MutableStateFlow(false));
-
-        when(mKeyguardTransitionInteractor.isInTransitionToState(any())).thenReturn(emptyFlow());
 
         mShadeInteractor = new ShadeInteractorImpl(
                 mTestScope.getBackgroundScope(),
@@ -666,6 +679,11 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         when(mView.requireViewById(R.id.keyguard_long_press))
                 .thenReturn(mock(LongPressHandlingView.class));
 
+        mHeadsUpNotificationInteractor =
+                new HeadsUpNotificationInteractor(mFakeHeadsUpNotificationRepository,
+                        mDeviceEntryFaceAuthInteractor, mKeyguardTransitionInteractor,
+                        mNotificationsKeyguardInteractor, mShadeInteractor);
+
         mNotificationPanelViewController = new NotificationPanelViewController(
                 mView,
                 mMainHandler,
@@ -764,6 +782,9 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                     @Override
                     public void onOpenStarted() {}
                 });
+        // Create a set to which the class will add all animators used, so that we can
+        // verify that they are all stopped.
+        mNotificationPanelViewController.mTestSetOfAnimatorsUsed = new HashSet<>();
         ArgumentCaptor<View.OnAttachStateChangeListener> onAttachStateChangeListenerArgumentCaptor =
                 ArgumentCaptor.forClass(View.OnAttachStateChangeListener.class);
         verify(mView, atLeast(1)).addOnAttachStateChangeListener(
@@ -825,12 +846,19 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
 
     @After
     public void tearDown() {
+        List<Animator> leakedAnimators = null;
         if (mNotificationPanelViewController != null) {
             mNotificationPanelViewController.mBottomAreaShadeAlphaAnimator.cancel();
             mNotificationPanelViewController.cancelHeightAnimator();
+            leakedAnimators = mNotificationPanelViewController.mTestSetOfAnimatorsUsed.stream()
+                    .filter(Animator::isRunning).toList();
+            mNotificationPanelViewController.mTestSetOfAnimatorsUsed.forEach(Animator::cancel);
         }
         if (mMainHandler != null) {
             mMainHandler.removeCallbacksAndMessages(null);
+        }
+        if (leakedAnimators != null) {
+            assertThat(leakedAnimators).isEmpty();
         }
     }
 

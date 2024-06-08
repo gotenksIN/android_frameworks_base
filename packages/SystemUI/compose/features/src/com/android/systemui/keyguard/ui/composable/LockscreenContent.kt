@@ -24,10 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.SceneScope
+import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
 import com.android.systemui.keyguard.ui.composable.blueprint.ComposableLockscreenSceneBlueprint
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel
-import javax.inject.Inject
 
 /**
  * Renders the content of the lockscreen.
@@ -35,9 +35,7 @@ import javax.inject.Inject
  * This is separate from the [LockscreenScene] because it's meant to support usage of this UI from
  * outside the scene container framework.
  */
-class LockscreenContent
-@Inject
-constructor(
+class LockscreenContent(
     private val viewModel: LockscreenContentViewModel,
     private val blueprints: Set<@JvmSuppressWildcards ComposableLockscreenSceneBlueprint>,
     private val clockInteractor: KeyguardClockInteractor,
@@ -60,6 +58,6 @@ constructor(
         }
 
         val blueprint = blueprintByBlueprintId[blueprintId] ?: return
-        with(blueprint) { Content(modifier) }
+        with(blueprint) { Content(modifier.sysuiResTag("keyguard_root_view")) }
     }
 }

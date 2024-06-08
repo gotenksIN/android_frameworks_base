@@ -41,8 +41,12 @@ import android.window.BackMotionEvent
 import android.window.BackNavigationInfo
 import android.window.BackProgressAnimator
 import android.window.IOnBackInvokedCallback
+import com.android.internal.dynamicanimation.animation.FloatValueHolder
+import com.android.internal.dynamicanimation.animation.SpringAnimation
+import com.android.internal.dynamicanimation.animation.SpringForce
 import com.android.internal.jank.Cuj
 import com.android.internal.policy.ScreenDecorationsUtils
+import com.android.internal.policy.SystemBarUtils
 import com.android.internal.protolog.common.ProtoLog
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
@@ -70,8 +74,10 @@ abstract class CrossActivityBackAnimation(
 
     protected val backAnimRect = Rect()
     private val cropRect = Rect()
+    private val tempRectF = RectF()
 
     private var cornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(context)
+    private var statusbarHeight = SystemBarUtils.getStatusBarHeight(context)
 
     private val backAnimationRunner =
         BackAnimationRunner(Callback(), Runner(), context, Cuj.CUJ_PREDICTIVE_BACK_CROSS_ACTIVITY)
@@ -83,7 +89,7 @@ abstract class CrossActivityBackAnimation(
     private var triggerBack = false
     private var finishCallback: IRemoteAnimationFinishedCallback? = null
     private val progressAnimator = BackProgressAnimator()
-    private val displayBoundsMargin =
+    protected val displayBoundsMargin =
         context.resources.getDimension(R.dimen.cross_task_back_vertical_margin)
 
     private val gestureInterpolator = Interpolators.BACK_GESTURE
@@ -98,6 +104,12 @@ abstract class CrossActivityBackAnimation(
     private var rightLetterboxLayer: SurfaceControl? = null
     private var letterboxColor: Int = 0
 
+    private val postCommitFlingScale = FloatValueHolder(SPRING_SCALE)
+    private var lastPostCommitFlingScale = SPRING_SCALE
+    private val postCommitFlingSpring = SpringForce(SPRING_SCALE)
+            .setStiffness(SpringForce.STIFFNESS_LOW)
+            .setDampingRatio(SpringForce.DAMPING_RATIO_LOW_BOUNCY)
+
     /** Background color to be used during the animation, also see [getBackgroundColor] */
     protected var customizedBackgroundColor = 0
 
@@ -107,10 +119,21 @@ abstract class CrossActivityBackAnimation(
     abstract val allowEnteringYShift: Boolean
 
     /**
+     * Subclasses must set the [startClosingRect] and [targetClosingRect] to define the movement
+     * of the closingTarget during pre-commit phase.
+     */
+    abstract fun preparePreCommitClosingRectMovement(@BackEvent.SwipeEdge swipeEdge: Int)
+
+    /**
      * Subclasses must set the [startEnteringRect] and [targetEnteringRect] to define the movement
      * of the enteringTarget during pre-commit phase.
      */
     abstract fun preparePreCommitEnteringRectMovement()
+
+    /**
+     * Subclasses must provide a duration (in ms) for the post-commit part of the animation
+     */
+    abstract fun getPostCommitAnimationDuration(): Long
 
     /**
      * Returns a base transformation to apply to the entering target during pre-commit. The system
@@ -121,6 +144,7 @@ abstract class CrossActivityBackAnimation(
 
     override fun onConfigurationChanged(newConfiguration: Configuration) {
         cornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(context)
+        statusbarHeight = SystemBarUtils.getStatusBarHeight(context)
     }
 
     override fun getRunner() = backAnimationRunner
@@ -160,24 +184,14 @@ abstract class CrossActivityBackAnimation(
         // Offset start rectangle to align task bounds.
         backAnimRect.offsetTo(0, 0)
 
-        startClosingRect.set(backAnimRect)
-
-        // scale closing target into the middle for rhs and to the right for lhs
-        targetClosingRect.set(startClosingRect)
-        targetClosingRect.scaleCentered(MAX_SCALE)
-        if (backMotionEvent.swipeEdge != BackEvent.EDGE_RIGHT) {
-            targetClosingRect.offset(
-                startClosingRect.right - targetClosingRect.right - displayBoundsMargin,
-                0f
-            )
-        }
-
+        preparePreCommitClosingRectMovement(backMotionEvent.swipeEdge)
         preparePreCommitEnteringRectMovement()
 
         background.ensureBackground(
             closingTarget!!.windowConfiguration.bounds,
             getBackgroundColor(),
-            transaction
+            transaction,
+            statusbarHeight
         )
         ensureScrimLayer()
         if (isLetterboxed && enteringHasSameLetterbox) {
@@ -198,7 +212,6 @@ abstract class CrossActivityBackAnimation(
 
     private fun onGestureProgress(backEvent: BackEvent) {
         val progress = gestureInterpolator.getInterpolation(backEvent.progress)
-        background.onBackProgressed(progress)
         currentClosingRect.setInterpolatedRectF(startClosingRect, targetClosingRect, progress)
         val yOffset = getYOffset(currentClosingRect, backEvent.touchY)
         currentClosingRect.offset(0f, yOffset)
@@ -213,6 +226,7 @@ abstract class CrossActivityBackAnimation(
             enteringTransformation
         )
         applyTransaction()
+        background.customizeStatusBarAppearance(currentClosingRect.top.toInt())
     }
 
     private fun getYOffset(centeredRect: RectF, touchY: Float): Float {
@@ -231,7 +245,7 @@ abstract class CrossActivityBackAnimation(
         return deltaY
     }
 
-    protected open fun onGestureCommitted() {
+    protected open fun onGestureCommitted(velocity: Float) {
         if (
             closingTarget?.leash == null ||
                 enteringTarget?.leash == null ||
@@ -242,7 +256,16 @@ abstract class CrossActivityBackAnimation(
             return
         }
 
-        val valueAnimator = ValueAnimator.ofFloat(1f, 0f).setDuration(POST_COMMIT_DURATION)
+        // kick off spring animation with the current velocity from the pre-commit phase, this
+        // affects the scaling of the closing activity during post-commit
+        val flingAnimation = SpringAnimation(postCommitFlingScale, SPRING_SCALE)
+            .setStartVelocity(min(0f, -velocity * SPRING_SCALE))
+            .setStartValue(SPRING_SCALE)
+            .setSpring(postCommitFlingSpring)
+        flingAnimation.start()
+
+        val valueAnimator =
+            ValueAnimator.ofFloat(1f, 0f).setDuration(getPostCommitAnimationDuration())
         valueAnimator.addUpdateListener { animation: ValueAnimator ->
             val progress = animation.animatedFraction
             onPostCommitProgress(progress)
@@ -291,6 +314,7 @@ abstract class CrossActivityBackAnimation(
         removeLetterbox()
         isLetterboxed = false
         enteringHasSameLetterbox = false
+        lastPostCommitFlingScale = SPRING_SCALE
     }
 
     protected fun applyTransform(
@@ -300,7 +324,15 @@ abstract class CrossActivityBackAnimation(
         baseTransformation: Transformation? = null
     ) {
         if (leash == null || !leash.isValid) return
-        val scale = rect.width() / backAnimRect.width()
+        tempRectF.set(rect)
+        if (leash == closingTarget?.leash) {
+            lastPostCommitFlingScale = (postCommitFlingScale.value / SPRING_SCALE).coerceIn(
+                    minimumValue = MAX_FLING_SCALE, maximumValue = lastPostCommitFlingScale
+            )
+            // apply an additional scale to the closing target to account for fling velocity
+            tempRectF.scaleCentered(lastPostCommitFlingScale)
+        }
+        val scale = tempRectF.width() / backAnimRect.width()
         val matrix = baseTransformation?.matrix ?: transformMatrix.apply { reset() }
         val scalePivotX =
             if (isLetterboxed && enteringHasSameLetterbox) {
@@ -309,7 +341,7 @@ abstract class CrossActivityBackAnimation(
                 0f
             }
         matrix.postScale(scale, scale, scalePivotX, 0f)
-        matrix.postTranslate(rect.left, rect.top)
+        matrix.postTranslate(tempRectF.left, tempRectF.top)
         transaction
             .setAlpha(leash, keepMinimumAlpha(alpha))
             .setMatrix(leash, matrix, tmpFloat9)
@@ -461,7 +493,7 @@ abstract class CrossActivityBackAnimation(
 
         override fun onBackInvoked() {
             progressAnimator.reset()
-            onGestureCommitted()
+            onGestureCommitted(progressAnimator.velocity)
         }
     }
 
@@ -496,7 +528,8 @@ abstract class CrossActivityBackAnimation(
         internal const val MAX_SCALE = 0.9f
         private const val MAX_SCRIM_ALPHA_DARK = 0.8f
         private const val MAX_SCRIM_ALPHA_LIGHT = 0.2f
-        private const val POST_COMMIT_DURATION = 300L
+        private const val SPRING_SCALE = 100f
+        private const val MAX_FLING_SCALE = 0.6f
     }
 }
 

@@ -65,6 +65,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.PermissionManuallyEnforced;
 import android.annotation.RequiresNoPermission;
+import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
@@ -697,7 +698,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
     /**
      * Returns the lock object for any synchronized test blocks.
-     * Should not be used outside of testing.
+     * External classes should only use for testing.
      * @return lock object.
      */
     @VisibleForTesting
@@ -801,7 +802,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
      *
      * @param packages list of packages that have stopped.
      * @param userState user state to be read & modified.
-     * @return {@code true} if a service was enabled or a button target was removed,
+     * @return {@code true} if the lists of enabled services or buttons were changed,
      * {@code false} otherwise.
      */
     @VisibleForTesting
@@ -824,6 +825,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     userState.getBindingServicesLocked().remove(comp);
                     userState.getCrashedServicesLocked().remove(comp);
                     enabledServicesChanged = true;
+                    break;
                 }
             }
         }
@@ -851,132 +853,15 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         return mPackageMonitor;
     }
 
+    @VisibleForTesting
+    void setPackageMonitor(PackageMonitor monitor) {
+        mPackageMonitor = monitor;
+    }
+
+    @SuppressLint("MissingPermission")
     private void registerBroadcastReceivers() {
-        mPackageMonitor = new PackageMonitor(true) {
-            @Override
-            public void onSomePackagesChanged() {
-                if (mTraceManager.isA11yTracingEnabledForTypes(FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
-                    mTraceManager.logTrace(LOG_TAG + ".PM.onSomePackagesChanged",
-                            FLAGS_PACKAGE_BROADCAST_RECEIVER);
-                }
-
-                final int userId = getChangingUserId();
-                List<AccessibilityServiceInfo> parsedAccessibilityServiceInfos = null;
-                List<AccessibilityShortcutInfo> parsedAccessibilityShortcutInfos = null;
-                parsedAccessibilityServiceInfos = parseAccessibilityServiceInfos(userId);
-                parsedAccessibilityShortcutInfos = parseAccessibilityShortcutInfos(userId);
-                synchronized (mLock) {
-                    // Only the profile parent can install accessibility services.
-                    // Therefore we ignore packages from linked profiles.
-                    if (userId != mCurrentUserId) {
-                        return;
-                    }
-                    onSomePackagesChangedLocked(parsedAccessibilityServiceInfos,
-                            parsedAccessibilityShortcutInfos);
-                }
-            }
-
-            @Override
-            public void onPackageUpdateFinished(String packageName, int uid) {
-                // The package should already be removed from mBoundServices, and added into
-                // mBindingServices in binderDied() during updating. Remove services from  this
-                // package from mBindingServices, and then update the user state to re-bind new
-                // versions of them.
-                if (mTraceManager.isA11yTracingEnabledForTypes(FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
-                    mTraceManager.logTrace(LOG_TAG + ".PM.onPackageUpdateFinished",
-                            FLAGS_PACKAGE_BROADCAST_RECEIVER,
-                            "packageName=" + packageName + ";uid=" + uid);
-                }
-                final int userId = getChangingUserId();
-                List<AccessibilityServiceInfo> parsedAccessibilityServiceInfos = null;
-                List<AccessibilityShortcutInfo> parsedAccessibilityShortcutInfos = null;
-                parsedAccessibilityServiceInfos = parseAccessibilityServiceInfos(userId);
-                parsedAccessibilityShortcutInfos = parseAccessibilityShortcutInfos(userId);
-                synchronized (mLock) {
-                    if (userId != mCurrentUserId) {
-                        return;
-                    }
-                    final AccessibilityUserState userState = getUserStateLocked(userId);
-                    final boolean reboundAService = userState.getBindingServicesLocked().removeIf(
-                            component -> component != null
-                                    && component.getPackageName().equals(packageName))
-                            || userState.mCrashedServices.removeIf(component -> component != null
-                                    && component.getPackageName().equals(packageName));
-                    // Reloads the installed services info to make sure the rebound service could
-                    // get a new one.
-                    userState.mInstalledServices.clear();
-                    final boolean configurationChanged;
-                    configurationChanged = readConfigurationForUserStateLocked(userState,
-                            parsedAccessibilityServiceInfos, parsedAccessibilityShortcutInfos);
-                    if (reboundAService || configurationChanged) {
-                        onUserStateChangedLocked(userState);
-                    }
-                    // Passing 0 for restoreFromSdkInt to have this migration check execute each
-                    // time. It can make sure a11y button settings are correctly if there's an a11y
-                    // service updated and modifies the a11y button configuration.
-                    migrateAccessibilityButtonSettingsIfNecessaryLocked(userState, packageName,
-                            /* restoreFromSdkInt = */0);
-                }
-            }
-
-            @Override
-            public void onPackageRemoved(String packageName, int uid) {
-                if (mTraceManager.isA11yTracingEnabledForTypes(FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
-                    mTraceManager.logTrace(LOG_TAG + ".PM.onPackageRemoved",
-                            FLAGS_PACKAGE_BROADCAST_RECEIVER,
-                            "packageName=" + packageName + ";uid=" + uid);
-                }
-
-                synchronized (mLock) {
-                    final int userId = getChangingUserId();
-                    // Only the profile parent can install accessibility services.
-                    // Therefore we ignore packages from linked profiles.
-                    if (userId != mCurrentUserId) {
-                        return;
-                    }
-                    onPackageRemovedLocked(packageName);
-                }
-            }
-
-            /**
-             * Handles instances in which a package or packages have forcibly stopped.
-             *
-             * @param intent intent containing package event information.
-             * @param uid linux process user id (different from Android user id).
-             * @param packages array of package names that have stopped.
-             * @param doit whether to try and handle the stop or just log the trace.
-             *
-             * @return {@code true} if package should be restarted, {@code false} otherwise.
-             */
-            @Override
-            public boolean onHandleForceStop(Intent intent, String[] packages,
-                    int uid, boolean doit) {
-                if (mTraceManager.isA11yTracingEnabledForTypes(FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
-                    mTraceManager.logTrace(LOG_TAG + ".PM.onHandleForceStop",
-                            FLAGS_PACKAGE_BROADCAST_RECEIVER,
-                            "intent=" + intent + ";packages=" + Arrays.toString(packages)
-                            + ";uid=" + uid + ";doit=" + doit);
-                }
-                synchronized (mLock) {
-                    final int userId = getChangingUserId();
-                    // Only the profile parent can install accessibility services.
-                    // Therefore we ignore packages from linked profiles.
-                    if (userId != mCurrentUserId) {
-                        return false;
-                    }
-                    final AccessibilityUserState userState = getUserStateLocked(userId);
-
-                    if (doit && onPackagesForceStoppedLocked(packages, userState)) {
-                        onUserStateChangedLocked(userState);
-                        return false;
-                    } else {
-                        return true;
-                    }
-                }
-            }
-        };
-
         // package changes
+        mPackageMonitor = new ManagerPackageMonitor(this);
         mPackageMonitor.register(mContext, null,  UserHandle.ALL, true);
 
         // user change and unlock
@@ -992,7 +877,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             @Override
             public void onReceive(Context context, Intent intent) {
                 if (mTraceManager.isA11yTracingEnabledForTypes(FLAGS_USER_BROADCAST_RECEIVER)) {
-                    mTraceManager.logTrace(LOG_TAG + ".BR.onReceive", FLAGS_USER_BROADCAST_RECEIVER,
+                    mTraceManager.logTrace(
+                            LOG_TAG + ".BR.onReceive",
+                            FLAGS_USER_BROADCAST_RECEIVER,
                             "context=" + context + ";intent=" + intent);
                 }
 
@@ -1005,33 +892,47 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     removeUser(intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0));
                 } else if (Intent.ACTION_SETTING_RESTORED.equals(action)) {
                     final String which = intent.getStringExtra(Intent.EXTRA_SETTING_NAME);
-                    if (Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES.equals(which)) {
-                        synchronized (mLock) {
-                            restoreEnabledAccessibilityServicesLocked(
-                                    intent.getStringExtra(Intent.EXTRA_SETTING_PREVIOUS_VALUE),
-                                    intent.getStringExtra(Intent.EXTRA_SETTING_NEW_VALUE),
-                                    intent.getIntExtra(Intent.EXTRA_SETTING_RESTORED_FROM_SDK_INT,
-                                            0));
+                    if (which == null) {
+                        return;
+                    }
+                    final String previousValue =
+                            intent.getStringExtra(Intent.EXTRA_SETTING_PREVIOUS_VALUE);
+                    final String newValue =
+                            intent.getStringExtra(Intent.EXTRA_SETTING_NEW_VALUE);
+                    final int restoredFromSdk =
+                            intent.getIntExtra(Intent.EXTRA_SETTING_RESTORED_FROM_SDK_INT, 0);
+                    switch (which) {
+                        case Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES -> {
+                            synchronized (mLock) {
+                                restoreEnabledAccessibilityServicesLocked(
+                                        previousValue, newValue, restoredFromSdk);
+                            }
                         }
-                    } else if (ACCESSIBILITY_DISPLAY_MAGNIFICATION_NAVBAR_ENABLED.equals(which)) {
-                        synchronized (mLock) {
-                            restoreLegacyDisplayMagnificationNavBarIfNeededLocked(
-                                    intent.getStringExtra(Intent.EXTRA_SETTING_NEW_VALUE),
-                                    intent.getIntExtra(Intent.EXTRA_SETTING_RESTORED_FROM_SDK_INT,
-                                            0));
+                        case ACCESSIBILITY_DISPLAY_MAGNIFICATION_NAVBAR_ENABLED -> {
+                            synchronized (mLock) {
+                                restoreLegacyDisplayMagnificationNavBarIfNeededLocked(
+                                        newValue, restoredFromSdk);
+                            }
                         }
-                    } else if (Settings.Secure.ACCESSIBILITY_BUTTON_TARGETS.equals(which)) {
-                        synchronized (mLock) {
-                            restoreAccessibilityButtonTargetsLocked(
-                                    intent.getStringExtra(Intent.EXTRA_SETTING_PREVIOUS_VALUE),
-                                    intent.getStringExtra(Intent.EXTRA_SETTING_NEW_VALUE));
+                        case Settings.Secure.ACCESSIBILITY_BUTTON_TARGETS -> {
+                            synchronized (mLock) {
+                                restoreAccessibilityButtonTargetsLocked(
+                                        previousValue, newValue);
+                            }
                         }
-                    } else if (Settings.Secure.ACCESSIBILITY_QS_TARGETS.equals(which)) {
-                        if (!android.view.accessibility.Flags.a11yQsShortcut()) {
-                            return;
+                        case Settings.Secure.ACCESSIBILITY_QS_TARGETS -> {
+                            if (!android.view.accessibility.Flags.a11yQsShortcut()) {
+                                return;
+                            }
+                            restoreAccessibilityQsTargets(newValue);
                         }
-                        restoreAccessibilityQsTargets(
-                                intent.getStringExtra(Intent.EXTRA_SETTING_NEW_VALUE));
+                        case Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE -> {
+                            if (!android.view.accessibility.Flags
+                                    .restoreA11yShortcutTargetService()) {
+                                return;
+                            }
+                            restoreAccessibilityShortcutTargetService(previousValue, newValue);
+                        }
                     }
                 }
             }
@@ -1045,7 +946,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 setNonA11yToolNotificationToMatchSafetyCenter();
             }
         };
-        mContext.registerReceiverAsUser(receiver, UserHandle.ALL, filter, null, mMainHandler,
+        mContext.registerReceiverAsUser(
+                receiver, UserHandle.ALL, filter, null, mMainHandler,
                 Context.RECEIVER_EXPORTED);
 
         if (!android.companion.virtual.flags.Flags.vdmPublicApis()) {
@@ -2193,6 +2095,65 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         }
     }
 
+    /**
+     * Merges the old and restored value of
+     * {@link Settings.Secure#ACCESSIBILITY_SHORTCUT_TARGET_SERVICE}.
+     *
+     * <p>Also clears out {@link R.string#config_defaultAccessibilityService} from
+     * the merged set if it was not present before restoring.
+     */
+    private void restoreAccessibilityShortcutTargetService(
+            String oldValue, String restoredValue) {
+        final Set<String> targetsFromSetting = new ArraySet<>();
+        readColonDelimitedStringToSet(oldValue, str -> str,
+                targetsFromSetting, /*doMerge=*/false);
+        final String defaultService =
+                mContext.getString(R.string.config_defaultAccessibilityService);
+        final ComponentName defaultServiceComponent = TextUtils.isEmpty(defaultService)
+                ? null : ComponentName.unflattenFromString(defaultService);
+        boolean shouldClearDefaultService = defaultServiceComponent != null
+                && !stringSetContainsComponentName(targetsFromSetting, defaultServiceComponent);
+        readColonDelimitedStringToSet(restoredValue, str -> str,
+                targetsFromSetting, /*doMerge=*/true);
+        if (Flags.clearDefaultFromA11yShortcutTargetServiceRestore()) {
+            if (shouldClearDefaultService && stringSetContainsComponentName(
+                    targetsFromSetting, defaultServiceComponent)) {
+                Slog.i(LOG_TAG, "Removing default service " + defaultService
+                        + " from restore of "
+                        + Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE);
+                targetsFromSetting.removeIf(str ->
+                        defaultServiceComponent.equals(ComponentName.unflattenFromString(str)));
+            }
+            if (targetsFromSetting.isEmpty()) {
+                return;
+            }
+        }
+        synchronized (mLock) {
+            final AccessibilityUserState userState = getUserStateLocked(UserHandle.USER_SYSTEM);
+            final Set<String> shortcutTargets =
+                    userState.getShortcutTargetsLocked(UserShortcutType.HARDWARE);
+            shortcutTargets.clear();
+            shortcutTargets.addAll(targetsFromSetting);
+            persistColonDelimitedSetToSettingLocked(
+                    Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE,
+                    UserHandle.USER_SYSTEM, targetsFromSetting, str -> str);
+            scheduleNotifyClientsOfServicesStateChangeLocked(userState);
+            onUserStateChangedLocked(userState);
+        }
+    }
+
+    /**
+     * Returns {@code true} if the set contains the provided non-null {@link ComponentName}.
+     *
+     * <p>This ignores values in the set that are not valid {@link ComponentName}s.
+     */
+    private boolean stringSetContainsComponentName(Set<String> set,
+            @NonNull ComponentName componentName) {
+        return componentName != null && set.stream()
+                .map(ComponentName::unflattenFromString)
+                .anyMatch(componentName::equals);
+    }
+
     private int getClientStateLocked(AccessibilityUserState userState) {
         return userState.getClientStateLocked(
             mUiAutomationManager.canIntrospect(),
@@ -2719,12 +2680,35 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             }
             builder.append(str);
         }
+        final String builderValue = builder.toString();
+        final String settingValue = TextUtils.isEmpty(builderValue)
+                ? defaultEmptyString : builderValue;
+        if (android.view.accessibility.Flags.restoreA11yShortcutTargetService()) {
+            final String currentValue = Settings.Secure.getStringForUser(
+                    mContext.getContentResolver(), settingName, userId);
+            if (Objects.equals(settingValue, currentValue)) {
+                // This logic exists to fix a bug where AccessibilityManagerService was writing
+                // `null` to the ACCESSIBILITY_SHORTCUT_TARGET_SERVICE setting during early boot
+                // during setup, due to a race condition in package scanning making A11yMS think
+                // that the default service was not installed.
+                //
+                // Writing `null` was implicitly causing that Setting to have the default
+                // `DEFAULT_OVERRIDEABLE_BY_RESTORE` property, which was preventing B&R for that
+                // Setting altogether.
+                //
+                // The "quick fix" here is to not write `null` if the existing value is already
+                // `null`. The ideal fix would be use the Settings.Secure#putStringForUser overload
+                // that allows override-by-restore, but the full repercussions of using that here
+                // have not yet been evaluated.
+                // TODO: b/333457719 - Evaluate and fix AccessibilityManagerService's usage of
+                //  "overridable by restore" when writing secure settings.
+                return;
+            }
+        }
         final long identity = Binder.clearCallingIdentity();
         try {
-            final String settingValue = builder.toString();
             Settings.Secure.putStringForUser(mContext.getContentResolver(),
-                    settingName,
-                    TextUtils.isEmpty(settingValue) ? defaultEmptyString : settingValue, userId);
+                    settingName, settingValue, userId);
         } finally {
             Binder.restoreCallingIdentity(identity);
         }
@@ -4371,7 +4355,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 );
 
         if (!targetWithNoTile.isEmpty()) {
-            throw new IllegalArgumentException(
+            Slog.e(LOG_TAG,
                     "Unable to add/remove Tiles for a11y features: " + targetWithNoTile
                             + "as the Tiles aren't provided");
         }
@@ -6220,6 +6204,169 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         private int getWindowId() {
             return mWindowId;
+        }
+    }
+
+    @VisibleForTesting
+    public static class ManagerPackageMonitor extends PackageMonitor {
+        private final AccessibilityManagerService mManagerService;
+        public ManagerPackageMonitor(AccessibilityManagerService managerService) {
+            super(/* supportsPackageRestartQuery = */ true);
+            mManagerService = managerService;
+        }
+
+        @Override
+        public void onSomePackagesChanged() {
+            if (mManagerService.mTraceManager.isA11yTracingEnabledForTypes(
+                    FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
+                mManagerService.mTraceManager.logTrace(LOG_TAG + ".PM.onSomePackagesChanged",
+                        FLAGS_PACKAGE_BROADCAST_RECEIVER);
+            }
+
+            final int userId = getChangingUserId();
+            List<AccessibilityServiceInfo> parsedAccessibilityServiceInfos = mManagerService
+                    .parseAccessibilityServiceInfos(userId);
+            List<AccessibilityShortcutInfo> parsedAccessibilityShortcutInfos = mManagerService
+                    .parseAccessibilityShortcutInfos(userId);
+            synchronized (mManagerService.getLock()) {
+                // Only the profile parent can install accessibility services.
+                // Therefore we ignore packages from linked profiles.
+                if (userId != mManagerService.getCurrentUserIdLocked()) {
+                    return;
+                }
+                mManagerService.onSomePackagesChangedLocked(parsedAccessibilityServiceInfos,
+                        parsedAccessibilityShortcutInfos);
+            }
+        }
+
+        @Override
+        public void onPackageUpdateFinished(String packageName, int uid) {
+            // The package should already be removed from mBoundServices, and added into
+            // mBindingServices in binderDied() during updating. Remove services from  this
+            // package from mBindingServices, and then update the user state to re-bind new
+            // versions of them.
+            if (mManagerService.mTraceManager.isA11yTracingEnabledForTypes(
+                    FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
+                mManagerService.mTraceManager.logTrace(
+                        LOG_TAG + ".PM.onPackageUpdateFinished",
+                        FLAGS_PACKAGE_BROADCAST_RECEIVER,
+                        "packageName=" + packageName + ";uid=" + uid);
+            }
+            final int userId = getChangingUserId();
+            List<AccessibilityServiceInfo> parsedAccessibilityServiceInfos = mManagerService
+                    .parseAccessibilityServiceInfos(userId);
+            List<AccessibilityShortcutInfo> parsedAccessibilityShortcutInfos =
+                    mManagerService.parseAccessibilityShortcutInfos(userId);
+            synchronized (mManagerService.getLock()) {
+                if (userId != mManagerService.getCurrentUserIdLocked()) {
+                    return;
+                }
+                final AccessibilityUserState userState = mManagerService.getUserStateLocked(userId);
+                final boolean reboundAService = userState.getBindingServicesLocked().removeIf(
+                        component -> component != null
+                                && component.getPackageName().equals(packageName))
+                        || userState.mCrashedServices.removeIf(component -> component != null
+                        && component.getPackageName().equals(packageName));
+                // Reloads the installed services info to make sure the rebound service could
+                // get a new one.
+                userState.mInstalledServices.clear();
+                final boolean configurationChanged;
+                configurationChanged = mManagerService.readConfigurationForUserStateLocked(
+                        userState, parsedAccessibilityServiceInfos,
+                        parsedAccessibilityShortcutInfos);
+                if (reboundAService || configurationChanged) {
+                    mManagerService.onUserStateChangedLocked(userState);
+                }
+                // Passing 0 for restoreFromSdkInt to have this migration check execute each
+                // time. It can make sure a11y button settings are correctly if there's an a11y
+                // service updated and modifies the a11y button configuration.
+                mManagerService.migrateAccessibilityButtonSettingsIfNecessaryLocked(
+                        userState, packageName, /* restoreFromSdkInt = */0);
+            }
+        }
+
+        @Override
+        public void onPackageRemoved(String packageName, int uid) {
+            if (mManagerService.mTraceManager.isA11yTracingEnabledForTypes(
+                    FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
+                mManagerService.mTraceManager.logTrace(LOG_TAG + ".PM.onPackageRemoved",
+                        FLAGS_PACKAGE_BROADCAST_RECEIVER,
+                        "packageName=" + packageName + ";uid=" + uid);
+            }
+
+            synchronized (mManagerService.getLock()) {
+                final int userId = getChangingUserId();
+                // Only the profile parent can install accessibility services.
+                // Therefore we ignore packages from linked profiles.
+                if (userId != mManagerService.getCurrentUserIdLocked()) {
+                    return;
+                }
+                mManagerService.onPackageRemovedLocked(packageName);
+            }
+        }
+
+        /**
+         * Handles instances in which a package or packages have forcibly stopped.
+         *
+         * @param intent intent containing package event information.
+         * @param uid linux process user id (different from Android user id).
+         * @param packages array of package names that have stopped.
+         * @param doit whether to try and handle the stop or just log the trace.
+         *
+         * @return {@code true} if doit == {@code false}
+         * and at least one of the provided packages is enabled.
+         * In any other case, returns {@code false}.
+         * This is to indicate whether further action is necessary.
+         */
+        @Override
+        public boolean onHandleForceStop(Intent intent, String[] packages,
+                int uid, boolean doit) {
+            if (mManagerService.mTraceManager.isA11yTracingEnabledForTypes(
+                    FLAGS_PACKAGE_BROADCAST_RECEIVER)) {
+                mManagerService.mTraceManager.logTrace(LOG_TAG + ".PM.onHandleForceStop",
+                        FLAGS_PACKAGE_BROADCAST_RECEIVER,
+                        "intent=" + intent + ";packages=" + Arrays.toString(packages)
+                                + ";uid=" + uid + ";doit=" + doit);
+            }
+            synchronized (mManagerService.getLock()) {
+                final int userId = getChangingUserId();
+                // Only the profile parent can install accessibility services.
+                // Therefore we ignore packages from linked profiles.
+                if (userId != mManagerService.getCurrentUserIdLocked()) {
+                    return false;
+                }
+                final AccessibilityUserState userState = mManagerService.getUserStateLocked(userId);
+
+                if (Flags.managerPackageMonitorLogicFix()) {
+                    if (!doit) {
+                        // if we're not handling the stop here, then we only need to know
+                        // if any of the force-stopped packages are currently enabled.
+                        return userState.mEnabledServices.stream().anyMatch(
+                                (comp) -> Arrays.stream(packages).anyMatch(
+                                        (pkg) -> pkg.equals(comp.getPackageName()))
+                        );
+                    } else if (mManagerService.onPackagesForceStoppedLocked(packages, userState)) {
+                        mManagerService.onUserStateChangedLocked(userState);
+                    }
+                    return false;
+                } else {
+                    // this old logic did not properly indicate when base packageMonitor's routine
+                    // should handle stopping the package.
+                    if (doit && mManagerService.onPackagesForceStoppedLocked(packages, userState)) {
+                        mManagerService.onUserStateChangedLocked(userState);
+                        return false;
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        @Override
+        public boolean onPackageChanged(String packageName, int uid, String[] components) {
+            // We care about all package changes, not just the whole package itself which is
+            // default behavior.
+            return true;
         }
     }
 

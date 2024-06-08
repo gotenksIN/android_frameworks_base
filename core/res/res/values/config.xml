@@ -1193,13 +1193,14 @@
     <!-- Allows activities to be launched on a long press on power during device setup. -->
     <bool name="config_allowStartActivityForLongPressOnPowerInSetup">false</bool>
 
-    <!-- Control the behavior when the user short presses the settings button.
-            0 - Nothing
+    <!-- Control the behavior when the user presses the settings button.
+            0 - Launch Settings activity
             1 - Launch notification panel
+            2 - Nothing
          This needs to match the constants in
          com/android/server/policy/PhoneWindowManager.java
     -->
-    <integer name="config_shortPressOnSettingsBehavior">0</integer>
+    <integer name="config_settingsKeyBehavior">0</integer>
 
     <!-- Control the behavior when the user short presses the power button.
             0 - Nothing
@@ -4205,13 +4206,6 @@
          automatically try to pair with it when the device exits tablet mode. -->
     <string translatable="false" name="config_packagedKeyboardName"></string>
 
-    <!-- The device supports freeform window management. Windows have title bars and can be moved
-         and resized. If you set this to true, you also need to add
-         PackageManager.FEATURE_FREEFORM_WINDOW_MANAGEMENT feature to your device specification.
-         The duplication is necessary, because this information is used before the features are
-         available to the system.-->
-    <bool name="config_freeformWindowManagement">false</bool>
-
     <!-- If set, this will force all windows to draw the status bar background, including the apps
          that have not requested doing so (via the WindowManager.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
          flag). -->
@@ -4729,6 +4723,8 @@
     <!-- The broadcast intent name for notifying when the on-device model has been unloaded  -->
     <string name="config_onDeviceIntelligenceModelUnloadedBroadcastKey" translatable="false"></string>
 
+    <!-- The DeviceConfig namespace for the default system on-device sandboxed inference service. -->
+    <string name="config_defaultOnDeviceIntelligenceDeviceConfigNamespace" translatable="false"></string>
 
     <!-- Component name that accepts ACTION_SEND intents for requesting ambient context consent for
          wearable sensing. -->
@@ -6974,9 +6970,6 @@
         "stopped" during initial boot of a device, or after an OTA update. Stopped state of
         an app is not changed during subsequent reboots.  -->
     <bool name="config_stopSystemPackagesByDefault">true</bool>
-
-    <!-- Whether to show weather on the lock screen by default. -->
-    <bool name="config_lockscreenWeatherEnabledByDefault">false</bool>
 
     <!-- Whether we should persist the brightness value in nits for the default display even if
          the underlying display device changes. -->

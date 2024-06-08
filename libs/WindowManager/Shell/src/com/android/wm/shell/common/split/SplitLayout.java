@@ -496,10 +496,10 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
      * Updates bounds with the passing position. Usually used to update recording bounds while
      * performing animation or dragging divider bar to resize the splits.
      */
-    void updateDividerBounds(int position) {
+    void updateDividerBounds(int position, boolean shouldUseParallaxEffect) {
         updateBounds(position);
         mSplitLayoutHandler.onLayoutSizeChanging(this, mSurfaceEffectPolicy.mParallaxOffset.x,
-                mSurfaceEffectPolicy.mParallaxOffset.y);
+                mSurfaceEffectPolicy.mParallaxOffset.y, shouldUseParallaxEffect);
     }
 
     void setDividerPosition(int position, boolean applyLayoutChange) {
@@ -620,10 +620,15 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
     }
 
     /** Fling divider from current position to center position. */
-    public void flingDividerToCenter() {
+    public void flingDividerToCenter(@Nullable Runnable finishCallback) {
         final int pos = mDividerSnapAlgorithm.getMiddleTarget().position;
         flingDividerPosition(getDividerPosition(), pos, FLING_ENTER_DURATION,
-                () -> setDividerPosition(pos, true /* applyLayoutChange */));
+                () -> {
+                    setDividerPosition(pos, true /* applyLayoutChange */);
+                    if (finishCallback != null) {
+                        finishCallback.run();
+                    }
+                });
     }
 
     @VisibleForTesting
@@ -647,7 +652,9 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
                 .setDuration(duration);
         mDividerFlingAnimator.setInterpolator(Interpolators.FAST_OUT_SLOW_IN);
         mDividerFlingAnimator.addUpdateListener(
-                animation -> updateDividerBounds((int) animation.getAnimatedValue()));
+                animation -> updateDividerBounds(
+                        (int) animation.getAnimatedValue(), false /* shouldUseParallaxEffect */)
+        );
         mDividerFlingAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
@@ -897,7 +904,8 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
          * @see #applySurfaceChanges(SurfaceControl.Transaction, SurfaceControl, SurfaceControl,
          * SurfaceControl, SurfaceControl, boolean)
          */
-        void onLayoutSizeChanging(SplitLayout layout, int offsetX, int offsetY);
+        void onLayoutSizeChanging(SplitLayout layout, int offsetX, int offsetY,
+                boolean shouldUseParallaxEffect);
 
         /**
          * Calls when finish resizing the split bounds.

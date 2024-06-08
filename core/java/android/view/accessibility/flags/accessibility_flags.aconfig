@@ -124,6 +124,7 @@ flag {
     namespace: "accessibility"
     name: "add_type_window_control"
     is_exported: true
+    is_fixed_read_only: true
     description: "adds new TYPE_WINDOW_CONTROL to AccessibilityWindowInfo for detecting Window Decorations"
     bug: "320445550"
 }
@@ -147,6 +148,16 @@ flag {
     namespace: "accessibility"
     description: "Clear pending messages and callbacks of the handler in AccessibilityInteractionController when the ViewRootImpl is detached from Window to prevent leaking ViewRootImpl"
     bug: "320701910"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "restore_a11y_shortcut_target_service"
+    namespace: "accessibility"
+    description: "Perform merging and other bug fixes for SettingsProvider restore of ACCESSIBILITY_SHORTCUT_TARGET_SERVICES secure setting"
+    bug: "341374402"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

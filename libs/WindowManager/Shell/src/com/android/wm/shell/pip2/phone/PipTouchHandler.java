@@ -64,6 +64,7 @@ import com.android.wm.shell.common.pip.PipUtils;
 import com.android.wm.shell.common.pip.SizeSpecSource;
 import com.android.wm.shell.pip.PipAnimationController;
 import com.android.wm.shell.pip.PipTransitionController;
+import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellInit;
 
 import java.io.PrintWriter;
@@ -73,7 +74,7 @@ import java.util.Optional;
  * Manages all the touch handling for PIP on the Phone, including moving, dismissing and expanding
  * the PIP.
  */
-public class PipTouchHandler {
+public class PipTouchHandler implements PipTransitionState.PipTransitionStateChangedListener {
 
     private static final String TAG = "PipTouchHandler";
     private static final float DEFAULT_STASH_VELOCITY_THRESHOLD = 18000.f;
@@ -81,9 +82,11 @@ public class PipTouchHandler {
     // Allow PIP to resize to a slightly bigger state upon touch
     private boolean mEnableResize;
     private final Context mContext;
+    private final ShellCommandHandler mShellCommandHandler;
     private final PipBoundsAlgorithm mPipBoundsAlgorithm;
     @NonNull private final PipBoundsState mPipBoundsState;
     @NonNull private final PipTransitionState mPipTransitionState;
+    @NonNull private final PipScheduler mPipScheduler;
     @NonNull private final SizeSpecSource mSizeSpecSource;
     private final PipUiEventLogger mPipUiEventLogger;
     private final PipDismissTargetHandler mPipDismissTargetHandler;
@@ -169,10 +172,12 @@ public class PipTouchHandler {
     @SuppressLint("InflateParams")
     public PipTouchHandler(Context context,
             ShellInit shellInit,
+            ShellCommandHandler shellCommandHandler,
             PhonePipMenuController menuController,
             PipBoundsAlgorithm pipBoundsAlgorithm,
             @NonNull PipBoundsState pipBoundsState,
             @NonNull PipTransitionState pipTransitionState,
+            @NonNull PipScheduler pipScheduler,
             @NonNull SizeSpecSource sizeSpecSource,
             PipMotionHelper pipMotionHelper,
             FloatingContentCoordinator floatingContentCoordinator,
@@ -180,6 +185,7 @@ public class PipTouchHandler {
             ShellExecutor mainExecutor,
             Optional<PipPerfHintController> pipPerfHintControllerOptional) {
         mContext = context;
+        mShellCommandHandler = shellCommandHandler;
         mMainExecutor = mainExecutor;
         mPipPerfHintController = pipPerfHintControllerOptional.orElse(null);
         mAccessibilityManager = context.getSystemService(AccessibilityManager.class);
@@ -188,6 +194,7 @@ public class PipTouchHandler {
 
         mPipTransitionState = pipTransitionState;
         mPipTransitionState.addPipTransitionStateChangedListener(this::onPipTransitionStateChanged);
+        mPipScheduler = pipScheduler;
         mSizeSpecSource = sizeSpecSource;
         mMenuController = menuController;
         mPipUiEventLogger = pipUiEventLogger;
@@ -213,10 +220,10 @@ public class PipTouchHandler {
                 },
                 menuController::hideMenu,
                 mainExecutor);
-        mPipResizeGestureHandler =
-                new PipResizeGestureHandler(context, pipBoundsAlgorithm, pipBoundsState,
-                        mTouchState, this::updateMovementBounds, pipUiEventLogger,
-                        menuController, mainExecutor, mPipPerfHintController);
+        mPipResizeGestureHandler = new PipResizeGestureHandler(context, pipBoundsAlgorithm,
+                pipBoundsState, mTouchState, mPipScheduler, mPipTransitionState,
+                this::updateMovementBounds, pipUiEventLogger, menuController, mainExecutor,
+                mPipPerfHintController);
         mPipBoundsState.addOnAspectRatioChangedCallback(this::updateMinMaxSize);
 
         if (PipUtils.isPip2ExperimentEnabled()) {
@@ -232,6 +239,7 @@ public class PipTouchHandler {
         mEnableResize = res.getBoolean(R.bool.config_pipEnableResizeForMenu);
         reloadResources();
 
+        mShellCommandHandler.addDumpCallback(this::dump, this);
         mMotionHelper.init();
         mPipResizeGestureHandler.init();
         mPipDismissTargetHandler.init();
@@ -1075,7 +1083,8 @@ public class PipTouchHandler {
         mPipResizeGestureHandler.setOhmOffset(offset);
     }
 
-    private void onPipTransitionStateChanged(@PipTransitionState.TransitionState int oldState,
+    @Override
+    public void onPipTransitionStateChanged(@PipTransitionState.TransitionState int oldState,
             @PipTransitionState.TransitionState int newState,
             @Nullable Bundle extra) {
         switch (newState) {

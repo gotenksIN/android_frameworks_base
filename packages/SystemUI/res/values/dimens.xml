@@ -449,8 +449,12 @@
     <dimen name="overlay_preview_container_margin">8dp</dimen>
     <dimen name="overlay_action_container_margin_horizontal">8dp</dimen>
     <dimen name="overlay_action_container_margin_bottom">6dp</dimen>
-    <!-- minimum distance to the left, right or bottom edges. -->
+    <!--
+        minimum distance to the left, right or bottom edges. Keep in sync with
+        negative_overlay_action_container_minimum_edge_spacing. -->
     <dimen name="overlay_action_container_minimum_edge_spacing">12dp</dimen>
+    <!-- Keep in sync with overlay_action_container_minimum_edge_spacing -->
+    <dimen name="negative_overlay_action_container_minimum_edge_spacing">-12dp</dimen>
     <dimen name="overlay_bg_protection_height">242dp</dimen>
     <dimen name="overlay_action_container_corner_radius">20dp</dimen>
     <dimen name="overlay_action_container_padding_vertical">8dp</dimen>
@@ -912,10 +916,6 @@
         Larger than the 16dp Launcher uses, to ensure consistency on the hub, where it's much more
         obvious when corner radii differ.-->
     <dimen name="communal_enforced_rounded_corner_max_radius">28dp</dimen>
-
-    <!-- Width and height used to filter widgets displayed in the communal widget picker -->
-    <dimen name="communal_widget_picker_desired_width">360dp</dimen>
-    <dimen name="communal_widget_picker_desired_height">240dp</dimen>
 
     <!-- The width/height of the unlock icon view on keyguard. -->
     <dimen name="keyguard_lock_height">42dp</dimen>
@@ -1772,12 +1772,15 @@
     <dimen name="bluetooth_dialog_scroll_view_min_height_with_auto_on">350dp</dimen>
 
     <!-- Hearing devices dialog related dimensions -->
+    <dimen name="hearing_devices_layout_margin">12dp</dimen>
     <dimen name="hearing_devices_preset_spinner_height">72dp</dimen>
-    <dimen name="hearing_devices_preset_spinner_margin">24dp</dimen>
     <dimen name="hearing_devices_preset_spinner_text_padding_start">20dp</dimen>
-    <dimen name="hearing_devices_preset_spinner_text_padding_end">80dp</dimen>
+    <dimen name="hearing_devices_preset_spinner_text_padding_vertical">15dp</dimen>
     <dimen name="hearing_devices_preset_spinner_arrow_size">24dp</dimen>
     <dimen name="hearing_devices_preset_spinner_background_radius">28dp</dimen>
+    <dimen name="hearing_devices_tool_icon_frame_width">94dp</dimen>
+    <dimen name="hearing_devices_tool_icon_frame_height">64dp</dimen>
+    <dimen name="hearing_devices_tool_icon_size">28dp</dimen>
 
     <!-- Height percentage of the parent container occupied by the communal view -->
     <item name="communal_source_height_percentage" format="float" type="dimen">0.80</item>
@@ -1962,15 +1965,6 @@
     <dimen name="broadcast_dialog_btn_text_size">16sp</dimen>
     <dimen name="broadcast_dialog_btn_minHeight">44dp</dimen>
     <dimen name="broadcast_dialog_margin">16dp</dimen>
-
-    <!-- Contrast dialog -->
-    <dimen name="contrast_dialog_button_total_size">90dp</dimen>
-    <dimen name="contrast_dialog_button_inner_size">82dp</dimen>
-    <dimen name="contrast_dialog_button_radius">20dp</dimen>
-    <dimen name="contrast_dialog_button_stroke_width">4dp</dimen>
-    <dimen name="contrast_dialog_button_text_size">14sp</dimen>
-    <dimen name="contrast_dialog_button_text_spacing">4dp</dimen>
-    <dimen name="contrast_dialog_button_horizontal_spacing">16dp</dimen>
 
     <!-- Shadow for dream overlay clock complication -->
     <dimen name="dream_overlay_clock_key_text_shadow_dx">0dp</dimen>

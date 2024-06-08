@@ -530,6 +530,13 @@
     <!-- Shows up as the reason for the work profile deletion when the admin of an organization-owend device relinquishes it. [CHAR LIMIT=NONE] -->
     <string name="device_ownership_relinquished">Admin relinquished device for personal use</string>
 
+    <!-- Private space deleted by IT admin notification--> <skip />
+    <!-- Shows up in the notification's title when the system deletes the private space due to admin policy. [CHAR LIMIT=NONE] -->
+    <string name="private_space_deleted_by_admin">Private space removed</string>
+    <!-- Content text for an expanded notification. The Title of the notification is "Private space removed".
+        This further explains that the private space is deleted by the system as a result of the current admin policy. [CHAR LIMIT=NONE]-->
+    <string name="private_space_deleted_by_admin_details">Your organisation does not allow private spaces on this managed device.</string>
+
     <!-- Content title for a notification. This notification indicates that the device is managed
          and network logging was activated by a device owner. [CHAR LIMIT=NONE]-->
     <string name="network_logging_notification_title">Device is managed</string>
@@ -5986,8 +5993,6 @@
     <string name="accessibility_system_action_dpad_right_label">Dpad Right</string>
     <!-- Label for Dpad center action [CHAR LIMIT=NONE] -->
     <string name="accessibility_system_action_dpad_center_label">Dpad Center</string>
-    <!-- Accessibility description of caption view -->
-    <string name="accessibility_freeform_caption">Caption bar of <xliff:g id="app_name">%1$s</xliff:g>.</string>
 
     <!-- Text to tell the user that a package has been forced by themselves in the RESTRICTED bucket. [CHAR LIMIT=NONE] -->
     <string name="as_app_forced_to_restricted_bucket">
@@ -6493,9 +6498,9 @@ ul.</string>
     <!-- Fingerprint dangling notification title -->
     <string name="fingerprint_dangling_notification_title">Set up Fingerprint Unlock again</string>
     <!-- Fingerprint dangling notification content for only 1 fingerprint deleted -->
-    <string name="fingerprint_dangling_notification_msg_1"><xliff:g id="fingerprint">%s</xliff:g> wasn\'t working well and was deleted to improve performance</string>
+    <string name="fingerprint_dangling_notification_msg_1"><xliff:g id="fingerprint">%s</xliff:g> wasn\'t working well and was deleted</string>
     <!-- Fingerprint dangling notification content for more than 1 fingerprints deleted -->
-    <string name="fingerprint_dangling_notification_msg_2"><xliff:g id="fingerprint">%1$s</xliff:g> and <xliff:g id="fingerprint">%2$s</xliff:g> weren\'t working well and were deleted to improve performance</string>
+    <string name="fingerprint_dangling_notification_msg_2"><xliff:g id="fingerprint">%1$s</xliff:g> and <xliff:g id="fingerprint">%2$s</xliff:g> weren\'t working well and were deleted</string>
     <!-- Fingerprint dangling notification content for only 1 fingerprint deleted and no fingerprint left-->
     <string name="fingerprint_dangling_notification_msg_all_deleted_1"><xliff:g id="fingerprint">%s</xliff:g> wasn\'t working well and was deleted. Set it up again to unlock your phone with fingerprint.</string>
     <!-- Fingerprint dangling notification content for more than 1 fingerprints deleted and no fingerprint left  -->

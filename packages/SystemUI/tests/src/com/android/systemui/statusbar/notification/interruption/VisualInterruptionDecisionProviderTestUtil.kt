@@ -15,11 +15,11 @@
  */
 package com.android.systemui.statusbar.notification.interruption
 
+import android.content.pm.PackageManager
 import android.hardware.display.AmbientDisplayConfiguration
 import android.os.Handler
 import android.os.PowerManager
 import com.android.internal.logging.UiEventLogger
-import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.settings.UserTracker
@@ -32,6 +32,8 @@ import com.android.systemui.util.EventLog
 import com.android.systemui.util.settings.GlobalSettings
 import com.android.systemui.util.settings.SystemSettings
 import com.android.systemui.util.time.SystemClock
+import com.android.wm.shell.bubbles.Bubbles
+import java.util.Optional
 
 object VisualInterruptionDecisionProviderTestUtil {
     fun createProviderByFlag(
@@ -53,7 +55,9 @@ object VisualInterruptionDecisionProviderTestUtil {
         uiEventLogger: UiEventLogger,
         userTracker: UserTracker,
         avalancheProvider: AvalancheProvider,
-        systemSettings: SystemSettings
+        systemSettings: SystemSettings,
+        packageManager: PackageManager,
+        bubbles: Optional<Bubbles>,
     ): VisualInterruptionDecisionProvider {
         return if (VisualInterruptionRefactor.isEnabled) {
             VisualInterruptionDecisionProviderImpl(
@@ -73,7 +77,9 @@ object VisualInterruptionDecisionProviderTestUtil {
                 uiEventLogger,
                 userTracker,
                 avalancheProvider,
-                systemSettings
+                systemSettings,
+                packageManager,
+                bubbles
             )
         } else {
             NotificationInterruptStateProviderWrapper(
@@ -93,7 +99,8 @@ object VisualInterruptionDecisionProviderTestUtil {
                     deviceProvisionedController,
                     systemClock,
                     globalSettings,
-                    eventLog
+                    eventLog,
+                    bubbles
                 )
             )
         }

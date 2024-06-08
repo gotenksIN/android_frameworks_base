@@ -96,6 +96,7 @@ import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 
 private const val USER_ID = 4
+private const val REQUEST_ID = 4L
 private const val CHALLENGE = 2L
 private const val DELAY = 1000L
 private const val OP_PACKAGE_NAME = "biometric.testapp"
@@ -382,25 +383,11 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
             }
 
             if (testCase.isFaceOnly) {
-                val shouldRepeatAnimation by collectLastValue(iconViewModel.shouldRepeatAnimation)
-                val shouldPulseAnimation by collectLastValue(iconViewModel.shouldPulseAnimation)
-                val lastPulseLightToDark by collectLastValue(iconViewModel.lastPulseLightToDark)
-
-                val expectedIconAsset =
-                    if (shouldPulseAnimation!!) {
-                        if (lastPulseLightToDark!!) {
-                            R.drawable.face_dialog_pulse_dark_to_light
-                        } else {
-                            R.drawable.face_dialog_pulse_light_to_dark
-                        }
-                    } else {
-                        R.drawable.face_dialog_pulse_dark_to_light
-                    }
+                val expectedIconAsset = R.raw.face_dialog_authenticating
                 assertThat(iconAsset).isEqualTo(expectedIconAsset)
                 assertThat(iconContentDescriptionId)
                     .isEqualTo(R.string.biometric_dialog_face_icon_description_authenticating)
                 assertThat(shouldAnimateIconView).isEqualTo(true)
-                assertThat(shouldRepeatAnimation).isEqualTo(true)
             }
 
             if (testCase.isCoex) {
@@ -422,26 +409,11 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
                     }
                 } else {
                     // implicit flow
-                    val shouldRepeatAnimation by
-                        collectLastValue(iconViewModel.shouldRepeatAnimation)
-                    val shouldPulseAnimation by collectLastValue(iconViewModel.shouldPulseAnimation)
-                    val lastPulseLightToDark by collectLastValue(iconViewModel.lastPulseLightToDark)
-
-                    val expectedIconAsset =
-                        if (shouldPulseAnimation!!) {
-                            if (lastPulseLightToDark!!) {
-                                R.drawable.face_dialog_pulse_dark_to_light
-                            } else {
-                                R.drawable.face_dialog_pulse_light_to_dark
-                            }
-                        } else {
-                            R.drawable.face_dialog_pulse_dark_to_light
-                        }
+                    val expectedIconAsset = R.raw.face_dialog_authenticating
                     assertThat(iconAsset).isEqualTo(expectedIconAsset)
                     assertThat(iconContentDescriptionId)
                         .isEqualTo(R.string.biometric_dialog_face_icon_description_authenticating)
                     assertThat(shouldAnimateIconView).isEqualTo(true)
-                    assertThat(shouldRepeatAnimation).isEqualTo(true)
                 }
             }
         }
@@ -531,14 +503,9 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
         }
 
         if (testCase.isFaceOnly) {
-            val shouldRepeatAnimation by collectLastValue(iconViewModel.shouldRepeatAnimation)
-            val shouldPulseAnimation by collectLastValue(iconViewModel.shouldPulseAnimation)
-
-            assertThat(shouldPulseAnimation!!).isEqualTo(false)
             assertThat(iconAsset).isEqualTo(R.drawable.face_dialog_dark_to_error)
             assertThat(iconContentDescriptionId).isEqualTo(R.string.keyguard_face_failed)
             assertThat(shouldAnimateIconView).isEqualTo(true)
-            assertThat(shouldRepeatAnimation).isEqualTo(false)
 
             // Clear error, go to idle
             errorJob.join()
@@ -547,7 +514,6 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
             assertThat(iconContentDescriptionId)
                 .isEqualTo(R.string.biometric_dialog_face_icon_description_idle)
             assertThat(shouldAnimateIconView).isEqualTo(true)
-            assertThat(shouldRepeatAnimation).isEqualTo(false)
         }
 
         if (testCase.isCoex) {
@@ -630,15 +596,10 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
 
             // If co-ex, using implicit flow (explicit flow always requires confirmation)
             if (testCase.isFaceOnly || testCase.isCoex) {
-                val shouldRepeatAnimation by collectLastValue(iconViewModel.shouldRepeatAnimation)
-                val shouldPulseAnimation by collectLastValue(iconViewModel.shouldPulseAnimation)
-
-                assertThat(shouldPulseAnimation!!).isEqualTo(false)
                 assertThat(iconAsset).isEqualTo(R.drawable.face_dialog_dark_to_checkmark)
                 assertThat(iconContentDescriptionId)
                     .isEqualTo(R.string.biometric_dialog_face_icon_description_authenticated)
                 assertThat(shouldAnimateIconView).isEqualTo(true)
-                assertThat(shouldRepeatAnimation).isEqualTo(false)
             }
         }
     }
@@ -660,15 +621,10 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
             )
 
             if (testCase.isFaceOnly) {
-                val shouldRepeatAnimation by collectLastValue(iconViewModel.shouldRepeatAnimation)
-                val shouldPulseAnimation by collectLastValue(iconViewModel.shouldPulseAnimation)
-
-                assertThat(shouldPulseAnimation!!).isEqualTo(false)
                 assertThat(iconAsset).isEqualTo(R.drawable.face_dialog_wink_from_dark)
                 assertThat(iconContentDescriptionId)
                     .isEqualTo(R.string.biometric_dialog_face_icon_description_authenticated)
                 assertThat(shouldAnimateIconView).isEqualTo(true)
-                assertThat(shouldRepeatAnimation).isEqualTo(false)
             }
 
             // explicit flow because confirmation requested
@@ -710,15 +666,10 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
             viewModel.confirmAuthenticated()
 
             if (testCase.isFaceOnly) {
-                val shouldRepeatAnimation by collectLastValue(iconViewModel.shouldRepeatAnimation)
-                val shouldPulseAnimation by collectLastValue(iconViewModel.shouldPulseAnimation)
-
-                assertThat(shouldPulseAnimation!!).isEqualTo(false)
                 assertThat(iconAsset).isEqualTo(R.drawable.face_dialog_dark_to_checkmark)
                 assertThat(iconContentDescriptionId)
                     .isEqualTo(R.string.biometric_dialog_face_icon_description_confirmed)
                 assertThat(shouldAnimateIconView).isEqualTo(true)
-                assertThat(shouldRepeatAnimation).isEqualTo(false)
             }
 
             // explicit flow because confirmation requested
@@ -1457,7 +1408,7 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
         whenever(activityTaskManager.getTasks(1)).thenReturn(listOf(runningTaskInfo))
         selector =
             PromptSelectorInteractorImpl(fingerprintRepository, promptRepository, lockPatternUtils)
-        selector.resetPrompt()
+        selector.resetPrompt(REQUEST_ID)
 
         viewModel =
             PromptViewModel(
@@ -1688,6 +1639,7 @@ private fun PromptSelectorInteractor.initializePrompt(
     setPrompt(
         info,
         USER_ID,
+        REQUEST_ID,
         BiometricModalities(fingerprintProperties = fingerprint, faceProperties = face),
         CHALLENGE,
         packageName,

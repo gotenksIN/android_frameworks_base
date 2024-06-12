@@ -1268,6 +1268,11 @@ public class InternetDialogDelegate implements
         mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
     }
 
+    @Override
+    public void onFiveGStateOverride() {
+        mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
+    }
+
     private void updateCiwlanConfigs() {
         if (mExtTelephonyManager != null) {
             try {

@@ -26,6 +26,7 @@ import static android.telephony.SubscriptionManager.PROFILE_CLASS_PROVISIONING;
 
 import static com.android.settingslib.mobile.MobileMappings.getIconKey;
 import static com.android.settingslib.mobile.MobileMappings.mapIconSets;
+import static com.android.settingslib.mobile.MobileMappings.toIconKey;
 import static com.android.settingslib.wifi.WifiUtils.getHotspotIconResource;
 import static com.android.wifitrackerlib.WifiEntry.CONNECTED_STATE_CONNECTED;
 
@@ -97,6 +98,9 @@ import com.android.systemui.flags.Flags;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
+import com.android.systemui.statusbar.policy.FiveGServiceClient;
+import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
+import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
 import com.android.systemui.toast.SystemUIToast;
@@ -246,6 +250,8 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     private ContentObserver mDualDataContentObserver;
     private int mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
     private boolean mIsNddsDataEnabled = false;
+    private FiveGServiceClient mFiveGServiceClient;
+    private final Map<Integer, FiveGStateMonitor> mSubIdFiveGStateMonitorMap = new HashMap<>();
 
     private ServiceCallback mExtTelServiceCallback = new ServiceCallback() {
         @Override
@@ -347,6 +353,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         mFeatureFlags = featureFlags;
         mCarrierNameCustomization = carrierNameCustomization;
         mExtTelephonyManager = ExtTelephonyManager.getInstance(context);
+        mFiveGServiceClient = FiveGServiceClient.getInstance(context);
     }
 
     void onStart(@NonNull InternetDialogCallback callback, boolean canConfigWifi) {
@@ -386,6 +393,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             notifyDualDataEnabledStateChanged();
         }
         mIsNddsDataEnabled = mTelephonyManager.createForSubscriptionId(mNddsSubId).isDataEnabled();
+        registerFiveGStateMonitor();
     }
 
     void onStop() {
@@ -411,6 +419,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         mConnectivityManager.unregisterNetworkCallback(mConnectivityManagerNetworkCallback);
         mConnectedWifiInternetMonitor.unregisterCallback();
         mCallback = null;
+        unregisterFiveGStateMonitor();
     }
 
     @VisibleForTesting
@@ -764,9 +773,12 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     }
 
     String getMobileNetworkSummary(int subId) {
-        String description = getNetworkTypeDescription(mContext, mConfig, subId);
+        String description = "";
         if (mCarrierNameCustomization.showCustomizeName()) {
             description = mCarrierNameCustomization.getNetworkTypeDescription(subId);
+        }
+        if (TextUtils.isEmpty(description)) {
+            description = getNetworkTypeDescription(mContext, mConfig, subId);
         }
         return getMobileSummary(mContext, description, subId);
     }
@@ -778,7 +790,17 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             int subId) {
         TelephonyDisplayInfo telephonyDisplayInfo =
                 mSubIdTelephonyDisplayInfoMap.getOrDefault(subId, DEFAULT_TELEPHONY_DISPLAY_INFO);
-        String iconKey = getIconKey(telephonyDisplayInfo);
+        String iconKey = null;
+        if (isNsa(telephonyDisplayInfo)) {
+            final FiveGServiceState fiveGState = getFiveGServiceState(subId);
+            if (!fiveGState.isNrIconTypeValid()) {
+                iconKey = toIconKey(telephonyDisplayInfo.getNetworkType());
+            } else {
+                iconKey = getIconKey(telephonyDisplayInfo);
+            }
+        } else {
+            iconKey = getIconKey(telephonyDisplayInfo);
+        }
 
         if (mapIconSets(config) == null || mapIconSets(config).get(iconKey) == null) {
             if (DEBUG) {
@@ -799,6 +821,15 @@ public class InternetDialogController implements AccessPointController.AccessPoi
 
         return resId != 0
                 ? SubscriptionManager.getResourcesForSubId(context, subId).getString(resId) : "";
+    }
+
+    private boolean isNsa(TelephonyDisplayInfo telephonyDisplayInfo) {
+        if (telephonyDisplayInfo != null) {
+            final int networkType = telephonyDisplayInfo.getOverrideNetworkType();
+            return networkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE
+                    || networkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA;
+        }
+        return false;
     }
 
     private String getMobileSummary(Context context, String networkTypeDescription, int subId) {
@@ -1561,6 +1592,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     };
 
     private void updateListener() {
+        updateFiveGStateMonitor();
         int defaultDataSubId = getDefaultDataSubscriptionId();
         if (mDefaultDataSubId == getDefaultDataSubscriptionId()) {
             if (DEBUG) {
@@ -1663,6 +1695,58 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         return true;
     }
 
+    private void registerFiveGStateMonitor() {
+        List<SubscriptionInfo> subInfos =
+                mSubscriptionManager.getActiveSubscriptionInfoList();
+        if (subInfos != null) {
+            for (SubscriptionInfo subInfo : subInfos) {
+                final FiveGStateMonitor monitor =
+                        new FiveGStateMonitor(mFiveGServiceClient, subInfo);
+                monitor.initiate();
+                mSubIdFiveGStateMonitorMap.put(subInfo.getSubscriptionId(), monitor);
+            }
+        }
+    }
+
+    private void unregisterFiveGStateMonitor() {
+        mSubIdFiveGStateMonitorMap.forEach((k, v) -> {
+            v.deInitiate();
+        });
+        mSubIdFiveGStateMonitorMap.clear();
+    }
+
+    private void updateFiveGStateMonitor() {
+        List<SubscriptionInfo> subInfos =
+                mSubscriptionManager.getActiveSubscriptionInfoList();
+        if (subInfos != null) {
+            Map<Integer, FiveGStateMonitor> availableFiveGStateMonitors = new HashMap<>();
+            for (SubscriptionInfo subInfo : subInfos) {
+                if (mSubIdFiveGStateMonitorMap.containsKey(subInfo.getSubscriptionId())) {
+                    availableFiveGStateMonitors.put(subInfo.getSubscriptionId(),
+                            mSubIdFiveGStateMonitorMap.get(subInfo.getSubscriptionId()));
+                    mSubIdFiveGStateMonitorMap.remove(subInfo.getSubscriptionId());
+                } else {
+                    final FiveGStateMonitor monitor =
+                            new FiveGStateMonitor(mFiveGServiceClient, subInfo);
+                    monitor.initiate();
+                    availableFiveGStateMonitors.put(subInfo.getSubscriptionId(), monitor);
+                }
+            }
+            unregisterFiveGStateMonitor(); // clear all invalid monitors
+            mSubIdFiveGStateMonitorMap.putAll(availableFiveGStateMonitors);
+            availableFiveGStateMonitors.clear();
+        } else {
+            unregisterFiveGStateMonitor();
+        }
+    }
+
+    private FiveGServiceState getFiveGServiceState(int subId) {
+        if (mSubIdFiveGStateMonitorMap.containsKey(subId)) {
+            return mSubIdFiveGStateMonitorMap.get(subId).getFiveGServiceState();
+        }
+        return new FiveGServiceState();
+    }
+
     interface InternetDialogCallback {
 
         void onRefreshCarrierInfo();
@@ -1699,6 +1783,49 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         void onDualDataEnabledStateChanged();
 
         void onWifiScan(boolean isScan);
+
+        void onFiveGStateOverride();
+    }
+
+    private class FiveGStateMonitor implements IFiveGStateListener {
+
+        private final FiveGServiceClient mClient;
+        private final SubscriptionInfo mSubscriptionInfo;
+        private FiveGServiceState mState;
+
+        public FiveGStateMonitor(FiveGServiceClient client, SubscriptionInfo subscriptionInfo) {
+            mClient = client;
+            mSubscriptionInfo = subscriptionInfo;
+        }
+
+        public void initiate() {
+            if (mClient != null) {
+                mClient.registerListener(mSubscriptionInfo.getSimSlotIndex(), this);
+            }
+        }
+
+        public void deInitiate() {
+            if (mClient != null) {
+                mClient.unregisterListener(mSubscriptionInfo.getSimSlotIndex(), this);
+            }
+        }
+
+        public FiveGServiceState getFiveGServiceState() {
+            if (mState != null) {
+                return mState;
+            }
+            return new FiveGServiceState();
+        }
+
+        @Override
+        public void onStateChanged(FiveGServiceState state) {
+            mState = state;
+            Log.d(TAG, "Five G state update on SUB " + mSubscriptionInfo.getSubscriptionId()
+                    + " by " + mState);
+            if (mCallback != null) {
+                mCallback.onFiveGStateOverride();
+            }
+        }
     }
 
     void makeOverlayToast(int stringId) {

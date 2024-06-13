@@ -155,6 +155,7 @@ import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
 import com.android.window.flags.Flags;
+import com.android.server.am.ProcessFreezerManager;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -2488,6 +2489,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                              mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_WARM_LAUNCH, r.packageName, 2, 0, 0);
                          }
                      }
+                    ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+                    if (freezer != null && freezer.useFreezerManager()) {
+                        freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
+                    }
                 }
                 return mTmpFindTaskResult.mIdealRecord;
             } else if (mTmpFindTaskResult.mCandidateRecord != null) {
@@ -2500,6 +2505,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             (mTmpFindTaskResult.mIdealRecord.getState() == DESTROYED)) {
             if (r != null && r.isMainIntent(r.intent)) {
                 acquireAppLaunchPerfLock(r);
+                ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+                if (freezer != null && freezer.useFreezerManager()) {
+                    freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
+                }
             } else if (r == null) {
                 Slog.w(TAG, "Should not happen! Didn't apply launch boost");
             }

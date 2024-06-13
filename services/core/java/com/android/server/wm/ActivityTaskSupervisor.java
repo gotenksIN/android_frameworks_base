@@ -161,6 +161,7 @@ import com.android.server.am.UserState;
 import com.android.server.pm.PackageManagerServiceUtils;
 import com.android.server.utils.Slogf;
 import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
+import com.android.server.am.ProcessFreezerManager;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -1160,6 +1161,12 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         r.notifyUnknownVisibilityLaunchedForKeyguardTransition();
 
         final boolean isTop = andResume && r.isTopRunningActivity();
+        if (isTop) {
+            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+            if (freezer != null && freezer.useFreezerManager()) {
+                freezer.startFreeze(r.processName, ProcessFreezerManager.COLD_LAUNCH_FREEZE);
+            }
+        }
         mService.startProcessAsync(r, knownToBeDead, isTop,
                 isTop ? HostingRecord.HOSTING_TYPE_TOP_ACTIVITY
                         : HostingRecord.HOSTING_TYPE_ACTIVITY);

@@ -142,8 +142,8 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
     private val wifiPickerTrackerCallback =
         argumentCaptor<WifiPickerTracker.WifiPickerTrackerCallback>()
 
-    private val dispatcher = StandardTestDispatcher()
-    private val testScope = TestScope(dispatcher)
+    private val testDispatcher = StandardTestDispatcher()
+    private val testScope = TestScope(testDispatcher)
 
     private val fiveGServiceClient = FiveGServiceClient(mContext)
 
@@ -197,7 +197,7 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
                 flags,
                 testScope.backgroundScope,
                 mainExecutor,
-                dispatcher,
+                testDispatcher,
                 wifiPickerTrackerFactory,
                 wifiManager,
                 wifiLogBuffer,
@@ -219,7 +219,7 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
                 fakeBroadcastDispatcher,
                 connectivityManager,
                 telephonyManager = telephonyManager,
-                bgDispatcher = dispatcher,
+                bgDispatcher = testDispatcher,
                 logger = logger,
                 mobileMappingsProxy = mobileMappings,
                 scope = testScope.backgroundScope,
@@ -253,8 +253,9 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
                 mobileMappings,
                 fakeBroadcastDispatcher,
                 context,
-                dispatcher,
+                /* bgDispatcher = */ testDispatcher,
                 testScope.backgroundScope,
+                /* mainDispatcher = */ testDispatcher,
                 airplaneModeRepository,
                 wifiRepository,
                 fullConnectionFactory,
@@ -1229,8 +1230,9 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
                     mobileMappings,
                     fakeBroadcastDispatcher,
                     context,
-                    dispatcher,
+                    testDispatcher,
                     testScope.backgroundScope,
+                    testDispatcher,
                     airplaneModeRepository,
                     wifiRepository,
                     fullConnectionFactory,

@@ -521,8 +521,6 @@ public final class ActiveServices {
     private final ServiceAnrTimer mShortFGSAnrTimer;
     // ActivityManagerConstants.DEFAULT_SERVICE_START_FOREGROUND_TIMEOUT_MS
     private final ServiceAnrTimer mServiceFGAnrTimer;
-    // see ServiceRecord#getEarliestStopTypeAndTime()
-    private final ServiceAnrTimer mFGSAnrTimer;
 
     /**
      * Mapping of uid to {fgs_type, fgs_info} for time limited fgs types such as dataSync and
@@ -819,9 +817,6 @@ public final class ActiveServices {
             if (DEBUG_SERVICE) Slog.w(TAG, "AIDL not Supported");
             mIsAIDLSupported = false;
         }
-        this.mFGSAnrTimer = new ServiceAnrTimer(service,
-                ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG,
-                "FGS_TIMEOUT");
     }
 
     void systemServicesReady() {
@@ -911,7 +906,8 @@ public final class ActiveServices {
             for (int i = 0; i < smap.mServicesByInstanceName.size(); i++) {
                 final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
                 if (sr.appInfo.packageName.equals(pkg) && sr.isForeground) {
-                    if (Objects.equals(sr.foregroundNoti.getChannelId(), channelId)) {
+                    if (sr.foregroundNoti != null
+                            && Objects.equals(sr.foregroundNoti.getChannelId(), channelId)) {
                         if (DEBUG_FOREGROUND_SERVICE) {
                             Slog.d(TAG_SERVICE, "Channel u" + userId + "/pkg=" + pkg
                                     + "/channelId=" + channelId
@@ -2533,11 +2529,9 @@ public final class ActiveServices {
                                             + " foreground service type "
                                             + ServiceInfo.foregroundServiceTypeToLabel(
                                                     foregroundServiceType);
-                                    // Only throw an exception if the new ANR behavior
-                                    // ("do nothing") is not gated or the new crashing logic gate
+                                    // Only throw an exception if the new crashing logic gate
                                     // is enabled; otherwise, reset the limit temporarily.
-                                    if (!android.app.Flags.gateFgsTimeoutAnrBehavior()
-                                            || android.app.Flags.enableFgsTimeoutCrashBehavior()) {
+                                    if (android.app.Flags.enableFgsTimeoutCrashBehavior()) {
                                         throw new ForegroundServiceStartNotAllowedException(
                                                     exceptionMsg);
                                     } else {
@@ -3887,8 +3881,9 @@ public final class ActiveServices {
 
             if (!sr.isFgsTimeLimited()) {
                 // Reset timers since new type does not have a timeout.
-                mFGSAnrTimer.cancel(sr);
                 mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_FGS_TIMEOUT_MSG, sr);
+                mAm.mHandler.removeMessages(
+                                ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG, sr);
                 return;
             }
         }
@@ -3910,9 +3905,9 @@ public final class ActiveServices {
         }
         fgsTypeInfo.noteFgsFgsStart(nowUptime);
 
-        // We'll cancel the previous ANR timer and start a fresh one below.
-        mFGSAnrTimer.cancel(sr);
+        // We'll cancel the timeout and crash messages and post a fresh one below.
         mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_FGS_TIMEOUT_MSG, sr);
+        mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG, sr);
 
         final Message msg = mAm.mHandler.obtainMessage(
                 ActivityManagerService.SERVICE_FGS_TIMEOUT_MSG, sr);
@@ -3940,8 +3935,8 @@ public final class ActiveServices {
             fgsTypeInfo.decNumParallelServices();
         }
         Slog.d(TAG_SERVICE, "Stop FGS timeout: " + sr);
-        mFGSAnrTimer.cancel(sr);
         mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_FGS_TIMEOUT_MSG, sr);
+        mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG, sr);
     }
 
     void onUidRemovedLocked(int uid) {
@@ -3968,7 +3963,8 @@ public final class ActiveServices {
         synchronized (mAm) {
             final int fgsType = getTimeLimitedFgsType(sr.foregroundServiceType);
             if (fgsType == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE || sr.app == null) {
-                mFGSAnrTimer.discard(sr);
+                mAm.mHandler.removeMessages(
+                                ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG, sr);
                 return;
             }
 
@@ -3977,8 +3973,9 @@ public final class ActiveServices {
             final long nowUptime = SystemClock.uptimeMillis();
             if (lastTopTime != Long.MIN_VALUE && constantTimeLimit > (nowUptime - lastTopTime)) {
                 // Discard any other messages for this service
-                mFGSAnrTimer.discard(sr);
                 mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_FGS_TIMEOUT_MSG, sr);
+                mAm.mHandler.removeMessages(
+                                ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG, sr);
                 // The app was in the TOP state after the FGS was started so its time allowance
                 // should be counted from that time since this is considered a user interaction
                 final Message msg = mAm.mHandler.obtainMessage(
@@ -3989,7 +3986,6 @@ public final class ActiveServices {
 
             Slog.e(TAG_SERVICE, "FGS (" + ServiceInfo.foregroundServiceTypeToLabel(fgsType)
                     + ") timed out: " + sr);
-            mFGSAnrTimer.accept(sr);
             traceInstant("FGS timed out: ", sr);
 
             final TimeLimitedFgsInfo fgsTypeInfo = getFgsTimeLimitedInfo(sr.appInfo.uid, fgsType);
@@ -4016,7 +4012,9 @@ public final class ActiveServices {
             }
 
             // Crash the service after giving the service some time to clean up.
-            mFGSAnrTimer.start(sr, mAm.mConstants.mFgsCrashExtraWaitDuration);
+            final Message msg = mAm.mHandler.obtainMessage(
+                                    ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG, sr);
+            mAm.mHandler.sendMessageDelayed(msg, mAm.mConstants.mFgsCrashExtraWaitDuration);
         }
     }
 
@@ -4033,20 +4031,12 @@ public final class ActiveServices {
                 // stop the service, decrement the number of parallel running services here.
                 fgsTypeInfo.decNumParallelServices();
             }
-        }
 
-        final String reason = "A foreground service of type "
-                + ServiceInfo.foregroundServiceTypeToLabel(fgsType)
-                + " did not stop within its timeout: " + sr.getComponentName();
-
-        if (android.app.Flags.gateFgsTimeoutAnrBehavior()) {
-            // Log a WTF instead of throwing an ANR while the new behavior is gated.
-            Slog.wtf(TAG, reason);
-            return;
-        }
-        if (android.app.Flags.enableFgsTimeoutCrashBehavior()) {
-            // Crash the app
-            synchronized (mAm) {
+            final String reason = "A foreground service of type "
+                    + ServiceInfo.foregroundServiceTypeToLabel(fgsType)
+                    + " did not stop within its timeout: " + sr.getComponentName();
+            if (android.app.Flags.enableFgsTimeoutCrashBehavior()) {
+                // Crash the app
                 Slog.e(TAG_SERVICE, "FGS Crashed: " + sr);
                 traceInstant("FGS Crash: ", sr);
                 if (sr.app != null) {
@@ -4056,23 +4046,9 @@ public final class ActiveServices {
                             ForegroundServiceDidNotStopInTimeException
                                     .createExtrasForService(sr.getComponentName()));
                 }
-            }
-        } else {
-            // ANR the app if the new crash behavior is not enabled
-            final TimeoutRecord tr = TimeoutRecord.forFgsTimeout(reason);
-            tr.mLatencyTracker.waitingOnAMSLockStarted();
-            synchronized (mAm) {
-                tr.mLatencyTracker.waitingOnAMSLockEnded();
-
-                Slog.e(TAG_SERVICE, "FGS ANR'ed: " + sr);
-                traceInstant("FGS ANR: ", sr);
-                if (sr.app != null) {
-                    mAm.appNotResponding(sr.app, tr);
-                }
-
-                // TODO: Can we close the ANR dialog here, if it's still shown? Currently, the ANR
-                // dialog really doesn't remember the "cause" (especially if there have been
-                // multiple ANRs), so it's not doable.
+            } else {
+                // Log a WTF instead of crashing the app while the new behavior is gated.
+                Slog.wtf(TAG, reason);
             }
         }
     }
@@ -5084,7 +5060,7 @@ public final class ActiveServices {
                 }
                 // TODO: come back and remove this assumption to triage all services
                 ResolveInfo rInfo = mAm.getPackageManagerInternal().resolveService(service,
-                        resolvedType, flags, userId, callingUid);
+                        resolvedType, flags, userId, callingUid, callingPid);
                 ServiceInfo sInfo = rInfo != null ? rInfo.serviceInfo : null;
                 if (sInfo == null) {
                     Slog.w(TAG_SERVICE, "Unable to start service " + service + " U=" + userId +
@@ -5204,7 +5180,7 @@ public final class ActiveServices {
                         try {
                             ResolveInfo rInfoForUserId0 =
                                     mAm.getPackageManagerInternal().resolveService(service,
-                                            resolvedType, flags, userId, callingUid);
+                                            resolvedType, flags, userId, callingUid, callingPid);
                             if (rInfoForUserId0 == null) {
                                 Slog.w(TAG_SERVICE,
                                         "Unable to resolve service " + service + " U=" + userId

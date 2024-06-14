@@ -172,7 +172,7 @@ final class ActivityManagerConstants extends ContentObserver {
      */
     static final String KEY_ENABLE_NEW_OOMADJ = "enable_new_oom_adj";
 
-    private static int DEFAULT_MAX_CACHED_PROCESSES = 1024;
+    private static final int DEFAULT_MAX_CACHED_PROCESSES = 1024;
     private static final boolean DEFAULT_PRIORITIZE_ALARM_BROADCASTS = true;
     private static final long DEFAULT_FGSERVICE_MIN_SHOWN_TIME = 2*1000;
     private static final long DEFAULT_FGSERVICE_MIN_REPORT_TIME = 3*1000;
@@ -860,6 +860,16 @@ final class ActivityManagerConstants extends ContentObserver {
     private ContentResolver mResolver;
     private final KeyValueListParser mParser = new KeyValueListParser(',');
 
+    public static BoostFramework mPerf = new BoostFramework();
+
+    static boolean USE_TRIM_SETTINGS = true;
+    static int COMPACTION_DELAY_MS = 300 * 1000;
+    static int EMPTY_APP_PERCENT = 50;
+    static int TRIM_EMPTY_PERCENT = 100;
+    static int TRIM_CACHE_PERCENT = 100;
+    static long TRIM_ENABLE_MEMORY = 1073741824;
+    public static boolean allowTrim() { return Process.getTotalMemory() < TRIM_ENABLE_MEMORY ; }
+
     private int mOverrideMaxCachedProcesses = -1;
     private final int mCustomizedMaxCachedProcesses;
 
@@ -873,16 +883,6 @@ final class ActivityManagerConstants extends ContentObserver {
     // processes and the number of those processes does not count against the cached
     // process limit. This will be initialized in the constructor.
     public int CUR_MAX_CACHED_PROCESSES;
-
-    public static BoostFramework mPerf = new BoostFramework();
-
-    static boolean USE_TRIM_SETTINGS = true;
-    static int COMPACTION_DELAY_MS = 300 * 1000;
-    static int EMPTY_APP_PERCENT = 50;
-    static int TRIM_EMPTY_PERCENT = 100;
-    static int TRIM_CACHE_PERCENT = 100;
-    static long TRIM_ENABLE_MEMORY = 1073741824;
-    public static boolean allowTrim() { return Process.getTotalMemory() < TRIM_ENABLE_MEMORY ; }
 
     // The maximum number of empty app processes we will let sit around.  This will be
     // initialized in the constructor.
@@ -1452,10 +1452,6 @@ final class ActivityManagerConstants extends ContentObserver {
 
     private void updatePerfConfigConstants() {
         if (mPerf != null) {
-          // Maximum number of cached processes we will allow.
-            DEFAULT_MAX_CACHED_PROCESSES = MAX_CACHED_PROCESSES = CUR_MAX_CACHED_PROCESSES = Integer.valueOf(
-                                                 mPerf.perfGetProp("ro.vendor.qti.sys.fw.bg_apps_limit", "32"));
-
             // Wait time after bootup to trigger system compaction
             COMPACTION_DELAY_MS = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.compaction_delay_sec", "300")) * 1000;
 
@@ -1465,13 +1461,6 @@ final class ActivityManagerConstants extends ContentObserver {
             TRIM_EMPTY_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_empty_percent", "100"));
             TRIM_CACHE_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_cache_percent", "100"));
             TRIM_ENABLE_MEMORY = Long.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_enable_memory", "1073741824"));
-
-            // The maximum number of empty app processes we will let sit around.
-            CUR_MAX_EMPTY_PROCESSES = computeEmptyProcessLimit(CUR_MAX_CACHED_PROCESSES);
-
-            final int rawEmptyProcesses = computeEmptyProcessLimit(MAX_CACHED_PROCESSES);
-            CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawEmptyProcesses);
-            CUR_TRIM_CACHED_PROCESSES = computeTrimCachedApps(rawEmptyProcesses, MAX_CACHED_PROCESSES);
         }
     }
 
@@ -1521,23 +1510,6 @@ final class ActivityManagerConstants extends ContentObserver {
                 DEFAULT_ENABLE_NEW_OOM_ADJ);
     }
 
-    public void setOverrideMaxCachedProcesses(int value) {
-        mOverrideMaxCachedProcesses = value;
-        updateMaxCachedProcesses();
-    }
-
-    public int getOverrideMaxCachedProcesses() {
-        return mOverrideMaxCachedProcesses;
-    }
-
-    public static int computeEmptyProcessLimit(int totalProcessLimit) {
-        if(USE_TRIM_SETTINGS && allowTrim()) {
-            return totalProcessLimit*EMPTY_APP_PERCENT/100;
-        } else {
-            return totalProcessLimit/2;
-        }
-    }
-
     public static int computeTrimEmptyApps(int rawMaxEmptyProcesses) {
         if (USE_TRIM_SETTINGS && allowTrim()) {
             return rawMaxEmptyProcesses*TRIM_EMPTY_PERCENT/100;
@@ -1552,6 +1524,19 @@ final class ActivityManagerConstants extends ContentObserver {
         } else {
             return (totalProcessLimit-rawMaxEmptyProcesses)/3;
         }
+    }
+
+    public void setOverrideMaxCachedProcesses(int value) {
+        mOverrideMaxCachedProcesses = value;
+        updateMaxCachedProcesses();
+    }
+
+    public int getOverrideMaxCachedProcesses() {
+        return mOverrideMaxCachedProcesses;
+    }
+
+    public static int computeEmptyProcessLimit(int totalProcessLimit) {
+        return totalProcessLimit/2;
     }
 
     @Override
@@ -2070,12 +2055,9 @@ final class ActivityManagerConstants extends ContentObserver {
         }
         CUR_MAX_EMPTY_PROCESSES = computeEmptyProcessLimit(CUR_MAX_CACHED_PROCESSES);
 
-        // Note the trim levels do NOT depend on the override process limit, we want
-        // to consider the same level the point where we do trimming regardless of any
-        // additional enforced limit.
         final int rawMaxEmptyProcesses = computeEmptyProcessLimit(
                 Integer.min(CUR_MAX_CACHED_PROCESSES, MAX_CACHED_PROCESSES));
-        CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawMaxEmptyProcesses);
+        CUR_TRIM_EMPTY_PROCESSES = rawMaxEmptyProcesses / 2;
         CUR_TRIM_CACHED_PROCESSES = (Integer.min(CUR_MAX_CACHED_PROCESSES, MAX_CACHED_PROCESSES)
                     - rawMaxEmptyProcesses) / 3;
     }

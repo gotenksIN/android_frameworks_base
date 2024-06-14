@@ -126,7 +126,8 @@ fun SceneScope.HeadsUpNotificationSpace(
                             " size=${coordinates.size}" +
                             " bounds=$boundsInWindow"
                     }
-                    viewModel.onHeadsUpTopChanged(boundsInWindow.top)
+                    // Note: boundsInWindow doesn't scroll off the screen
+                    stackScrollView.setHeadsUpTop(boundsInWindow.top)
                 }
     ) {
         content {}
@@ -169,6 +170,7 @@ fun SceneScope.NotificationScrollingStack(
     maxScrimTop: () -> Float,
     shouldPunchHoleBehindScrim: Boolean,
     shouldFillMaxSize: Boolean = true,
+    shouldReserveSpaceForNavBar: Boolean = true,
     shadeMode: ShadeMode,
     modifier: Modifier = Modifier,
 ) {
@@ -352,7 +354,7 @@ fun SceneScope.NotificationScrollingStack(
                         .fillMaxWidth()
                         .notificationStackHeight(
                             view = stackScrollView,
-                            padding = navBarHeight.toInt()
+                            padding = if (shouldReserveSpaceForNavBar) navBarHeight.toInt() else 0
                         )
                         .onSizeChanged { size -> stackHeight.intValue = size.height },
             )

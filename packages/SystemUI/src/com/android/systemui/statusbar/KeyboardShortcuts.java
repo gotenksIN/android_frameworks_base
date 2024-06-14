@@ -455,7 +455,7 @@ public final class KeyboardShortcuts {
         if (mReceivedAppShortcutGroups == null || mReceivedImeShortcutGroups == null) {
             return;
         }
-        List<KeyboardShortcutGroup> shortcutGroups = mReceivedAppShortcutGroups;
+        List<KeyboardShortcutGroup> shortcutGroups = new ArrayList<>(mReceivedAppShortcutGroups);
         shortcutGroups.addAll(mReceivedImeShortcutGroups);
         mReceivedAppShortcutGroups = null;
         mReceivedImeShortcutGroups = null;
@@ -610,7 +610,7 @@ public final class KeyboardShortcuts {
             keyboardShortcutInfoAppItems.add(new KeyboardShortcutInfo(
                     mContext.getString(R.string.keyboard_shortcut_group_applications_calendar),
                     calendarIcon,
-                    KeyEvent.KEYCODE_L,
+                    KeyEvent.KEYCODE_K,
                     KeyEvent.META_META_ON));
         }
 

@@ -415,7 +415,7 @@ public final class ApduServiceInfo implements Parcelable {
                             false);
                     if (!mOnHost && !autoTransact) {
                         Log.e(TAG, "Ignoring polling-loop-filter " + plf
-                                + " for offhost service that isn't autoTranact");
+                                + " for offhost service that isn't autoTransact");
                     } else {
                         mAutoTransact.put(plf, autoTransact);
                     }
@@ -432,7 +432,7 @@ public final class ApduServiceInfo implements Parcelable {
                             false);
                     if (!mOnHost && !autoTransact) {
                         Log.e(TAG, "Ignoring polling-loop-filter " + plf
-                                + " for offhost service that isn't autoTranact");
+                                + " for offhost service that isn't autoTransact");
                     } else {
                         mAutoTransactPatterns.put(Pattern.compile(plf), autoTransact);
                     }
@@ -1031,6 +1031,9 @@ public final class ApduServiceInfo implements Parcelable {
         pw.println("    Settings Activity: " + mSettingsActivityName);
         pw.println("    Requires Device Unlock: " + mRequiresDeviceUnlock);
         pw.println("    Requires Device ScreenOn: " + mRequiresDeviceScreenOn);
+        pw.println("    Should Default to Observe Mode: " + mShouldDefaultToObserveMode);
+        pw.println("    Auto-Transact Mapping: " + mAutoTransact);
+        pw.println("    Auto-Transact Patterns: " + mAutoTransactPatterns);
     }
 
 
@@ -1084,6 +1087,27 @@ public final class ApduServiceInfo implements Parcelable {
             proto.end(token);
         }
         proto.write(ApduServiceInfoProto.SETTINGS_ACTIVITY_NAME, mSettingsActivityName);
+        proto.write(ApduServiceInfoProto.SHOULD_DEFAULT_TO_OBSERVE_MODE,
+                mShouldDefaultToObserveMode);
+        {
+            long token = proto.start(ApduServiceInfoProto.AUTO_TRANSACT_MAPPING);
+            for (Map.Entry<String, Boolean> entry : mAutoTransact.entrySet()) {
+                proto.write(ApduServiceInfoProto.AutoTransactMapping.AID, entry.getKey());
+                proto.write(ApduServiceInfoProto.AutoTransactMapping.SHOULD_AUTO_TRANSACT,
+                        entry.getValue());
+            }
+            proto.end(token);
+        }
+        {
+            long token = proto.start(ApduServiceInfoProto.AUTO_TRANSACT_PATTERNS);
+            for (Map.Entry<Pattern, Boolean> entry : mAutoTransactPatterns.entrySet()) {
+                proto.write(ApduServiceInfoProto.AutoTransactPattern.REGEXP_PATTERN,
+                        entry.getKey().pattern());
+                proto.write(ApduServiceInfoProto.AutoTransactPattern.SHOULD_AUTO_TRANSACT,
+                        entry.getValue());
+            }
+            proto.end(token);
+        }
     }
 
     private static final Pattern AID_PATTERN = Pattern.compile("[0-9A-Fa-f]{10,32}\\*?\\#?");

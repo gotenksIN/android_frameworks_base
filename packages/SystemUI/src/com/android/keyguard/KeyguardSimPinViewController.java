@@ -400,4 +400,9 @@ public class KeyguardSimPinViewController
             mShowDefaultMessage = false;
         }
     }
+
+    @Override
+    protected int getInitialMessageResId() {
+        return 0;
+    }
 }

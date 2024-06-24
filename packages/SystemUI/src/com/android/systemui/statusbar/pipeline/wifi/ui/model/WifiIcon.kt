@@ -66,6 +66,12 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
         @VisibleForTesting
         internal val NO_INTERNET = R.string.data_connection_no_internet
 
+        var mIsWifiStandardDisplaySupported: Boolean? = null
+
+        fun initializeConfig(context: Context) {
+            mIsWifiStandardDisplaySupported = context.resources.getBoolean(com.android.
+                                              settingslib.R.bool.config_show_wifi_standard)
+        }
         /**
          * Mapping from a [WifiNetworkModel] to the appropriate [WifiIcon].
          *
@@ -133,6 +139,11 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
             val levelDesc = context.getString(WIFI_CONNECTION_STRENGTH[this.level])
             val wifiStandard = this.wifiStandard
 
+            if (mIsWifiStandardDisplaySupported == null) {
+                initializeConfig(context)
+            }
+            val isWifiStandardDisplaySupported = mIsWifiStandardDisplaySupported ?: false
+
             return if (this.isValidated) {
                 val icon = when (wifiStandard) {
                     4 -> WifiIcons.WIFI_4_FULL_ICONS[this.level]
@@ -141,7 +152,12 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
                     7 -> WifiIcons.WIFI_7_FULL_ICONS[this.level]
                     else -> WifiIcons.WIFI_FULL_ICONS[this.level]
                 }
-                Visible(icon, ContentDescription.Loaded(levelDesc))
+                if(isWifiStandardDisplaySupported) {
+                    Visible(icon, ContentDescription.Loaded(levelDesc))
+                } else {
+                    Visible(WifiIcons.WIFI_FULL_ICONS[this.level],
+                    ContentDescription.Loaded(levelDesc))
+                }
             } else {
                 val icon = when (wifiStandard) {
                     4 -> WifiIcons.WIFI_4_NO_INTERNET_ICONS[this.level]
@@ -150,9 +166,15 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
                     7 -> WifiIcons.WIFI_7_NO_INTERNET_ICONS[this.level]
                     else -> WifiIcons.WIFI_NO_INTERNET_ICONS[this.level]
                 }
-                Visible(icon,
-                    ContentDescription.Loaded("$levelDesc,${context.getString(NO_INTERNET)}"),
-                )
+                if(isWifiStandardDisplaySupported) {
+                    Visible(icon,
+                        ContentDescription.Loaded("$levelDesc,${context.getString(NO_INTERNET)}"),
+                    )
+                } else {
+                    Visible(WifiIcons.WIFI_NO_INTERNET_ICONS[this.level],
+                        ContentDescription.Loaded("$levelDesc,${context.getString(NO_INTERNET)}"),
+                    )
+                }
             }
         }
     }

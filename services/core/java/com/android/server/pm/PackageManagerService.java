@@ -4026,7 +4026,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 final PackageMetrics.ComponentStateMetrics componentStateMetrics =
                         new PackageMetrics.ComponentStateMetrics(setting,
                                 UserHandle.getUid(userId, packageSetting.getAppId()),
-                                packageSetting.getEnabled(userId), callingUid);
+                                setting.isComponent() ? computer.getComponentEnabledSettingInternal(
+                                        setting.getComponentName(), callingUid, userId)
+                                        : packageSetting.getEnabled(userId), callingUid);
                 if (!setEnabledSettingInternalLocked(computer, packageSetting, setting, userId,
                         callingPackage)) {
                     continue;
@@ -4375,7 +4377,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     public PackageFreezer freezePackage(String packageName, int userId, String killReason,
             int exitInfoReason, InstallRequest request) {
-        return new PackageFreezer(packageName, userId, killReason, this, exitInfoReason, request);
+        return freezePackage(packageName, userId, killReason, exitInfoReason, request,
+                /* waitAppKilled= */ false);
+    }
+
+    private PackageFreezer freezePackage(String packageName, int userId, String killReason,
+            int exitInfoReason, InstallRequest request, boolean waitAppKilled) {
+        return new PackageFreezer(packageName, userId, killReason, this, exitInfoReason, request,
+                waitAppKilled);
     }
 
     public PackageFreezer freezePackageForDelete(String packageName, int userId, int deleteFlags,
@@ -4800,7 +4809,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     final boolean succeeded;
                     try (PackageFreezer freezer = freezePackage(packageName, UserHandle.USER_ALL,
                             "clearApplicationUserData",
-                            ApplicationExitInfo.REASON_USER_REQUESTED, null /* request */)) {
+                            ApplicationExitInfo.REASON_USER_REQUESTED, null /* request */,
+                            /* waitAppKilled= */ true)) {
                         try (PackageManagerTracedLock installLock = mInstallLock.acquireLock()) {
                             succeeded = clearApplicationUserDataLIF(snapshotComputer(), packageName,
                                     userId);

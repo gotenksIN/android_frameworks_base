@@ -2286,13 +2286,13 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     static class ConfigOverrideHint {
         @Nullable DisplayInfo mTmpOverrideDisplayInfo;
         @Nullable ActivityRecord.CompatDisplayInsets mTmpCompatInsets;
-        @Nullable Rect mTmpParentAppBoundsOverride;
+        @Nullable Rect mParentAppBoundsOverride;
         int mTmpOverrideConfigOrientation;
         boolean mUseOverrideInsetsForConfig;
 
         void resolveTmpOverrides(DisplayContent dc, Configuration parentConfig,
                 boolean isFixedRotationTransforming) {
-            mTmpParentAppBoundsOverride = new Rect(parentConfig.windowConfiguration.getAppBounds());
+            mParentAppBoundsOverride = new Rect(parentConfig.windowConfiguration.getAppBounds());
             final Insets insets;
             if (mUseOverrideInsetsForConfig && dc != null) {
                 // Insets are decoupled from configuration by default from V+, use legacy
@@ -2314,13 +2314,12 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             } else {
                 insets = Insets.NONE;
             }
-            mTmpParentAppBoundsOverride.inset(insets);
+            mParentAppBoundsOverride.inset(insets);
         }
 
         void resetTmpOverrides() {
             mTmpOverrideDisplayInfo = null;
             mTmpCompatInsets = null;
-            mTmpParentAppBoundsOverride = null;
             mTmpOverrideConfigOrientation = ORIENTATION_UNDEFINED;
         }
     }
@@ -2409,7 +2408,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 final Rect containingAppBounds;
                 if (insideParentBounds) {
                     containingAppBounds = useOverrideInsetsForConfig
-                            ? overrideHint.mTmpParentAppBoundsOverride
+                            ? overrideHint.mParentAppBoundsOverride
                             : parentConfig.windowConfiguration.getAppBounds();
                 } else {
                     // Restrict appBounds to display non-decor rather than parent because the

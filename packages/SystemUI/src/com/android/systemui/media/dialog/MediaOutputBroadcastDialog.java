@@ -420,7 +420,7 @@ public class MediaOutputBroadcastDialog extends MediaOutputBaseDialog {
 
             if (mMediaOutputController.isThereAnyBroadcastSourceIntoSinkDevice(sink)) {
                 Log.d(TAG, "The sink device has the broadcast source now.");
-                return;
+                continue;
             }
             if (!mMediaOutputController.addSourceIntoSinkDeviceWithBluetoothLeAssistant(sink,
                     broadcastMetadata, /*isGroupOp=*/ false)) {

@@ -1484,6 +1484,12 @@ final class ActivityManagerConstants extends ContentObserver {
     private void updatePerfConfigConstants() {
         if (mPerf != null) {
             // Wait time after bootup to trigger system compaction
+            MAX_CACHED_PROCESSES = CUR_MAX_CACHED_PROCESSES = Integer.valueOf(
+                                       mPerf.perfGetProp("ro.vendor.qti.sys.fw.bg_apps_limit",
+                                       String.valueOf(DEFAULT_MAX_CACHED_PROCESSES)));
+            // The maximum number of empty app processes we will let sit around.
+            CUR_MAX_EMPTY_PROCESSES = computeEmptyProcessLimit(CUR_MAX_CACHED_PROCESSES);
+            // Wait time after bootup to trigger system compaction
             COMPACTION_DELAY_MS = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.compaction_delay_sec", "300")) * 1000;
 
             //Trim Settings
@@ -1492,6 +1498,7 @@ final class ActivityManagerConstants extends ContentObserver {
             TRIM_EMPTY_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_empty_percent", "100"));
             TRIM_CACHE_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_cache_percent", "100"));
             TRIM_ENABLE_MEMORY = Long.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_enable_memory", "1073741824"));
+
         }
     }
 

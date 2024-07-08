@@ -1499,6 +1499,9 @@ final class ActivityManagerConstants extends ContentObserver {
             TRIM_CACHE_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_cache_percent", "100"));
             TRIM_ENABLE_MEMORY = Long.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_enable_memory", "1073741824"));
 
+            final int rawEmptyProcesses = computeEmptyProcessLimit(MAX_CACHED_PROCESSES);
+            CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawEmptyProcesses);
+            CUR_TRIM_CACHED_PROCESSES = computeTrimCachedApps(rawEmptyProcesses, MAX_CACHED_PROCESSES);
         }
     }
 
@@ -1576,7 +1579,11 @@ final class ActivityManagerConstants extends ContentObserver {
     }
 
     public static int computeEmptyProcessLimit(int totalProcessLimit) {
-        return totalProcessLimit/2;
+        if(USE_TRIM_SETTINGS && allowTrim()) {
+            return totalProcessLimit*EMPTY_APP_PERCENT/100;
+        } else {
+            return totalProcessLimit/2;
+        }
     }
 
     @Override
@@ -2097,7 +2104,7 @@ final class ActivityManagerConstants extends ContentObserver {
 
         final int rawMaxEmptyProcesses = computeEmptyProcessLimit(
                 Integer.min(CUR_MAX_CACHED_PROCESSES, MAX_CACHED_PROCESSES));
-        CUR_TRIM_EMPTY_PROCESSES = rawMaxEmptyProcesses / 2;
+        CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawMaxEmptyProcesses);
         CUR_TRIM_CACHED_PROCESSES = (Integer.min(CUR_MAX_CACHED_PROCESSES, MAX_CACHED_PROCESSES)
                     - rawMaxEmptyProcesses) / 3;
     }

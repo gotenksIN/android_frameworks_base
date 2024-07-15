@@ -336,7 +336,8 @@ private class CellularIconViewModel(
         combine (
                 iconInteractor.imsInfo,
                 iconInteractor.showVolteIcon,
-        ) { imsInfo, showVolteIcon ->
+                iconInteractor.isInService,
+        ) { imsInfo, showVolteIcon, isInService ->
              if (!showVolteIcon) {
                 return@combine 0
             }
@@ -346,6 +347,7 @@ private class CellularIconViewModel(
                 return@combine R.drawable.ic_volte
             } else if ((netWorkType == TelephonyManager.NETWORK_TYPE_LTE
                         || netWorkType == TelephonyManager.NETWORK_TYPE_LTE_CA)
+                && isInService
                 && voiceNetworkType  == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
                 return@combine R.drawable.ic_volte_no_voice
             } else {

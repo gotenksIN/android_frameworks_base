@@ -3720,12 +3720,28 @@ public class AudioManager {
      *
      */
     public void setParameters(String keyValuePairs) {
-        AudioSystem.setParameters(keyValuePairs);
+        List swbKeys = Arrays.asList("bt_lc3_swb","bt_swb");
+        boolean hasSwbParams= false;
+        String[] kvpairs = keyValuePairs.split(";");
+        for (String pair : kvpairs) {
+            String[] kv = pair.split("=");
+            hasSwbParams = swbKeys.contains(kv[0]);
+            break;
+        }
         final IAudioService service = getService();
-        try {
-            service.cacheParameters(keyValuePairs);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
+        if (hasSwbParams) {
+            try {
+                service.setSwbParameters(keyValuePairs);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        } else {
+            AudioSystem.setParameters(keyValuePairs);
+            try {
+                service.cacheParameters(keyValuePairs);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
         }
     }
 
@@ -3763,9 +3779,12 @@ public class AudioManager {
     @RequiresPermission(Manifest.permission.BLUETOOTH_STACK)
     public void setBluetoothHeadsetProperties(@NonNull String name, boolean hasNrecEnabled,
             boolean hasWbsEnabled) {
-        AudioSystem.setParameters("bt_headset_name=" + name
-                + ";bt_headset_nrec=" + (hasNrecEnabled ? "on" : "off")
-                + ";bt_wbs=" + (hasWbsEnabled ? "on" : "off"));
+        final IAudioService service = getService();
+        try {
+            service.setScoParameters(name, hasNrecEnabled, hasWbsEnabled);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     /**

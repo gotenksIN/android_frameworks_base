@@ -235,6 +235,7 @@ public class AudioDeviceBroker {
     private void init() {
         setupMessaging(mContext);
 
+        initScoParams();
         initAudioHalBluetoothState();
         initRoutingStrategyIds();
         mPreferredCommunicationDevice = null;
@@ -1056,12 +1057,62 @@ public class AudioDeviceBroker {
     @GuardedBy("mBluetoothAudioStateLock")
     private boolean mBluetoothLeSuspendedApplied;
 
+    // SCO SWB params
+    @GuardedBy("mBluetoothAudioStateLock")
+    private boolean mHasSwbLc3Enabled;
+    @GuardedBy("mBluetoothAudioStateLock")
+    private boolean mHasSwbAptXEnabled;
+    // SCO params
+    @GuardedBy("mBluetoothAudioStateLock")
+    private String mBtHeadsetName;
+    @GuardedBy("mBluetoothAudioStateLock")
+    private boolean mHasNrecEnabled;
+    @GuardedBy("mBluetoothAudioStateLock")
+    private boolean mHasWbsEnabled;
+
     private void initAudioHalBluetoothState() {
         synchronized (mBluetoothAudioStateLock) {
             mBluetoothScoOnApplied = false;
             mBluetoothA2dpSuspendedApplied = false;
             mBluetoothLeSuspendedApplied = false;
             reapplyAudioHalBluetoothState();
+        }
+    }
+
+    private void initScoParams() {
+        synchronized (mBluetoothAudioStateLock) {
+            mHasSwbLc3Enabled = false;
+            mHasSwbAptXEnabled = false;
+            mBtHeadsetName = "";
+            mHasNrecEnabled = false;
+            mHasWbsEnabled = false;
+        }
+    }
+
+    void setSwbParameters(String keyValuePairs) {
+        synchronized (mBluetoothAudioStateLock) {
+            Log.i(TAG, "received " + keyValuePairs);
+            String[] kvpairs = keyValuePairs.split(";");
+            for (String pair : kvpairs) {
+                String[] kv = pair.split("=");
+                if (kv[0] == "bt_lc3_swb") {
+                    mHasSwbLc3Enabled = ((kv[1] == "on") ? true : false);
+                } else if (kv[0] == "bt_swb") {
+                    mHasSwbAptXEnabled = ((kv[1] == "0") ? true : false);
+                }
+            }
+        }
+    }
+
+    void setScoParameters(String name, boolean hasNrecEnabled,
+            boolean hasWbsEnabled) {
+        synchronized (mBluetoothAudioStateLock) {
+            Log.i(TAG, "received btHeadsetName=" + name
+                    + ";hasNrecEnabled=" + hasNrecEnabled
+                    + ";hasWbsEnabled=" + hasWbsEnabled + ";");
+            mBtHeadsetName = name;
+            mHasNrecEnabled = hasNrecEnabled;
+            mHasWbsEnabled = hasWbsEnabled;
         }
     }
 
@@ -1081,6 +1132,12 @@ public class AudioDeviceBroker {
                     AudioSystem.setParameters("LeAudioSuspended=true");
                     mBluetoothLeSuspendedApplied = true;
                 }
+                // set SCO related parameters before sending SCO on
+                AudioSystem.setParameters("bt_lc3_swb=" + (mHasSwbLc3Enabled ? "on" : "off"));
+                AudioSystem.setParameters("bt_swb=" + (mHasSwbAptXEnabled ? "0" : "65535"));
+                AudioSystem.setParameters("bt_headset_name=" + mBtHeadsetName
+                        + ";bt_headset_nrec=" + (mHasNrecEnabled ? "on" : "off")
+                        + ";bt_wbs=" + (mHasWbsEnabled ? "on" : "off"));
                 AudioSystem.setParameters("BT_SCO=on");
             } else {
                 AudioSystem.setParameters("BT_SCO=off");
@@ -1136,6 +1193,12 @@ public class AudioDeviceBroker {
         if (mBluetoothScoOnApplied) {
             AudioSystem.setParameters("A2dpSuspended=true");
             AudioSystem.setParameters("LeAudioSuspended=true");
+            // apply cached SCO parameters before sending SCO on
+            AudioSystem.setParameters("bt_lc3_swb=" + (mHasSwbLc3Enabled ? "on" : "off"));
+            AudioSystem.setParameters("bt_swb=" + (mHasSwbAptXEnabled ? "0" : "65535"));
+            AudioSystem.setParameters("bt_headset_name=" + mBtHeadsetName
+                    + ";bt_headset_nrec=" + (mHasNrecEnabled ? "on" : "off")
+                    + ";bt_wbs=" + (mHasWbsEnabled ? "on" : "off"));
             AudioSystem.setParameters("BT_SCO=on");
         } else {
             AudioSystem.setParameters("BT_SCO=off");

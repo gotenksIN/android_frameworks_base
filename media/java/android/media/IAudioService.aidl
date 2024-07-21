@@ -261,6 +261,9 @@ interface IAudioService {
 
     int getCurrentAudioFocus();
 
+    void setSwbParameters(in String keyValuePairs);
+    void setScoParameters(in String name, boolean hasNrecEnabled, boolean hasWbsEnabled);
+
     void startBluetoothSco(IBinder cb, int targetSdkVersion);
     void startBluetoothScoVirtualCall(IBinder cb);
     void stopBluetoothSco(IBinder cb);

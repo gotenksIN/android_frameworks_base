@@ -525,7 +525,12 @@ class MobileConnectionRepositoryImpl(
      * See b/322432056 for context.
      */
     @SuppressLint("RegisterReceiverViaContext")
-    override val networkName: StateFlow<NetworkNameModel> =
+    override val networkName: StateFlow<NetworkNameModel> = run {
+        var subscriptionManager: SubscriptionManager? =
+            context.getSystemService(SubscriptionManager::class.java)
+        val initial = subscriptionManager?.getActiveSubscriptionInfo(subId)?.let {
+             NetworkNameModel.IntentDerived(it.carrierName.toString())
+        } ?: defaultNetworkName
         conflatedCallbackFlow {
                 val receiver =
                     object : BroadcastReceiver() {
@@ -553,7 +558,9 @@ class MobileConnectionRepositoryImpl(
                 awaitClose { context.unregisterReceiver(receiver) }
             }
             .flowOn(bgDispatcher)
-            .stateIn(scope, SharingStarted.Eagerly, defaultNetworkName)
+            .stateIn(scope, SharingStarted.Eagerly, initial)
+    }
+
 
     override val dataEnabled = run {
         val initial = telephonyManager.isDataConnectionAllowed

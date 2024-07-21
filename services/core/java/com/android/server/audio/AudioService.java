@@ -6841,6 +6841,14 @@ public class AudioService extends IAudioService.Stub
         return mDeviceBroker.isBluetoothA2dpOn();
     }
 
+    public void setSwbParameters(String keyValuePairs) {
+        mDeviceBroker.setSwbParameters(keyValuePairs);
+    }
+
+    public void setScoParameters(String name, boolean hasNrecEnabled, boolean hasWbsEnabled) {
+        mDeviceBroker.setScoParameters(name, hasNrecEnabled, hasWbsEnabled);
+    }
+
     /** @see AudioManager#startBluetoothSco() */
     public void startBluetoothSco(IBinder cb, int targetSdkVersion) {
         Log.i(TAG, "In startBluetoothSco()");

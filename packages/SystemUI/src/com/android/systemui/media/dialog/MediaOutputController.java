@@ -1185,6 +1185,26 @@ public class MediaOutputController implements LocalMediaManager.DeviceCallback,
         return true;
     }
 
+    boolean isReceiverReceivingBroadcast(BluetoothDevice sink) {
+        LocalBluetoothLeBroadcastAssistant assistant =
+                mLocalBluetoothManager.getProfileManager().getLeAudioBroadcastAssistantProfile();
+        if (assistant == null) {
+            Log.d(TAG, "isSourceAddedIntoSinkDevice: The broadcast assistant profile "
+                    + "is null");
+            return false;
+        }
+        for (BluetoothLeBroadcastReceiveState receiveState: assistant.getAllSources(sink)) {
+            for (int i = 0; i < receiveState.getNumSubgroups(); i++) {
+                Long syncState = receiveState.getBisSyncState().get(i);
+                if (syncState > 0 && syncState < 0xFFFFFFFF) {
+                    Log.d(TAG, "Synchronized to " + String.valueOf(syncState));
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     void registerLeBroadcastAssistantServiceCallback(
             @NonNull @CallbackExecutor Executor executor,
             @NonNull BluetoothLeBroadcastAssistant.Callback callback) {

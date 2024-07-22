@@ -418,8 +418,8 @@ public class MediaOutputBroadcastDialog extends MediaOutputBaseDialog {
             Log.d(TAG, "The broadcastMetadata broadcastId: " + broadcastMetadata.getBroadcastId()
                     + ", the device: " + sink.getAnonymizedAddress());
 
-            if (mMediaOutputController.isThereAnyBroadcastSourceIntoSinkDevice(sink)) {
-                Log.d(TAG, "The sink device has the broadcast source now.");
+            if (mMediaOutputController.isReceiverReceivingBroadcast(sink)) {
+                Log.d(TAG, "The sink device is receiving broadcast streaming");
                 continue;
             }
             if (!mMediaOutputController.addSourceIntoSinkDeviceWithBluetoothLeAssistant(sink,

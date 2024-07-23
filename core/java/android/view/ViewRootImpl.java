@@ -25,8 +25,6 @@ import static android.os.Trace.TRACE_TAG_VIEW;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.DragEvent.ACTION_DRAG_LOCATION;
-import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_APP_PROGRESS_GENERATION_ALLOWED;
-import static android.view.flags.Flags.sensitiveContentPrematureProtectionRemovedFix;
 import static android.view.InputDevice.SOURCE_CLASS_NONE;
 import static android.view.InsetsSource.ID_IME;
 import static android.view.Surface.FRAME_RATE_CATEGORY_DEFAULT;
@@ -90,6 +88,7 @@ import static android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS;
 import static android.view.WindowManager.LayoutParams.LAST_APPLICATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_APP_PROGRESS_GENERATION_ALLOWED;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_EDGE_TO_EDGE_ENFORCED;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FIT_INSETS_CONTROLLED;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_DECOR_VIEW_VISIBILITY;
@@ -114,6 +113,7 @@ import static android.view.accessibility.Flags.forceInvertColor;
 import static android.view.accessibility.Flags.reduceWindowContentChangedEventThrottle;
 import static android.view.flags.Flags.addSchandleToVriSurface;
 import static android.view.flags.Flags.sensitiveContentAppProtection;
+import static android.view.flags.Flags.sensitiveContentPrematureProtectionRemovedFix;
 import static android.view.flags.Flags.toolkitFrameRateFunctionEnablingReadOnly;
 import static android.view.flags.Flags.toolkitFrameRateTypingReadOnly;
 import static android.view.flags.Flags.toolkitFrameRateVelocityMappingReadOnly;
@@ -124,12 +124,11 @@ import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodCl
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
+import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.activityWindowInfoFlag;
 import static com.android.window.flags.Flags.enableBufferTransformHintFromDisplay;
 import static com.android.window.flags.Flags.insetsControlChangedItem;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
-import static com.android.window.flags.Flags.windowSessionRelayoutInfo;
-import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 
 import android.Manifest;
 import android.accessibilityservice.AccessibilityService;
@@ -179,7 +178,6 @@ import android.graphics.Region;
 import android.graphics.RenderNode;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.hardware.SyncFence;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManager.DisplayListener;
 import android.hardware.display.DisplayManagerGlobal;
@@ -223,7 +221,6 @@ import android.util.proto.ProtoOutputStream;
 import android.view.InputDevice.InputSourceClass;
 import android.view.Surface.OutOfResourcesException;
 import android.view.SurfaceControl.Transaction;
-import android.view.SurfaceControl.TransactionStats;
 import android.view.View.AttachInfo;
 import android.view.View.FocusDirection;
 import android.view.View.MeasureSpec;
@@ -299,7 +296,6 @@ import java.util.OptionalInt;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 /**
  * The top of a view hierarchy, implementing the needed protocol between View
@@ -1139,7 +1135,7 @@ public final class ViewRootImpl implements ViewParent,
      */
 
     /**
-     * A temporary object used so relayoutWindow can return the latest SyncSeqId
+     * Object for relayoutWindow to return the latest window info, including the SyncSeqId
      * system. The SyncSeqId system was designed to work without synchronous relayout
      * window, and actually synchronous relayout window presents a problem.  We could have
      * a sequence like this:
@@ -1153,14 +1149,8 @@ public final class ViewRootImpl implements ViewParent,
      * we get rid of synchronous relayout, until then, we use this bundle to channel the
      * integer back over relayout.
      */
-    private final Bundle mRelayoutBundle = windowSessionRelayoutInfo()
-            ? null
-            : new Bundle();
-
-    private final WindowRelayoutResult mRelayoutResult = windowSessionRelayoutInfo()
-            ? new WindowRelayoutResult(mTmpFrames, mPendingMergedConfiguration, mSurfaceControl,
-                    mTempInsets, mTempControls)
-            : null;
+    private final WindowRelayoutResult mRelayoutResult = new WindowRelayoutResult(
+            mTmpFrames, mPendingMergedConfiguration, mSurfaceControl, mTempInsets, mTempControls);
 
     private static volatile boolean sAnrReported = false;
     static BLASTBufferQueue.TransactionHangCallback sTransactionHangCallback =
@@ -1197,13 +1187,6 @@ public final class ViewRootImpl implements ViewParent,
     private String mLargestViewTraceName;
 
     boolean mHaveMoveEvent = false;
-
-    private final boolean mAppStartInfoTimestampsFlagValue;
-    @GuardedBy("this")
-    private boolean mAppStartTimestampsSent = false;
-    private boolean mAppStartTrackingStarted = false;
-    private long mRenderThreadDrawStartTimeNs = -1;
-    private long mFirstFramePresentedTimeNs = -1;
 
     private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
     private static boolean sToolkitFrameRateFunctionEnablingReadOnlyFlagValue;
@@ -1322,8 +1305,6 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             mSensitiveContentProtectionService = null;
         }
-
-        mAppStartInfoTimestampsFlagValue = android.app.Flags.appStartInfoTimestamps();
     }
 
     public static void addFirstDrawHandler(Runnable callback) {
@@ -2599,12 +2580,6 @@ public final class ViewRootImpl implements ViewParent,
                     notifySurfaceDestroyed();
                 }
                 destroySurface();
-
-                // Reset so they can be sent again for warm starts.
-                mAppStartTimestampsSent = false;
-                mAppStartTrackingStarted = false;
-                mRenderThreadDrawStartTimeNs = -1;
-                mFirstFramePresentedTimeNs = -1;
             }
         }
     }
@@ -4404,74 +4379,11 @@ public final class ViewRootImpl implements ViewParent,
                 reportDrawFinished(t, seqId);
             }
         });
-
-        // Only trigger once per {@link ViewRootImpl} instance, so don't add listener if
-        // {link mTransactionCompletedTimeNs} has already been set.
-        if (mAppStartInfoTimestampsFlagValue && !mAppStartTrackingStarted) {
-            mAppStartTrackingStarted = true;
-            Transaction transaction = new Transaction();
-            transaction.addTransactionCompletedListener(mExecutor,
-                    new Consumer<TransactionStats>() {
-                        @Override
-                        public void accept(TransactionStats transactionStats) {
-                            SyncFence presentFence = transactionStats.getPresentFence();
-                            if (presentFence.awaitForever()) {
-                                if (mFirstFramePresentedTimeNs == -1) {
-                                    // Only trigger once per {@link ViewRootImpl} instance.
-                                    mFirstFramePresentedTimeNs = presentFence.getSignalTime();
-                                    maybeSendAppStartTimes();
-                                }
-                            }
-                            presentFence.close();
-                        }
-                    });
-            applyTransactionOnDraw(transaction);
-        }
-
         if (DEBUG_BLAST) {
             Log.d(mTag, "Setup new sync=" + mWmsRequestSyncGroup.getName());
         }
 
         mWmsRequestSyncGroup.add(this, null /* runnable */);
-    }
-
-    private void maybeSendAppStartTimes() {
-        synchronized (this) {
-            if (mAppStartTimestampsSent) {
-                // Don't send timestamps more than once.
-                return;
-            }
-
-            // If we already have {@link mRenderThreadDrawStartTimeNs} then pass it through, if not
-            // post to main thread and check if we have it there.
-            if (mRenderThreadDrawStartTimeNs != -1) {
-                sendAppStartTimesLocked();
-            } else {
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        synchronized (ViewRootImpl.this) {
-                            if (mRenderThreadDrawStartTimeNs == -1) {
-                                return;
-                            }
-                            sendAppStartTimesLocked();
-                        }
-                    }
-                });
-            }
-        }
-    }
-
-    @GuardedBy("this")
-    private void sendAppStartTimesLocked() {
-        try {
-            ActivityManager.getService().reportStartInfoViewTimestamps(
-                    mRenderThreadDrawStartTimeNs, mFirstFramePresentedTimeNs);
-            mAppStartTimestampsSent = true;
-        } catch (RemoteException e) {
-            // Ignore, timestamps may be lost.
-            if (DBG) Log.d(TAG, "Exception attempting to report start timestamps.", e);
-        }
     }
 
     /**
@@ -5660,13 +5572,7 @@ public final class ViewRootImpl implements ViewParent,
                     registerCallbackForPendingTransactions();
                 }
 
-                long timeNs = SystemClock.uptimeNanos();
                 mAttachInfo.mThreadedRenderer.draw(mView, mAttachInfo, this);
-
-                // Only trigger once per {@link ViewRootImpl} instance.
-                if (mAppStartInfoTimestampsFlagValue && mRenderThreadDrawStartTimeNs == -1) {
-                    mRenderThreadDrawStartTimeNs = timeNs;
-                }
             } else {
                 // If we get here with a disabled & requested hardware renderer, something went
                 // wrong (an invalidate posted right before we destroyed the hardware surface
@@ -7516,6 +7422,8 @@ public final class ViewRootImpl implements ViewParent,
             final KeyEvent event = (KeyEvent)q.mEvent;
             if (mView.dispatchKeyEventPreIme(event)) {
                 return FINISH_HANDLED;
+            } else if (q.forPreImeOnly()) {
+                return FINISH_NOT_HANDLED;
             }
             return FORWARD;
         }
@@ -9266,42 +9174,19 @@ public final class ViewRootImpl implements ViewParent,
                     insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0, mRelayoutSeq,
                     mLastSyncSeqId);
         } else {
-            if (windowSessionRelayoutInfo()) {
-                relayoutResult = mWindowSession.relayout(mWindow, params,
-                        requestedWidth, requestedHeight, viewVisibility,
-                        insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
-                        mRelayoutSeq, mLastSyncSeqId, mRelayoutResult);
-            } else {
-                relayoutResult = mWindowSession.relayoutLegacy(mWindow, params,
-                        requestedWidth, requestedHeight, viewVisibility,
-                        insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
-                        mRelayoutSeq, mLastSyncSeqId, mTmpFrames, mPendingMergedConfiguration,
-                        mSurfaceControl, mTempInsets, mTempControls, mRelayoutBundle);
-            }
+            relayoutResult = mWindowSession.relayout(mWindow, params,
+                    requestedWidth, requestedHeight, viewVisibility,
+                    insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
+                    mRelayoutSeq, mLastSyncSeqId, mRelayoutResult);
             mRelayoutRequested = true;
 
             if (activityWindowInfoFlag() && mPendingActivityWindowInfo != null) {
-                ActivityWindowInfo outInfo = null;
-                if (windowSessionRelayoutInfo()) {
-                    outInfo = mRelayoutResult != null ? mRelayoutResult.activityWindowInfo : null;
-                } else {
-                    try {
-                        outInfo = mRelayoutBundle.getParcelable(
-                                IWindowSession.KEY_RELAYOUT_BUNDLE_ACTIVITY_WINDOW_INFO,
-                                ActivityWindowInfo.class);
-                        mRelayoutBundle.remove(
-                                IWindowSession.KEY_RELAYOUT_BUNDLE_ACTIVITY_WINDOW_INFO);
-                    } catch (IllegalStateException e) {
-                        Log.e(TAG, "Failed to get ActivityWindowInfo from relayout Bundle", e);
-                    }
-                }
+                final ActivityWindowInfo outInfo = mRelayoutResult.activityWindowInfo;
                 if (outInfo != null) {
                     mPendingActivityWindowInfo.set(outInfo);
                 }
             }
-            final int maybeSyncSeqId = windowSessionRelayoutInfo()
-                    ? mRelayoutResult.syncSeqId
-                    : mRelayoutBundle.getInt(IWindowSession.KEY_RELAYOUT_BUNDLE_SEQID);
+            final int maybeSyncSeqId = mRelayoutResult.syncSeqId;
             if (maybeSyncSeqId > 0) {
                 mSyncSeqId = maybeSyncSeqId;
             }
@@ -10015,12 +9900,20 @@ public final class ViewRootImpl implements ViewParent,
         public static final int FLAG_RESYNTHESIZED = 1 << 4;
         public static final int FLAG_UNHANDLED = 1 << 5;
         public static final int FLAG_MODIFIED_FOR_COMPATIBILITY = 1 << 6;
+        public static final int FLAG_PRE_IME_ONLY = 1 << 7;
 
         public QueuedInputEvent mNext;
 
         public InputEvent mEvent;
         public InputEventReceiver mReceiver;
         public int mFlags;
+
+        public boolean forPreImeOnly() {
+            if ((mFlags & FLAG_PRE_IME_ONLY) != 0) {
+                return true;
+            }
+            return false;
+        }
 
         public boolean shouldSkipIme() {
             if ((mFlags & FLAG_DELIVER_POST_IME) != 0) {
@@ -10048,6 +9941,7 @@ public final class ViewRootImpl implements ViewParent,
             hasPrevious = flagToString("FINISHED_HANDLED", FLAG_FINISHED_HANDLED, hasPrevious, sb);
             hasPrevious = flagToString("RESYNTHESIZED", FLAG_RESYNTHESIZED, hasPrevious, sb);
             hasPrevious = flagToString("UNHANDLED", FLAG_UNHANDLED, hasPrevious, sb);
+            hasPrevious = flagToString("FLAG_PRE_IME_ONLY", FLAG_PRE_IME_ONLY, hasPrevious, sb);
             if (!hasPrevious) {
                 sb.append("0");
             }
@@ -10104,7 +9998,7 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     @UnsupportedAppUsage
-    void enqueueInputEvent(InputEvent event,
+    QueuedInputEvent enqueueInputEvent(InputEvent event,
             InputEventReceiver receiver, int flags, boolean processImmediately) {
         QueuedInputEvent q = obtainQueuedInputEvent(event, receiver, flags);
 
@@ -10143,6 +10037,7 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             scheduleProcessInputEvents();
         }
+        return q;
     }
 
     private void scheduleProcessInputEvents() {
@@ -12474,29 +12369,45 @@ public final class ViewRootImpl implements ViewParent,
                             + "IWindow:%s Session:%s",
                     mOnBackInvokedDispatcher, mBasePackageName, mWindow, mWindowSession));
         }
-        mOnBackInvokedDispatcher.attachToWindow(mWindowSession, mWindow,
+        mOnBackInvokedDispatcher.attachToWindow(mWindowSession, mWindow, this,
                 mImeBackAnimationController);
     }
 
-    private void sendBackKeyEvent(int action) {
+    /**
+     * Sends {@link KeyEvent#ACTION_DOWN ACTION_DOWN} and {@link KeyEvent#ACTION_UP ACTION_UP}
+     * back key events
+     *
+     * @param preImeOnly whether the back events should be sent to the pre-ime stage only
+     * @return whether the event was handled (i.e. onKeyPreIme consumed it if preImeOnly=true)
+     */
+    public boolean injectBackKeyEvents(boolean preImeOnly) {
+        boolean consumed;
+        try {
+            processingBackKey(true);
+            sendBackKeyEvent(KeyEvent.ACTION_DOWN, preImeOnly);
+            consumed = sendBackKeyEvent(KeyEvent.ACTION_UP, preImeOnly);
+        } finally {
+            processingBackKey(false);
+        }
+        return consumed;
+    }
+
+    private boolean sendBackKeyEvent(int action, boolean preImeOnly) {
         long when = SystemClock.uptimeMillis();
         final KeyEvent ev = new KeyEvent(when, when, action,
                 KeyEvent.KEYCODE_BACK, 0 /* repeat */, 0 /* metaState */,
                 KeyCharacterMap.VIRTUAL_KEYBOARD, 0 /* scancode */,
                 KeyEvent.FLAG_FROM_SYSTEM | KeyEvent.FLAG_VIRTUAL_HARD_KEY,
                 InputDevice.SOURCE_KEYBOARD);
-        enqueueInputEvent(ev, null /* receiver */, 0 /* flags */, true /* processImmediately */);
+        int flags = preImeOnly ? QueuedInputEvent.FLAG_PRE_IME_ONLY : 0;
+        QueuedInputEvent q = enqueueInputEvent(ev, null /* receiver */, flags,
+                true /* processImmediately */);
+        return (q.mFlags & QueuedInputEvent.FLAG_FINISHED_HANDLED) != 0;
     }
 
     private void registerCompatOnBackInvokedCallback() {
         mCompatOnBackInvokedCallback = () -> {
-            try {
-                processingBackKey(true);
-                sendBackKeyEvent(KeyEvent.ACTION_DOWN);
-                sendBackKeyEvent(KeyEvent.ACTION_UP);
-            } finally {
-                processingBackKey(false);
-            }
+            injectBackKeyEvents(/* preImeOnly */ false);
         };
         if (mOnBackInvokedDispatcher.hasImeOnBackInvokedDispatcher()) {
             Log.d(TAG, "Skip registering CompatOnBackInvokedCallback on IME dispatcher");

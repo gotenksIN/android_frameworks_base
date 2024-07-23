@@ -26,6 +26,9 @@ import com.android.systemui.media.controls.shared.model.MediaData
 import com.android.systemui.media.controls.shared.model.MediaDataLoadingModel
 import com.android.systemui.media.controls.shared.model.SmartspaceMediaData
 import com.android.systemui.media.controls.shared.model.SmartspaceMediaLoadingModel
+import com.android.systemui.media.controls.util.MediaSmartspaceLogger
+import com.android.systemui.media.controls.util.MediaSmartspaceLogger.Companion.SMARTSPACE_CARD_DISMISS_EVENT
+import com.android.systemui.media.controls.util.SmallHash
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.util.time.SystemClock
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
@@ -43,9 +46,10 @@ import kotlinx.coroutines.flow.asStateFlow
 class MediaFilterRepository
 @Inject
 constructor(
-    @Application applicationContext: Context,
+    @Application private val applicationContext: Context,
     private val systemClock: SystemClock,
     private val configurationController: ConfigurationController,
+    private val smartspaceLogger: MediaSmartspaceLogger,
 ) {
 
     val onAnyMediaConfigurationChange: Flow<Unit> = conflatedCallbackFlow {
@@ -211,6 +215,12 @@ constructor(
                         isMediaFromRec(it)
                     )
                 sortedMap[sortKey] = newCommonModel
+                val isUpdate =
+                    sortedMedia.values.any { commonModel ->
+                        commonModel is MediaCommonModel.MediaControl &&
+                            commonModel.mediaLoadedModel.instanceId ==
+                                mediaDataLoadingModel.instanceId
+                    }
 
                 // On Addition or tapping on recommendations, we should show the new order of media.
                 if (mediaFromRecPackageName == it.packageName) {
@@ -218,29 +228,49 @@ constructor(
                         mediaFromRecPackageName = null
                         _currentMedia.value = sortedMap.values.toList()
                     }
-                } else if (sortedMap.size > _currentMedia.value.size && it.active) {
-                    _currentMedia.value = sortedMap.values.toList()
                 } else {
-                    // When loading an update for an existing media control.
+                    var isNewToCurrentMedia = true
                     val currentList =
                         mutableListOf<MediaCommonModel>().apply { addAll(_currentMedia.value) }
                     currentList.forEachIndexed { index, mediaCommonModel ->
                         if (
                             mediaCommonModel is MediaCommonModel.MediaControl &&
                                 mediaCommonModel.mediaLoadedModel.instanceId ==
-                                    mediaDataLoadingModel.instanceId &&
-                                mediaCommonModel != newCommonModel
+                                    mediaDataLoadingModel.instanceId
                         ) {
-                            // Update media model if changed.
-                            currentList[index] = newCommonModel
+                            // When loading an update for an existing media control.
+                            isNewToCurrentMedia = false
+                            if (mediaCommonModel != newCommonModel) {
+                                // Update media model if changed.
+                                currentList[index] = newCommonModel
+                            }
                         }
                     }
-                    _currentMedia.value = currentList
+                    if (isNewToCurrentMedia && it.active) {
+                        _currentMedia.value = sortedMap.values.toList()
+                    } else {
+                        _currentMedia.value = currentList
+                    }
+                }
+
+                sortedMedia = sortedMap
+
+                if (!isUpdate) {
+                    val rank = sortedMedia.values.indexOf(newCommonModel)
+                    if (isSmartspaceLoggingEnabled(newCommonModel, rank)) {
+                        smartspaceLogger.logSmartspaceCardReceived(
+                            it.smartspaceId,
+                            it.appUid,
+                            cardinality = _currentMedia.value.size,
+                            isSsReactivated = mediaDataLoadingModel.isSsReactivated,
+                            rank = rank,
+                        )
+                    }
+                } else if (mediaDataLoadingModel.receivedSmartspaceCardLatency != 0) {
+                    logSmartspaceAllMediaCards(mediaDataLoadingModel.receivedSmartspaceCardLatency)
                 }
             }
         }
-
-        sortedMedia = sortedMap
 
         // On removal we want to keep the order being shown to user.
         if (mediaDataLoadingModel is MediaDataLoadingModel.Removed) {
@@ -249,6 +279,7 @@ constructor(
                     commonModel !is MediaCommonModel.MediaControl ||
                         mediaDataLoadingModel.instanceId != commonModel.mediaLoadedModel.instanceId
                 }
+            sortedMedia = sortedMap
         }
     }
 
@@ -271,21 +302,45 @@ constructor(
                 isPlaying = false,
                 active = _smartspaceMediaData.value.isActive,
             )
+        val newCommonModel = MediaCommonModel.MediaRecommendations(smartspaceMediaLoadingModel)
         when (smartspaceMediaLoadingModel) {
-            is SmartspaceMediaLoadingModel.Loaded ->
-                sortedMap[sortKey] =
-                    MediaCommonModel.MediaRecommendations(smartspaceMediaLoadingModel)
-            is SmartspaceMediaLoadingModel.Removed ->
+            is SmartspaceMediaLoadingModel.Loaded -> {
+                sortedMap[sortKey] = newCommonModel
+                _currentMedia.value = sortedMap.values.toList()
+                sortedMedia = sortedMap
+
+                if (isRecommendationActive()) {
+                    val hasActivatedExistedResumeMedia =
+                        !hasActiveMedia() &&
+                            hasAnyMedia() &&
+                            smartspaceMediaLoadingModel.isPrioritized
+                    if (hasActivatedExistedResumeMedia) {
+                        // Log resume card received if resumable media card is reactivated and
+                        // recommendation card is valid and ranked first
+                        logSmartspaceAllMediaCards(
+                            (systemClock.currentTimeMillis() -
+                                    _smartspaceMediaData.value.headphoneConnectionTimeMillis)
+                                .toInt()
+                        )
+                    }
+
+                    smartspaceLogger.logSmartspaceCardReceived(
+                        SmallHash.hash(_smartspaceMediaData.value.targetId),
+                        _smartspaceMediaData.value.getUid(applicationContext),
+                        cardinality = _currentMedia.value.size,
+                        isRecommendationCard = true,
+                        rank = _currentMedia.value.indexOf(newCommonModel),
+                    )
+                }
+            }
+            is SmartspaceMediaLoadingModel.Removed -> {
                 _currentMedia.value =
                     _currentMedia.value.filter { commonModel ->
                         commonModel !is MediaCommonModel.MediaRecommendations
                     }
+                sortedMedia = sortedMap
+            }
         }
-
-        if (sortedMap.size > sortedMedia.size) {
-            _currentMedia.value = sortedMap.values.toList()
-        }
-        sortedMedia = sortedMap
     }
 
     fun setOrderedMedia() {
@@ -308,11 +363,161 @@ constructor(
         return _smartspaceMediaData.value.isActive
     }
 
+    /** Log user event on media card if smartspace logging is enabled. */
+    fun logSmartspaceCardUserEvent(
+        eventId: Int,
+        location: Int,
+        interactedSubCardRank: Int = 0,
+        interactedSubCardCardinality: Int = 0,
+        instanceId: InstanceId? = null,
+        isRec: Boolean = false
+    ) {
+        _currentMedia.value.forEachIndexed { index, mediaCommonModel ->
+            when (mediaCommonModel) {
+                is MediaCommonModel.MediaControl -> {
+                    if (mediaCommonModel.mediaLoadedModel.instanceId == instanceId) {
+                        if (isSmartspaceLoggingEnabled(mediaCommonModel, index)) {
+                            logSmartspaceMediaCardUserEvent(
+                                instanceId,
+                                index,
+                                eventId,
+                                location,
+                                mediaCommonModel.mediaLoadedModel.isSsReactivated,
+                                interactedSubCardRank,
+                                interactedSubCardCardinality
+                            )
+                        }
+                        return
+                    }
+                }
+                is MediaCommonModel.MediaRecommendations -> {
+                    if (isRec) {
+                        if (isSmartspaceLoggingEnabled(mediaCommonModel, index)) {
+                            logSmarspaceRecommendationCardUserEvent(
+                                eventId,
+                                location,
+                                index,
+                                interactedSubCardRank,
+                                interactedSubCardCardinality
+                            )
+                        }
+                        return
+                    }
+                }
+            }
+        }
+    }
+
+    /** Log media and recommendation cards dismissal if smartspace logging is enabled for each. */
+    fun logSmartspaceCardsOnSwipeToDismiss(location: Int) {
+        _currentMedia.value.forEachIndexed { index, mediaCommonModel ->
+            if (isSmartspaceLoggingEnabled(mediaCommonModel, index)) {
+                when (mediaCommonModel) {
+                    is MediaCommonModel.MediaControl ->
+                        logSmartspaceMediaCardUserEvent(
+                            mediaCommonModel.mediaLoadedModel.instanceId,
+                            index,
+                            SMARTSPACE_CARD_DISMISS_EVENT,
+                            location,
+                            mediaCommonModel.mediaLoadedModel.isSsReactivated,
+                            isSwipeToDismiss = true
+                        )
+                    is MediaCommonModel.MediaRecommendations ->
+                        logSmarspaceRecommendationCardUserEvent(
+                            SMARTSPACE_CARD_DISMISS_EVENT,
+                            location,
+                            index,
+                            isSwipeToDismiss = true
+                        )
+                }
+            }
+        }
+    }
+
     private fun canBeRemoved(data: MediaData): Boolean {
         return data.isPlaying?.let { !it } ?: data.isClearable && !data.active
     }
 
     private fun isMediaFromRec(data: MediaData): Boolean {
         return data.isPlaying == true && mediaFromRecPackageName == data.packageName
+    }
+
+    /** Log all media cards if smartspace logging is enabled for each. */
+    private fun logSmartspaceAllMediaCards(receivedSmartspaceCardLatency: Int) {
+        sortedMedia.values.forEachIndexed { index, mediaCommonModel ->
+            if (mediaCommonModel is MediaCommonModel.MediaControl) {
+                _selectedUserEntries.value[mediaCommonModel.mediaLoadedModel.instanceId]?.let {
+                    it.smartspaceId =
+                        SmallHash.hash(it.appUid + systemClock.currentTimeMillis().toInt())
+                    it.isImpressed = false
+
+                    if (isSmartspaceLoggingEnabled(mediaCommonModel, index)) {
+                        smartspaceLogger.logSmartspaceCardReceived(
+                            it.smartspaceId,
+                            it.appUid,
+                            cardinality = _currentMedia.value.size,
+                            isSsReactivated = mediaCommonModel.mediaLoadedModel.isSsReactivated,
+                            rank = index,
+                            receivedLatencyMillis = receivedSmartspaceCardLatency,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun logSmartspaceMediaCardUserEvent(
+        instanceId: InstanceId,
+        index: Int,
+        eventId: Int,
+        location: Int,
+        isReactivated: Boolean,
+        interactedSubCardRank: Int = 0,
+        interactedSubCardCardinality: Int = 0,
+        isSwipeToDismiss: Boolean = false
+    ) {
+        _selectedUserEntries.value[instanceId]?.let {
+            smartspaceLogger.logSmartspaceCardUIEvent(
+                eventId,
+                it.smartspaceId,
+                it.appUid,
+                location,
+                _currentMedia.value.size,
+                isSsReactivated = isReactivated,
+                interactedSubcardRank = interactedSubCardRank,
+                interactedSubcardCardinality = interactedSubCardCardinality,
+                rank = index,
+                isSwipeToDismiss = isSwipeToDismiss,
+            )
+        }
+    }
+
+    private fun logSmarspaceRecommendationCardUserEvent(
+        eventId: Int,
+        location: Int,
+        index: Int,
+        interactedSubCardRank: Int = 0,
+        interactedSubCardCardinality: Int = 0,
+        isSwipeToDismiss: Boolean = false
+    ) {
+        smartspaceLogger.logSmartspaceCardUIEvent(
+            eventId,
+            SmallHash.hash(_smartspaceMediaData.value.targetId),
+            _smartspaceMediaData.value.getUid(applicationContext),
+            location,
+            _currentMedia.value.size,
+            isRecommendationCard = true,
+            interactedSubcardRank = interactedSubCardRank,
+            interactedSubcardCardinality = interactedSubCardCardinality,
+            rank = index,
+            isSwipeToDismiss = isSwipeToDismiss,
+        )
+    }
+
+    private fun isSmartspaceLoggingEnabled(commonModel: MediaCommonModel, index: Int): Boolean {
+        return sortedMedia.size > index &&
+            (_smartspaceMediaData.value.expiryTimeMs != 0L ||
+                isRecommendationActive() ||
+                commonModel is MediaCommonModel.MediaRecommendations)
     }
 }

@@ -39,6 +39,7 @@ import com.android.systemui.keyguard.shared.model.DozeTransitionModel
 import com.android.systemui.keyguard.shared.model.KeyguardDone
 import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.plugins.statusbar.StatusBarStateController
+import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.settings.UserTracker
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.util.time.SystemClock
@@ -77,6 +78,8 @@ interface KeyguardRepository {
     val bottomAreaAlpha: StateFlow<Float>
 
     val keyguardAlpha: StateFlow<Float>
+
+    val panelAlpha: MutableStateFlow<Float>
 
     /**
      * Observable for whether the keyguard is showing.
@@ -250,6 +253,9 @@ interface KeyguardRepository {
     /** Sets the current amount of alpha that should be used for rendering the keyguard. */
     fun setKeyguardAlpha(alpha: Float)
 
+    /** Temporary shim for fading out content when the brightness slider is used */
+    fun setPanelAlpha(alpha: Float)
+
     /** Whether the device is actively dreaming */
     fun setDreaming(isDreaming: Boolean)
 
@@ -288,6 +294,15 @@ interface KeyguardRepository {
 
     /** Sets whether the keyguard is enabled (see [isKeyguardEnabled]). */
     fun setKeyguardEnabled(enabled: Boolean)
+
+    /** @see isShowKeyguardWhenReenabled */
+    fun setShowKeyguardWhenReenabled(isShowKeyguardWhenReenabled: Boolean)
+
+    /**
+     * Returns `true` if the keyguard should be re-shown once it becomes re-enabled again; `false`
+     * otherwise.
+     */
+    fun isShowKeyguardWhenReenabled(): Boolean
 }
 
 /** Encapsulates application state for the keyguard. */
@@ -337,6 +352,8 @@ constructor(
 
     private val _keyguardAlpha = MutableStateFlow(1f)
     override val keyguardAlpha = _keyguardAlpha.asStateFlow()
+
+    override val panelAlpha: MutableStateFlow<Float> = MutableStateFlow(1f)
 
     private val _clockShouldBeCentered = MutableStateFlow(true)
     override val clockShouldBeCentered: Flow<Boolean> = _clockShouldBeCentered.asStateFlow()
@@ -466,6 +483,8 @@ constructor(
 
     private val _isDozing = MutableStateFlow(statusBarStateController.isDozing)
     override val isDozing: StateFlow<Boolean> = _isDozing.asStateFlow()
+
+    private var isShowKeyguardWhenReenabled: Boolean = false
 
     override fun setIsDozing(isDozing: Boolean) {
         _isDozing.value = isDozing
@@ -659,6 +678,10 @@ constructor(
         _keyguardAlpha.value = alpha
     }
 
+    override fun setPanelAlpha(alpha: Float) {
+        panelAlpha.value = alpha
+    }
+
     override fun setDreaming(isDreaming: Boolean) {
         this.isDreaming.value = isDreaming
     }
@@ -679,6 +702,16 @@ constructor(
 
     override fun setKeyguardEnabled(enabled: Boolean) {
         _isKeyguardEnabled.value = enabled
+    }
+
+    override fun setShowKeyguardWhenReenabled(isShowKeyguardWhenReenabled: Boolean) {
+        SceneContainerFlag.assertInNewMode()
+        this.isShowKeyguardWhenReenabled = isShowKeyguardWhenReenabled
+    }
+
+    override fun isShowKeyguardWhenReenabled(): Boolean {
+        SceneContainerFlag.assertInNewMode()
+        return isShowKeyguardWhenReenabled
     }
 
     private fun statusBarStateIntToObject(value: Int): StatusBarState {

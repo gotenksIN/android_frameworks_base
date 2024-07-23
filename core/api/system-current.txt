@@ -105,6 +105,7 @@ package android {
     field public static final String CAMERA_OPEN_CLOSE_LISTENER = "android.permission.CAMERA_OPEN_CLOSE_LISTENER";
     field @FlaggedApi("com.android.internal.camera.flags.camera_privacy_allowlist") public static final String CAMERA_PRIVACY_ALLOWLIST = "android.permission.CAMERA_PRIVACY_ALLOWLIST";
     field public static final String CAPTURE_AUDIO_HOTWORD = "android.permission.CAPTURE_AUDIO_HOTWORD";
+    field @FlaggedApi("android.os.allow_consentless_bugreport_delegated_consent") public static final String CAPTURE_CONSENTLESS_BUGREPORT_DELEGATED_CONSENT = "android.permission.CAPTURE_CONSENTLESS_BUGREPORT_DELEGATED_CONSENT";
     field public static final String CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD = "android.permission.CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD";
     field public static final String CAPTURE_MEDIA_OUTPUT = "android.permission.CAPTURE_MEDIA_OUTPUT";
     field public static final String CAPTURE_TUNER_AUDIO_INPUT = "android.permission.CAPTURE_TUNER_AUDIO_INPUT";
@@ -11471,6 +11472,19 @@ package android.os.storage {
 
 }
 
+package android.os.vibrator.persistence {
+
+  @FlaggedApi("android.os.vibrator.vibration_xml_apis") public final class ParsedVibration {
+    method @FlaggedApi("android.os.vibrator.vibration_xml_apis") @Nullable public android.os.VibrationEffect resolve(@NonNull android.os.Vibrator);
+  }
+
+  @FlaggedApi("android.os.vibrator.vibration_xml_apis") public final class VibrationXmlParser {
+    method @FlaggedApi("android.os.vibrator.vibration_xml_apis") @NonNull public static android.os.vibrator.persistence.ParsedVibration parse(@NonNull java.io.InputStream) throws java.io.IOException;
+    method @FlaggedApi("android.os.vibrator.vibration_xml_apis") @NonNull public static android.os.VibrationEffect parseVibrationEffect(@NonNull java.io.InputStream) throws java.io.IOException;
+  }
+
+}
+
 package android.permission {
 
   public final class AdminPermissionControlParams implements android.os.Parcelable {
@@ -12886,7 +12900,14 @@ package android.service.notification {
     field public static final String KEY_SENSITIVE_CONTENT = "key_sensitive_content";
     field public static final String KEY_SNOOZE_CRITERIA = "key_snooze_criteria";
     field public static final String KEY_TEXT_REPLIES = "key_text_replies";
+    field @FlaggedApi("android.service.notification.notification_classification") public static final String KEY_TYPE = "key_type";
     field public static final String KEY_USER_SENTIMENT = "key_user_sentiment";
+    field @FlaggedApi("android.service.notification.notification_classification") public static final int TYPE_CONTENT_RECOMMENDATION = 4; // 0x4
+    field @FlaggedApi("android.service.notification.notification_classification") public static final int TYPE_NEWS = 3; // 0x3
+    field @FlaggedApi("android.service.notification.notification_classification") public static final int TYPE_OTHER = 0; // 0x0
+    field @FlaggedApi("android.service.notification.notification_classification") public static final int TYPE_PROMOTION = 1; // 0x1
+    field @FlaggedApi("android.service.notification.notification_classification") public static final int TYPE_SOCIAL_MEDIA = 2; // 0x2
+    field @FlaggedApi("android.service.notification.notification_classification") public static final int TYPE_UNKNOWN = -1; // 0xffffffff
   }
 
   public abstract class NotificationAssistantService extends android.service.notification.NotificationListenerService {

@@ -27543,7 +27543,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return a view with given ID if found, or {@code null} otherwise
      * @see View#requireViewById(int)
      */
-    @Nullable
+    /* TODO(b/347672184): Re-add @Nullable */
     public final <T extends View> T findViewById(@IdRes int id) {
         if (id == NO_ID) {
             return null;
@@ -30616,7 +30616,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * {@link #setPointerIcon(PointerIcon)} for mouse devices. Subclasses may override this to
      * customize the icon for the given pointer.
      *
-     * For example, the pointer icon for a stylus pointer can be resolved in the following way:
+     * For example, to always show the PointerIcon.TYPE_HANDWRITING icon for a stylus pointer,
+     * the event can be resolved in the following way:
      * <code><pre>
      * &#64;Override
      * public PointerIcon onResolvePointerIcon(MotionEvent event, int pointerIndex) {
@@ -30626,7 +30627,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *             && (toolType == MotionEvent.TOOL_TYPE_STYLUS
      *                     || toolType == MotionEvent.TOOL_TYPE_ERASER)) {
      *         // Show this pointer icon only if this pointer is a stylus.
-     *         return PointerIcon.getSystemIcon(mContext, PointerIcon.TYPE_WAIT);
+     *         return PointerIcon.getSystemIcon(mContext, PointerIcon.TYPE_HANDWRITING);
      *     }
      *     // Use the default logic for determining the pointer icon for other non-stylus pointers,
      *     // like for the mouse cursor.
@@ -33907,8 +33908,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     protected int calculateFrameRateCategory() {
         int category;
         switch (getViewRootImpl().intermittentUpdateState()) {
-            case ViewRootImpl.INTERMITTENT_STATE_INTERMITTENT -> category =
-                    FRAME_RATE_CATEGORY_NORMAL | FRAME_RATE_CATEGORY_REASON_INTERMITTENT;
+            case ViewRootImpl.INTERMITTENT_STATE_INTERMITTENT -> {
+                if (!sToolkitFrameRateBySizeReadOnlyFlagValue) {
+                    category = FRAME_RATE_CATEGORY_NORMAL;
+                } else {
+                    // The size based frame rate category can only be LOW or NORMAL. If the size
+                    // based frame rate category is LOW, we shouldn't vote for NORMAL for
+                    // intermittent.
+                    category = Math.min(
+                            mSizeBasedFrameRateCategoryAndReason & ~FRAME_RATE_CATEGORY_REASON_MASK,
+                            FRAME_RATE_CATEGORY_NORMAL);
+                }
+                category |= FRAME_RATE_CATEGORY_REASON_INTERMITTENT;
+            }
             case ViewRootImpl.INTERMITTENT_STATE_NOT_INTERMITTENT ->
                     category = mSizeBasedFrameRateCategoryAndReason;
             default -> category = mLastFrameRateCategory;

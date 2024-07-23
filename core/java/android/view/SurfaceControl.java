@@ -2815,6 +2815,10 @@ public final class SurfaceControl implements Parcelable {
         private final ArrayMap<SurfaceControl, Point> mResizedSurfaces = new ArrayMap<>();
         private final ArrayMap<SurfaceControl, SurfaceControl> mReparentedSurfaces =
                  new ArrayMap<>();
+        // Only non-null if the SurfaceControlRegistry is enabled. This list tracks the set of calls
+        // made through this transaction object, and is dumped (and cleared) when the transaction is
+        // later applied.
+        ArrayList<String> mCalls;
 
         Runnable mFreeNativeResources;
         private static final float[] INVALID_COLOR = {-1, -1, -1};
@@ -2840,13 +2844,28 @@ public final class SurfaceControl implements Parcelable {
         private Transaction(long nativeObject) {
             mNativeObject = nativeObject;
             mFreeNativeResources = sRegistry.registerNativeAllocation(this, mNativeObject);
-            if (!SurfaceControlRegistry.sCallStackDebuggingInitialized) {
-                SurfaceControlRegistry.initializeCallStackDebugging();
-            }
+            setUpForSurfaceControlRegistry();
         }
 
         private Transaction(Parcel in) {
             readFromParcel(in);
+            setUpForSurfaceControlRegistry();
+        }
+
+        /**
+         * Sets up this transaction for the SurfaceControlRegistry.
+         */
+        private void setUpForSurfaceControlRegistry() {
+            if (!SurfaceControlRegistry.sCallStackDebuggingInitialized) {
+                SurfaceControlRegistry.initializeCallStackDebugging();
+            }
+            mCalls = SurfaceControlRegistry.sLogAllTxCallsOnApply
+                    ? new ArrayList<>()
+                    : null;
+            if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
+                SurfaceControlRegistry.getProcessInstance().checkCallStackDebugging(
+                        "ctor", this, null, null);
+            }
         }
 
         /**
@@ -2896,6 +2915,9 @@ public final class SurfaceControl implements Parcelable {
             if (mNativeObject != 0) {
                 nativeClearTransaction(mNativeObject);
             }
+            if (mCalls != null) {
+                mCalls.clear();
+            }
         }
 
         /**
@@ -2907,6 +2929,9 @@ public final class SurfaceControl implements Parcelable {
             mReparentedSurfaces.clear();
             mFreeNativeResources.run();
             mNativeObject = 0;
+            if (mCalls != null) {
+                mCalls.clear();
+            }
         }
 
         /**
@@ -2924,7 +2949,10 @@ public final class SurfaceControl implements Parcelable {
 
             if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
                 SurfaceControlRegistry.getProcessInstance().checkCallStackDebugging(
-                        "apply", this, null, null);
+                        SurfaceControlRegistry.APPLY, this, null, null);
+            }
+            if (mCalls != null) {
+                mCalls.clear();
             }
         }
 
@@ -4424,6 +4452,14 @@ public final class SurfaceControl implements Parcelable {
             if (this == other) {
                 return this;
             }
+            if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
+                SurfaceControlRegistry.getProcessInstance().checkCallStackDebugging(
+                        "merge", this, null, "otherTx=" + other.getId());
+                if (mCalls != null) {
+                    mCalls.addAll(other.mCalls);
+                    other.mCalls.clear();
+                }
+            }
             mResizedSurfaces.putAll(other.mResizedSurfaces);
             other.mResizedSurfaces.clear();
             mReparentedSurfaces.putAll(other.mReparentedSurfaces);
@@ -4475,6 +4511,10 @@ public final class SurfaceControl implements Parcelable {
                 Log.w(TAG, "addTransactionCompletedListener was called but flag is disabled");
                 return this;
             }
+            if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
+                SurfaceControlRegistry.getProcessInstance().checkCallStackDebugging(
+                        "setFrameTimeline", this, null, "vsyncId=" + vsyncId);
+            }
             nativeSetFrameTimelineVsync(mNativeObject, vsyncId);
             return this;
         }
@@ -4482,6 +4522,11 @@ public final class SurfaceControl implements Parcelable {
         /** @hide */
         @NonNull
         public Transaction setFrameTimelineVsync(long frameTimelineVsyncId) {
+            if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
+                SurfaceControlRegistry.getProcessInstance().checkCallStackDebugging(
+                        "setFrameTimelineVsync", this, null, "frameTimelineVsyncId="
+                                + frameTimelineVsyncId);
+            }
             nativeSetFrameTimelineVsync(mNativeObject, frameTimelineVsyncId);
             return this;
         }

@@ -26,6 +26,7 @@ import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.activityStarter
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.view.ChipBackgroundContainer
 import com.android.systemui.statusbar.phone.ongoingcall.data.repository.ongoingCallRepository
@@ -68,13 +69,13 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun chip_inCall_isShown() =
+    fun chip_inCall_isShownAsTimer() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
             repo.setOngoingCallState(OngoingCallModel.InCall(startTimeMs = 345, intent = null))
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown.Timer::class.java)
         }
 
     @Test
@@ -91,11 +92,12 @@ class CallChipViewModelTest : SysuiTestCase() {
             // started 2000ms ago (1000 - 3000). The OngoingActivityChipModel start time needs to be
             // relative to elapsedRealtime, so it should be 2000ms before the elapsed realtime set
             // on the clock.
-            assertThat((latest as OngoingActivityChipModel.Shown).startTimeMs).isEqualTo(398_000)
+            assertThat((latest as OngoingActivityChipModel.Shown.Timer).startTimeMs)
+                .isEqualTo(398_000)
         }
 
     @Test
-    fun chip_inCall_iconIsPhone() =
+    fun chip_iconIsPhone() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -103,6 +105,17 @@ class CallChipViewModelTest : SysuiTestCase() {
 
             assertThat(((latest as OngoingActivityChipModel.Shown).icon as Icon.Resource).res)
                 .isEqualTo(com.android.internal.R.drawable.ic_phone)
+        }
+
+    @Test
+    fun chip_colorsAreThemed() =
+        testScope.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            repo.setOngoingCallState(OngoingCallModel.InCall(startTimeMs = 1000, intent = null))
+
+            assertThat((latest as OngoingActivityChipModel.Shown).colors)
+                .isEqualTo(ColorsModel.Themed)
         }
 
     @Test
@@ -115,7 +128,8 @@ class CallChipViewModelTest : SysuiTestCase() {
             // Start a call
             repo.setOngoingCallState(OngoingCallModel.InCall(startTimeMs = 1000, intent = null))
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
-            assertThat((latest as OngoingActivityChipModel.Shown).startTimeMs).isEqualTo(398_000)
+            assertThat((latest as OngoingActivityChipModel.Shown.Timer).startTimeMs)
+                .isEqualTo(398_000)
 
             // End the call
             repo.setOngoingCallState(OngoingCallModel.NoCall)
@@ -128,20 +142,18 @@ class CallChipViewModelTest : SysuiTestCase() {
             // Start a new call, which started 1000ms ago
             repo.setOngoingCallState(OngoingCallModel.InCall(startTimeMs = 102_000, intent = null))
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
-            assertThat((latest as OngoingActivityChipModel.Shown).startTimeMs).isEqualTo(499_000)
+            assertThat((latest as OngoingActivityChipModel.Shown.Timer).startTimeMs)
+                .isEqualTo(499_000)
         }
 
     @Test
-    fun chip_inCall_nullIntent_clickListenerDoesNothing() =
+    fun chip_inCall_nullIntent_nullClickListener() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
             repo.setOngoingCallState(OngoingCallModel.InCall(startTimeMs = 1000, intent = null))
 
-            val clickListener = (latest as OngoingActivityChipModel.Shown).onClickListener
-
-            clickListener.onClick(chipView)
-            // Just verify nothing crashes
+            assertThat((latest as OngoingActivityChipModel.Shown).onClickListener).isNull()
         }
 
     @Test
@@ -152,8 +164,9 @@ class CallChipViewModelTest : SysuiTestCase() {
             val intent = mock<PendingIntent>()
             repo.setOngoingCallState(OngoingCallModel.InCall(startTimeMs = 1000, intent = intent))
             val clickListener = (latest as OngoingActivityChipModel.Shown).onClickListener
+            assertThat(clickListener).isNotNull()
 
-            clickListener.onClick(chipView)
+            clickListener!!.onClick(chipView)
 
             verify(kosmos.activityStarter).postStartActivityDismissingKeyguard(intent, null)
         }

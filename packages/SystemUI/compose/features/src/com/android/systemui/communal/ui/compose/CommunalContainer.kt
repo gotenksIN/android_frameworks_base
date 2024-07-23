@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,9 +60,11 @@ import com.android.systemui.communal.ui.compose.Dimensions.SlideOffsetY
 import com.android.systemui.communal.ui.compose.extensions.allowGestures
 import com.android.systemui.communal.ui.viewmodel.CommunalViewModel
 import com.android.systemui.communal.util.CommunalColors
+import com.android.systemui.keyguard.domain.interactor.FromPrimaryBouncerTransitionInteractor.Companion.TO_GONE_DURATION
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.SceneTransitionLayoutDataSource
+import kotlin.time.DurationUnit
 
 object Communal {
     object Elements {
@@ -89,6 +92,10 @@ private object TransitionDuration {
 val sceneTransitions = transitions {
     to(CommunalScenes.Communal, key = CommunalTransitionKeys.SimpleFade) {
         spec = tween(durationMillis = 250)
+        fade(AllElements)
+    }
+    to(CommunalScenes.Blank, key = CommunalTransitionKeys.SimpleFade) {
+        spec = tween(durationMillis = TO_GONE_DURATION.toInt(DurationUnit.MILLISECONDS))
         fade(AllElements)
     }
     to(CommunalScenes.Communal) {
@@ -131,6 +138,9 @@ val sceneTransitions = transitions {
             fade(Communal.Elements.Grid)
         }
     }
+    // Disable horizontal overscroll. If the scene is overscrolled too soon after showing, this
+    // can lead to inconsistent KeyguardState changes.
+    overscroll(CommunalScenes.Communal, Orientation.Horizontal) {}
 }
 
 /**
@@ -226,10 +236,14 @@ fun CommunalContainer(
 
         scene(
             CommunalScenes.Communal,
-            userActions =
-                mapOf(Swipe(SwipeDirection.Right, fromSource = Edge.Left) to CommunalScenes.Blank)
+            userActions = mapOf(Swipe(SwipeDirection.Right) to CommunalScenes.Blank)
         ) {
-            CommunalScene(backgroundType, colors, content)
+            CommunalScene(
+                backgroundType = backgroundType,
+                colors = colors,
+                content = content,
+                modifier = Modifier.horizontalNestedScrollToScene(),
+            )
         }
     }
 

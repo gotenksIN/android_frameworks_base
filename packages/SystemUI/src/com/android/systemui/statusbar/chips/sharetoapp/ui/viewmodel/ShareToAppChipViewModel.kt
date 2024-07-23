@@ -26,6 +26,7 @@ import com.android.systemui.statusbar.chips.mediaprojection.domain.interactor.Me
 import com.android.systemui.statusbar.chips.mediaprojection.domain.model.ProjectionChipModel
 import com.android.systemui.statusbar.chips.mediaprojection.ui.view.EndMediaProjectionDialogHelper
 import com.android.systemui.statusbar.chips.sharetoapp.ui.view.EndShareToAppDialogDelegate
+import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipViewModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipViewModel.Companion.createDialogLaunchOnClickListener
@@ -65,7 +66,8 @@ constructor(
                     }
                 }
             }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), OngoingActivityChipModel.Hidden)
+            // See b/347726238.
+            .stateIn(scope, SharingStarted.Lazily, OngoingActivityChipModel.Hidden)
 
     /** Stops the currently active projection. */
     private fun stopProjecting() {
@@ -75,9 +77,10 @@ constructor(
     private fun createShareToAppChip(
         state: ProjectionChipModel.Projecting,
     ): OngoingActivityChipModel.Shown {
-        return OngoingActivityChipModel.Shown(
+        return OngoingActivityChipModel.Shown.Timer(
             // TODO(b/332662551): Use the right content description.
             icon = Icon.Resource(SHARE_TO_APP_ICON, contentDescription = null),
+            colors = ColorsModel.Red,
             // TODO(b/332662551): Maybe use a MediaProjection API to fetch this time.
             startTimeMs = systemClock.elapsedRealtime(),
             createDialogLaunchOnClickListener(
@@ -95,7 +98,6 @@ constructor(
         )
 
     companion object {
-        // TODO(b/332662551): Use the right icon.
-        @DrawableRes val SHARE_TO_APP_ICON = R.drawable.ic_screenshot_share
+        @DrawableRes val SHARE_TO_APP_ICON = R.drawable.ic_present_to_all
     }
 }

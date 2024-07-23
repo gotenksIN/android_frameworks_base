@@ -1639,6 +1639,15 @@ public class ActivityRecordTests extends WindowTestsBase {
         clearInvocations(mDefaultDisplay);
     }
 
+    @Test
+    public void testCompleteResume_updateCompatDisplayInsets() {
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        doReturn(true).when(activity).shouldCreateCompatDisplayInsets();
+        activity.setState(RESUMED, "test");
+        activity.completeResumeLocked();
+        assertNotNull(activity.getCompatDisplayInsets());
+    }
+
     /**
      * Verify destroy activity request completes successfully.
      */
@@ -3089,6 +3098,30 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
+    public void testOnStartingWindowDrawn() {
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        // The task-has-been-visible should not affect the decision of making transition ready.
+        activity.getTask().setHasBeenVisible(true);
+        activity.detachFromProcess();
+        activity.mStartingData = mock(StartingData.class);
+        registerTestTransitionPlayer();
+        final Transition transition = activity.mTransitionController.requestTransitionIfNeeded(
+                WindowManager.TRANSIT_OPEN, 0 /* flags */, null /* trigger */, mDisplayContent);
+        activity.onStartingWindowDrawn();
+        assertTrue(activity.mStartingData.mIsDisplayed);
+        // The transition can be ready by the starting window of a visible-requested activity
+        // without a running process.
+        assertTrue(transition.allReady());
+
+        // If other event makes the transition unready, the reentrant of onStartingWindowDrawn
+        // should not replace the readiness again.
+        transition.setReady(mDisplayContent, false);
+        activity.onStartingWindowDrawn();
+        assertFalse(transition.allReady());
+    }
+
+
+    @Test
     public void testCloseToSquareFixedOrientation() {
         if (Flags.insetsDecoupledConfiguration()) {
             // No test needed as decor insets no longer affects orientation.
@@ -3324,14 +3357,8 @@ public class ActivityRecordTests extends WindowTestsBase {
         // to client if the app didn't request IME visible.
         assertFalse(app2.mActivityRecord.mImeInsetsFrozenUntilStartInput);
 
-        if (Flags.bundleClientTransactionFlag()) {
-            verify(app2.getProcess(), atLeastOnce()).scheduleClientTransactionItem(
-                    isA(WindowStateResizeItem.class));
-        } else {
-            verify(app2.mClient, atLeastOnce()).resized(any(), anyBoolean(), any(),
-                    insetsStateCaptor.capture(), anyBoolean(), anyBoolean(), anyInt(), anyInt(),
-                    anyBoolean(), any());
-        }
+        verify(app2.getProcess(), atLeastOnce()).scheduleClientTransactionItem(
+                isA(WindowStateResizeItem.class));
         assertFalse(app2.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
     }
 

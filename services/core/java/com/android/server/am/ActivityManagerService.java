@@ -5583,8 +5583,13 @@ public class ActivityManagerService extends IActivityManager.Stub
     private boolean isHomeLaunchDelayable() {
         // This feature is disabled on Auto since it seems to add an unacceptably long boot delay
         // without even solving the underlying issue (it merely hits the timeout).
-        return enableHomeDelay() &&
-                !mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE);
+        // This feature is disabled on TV since the ThemeOverlayController is currently not present
+        // and therefore we do not want to wait unnecessarily.
+        // This feature is currently disabled in WearOS to avoid extreme boot regressions
+        return enableHomeDelay()
+                && !mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
+                && !mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+                && !mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH);
     }
 
     final void ensureBootCompleted() {
@@ -10338,6 +10343,19 @@ public class ActivityManagerService extends IActivityManager.Stub
                 ALLOW_NON_FULL, "addStartInfoTimestamp", null);
 
         addStartInfoTimestampInternal(key, timestampNs, userId, callingUid);
+    }
+
+    @Override
+    public void reportStartInfoViewTimestamps(long renderThreadDrawStartTimeNs,
+            long framePresentedTimeNs) {
+        int callingUid = Binder.getCallingUid();
+        int userId = UserHandle.getUserId(callingUid);
+        addStartInfoTimestampInternal(
+                ApplicationStartInfo.START_TIMESTAMP_INITIAL_RENDERTHREAD_FRAME,
+                renderThreadDrawStartTimeNs, userId, callingUid);
+        addStartInfoTimestampInternal(
+                ApplicationStartInfo.START_TIMESTAMP_SURFACEFLINGER_COMPOSITION_COMPLETE,
+                framePresentedTimeNs, userId, callingUid);
     }
 
     private void addStartInfoTimestampInternal(int key, long timestampNs, int userId, int uid) {

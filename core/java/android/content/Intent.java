@@ -6080,7 +6080,6 @@ public class Intent implements Parcelable, Cloneable {
      * @see #CHOOSER_CONTENT_TYPE_ALBUM
      * @see #createChooser(Intent, CharSequence)
      */
-    @FlaggedApi(android.service.chooser.Flags.FLAG_CHOOSER_ALBUM_TEXT)
     public static final String EXTRA_CHOOSER_CONTENT_TYPE_HINT =
             "android.intent.extra.CHOOSER_CONTENT_TYPE_HINT";
 
@@ -6097,7 +6096,6 @@ public class Intent implements Parcelable, Cloneable {
      *
      * @see #EXTRA_CHOOSER_CONTENT_TYPE_HINT
      */
-    @FlaggedApi(android.service.chooser.Flags.FLAG_CHOOSER_ALBUM_TEXT)
     public static final int CHOOSER_CONTENT_TYPE_ALBUM = 1;
 
     /**

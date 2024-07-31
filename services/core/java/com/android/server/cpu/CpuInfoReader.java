@@ -82,6 +82,7 @@ public final class CpuInfoReader {
     // TODO(b/242722241): Protect updatable variables with a local lock.
     private final File mCpusetDir;
     private final long mMinReadIntervalMillis;
+    private final Object mLock = new Object();
     private final SparseIntArray mCpusetCategoriesByCpus = new SparseIntArray();
     private final SparseArray<File> mCpuFreqPolicyDirsById = new SparseArray<>();
     private final SparseArray<StaticPolicyInfo> mStaticPolicyInfoById = new SparseArray<>();
@@ -94,6 +95,8 @@ public final class CpuInfoReader {
     private boolean mHasTimeInStateFile;
     private long mLastReadUptimeMillis;
     private SparseArray<CpuInfo> mLastReadCpuInfos;
+    private int mCurrentTopCPUMask;
+    private int mCurrentBackgroundCPUMask;
 
     public CpuInfoReader() {
         this(new File(CPUSET_DIR_PATH), new File(CPUFREQ_DIR_PATH), new File(PROC_STAT_FILE_PATH),
@@ -140,9 +143,12 @@ public final class CpuInfoReader {
             return false;
         }
         readCpusetCategories();
-        if (mCpusetCategoriesByCpus.size() == 0) {
-            Slogf.e(TAG, "Failed to read cpuset information from %s", mCpusetDir.getAbsolutePath());
-            return false;
+        synchronized (mLock) {
+            if (mCpusetCategoriesByCpus.size() == 0) {
+                Slogf.e(TAG,
+                        "Failed to read cpuset information from %s", mCpusetDir.getAbsolutePath());
+                return false;
+            }
         }
         // Certain CPU performance scaling drivers, such as intel_pstate, perform their own CPU
         // frequency transitions and do not supply this information to the Kernel's cpufreq node.
@@ -224,7 +230,10 @@ public final class CpuInfoReader {
                         continue;
                     }
                 }
-                int cpusetCategories = mCpusetCategoriesByCpus.get(relatedCpuCore, -1);
+                int cpusetCategories;
+                synchronized (mLock) {
+                    cpusetCategories = mCpusetCategoriesByCpus.get(relatedCpuCore, -1);
+                }
                 if (cpusetCategories < 0) {
                     Slogf.w(TAG, "Missing cpuset information for the CPU core %d",
                             relatedCpuCore);
@@ -273,9 +282,11 @@ public final class CpuInfoReader {
 
         writer.printf("Cpuset categories by CPU core:\n");
         writer.increaseIndent();
-        for (int i = 0; i < mCpusetCategoriesByCpus.size(); i++) {
-            writer.printf("CPU core id = %d, %s\n", mCpusetCategoriesByCpus.keyAt(i),
-                    toCpusetCategoriesStr(mCpusetCategoriesByCpus.valueAt(i)));
+        synchronized (mLock) {
+            for (int i = 0; i < mCpusetCategoriesByCpus.size(); i++) {
+                writer.printf("CPU core id = %d, %s\n", mCpusetCategoriesByCpus.keyAt(i),
+                        toCpusetCategoriesStr(mCpusetCategoriesByCpus.valueAt(i)));
+            }
         }
         writer.decreaseIndent();
 
@@ -381,11 +392,24 @@ public final class CpuInfoReader {
         }
     }
 
+    public boolean isCpusetConfigurationChanged() {
+        int prevTopCPUMask = mCurrentTopCPUMask;
+        int prevBackgroundCPUMask = mCurrentBackgroundCPUMask;
+        readCpusetCategories();
+        return (prevTopCPUMask != mCurrentTopCPUMask) ||
+                (prevBackgroundCPUMask != mCurrentBackgroundCPUMask);
+    }
+
     private void readCpusetCategories() {
         File[] cpusetDirs = mCpusetDir.listFiles(File::isDirectory);
         if (cpusetDirs == null) {
             Slogf.e(TAG, "Missing cpuset directories at %s", mCpusetDir.getAbsolutePath());
             return;
+        }
+        mCurrentTopCPUMask = 0;
+        mCurrentBackgroundCPUMask = 0;
+        synchronized (mLock) {
+            mCpusetCategoriesByCpus.clear();
         }
         for (int i = 0; i < cpusetDirs.length; i++) {
             File dir = cpusetDirs[i];
@@ -408,13 +432,20 @@ public final class CpuInfoReader {
                 Slogf.e(TAG, "Failed to read CPU cores from %s", cpuCoresFile.getAbsolutePath());
                 continue;
             }
-            for (int j = 0; j < cpuCores.size(); j++) {
-                int categories = mCpusetCategoriesByCpus.get(cpuCores.get(j));
-                categories |= cpusetCategory;
-                mCpusetCategoriesByCpus.append(cpuCores.get(j), categories);
-                if (DEBUG) {
-                    Slogf.d(TAG, "Mapping CPU core id %d with cpuset categories [%s]",
-                            cpuCores.get(j), toCpusetCategoriesStr(categories));
+            synchronized (mLock) {
+                for (int j = 0; j < cpuCores.size(); j++) {
+                    int categories = mCpusetCategoriesByCpus.get(cpuCores.get(j));
+                    categories |= cpusetCategory;
+                    mCpusetCategoriesByCpus.append(cpuCores.get(j), categories);
+                    if (DEBUG) {
+                        Slogf.d(TAG, "Mapping CPU core id %d with cpuset categories [%s]",
+                                cpuCores.get(j), toCpusetCategoriesStr(categories));
+                    }
+                    if (cpusetCategory == FLAG_CPUSET_CATEGORY_TOP_APP) {
+                        mCurrentTopCPUMask |= 1<<cpuCores.get(j);
+                    } else if (cpusetCategory == FLAG_CPUSET_CATEGORY_BACKGROUND) {
+                        mCurrentBackgroundCPUMask |= 1<<cpuCores.get(j);
+                    }
                 }
             }
         }
@@ -551,7 +582,7 @@ public final class CpuInfoReader {
             long freq = latestTimeInState.keyAt(i);
             long durationMillis = latestTimeInState.valueAt(i);
             long prevDurationMillis = prevTimeInState.get(freq);
-            deltaTimeInState.put(freq, durationMillis > prevDurationMillis
+            deltaTimeInState.put(freq, durationMillis >= prevDurationMillis
                     ? (durationMillis - prevDurationMillis) : durationMillis);
         }
         return deltaTimeInState;

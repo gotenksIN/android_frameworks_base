@@ -77,6 +77,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -1005,7 +1006,7 @@ public class Watchdog implements Dumpable {
             // trace and wait another half.
             initialStack = StackTracesDumpHelper.dumpStackTraces(pids, null, null,
                     CompletableFuture.completedFuture(nativePids), null, subject,
-                    criticalEvents, Runnable::run,/* latencyTracker= */null);
+                    criticalEvents, /* extraHeaders */null, Runnable::run,/* latencyTracker= */null);
             if (initialStack != null){
                 SmartTraceUtils.dumpStackTraces(Process.myPid(), pids,
                     nativePids, initialStack);
@@ -1021,6 +1022,9 @@ public class Watchdog implements Dumpable {
             FrameworkStatsLog.write(FrameworkStatsLog.SYSTEM_SERVER_WATCHDOG_OCCURRED, subject);
         }
 
+        final LinkedHashMap headersMap =
+                com.android.server.am.Flags.enableDropboxWatchdogHeaders()
+                ? new LinkedHashMap<>(Collections.singletonMap("Watchdog-Type", dropboxTag)) : null;
         long anrTime = SystemClock.uptimeMillis();
         StringBuilder report = new StringBuilder();
         report.append(ResourcePressureUtil.currentPsiState());
@@ -1028,8 +1032,9 @@ public class Watchdog implements Dumpable {
         StringWriter tracesFileException = new StringWriter();
         final File finalStack = StackTracesDumpHelper.dumpStackTraces(
                 pids, processCpuTracker, new SparseBooleanArray(),
-                CompletableFuture.completedFuture(getInterestingNativePids()), tracesFileException,
-                subject, criticalEvents, Runnable::run, /* latencyTracker= */null);
+                CompletableFuture.completedFuture(getInterestingNativePids()),
+                tracesFileException, subject, criticalEvents, headersMap,
+                Runnable::run, /* latencyTracker= */null);
         if (finalStack != null){
             SmartTraceUtils.dumpStackTraces(Process.myPid(), pids, nativePids, finalStack);
         }

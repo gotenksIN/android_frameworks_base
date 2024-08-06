@@ -73,7 +73,6 @@ import com.android.launcher3.util.UserIconInfo;
 import com.android.settingslib.drawable.UserIconDrawable;
 import com.android.settingslib.fuelgauge.BatteryStatus;
 import com.android.settingslib.fuelgauge.BatteryUtils;
-import com.android.settingslib.utils.BuildCompatUtils;
 
 import java.util.List;
 
@@ -186,7 +185,7 @@ public class Utils {
         String name = info != null ? info.name : null;
         if (info.isManagedProfile()) {
             // We use predefined values for managed profiles
-            return BuildCompatUtils.isAtLeastT()
+            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                     ? getUpdatableManagedUserTitle(context)
                     : context.getString(R.string.managed_user_title);
         } else if (info.isGuest()) {

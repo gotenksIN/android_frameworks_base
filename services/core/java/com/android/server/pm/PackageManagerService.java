@@ -4520,8 +4520,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     void setSystemAppHiddenUntilInstalled(@NonNull Computer snapshot, String packageName,
             boolean hidden) {
         final int callingUid = Binder.getCallingUid();
-        final boolean calledFromSystemOrPhone = callingUid == Process.PHONE_UID
-                || callingUid == Process.SYSTEM_UID;
+        final boolean calledFromSystemOrPhone = isSystemOrPhone(callingUid);
         if (!calledFromSystemOrPhone) {
             mContext.enforceCallingOrSelfPermission(Manifest.permission.SUSPEND_APPS,
                     "setSystemAppHiddenUntilInstalled");
@@ -4546,8 +4545,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     boolean setSystemAppInstallState(@NonNull Computer snapshot, String packageName,
             boolean installed, int userId) {
         final int callingUid = Binder.getCallingUid();
-        final boolean calledFromSystemOrPhone = callingUid == Process.PHONE_UID
-                || callingUid == Process.SYSTEM_UID;
+        final boolean calledFromSystemOrPhone = isSystemOrPhone(callingUid);
         if (!calledFromSystemOrPhone) {
             mContext.enforceCallingOrSelfPermission(Manifest.permission.SUSPEND_APPS,
                     "setSystemAppHiddenUntilInstalled");
@@ -5062,8 +5060,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         final BroadcastOptions options = BroadcastOptions.makeBasic();
                         options.setPendingIntentBackgroundActivityLaunchAllowed(false);
                         pi.sendIntent(null, success ? 1 : 0, null /* intent */,
-                                null /* onFinished*/, null /* handler */,
-                                null /* requiredPermission */, options.toBundle());
+                                null /* requiredPermission */, options.toBundle(),
+                                null /* executor */, null /* onFinished*/);
                     } catch (SendIntentException e) {
                         Slog.w(TAG, e);
                     }
@@ -8150,5 +8148,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         return mDeletePackageHelper.deletePackageX(packageName,
                 PackageManager.VERSION_CODE_HIGHEST, UserHandle.USER_SYSTEM,
                 PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/);
+    }
+
+    private static boolean isSystemOrPhone(int uid) {
+        return UserHandle.isSameApp(uid, Process.SYSTEM_UID)
+                || UserHandle.isSameApp(uid, Process.PHONE_UID);
     }
 }

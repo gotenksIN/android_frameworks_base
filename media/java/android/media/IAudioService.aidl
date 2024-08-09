@@ -392,6 +392,8 @@ interface IAudioService {
 
     void setVolumePolicy(in VolumePolicy policy);
 
+    VolumePolicy getVolumePolicy();
+
     boolean hasRegisteredDynamicPolicy();
 
     void registerRecordingCallback(in IRecordingConfigDispatcher rcdb);

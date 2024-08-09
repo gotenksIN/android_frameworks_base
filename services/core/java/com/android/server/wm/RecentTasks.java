@@ -61,7 +61,6 @@ import android.content.pm.ParceledListSlice;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
-import android.graphics.Insets;
 import android.graphics.Rect;
 import android.os.Environment;
 import android.os.IBinder;
@@ -77,7 +76,6 @@ import android.util.SparseBooleanArray;
 import android.util.BoostFramework;
 import android.view.InsetsState;
 import android.view.MotionEvent;
-import android.view.WindowInsets;
 import android.view.WindowManagerPolicyConstants.PointerEventListener;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -1552,6 +1550,11 @@ class RecentTasks {
         // The task was detached, just trim it.
         if (!task.isAttached()) {
             return true;
+        }
+
+        // The task is marked as non-trimmable. Don't trim the task.
+        if (!task.mIsTrimmableFromRecents) {
+            return false;
         }
 
         // Ignore tasks from different displays

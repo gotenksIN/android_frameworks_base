@@ -1582,8 +1582,9 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             try {
                 final BroadcastOptions options = BroadcastOptions.makeBasic();
                 options.setPendingIntentBackgroundActivityLaunchAllowed(false);
-                callback.sendIntent(mContext, 0, intent, null /* onFinished*/,
-                        null /* handler */, null /* requiredPermission */, options.toBundle());
+                callback.sendIntent(mContext, 0, intent,
+                        null /* requiredPermission */, options.toBundle(),
+                        null /* executor */, null /* onFinished*/);
             } catch (SendIntentException ignore) {
             }
         });
@@ -1913,8 +1914,9 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             try {
                 final BroadcastOptions options = BroadcastOptions.makeBasic();
                 options.setPendingIntentBackgroundActivityLaunchAllowed(false);
-                mTarget.sendIntent(mContext, 0, fillIn, null /* onFinished*/,
-                        null /* handler */, null /* requiredPermission */, options.toBundle());
+                mTarget.sendIntent(mContext, 0, fillIn,
+                        null /* requiredPermission */, options.toBundle(),
+                        null /* executor */, null /* onFinished*/);
             } catch (SendIntentException ignored) {
             }
         }
@@ -1946,8 +1948,9 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             try {
                 final BroadcastOptions options = BroadcastOptions.makeBasic();
                 options.setPendingIntentBackgroundActivityLaunchAllowed(false);
-                mTarget.sendIntent(mContext, 0, fillIn, null /* onFinished*/,
-                        null /* handler */, null /* requiredPermission */, options.toBundle());
+                mTarget.sendIntent(mContext, 0, fillIn,
+                        null /* requiredPermission */, options.toBundle(),
+                        null /* executor */, null /* onFinished*/);
             } catch (SendIntentException ignored) {
             }
         }

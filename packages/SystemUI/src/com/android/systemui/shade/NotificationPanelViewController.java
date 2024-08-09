@@ -1786,8 +1786,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // the small clock here
         // With migrateClocksToBlueprint, weather clock will have behaviors similar to other clocks
         if (!MigrateClocksToBlueprint.isEnabled()) {
+            boolean bypassEnabled = mKeyguardBypassController.getBypassEnabled();
             if (mKeyguardStatusViewController.isLargeClockBlockingNotificationShelf()
-                    && hasVisibleNotifications() && isOnAod()) {
+                    && hasVisibleNotifications() && (isOnAod() || bypassEnabled)) {
                 return SMALL;
             }
         }

@@ -4861,6 +4861,8 @@ public final class DisplayManagerService extends SystemService {
                 }
                 final int[] supportedStates =
                         mDeviceStateManager.getSupportedStateIdentifiers();
+                // TODO(b/352019542): remove the log once b/345960547 is fixed.
+                Slog.d(TAG, "supportedStates=" + Arrays.toString(supportedStates));
                 DisplayInfo displayInfo;
                 for (int state : supportedStates) {
                     displayInfo = mLogicalDisplayMapper.getDisplayInfoForStateLocked(state,
@@ -4869,6 +4871,8 @@ public final class DisplayManagerService extends SystemService {
                         possibleInfo.add(displayInfo);
                     }
                 }
+                // TODO(b/352019542): remove the log once b/345960547 is fixed.
+                Slog.d(TAG, "possibleInfos=" + possibleInfo);
                 return possibleInfo;
             }
         }
@@ -5256,7 +5260,7 @@ public final class DisplayManagerService extends SystemService {
                 mHandler.sendMessage(msg);
 
                 mLogicalDisplayMapper
-                        .setDeviceStateLocked(deviceState.getIdentifier());
+                        .setDeviceStateLocked(deviceState);
             }
         }
     };

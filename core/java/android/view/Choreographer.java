@@ -42,6 +42,7 @@ import android.util.TimeUtils;
 import android.view.animation.AnimationUtils;
 
 import java.io.PrintWriter;
+import java.util.Locale;
 
 /**
  * Coordinates the timing of animations, input and drawing.
@@ -201,6 +202,7 @@ public final class Choreographer {
     private final DisplayEventReceiver.VsyncEventData mLastVsyncEventData =
             new DisplayEventReceiver.VsyncEventData();
     private final FrameData mFrameData = new FrameData();
+    private volatile boolean mInDoFrameCallback = false;
 
     /**
      * Contains information about the current frame for jank-tracking,
@@ -822,6 +824,11 @@ public final class Choreographer {
      * @hide
      */
     public long getVsyncId() {
+        if (!mInDoFrameCallback && Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            String message = String.format(Locale.getDefault(), "unsync-vsync-id=%d isSfChoreo=%s",
+                    mLastVsyncEventData.preferredFrameTimeline().vsyncId, this == getSfInstance());
+            Trace.instant(Trace.TRACE_TAG_VIEW, message);
+        }
         return mLastVsyncEventData.preferredFrameTimeline().vsyncId;
     }
 
@@ -857,6 +864,7 @@ public final class Choreographer {
             if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
                 Trace.traceBegin(
                         Trace.TRACE_TAG_VIEW, "Choreographer#doFrame " + timeline.mVsyncId);
+                mInDoFrameCallback = true;
             }
             synchronized (mLock) {
                 if (!mFrameScheduled) {
@@ -958,6 +966,7 @@ public final class Choreographer {
             ScrollOptimizer.setUITaskStatus(false);
         } finally {
             AnimationUtils.unlockAnimationClock();
+            mInDoFrameCallback = false;
             if (resynced) {
                 Trace.traceEnd(Trace.TRACE_TAG_VIEW);
             }

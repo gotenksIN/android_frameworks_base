@@ -66,8 +66,6 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
     // Cached assistant callbacks being register before service is connected.
     private final Map<BluetoothLeBroadcastAssistant.Callback, Executor> mCachedCallbackExecutorMap =
             new ConcurrentHashMap<>();
-    private Object mBassLock = new Object();
-    private BluetoothLeBroadcastAssistant.Callback mCallback = null;
 
     private final ServiceListener mServiceListener =
             new ServiceListener() {
@@ -153,13 +151,7 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             Log.d(TAG, "The BluetoothLeBroadcastAssistant is null");
             return;
         }
-        synchronized(mBassLock) {
-            if (mCallback == null) {
-                Log.d(TAG, "addSource: Callback is not registered yet");
-                return;
-            }
-            mService.addSource(sink, metadata, isGroupOp);
-        }
+        mService.addSource(sink, metadata, isGroupOp);
     }
 
     /**
@@ -235,13 +227,7 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             Log.d(TAG, "The BluetoothLeBroadcastAssistant is null");
             return;
         }
-        synchronized(mBassLock) {
-            if (mCallback == null) {
-                Log.d(TAG, "removeSource: Callback is not registered yet");
-                return;
-            }
-            mService.removeSource(sink, sourceId);
-        }
+        mService.removeSource(sink, sourceId);
     }
 
     public void startSearchingForSources(@NonNull List<android.bluetooth.le.ScanFilter> filters) {
@@ -252,13 +238,7 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             Log.d(TAG, "The BluetoothLeBroadcastAssistant is null");
             return;
         }
-        synchronized(mBassLock) {
-            if (mCallback == null) {
-                Log.d(TAG, "startSearchingForSources: Callback is not registered yet");
-                return;
-            }
-            mService.startSearchingForSources(filters);
-        }
+        mService.startSearchingForSources(filters);
     }
 
     public void stopSearchingForSources() {
@@ -269,13 +249,7 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             Log.d(TAG, "The BluetoothLeBroadcastAssistant is null");
             return;
         }
-        synchronized(mBassLock) {
-            if (mCallback == null) {
-                Log.d(TAG, "stopSearchingForSources: Callback is not registered yet");
-                return;
-            }
-            mService.stopSearchingForSources();
-        }
+        mService.stopSearchingForSources();
     }
 
     /**
@@ -331,17 +305,11 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             mCachedCallbackExecutorMap.putIfAbsent(callback, executor);
             return;
         }
-        synchronized(mBassLock) {
-            if (mCallback != null) {
-                Log.d(TAG, "Callback is already registered.");
-                return;
-            }
-            mCallback = callback;
-            try {
-                mService.registerCallback(executor, callback);
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "registerServiceCallBack failed. " + e.getMessage());
-            }
+
+        try {
+            mService.registerCallback(executor, callback);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "registerServiceCallBack failed. " + e.getMessage());
         }
     }
 
@@ -360,20 +328,10 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             return;
         }
 
-        synchronized(mBassLock) {
-            if (mCallback == null) {
-                Log.d(TAG, "Callback is not registered yet.");
-                return;
-            }
-            if (mCallback != callback) {
-                Log.e(TAG, "Invalid callback, use registered callback");
-            }
-            try {
-                mService.unregisterCallback(callback);
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "unregisterServiceCallBack failed. " + e.getMessage());
-            }
-            mCallback = null;
+        try {
+            mService.unregisterCallback(callback);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "unregisterServiceCallBack failed. " + e.getMessage());
         }
     }
 

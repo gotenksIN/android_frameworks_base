@@ -34,6 +34,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -64,11 +65,19 @@ constructor(
     @VisibleForTesting
     val reuseCache = mutableMapOf<Int, Pair<MobileIconViewModel, CoroutineScope>>()
 
+    val subscriptionIdsFlow: StateFlow<List<Int>> =
+        interactor.filteredSubscriptions
+            .mapLatest { subscriptions ->
+                subscriptions.map { subscriptionModel -> subscriptionModel.subscriptionId }
+            }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), listOf())
+
     private val ddsIcon: StateFlow<SignalIconModel?> =
-        interactor.defaultDataSubId
-            .mapLatest { subId ->
-                if (subId > SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                    commonViewModelForSub(subId)
+        combine(interactor.defaultDataSubId, subscriptionIdsFlow) {
+                defaultDataSubId, subscriptionIdsFlow ->
+                if (defaultDataSubId > SubscriptionManager.INVALID_SUBSCRIPTION_ID
+                    && subscriptionIdsFlow.contains(defaultDataSubId)) {
+                    commonViewModelForSub(defaultDataSubId)
                 } else {
                     null
                 }
@@ -77,13 +86,6 @@ constructor(
                 viewModel?.icon ?: flowOf(null)
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
-
-    val subscriptionIdsFlow: StateFlow<List<Int>> =
-        interactor.filteredSubscriptions
-            .mapLatest { subscriptions ->
-                subscriptions.map { subscriptionModel -> subscriptionModel.subscriptionId }
-            }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), listOf())
 
     private val firstMobileSubViewModel: StateFlow<MobileIconViewModelCommon?> =
         subscriptionIdsFlow

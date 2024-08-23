@@ -3024,17 +3024,9 @@ class Task extends TaskFragment {
         return r.getTask().mTaskId != taskId && r.token != notTop && r.canBeTopRunning();
     }
 
-    WindowState getTopFullscreenMainWindow(boolean includeStartingApp) {
-        final WindowState[] candidate = new WindowState[1];
-        getActivity((r) -> {
-            final WindowState win = r.findMainWindow(includeStartingApp);
-            if (win != null && win.mAttrs.isFullscreen()) {
-                candidate[0] = win;
-                return true;
-            }
-            return false;
-        });
-        return candidate[0];
+    @Nullable
+    WindowState getTopFullscreenMainWindow() {
+        return getWindow(w -> w.mAttrs.type == TYPE_BASE_APPLICATION && w.mAttrs.isFullscreen());
     }
 
     /**
@@ -3218,6 +3210,14 @@ class Task extends TaskFragment {
         return "Task=" + mTaskId;
     }
 
+    WindowContainer<?> getDimmerParent() {
+        if (!inMultiWindowMode() && isTranslucentForTransition()) {
+            return getRootDisplayArea();
+        }
+        return this;
+    }
+
+    @Deprecated
     @Override
     Dimmer getDimmer() {
         // If the window is in multi-window mode, we want to dim at the Task level to ensure the dim
@@ -3231,7 +3231,7 @@ class Task extends TaskFragment {
         // Once at the root task level, we want to check {@link #isTranslucent(ActivityRecord)}.
         // If true, we want to get the Dimmer from the level above since we don't want to animate
         // the dim with the Task.
-        if (!isRootTask() || (Dimmer.DIMMER_REFACTOR && isTranslucentAndVisible())
+        if (!isRootTask() || isTranslucentAndVisible()
                 || (Flags.getDimmerOnClosing() ? isTranslucentForTransition()
                                                 : isTranslucent(null))) {
             return super.getDimmer();
@@ -3602,8 +3602,7 @@ class Task extends TaskFragment {
         // starting window because persisted configuration does not effect to Task.
         info.taskInfo.configuration.setTo(activity.getConfiguration());
         if (!Flags.drawSnapshotAspectRatioMatch()) {
-            final WindowState mainWindow =
-                    getTopFullscreenMainWindow(false /* includeStartingApp */);
+            final WindowState mainWindow = getTopFullscreenMainWindow();
             if (mainWindow != null) {
                 info.topOpaqueWindowInsetsState =
                         mainWindow.getInsetsStateWithVisibilityOverride();

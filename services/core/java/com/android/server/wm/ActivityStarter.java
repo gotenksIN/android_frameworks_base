@@ -1795,6 +1795,9 @@ class ActivityStarter {
                     activity.destroyIfPossible("Removes redundant singleInstance");
                 }
             }
+            if (mLastStartActivityRecord != null) {
+                targetTaskTop.mLaunchSourceType = mLastStartActivityRecord.mLaunchSourceType;
+            }
             targetTaskTop.mTransitionController.collect(targetTaskTop);
             recordTransientLaunchIfNeeded(targetTaskTop);
             // Recycle the target task for this launch.

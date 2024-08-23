@@ -1281,6 +1281,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                             initAlphaForAnimationTargets(wallpapers);
                             if (isDream) {
                                 mDreamViewModel.get().startTransitionFromDream();
+                            } else {
+                                mCommunalTransitionViewModel.get().snapToCommunal();
                             }
                             mUnoccludeFinishedCallback = finishedCallback;
                             return;

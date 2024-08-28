@@ -1154,10 +1154,10 @@ public class AudioDeviceBroker {
             String[] kvpairs = keyValuePairs.split(";");
             for (String pair : kvpairs) {
                 String[] kv = pair.split("=");
-                if (kv[0] == "bt_lc3_swb") {
-                    mHasSwbLc3Enabled = ((kv[1] == "on") ? true : false);
-                } else if (kv[0] == "bt_swb") {
-                    mHasSwbAptXEnabled = ((kv[1] == "0") ? true : false);
+                if (kv[0].equals("bt_lc3_swb")) {
+                    mHasSwbLc3Enabled = ((kv[1].equals("on")) ? true : false);
+                } else if (kv[0].equals("bt_swb")) {
+                    mHasSwbAptXEnabled = ((kv[1].equals("0")) ? true : false);
                 }
             }
         }

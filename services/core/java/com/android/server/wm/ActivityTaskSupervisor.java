@@ -1162,12 +1162,12 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         r.notifyUnknownVisibilityLaunchedForKeyguardTransition();
 
         final boolean isTop = andResume && r.isTopRunningActivity();
-        if (isTop) {
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.startFreeze(r.processName, ProcessFreezerManager.COLD_LAUNCH_FREEZE);
-            }
-        }
+        // if (isTop) {
+        //     ProcessFreezerManager freezer = ProcessFreezerManager.getInstance(mService);
+        //     if (freezer != null && freezer.useFreezerManager()) {
+        //         freezer.startFreeze(r.processName, ProcessFreezerManager.COLD_LAUNCH_FREEZE);
+        //     }
+        // }
         mService.startProcessAsync(r, knownToBeDead, isTop,
                 isTop ? HostingRecord.HOSTING_TYPE_TOP_ACTIVITY
                         : HostingRecord.HOSTING_TYPE_ACTIVITY);
@@ -3044,6 +3044,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         ActivityRecord fillAndReturnTop(Task task, TaskInfo info) {
             info.numActivities = 0;
             info.baseActivity = null;
+            info.capturedLink = null;
+            info.capturedLinkTimestamp = 0;
             mInfo = info;
             task.forAllActivities(this);
             final ActivityRecord top = mTopRunning;

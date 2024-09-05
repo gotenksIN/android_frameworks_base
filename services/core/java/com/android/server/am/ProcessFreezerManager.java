@@ -70,6 +70,8 @@ public class ProcessFreezerManager {
     private static volatile boolean mUseFreezerManager = false;
     private static volatile boolean mUseCpuLoadMonitor = false;
 
+    private final ActivityManagerService mAm;
+
     public class CpuLoadMonitor {
         private CpuMonitorInternal mCpuMonitorService = null;
         private int mCpuAvalabilityPercentThreshold = 100 - DEFAULT_CPU_USAGE_THRESHOLD;
@@ -158,7 +160,7 @@ public class ProcessFreezerManager {
         }
     }
 
-    public static ProcessFreezerManager getInstance() {
+    public static ProcessFreezerManager getInstance(ActivityManagerService am) {
         if (!ALREADY_READ_PROPERTIES) {
             ALREADY_READ_PROPERTIES = true;
             mUseFreezerManager = Boolean.valueOf(mPerf.perfGetProp(
@@ -199,7 +201,7 @@ public class ProcessFreezerManager {
         if (mInstance == null) {
             synchronized (ProcessFreezerManager.class) {
                 if (mInstance == null) {
-                    mInstance = new ProcessFreezerManager();
+                    mInstance = new ProcessFreezerManager(am);
                 }
             }
         }
@@ -245,11 +247,13 @@ public class ProcessFreezerManager {
         return freezerManagerThread;
     }
 
-    private ProcessFreezerManager() {
+    private ProcessFreezerManager(ActivityManagerService am) {
         if (mUseCpuLoadMonitor) {
             mCpuLoadMonitor.setCpuUsageThreshold(mCpuUsageThreshold);
             mCpuLoadMonitor.setCpuSet(mCpuLoadMonitorBG);
         }
+
+        mAm = am;
 
         mFreezerManagerHandler = new Handler(createAndStartFreezeThread().getLooper(), msg -> {
             switch (msg.what) {
@@ -691,7 +695,7 @@ public class ProcessFreezerManager {
         }
 
         try {
-            int rc = CachedAppOptimizer.freezeBinder(pid, false, 2 /* timeout_ms */);
+            int rc = mAm.getFreezer().freezeBinder(pid, false, 2 /* timeout_ms */);
             if (rc != 0) {
                 Slog.w(TAG, " *unable to unfreeze binder: " +  logInfo + " " + rc );
             } else {
@@ -789,7 +793,7 @@ public class ProcessFreezerManager {
         }
 
         try {
-            int rc = CachedAppOptimizer.freezeBinder(pid, true, 2 /* timeout_ms */);
+            int rc = mAm.getFreezer().freezeBinder(pid, true, 2 /* timeout_ms */);
             if (rc != 0){
                 Slog.w(TAG, " *unable to freeze binder for " + pid + ": " + rc);
             } else {

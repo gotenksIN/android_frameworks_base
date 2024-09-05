@@ -34,6 +34,10 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -146,6 +150,25 @@ object BiometricViewBinder {
         val confirmationButton = view.requireViewById<Button>(R.id.button_confirm)
         val retryButton = view.requireViewById<Button>(R.id.button_try_again)
 
+        // Handles custom "Cancel Authentication" talkback action
+        val cancelDelegate: AccessibilityDelegateCompat =
+            object : AccessibilityDelegateCompat() {
+                override fun onInitializeAccessibilityNodeInfo(
+                    host: View,
+                    info: AccessibilityNodeInfoCompat
+                ) {
+                    super.onInitializeAccessibilityNodeInfo(host, info)
+                    info.addAction(
+                        AccessibilityActionCompat(
+                            AccessibilityNodeInfoCompat.ACTION_CLICK,
+                            view.context.getString(R.string.biometric_dialog_cancel_authentication)
+                        )
+                    )
+                }
+            }
+        ViewCompat.setAccessibilityDelegate(backgroundView, cancelDelegate)
+        ViewCompat.setAccessibilityDelegate(cancelButton, cancelDelegate)
+
         // TODO(b/330788871): temporary workaround for the unsafe callbacks & legacy controllers
         val adapter =
             Spaghetti(
@@ -173,11 +196,12 @@ object BiometricViewBinder {
                 }
             }
 
-            logoView.setImageDrawable(viewModel.logo.first())
+            val logoInfo = viewModel.logoInfo.first()
+            logoView.setImageDrawable(logoInfo.first)
             // The ellipsize effect on xml happens only when the TextView does not have any free
             // space on the screen to show the text. So we need to manually truncate.
             logoDescriptionView.text =
-                viewModel.logoDescription.first().ellipsize(MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER)
+                logoInfo.second?.ellipsize(MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER)
             titleView.text = viewModel.title.first()
             subtitleView.text = viewModel.subtitle.first()
             descriptionView.text = viewModel.description.first()
@@ -386,8 +410,12 @@ object BiometricViewBinder {
                             backgroundView.importantForAccessibility =
                                 IMPORTANT_FOR_ACCESSIBILITY_NO
 
-                            // Allow icon to be used as confirmation button with a11y enabled
-                            if (accessibilityManager.isTouchExplorationEnabled) {
+                            // Allow icon to be used as confirmation button with udfps and a11y
+                            // enabled
+                            if (
+                                accessibilityManager.isTouchExplorationEnabled &&
+                                    modalities.hasUdfps
+                            ) {
                                 iconOverlayView.setOnClickListener {
                                     viewModel.confirmAuthenticated()
                                 }

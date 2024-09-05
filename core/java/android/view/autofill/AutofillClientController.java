@@ -94,8 +94,15 @@ public final class AutofillClientController implements AutofillManager.AutofillC
      * @hide
      */
     public boolean isRelayoutFixEnabled() {
+        AutofillManager autofillManager = getAutofillManager();
+        if (autofillManager == null) {
+            if (Helper.sDebug) {
+                Log.d(TAG, "isRelayoutFixEnabled() : getAutofillManager() == null");
+            }
+            return false;
+        }
         if (mRelayoutFix == null) {
-            mRelayoutFix = getAutofillManager().isRelayoutFixEnabled();
+            mRelayoutFix = autofillManager.isRelayoutFixEnabled();
         }
         return mRelayoutFix;
     }
@@ -581,5 +588,10 @@ public final class AutofillClientController implements AutofillManager.AutofillC
         } catch (IntentSender.SendIntentException e) {
             Log.e(TAG, "authenticate() failed for intent:" + intent, e);
         }
+    }
+
+    @Override
+    public boolean isActivityResumed() {
+        return mActivity.isResumed();
     }
 }

@@ -98,6 +98,8 @@ import android.view.WindowManager;
 import androidx.annotation.Nullable;
 import androidx.test.filters.SmallTest;
 
+import com.android.app.viewcapture.ViewCapture;
+import com.android.app.viewcapture.ViewCaptureAwareWindowManager;
 import com.android.internal.colorextraction.ColorExtractor;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.statusbar.IStatusBarService;
@@ -121,6 +123,8 @@ import com.android.systemui.shade.NotificationShadeWindowView;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeWindowLogger;
 import com.android.systemui.shade.domain.interactor.ShadeInteractor;
+import com.android.systemui.shade.ui.viewmodel.NotificationShadeWindowModel;
+import com.android.systemui.shared.notifications.domain.interactor.NotificationSettingsInteractor;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.statusbar.NotificationEntryHelper;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
@@ -210,6 +214,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
+import kotlin.Lazy;
 import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
 import platform.test.runner.parameterized.Parameters;
 
@@ -342,9 +347,12 @@ public class BubblesTest extends SysuiTestCase {
     private Icon mAppBubbleIcon;
     @Mock
     private Display mDefaultDisplay;
+    @Mock
+    private Lazy<ViewCapture> mLazyViewCapture;
 
     private final KosmosJavaAdapter mKosmos = new KosmosJavaAdapter(this);
     private ShadeInteractor mShadeInteractor;
+    private NotificationShadeWindowModel mNotificationShadeWindowModel;
     private ShellTaskOrganizer mShellTaskOrganizer;
     private TaskViewTransitions mTaskViewTransitions;
 
@@ -403,11 +411,13 @@ public class BubblesTest extends SysuiTestCase {
         when(deviceEntryUdfpsInteractor.isUdfpsSupported()).thenReturn(MutableStateFlow(false));
 
         mShadeInteractor = mKosmos.getShadeInteractor();
+        mNotificationShadeWindowModel = mKosmos.getNotificationShadeWindowModel();
 
         mNotificationShadeWindowController = new NotificationShadeWindowControllerImpl(
                 mContext,
                 new FakeWindowRootViewComponent.Factory(mNotificationShadeWindowView),
-                mWindowManager,
+                new ViewCaptureAwareWindowManager(mWindowManager, mLazyViewCapture,
+                        /* isViewCaptureEnabled= */ false),
                 mActivityManager,
                 mDozeParameters,
                 mStatusBarStateController,
@@ -424,6 +434,7 @@ public class BubblesTest extends SysuiTestCase {
                 mShadeWindowLogger,
                 () -> mSelectedUserInteractor,
                 mUserTracker,
+                mNotificationShadeWindowModel,
                 mKosmos::getCommunalInteractor
         );
         mNotificationShadeWindowController.fetchWindowRootView();
@@ -480,7 +491,8 @@ public class BubblesTest extends SysuiTestCase {
                         mock(PackageManager.class),
                         Optional.of(mock(Bubbles.class)),
                         mContext,
-                        mock(NotificationManager.class)
+                        mock(NotificationManager.class),
+                        mock(NotificationSettingsInteractor.class)
                         );
         interruptionDecisionProvider.start();
 

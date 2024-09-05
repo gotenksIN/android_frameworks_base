@@ -39,6 +39,7 @@ import android.accessibilityservice.AccessibilityService;
 import android.annotation.AnyThread;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.content.res.Configuration;
 import android.os.Binder;
@@ -120,13 +121,22 @@ public final class ImeVisibilityStateComputer {
     @GuardedBy("ImfLock.class")
     private boolean mRequestedImeScreenshot;
 
-    /** The window token of the current visible IME layering target overlay. */
+    /** Whether there is a visible IME layering target overlay. */
     @GuardedBy("ImfLock.class")
-    private IBinder mCurVisibleImeLayeringOverlay;
+    private boolean mHasVisibleImeLayeringOverlay;
 
     /** The window token of the current visible IME input target. */
     @GuardedBy("ImfLock.class")
     private IBinder mCurVisibleImeInputTarget;
+
+    /**
+     * The last window token that we confirmed that IME started talking to.  This is always updated
+     * upon reports from the input method.  If the window state is already changed before the report
+     * is handled, this field just keeps the last value.
+     */
+    @GuardedBy("ImfLock.class")
+    @Nullable
+    private IBinder mLastImeTargetWindow;
 
     /** Represent the invalid IME visibility state */
     public static final int STATE_INVALID = -1;
@@ -208,34 +218,36 @@ public final class ImeVisibilityStateComputer {
         mPolicy = imePolicy;
         mWindowManagerInternal.setInputMethodTargetChangeListener(new ImeTargetChangeListener() {
             @Override
-            public void onImeTargetOverlayVisibilityChanged(IBinder overlayWindowToken,
+            public void onImeTargetOverlayVisibilityChanged(@NonNull IBinder overlayWindowToken,
                     @WindowManager.LayoutParams.WindowType int windowType, boolean visible,
                     boolean removed) {
                 // Ignoring the starting window since it's ok to cover the IME target
                 // window in temporary without affecting the IME visibility.
-                final var overlay = (visible && !removed && windowType != TYPE_APPLICATION_STARTING)
-                                ? overlayWindowToken : null;
+                final boolean hasOverlay = visible && !removed
+                        && windowType != TYPE_APPLICATION_STARTING;
                 synchronized (ImfLock.class) {
-                    mCurVisibleImeLayeringOverlay = overlay;
-
+                    mHasVisibleImeLayeringOverlay = hasOverlay;
                 }
             }
 
             @Override
             public void onImeInputTargetVisibilityChanged(IBinder imeInputTarget,
                     boolean visibleRequested, boolean removed) {
+                final boolean visibleAndNotRemoved = visibleRequested && !removed;
                 synchronized (ImfLock.class) {
-                    if (mCurVisibleImeInputTarget == imeInputTarget && (!visibleRequested
-                            || removed)
-                            && mCurVisibleImeLayeringOverlay != null) {
+                    if (visibleAndNotRemoved) {
+                        mCurVisibleImeInputTarget = imeInputTarget;
+                        return;
+                    }
+                    if (mHasVisibleImeLayeringOverlay
+                            && mCurVisibleImeInputTarget == imeInputTarget) {
                         final int reason = SoftInputShowHideReason.HIDE_WHEN_INPUT_TARGET_INVISIBLE;
                         final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
                                 ImeTracker.ORIGIN_SERVER, reason, false /* fromUser */);
                         mService.onApplyImeVisibilityFromComputerLocked(imeInputTarget, statsToken,
                                 new ImeVisibilityResult(STATE_HIDE_IME_EXPLICIT, reason));
                     }
-                    mCurVisibleImeInputTarget =
-                            (visibleRequested && !removed) ? imeInputTarget : null;
+                    mCurVisibleImeInputTarget = null;
                 }
             }
         });
@@ -479,8 +491,7 @@ public final class ImeVisibilityStateComputer {
                 break;
             case WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED:
                 // Do nothing but preserving the last IME requested visibility state.
-                final ImeTargetWindowState lastState =
-                        getWindowStateOrNull(mService.mLastImeTargetWindow);
+                final ImeTargetWindowState lastState = getWindowStateOrNull(mLastImeTargetWindow);
                 if (lastState != null) {
                     state.setRequestedImeVisible(lastState.mRequestedImeVisible);
                 }
@@ -568,7 +579,6 @@ public final class ImeVisibilityStateComputer {
     }
 
     @GuardedBy("ImfLock.class")
-    @VisibleForTesting
     ImeVisibilityResult onInteractiveChanged(IBinder windowToken, boolean interactive) {
         final ImeTargetWindowState state = getWindowStateOrNull(windowToken);
         if (state != null && state.isRequestedImeVisible() && mInputShown && !interactive) {
@@ -632,6 +642,17 @@ public final class ImeVisibilityStateComputer {
     }
 
     @GuardedBy("ImfLock.class")
+    @Nullable
+    IBinder getLastImeTargetWindow() {
+        return mLastImeTargetWindow;
+    }
+
+    @GuardedBy("ImfLock.class")
+    void setLastImeTargetWindow(@Nullable IBinder imeTargetWindow) {
+        mLastImeTargetWindow = imeTargetWindow;
+    }
+
+    @GuardedBy("ImfLock.class")
     void dumpDebug(ProtoOutputStream proto, long fieldId) {
         proto.write(SHOW_EXPLICITLY_REQUESTED, mRequestedShowExplicitly);
         proto.write(SHOW_FORCED, mShowForced);
@@ -647,6 +668,7 @@ public final class ImeVisibilityStateComputer {
                 + " mShowForced=" + mShowForced);
         p.println(prefix + "mImeHiddenByDisplayPolicy=" + mPolicy.isImeHiddenByDisplayPolicy());
         p.println(prefix + "mInputShown=" + mInputShown);
+        p.println(prefix + "mLastImeTargetWindow=" + mLastImeTargetWindow);
     }
 
     /**

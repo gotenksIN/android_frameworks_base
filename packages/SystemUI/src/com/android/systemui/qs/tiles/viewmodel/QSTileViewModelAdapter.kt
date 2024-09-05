@@ -19,7 +19,6 @@ package com.android.systemui.qs.tiles.viewmodel
 import android.content.Context
 import android.os.UserHandle
 import android.util.Log
-import androidx.annotation.GuardedBy
 import com.android.internal.logging.InstanceId
 import com.android.systemui.Dumpable
 import com.android.systemui.animation.Expandable
@@ -34,15 +33,16 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.io.PrintWriter
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.function.Supplier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 
 // TODO(b/http://b/299909989): Use QSTileViewModel directly after the rollout
@@ -57,10 +57,8 @@ constructor(
     private val context
         get() = qsHost.context
 
-    @GuardedBy("callbacks")
-    private val callbacks: MutableCollection<QSTile.Callback> = mutableSetOf()
-    @GuardedBy("listeningClients")
-    private val listeningClients: MutableCollection<Any> = mutableSetOf()
+    private val callbacks = CopyOnWriteArraySet<QSTile.Callback>()
+    private val listeningClients = CopyOnWriteArraySet<Any>()
 
     // Cancels the jobs when the adapter is no longer alive
     private var tileAdapterJob: Job? = null
@@ -72,7 +70,7 @@ constructor(
             applicationScope.launch {
                 launch {
                     qsTileViewModel.isAvailable.collectIndexed { index, isAvailable ->
-                        if (!isAvailable) {
+                        if (!isAvailable && qsTileViewModel.config.autoRemoveOnUnavailable) {
                             qsHost.removeTile(tileSpec)
                         }
                         // qsTileViewModel.isAvailable flow often starts with isAvailable == true.
@@ -89,8 +87,9 @@ constructor(
                         }
                     }
                 }
-                // Warm up tile with some initial state
-                launch { qsTileViewModel.state.first() }
+                // Warm up tile with some initial state. Because `state` is a StateFlow with initial
+                // state `null`, we collect until it's not null.
+                launch { qsTileViewModel.state.takeWhile { it == null }.collect {} }
             }
 
         // QSTileHost doesn't call this when userId is initialized
@@ -113,19 +112,17 @@ constructor(
 
     override fun addCallback(callback: QSTile.Callback?) {
         callback ?: return
-        synchronized(callbacks) {
-            callbacks.add(callback)
-            state?.let(callback::onStateChanged)
-        }
+        callbacks.add(callback)
+        state?.let(callback::onStateChanged)
     }
 
     override fun removeCallback(callback: QSTile.Callback?) {
         callback ?: return
-        synchronized(callbacks) { callbacks.remove(callback) }
+        callbacks.remove(callback)
     }
 
     override fun removeCallbacks() {
-        synchronized(callbacks) { callbacks.clear() }
+        callbacks.clear()
     }
 
     override fun click(expandable: Expandable?) {
@@ -163,32 +160,28 @@ constructor(
 
     override fun setListening(client: Any?, listening: Boolean) {
         client ?: return
-        synchronized(listeningClients) {
-            if (listening) {
-                listeningClients.add(client)
-                if (listeningClients.size == 1) {
-                    stateJob =
-                        qsTileViewModel.state
-                            .filterNotNull()
-                            .map { mapState(context, it, qsTileViewModel.config) }
-                            .onEach { legacyState ->
-                                synchronized(callbacks) {
-                                    callbacks.forEach { it.onStateChanged(legacyState) }
-                                }
-                            }
-                            .launchIn(applicationScope)
-                }
-            } else {
-                listeningClients.remove(client)
-                if (listeningClients.isEmpty()) {
-                    stateJob?.cancel()
-                }
+        if (listening) {
+            listeningClients.add(client)
+            if (listeningClients.size == 1) {
+                stateJob =
+                    qsTileViewModel.state
+                        .filterNotNull()
+                        .map { mapState(context, it, qsTileViewModel.config) }
+                        .onEach { legacyState ->
+                            callbacks.forEach { it.onStateChanged(legacyState) }
+                        }
+                        .launchIn(applicationScope)
+            }
+        } else {
+            listeningClients.remove(client)
+            if (listeningClients.isEmpty()) {
+                stateJob?.cancel()
             }
         }
     }
 
     override fun isListening(): Boolean =
-        synchronized(listeningClients) { listeningClients.isNotEmpty() }
+        listeningClients.isNotEmpty()
 
     override fun setDetailListening(show: Boolean) {
         // do nothing like QSTileImpl

@@ -131,9 +131,7 @@ import android.app.ActivityManager.RecentTaskInfo.PersistedTaskSnapshotData;
 import android.app.ActivityManager.TaskDescription;
 import android.app.ActivityOptions;
 import android.app.ActivityTaskManager;
-import android.app.AppCompatTaskInfo;
 import android.app.AppGlobals;
-import android.app.CameraCompatTaskInfo;
 import android.app.IActivityController;
 import android.app.PictureInPictureParams;
 import android.app.TaskInfo;
@@ -1138,6 +1136,9 @@ class Task extends TaskFragment {
             final Task oldParentTask = oldParent.asTask();
             if (oldParentTask != null) {
                 forAllActivities(oldParentTask::cleanUpActivityReferences);
+
+                // Update the task description of the previous parent as well
+                oldParentTask.updateTaskDescription();
             }
 
             if (newParent == null || !newParent.inPinnedWindowingMode()) {
@@ -1169,6 +1170,9 @@ class Task extends TaskFragment {
                 } catch (RemoteException e) {
                 }
             }
+
+            // Update the ancestor tasks' task description after reparenting
+            updateTaskDescription();
         }
 
         // First time we are adding the task to the system.
@@ -2298,7 +2302,7 @@ class Task extends TaskFragment {
         // Apply crop to root tasks only and clear the crops of the descendant tasks.
         int width = 0;
         int height = 0;
-        if (isRootTask()) {
+        if (isRootTask() && !mTransitionController.mIsWaitingForDisplayEnabled) {
             final Rect taskBounds = getBounds();
             width = taskBounds.width();
             height = taskBounds.height();
@@ -3370,7 +3374,7 @@ class Task extends TaskFragment {
 
         //TODO (AM refactor): Just use local once updateEffectiveIntent is run during all child
         //                    order changes.
-        final Task topTask = top != null ? top.getTask() : this;
+        final Task topTask = top != null && top.getTask() != null ? top.getTask() : this;
         info.resizeMode = topTask.mResizeMode;
         info.topActivityType = topTask.getActivityType();
         info.displayCutoutInsets = topTask.getDisplayCutoutInsets();
@@ -3391,29 +3395,6 @@ class Task extends TaskFragment {
                 ? top.getLastParentBeforePip().mTaskId : INVALID_TASK_ID;
         info.shouldDockBigOverlays = top != null && top.shouldDockBigOverlays;
         info.mTopActivityLocusId = top != null ? top.getLocusId() : null;
-
-        final boolean isTopActivityResumed = top != null
-                && top.getOrganizedTask() == this && top.isState(RESUMED);
-        final boolean isTopActivityVisible = top != null
-                && top.getOrganizedTask() == this && top.isVisible();
-        final AppCompatTaskInfo appCompatTaskInfo = info.appCompatTaskInfo;
-        // Whether the direct top activity is in size compat mode
-        appCompatTaskInfo.topActivityInSizeCompat = isTopActivityVisible && top.inSizeCompatMode();
-        if (appCompatTaskInfo.topActivityInSizeCompat
-                && mWmService.mAppCompatConfiguration.isTranslucentLetterboxingEnabled()) {
-            // We hide the restart button in case of transparent activities.
-            appCompatTaskInfo.topActivityInSizeCompat = top.fillsParent();
-        }
-        // Whether the direct top activity is eligible for letterbox education.
-        appCompatTaskInfo.topActivityEligibleForLetterboxEducation = isTopActivityResumed
-                && top.isEligibleForLetterboxEducation();
-        appCompatTaskInfo.isLetterboxEducationEnabled = top != null
-                && top.mLetterboxUiController.isLetterboxEducationEnabled();
-        // Whether the direct top activity requested showing camera compat control.
-        appCompatTaskInfo.cameraCompatTaskInfo.cameraCompatControlState = isTopActivityResumed
-                ? top.getCameraCompatControlState()
-                : CameraCompatTaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN;
-
         final Task parentTask = getParent() != null ? getParent().asTask() : null;
         info.parentTaskId = parentTask != null && parentTask.mCreatedByOrganizer
                 ? parentTask.mTaskId
@@ -3424,57 +3405,8 @@ class Task extends TaskFragment {
         info.isSleeping = shouldSleepActivities();
         info.isTopActivityTransparent = top != null && !top.fillsParent();
         info.isTopActivityStyleFloating = top != null && top.isStyleFloating();
-        appCompatTaskInfo.topActivityLetterboxVerticalPosition = TaskInfo.PROPERTY_VALUE_UNSET;
-        appCompatTaskInfo.topActivityLetterboxHorizontalPosition = TaskInfo.PROPERTY_VALUE_UNSET;
-        appCompatTaskInfo.topActivityLetterboxWidth = TaskInfo.PROPERTY_VALUE_UNSET;
-        appCompatTaskInfo.topActivityLetterboxHeight = TaskInfo.PROPERTY_VALUE_UNSET;
-        appCompatTaskInfo.isUserFullscreenOverrideEnabled = top != null
-                && top.mAppCompatController.getAppCompatAspectRatioOverrides()
-                    .shouldApplyUserFullscreenOverride();
-        appCompatTaskInfo.isSystemFullscreenOverrideEnabled = top != null
-                && top.mAppCompatController.getAppCompatAspectRatioOverrides()
-                    .isSystemOverrideToFullscreenEnabled();
-        appCompatTaskInfo.isFromLetterboxDoubleTap = top != null
-                && top.mLetterboxUiController.isFromDoubleTap();
-        if (top != null) {
-            appCompatTaskInfo.topActivityLetterboxWidth = top.getBounds().width();
-            appCompatTaskInfo.topActivityLetterboxHeight = top.getBounds().height();
-        }
-        // We need to consider if letterboxed or pillarboxed
-        // TODO(b/336807329) Encapsulate reachability logic
-        appCompatTaskInfo.isLetterboxDoubleTapEnabled = top != null
-                && top.mLetterboxUiController.isLetterboxDoubleTapEducationEnabled();
-        if (appCompatTaskInfo.isLetterboxDoubleTapEnabled) {
-            if (appCompatTaskInfo.isTopActivityPillarboxed()) {
-                if (top.mLetterboxUiController.allowHorizontalReachabilityForThinLetterbox()) {
-                    // Pillarboxed
-                    appCompatTaskInfo.topActivityLetterboxHorizontalPosition =
-                            top.mLetterboxUiController
-                                    .getLetterboxPositionForHorizontalReachability();
-                } else {
-                    appCompatTaskInfo.isLetterboxDoubleTapEnabled = false;
-                }
-            } else {
-                if (top.mLetterboxUiController.allowVerticalReachabilityForThinLetterbox()) {
-                    // Letterboxed
-                    appCompatTaskInfo.topActivityLetterboxVerticalPosition =
-                            top.mLetterboxUiController
-                                    .getLetterboxPositionForVerticalReachability();
-                } else {
-                    appCompatTaskInfo.isLetterboxDoubleTapEnabled = false;
-                }
-            }
-        }
-        appCompatTaskInfo.topActivityEligibleForUserAspectRatioButton = top != null
-                && !appCompatTaskInfo.topActivityInSizeCompat
-                && top.mAppCompatController.getAppCompatAspectRatioOverrides()
-                    .shouldEnableUserAspectRatioSettings()
-                && !info.isTopActivityTransparent;
-        appCompatTaskInfo.topActivityBoundsLetterboxed = top != null && top.areBoundsLetterboxed();
-        appCompatTaskInfo.cameraCompatTaskInfo.freeformCameraCompatMode = top == null
-                ? CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_NONE
-                : top.mAppCompatController.getAppCompatCameraOverrides()
-                        .getFreeformCameraCompatMode();
+        info.lastNonFullscreenBounds = topTask.mLastNonFullscreenBounds;
+        AppCompatUtils.fillAppCompatTaskInfo(this, info, top);
     }
 
     /**
@@ -3523,6 +3455,9 @@ class Task extends TaskFragment {
         if (task.effectiveUid != baseActivityUid) {
             info.baseActivity = new ComponentName("", "");
         }
+
+        info.capturedLink = null;
+        info.capturedLinkTimestamp = 0;
     }
 
     @Nullable PictureInPictureParams getPictureInPictureParams() {
@@ -6162,9 +6097,8 @@ class Task extends TaskFragment {
 
     @Override
     void onChildPositionChanged(WindowContainer child) {
-        dispatchTaskInfoChangedIfNeeded(false /* force */);
-
         if (!mChildren.contains(child)) {
+            dispatchTaskInfoChangedIfNeeded(false /* force */);
             return;
         }
         if (child.asTask() != null) {
@@ -6176,6 +6110,10 @@ class Task extends TaskFragment {
             // Send for TaskFragmentParentInfo#hasDirectActivity change.
             sendTaskFragmentParentInfoChangedIfNeeded();
         }
+
+        // Update the ancestor tasks' task description after any children have reparented
+        updateTaskDescription();
+        dispatchTaskInfoChangedIfNeeded(false /* force */);
     }
 
     void reparent(TaskDisplayArea newParent, boolean onTop) {

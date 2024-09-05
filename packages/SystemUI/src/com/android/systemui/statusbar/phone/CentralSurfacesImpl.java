@@ -47,7 +47,6 @@ import android.app.StatusBarManager;
 import android.app.TaskInfo;
 import android.app.UiModeManager;
 import android.app.WallpaperManager;
-import android.app.admin.DevicePolicyManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -883,8 +882,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
         // start old BaseStatusBar.start().
         mWindowManagerService = WindowManagerGlobal.getWindowManagerService();
-        mDevicePolicyManager = (DevicePolicyManager) mContext.getSystemService(
-                Context.DEVICE_POLICY_SERVICE);
 
         mAccessibilityManager = (AccessibilityManager)
                 mContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
@@ -916,8 +913,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 result.mRequestedVisibleTypes, result.mPackageName, result.mLetterboxDetails);
 
         // StatusBarManagerService has a back up of IME token and it's restored here.
-        mCommandQueueCallbacks.setImeWindowStatus(mDisplayId, result.mImeToken,
-                result.mImeWindowVis, result.mImeBackDisposition, result.mShowImeSwitcher);
+        mCommandQueueCallbacks.setImeWindowStatus(mDisplayId, result.mImeWindowVis,
+                result.mImeBackDisposition, result.mShowImeSwitcher);
 
         // Set up the initial icon state
         int numIcons = result.mIcons.size();
@@ -2642,6 +2639,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 mStackScrollerController.updateSensitivenessForOccludedWakeup();
             }
             if (mLaunchCameraWhenFinishedWaking) {
+                startLaunchTransitionTimeout();
                 mCameraLauncherLazy.get().launchCamera(mLastCameraLaunchSource,
                         mShadeSurface.isFullyCollapsed());
                 mLaunchCameraWhenFinishedWaking = false;
@@ -2714,21 +2712,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @Override
     public boolean isScreenFullyOff() {
         return mScreenLifecycle.getScreenState() == ScreenLifecycle.SCREEN_OFF;
-    }
-
-    @Override
-    public boolean isCameraAllowedByAdmin() {
-        if (mDevicePolicyManager.getCameraDisabled(null,
-                mLockscreenUserManager.getCurrentUserId())) {
-            return false;
-        } else if (mKeyguardStateController.isShowing()
-                && mStatusBarKeyguardViewManager.isSecure()) {
-            // Check if the admin has disabled the camera specifically for the keyguard
-            return (mDevicePolicyManager.getKeyguardDisabledFeatures(null,
-                    mLockscreenUserManager.getCurrentUserId())
-                    & DevicePolicyManager.KEYGUARD_DISABLE_SECURE_CAMERA) == 0;
-        }
-        return true;
     }
 
     @Override
@@ -2880,7 +2863,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
     protected boolean mDeviceInteractive;
 
-    protected DevicePolicyManager mDevicePolicyManager;
     private final PowerManager mPowerManager;
     protected StatusBarKeyguardViewManager mStatusBarKeyguardViewManager;
 

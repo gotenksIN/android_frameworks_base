@@ -118,12 +118,12 @@ import static com.android.server.LockGuard.installLock;
 import static com.android.server.policy.PhoneWindowManager.TRACE_WAIT_FOR_ALL_WINDOWS_DRAWN_METHOD;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
 import static com.android.server.wm.ActivityTaskManagerService.POWER_MODE_REASON_CHANGE_DISPLAY;
-import static com.android.server.wm.DisplayContent.IME_TARGET_CONTROL;
-import static com.android.server.wm.DisplayContent.IME_TARGET_LAYERING;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND_FLOATING;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_SOLID_COLOR;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_WALLPAPER;
+import static com.android.server.wm.DisplayContent.IME_TARGET_CONTROL;
+import static com.android.server.wm.DisplayContent.IME_TARGET_LAYERING;
 import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_RECENT_TASKS;
 import static com.android.server.wm.SensitiveContentPackages.PackageInfo;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_ALL;
@@ -358,7 +358,6 @@ import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
 import com.android.server.wallpaper.WallpaperCropper.WallpaperCropUtils;
-import com.android.window.flags.Flags;
 import com.android.server.am.ProcessFreezerManager;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -2811,10 +2810,10 @@ public class WindowManagerService extends IWindowManager.Stub
     void finishDrawingWindow(Session session, IWindow client,
             @Nullable SurfaceControl.Transaction postDrawTransaction, int seqId) {
         //unfreeze process if the first frame appeared
-        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-        if (freezer != null && freezer.useFreezerManager()) {
-            freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
-        }
+        // ProcessFreezerManager freezer = ProcessFreezerManager.getInstance(mAtmService);
+        // if (freezer != null && freezer.useFreezerManager()) {
+        //     freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
+        // }
 
         if (postDrawTransaction != null) {
             postDrawTransaction.sanitize(Binder.getCallingPid(), Binder.getCallingUid());
@@ -3779,7 +3778,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             mCurrentUserId = newUserId;
             mDisplayWindowSettingsProvider.setOverrideSettingsForUser(newUserId);
-            mDisplayWindowSettingsProvider.removeStaleDisplaySettings(mRoot);
+            mDisplayWindowSettingsProvider.removeStaleDisplaySettingsLocked(this, mRoot);
             mPolicy.setCurrentUserLw(newUserId);
             mKeyguardDisableHandler.setCurrentUser(newUserId);
 
@@ -5520,7 +5519,7 @@ public class WindowManagerService extends IWindowManager.Stub
             mRoot.forAllDisplays(DisplayContent::reconfigureDisplayLocked);
             // Per-user display settings may leave outdated settings after user switches, especially
             // during reboots starting with the default user without setCurrentUser called.
-            mDisplayWindowSettingsProvider.removeStaleDisplaySettings(mRoot);
+            mDisplayWindowSettingsProvider.removeStaleDisplaySettingsLocked(this, mRoot);
         }
     }
 
@@ -8133,11 +8132,10 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public void updateInputMethodTargetWindow(@NonNull IBinder imeToken,
-                @NonNull IBinder imeTargetWindowToken) {
+        public void updateInputMethodTargetWindow(@NonNull IBinder imeTargetWindowToken) {
             // TODO (b/34628091): Use this method to address the window animation issue.
             if (DEBUG_INPUT_METHOD) {
-                Slog.w(TAG_WM, "updateInputMethodTargetWindow: imeToken=" + imeToken
+                Slog.w(TAG_WM, "updateInputMethodTargetWindow:"
                         + " imeTargetWindowToken=" + imeTargetWindowToken);
             }
             synchronized (mGlobalLock) {
@@ -9075,7 +9073,8 @@ public class WindowManagerService extends IWindowManager.Stub
         // Otherwise, handle the touch-outside event directly.
         final WindowState w = t.getWindowState();
         final ActivityRecord activity = w != null ? w.getActivityRecord() : null;
-        if (activity != null && activity.isEmbedded()
+        if (mFocusedInputTarget != t && mFocusedInputTarget != null
+                && activity != null && activity.isEmbedded()
                 && activity.getTaskFragment().getAdjacentTaskFragment() != null) {
             mPointerDownOutsideFocusRunnable = () -> handlePointerDownOutsideFocus(t);
             mH.postDelayed(mPointerDownOutsideFocusRunnable, POINTER_DOWN_OUTSIDE_FOCUS_TIMEOUT_MS);
@@ -9425,11 +9424,6 @@ public class WindowManagerService extends IWindowManager.Stub
         final TaskFragment taskFragment = focusedActivity.getTaskFragment();
         if (taskFragment == null) {
             // Return if activity no attached.
-            return focusedActivity;
-        }
-
-        if (!Flags.embeddedActivityBackNavFlag()) {
-            // Return if flag is not enabled.
             return focusedActivity;
         }
 
@@ -9816,7 +9810,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 Slog.e(TAG, "Host window not found");
                 return;
             }
-            if (hostWindow.mInputChannel == null) {
+            if (hostWindow.mInputChannelToken == null) {
                 Slog.e(TAG, "Host window does not have an input channel");
                 return;
             }

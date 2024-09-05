@@ -19,7 +19,6 @@ package com.android.systemui.screenshot;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.view.WindowManager.LayoutParams.TYPE_SCREENSHOT;
 
-import static com.android.systemui.Flags.screenshotPrivateProfileAccessibilityAnnouncementFix;
 import static com.android.systemui.Flags.screenshotSaveImageExporter;
 import static com.android.systemui.screenshot.LogConfig.DEBUG_ANIM;
 import static com.android.systemui.screenshot.LogConfig.DEBUG_CALLBACK;
@@ -35,7 +34,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.annotation.MainThread;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.app.ICompatCameraControlCallback;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -95,27 +93,8 @@ import javax.inject.Provider;
 /**
  * Controls the state and flow for screenshots.
  */
-public class ScreenshotController implements ScreenshotHandler {
+public class ScreenshotController implements InteractiveScreenshotHandler {
     private static final String TAG = logTag(ScreenshotController.class);
-
-    public interface TransitionDestination {
-        /**
-         * Allows the long screenshot activity to call back with a destination location (the bounds
-         * on screen of the destination for the transitioning view) and a Runnable to be run once
-         * the transition animation is complete.
-         */
-        void setTransitionDestination(Rect transitionDestination, Runnable onTransitionEnd);
-    }
-
-    // These strings are used for communicating the action invoked to
-    // ScreenshotNotificationSmartActionsProvider.
-    public static final String EXTRA_ACTION_TYPE = "android:screenshot_action_type";
-    public static final String EXTRA_ID = "android:screenshot_id";
-    public static final String EXTRA_SMART_ACTIONS_ENABLED = "android:smart_actions_enabled";
-    public static final String EXTRA_ACTION_INTENT = "android:screenshot_action_intent";
-    public static final String EXTRA_ACTION_INTENT_FILLIN =
-            "android:screenshot_action_intent_fillin";
-
 
     // From WizardManagerHelper.java
     private static final String SETTINGS_SECURE_USER_SETUP_COMPLETE = "user_setup_complete";
@@ -375,21 +354,11 @@ public class ScreenshotController implements ScreenshotHandler {
 
     void prepareViewForNewScreenshot(@NonNull ScreenshotData screenshot, String oldPackageName) {
         withWindowAttached(() -> {
-            if (screenshotPrivateProfileAccessibilityAnnouncementFix()) {
-                mAnnouncementResolver.getScreenshotAnnouncement(
-                        screenshot.getUserHandle().getIdentifier(),
-                        announcement -> {
-                            mViewProxy.announceForAccessibility(announcement);
-                        });
-            } else {
-                if (mUserManager.isManagedProfile(screenshot.getUserHandle().getIdentifier())) {
-                    mViewProxy.announceForAccessibility(mContext.getResources().getString(
-                            R.string.screenshot_saving_work_profile_title));
-                } else {
-                    mViewProxy.announceForAccessibility(
-                            mContext.getResources().getString(R.string.screenshot_saving_title));
-                }
-            }
+            mAnnouncementResolver.getScreenshotAnnouncement(
+                    screenshot.getUserHandle().getIdentifier(),
+                    announcement -> {
+                        mViewProxy.announceForAccessibility(announcement);
+                    });
         });
 
         mViewProxy.reset();
@@ -413,16 +382,19 @@ public class ScreenshotController implements ScreenshotHandler {
      * Requests the view to dismiss the current screenshot (may be ignored, if screenshot is already
      * being dismissed)
      */
-    void requestDismissal(ScreenshotEvent event) {
+    @Override
+    public void requestDismissal(ScreenshotEvent event) {
         mViewProxy.requestDismissal(event);
     }
 
-    boolean isPendingSharedTransition() {
+    @Override
+    public boolean isPendingSharedTransition() {
         return mActionExecutor.isPendingSharedTransition();
     }
 
     // Any cleanup needed when the service is being destroyed.
-    void onDestroy() {
+    @Override
+    public void onDestroy() {
         if (mSaveInBgTask != null) {
             // just log success/failure for the pre-existing screenshot
             mSaveInBgTask.setActionsReadyListener(this::logSuccessOnActionsReady);
@@ -510,13 +482,6 @@ public class ScreenshotController implements ScreenshotHandler {
                                 }
                             }
                         }
-
-                        @Override
-                        public void requestCompatCameraControl(boolean showControl,
-                                boolean transformationApplied,
-                                ICompatCameraControlCallback callback) {
-                            Log.w(TAG, "Unexpected requestCompatCameraControl callback");
-                        }
                     });
         });
     }
@@ -603,7 +568,8 @@ public class ScreenshotController implements ScreenshotHandler {
         layout.setClipToPadding(false);
     }
 
-    void removeWindow() {
+    @Override
+    public void removeWindow() {
         final View decorView = mWindow.peekDecorView();
         if (decorView != null && decorView.isAttachedToWindow()) {
             if (DEBUG_WINDOW) {
@@ -854,12 +820,12 @@ public class ScreenshotController implements ScreenshotHandler {
 
     /** Injectable factory to create screenshot controller instances for a specific display. */
     @AssistedFactory
-    public interface Factory {
+    public interface Factory extends InteractiveScreenshotHandler.Factory {
         /**
          * Creates an instance of the controller for that specific display.
          *
          * @param display                 display to capture
          */
-        ScreenshotController create(Display display);
+        LegacyScreenshotController create(Display display);
     }
 }

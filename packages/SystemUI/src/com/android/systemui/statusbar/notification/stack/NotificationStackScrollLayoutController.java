@@ -80,9 +80,11 @@ import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin.OnMenuEv
 import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
+import com.android.systemui.qs.flags.QSComposeFragment;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.scene.ui.view.WindowRootView;
+import com.android.systemui.shade.QSHeaderBoundsProvider;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.statusbar.CommandQueue;
@@ -124,6 +126,7 @@ import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.NotificationGuts;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.row.NotificationSnooze;
+import com.android.systemui.statusbar.notification.shared.GroupHunAnimationFix;
 import com.android.systemui.statusbar.notification.shared.NotificationsHeadsUpRefactor;
 import com.android.systemui.statusbar.notification.stack.ui.viewbinder.NotificationListViewBinder;
 import com.android.systemui.statusbar.phone.HeadsUpAppearanceController;
@@ -1074,6 +1077,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
 
     public void setOnEmptySpaceClickListener(
             OnEmptySpaceClickListener listener) {
+        SceneContainerFlag.assertInLegacyMode();
         mView.setOnEmptySpaceClickListener(listener);
     }
 
@@ -1521,7 +1525,13 @@ public class NotificationStackScrollLayoutController implements Dumpable {
      * Sets the QS header. Used to check if a touch is within its bounds.
      */
     public void setQsHeader(ViewGroup view) {
+        QSComposeFragment.assertInLegacyMode();
         mView.setQsHeader(view);
+    }
+
+    public void setQsHeaderBoundsProvider(QSHeaderBoundsProvider qsHeaderBoundsProvider) {
+        QSComposeFragment.isUnexpectedlyInLegacyMode();
+        mView.setQsHeaderBoundsProvider(qsHeaderBoundsProvider);
     }
 
     public void setAnimationsEnabled(boolean enabled) {
@@ -1629,6 +1639,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     }
 
     public void setMaxTopPadding(int padding) {
+        SceneContainerFlag.assertInLegacyMode();
         mView.setMaxTopPadding(padding);
     }
 
@@ -1987,6 +1998,10 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                 NotificationEntry entry = row.getEntry();
                 mHeadsUpAppearanceController.updateHeader(entry);
                 mHeadsUpAppearanceController.updateHeadsUpAndPulsingRoundness(entry);
+                if (GroupHunAnimationFix.isEnabled() && !animatingAway) {
+                    // invalidate list to make sure the row is sorted to the correct section
+                    mHeadsUpManager.onEntryAnimatingAwayEnded(entry);
+                }
             });
         }
 

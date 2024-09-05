@@ -392,6 +392,24 @@ flag {
 }
 
 flag {
+    name: "status_bar_use_repos_for_call_chip"
+    namespace: "systemui"
+    description: "Use repositories as the source of truth for call notifications shown as a chip in"
+        "the status bar"
+    bug: "328584859"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "status_bar_call_chip_notification_icon"
+    namespace: "systemui"
+    description: "Use the small icon set on the notification for the status bar call chip"
+    bug: "354930838"
+}
+
+flag {
     name: "compose_bouncer"
     namespace: "systemui"
     description: "Use the new compose bouncer in SystemUI"
@@ -571,16 +589,6 @@ flag {
 }
 
 flag {
-    name: "screenshot_private_profile_accessibility_announcement_fix"
-    namespace: "systemui"
-    description: "Modified a11y announcement for private space screenshots"
-    bug: "326941376"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "screenshot_private_profile_behavior_fix"
     namespace: "systemui"
     description: "Private profile support for screenshots"
@@ -598,6 +606,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "screenshot_ui_controller_refactor"
+    namespace: "systemui"
+    description: "Simplify and refactor ScreenshotController"
+    bug: "354711957"
 }
 
 flag {
@@ -998,6 +1013,16 @@ flag {
 }
 
 flag {
+  name: "communal_timer_flicker_fix"
+  namespace: "systemui"
+  description: "fixes timers on the hub flickering when pausing"
+  bug: "353801573"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "app_clips_backlinks"
   namespace: "systemui"
   description: "Enables Backlinks improvement feature in App Clips"
@@ -1210,6 +1235,9 @@ flag {
   namespace: "systemui"
   description: "Enables fullscreen vertical swiping in hub mode to bring up and down the bouncer and shade"
   bug: "340177049"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -1237,6 +1265,16 @@ flag {
    namespace: "systemui"
    description: "The SIM PIN entry screens show the wrong message due"
    bug: "346932439"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "use_transitions_for_keyguard_occluded"
+   namespace: "systemui"
+   description: "Use Keyguard Transitions to set Notification Shade occlusion state"
+   bug: "344716537"
    metadata {
         purpose: PURPOSE_BUGFIX
    }

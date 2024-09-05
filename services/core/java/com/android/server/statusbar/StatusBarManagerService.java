@@ -535,9 +535,9 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
         @Override
-        public void setImeWindowStatus(int displayId, IBinder token, int vis, int backDisposition,
+        public void setImeWindowStatus(int displayId, int vis, int backDisposition,
                 boolean showImeSwitcher) {
-            StatusBarManagerService.this.setImeWindowStatus(displayId, token, vis, backDisposition,
+            StatusBarManagerService.this.setImeWindowStatus(displayId, vis, backDisposition,
                     showImeSwitcher);
         }
 
@@ -1352,25 +1352,24 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     }
 
     @Override
-    public void setImeWindowStatus(int displayId, final IBinder token, final int vis,
-            final int backDisposition, final boolean showImeSwitcher) {
+    public void setImeWindowStatus(int displayId, final int vis, final int backDisposition,
+            final boolean showImeSwitcher) {
         enforceStatusBar();
 
         if (SPEW) {
-            Slog.d(TAG, "swetImeWindowStatus vis=" + vis + " backDisposition=" + backDisposition);
+            Slog.d(TAG, "setImeWindowStatus vis=" + vis + " backDisposition=" + backDisposition);
         }
 
         synchronized(mLock) {
             // In case of IME change, we need to call up setImeWindowStatus() regardless of
             // mImeWindowVis because mImeWindowVis may not have been set to false when the
             // previous IME was destroyed.
-            getUiState(displayId).setImeWindowState(vis, backDisposition, showImeSwitcher, token);
+            getUiState(displayId).setImeWindowState(vis, backDisposition, showImeSwitcher);
 
             mHandler.post(() -> {
                 if (mBar == null) return;
                 try {
-                    mBar.setImeWindowStatus(
-                            displayId, token, vis, backDisposition, showImeSwitcher);
+                    mBar.setImeWindowStatus(displayId, vis, backDisposition, showImeSwitcher);
                 } catch (RemoteException ex) { }
             });
         }
@@ -1423,7 +1422,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         private int mImeWindowVis = 0;
         private int mImeBackDisposition = 0;
         private boolean mShowImeSwitcher = false;
-        private IBinder mImeToken = null;
         private LetterboxDetails[] mLetterboxDetails = new LetterboxDetails[0];
 
         private void setBarAttributes(@Appearance int appearance,
@@ -1466,11 +1464,10 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
         private void setImeWindowState(final int vis, final int backDisposition,
-                final boolean showImeSwitcher, final IBinder token) {
+                final boolean showImeSwitcher) {
             mImeWindowVis = vis;
             mImeBackDisposition = backDisposition;
             mShowImeSwitcher = showImeSwitcher;
-            mImeToken = token;
         }
     }
 
@@ -1564,7 +1561,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
             return new RegisterStatusBarResult(icons, gatherDisableActionsLocked(mCurrentUserId, 1),
                     state.mAppearance, state.mAppearanceRegions, state.mImeWindowVis,
                     state.mImeBackDisposition, state.mShowImeSwitcher,
-                    gatherDisableActionsLocked(mCurrentUserId, 2), state.mImeToken,
+                    gatherDisableActionsLocked(mCurrentUserId, 2),
                     state.mNavbarColorManagedByIme, state.mBehavior, state.mRequestedVisibleTypes,
                     state.mPackageName, state.mTransientBarTypes, state.mLetterboxDetails);
         }
@@ -1891,8 +1888,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         enforceStatusBarService();
         final long token = Binder.clearCallingIdentity();
         try {
-            // TODO(b/308479256): Check if hiding "all" IMEs is OK or not.
-            InputMethodManagerInternal.get().hideAllInputMethods(
+            InputMethodManagerInternal.get().hideInputMethod(
                     SoftInputShowHideReason.HIDE_BUBBLES, displayId);
         } finally {
             Binder.restoreCallingIdentity(token);

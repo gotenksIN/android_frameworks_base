@@ -69,8 +69,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -92,6 +94,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -145,9 +148,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.viewinterop.NoOpUpdate
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.layout.WindowMetricsCalculator
 import com.android.compose.animation.Easings.Emphasized
@@ -155,6 +160,7 @@ import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.LocalAndroidColorScheme
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 import com.android.internal.R.dimen.system_app_widget_background_radius
+import com.android.systemui.Flags.communalTimerFlickerFix
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.model.CommunalContentSize
 import com.android.systemui.communal.shared.model.CommunalScenes
@@ -216,7 +222,9 @@ fun CommunalHub(
     val screenWidth = windowMetrics.bounds.width()
     val layoutDirection = LocalLayoutDirection.current
 
-    if (!viewModel.isEditMode) {
+    if (viewModel.isEditMode) {
+        ObserveNewWidgetAddedEffect(communalContent, gridState, viewModel)
+    } else {
         ScrollOnUpdatedLiveContentEffect(communalContent, gridState)
     }
 
@@ -236,48 +244,59 @@ fun CommunalHub(
                 .semantics { testTagsAsResourceId = true }
                 .testTag(COMMUNAL_HUB_TEST_TAG)
                 .fillMaxSize()
-                .nestedScroll(nestedScrollConnection)
-                .pointerInput(layoutDirection, gridState, contentOffset, contentListState) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            var event = awaitFirstDown(requireUnconsumed = false)
-                            // Reset touch on first event.
-                            viewModel.onResetTouchState()
-
-                            // Process down event in case it's consumed immediately
-                            if (event.isConsumed) {
-                                viewModel.onHubTouchConsumed()
-                            }
-
-                            do {
-                                var event = awaitPointerEvent()
-                                for (change in event.changes) {
-                                    if (change.isConsumed) {
-                                        // Signal touch consumption on any consumed event.
-                                        viewModel.onHubTouchConsumed()
-                                    }
-                                }
-                            } while (
-                                !event.changes.fastAll {
-                                    it.changedToUp() || it.changedToUpIgnoreConsumed()
-                                }
-                            )
+                // Observe taps for selecting items
+                .thenIf(viewModel.isEditMode) {
+                    Modifier.pointerInput(
+                        layoutDirection,
+                        gridState,
+                        contentOffset,
+                        contentListState,
+                    ) {
+                        observeTaps { offset ->
+                            // if RTL, flip offset direction from Left side to Right
+                            val adjustedOffset =
+                                Offset(
+                                    if (layoutDirection == LayoutDirection.Rtl)
+                                        screenWidth - offset.x
+                                    else offset.x,
+                                    offset.y
+                                ) - contentOffset
+                            val index = firstIndexAtOffset(gridState, adjustedOffset)
+                            val key =
+                                index?.let { keyAtIndexIfEditable(contentListState.list, index) }
+                            viewModel.setSelectedKey(key)
                         }
                     }
+                }
+                // Nested scroll for full screen swipe to get to shade and bouncer
+                .thenIf(!viewModel.isEditMode) {
+                    Modifier.nestedScroll(nestedScrollConnection).pointerInput(viewModel) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val firstDownEvent = awaitFirstDown(requireUnconsumed = false)
+                                // Reset touch on first event.
+                                viewModel.onResetTouchState()
 
-                    // If not in edit mode, don't allow selecting items.
-                    if (!viewModel.isEditMode) return@pointerInput
-                    observeTaps { offset ->
-                        // if RTL, flip offset direction from Left side to Right
-                        val adjustedOffset =
-                            Offset(
-                                if (layoutDirection == LayoutDirection.Rtl) screenWidth - offset.x
-                                else offset.x,
-                                offset.y
-                            ) - contentOffset
-                        val index = firstIndexAtOffset(gridState, adjustedOffset)
-                        val key = index?.let { keyAtIndexIfEditable(contentListState.list, index) }
-                        viewModel.setSelectedKey(key)
+                                // Process down event in case it's consumed immediately
+                                if (firstDownEvent.isConsumed) {
+                                    viewModel.onHubTouchConsumed()
+                                }
+
+                                do {
+                                    val event = awaitPointerEvent()
+                                    for (change in event.changes) {
+                                        if (change.isConsumed) {
+                                            // Signal touch consumption on any consumed event.
+                                            viewModel.onHubTouchConsumed()
+                                        }
+                                    }
+                                } while (
+                                    !event.changes.fastAll {
+                                        it.changedToUp() || it.changedToUpIgnoreConsumed()
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
                 .thenIf(!viewModel.isEditMode && !isEmptyState) {
@@ -285,7 +304,7 @@ fun CommunalHub(
                         gridState,
                         contentOffset,
                         communalContent,
-                        gridCoordinates
+                        gridCoordinates,
                     ) {
                         detectLongPressGesture { offset ->
                             // Deduct both grid offset relative to its container and content
@@ -543,6 +562,56 @@ private fun ScrollOnUpdatedLiveContentEffect(
             // Launching with a scope to prevent the job from being canceled in the case of a
             // recomposition during scrolling
             coroutineScope.launch { gridState.animateScrollToItem(indexOfFirstUpdatedContent) }
+        }
+    }
+}
+
+/**
+ * Observes communal content and determines whether a new widget has been added, upon which case:
+ * - Announce for accessibility
+ * - Scroll if the new widget is not visible
+ */
+@Composable
+private fun ObserveNewWidgetAddedEffect(
+    communalContent: List<CommunalContentModel>,
+    gridState: LazyGridState,
+    viewModel: BaseCommunalViewModel,
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val widgetKeys = remember { mutableListOf<String>() }
+    var communalContentPending by remember { mutableStateOf(true) }
+
+    LaunchedEffect(communalContent) {
+        // Do nothing until any communal content comes in
+        if (communalContentPending && communalContent.isEmpty()) {
+            return@LaunchedEffect
+        }
+
+        val oldWidgetKeys = widgetKeys.toList()
+        val widgets = communalContent.filterIsInstance<CommunalContentModel.WidgetContent.Widget>()
+        widgetKeys.clear()
+        widgetKeys.addAll(widgets.map { it.key })
+
+        // Do nothing on first communal content since we don't have a delta
+        if (communalContentPending) {
+            communalContentPending = false
+            return@LaunchedEffect
+        }
+
+        // Do nothing if there is no new widget
+        val indexOfFirstNewWidget = widgetKeys.indexOfFirst { !oldWidgetKeys.contains(it) }
+        if (indexOfFirstNewWidget < 0) {
+            return@LaunchedEffect
+        }
+
+        viewModel.onNewWidgetAdded(widgets[indexOfFirstNewWidget].providerInfo)
+
+        // Scroll if the new widget is not visible
+        val lastVisibleItemIndex = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+        if (lastVisibleItemIndex != null && indexOfFirstNewWidget > lastVisibleItemIndex) {
+            // Launching with a scope to prevent the job from being canceled in the case of a
+            // recomposition during scrolling
+            coroutineScope.launch { gridState.animateScrollToItem(indexOfFirstNewWidget) }
         }
     }
 }
@@ -968,7 +1037,9 @@ private fun CtaTileInViewModeContent(
         shape = RoundedCornerShape(68.adjustedDp, 34.adjustedDp, 68.adjustedDp, 34.adjustedDp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(vertical = 32.dp, horizontal = 50.dp),
+            modifier =
+                Modifier.fillMaxSize()
+                    .padding(vertical = 32.adjustedDp, horizontal = 50.adjustedDp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -977,47 +1048,57 @@ private fun CtaTileInViewModeContent(
                 contentDescription = stringResource(R.string.cta_label_to_open_widget_picker),
                 modifier = Modifier.size(Dimensions.IconSize).clearAndSetSemantics {},
             )
-            Spacer(modifier = Modifier.size(6.dp))
+            Spacer(modifier = Modifier.size(6.adjustedDp))
             Text(
                 text = stringResource(R.string.cta_label_to_edit_widget),
                 style = MaterialTheme.typography.titleLarge,
                 fontSize = nonScalableTextSize(22.dp),
                 lineHeight = nonScalableTextSize(28.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState()).weight(1F)
             )
-            Spacer(modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.size(16.adjustedDp))
             Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                modifier = Modifier.fillMaxWidth().height(56.adjustedDp),
+                horizontalArrangement =
+                    Arrangement.spacedBy(16.adjustedDp, Alignment.CenterHorizontally),
             ) {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxHeight(),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            contentColor = colors.onPrimary,
-                        ),
-                    border = BorderStroke(width = 1.0.dp, color = colors.primaryContainer),
-                    contentPadding = PaddingValues(26.dp, 8.dp),
-                    onClick = viewModel::onDismissCtaTile,
+                CompositionLocalProvider(
+                    LocalDensity provides
+                        Density(
+                            LocalDensity.current.density,
+                            LocalDensity.current.fontScale.coerceIn(0f, 1.25f)
+                        )
                 ) {
-                    Text(
-                        text = stringResource(R.string.cta_tile_button_to_dismiss),
-                        fontSize = nonScalableTextSize(14.dp),
-                    )
-                }
-                Button(
-                    modifier = Modifier.fillMaxHeight(),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = colors.primaryContainer,
-                            contentColor = colors.onPrimaryContainer,
-                        ),
-                    contentPadding = PaddingValues(26.dp, 8.dp),
-                    onClick = viewModel::onOpenWidgetEditor
-                ) {
-                    Text(
-                        text = stringResource(R.string.cta_tile_button_to_open_widget_editor),
-                        fontSize = nonScalableTextSize(14.dp),
-                    )
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxHeight().weight(1F),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                contentColor = colors.onPrimary,
+                            ),
+                        border = BorderStroke(width = 1.0.dp, color = colors.primaryContainer),
+                        onClick = viewModel::onDismissCtaTile,
+                        contentPadding = PaddingValues(0.dp, 0.dp, 0.dp, 0.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cta_tile_button_to_dismiss),
+                            fontSize = 14.sp,
+                        )
+                    }
+                    Button(
+                        modifier = Modifier.fillMaxHeight().weight(1F),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = colors.primaryContainer,
+                                contentColor = colors.onPrimaryContainer,
+                            ),
+                        onClick = viewModel::onOpenWidgetEditor,
+                        contentPadding = PaddingValues(0.dp, 0.dp, 0.dp, 0.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cta_tile_button_to_open_widget_editor),
+                            fontSize = 14.sp,
+                        )
+                    }
                 }
             }
         }
@@ -1288,9 +1369,15 @@ private fun SmartspaceContent(
         factory = { context ->
             SmartspaceAppWidgetHostView(context).apply {
                 interactionHandler?.let { setInteractionHandler(it) }
-                updateAppWidget(model.remoteViews)
+                if (!communalTimerFlickerFix()) {
+                    updateAppWidget(model.remoteViews)
+                }
             }
         },
+        update =
+            if (communalTimerFlickerFix()) {
+                { view: SmartspaceAppWidgetHostView -> view.updateAppWidget(model.remoteViews) }
+            } else NoOpUpdate,
         // For reusing composition in lazy lists.
         onReset = {},
     )

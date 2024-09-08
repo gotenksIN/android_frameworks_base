@@ -1804,9 +1804,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             return;
         }
         final int displayRotation = getRotation();
-        final int rotation = ar.isVisible()
-                ? ar.getWindowConfiguration().getDisplayRotation()
-                : mDisplayRotation.rotationForOrientation(orientation, displayRotation);
+        final int rotation = mDisplayRotation.rotationForOrientation(orientation, displayRotation);
         if (rotation == displayRotation) {
             return;
         }
@@ -4415,13 +4413,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                                 mWmService.dispatchImeInputTargetVisibilityChanged(
                                         targetWin.mClient.asBinder(), isVisibleRequested,
                                         targetWin.mActivityRecord != null
-                                                && targetWin.mActivityRecord.finishing);
+                                                && targetWin.mActivityRecord.finishing,
+                                        mDisplayId);
                             }
                         });
                 targetWin.mToken.registerWindowContainerListener(
                         mImeTargetTokenListenerPair.second);
                 mWmService.dispatchImeInputTargetVisibilityChanged(targetWin.mClient.asBinder(),
-                        targetWin.isVisible() /* visible */, false /* removed */);
+                        targetWin.isVisible() /* visible */, false /* removed */, mDisplayId);
             }
         }
         if (refreshImeSecureFlag(getPendingTransaction())) {
@@ -6709,6 +6708,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         final boolean rotationChanged = super.setIgnoreOrientationRequest(ignoreOrientationRequest);
         mWmService.mDisplayWindowSettings.setIgnoreOrientationRequest(
                 this, mSetIgnoreOrientationRequest);
+        if (ignoreOrientationRequest && mWmService.mFlags.mRespectNonTopVisibleFixedOrientation) {
+            forAllActivities(r -> {
+                r.finishFixedRotationTransform();
+            });
+        }
         return rotationChanged;
     }
 

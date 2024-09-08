@@ -2004,8 +2004,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // Don't move below setOrientation(info.screenOrientation) since it triggers
         // getOverrideOrientation that requires having mLetterboxUiController
         // initialised.
-        mLetterboxUiController = new LetterboxUiController(mWmService, this);
         mAppCompatController = new AppCompatController(mWmService, this);
+        mLetterboxUiController = new LetterboxUiController(mWmService, this);
         mResolveConfigHint = new TaskFragment.ConfigOverrideHint();
         if (mWmService.mFlags.mInsetsDecoupledConfiguration) {
             // When the stable configuration is the default behavior, override for the legacy apps
@@ -2547,8 +2547,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // trampoline that will be always created and finished immediately. Then give a chance to
         // see if the snapshot is usable for the current running activity so the transition will
         // look smoother, instead of showing a splash screen on the second launch.
-        if (!newTask && taskSwitch && processRunning && !activityCreated && task.intent != null
-                && mActivityComponent.equals(task.intent.getComponent())) {
+        if (!newTask && taskSwitch && !activityCreated && task.intent != null
+                // Another case where snapshot is allowed to be used is if this activity has not yet
+                // been created && is translucent or floating.
+                // The component isn't necessary to be matched in this case.
+                && (!mOccludesParent || mActivityComponent.equals(task.intent.getComponent()))) {
             final ActivityRecord topAttached = task.getActivity(ActivityRecord::attachedToProcess);
             if (topAttached != null) {
                 if (topAttached.isSnapshotCompatible(snapshot)
@@ -5495,6 +5498,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             }
         }
 
+        mAtmService.mBackNavigationController.onAppVisibilityChanged(this, visible);
         onChildVisibilityRequested(visible);
 
         final DisplayContent displayContent = getDisplayContent();

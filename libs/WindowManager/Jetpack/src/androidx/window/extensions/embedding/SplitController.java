@@ -89,9 +89,9 @@ import android.window.WindowContainerTransaction;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.window.common.CommonFoldingFeature;
 import androidx.window.common.DeviceStateManagerFoldingFeatureProducer;
 import androidx.window.common.EmptyLifecycleCallbacksAdapter;
+import androidx.window.common.layout.CommonFoldingFeature;
 import androidx.window.extensions.WindowExtensions;
 import androidx.window.extensions.core.util.function.Consumer;
 import androidx.window.extensions.core.util.function.Function;
@@ -2725,15 +2725,19 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     TaskFragmentContainer createOrUpdateOverlayTaskFragmentIfNeeded(
             @NonNull WindowContainerTransaction wct, @NonNull Bundle options,
             @NonNull Intent intent, @NonNull Activity launchActivity) {
+        final String overlayTag = Objects.requireNonNull(options.getString(KEY_OVERLAY_TAG));
         if (isActivityFromSplit(launchActivity)) {
             // We restrict to launch the overlay from split. Fallback to treat it as normal
             // launch.
+            Log.w(TAG, "It's not allowed to launch overlay container with tag=" + overlayTag
+                    + " from activity in Activity Embedding split."
+                    + " Launching activity=" + launchActivity
+                    + " Fallback to launch the activity as normal launch.");
             return null;
         }
 
         final List<TaskFragmentContainer> overlayContainers =
                 getAllNonFinishingOverlayContainers();
-        final String overlayTag = Objects.requireNonNull(options.getString(KEY_OVERLAY_TAG));
         final boolean associateLaunchingActivity = options
                 .getBoolean(KEY_OVERLAY_ASSOCIATE_WITH_LAUNCHING_ACTIVITY, true);
 

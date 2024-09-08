@@ -79,6 +79,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.Executor;
 import java.util.stream.Stream;
 
+import javax.security.auth.callback.Callback;
+
 /**
  * CachedBluetoothDevice represents a remote Bluetooth device. It contains
  * attributes of the device (such as the address, name, RSSI, etc.) and
@@ -1071,6 +1073,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         return mDevice.getBluetoothClass();
     }
 
+    /**
+     * Returns a list of {@link LocalBluetoothProfile} supported by the device.
+     */
     public List<LocalBluetoothProfile> getProfiles() {
         return new ArrayList<>(mProfiles);
     }
@@ -1095,9 +1100,14 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         return ret;
     }
 
-    public List<LocalBluetoothProfile> getConnectableProfiles() {
-        List<LocalBluetoothProfile> connectableProfiles =
-                new ArrayList<LocalBluetoothProfile>();
+    /**
+     * Returns a list of {@link LocalBluetoothProfile} that are user-accessible from UI to
+     * initiate a connection.
+     *
+     * Note: Use {@link #getProfiles()} to retrieve all supported profiles on the device.
+     */
+    public List<LocalBluetoothProfile> getUiAccessibleProfiles() {
+        List<LocalBluetoothProfile> accessibleProfiles = new ArrayList<>();
         Class<?> bCProfileClass = null;
         String BC_PROFILE_CLASS = "com.android.settingslib.bluetooth.BCProfile";
         try {
@@ -1110,18 +1120,18 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             for (LocalBluetoothProfile profile : mProfiles) {
                 if (bCProfileClass != null && bCProfileClass.isInstance(profile)) {
                     if (isBASeeker()) {
-                        connectableProfiles.add(profile);
+                        accessibleProfiles.add(profile);
                     } else {
                         Log.d(TAG, "BC profile is not enabled for" + mDevice);
                     }
                 } else {
                     if (profile.accessProfileEnabled()) {
-                       connectableProfiles.add(profile);
+                       accessibleProfiles.add(profile);
                     }
                 }
             }
         }
-        return connectableProfiles;
+        return accessibleProfiles;
     }
 
     public List<LocalBluetoothProfile> getRemovedProfiles() {

@@ -32,6 +32,7 @@ import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.launcher3.icons.IconProvider;
+import com.android.window.flags.Flags;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.WindowManagerShellWrapper;
@@ -58,6 +59,7 @@ import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.common.TransactionPool;
 import com.android.wm.shell.dagger.back.ShellBackAnimationModule;
 import com.android.wm.shell.dagger.pip.PipModule;
+import com.android.wm.shell.desktopmode.DefaultDragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger;
 import com.android.wm.shell.desktopmode.DesktopModeLoggerTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopModeTaskRepository;
@@ -67,7 +69,10 @@ import com.android.wm.shell.desktopmode.DesktopTasksTransitionObserver;
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.EnterDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler;
+import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator;
+import com.android.wm.shell.desktopmode.SpringDragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler;
+import com.android.wm.shell.desktopmode.education.data.AppHandleEducationDatastoreRepository;
 import com.android.wm.shell.draganddrop.DragAndDropController;
 import com.android.wm.shell.draganddrop.GlobalDragListener;
 import com.android.wm.shell.freeform.FreeformComponents;
@@ -538,6 +543,7 @@ public abstract class WMShellModule {
             DragAndDropController dragAndDropController,
             Transitions transitions,
             KeyguardManager keyguardManager,
+            ReturnToDragStartAnimator returnToDragStartAnimator,
             EnterDesktopTaskTransitionHandler enterDesktopTransitionHandler,
             ExitDesktopTaskTransitionHandler exitDesktopTransitionHandler,
             ToggleResizeDesktopTaskTransitionHandler toggleResizeDesktopTaskTransitionHandler,
@@ -553,13 +559,13 @@ public abstract class WMShellModule {
             InteractionJankMonitor interactionJankMonitor) {
         return new DesktopTasksController(context, shellInit, shellCommandHandler, shellController,
                 displayController, shellTaskOrganizer, syncQueue, rootTaskDisplayAreaOrganizer,
-                dragAndDropController, transitions, keyguardManager, enterDesktopTransitionHandler,
+                dragAndDropController, transitions, keyguardManager,
+                returnToDragStartAnimator, enterDesktopTransitionHandler,
                 exitDesktopTransitionHandler, toggleResizeDesktopTaskTransitionHandler,
                 dragToDesktopTransitionHandler, desktopModeTaskRepository,
                 desktopModeLoggerTransitionObserver, launchAdjacentController,
-                recentsTransitionHandler, multiInstanceHelper,
-                mainExecutor, desktopTasksLimiter, recentTasksController.orElse(null),
-                interactionJankMonitor);
+                recentsTransitionHandler, multiInstanceHelper, mainExecutor, desktopTasksLimiter,
+                recentTasksController.orElse(null), interactionJankMonitor);
     }
 
     @WMSingleton
@@ -587,6 +593,13 @@ public abstract class WMShellModule {
         );
     }
 
+    @WMSingleton
+    @Provides
+    static ReturnToDragStartAnimator provideReturnToDragStartAnimator(
+            InteractionJankMonitor interactionJankMonitor) {
+        return new ReturnToDragStartAnimator(interactionJankMonitor);
+    }
+
 
     @WMSingleton
     @Provides
@@ -594,10 +607,12 @@ public abstract class WMShellModule {
             Context context,
             Transitions transitions,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
-            Optional<DesktopTasksLimiter> desktopTasksLimiter,
             InteractionJankMonitor interactionJankMonitor) {
-        return new DragToDesktopTransitionHandler(context, transitions,
-                rootTaskDisplayAreaOrganizer, interactionJankMonitor);
+        return Flags.enableDesktopWindowingTransitions()
+                ? new SpringDragToDesktopTransitionHandler(context, transitions,
+                        rootTaskDisplayAreaOrganizer, interactionJankMonitor)
+                : new DefaultDragToDesktopTransitionHandler(context, transitions,
+                        rootTaskDisplayAreaOrganizer, interactionJankMonitor);
     }
 
     @WMSingleton
@@ -663,6 +678,13 @@ public abstract class WMShellModule {
     @Provides
     static DesktopModeEventLogger provideDesktopModeEventLogger() {
         return new DesktopModeEventLogger();
+    }
+
+    @WMSingleton
+    @Provides
+    static AppHandleEducationDatastoreRepository provideAppHandleEducationDatastoreRepository(
+            Context context) {
+        return new AppHandleEducationDatastoreRepository(context);
     }
 
     //

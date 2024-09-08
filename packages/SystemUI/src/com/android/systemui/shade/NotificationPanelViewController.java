@@ -1105,14 +1105,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             }
 
             @Override
-            public void onPulseExpansionAmountChanged(boolean expandingChanged) {
-                if (mKeyguardBypassController.getBypassEnabled()) {
-                    // Position the notifications while dragging down while pulsing
-                    requestScrollerTopPaddingUpdate(false /* animate */);
-                }
-            }
-
-            @Override
             public void onDelayedDozeAmountAnimationRunning(boolean running) {
                 // On running OR finished, the animation is no longer waiting to play
                 setWillPlayDelayedDozeAmountAnimation(false);

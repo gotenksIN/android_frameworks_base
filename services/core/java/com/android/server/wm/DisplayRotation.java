@@ -1324,7 +1324,6 @@ public class DisplayRotation {
      * @param lastRotation The most recently used rotation.
      * @return The surface rotation to use.
      */
-    @VisibleForTesting
     @Surface.Rotation
     int rotationForOrientation(@ScreenOrientation int orientation,
             @Surface.Rotation int lastRotation) {

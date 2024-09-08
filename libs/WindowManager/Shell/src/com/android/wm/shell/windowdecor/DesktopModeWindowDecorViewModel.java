@@ -69,7 +69,6 @@ import android.view.InputChannel;
 import android.view.InputEvent;
 import android.view.InputEventReceiver;
 import android.view.InputMonitor;
-import android.view.InsetsSource;
 import android.view.InsetsState;
 import android.view.MotionEvent;
 import android.view.SurfaceControl;
@@ -115,6 +114,7 @@ import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration.ExclusionRegionListener;
+import com.android.wm.shell.windowdecor.extension.InsetsStateKt;
 import com.android.wm.shell.windowdecor.extension.TaskInfoKt;
 import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder;
 
@@ -321,10 +321,12 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
     private void onInit() {
         mShellController.addKeyguardChangeListener(mDesktopModeKeyguardChangeListener);
         mShellCommandHandler.addDumpCallback(this::dump, this);
-        mDisplayInsetsController.addInsetsChangedListener(mContext.getDisplayId(),
+        mDisplayInsetsController.addGlobalInsetsChangedListener(
                 new DesktopModeOnInsetsChangedListener());
         mDesktopTasksController.setOnTaskResizeAnimationListener(
                 new DesktopModeOnTaskResizeAnimationListener());
+        mDesktopTasksController.setOnTaskRepositionAnimationListener(
+                new DesktopModeOnTaskRepositionAnimationListener());
         mDisplayController.addDisplayChangingController(mOnDisplayChangingListener);
         try {
             mWindowManager.registerSystemGestureExclusionListener(mGestureExclusionListener,
@@ -464,9 +466,16 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
         if (decoration == null) {
             return;
         }
-        mDesktopTasksController.snapToHalfScreen(decoration.mTaskInfo,
-                decoration.mTaskInfo.configuration.windowConfiguration.getBounds(),
-                left ? SnapPosition.LEFT : SnapPosition.RIGHT);
+
+        if (!decoration.mTaskInfo.isResizeable
+                && DesktopModeFlags.DISABLE_SNAP_RESIZE.isEnabled(mContext)) {
+            //TODO(b/354658237) - show toast with relevant string
+        } else {
+            mDesktopTasksController.snapToHalfScreen(decoration.mTaskInfo,
+                    decoration.mTaskInfo.configuration.windowConfiguration.getBounds(),
+                    left ? SnapPosition.LEFT : SnapPosition.RIGHT);
+        }
+
         decoration.closeHandleMenu();
         decoration.closeMaximizeMenu();
     }
@@ -549,6 +558,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
         private final DragDetector mDragDetector;
         private final GestureDetector mGestureDetector;
         private final int mDisplayId;
+        private final Rect mOnDragStartInitialBounds = new Rect();
 
         /**
          * Whether to pilfer the next motion event to send cancellations to the windows below.
@@ -619,13 +629,21 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                     && id != R.id.maximize_window) {
                 return false;
             }
-            moveTaskToFront(decoration.mTaskInfo);
 
             final int actionMasked = e.getActionMasked();
             final boolean isDown = actionMasked == MotionEvent.ACTION_DOWN;
             final boolean isUpOrCancel = actionMasked == MotionEvent.ACTION_CANCEL
                     || actionMasked == MotionEvent.ACTION_UP;
             if (isDown) {
+                // Only move to front on down to prevent 2+ tasks from fighting
+                // (and thus flickering) for front status when drag-moving them simultaneously with
+                // two pointers.
+                // TODO(b/356962065): during a drag-move, this shouldn't be a WCT - just move the
+                //  task surface to the top of other tasks and reorder once the user releases the
+                //  gesture together with the bounds' WCT. This is probably still valid for other
+                //  gestures like simple clicks.
+                moveTaskToFront(decoration.mTaskInfo);
+
                 final boolean downInCustomizableCaptionRegion =
                         decoration.checkTouchEventInCustomizableRegion(e);
                 final boolean downInExclusionRegion = mExclusionRegion.contains(
@@ -752,10 +770,11 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: {
                     mDragPointerId = e.getPointerId(0);
-                    mDragPositioningCallback.onDragPositioningStart(
+                    final Rect initialBounds = mDragPositioningCallback.onDragPositioningStart(
                             0 /* ctrlType */, e.getRawX(0),
                             e.getRawY(0));
                     updateDragStatus(e.getActionMasked());
+                    mOnDragStartInitialBounds.set(initialBounds);
                     mHasLongClicked = false;
                     // Do not consume input event if a button is touched, otherwise it would
                     // prevent the button's ripple effect from showing.
@@ -799,9 +818,11 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                     // Tasks bounds haven't actually been updated (only its leash), so pass to
                     // DesktopTasksController to allow secondary transformations (i.e. snap resizing
                     // or transforming to fullscreen) before setting new task bounds.
-                    mDesktopTasksController.onDragPositioningEnd(taskInfo, position,
+                    mDesktopTasksController.onDragPositioningEnd(
+                            taskInfo, decoration.mTaskSurface, position,
                             new PointF(e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx)),
-                            newTaskBounds, decoration.calculateValidDragArea());
+                            newTaskBounds, decoration.calculateValidDragArea(),
+                            new Rect(mOnDragStartInitialBounds));
                     if (touchingButton && !mHasLongClicked) {
                         // We need the input event to not be consumed here to end the ripple
                         // effect on the touched button. We will reset drag state in the ensuing
@@ -1175,10 +1196,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                 && mSplitScreenController.isTaskRootOrStageRoot(taskInfo.taskId)) {
             return false;
         }
-        if (mDesktopModeKeyguardChangeListener.isKeyguardVisibleAndOccluded()
-                && taskInfo.isFocused) {
-            return false;
-        }
         if (DesktopModeFlags.MODALS_POLICY.isEnabled(mContext)
                 && isTopActivityExemptFromDesktopWindowing(mContext, taskInfo)) {
             return false;
@@ -1299,6 +1316,25 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
         pw.println(innerPrefix + "mWindowDecorByTaskId=" + mWindowDecorByTaskId);
     }
 
+    private class DesktopModeOnTaskRepositionAnimationListener
+            implements OnTaskRepositionAnimationListener {
+        @Override
+        public void onAnimationStart(int taskId) {
+            final DesktopModeWindowDecoration decoration = mWindowDecorByTaskId.get(taskId);
+            if (decoration != null) {
+                decoration.setAnimatingTaskResizeOrReposition(true);
+            }
+        }
+
+        @Override
+        public void onAnimationEnd(int taskId) {
+            final DesktopModeWindowDecoration decoration = mWindowDecorByTaskId.get(taskId);
+            if (decoration != null) {
+                decoration.setAnimatingTaskResizeOrReposition(false);
+            }
+        }
+    }
+
     private class DesktopModeOnTaskResizeAnimationListener
             implements OnTaskResizeAnimationListener {
         @Override
@@ -1309,7 +1345,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                 return;
             }
             decoration.showResizeVeil(t, bounds);
-            decoration.setAnimatingTaskResize(true);
+            decoration.setAnimatingTaskResizeOrReposition(true);
         }
 
         @Override
@@ -1324,7 +1360,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
             final DesktopModeWindowDecoration decoration = mWindowDecorByTaskId.get(taskId);
             if (decoration == null) return;
             decoration.hideResizeVeil();
-            decoration.setAnimatingTaskResize(false);
+            decoration.setAnimatingTaskResizeOrReposition(false);
         }
     }
 
@@ -1357,19 +1393,17 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
         }
     }
 
-    static class DesktopModeKeyguardChangeListener implements KeyguardChangeListener {
-        private boolean mIsKeyguardVisible;
-        private boolean mIsKeyguardOccluded;
-
+    class DesktopModeKeyguardChangeListener implements KeyguardChangeListener {
         @Override
         public void onKeyguardVisibilityChanged(boolean visible, boolean occluded,
                 boolean animatingDismiss) {
-            mIsKeyguardVisible = visible;
-            mIsKeyguardOccluded = occluded;
-        }
-
-        public boolean isKeyguardVisibleAndOccluded() {
-            return mIsKeyguardVisible && mIsKeyguardOccluded;
+            final int size = mWindowDecorByTaskId.size();
+            for (int i = size - 1; i >= 0; i--) {
+                final DesktopModeWindowDecoration decor = mWindowDecorByTaskId.valueAt(i);
+                if (decor != null) {
+                    decor.onKeyguardStateChanged(visible, occluded);
+                }
+            }
         }
     }
 
@@ -1377,28 +1411,26 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
     class DesktopModeOnInsetsChangedListener implements
             DisplayInsetsController.OnInsetsChangedListener {
         @Override
-        public void insetsChanged(InsetsState insetsState) {
-            for (int i = 0; i < insetsState.sourceSize(); i++) {
-                final InsetsSource source = insetsState.sourceAt(i);
-                if (source.getType() != statusBars()) {
+        public void insetsChanged(int displayId, @NonNull InsetsState insetsState) {
+            final int size = mWindowDecorByTaskId.size();
+            for (int i = size - 1; i >= 0; i--) {
+                final DesktopModeWindowDecoration decor = mWindowDecorByTaskId.valueAt(i);
+                if (decor == null) {
                     continue;
                 }
-
-                final DesktopModeWindowDecoration decor = getFocusedDecor();
-                if (decor == null) {
-                    return;
+                if (decor.mTaskInfo.displayId == displayId
+                        && Flags.enableDesktopWindowingImmersiveHandleHiding()) {
+                    decor.onInsetsStateChanged(insetsState);
                 }
-                // If status bar inset is visible, top task is not in immersive mode
-                final boolean inImmersiveMode = !source.isVisible();
-                // Calls WindowDecoration#relayout if decoration visibility needs to be updated
-                if (inImmersiveMode != mInImmersiveMode) {
-                    if (Flags.enableDesktopWindowingImmersiveHandleHiding()) {
-                        decor.relayout(decor.mTaskInfo);
-                    }
-                    mInImmersiveMode = inImmersiveMode;
+                if (!Flags.enableAdditionalWindowsAboveStatusBar()) {
+                    // If status bar inset is visible, top task is not in immersive mode.
+                    // This value is only needed when the App Handle input is being handled
+                    // through the global input monitor (hence the flag check) to ignore gestures
+                    // when the app is in immersive mode. When disabled, the view itself handles
+                    // input, and since it's removed when in immersive there's no need to track
+                    // this here.
+                    mInImmersiveMode = !InsetsStateKt.isVisible(insetsState, statusBars());
                 }
-
-                return;
             }
         }
     }

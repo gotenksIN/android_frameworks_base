@@ -450,7 +450,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         mViewMediator.onSystemReady();
         TestableLooper.get(this).processAllMessages();
 
-        mViewMediator.setShowingLocked(false);
+        mViewMediator.setShowingLocked(false, "");
         TestableLooper.get(this).processAllMessages();
 
         mViewMediator.onStartedGoingToSleep(OFF_BECAUSE_OF_USER);
@@ -470,7 +470,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         mViewMediator.onSystemReady();
         TestableLooper.get(this).processAllMessages();
 
-        mViewMediator.setShowingLocked(false);
+        mViewMediator.setShowingLocked(false, "");
         TestableLooper.get(this).processAllMessages();
 
         mViewMediator.onStartedGoingToSleep(OFF_BECAUSE_OF_USER);
@@ -814,7 +814,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         mViewMediator.onSystemReady();
         TestableLooper.get(this).processAllMessages();
 
-        mViewMediator.setShowingLocked(false);
+        mViewMediator.setShowingLocked(false, "");
         TestableLooper.get(this).processAllMessages();
 
         mViewMediator.onStartedGoingToSleep(OFF_BECAUSE_OF_USER);
@@ -834,7 +834,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         mViewMediator.onSystemReady();
         TestableLooper.get(this).processAllMessages();
 
-        mViewMediator.setShowingLocked(false);
+        mViewMediator.setShowingLocked(false, "");
         TestableLooper.get(this).processAllMessages();
 
         mViewMediator.onStartedGoingToSleep(OFF_BECAUSE_OF_USER);
@@ -949,7 +949,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     @Test
     @TestableLooper.RunWithLooper(setAsMainLooper = true)
     public void testDoKeyguardWhileInteractive_resets() {
-        mViewMediator.setShowingLocked(true);
+        mViewMediator.setShowingLocked(true, "");
         when(mKeyguardStateController.isShowing()).thenReturn(true);
         TestableLooper.get(this).processAllMessages();
 
@@ -963,7 +963,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     @Test
     @TestableLooper.RunWithLooper(setAsMainLooper = true)
     public void testDoKeyguardWhileNotInteractive_showsInsteadOfResetting() {
-        mViewMediator.setShowingLocked(true);
+        mViewMediator.setShowingLocked(true, "");
         when(mKeyguardStateController.isShowing()).thenReturn(true);
         TestableLooper.get(this).processAllMessages();
 
@@ -1022,7 +1022,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         mViewMediator.onSystemReady();
         processAllMessagesAndBgExecutorMessages();
 
-        mViewMediator.setShowingLocked(true);
+        mViewMediator.setShowingLocked(true, "");
 
         RemoteAnimationTarget[] apps = new RemoteAnimationTarget[]{
                 mock(RemoteAnimationTarget.class)
@@ -1094,7 +1094,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     @Test
     @TestableLooper.RunWithLooper(setAsMainLooper = true)
     public void testNotStartingKeyguardWhenFlagIsDisabled() {
-        mViewMediator.setShowingLocked(false);
+        mViewMediator.setShowingLocked(false, "");
         when(mKeyguardStateController.isShowing()).thenReturn(false);
 
         mViewMediator.onDreamingStarted();
@@ -1104,7 +1104,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     @Test
     @TestableLooper.RunWithLooper(setAsMainLooper = true)
     public void testStartingKeyguardWhenFlagIsEnabled() {
-        mViewMediator.setShowingLocked(true);
+        mViewMediator.setShowingLocked(true, "");
         when(mKeyguardStateController.isShowing()).thenReturn(true);
 
         mViewMediator.onDreamingStarted();
@@ -1145,7 +1145,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         TestableLooper.get(this).processAllMessages();
 
         // WHEN keyguard visibility becomes FALSE
-        mViewMediator.setShowingLocked(false);
+        mViewMediator.setShowingLocked(false, "");
         keyguardUpdateMonitorCallback.onKeyguardVisibilityChanged(false);
         TestableLooper.get(this).processAllMessages();
 

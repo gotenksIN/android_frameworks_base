@@ -6844,9 +6844,6 @@ package android.app {
     method public android.app.Notification.MessagingStyle.Message setData(String, android.net.Uri);
   }
 
-  @FlaggedApi("android.app.api_rich_ongoing") public abstract static class Notification.RichOngoingStyle extends android.app.Notification.Style {
-  }
-
   public abstract static class Notification.Style {
     ctor @Deprecated public Notification.Style();
     method public android.app.Notification build();
@@ -8717,6 +8714,30 @@ package android.app.admin {
     field @NonNull public static final android.os.Parcelable.Creator<android.app.admin.WifiSsidPolicy> CREATOR;
     field public static final int WIFI_SSID_POLICY_TYPE_ALLOWLIST = 0; // 0x0
     field public static final int WIFI_SSID_POLICY_TYPE_DENYLIST = 1; // 0x1
+  }
+
+}
+
+package android.app.appfunctions {
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public final class AppFunctionManager {
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public final class ExecuteAppFunctionRequest implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public android.os.Bundle getExtras();
+    method @NonNull public String getFunctionIdentifier();
+    method @NonNull public android.app.appsearch.GenericDocument getParameters();
+    method @NonNull public String getTargetPackageName();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.appfunctions.ExecuteAppFunctionRequest> CREATOR;
+  }
+
+  public static final class ExecuteAppFunctionRequest.Builder {
+    ctor public ExecuteAppFunctionRequest.Builder(@NonNull String, @NonNull String);
+    method @NonNull public android.app.appfunctions.ExecuteAppFunctionRequest build();
+    method @NonNull public android.app.appfunctions.ExecuteAppFunctionRequest.Builder setExtras(@NonNull android.os.Bundle);
+    method @NonNull public android.app.appfunctions.ExecuteAppFunctionRequest.Builder setParameters(@NonNull android.app.appsearch.GenericDocument);
   }
 
 }
@@ -10684,6 +10705,7 @@ package android.content {
     field public static final String ACTIVITY_SERVICE = "activity";
     field public static final String ALARM_SERVICE = "alarm";
     field public static final String APPWIDGET_SERVICE = "appwidget";
+    field @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public static final String APP_FUNCTION_SERVICE = "app_function";
     field public static final String APP_OPS_SERVICE = "appops";
     field public static final String APP_SEARCH_SERVICE = "app_search";
     field public static final String AUDIO_SERVICE = "audio";

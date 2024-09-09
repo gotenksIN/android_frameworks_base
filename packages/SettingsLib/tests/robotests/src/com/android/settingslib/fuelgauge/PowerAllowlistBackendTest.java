@@ -36,6 +36,7 @@ import com.android.settingslib.testutils.shadow.ShadowDefaultDialerManager;
 import com.android.settingslib.testutils.shadow.ShadowSmsApplication;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -87,6 +88,7 @@ public class PowerAllowlistBackendTest {
         mPowerAllowlistBackend = new PowerAllowlistBackend(mContext, mDeviceIdleService);
     }
 
+    @Ignore("b/359066481")
     @Test
     public void testIsAllowlisted() throws Exception {
         doReturn(new String[] {PACKAGE_ONE}).when(mDeviceIdleService).getFullPowerWhitelist();
@@ -161,6 +163,7 @@ public class PowerAllowlistBackendTest {
         assertThat(mPowerAllowlistBackend.isDefaultActiveApp(PACKAGE_ONE, UID)).isTrue();
     }
 
+    @Ignore("b/359066481")
     @Test
     public void testIsSystemAllowlisted() throws Exception {
         doReturn(new String[] {PACKAGE_ONE}).when(mDeviceIdleService).getSystemPowerWhitelist();

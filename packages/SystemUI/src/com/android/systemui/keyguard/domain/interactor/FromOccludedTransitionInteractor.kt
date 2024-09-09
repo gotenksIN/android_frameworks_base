@@ -135,7 +135,7 @@ constructor(
         }
     }
 
-    private suspend fun FromOccludedTransitionInteractor.startTransitionToLockscreenOrHub(
+    private suspend fun startTransitionToLockscreenOrHub(
         isIdleOnCommunal: Boolean,
         showCommunalFromOccluded: Boolean,
         dreamFromOccluded: Boolean,
@@ -146,8 +146,9 @@ constructor(
             if (SceneContainerFlag.isEnabled) return
             if (communalSceneKtfRefactor()) {
                 communalSceneInteractor.changeScene(
-                    CommunalScenes.Communal,
-                    CommunalTransitionKeys.SimpleFade
+                    newScene = CommunalScenes.Communal,
+                    loggingReason = "occluded to hub",
+                    transitionKey = CommunalTransitionKeys.SimpleFade
                 )
             } else {
                 startTransitionTo(KeyguardState.GLANCEABLE_HUB)

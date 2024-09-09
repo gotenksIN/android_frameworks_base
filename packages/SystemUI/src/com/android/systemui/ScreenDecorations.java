@@ -66,6 +66,7 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.android.app.viewcapture.ViewCaptureAwareWindowManager;
 import com.android.internal.util.Preconditions;
 import com.android.settingslib.Utils;
 import com.android.systemui.biometrics.data.repository.FacePropertyRepository;
@@ -171,7 +172,7 @@ public class ScreenDecorations implements
     ViewGroup mScreenDecorHwcWindow;
     @VisibleForTesting
     ScreenDecorHwcLayer mScreenDecorHwcLayer;
-    private WindowManager mWindowManager;
+    private ViewCaptureAwareWindowManager mWindowManager;
     private int mRotation;
     private UserSettingObserver mColorInversionSetting;
     @Nullable
@@ -341,7 +342,8 @@ public class ScreenDecorations implements
             ScreenDecorationsLogger logger,
             FacePropertyRepository facePropertyRepository,
             JavaAdapter javaAdapter,
-            CameraProtectionLoader cameraProtectionLoader) {
+            CameraProtectionLoader cameraProtectionLoader,
+            ViewCaptureAwareWindowManager viewCaptureAwareWindowManager) {
         mContext = context;
         mSecureSettings = secureSettings;
         mCommandRegistry = commandRegistry;
@@ -356,6 +358,7 @@ public class ScreenDecorations implements
         mLogger = logger;
         mFacePropertyRepository = facePropertyRepository;
         mJavaAdapter = javaAdapter;
+        mWindowManager = viewCaptureAwareWindowManager;
     }
 
     private final ScreenDecorCommand.Callback mScreenDecorCommandCallback = (cmd, pw) -> {
@@ -487,7 +490,6 @@ public class ScreenDecorations implements
 
     private void startOnScreenDecorationsThread() {
         Trace.beginSection("ScreenDecorations#startOnScreenDecorationsThread");
-        mWindowManager = mContext.getSystemService(WindowManager.class);
         mContext.getDisplay().getDisplayInfo(mDisplayInfo);
         mRotation = mDisplayInfo.rotation;
         mDisplaySize.x = mDisplayInfo.getNaturalWidth();

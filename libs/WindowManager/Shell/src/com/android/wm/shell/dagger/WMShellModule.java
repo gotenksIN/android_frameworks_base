@@ -164,8 +164,10 @@ public abstract class WMShellModule {
             BubbleLogger logger,
             BubblePositioner positioner,
             BubbleEducationController educationController,
-            @ShellMainThread ShellExecutor mainExecutor) {
-        return new BubbleData(context, logger, positioner, educationController, mainExecutor);
+            @ShellMainThread ShellExecutor mainExecutor,
+            @ShellBackgroundThread ShellExecutor bgExecutor) {
+        return new BubbleData(context, logger, positioner, educationController, mainExecutor,
+                bgExecutor);
     }
 
     // Note: Handler needed for LauncherApps.register
@@ -198,7 +200,7 @@ public abstract class WMShellModule {
             IWindowManager wmService) {
         return new BubbleController(context, shellInit, shellCommandHandler, shellController, data,
                 null /* synchronizer */, floatingContentCoordinator,
-                new BubbleDataRepository(launcherApps, mainExecutor,
+                new BubbleDataRepository(launcherApps, mainExecutor, bgExecutor,
                         new BubblePersistentRepository(context)),
                 statusBarService, windowManager, windowManagerShellWrapper, userManager,
                 launcherApps, logger, taskStackListener, organizer, positioner, displayController,
@@ -320,9 +322,19 @@ public abstract class WMShellModule {
             WindowDecorViewModel windowDecorViewModel,
             DisplayController displayController,
             @ShellMainThread ShellExecutor mainExecutor,
-            @ShellAnimationThread ShellExecutor animExecutor) {
-        return new FreeformTaskTransitionHandler(shellInit, transitions, context,
-                windowDecorViewModel, displayController, mainExecutor, animExecutor);
+            @ShellAnimationThread ShellExecutor animExecutor,
+            @DynamicOverride DesktopModeTaskRepository desktopModeTaskRepository,
+            InteractionJankMonitor interactionJankMonitor) {
+        return new FreeformTaskTransitionHandler(
+                shellInit,
+                transitions,
+                context,
+                windowDecorViewModel,
+                displayController,
+                mainExecutor,
+                animExecutor,
+                desktopModeTaskRepository,
+                interactionJankMonitor);
     }
 
     @WMSingleton

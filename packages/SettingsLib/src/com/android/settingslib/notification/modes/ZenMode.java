@@ -22,6 +22,7 @@ import static android.app.NotificationManager.INTERRUPTION_FILTER_ALL;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY;
 import static android.service.notification.SystemZenRules.getTriggerDescriptionForScheduleEvent;
 import static android.service.notification.SystemZenRules.getTriggerDescriptionForScheduleTime;
+import static android.service.notification.SystemZenRules.PACKAGE_ANDROID;
 import static android.service.notification.ZenModeConfig.tryParseCountdownConditionId;
 import static android.service.notification.ZenModeConfig.tryParseEventConditionId;
 import static android.service.notification.ZenModeConfig.tryParseScheduleConditionId;
@@ -129,7 +130,11 @@ public class ZenMode implements Parcelable {
     }
 
     public static ZenMode manualDndMode(AutomaticZenRule manualRule, boolean isActive) {
-        return new ZenMode(MANUAL_DND_MODE_ID, manualRule,
+        // Manual rule is owned by the system, so we set it here
+        AutomaticZenRule manualRuleWithPkg = new AutomaticZenRule.Builder(manualRule)
+                .setPackage(PACKAGE_ANDROID)
+                .build();
+        return new ZenMode(MANUAL_DND_MODE_ID, manualRuleWithPkg,
                 isActive ? Status.ENABLED_AND_ACTIVE : Status.ENABLED, true);
     }
 
@@ -218,6 +223,16 @@ public class ZenMode implements Parcelable {
         //   for these modes as well.
 
         return getTriggerDescription();
+    }
+
+    /**
+     * Returns an icon "key" that is guaranteed to be different if the icon is different. Note that
+     * the inverse is not true, i.e. two keys can be different and the icon still be visually the
+     * same.
+     */
+    @NonNull
+    public String getIconKey() {
+        return mRule.getType() + ":" + mRule.getPackageName() + ":" + mRule.getIconResId();
     }
 
     @NonNull

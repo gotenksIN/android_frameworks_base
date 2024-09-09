@@ -16,6 +16,7 @@
 
 package com.android.server;
 
+import static android.app.appfunctions.flags.Flags.enableAppFunctionManager;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_HIGH;
@@ -121,6 +122,7 @@ import com.android.server.am.ActivityManagerService;
 import com.android.server.ambientcontext.AmbientContextManagerService;
 import com.android.server.app.GameManagerService;
 import com.android.server.appbinding.AppBindingService;
+import com.android.server.appfunctions.AppFunctionManagerService;
 import com.android.server.apphibernation.AppHibernationService;
 import com.android.server.appop.AppOpMigrationHelper;
 import com.android.server.appop.AppOpMigrationHelperImpl;
@@ -1735,6 +1737,12 @@ public final class SystemServer implements Dumpable {
 
             t.traceBegin("StartLogcatManager");
             mSystemServiceManager.startService(LogcatManagerService.class);
+            t.traceEnd();
+
+            t.traceBegin("StartAppFunctionManager");
+            if (enableAppFunctionManager()) {
+                mSystemServiceManager.startService(AppFunctionManagerService.class);
+            }
             t.traceEnd();
 
         } catch (Throwable e) {

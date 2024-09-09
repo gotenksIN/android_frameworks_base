@@ -339,6 +339,7 @@ public class BubbleStackView extends FrameLayout
         pw.println(mExpandedViewContainer.getAnimationMatrix());
         pw.print("  stack visibility :       "); pw.println(getVisibility());
         pw.print("  temporarilyInvisible:    "); pw.println(mTemporarilyInvisible);
+        pw.print("  expandedViewTemporarilyHidden: "); pw.println(mExpandedViewTemporarilyHidden);
         mStackAnimationController.dump(pw);
         mExpandedAnimationController.dump(pw);
 
@@ -1127,6 +1128,8 @@ public class BubbleStackView extends FrameLayout
                 if (expandedView != null) {
                     // We need to be Z ordered on top in order for alpha animations to work.
                     expandedView.setSurfaceZOrderedOnTop(true);
+                    ProtoLog.d(WM_SHELL_BUBBLES, "expandedViewAlphaAnimation - start=%s",
+                            expandedView.getBubbleKey());
                     expandedView.setAnimating(true);
                     mExpandedViewContainer.setVisibility(VISIBLE);
                 }
@@ -1142,6 +1145,8 @@ public class BubbleStackView extends FrameLayout
                         // = 0f remains in effect.
                         && !mExpandedViewTemporarilyHidden) {
                     expandedView.setSurfaceZOrderedOnTop(false);
+                    ProtoLog.d(WM_SHELL_BUBBLES, "expandedViewAlphaAnimation - end=%s",
+                            expandedView.getBubbleKey());
                     expandedView.setAnimating(false);
                 }
             }
@@ -1601,6 +1606,11 @@ public class BubbleStackView extends FrameLayout
                 getResources().getColor(android.R.color.system_neutral1_1000)));
         mManageMenuScrim.setBackgroundDrawable(new ColorDrawable(
                 getResources().getColor(android.R.color.system_neutral1_1000)));
+        if (mShowingManage) {
+            // the manage menu location depends on the manage button location which may need a
+            // layout pass, so post this to the looper
+            post(() -> showManageMenu(true));
+        }
     }
 
     /**
@@ -2165,7 +2175,14 @@ public class BubbleStackView extends FrameLayout
         final BubbleViewProvider previouslySelected = mExpandedBubble;
         mExpandedBubble = bubbleToSelect;
         mExpandedViewAnimationController.setExpandedView(getExpandedView());
-
+        final String previouslySelectedKey = previouslySelected != null
+                ? previouslySelected.getKey()
+                : "null";
+        final String newlySelectedKey = mExpandedBubble != null
+                ? mExpandedBubble.getKey()
+                : "null";
+        ProtoLog.d(WM_SHELL_BUBBLES, "showNewlySelectedBubble b=%s, previouslySelected=%s,"
+                        + " mIsExpanded=%b", newlySelectedKey, previouslySelectedKey, mIsExpanded);
         if (mIsExpanded) {
             hideCurrentInputMethod();
 
@@ -2567,6 +2584,8 @@ public class BubbleStackView extends FrameLayout
             expandedView.setContentAlpha(0f);
             expandedView.setBackgroundAlpha(0f);
 
+            ProtoLog.d(WM_SHELL_BUBBLES, "animateBubbleExpansion, setAnimating true for bubble=%s",
+                    expandedView.getBubbleKey());
             // We'll be starting the alpha animation after a slight delay, so set this flag early
             // here.
             expandedView.setAnimating(true);
@@ -2730,6 +2749,11 @@ public class BubbleStackView extends FrameLayout
 
         mAnimatingOutSurfaceAlphaAnimator.reverse();
         mExpandedViewAlphaAnimator.start();
+
+        if (mExpandedBubble != null) {
+            ProtoLog.d(WM_SHELL_BUBBLES, "animateSwitchBubbles, switchingTo b=%s",
+                    mExpandedBubble.getKey());
+        }
 
         if (mPositioner.showBubblesVertically()) {
             float translationX = mStackAnimationController.isStackOnLeftSide()

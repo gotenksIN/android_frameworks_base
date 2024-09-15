@@ -35,6 +35,7 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.plugins.statusbar.StatusBarStateController.StateListener;
 import com.android.systemui.res.R;
+import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
@@ -251,6 +252,12 @@ public class HeadsUpManagerPhone extends BaseHeadsUpManager implements
         return entry != null && mSystemClock.elapsedRealtime() < entry.mPostTime;
     }
 
+    @Override
+    public void releaseAfterExpansion() {
+        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        onExpandingFinished();
+    }
+
     public void onExpandingFinished() {
         if (mReleaseOnExpandFinish) {
             releaseAllImmediately();
@@ -295,6 +302,11 @@ public class HeadsUpManagerPhone extends BaseHeadsUpManager implements
             }
             mHeadsUpAnimatingAway.setValue(headsUpAnimatingAway);
         }
+    }
+
+    @Override
+    public void unpinAll(boolean userUnPinned) {
+        super.unpinAll(userUnPinned);
     }
 
     /**
@@ -365,12 +377,14 @@ public class HeadsUpManagerPhone extends BaseHeadsUpManager implements
 
     @Override
     public boolean removeNotification(@NonNull String key, boolean releaseImmediately,
-            boolean animate) {
+            boolean animate, @NonNull String reason) {
         if (animate) {
-            return removeNotification(key, releaseImmediately);
+            return removeNotification(key, releaseImmediately,
+                    "removeNotification(animate: true), reason: " + reason);
         } else {
             mAnimationStateHandler.setHeadsUpGoingAwayAnimationsAllowed(false);
-            boolean removed = removeNotification(key, releaseImmediately);
+            final boolean removed = removeNotification(key, releaseImmediately,
+                    "removeNotification(animate: false), reason: " + reason);
             mAnimationStateHandler.setHeadsUpGoingAwayAnimationsAllowed(true);
             return removed;
         }

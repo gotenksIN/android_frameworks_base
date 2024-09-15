@@ -11,20 +11,20 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Handler;
+import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.testing.TestableLooper;
+import android.testing.UiThreadTest;
 import android.view.View;
+import android.view.Window;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -49,20 +49,18 @@ import kotlinx.coroutines.CoroutineScope;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.MockitoSession;
 
 import java.util.List;
 
-@Ignore("b/257089187")
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 @TestableLooper.RunWithLooper(setAsMainLooper = true)
+@UiThreadTest
 public class InternetDialogDelegateTest extends SysuiTestCase {
 
     private static final String MOBILE_NETWORK_TITLE = "Mobile Title";
@@ -92,6 +90,8 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
     private SystemUIDialog.Factory mSystemUIDialogFactory;
     @Mock
     private SystemUIDialog mSystemUIDialog;
+    @Mock
+    private Window mWindow;
 
     private FakeExecutor mBgExecutor = new FakeExecutor(new FakeSystemClock());
     private InternetDialogDelegate mInternetDialogDelegate;
@@ -126,13 +126,16 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.getMobileNetworkSummary(anyInt()))
                 .thenReturn(MOBILE_NETWORK_SUMMARY);
         when(mInternetDialogController.isWifiEnabled()).thenReturn(true);
-
+        when(mInternetDialogController.getActiveAutoSwitchNonDdsSubId()).thenReturn(
+                SubscriptionManager.INVALID_SUBSCRIPTION_ID);
         mMockitoSession = ExtendedMockito.mockitoSession()
                 .spyStatic(WifiEnterpriseRestrictionUtils.class)
                 .startMocking();
         when(WifiEnterpriseRestrictionUtils.isChangeWifiStateAllowed(mContext)).thenReturn(true);
         when(mSystemUIDialogFactory.create(any(SystemUIDialog.Delegate.class)))
                 .thenReturn(mSystemUIDialog);
+        when(mSystemUIDialog.getContext()).thenReturn(mContext);
+        when(mSystemUIDialog.getWindow()).thenReturn(mWindow);
         createInternetDialog();
     }
 
@@ -151,6 +154,8 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
                 mBgExecutor,
                 mKeyguard,
                 mSystemUIDialogFactory);
+        mInternetDialogDelegate.createDialog();
+        mInternetDialogDelegate.onCreate(mSystemUIDialog, null);
         mInternetDialogDelegate.mAdapter = mInternetAdapter;
         mInternetDialogDelegate.mConnectedWifiEntry = mInternetWifiEntry;
         mInternetDialogDelegate.mWifiEntriesCount = mWifiEntries.size();
@@ -168,10 +173,12 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         mSeeAll = mDialogView.requireViewById(R.id.see_all_layout);
         mWifiScanNotify = mDialogView.requireViewById(R.id.wifi_scan_notify_layout);
         mAirplaneModeSummaryText = mDialogView.requireViewById(R.id.airplane_mode_summary);
+        mInternetDialogDelegate.onStart(mSystemUIDialog);
     }
 
     @After
     public void tearDown() {
+        mInternetDialogDelegate.onStop(mSystemUIDialog);
         mInternetDialogDelegate.dismissDialog();
         mMockitoSession.finishMocking();
     }
@@ -196,59 +203,77 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
     @Test
     public void updateDialog_withApmOn_internetDialogSubTitleGone() {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mSubTitle.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mSubTitle.getVisibility()).isEqualTo(View.VISIBLE);
+                });
     }
 
     @Test
     public void updateDialog_withApmOff_internetDialogSubTitleVisible() {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(false);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mSubTitle.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mSubTitle.getVisibility()).isEqualTo(View.VISIBLE);
+                });
     }
 
     @Test
     public void updateDialog_apmOffAndHasEthernet_showEthernet() {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(false);
         when(mInternetDialogController.hasEthernet()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mEthernet.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mEthernet.getVisibility()).isEqualTo(View.VISIBLE);
+                });
     }
 
     @Test
     public void updateDialog_apmOffAndNoEthernet_hideEthernet() {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(false);
         when(mInternetDialogController.hasEthernet()).thenReturn(false);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mEthernet.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mEthernet.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
     public void updateDialog_apmOnAndHasEthernet_showEthernet() {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
         when(mInternetDialogController.hasEthernet()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mEthernet.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mEthernet.getVisibility()).isEqualTo(View.VISIBLE);
+                });
     }
 
     @Test
     public void updateDialog_apmOnAndNoEthernet_hideEthernet() {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
         when(mInternetDialogController.hasEthernet()).thenReturn(false);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mEthernet.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mEthernet.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
@@ -257,41 +282,56 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(false);
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(false);
         when(mInternetDialogController.hasActiveSubIdOnDds()).thenReturn(false);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
-    public void updateDialog_apmOnWithCarrierNetworkAndWifiStatus_mobileDataLayout() {
-        // Carrier network should be gone if airplane mode ON and Wi-Fi is off.
-        when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(true);
-        when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
-        when(mInternetDialogController.isWifiEnabled()).thenReturn(false);
-
-        mInternetDialogDelegate.updateDialog(true);
-
-        assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.GONE);
-
+    public void updateDialog_apmOnWithCarrierNetworkAndWifiStatus_mobileDataLayoutVisible() {
         // Carrier network should be visible if airplane mode ON and Wi-Fi is ON.
         when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(true);
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
         when(mInternetDialogController.isWifiEnabled()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.VISIBLE);
+                });
+    }
+
+    @Test
+    public void updateDialog_apmOnWithCarrierNetworkAndWifiStatus_mobileDataLayoutGone() {
+        // Carrier network should be gone if airplane mode ON and Wi-Fi is off.
+        when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(true);
+        when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
+        when(mInternetDialogController.isWifiEnabled()).thenReturn(false);
+        mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
+
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
     public void updateDialog_apmOnAndNoCarrierNetwork_mobileDataLayoutGone() {
         when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(false);
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
@@ -300,11 +340,14 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
         mInternetDialogDelegate.mConnectedWifiEntry = null;
         doReturn(false).when(mInternetDialogController).activeNetworkIsCellular();
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.VISIBLE);
-        assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mMobileDataLayout.getVisibility()).isEqualTo(View.VISIBLE);
+                    assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.VISIBLE);
+                });
     }
 
     @Test
@@ -313,30 +356,39 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(false);
         mInternetDialogDelegate.mConnectedWifiEntry = null;
         doReturn(false).when(mInternetDialogController).activeNetworkIsCellular();
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
     public void updateDialog_apmOffAndHasCarrierNetwork_notShowApmSummary() {
         when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(true);
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(false);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
     public void updateDialog_apmOnAndNoCarrierNetwork_notShowApmSummary() {
         when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(false);
         when(mInternetDialogController.isAirplaneModeEnabled()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mAirplaneModeSummaryText.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
@@ -345,10 +397,13 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(true);
         when(mInternetDialogController.isMobileDataEnabled(anyInt())).thenReturn(true);
         mMobileToggleSwitch.setChecked(false);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mMobileToggleSwitch.isChecked()).isTrue();
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mMobileToggleSwitch.isChecked()).isTrue();
+                });
     }
 
     @Test
@@ -357,26 +412,32 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.isCarrierNetworkActive()).thenReturn(true);
         when(mInternetDialogController.isMobileDataEnabled(anyInt())).thenReturn(false);
         mMobileToggleSwitch.setChecked(false);
-
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mMobileToggleSwitch.isChecked()).isFalse();
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mMobileToggleSwitch.isChecked()).isFalse();
+                });
     }
 
     @Test
     public void updateDialog_wifiOnAndHasInternetWifi_showConnectedWifi() {
-        mInternetDialogDelegate.dismissDialog();
+        when(mInternetDialogController.getActiveAutoSwitchNonDdsSubId()).thenReturn(1);
         doReturn(true).when(mInternetDialogController).hasActiveSubIdOnDds();
-        createInternetDialog();
         // The preconditions WiFi ON and Internet WiFi are already in setUp()
         doReturn(false).when(mInternetDialogController).activeNetworkIsCellular();
 
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.VISIBLE);
-        LinearLayout secondaryLayout = mDialogView.requireViewById(
-                R.id.secondary_mobile_network_layout);
-        assertThat(secondaryLayout.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.VISIBLE);
+                    LinearLayout secondaryLayout = mDialogView.requireViewById(
+                            R.id.secondary_mobile_network_layout);
+                    assertThat(secondaryLayout.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
@@ -384,10 +445,13 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         // The precondition WiFi ON is already in setUp()
         mInternetDialogDelegate.mConnectedWifiEntry = null;
         doReturn(false).when(mInternetDialogController).activeNetworkIsCellular();
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
@@ -395,14 +459,17 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         // The precondition WiFi ON is already in setUp()
         mInternetDialogDelegate.mConnectedWifiEntry = null;
         mInternetDialogDelegate.mWifiEntriesCount = 0;
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
-        // Show a blank block to fix the dialog height even if there is no WiFi list
-        assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
-        verify(mInternetAdapter).setMaxEntriesCount(3);
-        assertThat(mSeeAll.getVisibility()).isEqualTo(View.INVISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
+                    // Show a blank block to fix the dialog height even if there is no WiFi list
+                    assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
+                    verify(mInternetAdapter).setMaxEntriesCount(3);
+                    assertThat(mSeeAll.getVisibility()).isEqualTo(View.INVISIBLE);
+                });
     }
 
     @Test
@@ -410,28 +477,34 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         // The precondition WiFi ON is already in setUp()
         mInternetDialogDelegate.mConnectedWifiEntry = null;
         mInternetDialogDelegate.mWifiEntriesCount = 1;
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
-        // Show a blank block to fix the dialog height even if there is no WiFi list
-        assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
-        verify(mInternetAdapter).setMaxEntriesCount(3);
-        assertThat(mSeeAll.getVisibility()).isEqualTo(View.INVISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
+                    // Show a blank block to fix the dialog height even if there is no WiFi list
+                    assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
+                    verify(mInternetAdapter).setMaxEntriesCount(3);
+                    assertThat(mSeeAll.getVisibility()).isEqualTo(View.INVISIBLE);
+                });
     }
 
     @Test
     public void updateDialog_wifiOnAndHasConnectedWifi_showAllWifiAndSeeAllArea() {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         mInternetDialogDelegate.mWifiEntriesCount = 0;
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.VISIBLE);
-        // Show a blank block to fix the dialog height even if there is no WiFi list
-        assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
-        verify(mInternetAdapter).setMaxEntriesCount(2);
-        assertThat(mSeeAll.getVisibility()).isEqualTo(View.INVISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.VISIBLE);
+                    // Show a blank block to fix the dialog height even if there is no WiFi list
+                    assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
+                    verify(mInternetAdapter).setMaxEntriesCount(2);
+                    assertThat(mSeeAll.getVisibility()).isEqualTo(View.INVISIBLE);
+                });
     }
 
     @Test
@@ -440,13 +513,16 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         mInternetDialogDelegate.mConnectedWifiEntry = null;
         mInternetDialogDelegate.mWifiEntriesCount = MAX_WIFI_ENTRY_COUNT;
         mInternetDialogDelegate.mHasMoreWifiEntries = true;
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
-        verify(mInternetAdapter).setMaxEntriesCount(3);
-        assertThat(mSeeAll.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
+                    assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
+                    verify(mInternetAdapter).setMaxEntriesCount(3);
+                    assertThat(mSeeAll.getVisibility()).isEqualTo(View.VISIBLE);
+                });
     }
 
     @Test
@@ -454,13 +530,16 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         mInternetDialogDelegate.mWifiEntriesCount = MAX_WIFI_ENTRY_COUNT - 1;
         mInternetDialogDelegate.mHasMoreWifiEntries = true;
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.VISIBLE);
-        assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
-        verify(mInternetAdapter).setMaxEntriesCount(2);
-        assertThat(mSeeAll.getVisibility()).isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.VISIBLE);
+                    assertThat(mWifiList.getVisibility()).isEqualTo(View.VISIBLE);
+                    verify(mInternetAdapter).setMaxEntriesCount(2);
+                    assertThat(mSeeAll.getVisibility()).isEqualTo(View.VISIBLE);
+                });
     }
 
     @Test
@@ -468,32 +547,38 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         // The preconditions WiFi entries are already in setUp()
         when(mInternetDialogController.isDeviceLocked()).thenReturn(true);
         mInternetDialogDelegate.mConnectedWifiEntry = null;
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        // Show WiFi Toggle without background
-        assertThat(mWifiToggle.getVisibility()).isEqualTo(View.VISIBLE);
-        assertThat(mWifiToggle.getBackground()).isNull();
-        // Hide Wi-Fi networks and See all
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mWifiList.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mSeeAll.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    // Show WiFi Toggle without background
+                    assertThat(mWifiToggle.getVisibility()).isEqualTo(View.VISIBLE);
+                    assertThat(mWifiToggle.getBackground()).isNull();
+                    // Hide Wi-Fi networks and See all
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
+                    assertThat(mWifiList.getVisibility()).isEqualTo(View.GONE);
+                    assertThat(mSeeAll.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
     public void updateDialog_deviceLockedAndHasConnectedWifi_showWifiToggleWithBackground() {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         when(mInternetDialogController.isDeviceLocked()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        // Show WiFi Toggle with highlight background
-        assertThat(mWifiToggle.getVisibility()).isEqualTo(View.VISIBLE);
-        assertThat(mWifiToggle.getBackground()).isNotNull();
-        // Hide Wi-Fi networks and See all
-        assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mWifiList.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mSeeAll.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    // Show WiFi Toggle with highlight background
+                    assertThat(mWifiToggle.getVisibility()).isEqualTo(View.VISIBLE);
+                    assertThat(mWifiToggle.getBackground()).isNotNull();
+                    // Hide Wi-Fi networks and See all
+                    assertThat(mConnectedWifi.getVisibility()).isEqualTo(View.GONE);
+                    assertThat(mWifiList.getVisibility()).isEqualTo(View.GONE);
+                    assertThat(mSeeAll.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
@@ -501,13 +586,16 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         mInternetDialogDelegate.dismissDialog();
         when(WifiEnterpriseRestrictionUtils.isChangeWifiStateAllowed(mContext)).thenReturn(false);
         createInternetDialog();
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        // Disable Wi-Fi switch and show restriction message in summary.
-        assertThat(mWifiToggleSwitch.isEnabled()).isFalse();
-        assertThat(mWifiToggleSummary.getVisibility()).isEqualTo(View.VISIBLE);
-        assertThat(mWifiToggleSummary.getText().length()).isNotEqualTo(0);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    // Disable Wi-Fi switch and show restriction message in summary.
+                    assertThat(mWifiToggleSwitch.isEnabled()).isFalse();
+                    assertThat(mWifiToggleSummary.getVisibility()).isEqualTo(View.VISIBLE);
+                    assertThat(mWifiToggleSummary.getText().length()).isNotEqualTo(0);
+                });
     }
 
     @Test
@@ -515,50 +603,38 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         mInternetDialogDelegate.dismissDialog();
         when(WifiEnterpriseRestrictionUtils.isChangeWifiStateAllowed(mContext)).thenReturn(true);
         createInternetDialog();
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        // Enable Wi-Fi switch and hide restriction message in summary.
-        assertThat(mWifiToggleSwitch.isEnabled()).isTrue();
-        assertThat(mWifiToggleSummary.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    // Enable Wi-Fi switch and hide restriction message in summary.
+                    assertThat(mWifiToggleSwitch.isEnabled()).isTrue();
+                    assertThat(mWifiToggleSummary.getVisibility()).isEqualTo(View.GONE);
+                });
     }
 
     @Test
     public void updateDialog_showSecondaryDataSub() {
-        mInternetDialogDelegate.dismissDialog();
+        when(mInternetDialogController.getActiveAutoSwitchNonDdsSubId()).thenReturn(1);
         doReturn(1).when(mInternetDialogController).getActiveAutoSwitchNonDdsSubId();
         doReturn(true).when(mInternetDialogController).hasActiveSubIdOnDds();
         doReturn(false).when(mInternetDialogController).isAirplaneModeEnabled();
-        createInternetDialog();
-
         clearInvocations(mInternetDialogController);
         mInternetDialogDelegate.updateDialog(true);
+        mBgExecutor.runAllReady();
 
-        LinearLayout primaryLayout = mDialogView.requireViewById(
-                R.id.mobile_network_layout);
-        LinearLayout secondaryLayout = mDialogView.requireViewById(
-                R.id.secondary_mobile_network_layout);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    LinearLayout primaryLayout = mDialogView.requireViewById(
+                            R.id.mobile_network_layout);
+                    LinearLayout secondaryLayout = mDialogView.requireViewById(
+                            R.id.secondary_mobile_network_layout);
 
-        verify(mInternetDialogController).getMobileNetworkSummary(1);
-        assertThat(primaryLayout.getBackground()).isNotEqualTo(secondaryLayout.getBackground());
-
-        // Tap the primary sub info
-        primaryLayout.performClick();
-        ArgumentCaptor<AlertDialog> dialogArgumentCaptor =
-                ArgumentCaptor.forClass(AlertDialog.class);
-        verify(mDialogTransitionAnimator).showFromDialog(dialogArgumentCaptor.capture(),
-                eq(mSystemUIDialog), eq(null), eq(false));
-        AlertDialog dialog = dialogArgumentCaptor.getValue();
-        dialog.show();
-        dialog.getButton(DialogInterface.BUTTON_POSITIVE).performClick();
-        TestableLooper.get(this).processAllMessages();
-        verify(mInternetDialogController).setAutoDataSwitchMobileDataPolicy(1, false);
-
-        // Tap the secondary sub info
-        secondaryLayout.performClick();
-        verify(mInternetDialogController).launchMobileNetworkSettings(any(View.class));
-
-        dialog.dismiss();
+                    verify(mInternetDialogController).getMobileNetworkSummary(1);
+                    assertThat(primaryLayout.getBackground()).isNotEqualTo(
+                            secondaryLayout.getBackground());
+                });
     }
 
     @Test
@@ -566,6 +642,12 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
 
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
+
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.GONE);
+                });
 
         assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.GONE);
     }
@@ -574,8 +656,13 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
     public void updateDialog_wifiOffAndWifiScanOff_hideWifiScanNotify() {
         when(mInternetDialogController.isWifiEnabled()).thenReturn(false);
         when(mInternetDialogController.isWifiScanEnabled()).thenReturn(false);
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
+
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.GONE);
+                });
 
         assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.GONE);
     }
@@ -585,8 +672,13 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.isWifiEnabled()).thenReturn(false);
         when(mInternetDialogController.isWifiScanEnabled()).thenReturn(true);
         when(mInternetDialogController.isDeviceLocked()).thenReturn(true);
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
+
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.GONE);
+                });
 
         assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.GONE);
     }
@@ -596,33 +688,43 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
         when(mInternetDialogController.isWifiEnabled()).thenReturn(false);
         when(mInternetDialogController.isWifiScanEnabled()).thenReturn(true);
         when(mInternetDialogController.isDeviceLocked()).thenReturn(false);
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.VISIBLE);
-        TextView wifiScanNotifyText = mDialogView.requireViewById(R.id.wifi_scan_notify_text);
-        assertThat(wifiScanNotifyText.getText().length()).isNotEqualTo(0);
-        assertThat(wifiScanNotifyText.getMovementMethod()).isNotNull();
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mWifiScanNotify.getVisibility()).isEqualTo(View.VISIBLE);
+                    TextView wifiScanNotifyText = mDialogView.requireViewById(
+                            R.id.wifi_scan_notify_text);
+                    assertThat(wifiScanNotifyText.getText().length()).isNotEqualTo(0);
+                    assertThat(wifiScanNotifyText.getMovementMethod()).isNotNull();
+                });
     }
 
     @Test
     public void updateDialog_wifiIsDisabled_uncheckWifiSwitch() {
         when(mInternetDialogController.isWifiEnabled()).thenReturn(false);
         mWifiToggleSwitch.setChecked(true);
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mWifiToggleSwitch.isChecked()).isFalse();
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mWifiToggleSwitch.isChecked()).isFalse();
+                });
     }
 
     @Test
-    public void updateDialog_wifiIsEnabled_checkWifiSwitch() {
+    public void updateDialog_wifiIsEnabled_checkWifiSwitch() throws Exception {
         when(mInternetDialogController.isWifiEnabled()).thenReturn(true);
         mWifiToggleSwitch.setChecked(false);
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mWifiToggleSwitch.isChecked()).isTrue();
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mWifiToggleSwitch.isChecked()).isTrue();
+                });
     }
 
     @Test
@@ -704,21 +806,28 @@ public class InternetDialogDelegateTest extends SysuiTestCase {
     public void updateDialog_shareWifiIntentNull_hideButton() {
         when(mInternetDialogController.getConfiguratorQrCodeGeneratorIntentOrNull(any()))
                 .thenReturn(null);
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mInternetDialogDelegate.mShareWifiButton.getVisibility()).isEqualTo(View.GONE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mInternetDialogDelegate.mShareWifiButton.getVisibility()).isEqualTo(
+                            View.GONE);
+                });
     }
 
     @Test
     public void updateDialog_shareWifiShareable_showButton() {
         when(mInternetDialogController.getConfiguratorQrCodeGeneratorIntentOrNull(any()))
                 .thenReturn(new Intent());
-
         mInternetDialogDelegate.updateDialog(false);
+        mBgExecutor.runAllReady();
 
-        assertThat(mInternetDialogDelegate.mShareWifiButton.getVisibility())
-                .isEqualTo(View.VISIBLE);
+        mInternetDialogDelegate.mDataInternetContent.observe(
+                mInternetDialogDelegate.mLifecycleOwner, i -> {
+                    assertThat(mInternetDialogDelegate.mShareWifiButton.getVisibility())
+                            .isEqualTo(View.VISIBLE);
+                });
     }
 
     private void setNetworkVisible(boolean ethernetVisible, boolean mobileDataVisible,

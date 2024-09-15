@@ -421,7 +421,6 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         unregisterFiveGStateMonitor();
     }
 
-    @VisibleForTesting
     boolean isAirplaneModeEnabled() {
         return mGlobalSettings.getInt(Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
     }

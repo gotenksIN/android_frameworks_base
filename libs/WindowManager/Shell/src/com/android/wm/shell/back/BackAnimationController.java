@@ -29,7 +29,7 @@ import static com.android.internal.jank.InteractionJankMonitor.CUJ_PREDICTIVE_BA
 import static com.android.window.flags.Flags.migratePredictiveBackTransition;
 import static com.android.window.flags.Flags.predictiveBackSystemAnims;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BACK_PREVIEW;
-import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_BACK_ANIMATION;
+import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_BACK_ANIMATION;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -1313,15 +1313,18 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                         info.getChanges().remove(j);
                     }
                 }
-                tmpSize = info.getChanges().size();
-                for (int i = 0; i < tmpSize; ++i) {
-                    final TransitionInfo.Change change = init.getChanges().get(i);
-                    if (moveToTop) {
-                        if (isSameChangeTarget(openComponent, openTaskId, change)) {
-                            change.setFlags(change.getFlags() | FLAG_MOVED_TO_TOP);
+                // Ignore merge if there is no close target
+                if (!info.getChanges().isEmpty()) {
+                    tmpSize = init.getChanges().size();
+                    for (int i = 0; i < tmpSize; ++i) {
+                        final TransitionInfo.Change change = init.getChanges().get(i);
+                        if (moveToTop) {
+                            if (isSameChangeTarget(openComponent, openTaskId, change)) {
+                                change.setFlags(change.getFlags() | FLAG_MOVED_TO_TOP);
+                            }
                         }
+                        info.getChanges().add(i, change);
                     }
-                    info.getChanges().add(i, change);
                 }
             } else {
                 // Open transition, the transition info should be:

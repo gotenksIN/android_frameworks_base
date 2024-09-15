@@ -53,9 +53,11 @@ import androidx.annotation.Nullable;
 import com.android.settingslib.R;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.util.Comparator;
 import java.util.Objects;
 
 /**
@@ -88,6 +90,48 @@ public class ZenMode implements Parcelable {
                     .allowPriorityChannels(false)
                     .build();
 
+    private static final Comparator<Integer> PRIORITIZED_TYPE_COMPARATOR = new Comparator<>() {
+
+        private static final ImmutableList</* @AutomaticZenRule.Type */ Integer>
+                PRIORITIZED_TYPES = ImmutableList.of(
+                        AutomaticZenRule.TYPE_BEDTIME,
+                        AutomaticZenRule.TYPE_DRIVING);
+
+        @Override
+        public int compare(Integer first, Integer second) {
+            if (PRIORITIZED_TYPES.contains(first) && PRIORITIZED_TYPES.contains(second)) {
+                return PRIORITIZED_TYPES.indexOf(first) - PRIORITIZED_TYPES.indexOf(second);
+            } else if (PRIORITIZED_TYPES.contains(first)) {
+                return -1;
+            } else if (PRIORITIZED_TYPES.contains(second)) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+    };
+
+    // Manual DND first, Bedtime/Driving, then alphabetically.
+    static final Comparator<ZenMode> PRIORITIZING_COMPARATOR = Comparator
+            .comparing(ZenMode::isManualDnd).reversed()
+            .thenComparing(ZenMode::getType, PRIORITIZED_TYPE_COMPARATOR)
+            .thenComparing(ZenMode::getName);
+
+    public enum Kind {
+        /** A "normal" mode, created by apps or users via {@code addAutomaticZenRule()}. */
+        NORMAL,
+
+        /** The special, built-in "Do Not Disturb" mode. */
+        MANUAL_DND,
+
+        /**
+         * An implicit mode, automatically created and managed by the system on behalf of apps that
+         * call {@code setInterruptionFilter()} or {@code setNotificationPolicy()} (with some
+         * exceptions).
+         */
+        IMPLICIT,
+    }
+
     public enum Status {
         ENABLED,
         ENABLED_AND_ACTIVE,
@@ -97,8 +141,8 @@ public class ZenMode implements Parcelable {
 
     private final String mId;
     private final AutomaticZenRule mRule;
+    private final Kind mKind;
     private final Status mStatus;
-    private final boolean mIsManualDnd;
 
     /**
      * Initializes a {@link ZenMode}, mainly based on the information from the
@@ -108,9 +152,11 @@ public class ZenMode implements Parcelable {
      * active, or the reason it was disabled) are read from the {@link ZenModeConfig.ZenRule} --
      * see {@link #computeStatus}.
      */
-    public ZenMode(String id, @NonNull AutomaticZenRule rule,
+    ZenMode(String id, @NonNull AutomaticZenRule rule,
             @NonNull ZenModeConfig.ZenRule zenRuleExtraData) {
-        this(id, rule, computeStatus(zenRuleExtraData), false);
+        this(id, rule,
+                ZenModeConfig.isImplicitRuleId(id) ? Kind.IMPLICIT : Kind.NORMAL,
+                computeStatus(zenRuleExtraData));
     }
 
     private static Status computeStatus(@NonNull ZenModeConfig.ZenRule zenRuleExtraData) {
@@ -129,13 +175,16 @@ public class ZenMode implements Parcelable {
         }
     }
 
-    public static ZenMode manualDndMode(AutomaticZenRule manualRule, boolean isActive) {
+    static ZenMode manualDndMode(AutomaticZenRule manualRule, boolean isActive) {
         // Manual rule is owned by the system, so we set it here
         AutomaticZenRule manualRuleWithPkg = new AutomaticZenRule.Builder(manualRule)
                 .setPackage(PACKAGE_ANDROID)
                 .build();
-        return new ZenMode(MANUAL_DND_MODE_ID, manualRuleWithPkg,
-                isActive ? Status.ENABLED_AND_ACTIVE : Status.ENABLED, true);
+        return new ZenMode(
+                MANUAL_DND_MODE_ID,
+                manualRuleWithPkg,
+                Kind.MANUAL_DND,
+                isActive ? Status.ENABLED_AND_ACTIVE : Status.ENABLED);
     }
 
     /**
@@ -154,19 +203,19 @@ public class ZenMode implements Parcelable {
                 .setIconResId(iconResId)
                 .setManualInvocationAllowed(true)
                 .build();
-        return new ZenMode(TEMP_NEW_MODE_ID, rule, Status.ENABLED, false);
+        return new ZenMode(TEMP_NEW_MODE_ID, rule, Kind.NORMAL, Status.ENABLED);
     }
 
-    private ZenMode(String id, @NonNull AutomaticZenRule rule, Status status, boolean isManualDnd) {
+    private ZenMode(String id, @NonNull AutomaticZenRule rule, Kind kind, Status status) {
         mId = id;
         mRule = rule;
+        mKind = kind;
         mStatus = status;
-        mIsManualDnd = isManualDnd;
     }
 
     /** Creates a deep copy of this object. */
     public ZenMode copy() {
-        return new ZenMode(mId, new AutomaticZenRule.Builder(mRule).build(), mStatus, mIsManualDnd);
+        return new ZenMode(mId, new AutomaticZenRule.Builder(mRule).build(), mKind, mStatus);
     }
 
     @NonNull
@@ -235,10 +284,32 @@ public class ZenMode implements Parcelable {
         return mRule.getType() + ":" + mRule.getPackageName() + ":" + mRule.getIconResId();
     }
 
+    /**
+     * Returns the mode icon -- which can be either app-provided (via {@code addAutomaticZenRule}),
+     * user-chosen (via the icon picker in Settings), the app's launcher icon for implicit rules
+     * (in its monochrome variant, if available), or a default icon based on the mode type.
+     */
     @NonNull
     public ListenableFuture<Drawable> getIcon(@NonNull Context context,
             @NonNull ZenIconLoader iconLoader) {
-        if (mIsManualDnd) {
+        if (mKind == Kind.MANUAL_DND) {
+            return Futures.immediateFuture(requireNonNull(
+                    context.getDrawable(R.drawable.ic_do_not_disturb_on_24dp)));
+        }
+
+        return iconLoader.getIcon(context, mRule);
+    }
+
+    /**
+     * Returns an alternative mode icon. The difference with {@link #getIcon} is that it's the
+     * basic DND icon not only for Manual DND, but also for <em>implicit rules</em>. As such, it's
+     * suitable for places where showing the launcher icon of an app could be confusing, such as
+     * the status bar or lockscreen.
+     */
+    @NonNull
+    public ListenableFuture<Drawable> getLockscreenIcon(@NonNull Context context,
+            @NonNull ZenIconLoader iconLoader) {
+        if (mKind == Kind.MANUAL_DND || mKind == Kind.IMPLICIT) {
             return Futures.immediateFuture(requireNonNull(
                     context.getDrawable(R.drawable.ic_do_not_disturb_on_24dp)));
         }
@@ -344,7 +415,7 @@ public class ZenMode implements Parcelable {
     }
 
     public boolean isManualDnd() {
-        return mIsManualDnd;
+        return mKind == Kind.MANUAL_DND;
     }
 
     /**
@@ -375,18 +446,18 @@ public class ZenMode implements Parcelable {
         return obj instanceof ZenMode other
                 && mId.equals(other.mId)
                 && mRule.equals(other.mRule)
-                && mStatus.equals(other.mStatus)
-                && mIsManualDnd == other.mIsManualDnd;
+                && mKind.equals(other.mKind)
+                && mStatus.equals(other.mStatus);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(mId, mRule, mStatus, mIsManualDnd);
+        return Objects.hash(mId, mRule, mKind, mStatus);
     }
 
     @Override
     public String toString() {
-        return mId + " (" + mStatus + ") -> " + mRule;
+        return mId + " (" + mKind + ", " + mStatus + ") -> " + mRule;
     }
 
     @Override
@@ -398,8 +469,8 @@ public class ZenMode implements Parcelable {
     public void writeToParcel(@NonNull Parcel dest, int flags) {
         dest.writeString(mId);
         dest.writeParcelable(mRule, 0);
+        dest.writeString(mKind.name());
         dest.writeString(mStatus.name());
-        dest.writeBoolean(mIsManualDnd);
     }
 
     public static final Creator<ZenMode> CREATOR = new Creator<ZenMode>() {
@@ -409,8 +480,8 @@ public class ZenMode implements Parcelable {
                     in.readString(),
                     checkNotNull(in.readParcelable(AutomaticZenRule.class.getClassLoader(),
                             AutomaticZenRule.class)),
-                    Status.valueOf(in.readString()),
-                    in.readBoolean());
+                    Kind.valueOf(in.readString()),
+                    Status.valueOf(in.readString()));
         }
 
         @Override

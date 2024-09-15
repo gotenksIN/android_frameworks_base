@@ -298,6 +298,9 @@ public class PhoneStatusBarView extends FrameLayout {
     }
 
     private void updateWindowHeight() {
+        if (Flags.statusBarStopUpdatingWindowHeight()) {
+            return;
+        }
         mStatusBarWindowController.refreshStatusBarHeight();
     }
 }

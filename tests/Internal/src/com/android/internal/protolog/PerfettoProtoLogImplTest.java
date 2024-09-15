@@ -29,7 +29,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import static java.io.File.createTempFile;
-import static java.nio.file.Files.createTempDirectory;
 
 import android.content.Context;
 import android.os.SystemClock;
@@ -44,7 +43,7 @@ import android.tools.traces.protolog.ProtoLogTrace;
 import android.tracing.perfetto.DataSource;
 import android.util.proto.ProtoInputStream;
 
-import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.internal.protolog.common.IProtoLogGroup;
 import com.android.internal.protolog.common.LogDataType;
@@ -73,11 +72,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Test class for {@link ProtoLogImpl}.
  */
 @SuppressWarnings("ConstantConditions")
-@SmallTest
 @Presubmit
 @RunWith(JUnit4.class)
 public class PerfettoProtoLogImplTest {
-    private final File mTracingDirectory = createTempDirectory("temp").toFile();
+    private final File mTracingDirectory = InstrumentationRegistry.getInstrumentation()
+            .getTargetContext().getFilesDir();
 
     private final ResultWriter mWriter = new ResultWriter()
             .forScenario(new ScenarioBuilder()
@@ -165,8 +164,7 @@ public class PerfettoProtoLogImplTest {
         mReader = Mockito.spy(new ProtoLogViewerConfigReader(viewerConfigInputStreamProvider));
         mProtoLog = new PerfettoProtoLogImpl(
                 viewerConfigInputStreamProvider, mReader,
-                () -> mCacheUpdater.run());
-        mProtoLog.registerGroups(TestProtoLogGroup.values());
+                () -> mCacheUpdater.run(), TestProtoLogGroup.values());
     }
 
     @After

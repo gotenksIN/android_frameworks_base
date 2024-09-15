@@ -380,6 +380,17 @@ flag {
 }
 
 flag {
+    name: "status_bar_stop_updating_window_height"
+    namespace: "systemui"
+    description: "Don't have PhoneStatusBarView manually trigger an update of the height in "
+        "StatusBarWindowController"
+    bug: "360115167"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "compose_bouncer"
     namespace: "systemui"
     description: "Use the new compose bouncer in SystemUI"
@@ -524,6 +535,16 @@ flag {
     namespace: "systemui"
     description: "Adds Volume Controller signals to the AudioRepository to update volume"
     bug: "349348461"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "clipboard_image_timeout"
+    namespace: "systemui"
+    description: "Wait for clipboard image to load before showing UI"
+    bug: "359864629"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1035,6 +1056,13 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+  name: "media_controls_button_media3"
+  namespace: "systemui"
+  description: "Enable media action buttons updates using media3"
+  bug: "360196209"
 }
 
 flag {

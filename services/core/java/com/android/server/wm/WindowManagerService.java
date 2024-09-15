@@ -32,6 +32,7 @@ import static android.app.ActivityManagerInternal.ALLOW_NON_FULL;
 import static android.app.AppOpsManager.OP_SYSTEM_ALERT_WINDOW;
 import static android.app.StatusBarManager.DISABLE_MASK;
 import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.admin.DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED;
 import static android.content.pm.PackageManager.FEATURE_FREEFORM_WINDOW_MANAGEMENT;
 import static android.content.pm.PackageManager.FEATURE_PC;
@@ -6896,7 +6897,7 @@ public class WindowManagerService extends IWindowManager.Stub
      * @param proto     Stream to write the WindowContainer object to.
      * @param logLevel  Determines the amount of data to be written to the Protobuf.
      */
-    void dumpDebugLocked(ProtoOutputStream proto, @WindowTraceLogLevel int logLevel) {
+    void dumpDebugLocked(ProtoOutputStream proto, @WindowTracingLogLevel int logLevel) {
         mPolicy.dumpDebug(proto, POLICY);
         mRoot.dumpDebug(proto, ROOT_WINDOW_CONTAINER, logLevel);
         final DisplayContent topFocusedDisplayContent = mRoot.getTopFocusedDisplayContent();
@@ -7255,7 +7256,7 @@ public class WindowManagerService extends IWindowManager.Stub
         if (useProto) {
             final ProtoOutputStream proto = new ProtoOutputStream(fd);
             synchronized (mGlobalLock) {
-                dumpDebugLocked(proto, WindowTraceLogLevel.ALL);
+                dumpDebugLocked(proto, WindowTracingLogLevel.ALL);
             }
             proto.flush();
             return;
@@ -9062,14 +9063,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }
         clearPointerDownOutsideFocusRunnable();
 
-        // For embedded activity that is showing side-by-side with another activity, delay
-        // handling the touch-outside event to prevent focus rapid changes back-n-forth.
-        // Otherwise, handle the touch-outside event directly.
-        final WindowState w = t.getWindowState();
-        final ActivityRecord activity = w != null ? w.getActivityRecord() : null;
-        if (mFocusedInputTarget != t && mFocusedInputTarget != null
-                && activity != null && activity.isEmbedded()
-                && activity.getTaskFragment().getAdjacentTaskFragment() != null) {
+        if (shouldDelayTouchOutside(t)) {
             mPointerDownOutsideFocusRunnable = () -> handlePointerDownOutsideFocus(t);
             mH.postDelayed(mPointerDownOutsideFocusRunnable, POINTER_DOWN_OUTSIDE_FOCUS_TIMEOUT_MS);
         } else if (!fromHandler) {
@@ -9080,6 +9074,33 @@ public class WindowManagerService extends IWindowManager.Stub
         } else {
             handlePointerDownOutsideFocus(t);
         }
+    }
+
+    private boolean shouldDelayTouchOutside(InputTarget t) {
+        final WindowState w = t.getWindowState();
+        final ActivityRecord activity = w != null ? w.getActivityRecord() : null;
+        final Task task = w != null ? w.getRootTask() : null;
+
+        final boolean isInputTargetNotFocused =
+                mFocusedInputTarget != t && mFocusedInputTarget != null;
+        if (!isInputTargetNotFocused) {
+            return false;
+        }
+
+        // For embedded activity that is showing side-by-side with another activity, delay
+        // handling the touch-outside event to prevent focus rapid changes back-n-forth.
+        final boolean shouldDelayTouchForEmbeddedActivity = activity != null
+                && activity.isEmbedded()
+                && activity.getTaskFragment().getAdjacentTaskFragment() != null;
+
+        // For cases when there are multiple freeform windows where non-top windows are blocking
+        // the gesture zones, delay handling the touch-outside event to prevent refocusing the
+        // the non-top windows during the gesture.
+        final boolean shouldDelayTouchForFreeform =
+                task != null && task.getWindowingMode() == WINDOWING_MODE_FREEFORM;
+
+        // If non of the above cases are true, handle the touch-outside event directly.
+        return shouldDelayTouchForEmbeddedActivity || shouldDelayTouchForFreeform;
     }
 
     private void handlePointerDownOutsideFocus(InputTarget t) {

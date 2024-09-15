@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -167,7 +168,7 @@ constructor(
         actionsViewModelFactory.create()
     }
 
-    override suspend fun activate() {
+    override suspend fun activate(): Nothing {
         actionsViewModel.activate()
     }
 
@@ -631,7 +632,11 @@ private fun SceneScope.SplitShade(
                     modifier =
                         Modifier.weight(1f)
                             .fillMaxHeight()
-                            .padding(end = screenCornerRadius / 2f, bottom = navBarBottomHeight)
+                            .padding(
+                                end =
+                                    dimensionResource(R.dimen.notification_panel_margin_horizontal),
+                                bottom = navBarBottomHeight
+                            )
                             .then(brightnessMirrorShowingModifier)
                 )
             }

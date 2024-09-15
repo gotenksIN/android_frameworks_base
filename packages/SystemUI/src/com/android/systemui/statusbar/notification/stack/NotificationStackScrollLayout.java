@@ -258,7 +258,7 @@ public class NotificationStackScrollLayout
     private float mOverScrolledBottomPixels;
     private final ListenerSet<Runnable> mStackHeightChangedListeners = new ListenerSet<>();
     private final ListenerSet<Runnable> mHeadsUpHeightChangedListeners = new ListenerSet<>();
-    private NotificationLogger.OnChildLocationsChangedListener mListener;
+    private NotificationLogger.OnChildLocationsChangedListener mLegacyLocationsChangedListener;
     private OnNotificationLocationsChangedListener mLocationsChangedListener;
     private OnOverscrollTopChangedListener mOverscrollTopChangedListener;
     private ExpandableView.OnHeightChangedListener mOnHeightChangedListener;
@@ -1281,7 +1281,7 @@ public class NotificationStackScrollLayout
     public void setChildLocationsChangedListener(
             NotificationLogger.OnChildLocationsChangedListener listener) {
         NotificationsLiveDataStoreRefactor.assertInLegacyMode();
-        mListener = listener;
+        mLegacyLocationsChangedListener = listener;
     }
 
     private void setMaxLayoutHeight(int maxLayoutHeight) {
@@ -1721,6 +1721,19 @@ public class NotificationStackScrollLayout
         if (mTopHeadsUpRow == null) {
             return 0;
         }
+        ExpandableNotificationRow row = getTopHeadsUpRow();
+        return row.getPinnedHeadsUpHeight();
+    }
+
+    private int getTopHeadsUpIntrinsicHeight() {
+        if (mTopHeadsUpRow == null) {
+            return 0;
+        }
+        ExpandableNotificationRow row = getTopHeadsUpRow();
+        return row.getIntrinsicHeight();
+    }
+
+    private ExpandableNotificationRow getTopHeadsUpRow() {
         ExpandableNotificationRow row = mTopHeadsUpRow;
         if (row.isChildInGroup()) {
             final NotificationEntry groupSummary =
@@ -1729,7 +1742,7 @@ public class NotificationStackScrollLayout
                 row = groupSummary.getRow();
             }
         }
-        return row.getPinnedHeadsUpHeight();
+        return row;
     }
 
     /**
@@ -2511,7 +2524,7 @@ public class NotificationStackScrollLayout
 
     @Override
     public int getTopHeadsUpHeight() {
-        return getTopHeadsUpPinnedHeight();
+        return getTopHeadsUpIntrinsicHeight();
     }
 
     /**
@@ -4433,8 +4446,8 @@ public class NotificationStackScrollLayout
                 mLocationsChangedListener.onChildLocationsChanged(collectVisibleLocationsCallable);
             }
         } else {
-            if (mListener != null) {
-                mListener.onChildLocationsChanged();
+            if (mLegacyLocationsChangedListener != null) {
+                mLegacyLocationsChangedListener.onChildLocationsChanged();
             }
         }
 
@@ -5732,7 +5745,7 @@ public class NotificationStackScrollLayout
         return mDisallowScrollingInThisMotion;
     }
 
-    boolean isBeingDragged() {
+    public boolean isBeingDragged() {
         return mIsBeingDragged;
     }
 

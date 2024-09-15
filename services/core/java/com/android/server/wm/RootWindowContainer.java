@@ -1011,6 +1011,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // complete configuration.
                 continue;
             }
+            win.updateSurfacePositionIfNeeded();
             win.reportResized();
             mWmService.mResizingWindows.remove(i);
         }
@@ -1198,8 +1199,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
     @Override
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
-            @WindowTraceLogLevel int logLevel) {
-        if (logLevel == WindowTraceLogLevel.CRITICAL && !isVisible()) {
+            @WindowTracingLogLevel int logLevel) {
+        if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible()) {
             return;
         }
 
@@ -3551,26 +3552,30 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
     boolean allResumedActivitiesIdle() {
         for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
-            // TODO(b/117135575): Check resumed activities on all visible root tasks.
             final DisplayContent display = getChildAt(displayNdx);
             if (display.isSleeping()) {
                 // No resumed activities while display is sleeping.
                 continue;
             }
 
-            // If the focused root task is not null or not empty, there should have some activities
-            // resuming or resumed. Make sure these activities are idle.
-            final Task rootTask = display.getFocusedRootTask();
-            if (rootTask == null || !rootTask.hasActivity()) {
-                continue;
-            }
-            final ActivityRecord resumedActivity = rootTask.getTopResumedActivity();
-            if (resumedActivity == null || !resumedActivity.idle) {
-                ProtoLog.d(WM_DEBUG_STATES, "allResumedActivitiesIdle: rootTask=%d %s "
-                        + "not idle", rootTask.getRootTaskId(), resumedActivity);
+            final boolean foundNotIdle = display.forAllLeafTaskFragments(tf -> {
+                if (!tf.isVisibleRequested()) {
+                    return false;
+                }
+                // Note that only activities that will be resumed can report idle.
+                final ActivityRecord r = tf.topRunningActivity();
+                if (r != null && !r.idle && (r.isState(RESUMED)
+                        // Its process is not attached yet and it may resume later.
+                        || (r.app == null && r.isFocusable()))) {
+                    ProtoLog.d(WM_DEBUG_STATES, "allResumedActivitiesIdle: %s not idle", r);
+                    return true;
+                }
+                return false;
+            });
+            if (foundNotIdle) {
                 return false;
             }
-            if (mTransitionController.isTransientLaunch(resumedActivity)) {
+            if (mTransitionController.hasTransientLaunch(display)) {
                 // Not idle if the transient transition animation is running.
                 return false;
             }

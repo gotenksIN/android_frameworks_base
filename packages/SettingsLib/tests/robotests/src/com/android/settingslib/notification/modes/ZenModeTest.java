@@ -16,6 +16,12 @@
 
 package com.android.settingslib.notification.modes;
 
+import static android.app.AutomaticZenRule.TYPE_BEDTIME;
+import static android.app.AutomaticZenRule.TYPE_DRIVING;
+import static android.app.AutomaticZenRule.TYPE_IMMERSIVE;
+import static android.app.AutomaticZenRule.TYPE_OTHER;
+import static android.app.AutomaticZenRule.TYPE_THEATER;
+import static android.app.AutomaticZenRule.TYPE_UNKNOWN;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_NONE;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY;
@@ -24,7 +30,14 @@ import static android.service.notification.SystemZenRules.PACKAGE_ANDROID;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
 import android.app.AutomaticZenRule;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Parcel;
 import android.service.notification.Condition;
@@ -34,9 +47,15 @@ import android.service.notification.ZenPolicy;
 
 import com.android.internal.R;
 
+import com.google.common.util.concurrent.ListenableFuture;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @RunWith(RobolectricTestRunner.class)
 public class ZenModeTest {
@@ -46,9 +65,16 @@ public class ZenModeTest {
     private static final AutomaticZenRule ZEN_RULE =
             new AutomaticZenRule.Builder("Driving", Uri.parse("drive"))
                     .setPackage("com.some.driving.thing")
-                    .setType(AutomaticZenRule.TYPE_DRIVING)
+                    .setType(TYPE_DRIVING)
                     .setInterruptionFilter(INTERRUPTION_FILTER_PRIORITY)
                     .setZenPolicy(ZEN_POLICY)
+                    .build();
+
+    private static final String IMPLICIT_RULE_ID = ZenModeConfig.implicitRuleId("some.package");
+    private static final AutomaticZenRule IMPLICIT_ZEN_RULE =
+            new AutomaticZenRule.Builder("Implicit", Uri.parse("implicit/some.package"))
+                    .setPackage("some.package")
+                    .setType(TYPE_OTHER)
                     .build();
 
     @Test
@@ -226,6 +252,28 @@ public class ZenModeTest {
     }
 
     @Test
+    public void comparator_prioritizes() {
+        ZenMode manualDnd = TestModeBuilder.MANUAL_DND_INACTIVE;
+        ZenMode driving1 = new TestModeBuilder().setName("b1").setType(TYPE_DRIVING).build();
+        ZenMode driving2 = new TestModeBuilder().setName("b2").setType(TYPE_DRIVING).build();
+        ZenMode bedtime1 = new TestModeBuilder().setName("c1").setType(TYPE_BEDTIME).build();
+        ZenMode bedtime2 = new TestModeBuilder().setName("c2").setType(TYPE_BEDTIME).build();
+        ZenMode other = new TestModeBuilder().setName("a1").setType(TYPE_OTHER).build();
+        ZenMode immersive = new TestModeBuilder().setName("a2").setType(TYPE_IMMERSIVE).build();
+        ZenMode unknown = new TestModeBuilder().setName("a3").setType(TYPE_UNKNOWN).build();
+        ZenMode theater = new TestModeBuilder().setName("a4").setType(TYPE_THEATER).build();
+
+        ArrayList<ZenMode> list = new ArrayList<>(List.of(other, theater, bedtime1, unknown,
+                driving2, manualDnd, driving1, bedtime2, immersive));
+        list.sort(ZenMode.PRIORITIZING_COMPARATOR);
+
+        assertThat(list)
+                .containsExactly(manualDnd, bedtime1, bedtime2, driving1, driving2, other,
+                        immersive, unknown, theater)
+                .inOrder();
+    }
+
+    @Test
     public void writeToParcel_equals() {
         assertUnparceledIsEqualToOriginal("example",
                 new ZenMode("id", ZEN_RULE, zenConfigRuleFor(ZEN_RULE, false)));
@@ -234,6 +282,79 @@ public class ZenModeTest {
 
         assertUnparceledIsEqualToOriginal("custom_manual",
                 ZenMode.newCustomManual("New mode", R.drawable.ic_zen_mode_type_immersive));
+
+        assertUnparceledIsEqualToOriginal("implicit",
+                new ZenMode(IMPLICIT_RULE_ID, IMPLICIT_ZEN_RULE,
+                        zenConfigRuleFor(IMPLICIT_ZEN_RULE, false)));
+    }
+
+    @Test
+    public void getIcon_normalMode_loadsIconNormally() {
+        ZenIconLoader iconLoader = mock(ZenIconLoader.class);
+        ZenMode mode = new ZenMode("id", ZEN_RULE, zenConfigRuleFor(ZEN_RULE, false));
+
+        ListenableFuture<Drawable> unused = mode.getIcon(RuntimeEnvironment.getApplication(),
+                iconLoader);
+
+        verify(iconLoader).getIcon(any(), eq(ZEN_RULE));
+    }
+
+    @Test
+    public void getIcon_manualDnd_returnsFixedIcon() {
+        ZenIconLoader iconLoader = mock(ZenIconLoader.class);
+
+        ListenableFuture<Drawable> future = TestModeBuilder.MANUAL_DND_INACTIVE.getIcon(
+                RuntimeEnvironment.getApplication(), iconLoader);
+
+        assertThat(future.isDone()).isTrue();
+        verify(iconLoader, never()).getIcon(any(), any());
+    }
+
+    @Test
+    public void getIcon_implicitMode_loadsIconNormally() {
+        ZenIconLoader iconLoader = mock(ZenIconLoader.class);
+        ZenMode mode = new ZenMode(IMPLICIT_RULE_ID, IMPLICIT_ZEN_RULE,
+                zenConfigRuleFor(IMPLICIT_ZEN_RULE, false));
+
+        ListenableFuture<Drawable> unused = mode.getIcon(RuntimeEnvironment.getApplication(),
+                iconLoader);
+
+        verify(iconLoader).getIcon(any(), eq(IMPLICIT_ZEN_RULE));
+    }
+
+    @Test
+    public void getLockscreenIcon_normalMode_loadsIconNormally() {
+        ZenIconLoader iconLoader = mock(ZenIconLoader.class);
+        ZenMode mode = new ZenMode("id", ZEN_RULE, zenConfigRuleFor(ZEN_RULE, false));
+
+        ListenableFuture<Drawable> unused = mode.getLockscreenIcon(
+                RuntimeEnvironment.getApplication(), iconLoader);
+
+        verify(iconLoader).getIcon(any(), eq(ZEN_RULE));
+    }
+
+    @Test
+    public void getLockscreenIcon_manualDnd_returnsFixedIcon() {
+        ZenIconLoader iconLoader = mock(ZenIconLoader.class);
+
+        ListenableFuture<Drawable> future = TestModeBuilder.MANUAL_DND_INACTIVE.getLockscreenIcon(
+                RuntimeEnvironment.getApplication(), iconLoader);
+
+        assertThat(future.isDone()).isTrue();
+        verify(iconLoader, never()).getIcon(any(), any());
+    }
+
+    @Test
+    public void getLockscreenIcon_implicitMode_returnsFixedIcon() {
+        ZenIconLoader iconLoader = mock(ZenIconLoader.class);
+        ZenMode mode = new ZenMode(IMPLICIT_RULE_ID, IMPLICIT_ZEN_RULE,
+                zenConfigRuleFor(IMPLICIT_ZEN_RULE, false));
+
+        ListenableFuture<Drawable> future = mode.getLockscreenIcon(
+                RuntimeEnvironment.getApplication(), iconLoader);
+
+        assertThat(future.isDone()).isTrue();
+        verify(iconLoader, never()).getIcon(any(), any());
     }
 
     private static void assertUnparceledIsEqualToOriginal(String type, ZenMode original) {

@@ -19,7 +19,7 @@ package com.android.systemui.util.kotlin
 import android.util.IndentingPrintWriter
 import com.android.systemui.Dumpable
 import com.android.systemui.dump.DumpManager
-import com.android.systemui.lifecycle.SafeActivatable
+import com.android.systemui.lifecycle.BaseActivatable
 import com.android.systemui.lifecycle.SysUiViewModel
 import com.android.systemui.util.asIndenting
 import com.android.systemui.util.printCollection
@@ -170,7 +170,7 @@ abstract class FlowDumperImpl(
  * [Activatable.activate()][com.android.systemui.lifecycle.Activatable.activate].
  */
 interface ActivatableFlowDumper : FlowDumper {
-    suspend fun activateFlowDumper()
+    suspend fun activateFlowDumper(): Nothing
 }
 
 /**
@@ -189,8 +189,8 @@ class ActivatableFlowDumperImpl(
 ) : SimpleFlowDumper(), ActivatableFlowDumper {
 
     private val registration =
-        object : SafeActivatable() {
-            override suspend fun onActivated() {
+        object : BaseActivatable() {
+            override suspend fun onActivated(): Nothing {
                 try {
                     dumpManager.registerCriticalDumpable(
                         dumpManagerName,
@@ -205,7 +205,7 @@ class ActivatableFlowDumperImpl(
 
     private val dumpManagerName = "[$idString] $tag"
 
-    override suspend fun activateFlowDumper() {
+    override suspend fun activateFlowDumper(): Nothing {
         registration.activate()
     }
 }

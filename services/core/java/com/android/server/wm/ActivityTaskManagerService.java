@@ -124,8 +124,6 @@ import static com.android.server.wm.ActivityTaskSupervisor.ON_TOP;
 import static com.android.server.wm.ActivityTaskSupervisor.REMOVE_FROM_RECENTS;
 import static com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import static com.android.server.wm.LockTaskController.LOCK_TASK_AUTH_DONT_LOCK;
-import static com.android.server.wm.RecentsAnimationController.REORDER_KEEP_IN_PLACE;
-import static com.android.server.wm.RecentsAnimationController.REORDER_MOVE_TO_ORIGINAL_POSITION;
 import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_ONLY;
 import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_RECENT_TASKS;
 import static com.android.server.wm.Task.REPARENT_KEEP_ROOT_TASK_AT_FRONT;
@@ -241,7 +239,6 @@ import android.util.SparseArray;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 import android.view.Display;
-import android.view.IRecentsAnimationRunner;
 import android.view.RemoteAnimationAdapter;
 import android.view.RemoteAnimationDefinition;
 import android.view.WindowManager;
@@ -441,13 +438,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     /** It is set from keyguard-going-away to set-keyguard-shown. */
     static final int DEMOTE_TOP_REASON_DURING_UNLOCKING = 1;
-    /** It is set if legacy recents animation is running. */
-    static final int DEMOTE_TOP_REASON_ANIMATING_RECENTS = 1 << 1;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({
             DEMOTE_TOP_REASON_DURING_UNLOCKING,
-            DEMOTE_TOP_REASON_ANIMATING_RECENTS,
     })
     @interface DemoteTopReason {}
 
@@ -1775,35 +1769,23 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     /**
-     * Start the recents activity to perform the recents animation.
+     * Preload the recents activity.
      *
-     * @param intent                 The intent to start the recents activity.
-     * @param eventTime              When the (touch) event is triggered to start recents activity.
-     * @param recentsAnimationRunner Pass {@code null} to only preload the activity.
+     * @param intent The intent to preload the recents activity.
      */
     @Override
-    public void startRecentsActivity(Intent intent, long eventTime,
-            @Nullable IRecentsAnimationRunner recentsAnimationRunner) {
-        enforceTaskPermission("startRecentsActivity()");
-        final int callingPid = Binder.getCallingPid();
-        final int callingUid = Binder.getCallingUid();
+    public void preloadRecentsActivity(Intent intent) {
+        enforceTaskPermission("preloadRecentsActivity()");
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
                 final ComponentName recentsComponent = mRecentTasks.getRecentsComponent();
                 final String recentsFeatureId = mRecentTasks.getRecentsComponentFeatureId();
                 final int recentsUid = mRecentTasks.getRecentsComponentUid();
-                final WindowProcessController caller = getProcessController(callingPid, callingUid);
-
-                // Start a new recents animation
                 final RecentsAnimation anim = new RecentsAnimation(this, mTaskSupervisor,
-                        getActivityStartController(), mWindowManager, intent, recentsComponent,
-                        recentsFeatureId, recentsUid, caller);
-                if (recentsAnimationRunner == null) {
-                    anim.preloadRecentsActivity();
-                } else {
-                    anim.startRecentsActivity(recentsAnimationRunner, eventTime);
-                }
+                        getActivityStartController(), intent, recentsComponent,
+                        recentsFeatureId, recentsUid);
+                anim.preloadRecentsActivity();
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -2564,23 +2546,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             }
         } finally {
             Binder.restoreCallingIdentity(ident);
-        }
-    }
-
-    @Override
-    public void cancelRecentsAnimation(boolean restoreHomeRootTaskPosition) {
-        enforceTaskPermission("cancelRecentsAnimation()");
-        final long callingUid = Binder.getCallingUid();
-        final long origId = Binder.clearCallingIdentity();
-        try {
-            synchronized (mGlobalLock) {
-                // Cancel the recents animation synchronously (do not hold the WM lock)
-                mWindowManager.cancelRecentsAnimation(restoreHomeRootTaskPosition
-                        ? REORDER_MOVE_TO_ORIGINAL_POSITION
-                        : REORDER_KEEP_IN_PLACE, "cancelRecentsAnimation/uid=" + callingUid);
-            }
-        } finally {
-            Binder.restoreCallingIdentity(origId);
         }
     }
 
@@ -3654,6 +3619,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         final long token = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
+                boolean isPowerModePreApplied = false;
+                if (mPowerModeReasons == 0) {
+                    startPowerMode(POWER_MODE_REASON_START_ACTIVITY);
+                    isPowerModePreApplied = true;
+                }
                 // Keyguard asked us to clear the home task snapshot before going away, so do that.
                 if ((flags & KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT) != 0) {
                     mActivityClientController.invalidateHomeTaskSnapshot(null /* token */);
@@ -3662,9 +3632,19 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     mDemoteTopAppReasons |= DEMOTE_TOP_REASON_DURING_UNLOCKING;
                 }
 
-                mRootWindowContainer.forAllDisplays(displayContent -> {
-                    mKeyguardController.keyguardGoingAway(displayContent.getDisplayId(), flags);
-                });
+                boolean foundResumed = false;
+                for (int i = mRootWindowContainer.getChildCount() - 1; i >= 0; i--) {
+                    final DisplayContent dc = mRootWindowContainer.getChildAt(i);
+                    final boolean wasNoResumed = dc.mFocusedApp == null
+                            || !dc.mFocusedApp.isState(RESUMED);
+                    mKeyguardController.keyguardGoingAway(dc.mDisplayId, flags);
+                    if (wasNoResumed && dc.mFocusedApp != null && dc.mFocusedApp.isState(RESUMED)) {
+                        foundResumed = true;
+                    }
+                }
+                if (isPowerModePreApplied && !foundResumed) {
+                    endPowerMode(POWER_MODE_REASON_START_ACTIVITY);
+                }
             }
             WallpaperManagerInternal wallpaperManagerInternal = getWallpaperManagerInternal();
             if (wallpaperManagerInternal != null) {

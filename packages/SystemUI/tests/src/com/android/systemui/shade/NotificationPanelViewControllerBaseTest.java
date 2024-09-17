@@ -470,7 +470,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 () -> mKosmos.getDeviceUnlockedInteractor(),
                 () -> mKosmos.getSceneInteractor(),
                 () -> mKosmos.getSceneContainerOcclusionInteractor(),
-                () -> mKosmos.getKeyguardClockInteractor());
+                () -> mKosmos.getKeyguardClockInteractor(),
+                () -> mKosmos.getSceneBackInteractor());
 
         KeyguardStatusView keyguardStatusView = new KeyguardStatusView(mContext);
         keyguardStatusView.setId(R.id.keyguard_status_view);
@@ -627,7 +628,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                                 () -> mKosmos.getDeviceUnlockedInteractor(),
                                 () -> mKosmos.getSceneInteractor(),
                                 () -> mKosmos.getSceneContainerOcclusionInteractor(),
-                                () -> mKosmos.getKeyguardClockInteractor()),
+                                () -> mKosmos.getKeyguardClockInteractor(),
+                                () -> mKosmos.getSceneBackInteractor()),
                         mKeyguardBypassController,
                         mDozeParameters,
                         mScreenOffAnimationController,

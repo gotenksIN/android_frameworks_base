@@ -262,7 +262,7 @@ constructor(
         shouldOpenWidgetPickerOnStart: Boolean,
     ) {
         persistScrollPosition()
-        communalInteractor.showWidgetEditor(selectedKey.value, shouldOpenWidgetPickerOnStart)
+        communalInteractor.showWidgetEditor(shouldOpenWidgetPickerOnStart)
     }
 
     override fun onDismissCtaTile() {
@@ -272,8 +272,8 @@ constructor(
         }
     }
 
-    override fun onTapWidget(componentName: ComponentName, priority: Int) {
-        metricsLogger.logTapWidget(componentName.flattenToString(), priority)
+    override fun onTapWidget(componentName: ComponentName, rank: Int) {
+        metricsLogger.logTapWidget(componentName.flattenToString(), rank)
     }
 
     fun onClick() {

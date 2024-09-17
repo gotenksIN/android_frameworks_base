@@ -45,19 +45,20 @@ internal constructor(
     internal val transitionSpecs: List<TransitionSpecImpl>,
     internal val overscrollSpecs: List<OverscrollSpecImpl>,
     internal val interruptionHandler: InterruptionHandler,
+    internal val defaultProgressConverter: ProgressConverter,
 ) {
     private val transitionCache =
         mutableMapOf<
-            SceneKey,
-            MutableMap<SceneKey, MutableMap<TransitionKey?, TransitionSpecImpl>>
+            ContentKey,
+            MutableMap<ContentKey, MutableMap<TransitionKey?, TransitionSpecImpl>>
         >()
 
     private val overscrollCache =
-        mutableMapOf<SceneKey, MutableMap<Orientation, OverscrollSpecImpl?>>()
+        mutableMapOf<ContentKey, MutableMap<Orientation, OverscrollSpecImpl?>>()
 
     internal fun transitionSpec(
-        from: SceneKey,
-        to: SceneKey,
+        from: ContentKey,
+        to: ContentKey,
         key: TransitionKey?,
     ): TransitionSpecImpl {
         return transitionCache
@@ -66,7 +67,11 @@ internal constructor(
             .getOrPut(key) { findSpec(from, to, key) }
     }
 
-    private fun findSpec(from: SceneKey, to: SceneKey, key: TransitionKey?): TransitionSpecImpl {
+    private fun findSpec(
+        from: ContentKey,
+        to: ContentKey,
+        key: TransitionKey?
+    ): TransitionSpecImpl {
         val spec = transition(from, to, key) { it.from == from && it.to == to }
         if (spec != null) {
             return spec
@@ -92,8 +97,8 @@ internal constructor(
     }
 
     private fun transition(
-        from: SceneKey,
-        to: SceneKey,
+        from: ContentKey,
+        to: ContentKey,
         key: TransitionKey?,
         filter: (TransitionSpecImpl) -> Boolean,
     ): TransitionSpecImpl? {
@@ -109,16 +114,16 @@ internal constructor(
         return match
     }
 
-    private fun defaultTransition(from: SceneKey, to: SceneKey) =
+    private fun defaultTransition(from: ContentKey, to: ContentKey) =
         TransitionSpecImpl(key = null, from, to, null, null, TransformationSpec.EmptyProvider)
 
-    internal fun overscrollSpec(scene: SceneKey, orientation: Orientation): OverscrollSpecImpl? =
+    internal fun overscrollSpec(scene: ContentKey, orientation: Orientation): OverscrollSpecImpl? =
         overscrollCache
             .getOrPut(scene) { mutableMapOf() }
-            .getOrPut(orientation) { overscroll(scene, orientation) { it.scene == scene } }
+            .getOrPut(orientation) { overscroll(scene, orientation) { it.content == scene } }
 
     private fun overscroll(
-        scene: SceneKey,
+        scene: ContentKey,
         orientation: Orientation,
         filter: (OverscrollSpecImpl) -> Boolean,
     ): OverscrollSpecImpl? {
@@ -147,6 +152,7 @@ internal constructor(
                 transitionSpecs = emptyList(),
                 overscrollSpecs = emptyList(),
                 interruptionHandler = DefaultInterruptionHandler,
+                defaultProgressConverter = ProgressConverter.Default,
             )
     }
 }
@@ -262,10 +268,10 @@ internal class TransitionSpecImpl(
         previewTransformationSpec?.invoke()
 }
 
-/** The definition of the overscroll behavior of the [scene]. */
+/** The definition of the overscroll behavior of the [content]. */
 interface OverscrollSpec {
     /** The scene we are over scrolling. */
-    val scene: SceneKey
+    val content: ContentKey
 
     /** The orientation of this [OverscrollSpec]. */
     val orientation: Orientation
@@ -282,14 +288,14 @@ interface OverscrollSpec {
      * - 1, the user overscrolled by exactly the [OverscrollBuilder.distance].
      * - Greater than 1, the user overscrolled more than the [OverscrollBuilder.distance].
      */
-    val progressConverter: (Float) -> Float
+    val progressConverter: ProgressConverter?
 }
 
 internal class OverscrollSpecImpl(
-    override val scene: SceneKey,
+    override val content: ContentKey,
     override val orientation: Orientation,
     override val transformationSpec: TransformationSpecImpl,
-    override val progressConverter: (Float) -> Float,
+    override val progressConverter: ProgressConverter?,
 ) : OverscrollSpec
 
 /**

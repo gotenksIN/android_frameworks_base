@@ -27,13 +27,13 @@ internal class LinkedTransition(
     fromScene: SceneKey,
     toScene: SceneKey,
     override val key: TransitionKey? = null,
-) : TransitionState.Transition(fromScene, toScene) {
+) : TransitionState.Transition.ChangeCurrentScene(fromScene, toScene) {
 
     override val currentScene: SceneKey
         get() {
             return when (originalTransition.currentScene) {
-                originalTransition.fromScene -> fromScene
-                originalTransition.toScene -> toScene
+                originalTransition.fromContent -> fromScene
+                originalTransition.toContent -> toScene
                 else -> error("Original currentScene is neither FromScene nor ToScene")
             }
         }

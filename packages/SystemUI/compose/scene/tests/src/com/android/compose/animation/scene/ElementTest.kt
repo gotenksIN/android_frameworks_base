@@ -724,6 +724,7 @@ class ElementTest {
                 layoutHeight = layoutHeight,
                 sceneTransitions = {
                     overscroll(SceneB, Orientation.Vertical) {
+                        progressConverter = ProgressConverter.linear()
                         // On overscroll 100% -> Foo should translate by overscrollTranslateY
                         translate(TestElements.Foo, y = overscrollTranslateY)
                     }
@@ -735,7 +736,7 @@ class ElementTest {
 
         val fooElement = rule.onNodeWithTag(TestElements.Foo.testTag)
         fooElement.assertTopPositionInRootIsEqualTo(0.dp)
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(transition).isNotNull()
         assertThat(transition).hasProgress(0.5f)
         assertThat(animatedFloat).isEqualTo(50f)
@@ -780,6 +781,7 @@ class ElementTest {
                     transitions =
                         transitions {
                             overscroll(SceneB, Orientation.Vertical) {
+                                progressConverter = ProgressConverter.linear()
                                 translate(TestElements.Foo, y = overscrollTranslateY)
                             }
                         }
@@ -822,7 +824,7 @@ class ElementTest {
             moveBy(Offset(0f, touchSlop + layoutHeight.toPx() * 0.5f), delayMillis = 1_000)
         }
 
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(transition).hasOverscrollSpec()
         assertThat(transition).hasProgress(-0.5f)
         fooElement.assertTopPositionInRootIsEqualTo(overscrollTranslateY * 0.5f)
@@ -905,7 +907,7 @@ class ElementTest {
             }
         }
 
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(transition).hasProgress(0.5f)
         fooElement.assertTopPositionInRootIsEqualTo(translateY * 0.5f)
     }
@@ -921,6 +923,7 @@ class ElementTest {
                 layoutHeight = layoutHeight,
                 sceneTransitions = {
                     overscroll(SceneB, Orientation.Vertical) {
+                        progressConverter = ProgressConverter.linear()
                         // On overscroll 100% -> Foo should translate by layoutHeight
                         translate(TestElements.Foo, y = { absoluteDistance })
                     }
@@ -939,7 +942,7 @@ class ElementTest {
             moveBy(Offset(0f, layoutHeight.toPx() * 0.5f), delayMillis = 1_000)
         }
 
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(animatedFloat).isEqualTo(100f)
 
         // Scroll 150% (100% scroll + 50% overscroll)
@@ -961,6 +964,97 @@ class ElementTest {
     }
 
     @Test
+    fun elementTransitionWithDistanceDuringOverscrollWithDefaultProgressConverter() {
+        val layoutWidth = 200.dp
+        val layoutHeight = 400.dp
+        var animatedFloat = 0f
+        val state =
+            setupOverscrollScenario(
+                layoutWidth = layoutWidth,
+                layoutHeight = layoutHeight,
+                sceneTransitions = {
+                    // Overscroll progress will be halved
+                    defaultOverscrollProgressConverter = ProgressConverter { it / 2f }
+
+                    overscroll(SceneB, Orientation.Vertical) {
+                        // On overscroll 100% -> Foo should translate by layoutHeight
+                        translate(TestElements.Foo, y = { absoluteDistance })
+                    }
+                },
+                firstScroll = 1f, // 100% scroll
+                animatedFloatRange = 0f..100f,
+                onAnimatedFloat = { animatedFloat = it },
+            )
+
+        val fooElement = rule.onNodeWithTag(TestElements.Foo.testTag)
+        fooElement.assertTopPositionInRootIsEqualTo(0.dp)
+        assertThat(animatedFloat).isEqualTo(100f)
+
+        rule.onRoot().performTouchInput {
+            // Scroll another 100%
+            moveBy(Offset(0f, layoutHeight.toPx()), delayMillis = 1_000)
+        }
+
+        val transition = assertThat(state.transitionState).isSceneTransition()
+        assertThat(animatedFloat).isEqualTo(100f)
+
+        // Scroll 200% (100% scroll + 100% overscroll)
+        assertThat(transition).hasProgress(2f)
+        assertThat(transition).hasOverscrollSpec()
+
+        // Overscroll progress is halved, we are at 50% of the overscroll progress.
+        fooElement.assertTopPositionInRootIsEqualTo(layoutHeight * 0.5f)
+        assertThat(animatedFloat).isEqualTo(100f)
+    }
+
+    @Test
+    fun elementTransitionWithDistanceDuringOverscrollWithOverrideDefaultProgressConverter() {
+        val layoutWidth = 200.dp
+        val layoutHeight = 400.dp
+        var animatedFloat = 0f
+        val state =
+            setupOverscrollScenario(
+                layoutWidth = layoutWidth,
+                layoutHeight = layoutHeight,
+                sceneTransitions = {
+                    // Overscroll progress will be linear (by default)
+                    defaultOverscrollProgressConverter = ProgressConverter.linear()
+
+                    overscroll(SceneB, Orientation.Vertical) {
+                        // This override the defaultOverscrollProgressConverter
+                        // Overscroll progress will be halved
+                        progressConverter = ProgressConverter { it / 2f }
+                        // On overscroll 100% -> Foo should translate by layoutHeight
+                        translate(TestElements.Foo, y = { absoluteDistance })
+                    }
+                },
+                firstScroll = 1f, // 100% scroll
+                animatedFloatRange = 0f..100f,
+                onAnimatedFloat = { animatedFloat = it },
+            )
+
+        val fooElement = rule.onNodeWithTag(TestElements.Foo.testTag)
+        fooElement.assertTopPositionInRootIsEqualTo(0.dp)
+        assertThat(animatedFloat).isEqualTo(100f)
+
+        rule.onRoot().performTouchInput {
+            // Scroll another 100%
+            moveBy(Offset(0f, layoutHeight.toPx()), delayMillis = 1_000)
+        }
+
+        val transition = assertThat(state.transitionState).isSceneTransition()
+        assertThat(animatedFloat).isEqualTo(100f)
+
+        // Scroll 200% (100% scroll + 100% overscroll)
+        assertThat(transition).hasProgress(2f)
+        assertThat(transition).hasOverscrollSpec()
+
+        // Overscroll progress is halved, we are at 50% of the overscroll progress.
+        fooElement.assertTopPositionInRootIsEqualTo(layoutHeight * 0.5f)
+        assertThat(animatedFloat).isEqualTo(100f)
+    }
+
+    @Test
     fun elementTransitionWithDistanceDuringOverscrollWithProgressConverter() {
         val layoutWidth = 200.dp
         val layoutHeight = 400.dp
@@ -972,7 +1066,7 @@ class ElementTest {
                 sceneTransitions = {
                     overscroll(SceneB, Orientation.Vertical) {
                         // Overscroll progress will be halved
-                        progressConverter = { it / 2f }
+                        progressConverter = ProgressConverter { it / 2f }
 
                         // On overscroll 100% -> Foo should translate by layoutHeight
                         translate(TestElements.Foo, y = { absoluteDistance })
@@ -992,7 +1086,7 @@ class ElementTest {
             moveBy(Offset(0f, layoutHeight.toPx()), delayMillis = 1_000)
         }
 
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(animatedFloat).isEqualTo(100f)
 
         // Scroll 200% (100% scroll + 100% overscroll)
@@ -1034,6 +1128,7 @@ class ElementTest {
                         )
 
                     overscroll(SceneB, Orientation.Vertical) {
+                        progressConverter = ProgressConverter.linear()
                         // On overscroll 100% -> Foo should translate by layoutHeight
                         translate(TestElements.Foo, y = { absoluteDistance })
                     }
@@ -1052,7 +1147,7 @@ class ElementTest {
             moveBy(Offset(0f, layoutHeight.toPx() * 0.5f), delayMillis = 1_000)
         }
 
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
 
         // Scroll 150% (100% scroll + 50% overscroll)
         assertThat(transition).hasProgress(1.5f)
@@ -1069,7 +1164,7 @@ class ElementTest {
 
         assertThat(transition.progress).isLessThan(1f)
         assertThat(transition).hasOverscrollSpec()
-        assertThat(transition).hasBouncingScene(transition.toScene)
+        assertThat(transition).hasBouncingContent(transition.toContent)
         assertThat(animatedFloat).isEqualTo(100f)
     }
 
@@ -1152,13 +1247,15 @@ class ElementTest {
 
         val transitions = state.currentTransitions
         assertThat(transitions).hasSize(2)
-        assertThat(transitions[0]).hasFromScene(SceneA)
-        assertThat(transitions[0]).hasToScene(SceneB)
-        assertThat(transitions[0]).hasProgress(0f)
+        val firstTransition = assertThat(transitions[0]).isSceneTransition()
+        assertThat(firstTransition).hasFromScene(SceneA)
+        assertThat(firstTransition).hasToScene(SceneB)
+        assertThat(firstTransition).hasProgress(0f)
 
-        assertThat(transitions[1]).hasFromScene(SceneB)
-        assertThat(transitions[1]).hasToScene(SceneC)
-        assertThat(transitions[1]).hasProgress(0f)
+        val secondTransition = assertThat(transitions[1]).isSceneTransition()
+        assertThat(secondTransition).hasFromScene(SceneB)
+        assertThat(secondTransition).hasToScene(SceneC)
+        assertThat(secondTransition).hasProgress(0f)
 
         // First frame: both are at x = 0dp. For the whole transition, Foo is at y = 0dp and Bar is
         // at y = layoutSize - elementSoze = 100dp.
@@ -1768,6 +1865,7 @@ class ElementTest {
                     SceneA,
                     transitions {
                         overscroll(SceneB, Orientation.Vertical) {
+                            progressConverter = ProgressConverter.linear()
                             translate(TestElements.Foo, y = 15.dp)
                         }
                     }

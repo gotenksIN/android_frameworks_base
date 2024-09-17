@@ -20,6 +20,9 @@ import com.android.internal.protolog.common.IProtoLog;
 import com.android.internal.protolog.common.IProtoLogGroup;
 import com.android.internal.protolog.common.LogLevel;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
 /**
  * ProtoLog API - exposes static logging methods. Usage of this API is similar
  * to {@code android.utils.Log} class. Instead of plain text log messages each call consists of
@@ -49,6 +52,8 @@ public class ProtoLog {
 
     private static IProtoLog sProtoLogInstance;
 
+    private static final Object sInitLock = new Object();
+
     /**
      * Initialize ProtoLog in this process.
      * <p>
@@ -58,11 +63,22 @@ public class ProtoLog {
      * @param groups The ProtoLog groups that will be used in the process.
      */
     public static void init(IProtoLogGroup... groups) {
+        // These tracing instances are only used when we cannot or do not preprocess the source
+        // files to extract out the log strings. Otherwise, the trace calls are replaced with calls
+        // directly to the generated tracing implementations.
         if (android.tracing.Flags.perfettoProtologTracing()) {
-            sProtoLogInstance = new PerfettoProtoLogImpl(groups);
+            synchronized (sInitLock) {
+                if (sProtoLogInstance != null) {
+                    // The ProtoLog instance has already been initialized in this process
+                    final var alreadyRegisteredGroups = sProtoLogInstance.getRegisteredGroups();
+                    final var allGroups = new ArrayList<>(alreadyRegisteredGroups);
+                    allGroups.addAll(Arrays.stream(groups).toList());
+                    groups = allGroups.toArray(new IProtoLogGroup[0]);
+                }
+
+                sProtoLogInstance = new PerfettoProtoLogImpl(groups);
+            }
         } else {
-            // The first call to ProtoLog is likely to flip REQUIRE_PROTOLOGTOOL, which is when this
-            // static block will be executed before REQUIRE_PROTOLOGTOOL is actually set.
             sProtoLogInstance = new LogcatOnlyProtoLogImpl();
         }
     }

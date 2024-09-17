@@ -1464,7 +1464,7 @@ public class AudioDeviceInventory {
     private int setDevicesRoleForCapturePreset(int capturePreset, int role,
                                                @NonNull List<AudioDeviceAttributes> devices) {
         return setDevicesRole(mAppliedPresetRoles, (p, r, d) -> {
-            return mAudioSystem.addDevicesRoleForCapturePreset(p, r, d);
+            return mAudioSystem.setDevicesRoleForCapturePreset(p, r, d);
         }, (p, r, d) -> {
                 return mAudioSystem.clearDevicesRoleForCapturePreset(p, r);
             }, capturePreset, role, devices);

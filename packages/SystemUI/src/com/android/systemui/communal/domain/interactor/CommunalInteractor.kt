@@ -140,6 +140,10 @@ constructor(
      */
     val editActivityShowing: StateFlow<Boolean> = _editActivityShowing.asStateFlow()
 
+    private val _selectedKey: MutableStateFlow<String?> = MutableStateFlow(null)
+
+    val selectedKey: StateFlow<String?> = _selectedKey.asStateFlow()
+
     /** Whether communal features are enabled. */
     val isCommunalEnabled: StateFlow<Boolean> = communalSettingsInteractor.isCommunalEnabled
 
@@ -177,6 +181,10 @@ constructor(
             delay(DISCLAIMER_RESET_MILLIS)
             _isDisclaimerDismissed.value = false
         }
+    }
+
+    fun setSelectedKey(key: String?) {
+        _selectedKey.value = key
     }
 
     /** Whether to show communal when exiting the occluded state. */
@@ -345,11 +353,10 @@ constructor(
 
     /** Show the widget editor Activity. */
     fun showWidgetEditor(
-        preselectedKey: String? = null,
         shouldOpenWidgetPickerOnStart: Boolean = false,
     ) {
         communalSceneInteractor.setEditModeState(EditModeState.STARTING)
-        editWidgetsActivityStarter.startActivity(preselectedKey, shouldOpenWidgetPickerOnStart)
+        editWidgetsActivityStarter.startActivity(shouldOpenWidgetPickerOnStart)
     }
 
     /**
@@ -367,13 +374,16 @@ constructor(
     /** Dismiss the CTA tile from the hub in view mode. */
     suspend fun dismissCtaTile() = communalPrefsInteractor.setCtaDismissed()
 
-    /** Add a widget at the specified position. */
+    /**
+     * Add a widget at the specified rank. If rank is not provided, the widget will be added at the
+     * end.
+     */
     fun addWidget(
         componentName: ComponentName,
         user: UserHandle,
-        priority: Int,
+        rank: Int? = null,
         configurator: WidgetConfigurator?,
-    ) = widgetRepository.addWidget(componentName, user, priority, configurator)
+    ) = widgetRepository.addWidget(componentName, user, rank, configurator)
 
     /**
      * Delete a widget by id. Called when user deletes a widget from the hub or a widget is
@@ -384,10 +394,10 @@ constructor(
     /**
      * Reorder the widgets.
      *
-     * @param widgetIdToPriorityMap mapping of the widget ids to their new priorities.
+     * @param widgetIdToRankMap mapping of the widget ids to their new priorities.
      */
-    fun updateWidgetOrder(widgetIdToPriorityMap: Map<Int, Int>) =
-        widgetRepository.updateWidgetOrder(widgetIdToPriorityMap)
+    fun updateWidgetOrder(widgetIdToRankMap: Map<Int, Int>) =
+        widgetRepository.updateWidgetOrder(widgetIdToRankMap)
 
     /** Request to unpause work profile that is currently in quiet mode. */
     fun unpauseWorkProfile() {
@@ -440,7 +450,7 @@ constructor(
                     is CommunalWidgetContentModel.Available -> {
                         WidgetContent.Widget(
                             appWidgetId = widget.appWidgetId,
-                            priority = widget.priority,
+                            rank = widget.rank,
                             providerInfo = widget.providerInfo,
                             appWidgetHost = appWidgetHost,
                             inQuietMode = isQuietModeEnabled(widget.providerInfo.profile)
@@ -449,7 +459,7 @@ constructor(
                     is CommunalWidgetContentModel.Pending -> {
                         WidgetContent.PendingWidget(
                             appWidgetId = widget.appWidgetId,
-                            priority = widget.priority,
+                            rank = widget.rank,
                             componentName = widget.componentName,
                             icon = widget.icon,
                         )

@@ -2186,6 +2186,80 @@ public class ZenModeHelperTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags({FLAG_MODES_API, FLAG_MODES_UI})
+    public void testReadXml_upgradeToModesUi_resetsImplicitRuleIcon() throws Exception {
+        setupZenConfig();
+        mZenModeHelper.mConfig.automaticRules.clear();
+
+        ZenRule implicitRuleWithModesUi = expectedImplicitRule("pkg",
+                ZEN_MODE_IMPORTANT_INTERRUPTIONS, POLICY, null);
+
+        // Add one implicit rule in the pre-MODES_UI configuration.
+        ZenRule implicitRuleBeforeModesUi = implicitRuleWithModesUi.copy();
+        implicitRuleBeforeModesUi.iconResName = "pkg_icon";
+        mZenModeHelper.mConfig.automaticRules.put(implicitRuleBeforeModesUi.id,
+                implicitRuleBeforeModesUi);
+        // Plus one other normal rule.
+        ZenRule anotherRule = newZenRule("other_pkg", Instant.now(), null);
+        anotherRule.id = "other_rule";
+        anotherRule.iconResName = "other_icon";
+        anotherRule.type = TYPE_IMMERSIVE;
+        mZenModeHelper.mConfig.automaticRules.put(anotherRule.id, anotherRule);
+
+        // Write with pre-modes-ui = (modes_api) version, then re-read.
+        ByteArrayOutputStream baos = writeXmlAndPurge(ZenModeConfig.XML_VERSION_MODES_API);
+        TypedXmlPullParser parser = Xml.newFastPullParser();
+        parser.setInput(new BufferedInputStream(
+                new ByteArrayInputStream(baos.toByteArray())), null);
+        parser.nextTag();
+        mZenModeHelper.readXml(parser, false, UserHandle.USER_ALL);
+
+        // Implicit rule was updated.
+        assertThat(mZenModeHelper.mConfig.automaticRules.get(implicitRuleBeforeModesUi.id))
+                .isEqualTo(implicitRuleWithModesUi);
+
+        // The other rule was untouched.
+        assertThat(mZenModeHelper.mConfig.automaticRules.get(anotherRule.id))
+                .isEqualTo(anotherRule);
+    }
+
+    @Test
+    @EnableFlags({FLAG_MODES_API, FLAG_MODES_UI})
+    public void testReadXml_onModesUi_implicitRulesUntouched() throws Exception {
+        setupZenConfig();
+        mZenModeHelper.mConfig.automaticRules.clear();
+
+        // Add one implicit rule already in its post-modes-UI configuration, also customized with
+        // an icon;
+        ZenRule implicitRuleWithModesUi = expectedImplicitRule("pkg",
+                ZEN_MODE_IMPORTANT_INTERRUPTIONS, POLICY, null);
+        implicitRuleWithModesUi.iconResName = "icon_chosen_by_user";
+        mZenModeHelper.mConfig.automaticRules.put(implicitRuleWithModesUi.id,
+                implicitRuleWithModesUi);
+
+        // Plus one other normal rule.
+        ZenRule anotherRule = newZenRule("other_pkg", Instant.now(), null);
+        anotherRule.id = "other_rule";
+        anotherRule.iconResName = "other_icon";
+        anotherRule.type = TYPE_IMMERSIVE;
+        mZenModeHelper.mConfig.automaticRules.put(anotherRule.id, anotherRule);
+
+        // Write with modes_ui version, then re-read.
+        ByteArrayOutputStream baos = writeXmlAndPurge(ZenModeConfig.XML_VERSION_MODES_UI);
+        TypedXmlPullParser parser = Xml.newFastPullParser();
+        parser.setInput(new BufferedInputStream(
+                new ByteArrayInputStream(baos.toByteArray())), null);
+        parser.nextTag();
+        mZenModeHelper.readXml(parser, false, UserHandle.USER_ALL);
+
+        // Both rules were untouched
+        assertThat(mZenModeHelper.mConfig.automaticRules.get(implicitRuleWithModesUi.id))
+                .isEqualTo(implicitRuleWithModesUi);
+        assertThat(mZenModeHelper.mConfig.automaticRules.get(anotherRule.id))
+                .isEqualTo(anotherRule);
+    }
+
+    @Test
     public void testCountdownConditionSubscription() throws Exception {
         ZenModeConfig config = new ZenModeConfig();
         mZenModeHelper.mConfig = config;
@@ -5538,6 +5612,49 @@ public class ZenModeHelperTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags({FLAG_MODES_API, FLAG_MODES_UI})
+    public void removeAndAddAutomaticZenRule_ifChangingComponent_isAllowedAndDoesNotRestore() {
+        // Start with a rule.
+        mZenModeHelper.mConfig.automaticRules.clear();
+        AutomaticZenRule rule = new AutomaticZenRule.Builder("Test", CONDITION_ID)
+                .setOwner(new ComponentName("first", "owner"))
+                .setInterruptionFilter(INTERRUPTION_FILTER_ALL)
+                .build();
+        String ruleId = mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(), rule,
+                ORIGIN_APP, "add it", CUSTOM_PKG_UID);
+
+        // User customizes it.
+        AutomaticZenRule userUpdate = new AutomaticZenRule.Builder(rule)
+                .setInterruptionFilter(INTERRUPTION_FILTER_PRIORITY)
+                .build();
+        mZenModeHelper.updateAutomaticZenRule(ruleId, userUpdate, ORIGIN_USER_IN_SYSTEMUI,
+                "userUpdate", SYSTEM_UID);
+
+        // App deletes it. It's preserved for a possible restoration.
+        mZenModeHelper.removeAutomaticZenRule(ruleId, ORIGIN_APP, "delete it",
+                CUSTOM_PKG_UID);
+        assertThat(mZenModeHelper.mConfig.automaticRules).hasSize(0);
+        assertThat(mZenModeHelper.mConfig.deletedRules).hasSize(1);
+
+        // App adds it again, but this time with a different owner!
+        AutomaticZenRule readdingWithDifferentOwner = new AutomaticZenRule.Builder(rule)
+                .setOwner(new ComponentName("second", "owner"))
+                .setInterruptionFilter(INTERRUPTION_FILTER_ALARMS)
+                .build();
+        String newRuleId = mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(),
+                readdingWithDifferentOwner, ORIGIN_APP, "add it again", CUSTOM_PKG_UID);
+
+        // Verify that the rule was NOT restored:
+        assertThat(newRuleId).isNotEqualTo(ruleId);
+        AutomaticZenRule finalRule = mZenModeHelper.getAutomaticZenRule(newRuleId);
+        assertThat(finalRule.getInterruptionFilter()).isEqualTo(INTERRUPTION_FILTER_ALARMS);
+        assertThat(finalRule.getOwner()).isEqualTo(new ComponentName("second", "owner"));
+
+        // Also, we discarded the "deleted rule" since we found it but decided not to use it.
+        assertThat(mZenModeHelper.mConfig.deletedRules).hasSize(0);
+    }
+
+    @Test
     @EnableFlags(FLAG_MODES_API)
     public void removeAutomaticZenRule_preservedForRestoringByPackageAndConditionId() {
         mContext.getTestablePermissions().setPermission(Manifest.permission.MANAGE_NOTIFICATIONS,
@@ -6809,7 +6926,9 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         rule.zenPolicy = policy;
         rule.pkg = ownerPkg;
         rule.name = CUSTOM_APP_LABEL;
-        rule.iconResName = ICON_RES_NAME;
+        if (!Flags.modesUi()) {
+            rule.iconResName = ICON_RES_NAME;
+        }
         rule.triggerDescription = mContext.getString(R.string.zen_mode_implicit_trigger_description,
                 CUSTOM_APP_LABEL);
         rule.type = AutomaticZenRule.TYPE_OTHER;

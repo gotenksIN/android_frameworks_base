@@ -478,7 +478,7 @@ class SceneTransitionLayoutStateTest {
                         overscroll(SceneB, Orientation.Vertical) { fade(TestElements.Foo) }
                     }
             )
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(transition).hasNoOverscrollSpec()
 
         // overscroll for SceneA is NOT defined
@@ -495,7 +495,7 @@ class SceneTransitionLayoutStateTest {
         // overscroll for SceneB is defined
         progress.value = 1.1f
         val overscrollSpec = assertThat(transition).hasOverscrollSpec()
-        assertThat(overscrollSpec.scene).isEqualTo(SceneB)
+        assertThat(overscrollSpec.content).isEqualTo(SceneB)
     }
 
     @Test
@@ -510,13 +510,13 @@ class SceneTransitionLayoutStateTest {
                     }
             )
 
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(transition).hasNoOverscrollSpec()
 
         // overscroll for SceneA is defined
         progress.value = -0.1f
         val overscrollSpec = assertThat(transition).hasOverscrollSpec()
-        assertThat(overscrollSpec.scene).isEqualTo(SceneA)
+        assertThat(overscrollSpec.content).isEqualTo(SceneA)
 
         // scroll from SceneA to SceneB
         progress.value = 0.5f
@@ -539,7 +539,7 @@ class SceneTransitionLayoutStateTest {
                 sceneTransitions = transitions {}
             )
 
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(transition).hasNoOverscrollSpec()
 
         // overscroll for SceneA is NOT defined
@@ -642,7 +642,7 @@ class SceneTransitionLayoutStateTest {
 
         // Transition to B.
         state.setTargetScene(SceneB, coroutineScope = this)
-        val transition = assertThat(state.transitionState).isTransition()
+        val transition = assertThat(state.transitionState).isSceneTransition()
         assertThat(transition).hasCurrentScene(SceneB)
 
         // Snap to C.

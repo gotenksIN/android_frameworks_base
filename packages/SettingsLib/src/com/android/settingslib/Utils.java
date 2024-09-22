@@ -534,7 +534,7 @@ public class Utils {
                 || packageName.equals(sServicesSystemSharedLibPackageName)
                 || packageName.equals(sSharedSystemSharedLibPackageName)
                 || packageName.equals(PrintManager.PRINT_SPOOLER_PACKAGE_NAME)
-                || (updateServiceV2() && packageName.equals(getDefaultWebViewPackageName()))
+                || (updateServiceV2() && packageName.equals(getDefaultWebViewPackageName(pm)))
                 || isDeviceProvisioningPackage(resources, packageName);
     }
 
@@ -550,7 +550,7 @@ public class Utils {
 
     /** Fetch the package name of the default WebView provider. */
     @Nullable
-    private static String getDefaultWebViewPackageName() {
+    private static String getDefaultWebViewPackageName(PackageManager pm) {
         if (sDefaultWebViewPackageName != null) {
             return sDefaultWebViewPackageName;
         }
@@ -558,9 +558,10 @@ public class Utils {
         WebViewProviderInfo provider = null;
 
         if (android.webkit.Flags.updateServiceIpcWrapper()) {
-            WebViewUpdateManager manager = WebViewUpdateManager.getInstance();
-            if (manager != null) {
-                provider = manager.getDefaultWebViewPackage();
+            if (pm.hasSystemFeature(PackageManager.FEATURE_WEBVIEW)) {
+                // WebViewUpdateManager.getInstance() will not return null on devices with
+                // FEATURE_WEBVIEW.
+                provider = WebViewUpdateManager.getInstance().getDefaultWebViewPackage();
             }
         } else {
             try {

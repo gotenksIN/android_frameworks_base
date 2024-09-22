@@ -124,7 +124,7 @@
     <string name="screenrecord_ongoing_screen_and_audio" msgid="5351133763125180920">"Inarekodi skrini na sauti"</string>
     <string name="screenrecord_taps_label" msgid="1595690528298857649">"Onyesha sehemu za kugusa kwenye skrini"</string>
     <string name="screenrecord_stop_label" msgid="72699670052087989">"Acha"</string>
-    <string name="screenrecord_share_label" msgid="5025590804030086930">"Shiriki"</string>
+    <string name="screenrecord_share_label" msgid="5025590804030086930">"Tuma"</string>
     <string name="screenrecord_save_title" msgid="1886652605520893850">"Imehifadhi rekodi ya skrini"</string>
     <string name="screenrecord_save_text" msgid="3008973099800840163">"Gusa ili uangalie"</string>
     <string name="screenrecord_save_error" msgid="5862648532560118815">"Hitilafu imetokea wakati wa kuhifadhi rekodi ya skrini"</string>
@@ -300,6 +300,8 @@
     <string name="turn_on_bluetooth" msgid="5681370462180289071">"Tumia Bluetooth"</string>
     <string name="quick_settings_bluetooth_device_connected" msgid="7884777006729260996">"Imeunganishwa"</string>
     <string name="quick_settings_bluetooth_device_audio_sharing" msgid="1496358082943301670">"Kusikiliza Pamoja"</string>
+    <!-- no translation found for quick_settings_bluetooth_device_audio_sharing_or_switch_active (3227408556754456024) -->
+    <skip />
     <string name="quick_settings_bluetooth_device_saved" msgid="7549938728928069477">"Imehifadhiwa"</string>
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_disconnect" msgid="415980329093277342">"ondoa"</string>
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_activate" msgid="3724301751036877403">"anza kutumia"</string>
@@ -308,8 +310,7 @@
     <string name="turn_on_bluetooth_auto_info_enabled" msgid="7440944034584560279">"Bluetooth itawaka kesho asubuhi"</string>
     <string name="quick_settings_bluetooth_audio_sharing_button" msgid="7545274861795853838">"Sikiliza pamoja na wengine"</string>
     <string name="quick_settings_bluetooth_audio_sharing_button_sharing" msgid="3069309588231072128">"Mnasikiliza pamoja"</string>
-    <!-- no translation found for quick_settings_bluetooth_audio_sharing_button_accessibility (7604615019302091708) -->
-    <skip />
+    <string name="quick_settings_bluetooth_audio_sharing_button_accessibility" msgid="7604615019302091708">"uweke mipangilio ya kusikiliza pamoja"</string>
     <string name="quick_settings_bluetooth_secondary_label_battery_level" msgid="4182034939479344093">"Chaji ya betri ni <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%s</xliff:g>"</string>
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"Sauti"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"Vifaa vya sauti"</string>
@@ -436,6 +437,7 @@
     <string name="zen_modes_dialog_done" msgid="6654130880256438950">"Nimemaliza"</string>
     <string name="zen_modes_dialog_settings" msgid="2310248023728936697">"Mipangilio"</string>
     <string name="zen_mode_on" msgid="9085304934016242591">"Imewashwa"</string>
+    <string name="zen_mode_on_with_details" msgid="7416143430557895497">"Imewashwa • <xliff:g id="TRIGGER_DESCRIPTION">%1$s</xliff:g>"</string>
     <string name="zen_mode_off" msgid="1736604456618147306">"Imezimwa"</string>
     <string name="zen_mode_set_up" msgid="7457957033034460064">"Weka mipangilio"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"Dhibiti katika mipangilio"</string>
@@ -718,6 +720,7 @@
     <string name="accessibility_status_bar_satellite_good_connection" msgid="308079391708578704">"Setilaiti, muunganisho thabiti"</string>
     <string name="accessibility_status_bar_satellite_available" msgid="6514855015496916829">"Setilaiti, muunganisho unapatikana"</string>
     <string name="satellite_connected_carrier_text" msgid="118524195198532589">"Msaada kupitia Setilaiti"</string>
+    <string name="satellite_emergency_only_carrier_text" msgid="828510231597991206">"Simu za dharura"</string>
     <string name="accessibility_managed_profile" msgid="4703836746209377356">"Wasifu wa kazini"</string>
     <string name="tuner_warning_title" msgid="7721976098452135267">"Kinafurahisha kwa baadhi ya watu lakini si wote"</string>
     <string name="tuner_warning" msgid="1861736288458481650">"Kirekebishi cha kiolesura cha mfumo kinakupa njia zaidi za kugeuza na kubadilisha kiolesura cha Android ili kikufae. Vipengele hivi vya majaribio vinaweza kubadilika, kuharibika au kupotea katika matoleo ya siku zijazo. Endelea kwa uangalifu."</string>

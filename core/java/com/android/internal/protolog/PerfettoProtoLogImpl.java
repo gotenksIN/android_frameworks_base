@@ -16,7 +16,7 @@
 
 package com.android.internal.protolog;
 
-import static android.content.Context.PROTOLOG_SERVICE;
+import static android.content.Context.PROTOLOG_CONFIGURATION_SERVICE;
 import static android.internal.perfetto.protos.InternedDataOuterClass.InternedData.PROTOLOG_STACKTRACE;
 import static android.internal.perfetto.protos.InternedDataOuterClass.InternedData.PROTOLOG_STRING_ARGS;
 import static android.internal.perfetto.protos.ProfileCommon.InternedString.IID;
@@ -114,7 +114,7 @@ public class PerfettoProtoLogImpl extends IProtoLogClient.Stub implements IProto
     private final Runnable mCacheUpdater;
 
     @Nullable // null when the flag android.tracing.client_side_proto_logging is not flipped
-    private final IProtoLogService mProtoLogService;
+    private final IProtoLogConfigurationService mProtoLogConfigurationService;
 
     @NonNull
     private final int[] mDefaultLogLevelCounts = new int[LogLevel.values().length];
@@ -186,30 +186,32 @@ public class PerfettoProtoLogImpl extends IProtoLogClient.Stub implements IProto
         registerGroupsLocally(groups);
 
         if (android.tracing.Flags.clientSideProtoLogging()) {
-            mProtoLogService =
-                    IProtoLogService.Stub.asInterface(ServiceManager.getService(PROTOLOG_SERVICE));
-            Objects.requireNonNull(mProtoLogService,
-                    "ServiceManager returned a null ProtoLog service");
+            mProtoLogConfigurationService =
+                    IProtoLogConfigurationService.Stub.asInterface(ServiceManager.getService(
+                            PROTOLOG_CONFIGURATION_SERVICE));
+            Objects.requireNonNull(mProtoLogConfigurationService,
+                    "ServiceManager returned a null ProtoLog Configuration Service");
 
             try {
-                var args = new ProtoLogService.RegisterClientArgs();
+                var args = new ProtoLogConfigurationService.RegisterClientArgs();
 
                 if (viewerConfigFilePath != null) {
                     args.setViewerConfigFile(viewerConfigFilePath);
                 }
 
                 final var groupArgs = Stream.of(groups)
-                        .map(group -> new ProtoLogService.RegisterClientArgs.GroupConfig(
-                                group.name(), group.isLogToLogcat()))
-                        .toArray(ProtoLogService.RegisterClientArgs.GroupConfig[]::new);
+                        .map(group -> new ProtoLogConfigurationService.RegisterClientArgs
+                                .GroupConfig(group.name(), group.isLogToLogcat()))
+                        .toArray(
+                                ProtoLogConfigurationService.RegisterClientArgs.GroupConfig[]::new);
                 args.setGroups(groupArgs);
 
-                mProtoLogService.registerClient(this, args);
+                mProtoLogConfigurationService.registerClient(this, args);
             } catch (RemoteException e) {
                 throw new RuntimeException("Failed to register ProtoLog client");
             }
         } else {
-            mProtoLogService = null;
+            mProtoLogConfigurationService = null;
         }
     }
 
@@ -928,37 +930,47 @@ public class PerfettoProtoLogImpl extends IProtoLogClient.Stub implements IProto
     }
 
     private static class Message {
+        @Nullable
         private final Long mMessageHash;
+        @Nullable
         private final Integer mMessageMask;
+        @Nullable
         private final String mMessageString;
 
-        private Message(Long messageHash, int messageMask) {
+        private Message(long messageHash, int messageMask) {
             this.mMessageHash = messageHash;
             this.mMessageMask = messageMask;
             this.mMessageString = null;
         }
 
-        private Message(String messageString) {
+        private Message(@NonNull String messageString) {
             this.mMessageHash = null;
             final List<Integer> argTypes = LogDataType.parseFormatString(messageString);
             this.mMessageMask = LogDataType.logDataTypesToBitMask(argTypes);
             this.mMessageString = messageString;
         }
 
-        private int getMessageMask() {
+        @Nullable
+        private Integer getMessageMask() {
             return mMessageMask;
         }
 
+        @Nullable
         private String getMessage() {
             return mMessageString;
         }
 
+        @Nullable
         private String getMessage(@NonNull ProtoLogViewerConfigReader viewerConfigReader) {
             if (mMessageString != null) {
                 return mMessageString;
             }
 
-            return viewerConfigReader.getViewerString(mMessageHash);
+            if (mMessageHash != null) {
+                return viewerConfigReader.getViewerString(mMessageHash);
+            }
+
+            throw new RuntimeException("Both mMessageString and mMessageHash should never be null");
         }
     }
 }

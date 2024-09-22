@@ -1974,7 +1974,7 @@ public final class Settings {
     /**
      * Activity Action: Show Notification Policy access settings.
      * <p>
-     * Users can grant and deny access to Notification Policy (DND / Priority Modes) configuration
+     * Users can grant and deny access to Notification Policy (DND / Modes) configuration
      * from here. Managed profiles cannot grant Notification Policy access.
      * See {@link android.app.NotificationManager#isNotificationPolicyAccessGranted()} for more
      * details.
@@ -19697,6 +19697,8 @@ public final class Settings {
             public static final int PAIRED_DEVICE_OS_TYPE_ANDROID = 1;
             /** @hide */
             public static final int PAIRED_DEVICE_OS_TYPE_IOS = 2;
+            /** @hide */
+            public static final int PAIRED_DEVICE_OS_TYPE_NONE = 3;
 
             /**
              * The bluetooth settings selected BLE role for the companion.

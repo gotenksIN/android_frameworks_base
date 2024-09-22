@@ -31,9 +31,6 @@ import kotlinx.coroutines.flow.flowOf
  *    layout or Compose drawing phases.
  * 2. [ObservableTransitionState] values are backed by Kotlin [Flow]s and can be collected by
  *    non-Compose code to observe value changes.
- * 3. [ObservableTransitionState.Transition.fromScene] and
- *    [ObservableTransitionState.Transition.toScene] will never be equal, while
- *    [TransitionState.Transition.fromScene] and [TransitionState.Transition.toScene] can be equal.
  */
 sealed interface ObservableTransitionState {
     /**
@@ -43,7 +40,7 @@ sealed interface ObservableTransitionState {
     fun currentScene(): Flow<SceneKey> {
         return when (this) {
             is Idle -> flowOf(currentScene)
-            is Transition.ChangeCurrentScene -> currentScene
+            is Transition.ChangeScene -> currentScene
             is Transition.ShowOrHideOverlay -> flowOf(currentScene)
             is Transition.ReplaceOverlay -> flowOf(currentScene)
         }
@@ -54,9 +51,8 @@ sealed interface ObservableTransitionState {
 
     /** There is a transition animating between two scenes. */
     sealed class Transition(
-        // TODO(b/353679003): Rename these to fromContent and toContent.
-        open val fromScene: ContentKey,
-        open val toScene: ContentKey,
+        val fromContent: ContentKey,
+        val toContent: ContentKey,
         val currentOverlays: Flow<Set<OverlayKey>>,
         val progress: Flow<Float>,
 
@@ -86,17 +82,17 @@ sealed interface ObservableTransitionState {
     ) : ObservableTransitionState {
         override fun toString(): String =
             """Transition
-                |(from=$fromScene,
-                | to=$toScene,
+                |(from=$fromContent,
+                | to=$toContent,
                 | isInitiatedByUserInput=$isInitiatedByUserInput,
                 | isUserInputOngoing=$isUserInputOngoing
                 |)"""
                 .trimMargin()
 
         /** A transition animating between [fromScene] and [toScene]. */
-        class ChangeCurrentScene(
-            override val fromScene: SceneKey,
-            override val toScene: SceneKey,
+        class ChangeScene(
+            val fromScene: SceneKey,
+            val toScene: SceneKey,
             val currentScene: Flow<SceneKey>,
             currentOverlays: Flow<Set<OverlayKey>>,
             progress: Flow<Float>,
@@ -174,8 +170,8 @@ sealed interface ObservableTransitionState {
                 previewProgress: Flow<Float> = flowOf(0f),
                 isInPreviewStage: Flow<Boolean> = flowOf(false),
                 currentOverlays: Flow<Set<OverlayKey>> = flowOf(emptySet()),
-            ): ChangeCurrentScene {
-                return ChangeCurrentScene(
+            ): ChangeScene {
+                return ChangeScene(
                     fromScene,
                     toScene,
                     currentScene,
@@ -190,14 +186,14 @@ sealed interface ObservableTransitionState {
         }
     }
 
-    fun isIdle(scene: SceneKey?): Boolean {
+    fun isIdle(scene: SceneKey? = null): Boolean {
         return this is Idle && (scene == null || this.currentScene == scene)
     }
 
     fun isTransitioning(from: ContentKey? = null, to: ContentKey? = null): Boolean {
         return this is Transition &&
-            (from == null || this.fromScene == from) &&
-            (to == null || this.toScene == to)
+            (from == null || this.fromContent == from) &&
+            (to == null || this.toContent == to)
     }
 }
 
@@ -210,8 +206,8 @@ fun SceneTransitionLayoutState.observableTransitionState(): Flow<ObservableTrans
     return snapshotFlow {
             when (val state = transitionState) {
                 is TransitionState.Idle -> ObservableTransitionState.Idle(state.currentScene)
-                is TransitionState.Transition.ChangeCurrentScene -> {
-                    ObservableTransitionState.Transition.ChangeCurrentScene(
+                is TransitionState.Transition.ChangeScene -> {
+                    ObservableTransitionState.Transition.ChangeScene(
                         fromScene = state.fromScene,
                         toScene = state.toScene,
                         currentScene = snapshotFlow { state.currentScene },

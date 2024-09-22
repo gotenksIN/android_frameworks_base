@@ -578,7 +578,8 @@ public class DisplayModeDirector {
      * @param pw The stream to dump information to.
      */
     public void dump(PrintWriter pw) {
-        pw.println("DisplayModeDirector");
+        pw.println("DisplayModeDirector:");
+        pw.println("--------------------");
         synchronized (mLock) {
             pw.println("  mSupportedModesByDisplay:");
             for (int i = 0; i < mSupportedModesByDisplay.size(); i++) {
@@ -1500,10 +1501,18 @@ public class DisplayModeDirector {
         }
 
         private void updateLayoutLimitedFrameRate(int displayId, @Nullable DisplayInfo info) {
-            Vote vote = info != null && info.layoutLimitedRefreshRate != null
-                    ? Vote.forPhysicalRefreshRates(info.layoutLimitedRefreshRate.min,
-                    info.layoutLimitedRefreshRate.max) : null;
-            mVotesStorage.updateVote(displayId, Vote.PRIORITY_LAYOUT_LIMITED_FRAME_RATE, vote);
+            Vote refreshRateVote = null;
+            Vote frameRateVote = null;
+            if (info != null && info.layoutLimitedRefreshRate != null) {
+                refreshRateVote = Vote.forPhysicalRefreshRates(info.layoutLimitedRefreshRate.min,
+                        info.layoutLimitedRefreshRate.max);
+                frameRateVote = Vote.forRenderFrameRates(info.layoutLimitedRefreshRate.min,
+                        info.layoutLimitedRefreshRate.max);
+            }
+            mVotesStorage.updateVote(
+                    displayId, Vote.PRIORITY_LAYOUT_LIMITED_REFRESH_RATE, refreshRateVote);
+            mVotesStorage.updateVote(
+                    displayId, Vote.PRIORITY_LAYOUT_LIMITED_FRAME_RATE, frameRateVote);
         }
 
         private void removeUserSettingDisplayPreferredSize(int displayId) {

@@ -300,6 +300,8 @@
     <string name="turn_on_bluetooth" msgid="5681370462180289071">"„Bluetooth“ naudojimas"</string>
     <string name="quick_settings_bluetooth_device_connected" msgid="7884777006729260996">"Prisijungta"</string>
     <string name="quick_settings_bluetooth_device_audio_sharing" msgid="1496358082943301670">"Garso įrašų bendrinimas"</string>
+    <!-- no translation found for quick_settings_bluetooth_device_audio_sharing_or_switch_active (3227408556754456024) -->
+    <skip />
     <string name="quick_settings_bluetooth_device_saved" msgid="7549938728928069477">"Išsaugota"</string>
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_disconnect" msgid="415980329093277342">"atjungti"</string>
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_activate" msgid="3724301751036877403">"suaktyvinti"</string>
@@ -308,8 +310,7 @@
     <string name="turn_on_bluetooth_auto_info_enabled" msgid="7440944034584560279">"„Bluetooth“ ryšys bus įjungtas rytoj ryte"</string>
     <string name="quick_settings_bluetooth_audio_sharing_button" msgid="7545274861795853838">"Bendrinti garsą"</string>
     <string name="quick_settings_bluetooth_audio_sharing_button_sharing" msgid="3069309588231072128">"Bendrinamas garsas"</string>
-    <!-- no translation found for quick_settings_bluetooth_audio_sharing_button_accessibility (7604615019302091708) -->
-    <skip />
+    <string name="quick_settings_bluetooth_audio_sharing_button_accessibility" msgid="7604615019302091708">"įvesti garso įrašų bendrinimo nustatymus"</string>
     <string name="quick_settings_bluetooth_secondary_label_battery_level" msgid="4182034939479344093">"Akumuliatorius: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%s</xliff:g>"</string>
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"Garsas"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"Virtualiosios realybės įrenginys"</string>
@@ -436,6 +437,7 @@
     <string name="zen_modes_dialog_done" msgid="6654130880256438950">"Atlikta"</string>
     <string name="zen_modes_dialog_settings" msgid="2310248023728936697">"Nustatymai"</string>
     <string name="zen_mode_on" msgid="9085304934016242591">"Įjungta"</string>
+    <string name="zen_mode_on_with_details" msgid="7416143430557895497">"Įjungta • <xliff:g id="TRIGGER_DESCRIPTION">%1$s</xliff:g>"</string>
     <string name="zen_mode_off" msgid="1736604456618147306">"Išjungta"</string>
     <string name="zen_mode_set_up" msgid="7457957033034460064">"Nustatyti"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"Tvarkyti skiltyje „Nustatymai“"</string>
@@ -718,6 +720,7 @@
     <string name="accessibility_status_bar_satellite_good_connection" msgid="308079391708578704">"Palydovas, geras ryšys"</string>
     <string name="accessibility_status_bar_satellite_available" msgid="6514855015496916829">"Palydovas, pasiekiamas ryšys"</string>
     <string name="satellite_connected_carrier_text" msgid="118524195198532589">"Prisijungimas prie palydovo kritiniu atveju"</string>
+    <string name="satellite_emergency_only_carrier_text" msgid="828510231597991206">"Skambučiai pagalbos numeriu arba pagalbos iškvietimas kritiniu atveju"</string>
     <string name="accessibility_managed_profile" msgid="4703836746209377356">"Darbo profilis"</string>
     <string name="tuner_warning_title" msgid="7721976098452135267">"Smagu, bet ne visada"</string>
     <string name="tuner_warning" msgid="1861736288458481650">"Sistemos naudotojo sąsajos derinimo priemonė suteikia papildomų galimybių pagerinti ir tinkinti „Android“ naudotojo sąsają. Šios eksperimentinės funkcijos gali pasikeisti, nutrūkti ar išnykti iš būsimų laidų. Tęskite atsargiai."</string>

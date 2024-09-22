@@ -110,7 +110,7 @@
     <string name="screenrecord_permission_dialog_title" msgid="7415261783188749730">"Vols gravar la pantalla?"</string>
     <string name="screenrecord_permission_dialog_option_text_single_app" msgid="1996450687814647583">"Grava una aplicació"</string>
     <string name="screenrecord_permission_dialog_option_text_entire_screen" msgid="2794896384693120020">"Grava tota la pantalla"</string>
-    <string name="screenrecord_permission_dialog_warning_entire_screen" msgid="1321758636709366068">"Quan graves tota la pantalla, es grava tot el que es mostra en pantalla. Per aquest motiu, ves amb compte amb les contrasenyes, les dades de pagament, els missatges, les fotos, i l\'àudio i el vídeo."</string>
+    <string name="screenrecord_permission_dialog_warning_entire_screen" msgid="1321758636709366068">"Quan graves tota la pantalla, es grava tot el que es mostra en pantalla. Per aquest motiu, ves amb compte amb elements com les contrasenyes, les dades de pagament, els missatges, les fotos, i l\'àudio i el vídeo."</string>
     <string name="screenrecord_permission_dialog_warning_single_app" msgid="3738199712880063924">"Quan graves una aplicació, es grava tot el que es mostra o es reprodueix en aquesta aplicació. Per aquest motiu, ves amb compte amb les contrasenyes, les dades de pagament, els missatges, les fotos, i l\'àudio i el vídeo."</string>
     <string name="screenrecord_permission_dialog_continue_entire_screen" msgid="5557974446773486600">"Grava la pantalla"</string>
     <string name="screenrecord_app_selector_title" msgid="3854492366333954736">"Tria una aplicació per gravar"</string>
@@ -300,6 +300,8 @@
     <string name="turn_on_bluetooth" msgid="5681370462180289071">"Utilitza el Bluetooth"</string>
     <string name="quick_settings_bluetooth_device_connected" msgid="7884777006729260996">"Connectat"</string>
     <string name="quick_settings_bluetooth_device_audio_sharing" msgid="1496358082943301670">"Compartició d\'àudio"</string>
+    <!-- no translation found for quick_settings_bluetooth_device_audio_sharing_or_switch_active (3227408556754456024) -->
+    <skip />
     <string name="quick_settings_bluetooth_device_saved" msgid="7549938728928069477">"Desat"</string>
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_disconnect" msgid="415980329093277342">"desconnecta"</string>
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_activate" msgid="3724301751036877403">"activa"</string>
@@ -308,8 +310,7 @@
     <string name="turn_on_bluetooth_auto_info_enabled" msgid="7440944034584560279">"El Bluetooth s\'activarà demà al matí"</string>
     <string name="quick_settings_bluetooth_audio_sharing_button" msgid="7545274861795853838">"Comparteix l\'àudio"</string>
     <string name="quick_settings_bluetooth_audio_sharing_button_sharing" msgid="3069309588231072128">"S\'està compartint l\'àudio"</string>
-    <!-- no translation found for quick_settings_bluetooth_audio_sharing_button_accessibility (7604615019302091708) -->
-    <skip />
+    <string name="quick_settings_bluetooth_audio_sharing_button_accessibility" msgid="7604615019302091708">"introduir la configuració de compartició d\'àudio"</string>
     <string name="quick_settings_bluetooth_secondary_label_battery_level" msgid="4182034939479344093">"<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%s</xliff:g> de bateria"</string>
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"Àudio"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"Auriculars"</string>
@@ -436,6 +437,7 @@
     <string name="zen_modes_dialog_done" msgid="6654130880256438950">"Fet"</string>
     <string name="zen_modes_dialog_settings" msgid="2310248023728936697">"Configuració"</string>
     <string name="zen_mode_on" msgid="9085304934016242591">"Activat"</string>
+    <string name="zen_mode_on_with_details" msgid="7416143430557895497">"Activat • <xliff:g id="TRIGGER_DESCRIPTION">%1$s</xliff:g>"</string>
     <string name="zen_mode_off" msgid="1736604456618147306">"Desactivat"</string>
     <string name="zen_mode_set_up" msgid="7457957033034460064">"Configura"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"Gestiona a la configuració"</string>
@@ -506,7 +508,7 @@
     <string name="accessibility_action_label_remove_widget" msgid="3373779447448758070">"suprimeix el widget"</string>
     <string name="accessibility_action_label_place_widget" msgid="1914197458644168978">"col·loca el widget seleccionat"</string>
     <string name="communal_widget_picker_title" msgid="1953369090475731663">"Widgets de la pantalla de bloqueig"</string>
-    <string name="communal_widget_picker_description" msgid="490515450110487871">"Tothom pot veure widgets a la pantalla de bloqueig, fins i tot amb la tauleta bloquejada."</string>
+    <string name="communal_widget_picker_description" msgid="490515450110487871">"Tothom pot veure els widgets de la teva pantalla de bloqueig, fins i tot quan la tauleta està bloquejada."</string>
     <string name="accessibility_action_label_unselect_widget" msgid="1041811747619468698">"desselecciona el widget"</string>
     <string name="communal_widgets_disclaimer_title" msgid="1150954395585308868">"Widgets de la pantalla de bloqueig"</string>
     <string name="communal_widgets_disclaimer_text" msgid="1423545475160506349">"Per obrir una aplicació utilitzant un widget, necessitaràs verificar la teva identitat. També has de tenir en compte que qualsevol persona pot veure els widgets, fins i tot quan la tauleta està bloquejada. És possible que alguns widgets no estiguin pensats per a la pantalla de bloqueig i que no sigui segur afegir-los-hi."</string>
@@ -718,6 +720,7 @@
     <string name="accessibility_status_bar_satellite_good_connection" msgid="308079391708578704">"Satèl·lit, bona connexió"</string>
     <string name="accessibility_status_bar_satellite_available" msgid="6514855015496916829">"Satèl·lit, connexió disponible"</string>
     <string name="satellite_connected_carrier_text" msgid="118524195198532589">"SOS per satèl·lit"</string>
+    <string name="satellite_emergency_only_carrier_text" msgid="828510231597991206">"Trucades d\'emergència o SOS"</string>
     <string name="accessibility_managed_profile" msgid="4703836746209377356">"Perfil de treball"</string>
     <string name="tuner_warning_title" msgid="7721976098452135267">"Diversió per a uns quants, però no per a tothom"</string>
     <string name="tuner_warning" msgid="1861736288458481650">"El Personalitzador d\'interfície d\'usuari presenta opcions addicionals per canviar i personalitzar la interfície d\'usuari d\'Android. És possible que aquestes funcions experimentals canviïn, deixin de funcionar o desapareguin en versions futures. Continua amb precaució."</string>

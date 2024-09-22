@@ -356,6 +356,7 @@ import android.window.SplashScreen;
 import android.window.SplashScreenView;
 import android.window.SplashScreenView.SplashScreenViewParcelable;
 import android.window.TaskSnapshot;
+import android.window.TransitionInfo;
 import android.window.TransitionInfo.AnimationOptions;
 import android.window.WindowContainerToken;
 import android.window.WindowOnBackInvokedDispatcher;
@@ -828,6 +829,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     /** The last set {@link DropInputMode} for this activity surface. */
     @DropInputMode
     private int mLastDropInputMode = DropInputMode.NONE;
+    /** Whether the input to this activity will be dropped during the current playing animation. */
+    private boolean mIsInputDroppedForAnimation;
 
     /**
      * Whether the application has desk mode resources. Calculated and cached when
@@ -1662,6 +1665,15 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
     }
 
+    /** Sets if all input will be dropped as a protection during the client-driven animation. */
+    void setDropInputForAnimation(boolean isInputDroppedForAnimation) {
+        if (mIsInputDroppedForAnimation == isInputDroppedForAnimation) {
+            return;
+        }
+        mIsInputDroppedForAnimation = isInputDroppedForAnimation;
+        updateUntrustedEmbeddingInputProtection();
+    }
+
     /**
      * Sets to drop input when obscured to activity if it is embedded in untrusted mode.
      *
@@ -1674,7 +1686,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (getSurfaceControl() == null) {
             return;
         }
-        if (isEmbeddedInUntrustedMode()) {
+        if (mIsInputDroppedForAnimation) {
+            // Disable all input during the animation.
+            setDropInputMode(DropInputMode.ALL);
+        } else if (isEmbeddedInUntrustedMode()) {
             // Set drop input to OBSCURED when untrusted embedded.
             setDropInputMode(DropInputMode.OBSCURED);
         } else {
@@ -2642,7 +2657,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 || mStartingWindow == null
                 || mTransferringSplashScreenState == TRANSFER_SPLASH_SCREEN_FINISH
                 // skip copy splash screen to client if it was resized
-                || (mStartingData != null && mStartingData.mResizedFromTransfer)) {
+                || (mStartingData != null && mStartingData.mResizedFromTransfer)
+                || isRelaunching()) {
             return false;
         }
         if (isTransferringSplashScreen()) {
@@ -5065,7 +5081,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // controller but don't clear the animation information from the options since they
                 // need to be sent to the animating activity.
                 mTransitionController.setOverrideAnimation(
-                        AnimationOptions.makeSceneTransitionAnimOptions(), null, null);
+                        TransitionInfo.AnimationOptions.makeSceneTransitionAnimOptions(), this,
+                        null, null);
                 return;
             }
             applyOptionsAnimation(mPendingOptions, intent);
@@ -5188,7 +5205,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
 
         if (options != null) {
-            mTransitionController.setOverrideAnimation(options, startCallback, finishCallback);
+            mTransitionController.setOverrideAnimation(options, this, startCallback,
+                    finishCallback);
         }
     }
 
@@ -5923,6 +5941,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     mAtmService.updateBatteryStats(this, false);
                 }
                 mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_DESTROYED);
+                idle = false;
                 // Fall through.
             case DESTROYING:
                 if (app != null && !app.hasActivities()) {
@@ -8310,6 +8329,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      */
     @Override
     protected int getOverrideOrientation() {
+        if (mWmService.mConstants.mIgnoreActivityOrientationRequest) {
+            return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+        }
         return mAppCompatController.getOrientationPolicy()
                 .overrideOrientationIfNeeded(super.getOverrideOrientation());
     }

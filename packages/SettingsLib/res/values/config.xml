@@ -34,4 +34,14 @@
 
     <!-- Control whether to show Wifi standard in Wifi icon -->
     <bool name="config_show_wifi_standard">true</bool>
+
+    <!-- Edit User avatar explicit package name -->
+    <string name="config_avatar_picker_package" translatable="false">
+        com.android.avatarpicker
+    </string>
+
+    <!-- Edit User avatar explicit activity class -->
+    <string name="config_avatar_picker_class" translatable="false">
+        com.android.avatarpicker.ui.AvatarPickerActivity
+    </string>
 </resources>

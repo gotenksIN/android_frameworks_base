@@ -156,7 +156,6 @@ import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinatorLogger;
 import com.android.systemui.statusbar.notification.data.repository.NotificationsKeyguardViewStateRepository;
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor;
-import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor;
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationsKeyguardInteractor;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
@@ -164,7 +163,6 @@ import com.android.systemui.statusbar.notification.stack.NotificationListContain
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCalculator;
-import com.android.systemui.statusbar.notification.stack.data.repository.FakeHeadsUpNotificationRepository;
 import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor;
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.ConfigurationControllerImpl;
@@ -367,13 +365,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected TestScope mTestScope = mKosmos.getTestScope();
     protected ShadeInteractor mShadeInteractor;
     protected PowerInteractor mPowerInteractor;
-    protected FakeHeadsUpNotificationRepository mFakeHeadsUpNotificationRepository =
-            new FakeHeadsUpNotificationRepository();
-    protected NotificationsKeyguardViewStateRepository mNotificationsKeyguardViewStateRepository =
-            new NotificationsKeyguardViewStateRepository();
-    protected NotificationsKeyguardInteractor mNotificationsKeyguardInteractor =
-            new NotificationsKeyguardInteractor(mNotificationsKeyguardViewStateRepository);
-    protected HeadsUpNotificationInteractor mHeadsUpNotificationInteractor;
     protected NotificationPanelViewController.TouchHandler mTouchHandler;
     protected ConfigurationController mConfigurationController;
     protected SysuiStatusBarStateController mStatusBarStateController;
@@ -691,12 +682,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         when(longPressHandlingView.getResources()).thenReturn(longPressHandlingViewRes);
         when(longPressHandlingViewRes.getString(anyInt())).thenReturn("");
 
-
-        mHeadsUpNotificationInteractor =
-                new HeadsUpNotificationInteractor(mFakeHeadsUpNotificationRepository,
-                        mDeviceEntryFaceAuthInteractor, mKeyguardTransitionInteractor,
-                        mNotificationsKeyguardInteractor, mShadeInteractor);
-
         mNotificationPanelViewController = new NotificationPanelViewController(
                 mView,
                 mMainHandler,
@@ -771,7 +756,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mActivityStarter,
                 mSharedNotificationContainerInteractor,
                 mActiveNotificationsInteractor,
-                mHeadsUpNotificationInteractor,
                 mEmergencyButtonControllerFactory,
                 mShadeAnimationInteractor,
                 mKeyguardViewConfigurator,

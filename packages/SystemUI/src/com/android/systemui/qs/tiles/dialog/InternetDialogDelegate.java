@@ -394,6 +394,8 @@ public class InternetDialogDelegate implements
                 mInternetDialogController.isAirplaneModeEnabled() ? View.VISIBLE : View.GONE);
         mWifiRecyclerView.setLayoutManager(new LinearLayoutManager(context));
         mWifiRecyclerView.setAdapter(mAdapter);
+
+        updateDialogUI(getWifiNetworkContent());
     }
 
     @Override
@@ -406,6 +408,7 @@ public class InternetDialogDelegate implements
         }
 
         mLifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
+
         mInternetDialogController.onStart(this, mCanConfigWifi);
         if (!mCanConfigWifi) {
             hideWifiViews();
@@ -499,10 +502,12 @@ public class InternetDialogDelegate implements
         internetContent.mShouldUpdateMobileNetwork = shouldUpdateMobileNetwork;
         internetContent.mInternetDialogTitleString = getDialogTitleText();
         internetContent.mInternetDialogSubTitle = getSubtitleText();
-        internetContent.mActiveNetworkIsCellular =
-                mInternetDialogController.activeNetworkIsCellular();
-        internetContent.mIsCarrierNetworkActive =
-                mInternetDialogController.isCarrierNetworkActive();
+        if (shouldUpdateMobileNetwork) {
+            internetContent.mActiveNetworkIsCellular =
+                    mInternetDialogController.activeNetworkIsCellular();
+            internetContent.mIsCarrierNetworkActive =
+                    mInternetDialogController.isCarrierNetworkActive();
+        }
         internetContent.mIsAirplaneModeEnabled = mInternetDialogController.isAirplaneModeEnabled();
         internetContent.mHasEthernet = mInternetDialogController.hasEthernet();
         internetContent.mIsWifiEnabled = mInternetDialogController.isWifiEnabled();
@@ -510,6 +515,15 @@ public class InternetDialogDelegate implements
         internetContent.mIsMobileDataEnabled = mInternetDialogController.isMobileDataEnabled(mDefaultDataSubId);
         internetContent.mIsDeviceLocked = mInternetDialogController.isDeviceLocked();
         internetContent.mIsWifiScanEnabled = mInternetDialogController.isWifiScanEnabled();
+        return internetContent;
+    }
+
+    private InternetContent getWifiNetworkContent() {
+        InternetContent internetContent = new InternetContent();
+        internetContent.mInternetDialogTitleString = getDialogTitleText();
+        internetContent.mInternetDialogSubTitle = getSubtitleText();
+        internetContent.mIsWifiEnabled = mInternetDialogController.isWifiEnabled();
+        internetContent.mIsDeviceLocked = mInternetDialogController.isDeviceLocked();
         return internetContent;
     }
 

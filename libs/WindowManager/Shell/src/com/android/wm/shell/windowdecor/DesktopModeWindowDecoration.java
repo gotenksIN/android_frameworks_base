@@ -54,6 +54,7 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Trace;
+import android.os.UserHandle;
 import android.util.Size;
 import android.util.Slog;
 import android.view.Choreographer;
@@ -113,6 +114,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     private final Choreographer mChoreographer;
     private final SyncTransactionQueue mSyncQueue;
     private final SplitScreenController mSplitScreenController;
+    private final WindowManagerWrapper mWindowManagerWrapper;
 
     private WindowDecorationViewHolder mWindowDecorViewHolder;
     private View.OnClickListener mOnCaptionButtonClickListener;
@@ -187,7 +189,9 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 taskInfo, taskSurface, handler, bgExecutor, choreographer, syncQueue,
                 rootTaskDisplayAreaOrganizer, genericLinksParser, SurfaceControl.Builder::new,
                 SurfaceControl.Transaction::new,  WindowContainerTransaction::new,
-                SurfaceControl::new, new SurfaceControlViewHostFactory() {},
+                SurfaceControl::new, new WindowManagerWrapper(
+                        context.getSystemService(WindowManager.class)),
+                new SurfaceControlViewHostFactory() {},
                 DefaultMaximizeMenuFactory.INSTANCE, DefaultHandleMenuFactory.INSTANCE,
                 multiInstanceHelper);
     }
@@ -210,6 +214,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             Supplier<SurfaceControl.Transaction> surfaceControlTransactionSupplier,
             Supplier<WindowContainerTransaction> windowContainerTransactionSupplier,
             Supplier<SurfaceControl> surfaceControlSupplier,
+            WindowManagerWrapper windowManagerWrapper,
             SurfaceControlViewHostFactory surfaceControlViewHostFactory,
             MaximizeMenuFactory maximizeMenuFactory,
             HandleMenuFactory handleMenuFactory,
@@ -228,6 +233,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         mMaximizeMenuFactory = maximizeMenuFactory;
         mHandleMenuFactory = handleMenuFactory;
         mMultiInstanceHelper = multiInstanceHelper;
+        mWindowManagerWrapper = windowManagerWrapper;
     }
 
     /**
@@ -480,6 +486,10 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         return mGenericLink;
     }
 
+    UserHandle getUser() {
+        return mUserContext.getUser();
+    }
+
     private void updateDragResizeListener(SurfaceControl oldDecorationSurface) {
         if (!isDragResizable(mTaskInfo)) {
             if (!mTaskInfo.positionInParent.equals(mPositionInParent)) {
@@ -569,7 +579,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             return new AppHandleViewHolder(
                     mResult.mRootView,
                     mOnCaptionTouchListener,
-                    mOnCaptionButtonClickListener
+                    mOnCaptionButtonClickListener,
+                    mWindowManagerWrapper
             );
         } else if (mRelayoutParams.mLayoutResId
                 == R.layout.desktop_mode_app_header) {
@@ -983,6 +994,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         updateGenericLink();
         mHandleMenu = mHandleMenuFactory.create(
                 this,
+                mWindowManagerWrapper,
                 mRelayoutParams.mLayoutResId,
                 mAppIconBitmap,
                 mAppName,

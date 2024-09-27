@@ -1182,7 +1182,6 @@ static int32_t android_hardware_Camera_getAudioRestriction(
 static const JNINativeMethod camMethods[] = {
         {"_getNumberOfCameras", "(Landroid/os/Parcel;I)I",
          (void *)android_hardware_Camera_getNumberOfCameras},
-        {"_getNumberOfCameras", "()I", (void *)android_hardware_Camera_getNumberOfCameras},
         {"_getCameraInfo", "(IILandroid/os/Parcel;ILandroid/hardware/Camera$CameraInfo;)V",
          (void *)android_hardware_Camera_getCameraInfo},
         {"native_setup", "(Ljava/lang/Object;IIZLandroid/os/Parcel;I)I",

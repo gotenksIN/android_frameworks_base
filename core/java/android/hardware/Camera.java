@@ -314,18 +314,15 @@ public class Camera {
                 }
             }
         }
-        int numberOfCameras = _getNumberOfCameras();
+
+        Context context = ActivityThread.currentApplication().getApplicationContext();
+        int numberOfCameras = getNumberOfCameras(context);
         if (exposeAuxCamera == false && (numberOfCameras > 2)) {
             numberOfCameras = 2;
         }
+
         return numberOfCameras;
     }
-
-    /**
-     * Returns the number of physical cameras available on this device.
-     */
-    /** @hide */
-    public native static int _getNumberOfCameras();
 
     /**
      * Returns the number of physical cameras available on this device for the given context.

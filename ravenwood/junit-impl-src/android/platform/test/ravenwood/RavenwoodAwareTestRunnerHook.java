@@ -27,20 +27,30 @@ import android.util.Log;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.android.internal.os.RuntimeInit;
+import com.android.ravenwood.common.RavenwoodCommonUtils;
+
 import org.junit.runner.Description;
 import org.junit.runner.Runner;
 import org.junit.runners.model.TestClass;
+
+import java.util.Stack;
 
 /**
  * Provide hook points created by {@link RavenwoodAwareTestRunner}.
  */
 public class RavenwoodAwareTestRunnerHook {
-    private static final String TAG = "RavenwoodAwareTestRunnerHook";
+    private static final String TAG = RavenwoodAwareTestRunner.TAG;
 
     private RavenwoodAwareTestRunnerHook() {
     }
 
     private static RavenwoodTestStats sStats; // lazy initialization.
+
+    // Keep track of the current class description.
+
+    // Test classes can be nested because of "Suite", so we need a stack to keep track.
+    private static final Stack<Description> sClassDescriptions = new Stack<>();
     private static Description sCurrentClassDescription;
 
     private static RavenwoodTestStats getStats() {
@@ -56,20 +66,36 @@ public class RavenwoodAwareTestRunnerHook {
      * Called when a runner starts, before the inner runner gets a chance to run.
      */
     public static void onRunnerInitializing(Runner runner, TestClass testClass) {
+        // TODO: Move the initialization code to a better place.
+
+        initOnce();
+
         // This log call also ensures the framework JNI is loaded.
         Log.i(TAG, "onRunnerInitializing: testClass=" + testClass.getJavaClass()
                 + " runner=" + runner);
 
-        // TODO: Move the initialization code to a better place.
+        // This is needed to make AndroidJUnit4ClassRunner happy.
+        InstrumentationRegistry.registerInstance(null, Bundle.EMPTY);
+    }
+
+    private static boolean sInitialized = false;
+
+    private static void initOnce() {
+        if (sInitialized) {
+            return;
+        }
+        sInitialized = true;
+
+        // We haven't initialized liblog yet, so directly write to System.out here.
+        RavenwoodCommonUtils.log(TAG, "initOnce()");
+
+        // Redirect stdout/stdin to liblog.
+        RuntimeInit.redirectLogStreams();
 
         // This will let AndroidJUnit4 use the original runner.
         System.setProperty("android.junit.runner",
                 "androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner");
         System.setProperty(RAVENWOOD_VERSION_JAVA_SYSPROP, "1");
-
-
-        // This is needed to make AndroidJUnit4ClassRunner happy.
-        InstrumentationRegistry.registerInstance(null, Bundle.EMPTY);
     }
 
     /**
@@ -87,16 +113,17 @@ public class RavenwoodAwareTestRunnerHook {
      */
     public static boolean onBefore(RavenwoodAwareTestRunner runner, Description description,
             Scope scope, Order order) {
-        Log.i(TAG, "onBefore: description=" + description + ", " + scope + ", " + order);
+        Log.v(TAG, "onBefore: description=" + description + ", " + scope + ", " + order);
 
-        if (scope == Scope.Class && order == Order.First) {
+        if (scope == Scope.Class && order == Order.Outer) {
             // Keep track of the current class.
             sCurrentClassDescription = description;
+            sClassDescriptions.push(description);
         }
 
         // Class-level annotations are checked by the runner already, so we only check
         // method-level annotations here.
-        if (scope == Scope.Instance && order == Order.First) {
+        if (scope == Scope.Instance && order == Order.Outer) {
             if (!RavenwoodEnablementChecker.shouldEnableOnRavenwood(
                     description, true)) {
                 getStats().onTestFinished(sCurrentClassDescription, description, Result.Skipped);
@@ -113,19 +140,22 @@ public class RavenwoodAwareTestRunnerHook {
      */
     public static boolean onAfter(RavenwoodAwareTestRunner runner, Description description,
             Scope scope, Order order, Throwable th) {
-        Log.i(TAG, "onAfter: description=" + description + ", " + scope + ", " + order + ", " + th);
+        Log.v(TAG, "onAfter: description=" + description + ", " + scope + ", " + order + ", " + th);
 
-        if (scope == Scope.Instance && order == Order.First) {
+        if (scope == Scope.Instance && order == Order.Outer) {
             getStats().onTestFinished(sCurrentClassDescription, description,
                     th == null ? Result.Passed : Result.Failed);
 
-        } else if (scope == Scope.Class && order == Order.Last) {
+        } else if (scope == Scope.Class && order == Order.Outer) {
             getStats().onClassFinished(sCurrentClassDescription);
+            sClassDescriptions.pop();
+            sCurrentClassDescription =
+                    sClassDescriptions.size() == 0 ? null : sClassDescriptions.peek();
         }
 
         // If RUN_DISABLED_TESTS is set, and the method did _not_ throw, make it an error.
         if (RavenwoodRule.private$ravenwood().isRunningDisabledTests()
-                && scope == Scope.Instance && order == Order.First) {
+                && scope == Scope.Instance && order == Order.Outer) {
 
             boolean isTestEnabled = RavenwoodEnablementChecker.shouldEnableOnRavenwood(
                     description, false);

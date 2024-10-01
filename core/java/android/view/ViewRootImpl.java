@@ -4349,6 +4349,7 @@ public final class ViewRootImpl implements ViewParent,
 
             handleSyncRequestWhenNoAsyncDraw(mActiveSurfaceSyncGroup, mHasPendingTransactions,
                     mPendingTransaction, "view not visible");
+            mHasPendingTransactions = false;
         } else if (cancelAndRedraw) {
             if (!mWasLastDrawCanceled) {
                 logAndTrace("Canceling draw."
@@ -4376,6 +4377,7 @@ public final class ViewRootImpl implements ViewParent,
             if (!performDraw(mActiveSurfaceSyncGroup)) {
                 handleSyncRequestWhenNoAsyncDraw(mActiveSurfaceSyncGroup, mHasPendingTransactions,
                         mPendingTransaction, mLastPerformDrawSkippedReason);
+                mHasPendingTransactions = false;
             }
         }
         mWasLastDrawCanceled = cancelAndRedraw;
@@ -4392,7 +4394,14 @@ public final class ViewRootImpl implements ViewParent,
             mReportNextDraw = false;
             mLastReportNextDrawReason = null;
             mActiveSurfaceSyncGroup = null;
-            mHasPendingTransactions = false;
+            if (mHasPendingTransactions) {
+                // TODO: We shouldn't ever actually hit this, it means mPendingTransaction wasn't
+                // merged with a sync group or BLASTBufferQueue before making it to this point
+                // But better a one or two frame flicker than steady-state broken from dropping
+                // whatever is in this transaction
+                mPendingTransaction.apply();
+                mHasPendingTransactions = false;
+            }
             mSyncBuffer = false;
             if (isInWMSRequestedSync()) {
                 mWmsRequestSyncGroup.markSyncReady();
@@ -5309,6 +5318,7 @@ public final class ViewRootImpl implements ViewParent,
     private void registerCallbackForPendingTransactions() {
         Transaction t = new Transaction();
         t.merge(mPendingTransaction);
+        mHasPendingTransactions = false;
 
         registerRtFrameCallback(new FrameDrawingCallback() {
             @Override
@@ -5388,6 +5398,7 @@ public final class ViewRootImpl implements ViewParent,
         if (!usingAsyncReport && mHasPendingTransactions) {
             pendingTransaction = new Transaction();
             pendingTransaction.merge(mPendingTransaction);
+            mHasPendingTransactions = false;
         } else {
             pendingTransaction = null;
         }
@@ -9950,6 +9961,7 @@ public final class ViewRootImpl implements ViewParent,
         }
         handleSyncRequestWhenNoAsyncDraw(mActiveSurfaceSyncGroup, mHasPendingTransactions,
                 mPendingTransaction, "shutting down VRI");
+        mHasPendingTransactions = false;
         WindowManagerGlobal.getInstance().doRemoveView(this);
     }
 
@@ -12614,6 +12626,7 @@ public final class ViewRootImpl implements ViewParent,
         if (mHasPendingTransactions) {
             t = new Transaction();
             t.merge(mPendingTransaction);
+            mHasPendingTransactions = false;
         } else {
             t = null;
         }

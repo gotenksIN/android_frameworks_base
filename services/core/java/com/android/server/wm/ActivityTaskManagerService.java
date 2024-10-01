@@ -4358,6 +4358,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mTaskOrganizerController.dump(pw, "  ");
             mVisibleActivityProcessTracker.dump(pw, "  ");
             mActiveUids.dump(pw, "  ");
+            pw.println("  SleepTokens=" + mRootWindowContainer.mSleepTokens);
             if (mDemoteTopAppReasons != 0) {
                 pw.println("  mDemoteTopAppReasons=" + mDemoteTopAppReasons);
             }
@@ -5073,17 +5074,16 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         EventLogTags.writeWmSetResumedActivity(r.mUserId, r.shortComponentName, reason);
     }
 
-    final class SleepTokenAcquirerImpl implements ActivityTaskManagerInternal.SleepTokenAcquirer {
+    final class SleepTokenAcquirer {
         private final String mTag;
         private final SparseArray<RootWindowContainer.SleepToken> mSleepTokens =
                 new SparseArray<>();
 
-        SleepTokenAcquirerImpl(@NonNull String tag) {
+        SleepTokenAcquirer(@NonNull String tag) {
             mTag = tag;
         }
 
-        @Override
-        public void acquire(int displayId) {
+        void acquire(int displayId) {
             synchronized (mGlobalLock) {
                 if (!mSleepTokens.contains(displayId)) {
                     mSleepTokens.append(displayId,
@@ -5093,8 +5093,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             }
         }
 
-        @Override
-        public void release(int displayId) {
+        void release(int displayId) {
             synchronized (mGlobalLock) {
                 final RootWindowContainer.SleepToken token = mSleepTokens.get(displayId);
                 if (token != null) {
@@ -5969,11 +5968,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     final class LocalService extends ActivityTaskManagerInternal {
-        @Override
-        public SleepTokenAcquirer createSleepTokenAcquirer(@NonNull String tag) {
-            Objects.requireNonNull(tag);
-            return new SleepTokenAcquirerImpl(tag);
-        }
 
         @Override
         public ComponentName getHomeActivityForUser(int userId) {
@@ -6442,13 +6436,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
-        public CompatibilityInfo compatibilityInfoForPackage(ApplicationInfo ai) {
-            synchronized (mGlobalLock) {
-                return compatibilityInfoForPackageLocked(ai);
-            }
-        }
-
-        @Override
         public void sendActivityResult(int callingUid, IBinder activityToken, String resultWho,
                 int requestCode, int resultCode, Intent data) {
             final ActivityRecord r;
@@ -6726,9 +6713,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
         @HotPath(caller = HotPath.PROCESS_CHANGE)
         @Override
-        public void preBindApplication(WindowProcessController wpc) {
+        public PreBindInfo preBindApplication(WindowProcessController wpc, ApplicationInfo info) {
             synchronized (mGlobalLockWithoutBoost) {
                 mTaskSupervisor.getActivityMetricsLogger().notifyBindApplication(wpc.mInfo);
+                wpc.onConfigurationChanged(getGlobalConfiguration());
+                // The "info" can be the target of instrumentation.
+                return new PreBindInfo(compatibilityInfoForPackageLocked(info),
+                        new Configuration(wpc.getConfiguration()));
             }
         }
 

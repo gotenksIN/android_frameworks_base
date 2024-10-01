@@ -18,8 +18,12 @@ package com.android.systemui.scene.ui.viewmodel
 
 import android.view.MotionEvent
 import androidx.compose.runtime.getValue
+import com.android.compose.animation.scene.ContentKey
+import com.android.compose.animation.scene.DefaultEdgeDetector
 import com.android.compose.animation.scene.ObservableTransitionState
+import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
+import com.android.compose.animation.scene.SwipeSourceDetector
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.systemui.classifier.Classifier
@@ -30,12 +34,16 @@ import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.scene.ui.composable.Overlay
+import com.android.systemui.shade.domain.interactor.ShadeInteractor
+import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 
 /** Models UI state for the scene container. */
 class SceneContainerViewModel
@@ -44,6 +52,8 @@ constructor(
     private val sceneInteractor: SceneInteractor,
     private val falsingInteractor: FalsingInteractor,
     private val powerInteractor: PowerInteractor,
+    private val shadeInteractor: ShadeInteractor,
+    private val splitEdgeDetector: SplitEdgeDetector,
     private val logger: SceneLogger,
     @Assisted private val motionEventHandlerReceiver: (MotionEventHandler?) -> Unit,
 ) : ExclusiveActivatable() {
@@ -55,6 +65,20 @@ constructor(
 
     /** Whether the container is visible. */
     val isVisible: Boolean by hydrator.hydratedStateOf("isVisible", sceneInteractor.isVisible)
+
+    /**
+     * The [SwipeSourceDetector] to use for defining which edges of the screen can be defined in the
+     * [UserAction]s for this container.
+     */
+    val edgeDetector: SwipeSourceDetector by
+        hydrator.hydratedStateOf(
+            traceName = "edgeDetector",
+            initialValue = DefaultEdgeDetector,
+            source =
+                shadeInteractor.shadeMode.map {
+                    if (it is ShadeMode.Dual) splitEdgeDetector else DefaultEdgeDetector
+                }
+        )
 
     override suspend fun onActivated(): Nothing {
         try {
@@ -83,7 +107,7 @@ constructor(
     /**
      * Binds the given flow so the system remembers it.
      *
-     * Note that you must call is with `null` when the UI is done or risk a memory leak.
+     * Note that you must call this with `null` when the UI is done or risk a memory leak.
      */
     fun setTransitionState(transitionState: Flow<ObservableTransitionState>?) {
         sceneInteractor.setTransitionState(transitionState)
@@ -194,6 +218,29 @@ constructor(
                 is UserActionResult.HideOverlay,
                 is UserActionResult.ReplaceByOverlay -> TODO("b/353679003: Support overlays")
             } ?: actionResult
+        }
+    }
+
+    /**
+     * Returns the [ContentKey] whose user actions should be active.
+     *
+     * @param overlayByKey Mapping of [Overlay] by [OverlayKey], ordered by z-order such that the
+     *   last overlay is rendered on top of all other overlays.
+     */
+    fun getActionableContentKey(
+        currentScene: SceneKey,
+        currentOverlays: Set<OverlayKey>,
+        overlayByKey: Map<OverlayKey, Overlay>,
+    ): ContentKey {
+        // Overlay actions take precedence over scene actions.
+        return when (currentOverlays.size) {
+            // No overlays, the scene is actionable.
+            0 -> currentScene
+            // Small optimization for the most common case.
+            1 -> currentOverlays.first()
+            // Find the top-most overlay by z-index.
+            else ->
+                checkNotNull(overlayByKey.asSequence().findLast { it.key in currentOverlays }?.key)
         }
     }
 

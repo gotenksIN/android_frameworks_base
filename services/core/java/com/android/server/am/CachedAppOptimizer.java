@@ -88,7 +88,6 @@ import com.android.server.ServiceThread;
 
 import dalvik.annotation.optimization.NeverCompile;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -2427,6 +2426,7 @@ public final class CachedAppOptimizer {
                         Slog.d(TAG_AM, "Skipping freeze because process is marked "
                                 + "should not be frozen");
                     }
+                    reportProcessFreezableChangedLocked(proc);
                     return;
                 }
 

@@ -15,6 +15,11 @@
  */
 package com.android.platform.test.ravenwood.runtimehelper;
 
+import static com.android.ravenwood.common.RavenwoodCommonUtils.RAVENWOOD_VERBOSE_LOGGING;
+
+import android.system.ErrnoException;
+import android.system.Os;
+
 import com.android.ravenwood.common.RavenwoodCommonUtils;
 
 import java.io.File;
@@ -121,6 +126,15 @@ public class ClassLoadHook {
         if (SKIP_LOADING_LIBANDROID) {
             log("Skip loading native runtime.");
             return;
+        }
+
+        if (RAVENWOOD_VERBOSE_LOGGING) {
+            log("Force enabling verbose logging");
+            try {
+                Os.setenv("ANDROID_LOG_TAGS", "*:v", true);
+            } catch (ErrnoException e) {
+                // Shouldn't happen.
+            }
         }
 
         // Make sure these properties are not set.

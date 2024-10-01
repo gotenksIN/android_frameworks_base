@@ -36,12 +36,15 @@ import com.android.internal.widget.LockPatternView.Cell;
 import com.android.internal.widget.LockscreenCredential;
 import com.android.keyguard.EmergencyButtonController.EmergencyButtonCallback;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
+import com.android.systemui.bouncer.ui.helper.BouncerHapticHelper;
 import com.android.systemui.classifier.FalsingClassifier;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.DevicePostureController;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
+
+import com.google.android.msdl.domain.MSDLPlayer;
 
 import java.util.HashMap;
 import java.util.List;
@@ -67,12 +70,17 @@ public class KeyguardPatternViewController
     private LockPatternView mLockPatternView;
     private CountDownTimer mCountdownTimer;
     private AsyncTask<?, ?, ?> mPendingLockCheck;
+    private MSDLPlayer mMSDLPlayer;
 
     private EmergencyButtonCallback mEmergencyButtonCallback = new EmergencyButtonCallback() {
         @Override
         public void onEmergencyButtonClickedWhenInCall() {
             getKeyguardSecurityCallback().reset();
         }
+    };
+
+    private final LockPatternView.ExternalHapticsPlayer mExternalHapticsPlayer = () -> {
+        BouncerHapticHelper.INSTANCE.playPatternDotFeedback(mMSDLPlayer, mView);
     };
 
     /**
@@ -167,6 +175,10 @@ public class KeyguardPatternViewController
             boolean dismissKeyguard = mSelectedUserInteractor.getSelectedUserId() == userId;
             if (matched) {
                 mLockPatternUtils.sanitizePassword();
+                BouncerHapticHelper.INSTANCE.playMSDLAuthenticationFeedback(
+                        /* authenticationSucceeded= */true,
+                        /* player =*/mMSDLPlayer
+                );
                 getKeyguardSecurityCallback().reportUnlockAttempt(userId, true, 0);
                 if (dismissKeyguard) {
                     mLockPatternView.setDisplayMode(LockPatternView.DisplayMode.Correct);
@@ -174,6 +186,10 @@ public class KeyguardPatternViewController
                     getKeyguardSecurityCallback().dismiss(true, userId, SecurityMode.Pattern);
                 }
             } else {
+                BouncerHapticHelper.INSTANCE.playMSDLAuthenticationFeedback(
+                        /* authenticationSucceeded= */false,
+                        /* player =*/mMSDLPlayer
+                );
                 mLockPatternView.setDisplayMode(LockPatternView.DisplayMode.Wrong);
                 if (isValidPattern) {
                     getKeyguardSecurityCallback().reportUnlockAttempt(userId, false, timeoutMs);
@@ -201,7 +217,7 @@ public class KeyguardPatternViewController
             EmergencyButtonController emergencyButtonController,
             KeyguardMessageAreaController.Factory messageAreaControllerFactory,
             DevicePostureController postureController, FeatureFlags featureFlags,
-            SelectedUserInteractor selectedUserInteractor) {
+            SelectedUserInteractor selectedUserInteractor, MSDLPlayer msdlPlayer) {
         super(view, securityMode, keyguardSecurityCallback, emergencyButtonController,
                 messageAreaControllerFactory, featureFlags, selectedUserInteractor);
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
@@ -213,6 +229,7 @@ public class KeyguardPatternViewController
                 featureFlags.isEnabled(LOCKSCREEN_ENABLE_LANDSCAPE));
         mLockPatternView = mView.findViewById(R.id.lockPatternView);
         mPostureController = postureController;
+        mMSDLPlayer = msdlPlayer;
     }
 
     @Override
@@ -250,6 +267,7 @@ public class KeyguardPatternViewController
         if (deadline != 0) {
             handleAttemptLockout(deadline);
         }
+        mLockPatternView.setExternalHapticsPlayer(mExternalHapticsPlayer);
     }
 
     @Override
@@ -263,6 +281,7 @@ public class KeyguardPatternViewController
             cancelBtn.setOnClickListener(null);
         }
         mPostureController.removeCallback(mPostureCallback);
+        mLockPatternView.setExternalHapticsPlayer(null);
     }
 
     @Override

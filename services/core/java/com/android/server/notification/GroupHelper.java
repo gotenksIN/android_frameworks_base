@@ -757,8 +757,12 @@ public class GroupHelper {
 
             // scenario 3: sparse/singleton groups
             if (Flags.notificationForceGroupSingletons()) {
-                groupSparseGroups(record, notificationList, summaryByGroupKey, sectioner,
-                    fullAggregateGroupKey);
+                try {
+                    groupSparseGroups(record, notificationList, summaryByGroupKey, sectioner,
+                            fullAggregateGroupKey);
+                } catch (Throwable e) {
+                    Slog.wtf(TAG, "Failed to group sparse groups", e);
+                }
             }
         }
     }
@@ -1193,6 +1197,11 @@ public class GroupHelper {
             final ArrayMap<String, NotificationAttributes> aggregatedNotificationsAttrs =
                     mAggregatedNotifications.getOrDefault(fullAggregateGroupKey, new ArrayMap<>());
             final boolean hasSummary = !aggregatedNotificationsAttrs.isEmpty();
+            String triggeringKey = null;
+            if (!record.getNotification().isGroupSummary()) {
+                // Use this record as triggeringKey only if not a group summary (will be removed)
+                triggeringKey = record.getKey();
+            }
             for (NotificationRecord r : notificationList) {
                 // Add notifications for detected sparse groups
                 if (sparseGroupSummaries.containsKey(r.getGroupKey())) {
@@ -1209,6 +1218,10 @@ public class GroupHelper {
                                 r.getNotification().getGroupAlertBehavior(),
                                 r.getChannel().getId()));
 
+                        // Pick the first valid triggeringKey
+                        if (triggeringKey == null) {
+                            triggeringKey = r.getKey();
+                        }
                     } else if (r.getNotification().isGroupSummary()) {
                         // Remove summary notifications
                         if (DEBUG) {
@@ -1231,7 +1244,7 @@ public class GroupHelper {
 
             mAggregatedNotifications.put(fullAggregateGroupKey, aggregatedNotificationsAttrs);
             // add/update aggregate summary
-            updateAggregateAppGroup(fullAggregateGroupKey, record.getKey(), hasSummary,
+            updateAggregateAppGroup(fullAggregateGroupKey, triggeringKey, hasSummary,
                     sectioner.mSummaryId);
 
             //cleanup mUngroupedAbuseNotifications

@@ -1539,10 +1539,19 @@ public class UserManager {
      * Specifies that the managed profile is not allowed to have unified lock screen challenge with
      * the primary user.
      *
-     * <p><strong>Note:</strong> Setting this restriction alone doesn't automatically set a
-     * separate challenge. Profile owner can ask the user to set a new password using
-     * {@link DevicePolicyManager#ACTION_SET_NEW_PASSWORD} and verify it using
-     * {@link DevicePolicyManager#isUsingUnifiedPassword(ComponentName)}.
+     * <p>To ensure that there is a separate work profile password, IT admins
+     * have to:
+     * <ol>
+     *   <li>Enforce {@link UserManager#DISALLOW_UNIFIED_PASSWORD}</li>
+     *   <li>Verify that {@link DevicePolicyManager#isUsingUnifiedPassword(ComponentName)}
+     *       returns true. This indicates that there is now a separate work
+     *       profile password configured and the set up is completed.</li>
+     *   <li>In case {@link DevicePolicyManager#isUsingUnifiedPassword(ComponentName)}
+     *       returns false, invoke {@link DevicePolicyManager#ACTION_SET_NEW_PASSWORD}
+     *       intent and then verify again
+     *       {@link DevicePolicyManager#isUsingUnifiedPassword(ComponentName)}.</li>
+     * </ol>
+     * </p>
      *
      * <p>Can be set by profile owners. It only has effect on managed profiles when set by managed
      * profile owner. Has no effect on non-managed profiles or users.
@@ -3754,7 +3763,8 @@ public class UserManager {
     }
 
     private static final String CACHE_KEY_IS_USER_UNLOCKED_PROPERTY =
-            "cache_key.is_user_unlocked";
+        PropertyInvalidatedCache.createPropertyName(
+            PropertyInvalidatedCache.MODULE_SYSTEM, "is_user_unlocked");
 
     private final PropertyInvalidatedCache<Integer, Boolean> mIsUserUnlockedCache =
             new PropertyInvalidatedCache<Integer, Boolean>(
@@ -6685,7 +6695,9 @@ public class UserManager {
     }
 
     /* Cache key for anything that assumes that userIds cannot be re-used without rebooting. */
-    private static final String CACHE_KEY_STATIC_USER_PROPERTIES = "cache_key.static_user_props";
+    private static final String CACHE_KEY_STATIC_USER_PROPERTIES =
+        PropertyInvalidatedCache.createPropertyName(
+            PropertyInvalidatedCache.MODULE_SYSTEM, "static_user_props");
 
     private final PropertyInvalidatedCache<Integer, String> mProfileTypeCache =
             new PropertyInvalidatedCache<Integer, String>(32, CACHE_KEY_STATIC_USER_PROPERTIES) {
@@ -6712,7 +6724,9 @@ public class UserManager {
     }
 
     /* Cache key for UserProperties object. */
-    private static final String CACHE_KEY_USER_PROPERTIES = "cache_key.user_properties";
+    private static final String CACHE_KEY_USER_PROPERTIES =
+        PropertyInvalidatedCache.createPropertyName(
+            PropertyInvalidatedCache.MODULE_SYSTEM, "user_properties");
 
     // TODO: It would be better to somehow have this as static, so that it can work cross-context.
     private final PropertyInvalidatedCache<Integer, UserProperties> mUserPropertiesCache =

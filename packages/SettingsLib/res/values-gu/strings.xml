@@ -564,8 +564,7 @@
     <string name="alarms_and_reminders_title" msgid="8819933264635406032">"અલાર્મ અને રિમાઇન્ડર"</string>
     <string name="alarms_and_reminders_footer_title" msgid="6302587438389079695">"આ ઍપને અલાર્મ સેટ કરવા અને સમય પ્રતિ સંવેદનશીલ ક્રિયાઓ શેડ્યૂલ કરવા માટે મંજૂરી આપો. આ ઍપને બૅકગ્રાઉન્ડમાં ચાલવા દે છે, જેને કારણે બૅટરીનો વધુ વપરાશ થઈ શકે છે.\n\nજો આ પરવાનગી બંધ હોય, તો આ ઍપ દ્વારા શેડ્યૂલ કરવામાં આવેલા વર્તમાન અલાર્મ અને સમય આધારિત ઇવેન્ટ કામ કરશે નહીં."</string>
     <string name="keywords_alarms_and_reminders" msgid="6633360095891110611">"શેડ્યૂલ, અલાર્મ, રિમાઇન્ડર, ઘડિયાળ"</string>
-    <!-- no translation found for zen_mode_do_not_disturb_name (6798711401734798283) -->
-    <skip />
+    <string name="zen_mode_do_not_disturb_name" msgid="6798711401734798283">"ખલેલ પાડશો નહીં"</string>
     <string name="zen_mode_settings_title" msgid="7374070457626419755">"ખલેલ પાડશો નહીં"</string>
     <string name="zen_mode_enable_dialog_turn_on" msgid="6418297231575050426">"ચાલુ કરો"</string>
     <string name="zen_mode_settings_turn_on_dialog_title" msgid="2760567063190790696">"ખલેલ પાડશો નહીં ચાલુ કરો"</string>
@@ -584,6 +583,8 @@
     <string name="media_transfer_this_device_name" msgid="2357329267148436433">"આ ફોન"</string>
     <string name="media_transfer_this_device_name_tablet" msgid="2975593806278422086">"આ ટૅબ્લેટ"</string>
     <!-- no translation found for media_transfer_this_device_name_tv (5285685336836896535) -->
+    <skip />
+    <!-- no translation found for media_transfer_internal_mic (797333824290228595) -->
     <skip />
     <string name="media_transfer_dock_speaker_device_name" msgid="2856219597113881950">"ડૉક સ્પીકર"</string>
     <string name="media_transfer_external_device_name" msgid="2588672258721846418">"બહારનું ડિવાઇસ"</string>
@@ -686,6 +687,10 @@
     <string name="cached_apps_freezer_enabled" msgid="8866703500183051546">"ચાલુ છે"</string>
     <string name="cached_apps_freezer_reboot_dialog_text" msgid="695330563489230096">"આ ફેરફારને લાગુ કરવા માટે તમારા ડિવાઇસને રીબૂટ કરવાની જરૂર છે. હમણાં જ રીબૂટ કરો કે રદ કરો."</string>
     <string name="media_transfer_wired_usb_device_name" msgid="7699141088423210903">"વાયરવાળો હૅડફોન"</string>
+    <!-- no translation found for media_transfer_wired_device_mic_name (7417067197803840965) -->
+    <skip />
+    <!-- no translation found for media_transfer_usb_device_mic_name (9189914846215516322) -->
+    <skip />
     <string name="wifi_hotspot_switch_on_text" msgid="9212273118217786155">"ચાલુ"</string>
     <string name="wifi_hotspot_switch_off_text" msgid="7245567251496959764">"બંધ"</string>
     <string name="carrier_network_change_mode" msgid="4257621815706644026">"કૅરીઅર નેટવર્કમાં ફેરફાર થઈ રહ્યો છે"</string>

@@ -61,6 +61,20 @@ public class AppFunctionRuntimeMetadata extends GenericDocument {
         return RUNTIME_SCHEMA_TYPE + RUNTIME_SCHEMA_TYPE_SEPARATOR + Objects.requireNonNull(pkg);
     }
 
+    /** Returns the package name from the runtime metadata schema name. */
+    @NonNull
+    public static String getPackageNameFromSchema(String metadataSchemaType) {
+        String[] split = metadataSchemaType.split(RUNTIME_SCHEMA_TYPE_SEPARATOR);
+        if (split.length > 2) {
+            throw new IllegalArgumentException(
+                    "Invalid schema type: " + metadataSchemaType + " for app function runtime");
+        }
+        if (split.length < 2) {
+            return APP_FUNCTION_INDEXER_PACKAGE;
+        }
+        return split[1];
+    }
+
     /** Returns the document id for an app function's runtime metadata. */
     public static String getDocumentIdForAppFunction(
             @NonNull String pkg, @NonNull String functionId) {
@@ -166,13 +180,8 @@ public class AppFunctionRuntimeMetadata extends GenericDocument {
          *
          * @param packageName the name of the package that owns the function.
          * @param functionId the id of the function.
-         * @param staticMetadataQualifiedId the qualified static metadata id that this runtime
-         *     metadata refers to.
          */
-        public Builder(
-                @NonNull String packageName,
-                @NonNull String functionId,
-                @NonNull String staticMetadataQualifiedId) {
+        public Builder(@NonNull String packageName, @NonNull String functionId) {
             super(
                     APP_FUNCTION_RUNTIME_NAMESPACE,
                     getDocumentIdForAppFunction(
@@ -184,7 +193,9 @@ public class AppFunctionRuntimeMetadata extends GenericDocument {
 
             // Set qualified id automatically
             setPropertyString(
-                    PROPERTY_APP_FUNCTION_STATIC_METADATA_QUALIFIED_ID, staticMetadataQualifiedId);
+                    PROPERTY_APP_FUNCTION_STATIC_METADATA_QUALIFIED_ID,
+                    AppFunctionStaticMetadataHelper.getStaticMetadataQualifiedId(
+                            packageName, functionId));
         }
 
         /**

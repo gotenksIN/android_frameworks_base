@@ -111,6 +111,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -3021,6 +3022,9 @@ public final class Settings {
 
     /** @hide - Private call() method to query the 'configuration' table */
     public static final String CALL_METHOD_LIST_CONFIG = "LIST_config";
+
+    /** @hide - Private call() method to query the 'configuration' tables' namespaces */
+    public static final String CALL_METHOD_LIST_NAMESPACES_CONFIG = "LIST_namespaces_config";
 
     /** @hide - Private call() method to disable / re-enable syncs to the 'configuration' table */
     public static final String CALL_METHOD_SET_SYNC_DISABLED_MODE_CONFIG =
@@ -9165,15 +9169,27 @@ public final class Settings {
         public static final String MULTI_PRESS_TIMEOUT = "multi_press_timeout";
 
         /**
+         * Whether to enable key repeats for Physical Keyboard.
+         *
+         * If set to false, continuous key presses on
+         * physical keyboard will not cause the pressed key to repeated.
+         * @hide
+         */
+        @Readable
+        public static final String KEY_REPEAT_ENABLED = "key_repeat_enabled";
+
+        /**
          * The duration before a key repeat begins in milliseconds.
          * @hide
          */
+        @Readable
         public static final String KEY_REPEAT_TIMEOUT_MS = "key_repeat_timeout";
 
         /**
          * The duration between successive key repeats in milliseconds.
          * @hide
          */
+        @Readable
         public static final String KEY_REPEAT_DELAY_MS = "key_repeat_delay";
 
         /**
@@ -17841,6 +17857,12 @@ public final class Settings {
         public static final String FORCE_NON_DEBUGGABLE_FINAL_BUILD_FOR_COMPAT =
                 "force_non_debuggable_final_build_for_compat";
 
+        /**
+         * Flag to enable the use of ApplicationInfo for getting not-launched status.
+         *
+         * @hide
+         */
+        public static final String ENABLE_USE_APP_INFO_NOT_LAUNCHED = "use_app_info_not_launched";
 
         /**
          * Current version of signed configuration applied.
@@ -20483,6 +20505,10 @@ public final class Settings {
          *
          * The keys take the form {@code namespace/flag}, and the values are the flag values.
          *
+         * Note: this API is _not_ performant, and may make a large number of
+         * Binder calls. It is intended for use in testing and debugging, and
+         * should not be used in performance-sensitive code.
+         *
          * @hide
          */
         @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
@@ -20494,13 +20520,33 @@ public final class Settings {
                 Bundle arg = new Bundle();
                 arg.putInt(Settings.CALL_METHOD_USER_KEY, resolver.getUserId());
                 IContentProvider cp = sProviderHolder.getProvider(resolver);
-                Bundle b = cp.call(resolver.getAttributionSource(),
-                        sProviderHolder.mUri.getAuthority(), CALL_METHOD_LIST_CONFIG, null, arg);
-                if (b != null) {
-                    Map<String, String> flagsToValues =
-                            (HashMap) b.getSerializable(Settings.NameValueTable.VALUE,
-                                            java.util.HashMap.class);
-                    allFlags.putAll(flagsToValues);
+
+                if (Flags.reduceBinderTransactionSizeForGetAllProperties()) {
+                    Bundle b = cp.call(resolver.getAttributionSource(),
+                            sProviderHolder.mUri.getAuthority(),
+                                CALL_METHOD_LIST_NAMESPACES_CONFIG, null, arg);
+                    if (b != null) {
+                        HashSet<String> namespaces =
+                                (HashSet) b.getSerializable(Settings.NameValueTable.VALUE,
+                                                java.util.HashSet.class);
+                        for (String namespace : namespaces) {
+                            Map<String, String> keyValues =
+                                    getStrings(namespace, new ArrayList());
+                            for (String key : keyValues.keySet()) {
+                                allFlags.put(namespace + "/" + key, keyValues.get(key));
+                            }
+                        }
+                    }
+                } else {
+                    Bundle b = cp.call(resolver.getAttributionSource(),
+                            sProviderHolder.mUri.getAuthority(),
+                            CALL_METHOD_LIST_CONFIG, null, arg);
+                    if (b != null) {
+                        Map<String, String> flagsToValues =
+                                (HashMap) b.getSerializable(Settings.NameValueTable.VALUE,
+                                                java.util.HashMap.class);
+                        allFlags.putAll(flagsToValues);
+                    }
                 }
             } catch (RemoteException e) {
                 Log.w(TAG, "Can't query configuration table for " + CONTENT_URI, e);

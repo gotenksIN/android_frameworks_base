@@ -53,6 +53,7 @@ import com.android.systemui.dagger.qualifiers.DisplayId;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.display.domain.interactor.ConnectedDisplayInteractor;
+import com.android.systemui.modes.shared.ModesUiIcons;
 import com.android.systemui.privacy.PrivacyItem;
 import com.android.systemui.privacy.PrivacyItemController;
 import com.android.systemui.privacy.PrivacyType;
@@ -362,7 +363,7 @@ public class PhoneStatusBarPolicy
         mBluetooth.addCallback(this);
         mProvisionedController.addCallback(this);
         mCurrentUserSetup = mProvisionedController.isCurrentUserSetup();
-        if (usesModeIcons()) {
+        if (ModesUiIcons.isEnabled()) {
             // Note that we're not fully replacing ZenModeController with ZenModeInteractor, so
             // we listen for the extra event here but still add the ZMC callback.
             mJavaAdapter.alwaysCollectFlow(mZenModeInteractor.getMainActiveMode(),
@@ -399,8 +400,7 @@ public class PhoneStatusBarPolicy
     }
 
     private void onMainActiveModeChanged(@Nullable ZenModeInfo mainActiveMode) {
-        if (!usesModeIcons()) {
-            Log.wtf(TAG, "onMainActiveModeChanged shouldn't run if MODES_UI_ICONS is disabled");
+        if (ModesUiIcons.isUnexpectedlyInLegacyMode()) {
             return;
         }
 
@@ -460,14 +460,14 @@ public class PhoneStatusBarPolicy
 
     private void updateVolumeZen() {
         int zen = mZenController.getZen();
-        if (!usesModeIcons()) {
+        if (!ModesUiIcons.isEnabled()) {
             updateZenIcon(zen);
         }
         updateRingerAndAlarmIcons(zen);
     }
 
     private void updateZenIcon(int zen) {
-        if (usesModeIcons()) {
+        if (ModesUiIcons.isEnabled()) {
             Log.wtf(TAG, "updateZenIcon shouldn't be called if MODES_UI_ICONS is enabled");
             return;
         }
@@ -964,10 +964,5 @@ public class PhoneStatusBarPolicy
         }
 
         mIconController.setIconVisibility(mSlotConnectedDisplay, visible);
-    }
-
-    private static boolean usesModeIcons() {
-        return android.app.Flags.modesApi() && android.app.Flags.modesUi()
-                && android.app.Flags.modesUiIcons();
     }
 }

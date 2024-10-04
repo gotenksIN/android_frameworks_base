@@ -105,6 +105,7 @@
     <string name="app_clips_save_add_to_note" msgid="3460200751278069445">"টোকাত যোগ দিয়ক"</string>
     <string name="backlinks_include_link" msgid="4562093591148248158">"লিংক অন্তৰ্ভুক্ত কৰক"</string>
     <string name="backlinks_duplicate_label_format" msgid="558445128952827926">"<xliff:g id="APPNAME">%1$s</xliff:g> <xliff:g id="FREQUENCYCOUNT">(%2$d)</xliff:g>⁠"</string>
+    <string name="backlinks_cross_profile_error" msgid="1355798585727802282">"অন্য প্ৰ’ফাইলৰ পৰা লিংক যোগ দিব নোৱাৰি"</string>
     <string name="screenrecord_title" msgid="4257171601439507792">"স্ক্ৰীন ৰেকৰ্ডাৰ"</string>
     <string name="screenrecord_background_processing_label" msgid="7244617554884238898">"স্ক্রীন ৰেকৰ্ডিঙৰ প্ৰক্ৰিয়াকৰণ হৈ আছে"</string>
     <string name="screenrecord_channel_description" msgid="4147077128486138351">"স্ক্রীন ৰেকৰ্ডিং ছেশ্বন চলি থকা সময়ত পোৱা জাননী"</string>
@@ -292,8 +293,7 @@
     <string name="start_dreams" msgid="9131802557946276718">"স্ক্ৰীন ছেভাৰ"</string>
     <string name="ethernet_label" msgid="2203544727007463351">"ইথাৰনেট"</string>
     <string name="quick_settings_dnd_label" msgid="7728690179108024338">"অসুবিধা নিদিব"</string>
-    <!-- no translation found for quick_settings_modes_label (879156359479504244) -->
-    <skip />
+    <string name="quick_settings_modes_label" msgid="879156359479504244">"ম’ড"</string>
     <string name="quick_settings_bluetooth_label" msgid="7018763367142041481">"ব্লুটুথ"</string>
     <string name="quick_settings_bluetooth_detail_empty_text" msgid="5760239584390514322">"কোনো যোৰা লগোৱা ডিভাইচ উপলব্ধ নহয়।"</string>
     <string name="quick_settings_bluetooth_tile_subtitle" msgid="212752719010829550">"ডিভাইচ সংযোগ কৰিবলৈ অথবা সংযোগ বিচ্ছিন্ন কৰিবলৈ টিপক"</string>
@@ -434,8 +434,7 @@
     <string name="sensor_privacy_dialog_open_settings" msgid="5635865896053011859">"ছেটিং খোলক"</string>
     <string name="media_seamless_other_device" msgid="4654849800789196737">"অন্য ডিভাইচ"</string>
     <string name="quick_step_accessibility_toggle_overview" msgid="7908949976727578403">"অৱলোকন ট’গল কৰক"</string>
-    <!-- no translation found for zen_modes_dialog_title (8854640808100096934) -->
-    <skip />
+    <string name="zen_modes_dialog_title" msgid="8854640808100096934">"ম’ড"</string>
     <string name="zen_modes_dialog_done" msgid="6654130880256438950">"কৰা হ’ল"</string>
     <string name="zen_modes_dialog_settings" msgid="2310248023728936697">"ছেটিং"</string>
     <string name="zen_mode_on" msgid="9085304934016242591">"অন আছে"</string>
@@ -1290,6 +1289,8 @@
     <string name="add" msgid="81036585205287996">"যোগ দিয়ক"</string>
     <string name="manage_users" msgid="1823875311934643849">"পৰিচালনা কৰক"</string>
     <string name="drag_split_not_supported" msgid="7173481676120546121">"এই জাননীটোৱে বিভাজিত স্ক্ৰীনলৈ টানি আনি এৰাৰ সুবিধাটো সমৰ্থন নকৰে"</string>
+    <!-- no translation found for dream_overlay_location_active (6484763493158166618) -->
+    <skip />
     <string name="dream_overlay_status_bar_wifi_off" msgid="4497069245055003582">"ৱাই-ফাই উপলব্ধ নহয়"</string>
     <string name="dream_overlay_status_bar_priority_mode" msgid="5428462123314728739">"অগ্ৰাধিকাৰ ম’ড"</string>
     <string name="dream_overlay_status_bar_alarm_set" msgid="566707328356590886">"এলাৰ্ম ছেট কৰা হ’ল"</string>
@@ -1346,6 +1347,8 @@
     <string name="lock_screen_settings" msgid="6152703934761402399">"লক স্ক্ৰীন কাষ্টমাইজ কৰক"</string>
     <string name="keyguard_unlock_to_customize_ls" msgid="2068542308086253819">"লক স্ক্ৰীন কাষ্টমাইজ কৰিবলৈ আনলক কৰক"</string>
     <string name="wifi_unavailable_dream_overlay_content_description" msgid="2024166212194640100">"ৱাই-ফাই উপলব্ধ নহয়"</string>
+    <!-- no translation found for location_active_dream_overlay_content_description (6208885541020673916) -->
+    <skip />
     <string name="camera_blocked_dream_overlay_content_description" msgid="4074759493559418130">"কেমেৰা অৱৰোধ কৰা আছে"</string>
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"কেমেৰা আৰু মাইক্ৰ’ফ’ন অৱৰোধ কৰা আছে"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"মাইক্ৰ’ফ’ন অৱৰোধ কৰা আছে"</string>
@@ -1393,21 +1396,16 @@
     <string name="shortcut_helper_content_description_collapse_icon" msgid="8028015738431664954">"সংকোচন কৰাৰ চিহ্ন"</string>
     <string name="shortcut_helper_content_description_expand_icon" msgid="1084435697860417390">"বিস্তাৰ কৰাৰ চিহ্ন"</string>
     <string name="shortcut_helper_key_combinations_or_separator" msgid="7082902112102125540">"অথবা"</string>
-    <!-- no translation found for launch_keyboard_tutorial_notification_title (8849933155160522519) -->
-    <skip />
-    <!-- no translation found for launch_keyboard_tutorial_notification_content (2880339951512757918) -->
-    <skip />
-    <!-- no translation found for launch_touchpad_tutorial_notification_title (2243780062772196901) -->
-    <skip />
-    <!-- no translation found for launch_touchpad_tutorial_notification_content (7931085031240753226) -->
-    <skip />
-    <!-- no translation found for launch_keyboard_touchpad_tutorial_notification_title (1940023776496198762) -->
-    <skip />
-    <!-- no translation found for launch_keyboard_touchpad_tutorial_notification_content (1780725168171929365) -->
-    <skip />
+    <string name="launch_keyboard_tutorial_notification_title" msgid="8849933155160522519">"কীব’ৰ্ড ব্যৱহাৰ কৰি নেভিগে’ট কৰক"</string>
+    <string name="launch_keyboard_tutorial_notification_content" msgid="2880339951512757918">"কীব’ৰ্ডৰ শ্বৰ্টকাটসমূহৰ বিষয়ে জানক"</string>
+    <string name="launch_touchpad_tutorial_notification_title" msgid="2243780062772196901">"আপোনাৰ টাচ্চপেড ব্যৱহাৰ কৰি নেভিগে’ট কৰক"</string>
+    <string name="launch_touchpad_tutorial_notification_content" msgid="7931085031240753226">"টাচ্চপেডৰ নিৰ্দেশসমূহ জানক"</string>
+    <string name="launch_keyboard_touchpad_tutorial_notification_title" msgid="1940023776496198762">"আপোনাৰ কীব’ৰ্ড আৰু টাচ্চপেড ব্যৱহাৰ কৰি নেভিগে’ট কৰক"</string>
+    <string name="launch_keyboard_touchpad_tutorial_notification_content" msgid="1780725168171929365">"টাচ্চপেডৰ নিৰ্দেশ, কীব’ৰ্ডৰ শ্বৰ্টকাট আৰু অধিকৰ বিষয়ে জানক"</string>
     <string name="touchpad_tutorial_back_gesture_button" msgid="2746834288077265946">"উভতি যাওক নিৰ্দেশ"</string>
     <string name="touchpad_tutorial_home_gesture_button" msgid="7640544867625955304">"গৃহ স্ক্ৰীনলৈ যোৱাৰ নিৰ্দেশ"</string>
-    <string name="touchpad_tutorial_action_key_button" msgid="3220074511852927267">"কাৰ্য কী"</string>
+    <!-- no translation found for touchpad_tutorial_recent_apps_gesture_button (8919227647650347359) -->
+    <skip />
     <string name="touchpad_tutorial_done_button" msgid="176168488821755503">"হ’ল"</string>
     <string name="touchpad_back_gesture_action_title" msgid="7199067250654332735">"উভতি যাওক"</string>
     <string name="touchpad_back_gesture_guidance" msgid="6263750214998421587">"উভতি যাবলৈ, টাচ্চপেডৰ যিকোনো স্থানত তিনিটা আঙুলি ব্যৱহাৰ কৰি বাওঁ বা সোঁফালে ছোৱাইপ কৰক।\n\nইয়াৰ বাবে আপুনি কীব’ৰ্ড শ্বৰ্টকাট কাৰ্য + ESC ব্যৱহাৰ কৰিবও পাৰে।"</string>
@@ -1417,6 +1415,14 @@
     <string name="touchpad_home_gesture_guidance" msgid="3043931356096731966">"যিকোনো সময়তে আপোনাৰ গৃহ স্ক্ৰীনলৈ যাবলৈ, আপোনাৰ স্ক্ৰীনখনৰ একেবাৰে তলৰ পৰা ওপৰলৈ তিনিটা আঙুলিৰে ছোৱাইপ কৰক।"</string>
     <string name="touchpad_home_gesture_success_title" msgid="3778407003948209795">"সুন্দৰ!"</string>
     <string name="touchpad_home_gesture_success_body" msgid="2404031094918807067">"আপুনি গৃহ স্ক্ৰীনলৈ উভতি যোৱাৰ নিৰ্দেশটো সম্পূৰ্ণ কৰিলে।"</string>
+    <!-- no translation found for touchpad_recent_apps_gesture_action_title (934906836867137906) -->
+    <skip />
+    <!-- no translation found for touchpad_recent_apps_gesture_guidance (6012057247259983871) -->
+    <skip />
+    <!-- no translation found for touchpad_recent_apps_gesture_success_title (8481920554139332593) -->
+    <skip />
+    <!-- no translation found for touchpad_recent_apps_gesture_success_body (4334263906697493273) -->
+    <skip />
     <string name="tutorial_action_key_title" msgid="2659466586996495447">"কাৰ্য কী"</string>
     <string name="tutorial_action_key_guidance" msgid="5718948664616999196">"আপোনাৰ এপ্‌সমূহ এক্সেছ কৰিবলৈ আপোনাৰ কীব’ৰ্ডৰ কাৰ্য কীটোত টিপক।"</string>
     <string name="tutorial_action_key_success_title" msgid="466467860120112933">"অভিনন্দন!"</string>
@@ -1440,8 +1446,19 @@
     <string name="overview_edu_notification_content" msgid="3578204677648432500">"তিনিটা আঙুলি ব্যৱহাৰ কৰি ওপৰলৈ ছোৱাইপ কৰি ধৰি ৰাখক। অধিক নিৰ্দেশ শিকিবলৈ টিপক।"</string>
     <string name="all_apps_edu_notification_title" msgid="372262997265569063">"আটাইবোৰ এপ্‌ চাবলৈ আপোনাৰ কীব’ৰ্ড ব্যৱহাৰ কৰক"</string>
     <string name="all_apps_edu_notification_content" msgid="3255070575694025585">"যিকোনো সময়তে কাৰ্য কীটোত টিপক। অধিক নিৰ্দেশ শিকিবলৈ টিপক।"</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_title" msgid="4369307638184799742">"এক্সট্ৰা ডিম এতিয়া উজ্জ্বলতা বাৰৰ অংশ"</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_description" msgid="7513137763024327538">"আপুনি এতিয়া আপোনাৰ স্ক্ৰীনৰ একেবাৰে ওপৰৰ পৰা উজ্জ্বলতাৰ স্তৰ আৰু অধিক হ্ৰাস কৰি স্ক্ৰীনখন এক্সট্ৰা ডিম কৰিব পাৰে।\n\nআপুনি অন্ধকাৰ পৰিৱেশত থাকিলে এই সুবিধাটোৱে আটাইতকৈ ভাল কাম কৰে।"</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_button" msgid="1782147201534669800">"এক্সট্ৰা ডিম শ্বৰ্টকাট আঁতৰাওক"</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_toast" msgid="4070696910424515757">"এক্সট্ৰা ডিম শ্বৰ্টকাট আঁতৰোৱা হৈছে। আপোনাৰ উজ্জ্বলতা হ্ৰাস কৰিবলৈ, নিয়মীয়া উজ্জ্বলতা বাৰ ব্যৱহাৰ কৰক।"</string>
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_title (910988771011857460) -->
+    <skip />
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_description (4453123359258743230) -->
+    <skip />
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_button (3947537827396916005) -->
+    <skip />
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_toast (165474092660941104) -->
+    <skip />
+    <string name="qs_edit_mode_category_connectivity" msgid="4559726936546032672">"সংযোগ"</string>
+    <string name="qs_edit_mode_category_accessibility" msgid="7969091385071475922">"সাধ্য সুবিধা"</string>
+    <string name="qs_edit_mode_category_utilities" msgid="8123080090108420095">"সহায়ক সঁজুলি"</string>
+    <string name="qs_edit_mode_category_privacy" msgid="6577774443194551775">"গোপনীয়তা"</string>
+    <string name="qs_edit_mode_category_providedByApps" msgid="8346112074897919019">"এপে প্ৰদান কৰা"</string>
+    <string name="qs_edit_mode_category_display" msgid="4749511439121053942">"ডিছপ্লে’"</string>
+    <string name="qs_edit_mode_category_unknown" msgid="509314252124053550">"অজ্ঞাত"</string>
 </resources>

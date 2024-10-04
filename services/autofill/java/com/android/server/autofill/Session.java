@@ -716,6 +716,9 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
 
         void handleInlineSuggestionRequest(InlineSuggestionsRequest inlineSuggestionsRequest,
                 ViewState viewState) {
+            if (sVerbose) {
+                Slog.v(TAG, "handleInlineSuggestionRequest(): inline suggestion request received");
+            }
             synchronized (mLock) {
                 if (!mWaitForInlineRequest || mPendingInlineSuggestionsRequest != null) {
                     return;
@@ -730,15 +733,27 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         @GuardedBy("mLock")
         void maybeRequestFillLocked() {
             if (mPendingFillRequest == null) {
+                if (sVerbose) {
+                        Slog.v(TAG, "maybeRequestFillLocked(): cancelling calling fill request "
+                            + "due to empty pending fill request");
+                }
                 return;
             }
             mFieldClassificationIdSnapshot = sIdCounterForPcc.get();
 
             if (mWaitForInlineRequest) {
                 if (mPendingInlineSuggestionsRequest == null) {
+                    if (sVerbose) {
+                        Slog.v(TAG, "maybeRequestFillLocked(): cancelling calling fill request "
+                            + "due to waiting for inline request and pending inline request is "
+                            + "currently empty");
+                    }
                     return;
                 }
-
+                if (sVerbose) {
+                    Slog.v(TAG, "maybeRequestFillLocked(): adding inline request to pending "
+                        + "fill request");
+                }
                 mPendingFillRequest = new FillRequest(mPendingFillRequest.getId(),
                         mPendingFillRequest.getFillContexts(),
                         mPendingFillRequest.getHints(),
@@ -746,8 +761,17 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                         mPendingFillRequest.getFlags(),
                         mPendingInlineSuggestionsRequest,
                         mPendingFillRequest.getDelayedFillIntentSender());
+            } else {
+                if (sVerbose) {
+                    Slog.v(TAG, "maybeRequestFillLocked(): not adding inline request to pending "
+                        + "fill request");
+                }
             }
+
             mLastFillRequest = mPendingFillRequest;
+            if (sVerbose) {
+                Slog.v(TAG, "maybeRequestFillLocked(): sending fill request");
+            }
             if (shouldRequestSecondaryProvider(mPendingFillRequest.getFlags())
                     && mSecondaryProviderHandler != null) {
                 Slog.v(TAG, "Requesting fill response to secondary provider.");

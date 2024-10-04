@@ -26,8 +26,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.util.Log;
 
-import com.android.ravenwood.common.SneakyThrow;
-
 import org.junit.Assume;
 import org.junit.AssumptionViolatedException;
 import org.junit.internal.builders.AllDefaultPossibilitiesBuilder;
@@ -48,6 +46,7 @@ import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runner.notification.StoppedByUserException;
 import org.junit.runners.BlockJUnit4ClassRunner;
+import org.junit.runners.Suite;
 import org.junit.runners.model.MultipleFailureException;
 import org.junit.runners.model.RunnerBuilder;
 import org.junit.runners.model.Statement;
@@ -61,6 +60,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Stack;
+import java.util.function.BiConsumer;
 
 /**
  * A test runner used for Ravenwood.
@@ -83,7 +83,7 @@ import java.util.Stack;
  * it will basically just delegate to the inner wrapper, and won't do anything special.
  * (no hooks, etc.)
  */
-public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orderable {
+public final class RavenwoodAwareTestRunner extends Runner implements Filterable, Orderable {
     public static final String TAG = "Ravenwood";
 
     @Inherited
@@ -105,7 +105,6 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
 
     /** Scope of a hook. */
     public enum Scope {
-        Runner,
         Class,
         Instance,
     }
@@ -120,21 +119,21 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
     private static class RavenwoodClassOuterRule implements TestRule {
         @Override
         public Statement apply(Statement base, Description description) {
-            return getCurrentRunner().updateStatement(base, description, Scope.Class, Order.Outer);
+            return getCurrentRunner().wrapWithHooks(base, description, Scope.Class, Order.Outer);
         }
     }
 
     private static class RavenwoodClassInnerRule implements TestRule {
         @Override
         public Statement apply(Statement base, Description description) {
-            return getCurrentRunner().updateStatement(base, description, Scope.Class, Order.Inner);
+            return getCurrentRunner().wrapWithHooks(base, description, Scope.Class, Order.Inner);
         }
     }
 
     private static class RavenwoodInstanceOuterRule implements TestRule {
         @Override
         public Statement apply(Statement base, Description description) {
-            return getCurrentRunner().updateStatement(
+            return getCurrentRunner().wrapWithHooks(
                     base, description, Scope.Instance, Order.Outer);
         }
     }
@@ -142,7 +141,7 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
     private static class RavenwoodInstanceInnerRule implements TestRule {
         @Override
         public Statement apply(Statement base, Description description) {
-            return getCurrentRunner().updateStatement(
+            return getCurrentRunner().wrapWithHooks(
                     base, description, Scope.Instance, Order.Inner);
         }
     }
@@ -160,7 +159,7 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
     /** Keeps track of the runner on the current thread. */
     private static final ThreadLocal<RavenwoodAwareTestRunner> sCurrentRunner = new ThreadLocal<>();
 
-    private static RavenwoodAwareTestRunner getCurrentRunner() {
+    static RavenwoodAwareTestRunner getCurrentRunner() {
         var runner = sCurrentRunner.get();
         if (runner == null) {
             throw new RuntimeException("Current test runner not set!");
@@ -172,6 +171,13 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
     private Runner mRealRunner = null;
     private Description mDescription = null;
     private Throwable mExceptionInConstructor = null;
+    private boolean mRealRunnerTakesRunnerBuilder = false;
+
+    /**
+     * Stores internal states / methods associated with this runner that's only needed in
+     * junit-impl.
+     */
+    final RavenwoodRunnerState mState = new RavenwoodRunnerState(this);
 
     private Error logAndFail(String message, Throwable exception) {
         Log.e(TAG, message, exception);
@@ -187,22 +193,26 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
      */
     public RavenwoodAwareTestRunner(Class<?> testClass) {
         try {
+            performGlobalInitialization();
+
+            /*
+             * If the class has @DisabledOnRavenwood, then we'll delegate to
+             * ClassSkippingTestRunner, which simply skips it.
+             *
+             * We need to do it before instantiating TestClass for b/367694651.
+             */
+            if (isOnRavenwood() && !RavenwoodAwareTestRunnerHook.shouldRunClassOnRavenwood(
+                    testClass)) {
+                mRealRunner = new ClassSkippingTestRunner(testClass);
+                mDescription = mRealRunner.getDescription();
+                return;
+            }
+
             mTestClass = new TestClass(testClass);
 
             Log.v(TAG, "RavenwoodAwareTestRunner starting for " + testClass.getCanonicalName());
 
             onRunnerInitializing();
-
-            /*
-             * If the class has @DisabledOnRavenwood, then we'll delegate to
-             * ClassSkippingTestRunner, which simply skips it.
-             */
-            if (isOnRavenwood() && !RavenwoodAwareTestRunnerHook.shouldRunClassOnRavenwood(
-                    mTestClass.getJavaClass())) {
-                mRealRunner = new ClassSkippingTestRunner(mTestClass);
-                mDescription = mRealRunner.getDescription();
-                return;
-            }
 
             // Find the real runner.
             final Class<? extends Runner> realRunnerClass;
@@ -239,7 +249,7 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
         }
     }
 
-    private static Runner instantiateRealRunner(
+    private Runner instantiateRealRunner(
             Class<? extends Runner> realRunnerClass,
             Class<?> testClass)
             throws NoSuchMethodException, InvocationTargetException, InstantiationException,
@@ -247,10 +257,17 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
         try {
             return realRunnerClass.getConstructor(Class.class).newInstance(testClass);
         } catch (NoSuchMethodException e) {
-            var runnerBuilder = new AllDefaultPossibilitiesBuilder();
-            return realRunnerClass.getConstructor(Class.class,
-                    RunnerBuilder.class).newInstance(testClass, runnerBuilder);
+            var constructor = realRunnerClass.getConstructor(Class.class, RunnerBuilder.class);
+            mRealRunnerTakesRunnerBuilder = true;
+            return constructor.newInstance(testClass, new AllDefaultPossibilitiesBuilder());
         }
+    }
+
+    private void performGlobalInitialization() {
+        if (!isOnRavenwood()) {
+            return;
+        }
+        RavenwoodAwareTestRunnerHook.performGlobalInitialization();
     }
 
     /**
@@ -261,7 +278,6 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
         if (!isOnRavenwood()) {
             return;
         }
-        // DO NOT USE android.util.Log before calling onRunnerInitializing().
 
         RavenwoodAwareTestRunnerHook.onRunnerInitializing(this, mTestClass);
 
@@ -296,7 +312,7 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
 
     @Override
     public void run(RunNotifier realNotifier) {
-        final RunNotifier notifier = new RavenwoodRunNotifier(realNotifier);
+        final RavenwoodRunNotifier notifier = new RavenwoodRunNotifier(realNotifier);
 
         if (mRealRunner instanceof ClassSkippingTestRunner) {
             mRealRunner.run(notifier);
@@ -313,12 +329,35 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
             return;
         }
 
+        // TODO(b/365976974): handle nested classes better
+        final boolean skipRunnerHook =
+                mRealRunnerTakesRunnerBuilder && mRealRunner instanceof Suite;
+
         sCurrentRunner.set(this);
         try {
-            runWithHooks(getDescription(), Scope.Runner, Order.Outer,
-                    () -> mRealRunner.run(notifier));
+            if (!skipRunnerHook) {
+                try {
+                    RavenwoodAwareTestRunnerHook.onBeforeInnerRunnerStart(
+                            this, getDescription());
+                } catch (Throwable th) {
+                    notifier.reportBeforeTestFailure(getDescription(), th);
+                    return;
+                }
+            }
+
+            // Delegate to the inner runner.
+            mRealRunner.run(notifier);
         } finally {
             sCurrentRunner.remove();
+
+            if (!skipRunnerHook) {
+                try {
+                    RavenwoodAwareTestRunnerHook.onAfterInnerRunnerFinished(
+                            this, getDescription());
+                } catch (Throwable th) {
+                    notifier.reportAfterTestFailure(th);
+                }
+            }
         }
     }
 
@@ -355,7 +394,7 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
         }
     }
 
-    private Statement updateStatement(Statement base, Description description, Scope scope,
+    private Statement wrapWithHooks(Statement base, Description description, Scope scope,
             Order order) {
         if (!isOnRavenwood()) {
             return base;
@@ -368,7 +407,8 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
         };
     }
 
-    private void runWithHooks(Description description, Scope scope, Order order, Runnable r) {
+    private void runWithHooks(Description description, Scope scope, Order order, Runnable r)
+            throws Throwable {
         runWithHooks(description, scope, order, new Statement() {
             @Override
             public void evaluate() throws Throwable {
@@ -377,7 +417,8 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
         });
     }
 
-    private void runWithHooks(Description description, Scope scope, Order order, Statement s) {
+    private void runWithHooks(Description description, Scope scope, Order order, Statement s)
+            throws Throwable {
         if (isOnRavenwood()) {
             Assume.assumeTrue(
                     RavenwoodAwareTestRunnerHook.onBefore(this, description, scope, order));
@@ -394,7 +435,7 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
                         this, description, scope, order, t);
             }
             if (shouldThrow) {
-                SneakyThrow.sneakyThrow(t);
+                throw t;
             }
         }
     }
@@ -405,14 +446,11 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
      * filter.
      */
     private static class ClassSkippingTestRunner extends Runner implements Filterable {
-        private final TestClass mTestClass;
         private final Description mDescription;
         private boolean mFilteredOut;
 
-        ClassSkippingTestRunner(TestClass testClass) {
-            mTestClass = testClass;
-            mDescription = Description.createTestDescription(
-                    testClass.getJavaClass(), testClass.getJavaClass().getSimpleName());
+        ClassSkippingTestRunner(Class<?> testClass) {
+            mDescription = Description.createTestDescription(testClass, testClass.getSimpleName());
             mFilteredOut = false;
         }
 
@@ -615,16 +653,13 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
                 return true;
             }
             if (mAfterTest) {
-                // Unfortunately, there's no good way to report it, so kill the own process.
-                onCriticalError(
-                        "Failures detected in @AfterClass, which would be swalloed by tradefed",
-                        th);
-                return true; // unreachable
+                reportAfterTestFailure(th);
+                return true;
             }
             return false;
         }
 
-        private void reportBeforeTestFailure(Description suiteDesc, Throwable th) {
+        public void reportBeforeTestFailure(Description suiteDesc, Throwable th) {
             // If a failure happens befere running any tests, we'll need to pretend
             // as if each test in the suite reported the failure, to work around b/364395552.
             for (var child : suiteDesc.getChildren()) {
@@ -646,11 +681,51 @@ public class RavenwoodAwareTestRunner extends Runner implements Filterable, Orde
                 }
             }
         }
+
+        public void reportAfterTestFailure(Throwable th) {
+            // Unfortunately, there's no good way to report it, so kill the own process.
+            onCriticalError(
+                    "Failures detected in @AfterClass, which would be swallowed by tradefed",
+                    th);
+        }
     }
 
+    private static volatile BiConsumer<String, Throwable> sCriticalErrorHanler;
+
     private void onCriticalError(@NonNull String message, @Nullable Throwable th) {
-        Log.e(TAG, "Critical error! Ravenwood cannot continue. Killing self process: "
-                + message, th);
+        Log.e(TAG, "Critical error! " + message, th);
+        var handler = sCriticalErrorHanler;
+        if (handler == null) {
+            handler = sDefaultCriticalErrorHandler;
+        }
+        handler.accept(message, th);
+    }
+
+    private static BiConsumer<String, Throwable> sDefaultCriticalErrorHandler = (message, th) -> {
+        Log.e(TAG, "Ravenwood cannot continue. Killing self process.", th);
         System.exit(1);
+    };
+
+    /**
+     * Contains Ravenwood private APIs.
+     */
+    public static class RavenwoodPrivate {
+        private RavenwoodPrivate() {
+        }
+
+        /**
+         * Set a listener for onCriticalError(), for testing. If a listener is set, we won't call
+         * System.exit().
+         */
+        public void setCriticalErrorHandler(
+                @Nullable BiConsumer<String, Throwable> handler) {
+            sCriticalErrorHanler = handler;
+        }
+    }
+
+    private static final RavenwoodPrivate sRavenwoodPrivate = new RavenwoodPrivate();
+
+    public static RavenwoodPrivate private$ravenwood() {
+        return sRavenwoodPrivate;
     }
 }

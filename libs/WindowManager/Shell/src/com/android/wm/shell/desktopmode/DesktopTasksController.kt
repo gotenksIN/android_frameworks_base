@@ -35,6 +35,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.Region
 import android.os.Binder
+import android.os.Handler
 import android.os.IBinder
 import android.os.SystemProperties
 import android.util.Size
@@ -136,7 +137,8 @@ class DesktopTasksController(
     @ShellMainThread private val mainExecutor: ShellExecutor,
     private val desktopTasksLimiter: Optional<DesktopTasksLimiter>,
     private val recentTasksController: RecentTasksController?,
-    private val interactionJankMonitor: InteractionJankMonitor
+    private val interactionJankMonitor: InteractionJankMonitor,
+    @ShellMainThread private val handler: Handler,
 ) :
     RemoteCallable<DesktopTasksController>,
     Transitions.TransitionHandler,
@@ -303,6 +305,20 @@ class DesktopTasksController(
     private fun getSplitFocusedTask(task1: RunningTaskInfo, task2: RunningTaskInfo) =
         if (task1.taskId == task2.parentTaskId) task2 else task1
 
+    private fun forceEnterDesktop(displayId: Int): Boolean {
+        if (!DesktopModeStatus.enterDesktopByDefaultOnFreeformDisplay(context)) {
+            return false
+        }
+
+        val tdaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(displayId)
+        requireNotNull(tdaInfo) {
+            "This method can only be called with the ID of a display having non-null DisplayArea."
+        }
+        val tdaWindowingMode = tdaInfo.configuration.windowConfiguration.windowingMode
+        val isFreeformDisplay = tdaWindowingMode == WINDOWING_MODE_FREEFORM
+        return isFreeformDisplay
+    }
+
     /** Moves task to desktop mode if task is running, else launches it in desktop mode. */
     fun moveTaskToDesktop(
         taskId: Int,
@@ -378,7 +394,7 @@ class DesktopTasksController(
         taskSurface: SurfaceControl,
     ) {
         logV("startDragToDesktop taskId=%d", taskInfo.taskId)
-        interactionJankMonitor.begin(taskSurface, context,
+        interactionJankMonitor.begin(taskSurface, context, handler,
             CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD)
         dragToDesktopTransitionHandler.startDragToDesktopTransition(
             taskInfo.taskId,
@@ -782,7 +798,7 @@ class DesktopTasksController(
         releaseVisualIndicator()
         if (!taskInfo.isResizeable && DesktopModeFlags.DISABLE_SNAP_RESIZE.isEnabled(context)) {
             interactionJankMonitor.begin(
-                taskSurface, context, CUJ_DESKTOP_MODE_SNAP_RESIZE, "drag_non_resizable"
+                taskSurface, context, handler, CUJ_DESKTOP_MODE_SNAP_RESIZE, "drag_non_resizable"
             )
 
             // reposition non-resizable app back to its original position before being dragged
@@ -795,7 +811,7 @@ class DesktopTasksController(
             )
         } else {
             interactionJankMonitor.begin(
-                taskSurface, context, CUJ_DESKTOP_MODE_SNAP_RESIZE, "drag_resizable"
+                taskSurface, context, handler, CUJ_DESKTOP_MODE_SNAP_RESIZE, "drag_resizable"
             )
             snapToHalfScreen(taskInfo, taskSurface, currentDragBounds, position)
         }
@@ -1077,45 +1093,47 @@ class DesktopTasksController(
             request.triggerTask != null
     }
 
+    /** Open an existing instance of an app. */
+    fun openInstance(
+        callingTask: RunningTaskInfo,
+        requestedTaskId: Int
+    ) {
+        val wct = WindowContainerTransaction()
+        val options = createNewWindowOptions(callingTask)
+        if (options.launchWindowingMode == WINDOWING_MODE_FREEFORM) {
+            wct.startTask(requestedTaskId, options.toBundle())
+            transitions.startTransition(TRANSIT_OPEN, wct, null)
+        } else {
+            val splitPosition = splitScreenController.determineNewInstancePosition(callingTask)
+            splitScreenController.startTask(requestedTaskId, splitPosition,
+                options.toBundle(), null /* hideTaskToken */)
+        }
+    }
+
+    /** Create an Intent to open a new window of a task. */
     fun openNewWindow(
-        taskInfo: RunningTaskInfo
+        callingTaskInfo: RunningTaskInfo
     ) {
         // TODO(b/337915660): Add a transition handler for these; animations
         //  need updates in some cases.
-        val newTaskWindowingMode = when {
-            taskInfo.isFreeform -> {
-                WINDOWING_MODE_FREEFORM
-            }
-            taskInfo.isFullscreen || taskInfo.isMultiWindow -> {
-                WINDOWING_MODE_MULTI_WINDOW
-            }
-            else -> {
-                error("Invalid windowing mode: ${taskInfo.windowingMode}")
-            }
-        }
-
-        val baseActivity = taskInfo.baseActivity ?: return
+        val baseActivity = callingTaskInfo.baseActivity ?: return
         val fillIn: Intent = context.packageManager
             .getLaunchIntentForPackage(
                 baseActivity.packageName
             ) ?: return
         fillIn
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-        val options =
-            ActivityOptions.makeBasic().apply {
-                launchWindowingMode = newTaskWindowingMode
-                pendingIntentBackgroundActivityStartMode =
-                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-            }
         val launchIntent = PendingIntent.getActivity(
             context,
             /* requestCode= */ 0,
             fillIn,
             PendingIntent.FLAG_IMMUTABLE
         )
-        when (newTaskWindowingMode) {
+        val options = createNewWindowOptions(callingTaskInfo)
+        when (options.launchWindowingMode) {
             WINDOWING_MODE_MULTI_WINDOW -> {
-                val splitPosition = splitScreenController.determineNewInstancePosition(taskInfo)
+                val splitPosition = splitScreenController
+                    .determineNewInstancePosition(callingTaskInfo)
                 splitScreenController.startIntent(
                     launchIntent, context.userId, fillIn, splitPosition,
                     options.toBundle(), null /* hideTaskToken */
@@ -1127,6 +1145,25 @@ class DesktopTasksController(
                 wct.sendPendingIntent(launchIntent, fillIn, options.toBundle())
                 transitions.startTransition(TRANSIT_OPEN, wct, null)
             }
+        }
+    }
+
+    private fun createNewWindowOptions(callingTask: RunningTaskInfo): ActivityOptions {
+        val newTaskWindowingMode = when {
+            callingTask.isFreeform -> {
+                WINDOWING_MODE_FREEFORM
+            }
+            callingTask.isFullscreen || callingTask.isMultiWindow -> {
+                WINDOWING_MODE_MULTI_WINDOW
+            }
+            else -> {
+                error("Invalid windowing mode: ${callingTask.windowingMode}")
+            }
+        }
+        return ActivityOptions.makeBasic().apply {
+            launchWindowingMode = newTaskWindowingMode
+            pendingIntentBackgroundActivityStartMode =
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
         }
     }
 
@@ -1159,10 +1196,11 @@ class DesktopTasksController(
         val wct = WindowContainerTransaction()
         if (!isDesktopModeShowing(task.displayId)) {
             logD("Bring desktop tasks to front on transition=taskId=%d", task.taskId)
-            // We are outside of desktop mode and already existing desktop task is being launched.
-            // We should make this task go to fullscreen instead of freeform. Note that this means
-            // any re-launch of a freeform window outside of desktop will be in fullscreen.
-            if (taskRepository.isActiveTask(task.taskId)) {
+            if (taskRepository.isActiveTask(task.taskId) && !forceEnterDesktop(task.displayId)) {
+                // We are outside of desktop mode and already existing desktop task is being
+                // launched. We should make this task go to fullscreen instead of freeform. Note
+                // that this means any re-launch of a freeform window outside of desktop will be in
+                // fullscreen as long as default-desktop flag is disabled.
                 addMoveToFullscreenChanges(wct, task)
                 return wct
             }
@@ -1199,7 +1237,7 @@ class DesktopTasksController(
         transition: IBinder
     ): WindowContainerTransaction? {
         logV("handleFullscreenTaskLaunch")
-        if (isDesktopModeShowing(task.displayId)) {
+        if (isDesktopModeShowing(task.displayId) || forceEnterDesktop(task.displayId)) {
             logD("Switch fullscreen task to freeform on transition: taskId=%d", task.taskId)
             return WindowContainerTransaction().also { wct ->
                 addMoveToDesktopChanges(wct, task)
@@ -1572,7 +1610,7 @@ class DesktopTasksController(
         when (indicatorType) {
             IndicatorType.TO_DESKTOP_INDICATOR -> {
                 // Start a new jank interaction for the drag release to desktop window animation.
-                interactionJankMonitor.begin(taskSurface, context,
+                interactionJankMonitor.begin(taskSurface, context, handler,
                     CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_RELEASE, "to_desktop")
                 finalizeDragToDesktop(taskInfo)
             }

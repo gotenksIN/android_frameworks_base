@@ -5853,6 +5853,13 @@
          should also be non-empty.-->
     <string name="config_rawContactsLocalAccountType" translatable="false"></string>
 
+    <!-- The array of account types that accounts in any of these can be set as the default account
+         for new raw contacts. -->
+    <string-array name="config_rawContactsEligibleDefaultAccountTypes" translatable="false">
+        <!-- Add account types here, example: -->
+        <!-- <item>com.google</item> -->
+    </string-array>
+
     <!-- Whether or not to use assistant stream volume separately from music volume -->
     <bool name="config_useAssistantVolume">false</bool>
 
@@ -7112,6 +7119,10 @@
 
     <!-- Maximum number of active tasks on a given Desktop Windowing session. Set to 0 for unlimited. -->
     <integer name="config_maxDesktopWindowingActiveTasks">0</integer>
+
+    <!-- Whether a display enters desktop mode by default when the windowing mode of the display's
+         root TaskDisplayArea is set to WINDOWING_MODE_FREEFORM. -->
+    <bool name="config_enterDesktopByDefaultOnFreeformDisplay">false</bool>
 
     <!-- Frame rate compatibility value for Wallpaper
          FRAME_RATE_COMPATIBILITY_MIN (102) is used by default for lower power consumption -->

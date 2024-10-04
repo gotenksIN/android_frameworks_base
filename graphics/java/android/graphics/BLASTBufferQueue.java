@@ -17,6 +17,7 @@
 package android.graphics;
 
 import android.annotation.NonNull;
+import android.os.IBinder;
 import android.view.Surface;
 import android.view.SurfaceControl;
 
@@ -49,6 +50,7 @@ public final class BLASTBufferQueue {
             long frameNumber);
     private static native void nativeSetTransactionHangCallback(long ptr,
             TransactionHangCallback callback);
+    private static native void nativeSetApplyToken(long ptr, IBinder applyToken);
 
     public interface TransactionHangCallback {
         void onTransactionHang(String reason);
@@ -219,5 +221,9 @@ public final class BLASTBufferQueue {
 
     public void setTransactionHangCallback(TransactionHangCallback hangCallback) {
         nativeSetTransactionHangCallback(mNativeObject, hangCallback);
+    }
+
+    public void setApplyToken(IBinder applyToken) {
+        nativeSetApplyToken(mNativeObject, applyToken);
     }
 }

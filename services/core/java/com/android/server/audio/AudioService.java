@@ -4052,6 +4052,7 @@ public class AudioService extends IAudioService.Stub
                             && isFullVolumeDevice(device);
                     boolean tvConditions = mHdmiTvClient != null
                             && mHdmiSystemAudioSupported
+                            && isFullVolumeDevice(device)
                             && !isAbsoluteVolumeDevice(device)
                             && !isA2dpAbsoluteVolumeDevice(device);
 
@@ -9296,7 +9297,7 @@ public class AudioService extends IAudioService.Stub
                 index = 1;
             }
 
-            if (replaceStreamBtSco()) {
+            if (replaceStreamBtSco() && index != 0) {
                 index = (int) (mIndexMin + (index * 10 - mIndexMin) / getIndexStepFactor() + 5)
                         / 10;
             }

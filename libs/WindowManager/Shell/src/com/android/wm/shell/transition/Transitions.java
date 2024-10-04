@@ -39,7 +39,7 @@ import static android.window.TransitionInfo.FLAG_NO_ANIMATION;
 import static android.window.TransitionInfo.FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 
-import static com.android.systemui.shared.Flags.returnAnimationFrameworkLibrary;
+import static com.android.systemui.shared.Flags.returnAnimationFrameworkLongLived;
 import static com.android.window.flags.Flags.ensureWallpaperInTransitions;
 import static com.android.window.flags.Flags.migratePredictiveBackTransition;
 import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
@@ -196,6 +196,9 @@ public class Transitions implements RemoteCallable<Transitions>,
 
     /** Transition to set windowing mode after exit pip transition is finished animating. */
     public static final int TRANSIT_CLEANUP_PIP_EXIT = WindowManager.TRANSIT_FIRST_CUSTOM + 19;
+
+    /** Transition type to minimize a task. */
+    public static final int TRANSIT_MINIMIZE = WindowManager.TRANSIT_FIRST_CUSTOM + 20;
 
     /** Transition type for desktop mode transitions. */
     public static final int TRANSIT_DESKTOP_MODE_TYPES =
@@ -1257,7 +1260,7 @@ public class Transitions implements RemoteCallable<Transitions>,
     @Nullable
     public TransitionHandler getHandlerForTakeover(
             @NonNull IBinder transition, @NonNull TransitionInfo info) {
-        if (!returnAnimationFrameworkLibrary()) {
+        if (!returnAnimationFrameworkLongLived()) {
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                     "Trying to get a handler for takeover but the flag is disabled");
             return null;
@@ -1506,16 +1509,16 @@ public class Transitions implements RemoteCallable<Transitions>,
          *                          transition animation. The Transition system will apply it when
          *                          finishCallback is called by the transition handler.
          */
-        void onTransitionReady(@NonNull IBinder transition, @NonNull TransitionInfo info,
+        default void onTransitionReady(@NonNull IBinder transition, @NonNull TransitionInfo info,
                 @NonNull SurfaceControl.Transaction startTransaction,
-                @NonNull SurfaceControl.Transaction finishTransaction);
+                @NonNull SurfaceControl.Transaction finishTransaction) {}
 
         /**
          * Called when the transition is starting to play. It isn't called for merged transitions.
          *
          * @param transition the unique token of this transition
          */
-        void onTransitionStarting(@NonNull IBinder transition);
+        default void onTransitionStarting(@NonNull IBinder transition) {}
 
         /**
          * Called when a transition is merged into another transition. There won't be any following
@@ -1524,7 +1527,7 @@ public class Transitions implements RemoteCallable<Transitions>,
          * @param merged the unique token of the transition that's merged to another one
          * @param playing the unique token of the transition that accepts the merge
          */
-        void onTransitionMerged(@NonNull IBinder merged, @NonNull IBinder playing);
+        default void onTransitionMerged(@NonNull IBinder merged, @NonNull IBinder playing) {}
 
         /**
          * Called when the transition is finished. This isn't called for merged transitions.
@@ -1532,7 +1535,7 @@ public class Transitions implements RemoteCallable<Transitions>,
          * @param transition the unique token of this transition
          * @param aborted {@code true} if this transition is aborted; {@code false} otherwise.
          */
-        void onTransitionFinished(@NonNull IBinder transition, boolean aborted);
+        default void onTransitionFinished(@NonNull IBinder transition, boolean aborted) {}
     }
 
     @BinderThread

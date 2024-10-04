@@ -42,6 +42,7 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.systemui.DejankUtils.whitelistIpcs;
 import static com.android.systemui.Flags.notifyPowerManagerUserActivityBackground;
 import static com.android.systemui.Flags.relockWithPowerButtonImmediately;
+import static com.android.systemui.Flags.simPinBouncerReset;
 import static com.android.systemui.Flags.translucentOccludingActivityFix;
 import static com.android.systemui.keyguard.ui.viewmodel.LockscreenToDreamingTransitionViewModel.DREAMING_ANIMATION_DURATION_MS;
 
@@ -239,7 +240,6 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private static final long KEYGUARD_DONE_PENDING_TIMEOUT_MS = 3000;
 
     private static final boolean DEBUG = KeyguardConstants.DEBUG;
-    private static final boolean DEBUG_SIM_STATES = KeyguardConstants.DEBUG_SIM_STATES;
 
     private final static String TAG = "KeyguardViewMediator";
 
@@ -347,6 +347,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private boolean mShuttingDown;
     private boolean mDozing;
     private boolean mAnimatingScreenOff;
+    private boolean mIgnoreDismiss;
     private final Context mContext;
     private final FalsingCollector mFalsingCollector;
 
@@ -611,18 +612,20 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         public void onUserSwitching(int userId) {
             Log.d(TAG, String.format("onUserSwitching %d", userId));
             synchronized (KeyguardViewMediator.this) {
+                mIgnoreDismiss = true;
                 notifyTrustedChangedLocked(mUpdateMonitor.getUserHasTrust(userId));
                 resetKeyguardDonePendingLocked();
-                dismiss(null /* callback */, null /* message */);
+                resetStateLocked();
                 adjustStatusBarLocked();
             }
         }
 
         @Override
         public void onUserSwitchComplete(int userId) {
+            mIgnoreDismiss = false;
             Log.d(TAG, String.format("onUserSwitchComplete %d", userId));
-            // We are calling dismiss again and with a delay as there are race conditions
-            // in some scenarios caused by async layout listeners
+            // We are calling dismiss with a delay as there are race conditions in some scenarios
+            // caused by async layout listeners
             mHandler.postDelayed(() -> dismiss(null /* callback */, null /* message */), 500);
         }
 
@@ -633,11 +636,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
         @Override
         public void onSimStateChanged(int subId, int slotId, int simState) {
-
-            if (DEBUG_SIM_STATES) {
-                Log.d(TAG, "onSimStateChanged(subId=" + subId + ", slotId=" + slotId
-                        + ",state=" + simState + ")");
-            }
+            Log.d(TAG, "onSimStateChanged(subId=" + subId + ", slotId=" + slotId
+                    + ",state=" +  TelephonyManager.simStateToString(simState) + ")");
 
             int size = mKeyguardStateCallbacks.size();
             boolean simPinSecure = mUpdateMonitor.isSimPinSecure();
@@ -690,7 +690,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     synchronized (KeyguardViewMediator.this) {
                         if (shouldWaitForProvisioning()) {
                             if (!mShowing) {
-                                if (DEBUG_SIM_STATES) Log.d(TAG, "ICC_ABSENT isn't showing,"
+                                Log.d(TAG, "ICC_ABSENT isn't showing,"
                                         + " we need to show the keyguard since the "
                                         + "device isn't provisioned yet.");
                                 doKeyguardLocked(null);
@@ -702,11 +702,21 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                             // MVNO SIMs can become transiently NOT_READY when switching networks,
                             // so we should only lock when they are ABSENT.
                             if (lastSimStateWasLocked) {
-                                if (DEBUG_SIM_STATES) Log.d(TAG, "SIM moved to ABSENT when the "
+                                Log.d(TAG, "SIM moved to ABSENT when the "
                                         + "previous state was locked. Reset the state.");
                                 resetStateLocked();
                             }
                             mSimWasLocked.append(slotId, false);
+                        } else if (simState == TelephonyManager.SIM_STATE_NOT_READY) {
+                            if (simPinBouncerReset()) {
+                                // Support eSIM disablement, and do not clear `mSimWasLocked`.
+                                // NOT_READY could just be a temporary state
+                                if (lastSimStateWasLocked) {
+                                    Log.d(TAG, "SIM moved to NOT_READY when the "
+                                            + "previous state was locked. Reset the state.");
+                                    resetStateLocked();
+                                }
+                            }
                         }
                     }
                     break;
@@ -715,7 +725,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     synchronized (KeyguardViewMediator.this) {
                         mSimWasLocked.append(slotId, true);
                         if (!mShowing) {
-                            if (DEBUG_SIM_STATES) Log.d(TAG,
+                            Log.d(TAG,
                                     "INTENT_VALUE_ICC_LOCKED and keygaurd isn't "
                                     + "showing; need to show keyguard so user can enter sim pin");
                             doKeyguardLocked(null);
@@ -727,11 +737,11 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 case TelephonyManager.SIM_STATE_PERM_DISABLED:
                     synchronized (KeyguardViewMediator.this) {
                         if (!mShowing) {
-                            if (DEBUG_SIM_STATES) Log.d(TAG, "PERM_DISABLED and "
+                            Log.d(TAG, "PERM_DISABLED and "
                                   + "keygaurd isn't showing.");
                             doKeyguardLocked(null);
                         } else {
-                            if (DEBUG_SIM_STATES) Log.d(TAG, "PERM_DISABLED, resetStateLocked to"
+                            Log.d(TAG, "PERM_DISABLED, resetStateLocked to"
                                   + "show permanently disabled message in lockscreen.");
                             resetStateLocked();
                         }
@@ -739,9 +749,9 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     break;
                 case TelephonyManager.SIM_STATE_READY:
                     synchronized (KeyguardViewMediator.this) {
-                        if (DEBUG_SIM_STATES) Log.d(TAG, "READY, reset state? " + mShowing);
+                        Log.d(TAG, "READY, reset state? " + mShowing);
                         if (mShowing && mSimWasLocked.get(slotId, false)) {
-                            if (DEBUG_SIM_STATES) Log.d(TAG, "SIM moved to READY when the "
+                            Log.d(TAG, "SIM moved to READY when the "
                                     + "previously was locked. Reset the state.");
                             mSimWasLocked.append(slotId, false);
                             resetStateLocked();
@@ -749,7 +759,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     }
                     break;
                 default:
-                    if (DEBUG_SIM_STATES) Log.v(TAG, "Unspecific state: " + simState);
+                    Log.v(TAG, "Unspecific state: " + simState);
                     break;
             }
         }
@@ -1681,6 +1691,12 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     });
             mJavaAdapter.alwaysCollectFlow(communalViewModel.getTransitionFromOccludedEnded(),
                     getFinishedCallbackConsumer());
+
+            // System ready can be invoked in the middle of user switching, so check for this state
+            // and issue the call manually as that important event was missed.
+            if (mUserTracker.isUserSwitching()) {
+                mUpdateCallback.onUserSwitching(mUserTracker.getUserId());
+            }
         }
         // Most services aren't available until the system reaches the ready state, so we
         // send it here when the device first boots.
@@ -2433,6 +2449,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     }
 
     public void dismiss(IKeyguardDismissCallback callback, CharSequence message) {
+        if (mIgnoreDismiss) {
+            android.util.Log.i(TAG, "Ignoring request to dismiss (user switch in progress?)");
+            return;
+        }
         mHandler.obtainMessage(DISMISS, new DismissMessage(callback, message)).sendToTarget();
     }
 

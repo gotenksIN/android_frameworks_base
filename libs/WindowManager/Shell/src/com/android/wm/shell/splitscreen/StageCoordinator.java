@@ -34,7 +34,6 @@ import static android.view.WindowManager.transitTypeToString;
 import static android.window.TransitionInfo.FLAG_IS_DISPLAY;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER;
 
-import static com.android.wm.shell.Flags.enableFlexibleSplit;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_ALIGN_CENTER;
 import static com.android.wm.shell.common.split.SplitScreenUtils.reverseSplitPosition;
 import static com.android.wm.shell.common.split.SplitScreenUtils.splitFailureMessage;
@@ -1176,6 +1175,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mSplitTransitions.startDismissTransition(wct, this, mLastActiveStage, reason);
         setSplitsVisible(false);
         mBreakOnNextWake = false;
+        logExit(reason);
     }
 
     void exitSplitScreenOnHide(boolean exitSplitScreenOnHide) {
@@ -1266,6 +1266,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         prepareExitSplitScreen(stage, wct);
         mSplitTransitions.startDismissTransition(wct, this, stage, exitReason);
+        logExit(exitReason);
     }
 
     /**
@@ -1362,6 +1363,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             mMainStage.doForAllChildTasks(taskId -> recentTasks.removeSplitPair(taskId));
             mSideStage.doForAllChildTasks(taskId -> recentTasks.removeSplitPair(taskId));
         });
+        logExit(exitReason);
     }
 
     /**
@@ -1580,7 +1582,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         if (stage == STAGE_TYPE_MAIN) {
             mLogger.logMainStageAppChange(getMainStagePosition(), mMainStage.getTopChildTaskUid(),
                     mSplitLayout.isLeftRightSplit());
-        } else {
+        } else if (stage == STAGE_TYPE_SIDE) {
             mLogger.logSideStageAppChange(getSideStagePosition(), mSideStage.getTopChildTaskUid(),
                     mSplitLayout.isLeftRightSplit());
         }
@@ -1653,7 +1655,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             mSplitLayout = new SplitLayout(TAG + "SplitDivider", mContext,
                     mRootTaskInfo.configuration, this, mParentContainerCallbacks,
                     mDisplayController, mDisplayImeController, mTaskOrganizer,
-                    PARALLAX_ALIGN_CENTER /* parallaxType */);
+                    PARALLAX_ALIGN_CENTER /* parallaxType */, mMainHandler);
             mDisplayInsetsController.addInsetsChangedListener(mDisplayId, mSplitLayout);
         }
 
@@ -1666,7 +1668,6 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         if (mRootTaskInfo == null || mRootTaskInfo.taskId != taskInfo.taskId) {
             throw new IllegalArgumentException(this + "\n Unknown task info changed: " + taskInfo);
         }
-        mWindowDecorViewModel.ifPresent(viewModel -> viewModel.onTaskInfoChanged(taskInfo));
         mRootTaskInfo = taskInfo;
         if (mSplitLayout != null
                 && mSplitLayout.updateConfiguration(mRootTaskInfo.configuration)
@@ -2276,6 +2277,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         if (isOpening && inFullscreen) {
             // One task is opening into fullscreen mode, remove the corresponding split record.
             mRecentTasks.ifPresent(recentTasks -> recentTasks.removeSplitPair(triggerTask.taskId));
+            logExit(EXIT_REASON_FULLSCREEN_REQUEST);
         }
 
         if (isSplitActive()) {
@@ -2403,6 +2405,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             if (triggerTask != null) {
                 mRecentTasks.ifPresent(
                         recentTasks -> recentTasks.removeSplitPair(triggerTask.taskId));
+                logExit(EXIT_REASON_CHILD_TASK_ENTER_PIP);
             }
             @StageType int topStage = STAGE_TYPE_UNDEFINED;
             if (isSplitScreenVisible()) {
@@ -2454,6 +2457,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             final StageChangeRecord record = new StageChangeRecord();
             final int transitType = info.getType();
             TransitionInfo.Change pipChange = null;
+            int closingSplitTaskId = -1;
             for (int iC = 0; iC < info.getChanges().size(); ++iC) {
                 final TransitionInfo.Change change = info.getChanges().get(iC);
                 if (change.getMode() == TRANSIT_CHANGE
@@ -2514,21 +2518,31 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                                 + " with " + taskInfo.taskId + " before startAnimation().");
                     }
                 }
+                if (isClosingType(change.getMode()) &&
+                        getStageOfTask(change.getTaskInfo().taskId) != STAGE_TYPE_UNDEFINED) {
+                    // If either one of the 2 stages is closing we're assuming we'll break split
+                    closingSplitTaskId = change.getTaskInfo().taskId;
+                }
             }
 
             if (pipChange != null) {
                 TransitionInfo.Change pipReplacingChange = getPipReplacingChange(info, pipChange,
                         mMainStage.mRootTaskInfo.taskId, mSideStage.mRootTaskInfo.taskId,
                         getSplitItemStage(pipChange.getLastParent()));
-                if (pipReplacingChange != null) {
+                boolean keepSplitWithPip = pipReplacingChange != null && closingSplitTaskId == -1;
+                if (keepSplitWithPip) {
                     // Set an enter transition for when startAnimation gets called again
                     mSplitTransitions.setEnterTransition(transition, /*remoteTransition*/ null,
                             TRANSIT_SPLIT_SCREEN_OPEN_TO_SIDE, /*resizeAnim*/ false);
+                } else {
+                    int finalClosingTaskId = closingSplitTaskId;
+                    mRecentTasks.ifPresent(recentTasks ->
+                            recentTasks.removeSplitPair(finalClosingTaskId));
+                    logExit(EXIT_REASON_FULLSCREEN_REQUEST);
                 }
 
                 mMixedHandler.animatePendingEnterPipFromSplit(transition, info,
-                        startTransaction, finishTransaction, finishCallback,
-                        pipReplacingChange != null);
+                        startTransaction, finishTransaction, finishCallback, keepSplitWithPip);
                 notifySplitAnimationFinished();
                 return true;
             }
@@ -2744,7 +2758,10 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 final int dismissTop = mainChild != null ? STAGE_TYPE_MAIN :
                         (sideChild != null ? STAGE_TYPE_SIDE : STAGE_TYPE_UNDEFINED);
                 pendingEnter.cancel(
-                        (cancelWct, cancelT) -> prepareExitSplitScreen(dismissTop, cancelWct));
+                        (cancelWct, cancelT) -> {
+                            prepareExitSplitScreen(dismissTop, cancelWct);
+                            logExit(EXIT_REASON_UNKNOWN);
+                        });
                 Log.w(TAG, splitFailureMessage("startPendingEnterAnimation",
                         "launched 2 tasks in split, but didn't receive "
                         + "2 tasks in transition. Possibly one of them failed to launch"));
@@ -2815,6 +2832,14 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 mSplitLayout.flingDividerToCenter(this::notifySplitAnimationFinished);
             }
             callbackWct.setReparentLeafTaskIfRelaunch(mRootTaskInfo.token, false);
+            mWindowDecorViewModel.ifPresent(viewModel -> {
+                if (finalMainChild != null) {
+                    viewModel.onTaskInfoChanged(finalMainChild.getTaskInfo());
+                }
+                if (finalSideChild != null) {
+                    viewModel.onTaskInfoChanged(finalSideChild.getTaskInfo());
+                }
+            });
             mPausingTasks.clear();
         });
 

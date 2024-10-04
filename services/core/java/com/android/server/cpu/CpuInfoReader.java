@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -80,14 +81,15 @@ public final class CpuInfoReader {
     /** package **/ @interface CpusetCategory{}
 
     // TODO(b/242722241): Protect updatable variables with a local lock.
-    private final File mCpusetDir;
     private final long mMinReadIntervalMillis;
     private final Object mLock = new Object();
     private final SparseIntArray mCpusetCategoriesByCpus = new SparseIntArray();
     private final SparseArray<File> mCpuFreqPolicyDirsById = new SparseArray<>();
     private final SparseArray<StaticPolicyInfo> mStaticPolicyInfoById = new SparseArray<>();
     private final SparseArray<LongSparseLongArray> mTimeInStateByPolicyId = new SparseArray<>();
+    private final AtomicBoolean mShouldReadCpusetCategories;
 
+    private File mCpusetDir;
     private File mCpuFreqDir;
     private File mProcStatFile;
     private SparseArray<CpuUsageStats> mCumulativeCpuUsageStats = new SparseArray<>();
@@ -109,10 +111,13 @@ public final class CpuInfoReader {
         mCpuFreqDir = cpuFreqDir;
         mProcStatFile = procStatFile;
         mMinReadIntervalMillis = minReadIntervalMillis;
+        mShouldReadCpusetCategories = new AtomicBoolean(true);
     }
 
     /**
      * Initializes CpuInfoReader and returns a boolean to indicate whether the reader is enabled.
+     *
+     * <p>Returns {@code true} on success. Otherwise, returns {@code false}.
      */
     public boolean init() {
         if (mCpuFreqPolicyDirsById.size() > 0) {
@@ -142,13 +147,11 @@ public final class CpuInfoReader {
             Slogf.e(TAG, "Missing proc stat file at %s", mProcStatFile.getAbsolutePath());
             return false;
         }
-        readCpusetCategories();
         synchronized (mLock) {
-            if (mCpusetCategoriesByCpus.size() == 0) {
-                Slogf.e(TAG,
-                        "Failed to read cpuset information from %s", mCpusetDir.getAbsolutePath());
-                return false;
-            }
+          if (!readCpusetCategories()) {
+              Slogf.e(TAG, "Failed to read cpuset information from %s", mCpusetDir.getAbsolutePath());
+              return false;
+          }
         }
         // Certain CPU performance scaling drivers, such as intel_pstate, perform their own CPU
         // frequency transitions and do not supply this information to the Kernel's cpufreq node.
@@ -169,10 +172,19 @@ public final class CpuInfoReader {
         return true;
     }
 
+  public void stopPeriodicCpusetReading() {
+        mShouldReadCpusetCategories.set(false);
+        if (!readCpusetCategories()) {
+            Slogf.e(TAG, "Failed to read cpuset information from %s",
+                    mCpusetDir.getAbsolutePath());
+            mIsEnabled = false;
+        }
+    }
+
     /**
      * Reads CPU information from proc and sys fs files exposed by the Kernel.
      *
-     * @return SparseArray keyed by CPU core ID; {@code null} on error or when disabled.
+     * <p>Returns SparseArray keyed by CPU core ID; {@code null} on error or when disabled.
      */
     @Nullable
     public SparseArray<CpuInfo> readCpuInfos() {
@@ -189,6 +201,12 @@ public final class CpuInfoReader {
         }
         mLastReadUptimeMillis = uptimeMillis;
         mLastReadCpuInfos = null;
+        if (mShouldReadCpusetCategories.get() && !readCpusetCategories()) {
+            Slogf.e(TAG, "Failed to read cpuset information from %s",
+                    mCpusetDir.getAbsolutePath());
+            mIsEnabled = false;
+            return null;
+        }
         SparseArray<CpuUsageStats> cpuUsageStatsByCpus = readLatestCpuUsageStats();
         if (cpuUsageStatsByCpus == null || cpuUsageStatsByCpus.size() == 0) {
             Slogf.e(TAG, "Failed to read latest CPU usage stats");
@@ -335,7 +353,7 @@ public final class CpuInfoReader {
     /**
      * Sets the CPU frequency for testing.
      *
-     * <p>Return {@code true} on success. Otherwise, returns {@code false}.
+     * <p>Returns {@code true} on success. Otherwise, returns {@code false}.
      */
     @VisibleForTesting
     boolean setCpuFreqDir(File cpuFreqDir) {
@@ -365,7 +383,7 @@ public final class CpuInfoReader {
     /**
      * Sets the proc stat file for testing.
      *
-     * <p>Return true on success. Otherwise, returns false.
+     * <p>Returns {@code true} on success. Otherwise, returns {@code false}.
      */
     @VisibleForTesting
     boolean setProcStatFile(File procStatFile) {
@@ -374,6 +392,21 @@ public final class CpuInfoReader {
             return false;
         }
         mProcStatFile = procStatFile;
+        return true;
+    }
+
+    /**
+     * Set the cpuset directory for testing.
+     *
+     * <p>Returns {@code true} on success. Otherwise, returns {@code false}.
+     */
+    @VisibleForTesting
+    boolean setCpusetDir(File cpusetDir) {
+        if (!cpusetDir.exists() && !cpusetDir.isDirectory()) {
+            Slogf.e(TAG, "Missing or invalid cpuset directory at %s", cpusetDir.getAbsolutePath());
+            return false;
+        }
+        mCpusetDir = cpusetDir;
         return true;
     }
 
@@ -400,11 +433,25 @@ public final class CpuInfoReader {
                 (prevBackgroundCPUMask != mCurrentBackgroundCPUMask);
     }
 
-    private void readCpusetCategories() {
+    /**
+     * Reads cpuset categories by CPU.
+     *
+     * <p>The cpusets are read from the cpuset category specific directories
+     * under the /dev/cpuset directory. The cpuset categories are subject to change at any point
+     * during system bootup, as determined by the init rules specified within the init.rc files.
+     * Therefore, it's necessary to read the cpuset categories each time before accessing CPU usage
+     * statistics until the system boot completes. Once the boot is complete, the latest changes to
+     * the cpuset categories will take a few seconds to propagate. Thus, on boot complete,
+     * the periodic reading is stopped with a delay of
+     * {@link CpuMonitorService#STOP_PERIODIC_CPUSET_READING_DELAY_MILLISECONDS}.
+     *
+     * <p>Returns {@code true} on success. Otherwise, returns {@code false}.
+     */
+    private boolean readCpusetCategories() {
         File[] cpusetDirs = mCpusetDir.listFiles(File::isDirectory);
         if (cpusetDirs == null) {
             Slogf.e(TAG, "Missing cpuset directories at %s", mCpusetDir.getAbsolutePath());
-            return;
+            return false;
         }
         mCurrentTopCPUMask = 0;
         mCurrentBackgroundCPUMask = 0;
@@ -449,6 +496,7 @@ public final class CpuInfoReader {
                 }
             }
         }
+        return mCpusetCategoriesByCpus.size() > 0;
     }
 
     private void readStaticPolicyInfo() {

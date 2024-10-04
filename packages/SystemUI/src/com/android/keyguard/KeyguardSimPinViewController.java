@@ -21,7 +21,6 @@ import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 import static com.android.systemui.util.PluralMessageFormaterKt.icuMessageFormat;
 
 import android.annotation.NonNull;
-import android.annotation.Nullable;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.app.Dialog;
@@ -44,18 +43,16 @@ import com.android.internal.util.LatencyTracker;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
 import com.android.keyguard.domain.interactor.KeyguardKeyboardInteractor;
+import com.android.systemui.bouncer.ui.helper.BouncerHapticPlayer;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.res.R;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 
-import com.google.android.msdl.domain.MSDLPlayer;
-
 public class KeyguardSimPinViewController
         extends KeyguardPinBasedInputViewController<KeyguardSimPinView> {
     public static final String TAG = "KeyguardSimPinView";
     private static final String LOG_TAG = "KeyguardSimPinView";
-    private static final boolean DEBUG = KeyguardConstants.DEBUG_SIM_STATES;
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     private final TelephonyManager mTelephonyManager;
 
@@ -74,9 +71,8 @@ public class KeyguardSimPinViewController
     KeyguardUpdateMonitorCallback mUpdateMonitorCallback = new KeyguardUpdateMonitorCallback() {
         @Override
         public void onSimStateChanged(int subId, int slotId, int simState) {
-            if (DEBUG) Log.v(TAG, "onSimStateChanged(subId=" + subId + ",slotId=" + slotId
+            Log.v(TAG, "onSimStateChanged(subId=" + subId + ",slotId=" + slotId
                 + ",simState=" + simState + ")");
-
             // If subId has gone to PUK required then we need to go to the PUK screen.
             if (subId == mSubId && simState == TelephonyManager.SIM_STATE_PUK_REQUIRED) {
                 getKeyguardSecurityCallback().showCurrentSecurityScreen();
@@ -105,12 +101,12 @@ public class KeyguardSimPinViewController
             EmergencyButtonController emergencyButtonController, FeatureFlags featureFlags,
             SelectedUserInteractor selectedUserInteractor,
             KeyguardKeyboardInteractor keyguardKeyboardInteractor,
-            @Nullable MSDLPlayer msdlPlayer,
+            BouncerHapticPlayer bouncerHapticPlayer,
             UserActivityNotifier userActivityNotifier) {
         super(view, keyguardUpdateMonitor, securityMode, lockPatternUtils, keyguardSecurityCallback,
                 messageAreaControllerFactory, latencyTracker, liftToActivateListener,
                 emergencyButtonController, falsingCollector, featureFlags, selectedUserInteractor,
-                keyguardKeyboardInteractor, msdlPlayer, userActivityNotifier);
+                keyguardKeyboardInteractor, bouncerHapticPlayer, userActivityNotifier);
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mTelephonyManager = telephonyManager;
         mSimImageView = mView.findViewById(R.id.keyguard_sim);
@@ -137,7 +133,7 @@ public class KeyguardSimPinViewController
     @Override
     void resetState() {
         super.resetState();
-        if (DEBUG) Log.v(TAG, "Resetting state mShowDefaultMessage="+mShowDefaultMessage);
+        Log.v(TAG, "Resetting state mShowDefaultMessage="+mShowDefaultMessage);
         handleSubInfoChangeIfNeeded();
         mMessageAreaController.setMessage("");
         if (mShowDefaultMessage) {
@@ -226,11 +222,9 @@ public class KeyguardSimPinViewController
                                 mMessageAreaController.setMessage(mView.getResources().getString(
                                         R.string.kg_password_pin_failed));
                             }
-                            if (DEBUG) {
-                                Log.d(LOG_TAG, "verifyPasswordAndUnlock "
-                                        + " CheckSimPin.onSimCheckResponse: " + result
-                                        + " attemptsRemaining=" + result.getAttemptsRemaining());
-                            }
+                            Log.d(LOG_TAG, "verifyPasswordAndUnlock "
+                                    + " CheckSimPin.onSimCheckResponse: " + result
+                                    + " attemptsRemaining=" + result.getAttemptsRemaining());
                         }
                         getKeyguardSecurityCallback().userActivity();
                         mCheckSimPinThread = null;
@@ -298,10 +292,8 @@ public class KeyguardSimPinViewController
             displayMessage = mView.getResources()
                     .getString(R.string.kg_sim_lock_esim_instructions, displayMessage);
         }
-        if (DEBUG) {
-            Log.d(LOG_TAG, "getPinPasswordErrorMessage: attemptsRemaining="
-                    + attemptsRemaining + " displayMessage=" + displayMessage);
-        }
+        Log.d(LOG_TAG, "getPinPasswordErrorMessage: attemptsRemaining="
+                + attemptsRemaining + " displayMessage=" + displayMessage);
         return displayMessage;
     }
 
@@ -342,14 +334,10 @@ public class KeyguardSimPinViewController
 
         @Override
         public void run() {
-            if (DEBUG) {
-                Log.v(TAG, "call supplyIccLockPin(subid=" + mSubId + ")");
-            }
+            Log.v(TAG, "call supplyIccLockPin(subid=" + mSubId + ")");
             TelephonyManager telephonyManager = mTelephonyManager.createForSubscriptionId(mSubId);
             final PinResult result = telephonyManager.supplyIccLockPin(mPin);
-            if (DEBUG) {
-                Log.v(TAG, "supplyIccLockPin returned: " + result.toString());
-            }
+            Log.v(TAG, "supplyIccLockPin returned: " + result.toString());
             mView.post(() -> onSimCheckResponse(result));
         }
     }
@@ -394,7 +382,7 @@ public class KeyguardSimPinViewController
         int subId = mKeyguardUpdateMonitor
                 .getUnlockedSubIdForState(TelephonyManager.SIM_STATE_PIN_REQUIRED);
         if (SubscriptionManager.isValidSubscriptionId(subId)) {
-           if (DEBUG) Log.v(TAG, "handleSubInfoChangeIfNeeded mSubId="+mSubId+" subId="+ subId);
+            Log.v(TAG, "handleSubInfoChangeIfNeeded mSubId="+mSubId+" subId="+ subId);
             mShowDefaultMessage = true;
             if(subId != mSubId){
               mSubId = subId;

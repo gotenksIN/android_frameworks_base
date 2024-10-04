@@ -105,6 +105,7 @@
     <string name="app_clips_save_add_to_note" msgid="3460200751278069445">"గమనికకు జోడించండి"</string>
     <string name="backlinks_include_link" msgid="4562093591148248158">"లింక్‌ను చేర్చండి"</string>
     <string name="backlinks_duplicate_label_format" msgid="558445128952827926">"<xliff:g id="APPNAME">%1$s</xliff:g> <xliff:g id="FREQUENCYCOUNT">(%2$d)</xliff:g>⁠"</string>
+    <string name="backlinks_cross_profile_error" msgid="1355798585727802282">"ఇతర ప్రొఫైల్స్ నుండి లింక్‌లు జోడించబడవు"</string>
     <string name="screenrecord_title" msgid="4257171601439507792">"స్క్రీన్ రికార్డర్"</string>
     <string name="screenrecord_background_processing_label" msgid="7244617554884238898">"స్క్రీన్ రికార్డింగ్ అవుతోంది"</string>
     <string name="screenrecord_channel_description" msgid="4147077128486138351">"స్క్రీన్ రికార్డ్ సెషన్ కోసం ఆన్‌గోయింగ్ నోటిఫికేషన్"</string>
@@ -124,7 +125,7 @@
     <string name="screenrecord_ongoing_screen_only" msgid="4459670242451527727">"స్క్రీన్ రికార్డింగ్ చేయబడుతోంది"</string>
     <string name="screenrecord_ongoing_screen_and_audio" msgid="5351133763125180920">"స్క్రీన్, ఆడియో రికార్డింగ్ చేయబడుతున్నాయి"</string>
     <string name="screenrecord_taps_label" msgid="1595690528298857649">"స్క్రీన్‌పై తాకే స్థానాలను చూపండి"</string>
-    <string name="screenrecord_stop_label" msgid="72699670052087989">"ఆపివేయి"</string>
+    <string name="screenrecord_stop_label" msgid="72699670052087989">"ఆపివేయండి"</string>
     <string name="screenrecord_share_label" msgid="5025590804030086930">"షేర్ చేయండి"</string>
     <string name="screenrecord_save_title" msgid="1886652605520893850">"స్క్రీన్ రికార్డింగ్ సేవ్ చేయబడింది"</string>
     <string name="screenrecord_save_text" msgid="3008973099800840163">"చూడటానికి ట్యాప్ చేయండి"</string>
@@ -292,8 +293,7 @@
     <string name="start_dreams" msgid="9131802557946276718">"స్క్రీన్ సేవర్"</string>
     <string name="ethernet_label" msgid="2203544727007463351">"ఈథర్‌నెట్"</string>
     <string name="quick_settings_dnd_label" msgid="7728690179108024338">"అంతరాయం కలిగించవద్దు"</string>
-    <!-- no translation found for quick_settings_modes_label (879156359479504244) -->
-    <skip />
+    <string name="quick_settings_modes_label" msgid="879156359479504244">"మోడ్‌లు"</string>
     <string name="quick_settings_bluetooth_label" msgid="7018763367142041481">"బ్లూటూత్"</string>
     <string name="quick_settings_bluetooth_detail_empty_text" msgid="5760239584390514322">"జత చేసిన పరికరాలు ఏవీ అందుబాటులో లేవు"</string>
     <string name="quick_settings_bluetooth_tile_subtitle" msgid="212752719010829550">"పరికరాన్ని కనెక్ట్ చేయడానికి లేదా డిస్‌కనెక్ట్ చేయడానికి ట్యాప్ చేయండి"</string>
@@ -434,8 +434,7 @@
     <string name="sensor_privacy_dialog_open_settings" msgid="5635865896053011859">"సెట్టింగ్‌లను తెరవండి"</string>
     <string name="media_seamless_other_device" msgid="4654849800789196737">"ఇతర పరికరం"</string>
     <string name="quick_step_accessibility_toggle_overview" msgid="7908949976727578403">"స్థూలదృష్టిని టోగుల్ చేయి"</string>
-    <!-- no translation found for zen_modes_dialog_title (8854640808100096934) -->
-    <skip />
+    <string name="zen_modes_dialog_title" msgid="8854640808100096934">"మోడ్‌లు"</string>
     <string name="zen_modes_dialog_done" msgid="6654130880256438950">"పూర్తయింది"</string>
     <string name="zen_modes_dialog_settings" msgid="2310248023728936697">"సెట్టింగ్‌లు"</string>
     <string name="zen_mode_on" msgid="9085304934016242591">"ఆన్‌లో ఉంది"</string>
@@ -1290,6 +1289,8 @@
     <string name="add" msgid="81036585205287996">"జోడించండి"</string>
     <string name="manage_users" msgid="1823875311934643849">"యూజర్‌లను మేనేజ్ చేయండి"</string>
     <string name="drag_split_not_supported" msgid="7173481676120546121">"ఈ నోటిఫికేషన్ స్ప్లిట్ స్క్రీన్‌కు లాగడాన్ని సపోర్ట్ చేయదు"</string>
+    <!-- no translation found for dream_overlay_location_active (6484763493158166618) -->
+    <skip />
     <string name="dream_overlay_status_bar_wifi_off" msgid="4497069245055003582">"Wi‑Fi అందుబాటులో లేదు"</string>
     <string name="dream_overlay_status_bar_priority_mode" msgid="5428462123314728739">"ముఖ్యమైన ఫైల్స్ మోడ్"</string>
     <string name="dream_overlay_status_bar_alarm_set" msgid="566707328356590886">"అలారం సెట్ చేశాను"</string>
@@ -1346,6 +1347,8 @@
     <string name="lock_screen_settings" msgid="6152703934761402399">"లాక్ స్క్రీన్ అనుకూలంగా మార్చండి"</string>
     <string name="keyguard_unlock_to_customize_ls" msgid="2068542308086253819">"లాక్ స్క్రీన్‌ను అనుకూలంగా మార్చుకోవడానికి అన్‌లాక్ చేయండి"</string>
     <string name="wifi_unavailable_dream_overlay_content_description" msgid="2024166212194640100">"Wi-Fi అందుబాటులో లేదు"</string>
+    <!-- no translation found for location_active_dream_overlay_content_description (6208885541020673916) -->
+    <skip />
     <string name="camera_blocked_dream_overlay_content_description" msgid="4074759493559418130">"కెమెరా బ్లాక్ చేయబడింది"</string>
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"కెమెరా, మైక్రోఫోన్ బ్లాక్ చేయబడ్డాయి"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"మైక్రోఫోన్ బ్లాక్ చేయబడింది"</string>
@@ -1393,21 +1396,16 @@
     <string name="shortcut_helper_content_description_collapse_icon" msgid="8028015738431664954">"కుదించండి చిహ్నం"</string>
     <string name="shortcut_helper_content_description_expand_icon" msgid="1084435697860417390">"విస్తరించండి చిహ్నం"</string>
     <string name="shortcut_helper_key_combinations_or_separator" msgid="7082902112102125540">"లేదా"</string>
-    <!-- no translation found for launch_keyboard_tutorial_notification_title (8849933155160522519) -->
-    <skip />
-    <!-- no translation found for launch_keyboard_tutorial_notification_content (2880339951512757918) -->
-    <skip />
-    <!-- no translation found for launch_touchpad_tutorial_notification_title (2243780062772196901) -->
-    <skip />
-    <!-- no translation found for launch_touchpad_tutorial_notification_content (7931085031240753226) -->
-    <skip />
-    <!-- no translation found for launch_keyboard_touchpad_tutorial_notification_title (1940023776496198762) -->
-    <skip />
-    <!-- no translation found for launch_keyboard_touchpad_tutorial_notification_content (1780725168171929365) -->
-    <skip />
+    <string name="launch_keyboard_tutorial_notification_title" msgid="8849933155160522519">"మీ కీబోర్డ్ ఉపయోగించి నావిగేట్ చేయండి"</string>
+    <string name="launch_keyboard_tutorial_notification_content" msgid="2880339951512757918">"కీబోర్డ్ షార్ట్‌కట్‌ల గురించి తెలుసుకోండి"</string>
+    <string name="launch_touchpad_tutorial_notification_title" msgid="2243780062772196901">"మీ టచ్‌ప్యాడ్‌ని ఉపయోగించి నావిగేట్ చేయండి"</string>
+    <string name="launch_touchpad_tutorial_notification_content" msgid="7931085031240753226">"టచ్‌ప్యాడ్ సంజ్ఞ గురించి తెలుసుకోండి"</string>
+    <string name="launch_keyboard_touchpad_tutorial_notification_title" msgid="1940023776496198762">"మీ కీబోర్డ్, టచ్‌ప్యాడ్‌ను ఉపయోగించి నావిగేట్ చేయండి"</string>
+    <string name="launch_keyboard_touchpad_tutorial_notification_content" msgid="1780725168171929365">"టచ్‌ప్యాడ్ సంజ్ఞలు, కీబోర్డ్ షార్ట్‌కట్‌లు, అలాగే మరిన్నింటిని గురించి తెలుసుకోండి"</string>
     <string name="touchpad_tutorial_back_gesture_button" msgid="2746834288077265946">"వెనుకకు పంపే సంజ్ఞ"</string>
     <string name="touchpad_tutorial_home_gesture_button" msgid="7640544867625955304">"హోమ్‌కు పంపే సంజ్ఞ"</string>
-    <string name="touchpad_tutorial_action_key_button" msgid="3220074511852927267">"యాక్షన్ కీ"</string>
+    <!-- no translation found for touchpad_tutorial_recent_apps_gesture_button (8919227647650347359) -->
+    <skip />
     <string name="touchpad_tutorial_done_button" msgid="176168488821755503">"పూర్తయింది"</string>
     <string name="touchpad_back_gesture_action_title" msgid="7199067250654332735">"వెనుకకు"</string>
     <string name="touchpad_back_gesture_guidance" msgid="6263750214998421587">"వెనుకకు వెళ్లడానికి, టచ్‌ప్యాడ్‌లో ఎక్కడైనా మూడు వేళ్లను ఉపయోగించి ఎడమ లేదా కుడి వైపునకు స్వైప్ చేయండి.\n\nమీరు దీని కోసం + ESC కీబోర్డ్ షార్ట్‌కట్ యాక్షన్‌ను కూడా ఉపయోగించవచ్చు."</string>
@@ -1417,6 +1415,14 @@
     <string name="touchpad_home_gesture_guidance" msgid="3043931356096731966">"ఏ సమయంలోనైనా మీ మొదటి స్క్రీన్‌కు వెళ్లడానికి, మీ స్క్రీన్ కింది నుండి మూడు వేళ్లతో పైకి స్వైప్ చేయండి."</string>
     <string name="touchpad_home_gesture_success_title" msgid="3778407003948209795">"సూపర్!"</string>
     <string name="touchpad_home_gesture_success_body" msgid="2404031094918807067">"మొదటి స్క్రీన్‌కు వెళ్ళడానికి ఉపయోగించే సంజ్ఞకు సంబంధించిన ట్యుటోరియల్‌ను మీరు పూర్తి చేశారు."</string>
+    <!-- no translation found for touchpad_recent_apps_gesture_action_title (934906836867137906) -->
+    <skip />
+    <!-- no translation found for touchpad_recent_apps_gesture_guidance (6012057247259983871) -->
+    <skip />
+    <!-- no translation found for touchpad_recent_apps_gesture_success_title (8481920554139332593) -->
+    <skip />
+    <!-- no translation found for touchpad_recent_apps_gesture_success_body (4334263906697493273) -->
+    <skip />
     <string name="tutorial_action_key_title" msgid="2659466586996495447">"యాక్షన్ కీ"</string>
     <string name="tutorial_action_key_guidance" msgid="5718948664616999196">"మీ యాప్‌లను యాక్సెస్ చేయడానికి, మీ కీబోర్డ్‌లో యాక్షన్ కీని నొక్కండి."</string>
     <string name="tutorial_action_key_success_title" msgid="466467860120112933">"అభినందనలు!"</string>
@@ -1440,8 +1446,19 @@
     <string name="overview_edu_notification_content" msgid="3578204677648432500">"మూడు వేళ్లతో పైకి స్వైప్ చేసి, హోల్డ్ చేయండి. మరిన్ని సంజ్ఞల గురించి తెలుసుకోవడానికి ట్యాప్ చేయండి."</string>
     <string name="all_apps_edu_notification_title" msgid="372262997265569063">"యాప్‌లన్నింటినీ చూడటానికి మీ కీబోర్డ్‌ను ఉపయోగించండి"</string>
     <string name="all_apps_edu_notification_content" msgid="3255070575694025585">"ఏ సమయంలోనైనా యాక్షన్ కీని నొక్కండి. మరిన్ని సంజ్ఞల గురించి తెలుసుకోవడానికి ట్యాప్ చేయండి."</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_title" msgid="4369307638184799742">"కాంతిని మరింత డిమ్ చేసే ఫీచర్ ఇప్పుడు బ్రైట్‌నెస్ బార్‌లో ఒక భాగం"</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_description" msgid="7513137763024327538">"మీరు ఇప్పుడు మీ స్క్రీన్ పైభాగం నుండి బ్రైట్‌నెస్ స్థాయిని తగ్గించడం ద్వారా కూడా స్క్రీన్ కాంతిని మరింత డిమ్ చేయవచ్చు.\n\nమీరు డార్క్ ఎన్విరాన్‌మెంట్‌లో ఉన్నప్పుడు కూడా ఇది బాగా పని చేస్తుంది."</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_button" msgid="1782147201534669800">"కాంతిని మరింత డిమ్ చేసే షార్ట్‌కట్‌ను తీసివేయండి"</string>
-    <string name="accessibility_deprecate_extra_dim_dialog_toast" msgid="4070696910424515757">"కాంతిని మరింత డిమ్ చేసే షార్ట్‌కట్ తీసివేయబడింది. మీ బ్రైట్‌నెస్‌ను తగ్గించడానికి, సాధారణ బ్రైట్‌నెస్ బార్‌ను ఉపయోగించండి."</string>
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_title (910988771011857460) -->
+    <skip />
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_description (4453123359258743230) -->
+    <skip />
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_button (3947537827396916005) -->
+    <skip />
+    <!-- no translation found for accessibility_deprecate_extra_dim_dialog_toast (165474092660941104) -->
+    <skip />
+    <string name="qs_edit_mode_category_connectivity" msgid="4559726936546032672">"కనెక్టివిటీ"</string>
+    <string name="qs_edit_mode_category_accessibility" msgid="7969091385071475922">"Accessibility"</string>
+    <string name="qs_edit_mode_category_utilities" msgid="8123080090108420095">"యుటిలిటీలు"</string>
+    <string name="qs_edit_mode_category_privacy" msgid="6577774443194551775">"గోప్యత"</string>
+    <string name="qs_edit_mode_category_providedByApps" msgid="8346112074897919019">"యాప్‌ల ద్వారా అందించబడినవి"</string>
+    <string name="qs_edit_mode_category_display" msgid="4749511439121053942">"డిస్‌ప్లే"</string>
+    <string name="qs_edit_mode_category_unknown" msgid="509314252124053550">"తెలియదు"</string>
 </resources>

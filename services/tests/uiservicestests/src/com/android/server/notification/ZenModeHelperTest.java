@@ -5788,7 +5788,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
 
         // ... but it is NOT active
         ZenRule storedRule = mZenModeHelper.mConfig.automaticRules.get(newRuleId);
-        assertThat(storedRule.isAutomaticActive()).isFalse();
+        assertThat(storedRule.isActive()).isFalse();
         assertThat(storedRule.isTrueOrUnknown()).isFalse();
         assertThat(storedRule.condition).isNull();
         assertThat(mZenModeHelper.getZenMode()).isEqualTo(ZEN_MODE_OFF);
@@ -5841,7 +5841,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
 
         // ... but it is NEITHER active NOR snoozed.
         ZenRule storedRule = mZenModeHelper.mConfig.automaticRules.get(newRuleId);
-        assertThat(storedRule.isAutomaticActive()).isFalse();
+        assertThat(storedRule.isActive()).isFalse();
         assertThat(storedRule.isTrueOrUnknown()).isFalse();
         assertThat(storedRule.condition).isNull();
         assertThat(storedRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
@@ -6619,7 +6619,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "manual-on", STATE_TRUE, SOURCE_USER_ACTION),
                 ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_ACTIVATE);
         assertThat(zenRule.condition).isNull();
 
@@ -6627,14 +6627,14 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "manual-off", STATE_FALSE, SOURCE_USER_ACTION),
                 ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isFalse();
+        assertThat(zenRule.isActive()).isFalse();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
         assertThat(zenRule.condition).isNull();
 
         // Bonus check: app has resumed control over the rule and can now turn it on.
         mZenModeHelper.setAutomaticZenRuleState(ruleId, autoOn,  ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
         assertThat(zenRule.condition).isEqualTo(autoOn);
     }
@@ -6655,7 +6655,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
 
         mZenModeHelper.setAutomaticZenRuleState(ruleId, autoOn,  ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
         assertThat(zenRule.condition).isEqualTo(autoOn);
 
@@ -6663,7 +6663,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "manual-off", STATE_FALSE, SOURCE_USER_ACTION),
                 ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isFalse();
+        assertThat(zenRule.isActive()).isFalse();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_DEACTIVATE);
         assertThat(zenRule.condition).isEqualTo(autoOn);
 
@@ -6671,14 +6671,14 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "manual-on", STATE_TRUE, SOURCE_USER_ACTION),
                 ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
         assertThat(zenRule.condition).isEqualTo(autoOn);
 
         // Bonus check: app has resumed control over the rule and can now turn it off.
         mZenModeHelper.setAutomaticZenRuleState(ruleId, autoOff,  ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isFalse();
+        assertThat(zenRule.isActive()).isFalse();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
         assertThat(zenRule.condition).isEqualTo(autoOff);
     }
@@ -6696,7 +6696,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "auto-on", STATE_TRUE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         ZenRule zenRuleOn = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRuleOn.isAutomaticActive()).isTrue();
+        assertThat(zenRuleOn.isActive()).isTrue();
         assertThat(zenRuleOn.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
         assertThat(zenRuleOn.condition).isNotNull();
 
@@ -6704,7 +6704,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "manual-off", STATE_FALSE, SOURCE_USER_ACTION),
                 ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
         ZenRule zenRuleOff = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRuleOff.isAutomaticActive()).isFalse();
+        assertThat(zenRuleOff.isActive()).isFalse();
         assertThat(zenRuleOff.getConditionOverride()).isEqualTo(OVERRIDE_DEACTIVATE);
         assertThat(zenRuleOff.condition).isNotNull();
     }
@@ -6723,27 +6723,27 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "manual-on", STATE_TRUE, SOURCE_USER_ACTION),
                 ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_ACTIVATE);
 
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-off", STATE_FALSE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_ACTIVATE);
 
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-on", STATE_TRUE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-off", STATE_FALSE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isFalse();
+        assertThat(zenRule.isActive()).isFalse();
     }
 
     @Test
@@ -6760,35 +6760,35 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new Condition(rule.getConditionId(), "auto-on", STATE_TRUE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
 
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "manual-off", STATE_FALSE, SOURCE_USER_ACTION),
                 ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isFalse();
+        assertThat(zenRule.isActive()).isFalse();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_DEACTIVATE);
 
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-on", STATE_TRUE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isFalse();
+        assertThat(zenRule.isActive()).isFalse();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_DEACTIVATE);
 
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-off", STATE_FALSE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isFalse();
+        assertThat(zenRule.isActive()).isFalse();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
 
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-on", STATE_TRUE, SOURCE_CONTEXT),
                 ORIGIN_APP, CUSTOM_PKG_UID);
         zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
-        assertThat(zenRule.isAutomaticActive()).isTrue();
+        assertThat(zenRule.isActive()).isTrue();
         assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
     }
 
@@ -6805,14 +6805,14 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "manual-on-from-sysui", STATE_TRUE,
                         SOURCE_USER_ACTION), ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
-        assertThat(getZenRule(ruleId).isAutomaticActive()).isTrue();
+        assertThat(getZenRule(ruleId).isActive()).isTrue();
         assertThat(getZenRule(ruleId).getConditionOverride()).isEqualTo(OVERRIDE_ACTIVATE);
 
         // ... and they can turn it off manually from inside the app.
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "manual-off-from-app", STATE_FALSE,
                         SOURCE_USER_ACTION), ORIGIN_USER_IN_APP, CUSTOM_PKG_UID);
-        assertThat(getZenRule(ruleId).isAutomaticActive()).isFalse();
+        assertThat(getZenRule(ruleId).isActive()).isFalse();
         assertThat(getZenRule(ruleId).getConditionOverride()).isEqualTo(OVERRIDE_NONE);
     }
 
@@ -6829,21 +6829,21 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-on-from-app", STATE_TRUE,
                         SOURCE_SCHEDULE), ORIGIN_APP, CUSTOM_PKG_UID);
-        assertThat(getZenRule(ruleId).isAutomaticActive()).isTrue();
+        assertThat(getZenRule(ruleId).isActive()).isTrue();
         assertThat(getZenRule(ruleId).getConditionOverride()).isEqualTo(OVERRIDE_NONE);
 
         // User manually turns off rule from SysUI / Settings...
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "manual-off-from-sysui", STATE_FALSE,
                         SOURCE_USER_ACTION), ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
-        assertThat(getZenRule(ruleId).isAutomaticActive()).isFalse();
+        assertThat(getZenRule(ruleId).isActive()).isFalse();
         assertThat(getZenRule(ruleId).getConditionOverride()).isEqualTo(OVERRIDE_DEACTIVATE);
 
         // ... and they can turn it on manually from inside the app.
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "manual-on-from-app", STATE_TRUE,
                         SOURCE_USER_ACTION), ORIGIN_USER_IN_APP, CUSTOM_PKG_UID);
-        assertThat(getZenRule(ruleId).isAutomaticActive()).isTrue();
+        assertThat(getZenRule(ruleId).isActive()).isTrue();
         assertThat(getZenRule(ruleId).getConditionOverride()).isEqualTo(OVERRIDE_NONE);
     }
 
@@ -6861,14 +6861,14 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "manual-on-from-app", STATE_TRUE,
                         SOURCE_USER_ACTION), ORIGIN_USER_IN_APP, CUSTOM_PKG_UID);
-        assertThat(getZenRule(ruleId).isAutomaticActive()).isTrue();
+        assertThat(getZenRule(ruleId).isActive()).isTrue();
         assertThat(getZenRule(ruleId).getConditionOverride()).isEqualTo(OVERRIDE_NONE);
 
         // ... so the app can turn it off when its schedule is over.
         mZenModeHelper.setAutomaticZenRuleState(ruleId,
                 new Condition(rule.getConditionId(), "auto-off-from-app", STATE_FALSE,
                         SOURCE_SCHEDULE), ORIGIN_APP, CUSTOM_PKG_UID);
-        assertThat(getZenRule(ruleId).isAutomaticActive()).isFalse();
+        assertThat(getZenRule(ruleId).isActive()).isFalse();
         assertThat(getZenRule(ruleId).getConditionOverride()).isEqualTo(OVERRIDE_NONE);
     }
 
@@ -6921,6 +6921,75 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         assertThat(eventsRule.zenPolicy).isEqualTo(mZenModeHelper.getDefaultZenPolicy());
         assertThat(eventsRule.type).isEqualTo(TYPE_SCHEDULE_CALENDAR);
         assertThat(eventsRule.triggerDescription).isNotEmpty();
+    }
+
+    @Test
+    @EnableFlags({FLAG_MODES_API, FLAG_MODES_UI})
+    public void setAutomaticZenRuleState_withManualActivation_activeOnReboot()
+            throws Exception {
+        AutomaticZenRule rule = new AutomaticZenRule.Builder("Rule", Uri.parse("cond"))
+                .setPackage(mPkg)
+                .build();
+        String ruleId = mZenModeHelper.addAutomaticZenRule(mPkg, rule, ORIGIN_APP, "adding",
+                CUSTOM_PKG_UID);
+        mZenModeHelper.setAutomaticZenRuleState(ruleId,
+                new Condition(rule.getConditionId(), "manual-on", STATE_TRUE, SOURCE_USER_ACTION),
+                ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
+        assertThat(mZenModeHelper.getAutomaticZenRuleState(ruleId)).isEqualTo(STATE_TRUE);
+        ZenRule zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
+        assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_ACTIVATE);
+        assertThat(zenRule.condition).isNull();
+
+        ByteArrayOutputStream xmlBytes = writeXmlAndPurge(ZenModeConfig.XML_VERSION_MODES_UI);
+        zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
+        assertThat(zenRule).isNull();
+
+        // Now simulate a reboot -> reload the configuration after purging.
+        TypedXmlPullParser parser = getParserForByteStream(xmlBytes);
+        mZenModeHelper.readXml(parser, false, UserHandle.USER_ALL);
+
+        if (Flags.modesUi()) {
+            assertThat(mZenModeHelper.getAutomaticZenRuleState(ruleId)).isEqualTo(STATE_TRUE);
+            zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
+            assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_ACTIVATE);
+            assertThat(zenRule.condition).isNull();
+        } else {
+            assertThat(mZenModeHelper.getAutomaticZenRuleState(ruleId)).isEqualTo(STATE_FALSE);
+        }
+    }
+
+    @Test
+    @EnableFlags({FLAG_MODES_API, FLAG_MODES_UI})
+    public void setAutomaticZenRuleState_withManualDeactivation_clearedOnReboot()
+            throws Exception {
+        AutomaticZenRule rule = new AutomaticZenRule.Builder("Rule", Uri.parse("cond"))
+                .setPackage(mPkg)
+                .build();
+        String ruleId = mZenModeHelper.addAutomaticZenRule(mPkg, rule, ORIGIN_APP, "adding",
+                CUSTOM_PKG_UID);
+        mZenModeHelper.setAutomaticZenRuleState(ruleId,
+                new Condition(rule.getConditionId(), "auto-on", STATE_TRUE, SOURCE_CONTEXT),
+                ORIGIN_APP, CUSTOM_PKG_UID);
+        mZenModeHelper.setAutomaticZenRuleState(ruleId,
+                new Condition(rule.getConditionId(), "snooze", STATE_FALSE, SOURCE_USER_ACTION),
+                ORIGIN_USER_IN_SYSTEMUI, SYSTEM_UID);
+        assertThat(mZenModeHelper.getAutomaticZenRuleState(ruleId)).isEqualTo(STATE_FALSE);
+        ZenRule zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
+        assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_DEACTIVATE);
+        assertThat(zenRule.condition).isNotNull();
+
+        ByteArrayOutputStream xmlBytes = writeXmlAndPurge(ZenModeConfig.XML_VERSION_MODES_UI);
+        zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
+        assertThat(zenRule).isNull();
+
+        // Now simulate a reboot -> reload the configuration after purging.
+        TypedXmlPullParser parser = getParserForByteStream(xmlBytes);
+        mZenModeHelper.readXml(parser, false, UserHandle.USER_ALL);
+
+        assertThat(mZenModeHelper.getAutomaticZenRuleState(ruleId)).isEqualTo(STATE_TRUE);
+        zenRule = mZenModeHelper.mConfig.automaticRules.get(ruleId);
+        assertThat(zenRule.getConditionOverride()).isEqualTo(OVERRIDE_NONE);
+        assertThat(zenRule.condition).isNotNull();
     }
 
     private static void addZenRule(ZenModeConfig config, String id, String ownerPkg, int zenMode,

@@ -168,7 +168,7 @@ import com.android.systemui.statusbar.OperatorNameViewController;
 import com.android.systemui.statusbar.PulseExpansionHandler;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.StatusBarStateControllerImpl;
-import com.android.systemui.statusbar.core.StatusBarInitializer;
+import com.android.systemui.statusbar.core.StatusBarInitializerImpl;
 import com.android.systemui.statusbar.data.repository.FakeStatusBarModeRepository;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
@@ -467,13 +467,12 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                     mDeviceProvisionedController,
                     mNotificationShadeWindowController,
                     0,
+                    () -> mNotificationShadeWindowViewController,
                     () -> mNotificationPanelViewController,
                     () -> mAssistManager,
                     () -> mNotificationGutsManager
             ));
         }
-        mShadeController.setNotificationShadeWindowViewController(
-                mNotificationShadeWindowViewController);
         mShadeController.setNotificationPresenter(mNotificationPresenter);
 
         when(mOperatorNameViewControllerFactory.create(any()))
@@ -505,7 +504,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mock(FragmentService.class),
                 mLightBarController,
                 mAutoHideController,
-                new StatusBarInitializer(
+                new StatusBarInitializerImpl(
                         mStatusBarWindowController,
                         mCollapsedStatusBarFragmentProvider,
                         emptySet()),

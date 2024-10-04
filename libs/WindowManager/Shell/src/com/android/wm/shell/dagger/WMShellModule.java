@@ -18,6 +18,7 @@ package com.android.wm.shell.dagger;
 
 import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASK_LIMIT;
 
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.KeyguardManager;
 import android.content.Context;
@@ -74,6 +75,7 @@ import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator;
 import com.android.wm.shell.desktopmode.SpringDragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler;
+import com.android.wm.shell.desktopmode.WindowDecorCaptionHandleRepository;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationFilter;
 import com.android.wm.shell.desktopmode.education.data.AppHandleEducationDatastoreRepository;
@@ -114,6 +116,8 @@ import com.android.wm.shell.unfold.qualifier.UnfoldTransition;
 import com.android.wm.shell.windowdecor.CaptionWindowDecorViewModel;
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecorViewModel;
 import com.android.wm.shell.windowdecor.WindowDecorViewModel;
+import com.android.wm.shell.windowdecor.viewhost.DefaultWindowDecorViewHostSupplier;
+import com.android.wm.shell.windowdecor.viewhost.WindowDecorViewHostSupplier;
 
 import dagger.Binds;
 import dagger.Lazy;
@@ -138,7 +142,7 @@ import java.util.Optional;
         includes = {
                 WMShellBaseModule.class,
                 PipModule.class,
-                ShellBackAnimationModule.class,
+                ShellBackAnimationModule.class
         })
 public abstract class WMShellModule {
 
@@ -244,7 +248,9 @@ public abstract class WMShellModule {
             AssistContentRequester assistContentRequester,
             MultiInstanceHelper multiInstanceHelper,
             Optional<DesktopTasksLimiter> desktopTasksLimiter,
-            Optional<DesktopActivityOrientationChangeHandler> desktopActivityOrientationHandler) {
+            WindowDecorCaptionHandleRepository windowDecorCaptionHandleRepository,
+            Optional<DesktopActivityOrientationChangeHandler> desktopActivityOrientationHandler,
+            WindowDecorViewHostSupplier windowDecorViewHostSupplier) {
         if (DesktopModeStatus.canEnterDesktopMode(context)) {
             return new DesktopModeWindowDecorViewModel(
                     context,
@@ -268,7 +274,9 @@ public abstract class WMShellModule {
                     assistContentRequester,
                     multiInstanceHelper,
                     desktopTasksLimiter,
-                    desktopActivityOrientationHandler);
+                    windowDecorCaptionHandleRepository,
+                    desktopActivityOrientationHandler,
+                    windowDecorViewHostSupplier);
         }
         return new CaptionWindowDecorViewModel(
                 context,
@@ -282,7 +290,8 @@ public abstract class WMShellModule {
                 displayController,
                 rootTaskDisplayAreaOrganizer,
                 syncQueue,
-                transitions);
+                transitions,
+                windowDecorViewHostSupplier);
     }
 
     @WMSingleton
@@ -347,7 +356,8 @@ public abstract class WMShellModule {
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellAnimationThread ShellExecutor animExecutor,
             @DynamicOverride DesktopModeTaskRepository desktopModeTaskRepository,
-            InteractionJankMonitor interactionJankMonitor) {
+            InteractionJankMonitor interactionJankMonitor,
+            @ShellMainThread Handler handler) {
         return new FreeformTaskTransitionHandler(
                 shellInit,
                 transitions,
@@ -357,7 +367,8 @@ public abstract class WMShellModule {
                 mainExecutor,
                 animExecutor,
                 desktopModeTaskRepository,
-                interactionJankMonitor);
+                interactionJankMonitor,
+                handler);
     }
 
     @WMSingleton
@@ -369,6 +380,13 @@ public abstract class WMShellModule {
             WindowDecorViewModel windowDecorViewModel) {
         return new FreeformTaskTransitionObserver(
                 context, shellInit, transitions, windowDecorViewModel);
+    }
+
+    @WMSingleton
+    @Provides
+    static WindowDecorViewHostSupplier provideWindowDecorViewHostSupplier(
+            @ShellMainThread @NonNull CoroutineScope mainScope) {
+        return new DefaultWindowDecorViewHostSupplier(mainScope);
     }
 
     //
@@ -461,10 +479,11 @@ public abstract class WMShellModule {
     @Provides
     static RecentsTransitionHandler provideRecentsTransitionHandler(
             ShellInit shellInit,
+            ShellTaskOrganizer shellTaskOrganizer,
             Transitions transitions,
             Optional<RecentTasksController> recentTasksController,
             HomeTransitionObserver homeTransitionObserver) {
-        return new RecentsTransitionHandler(shellInit, transitions,
+        return new RecentsTransitionHandler(shellInit, shellTaskOrganizer, transitions,
                 recentTasksController.orElse(null), homeTransitionObserver);
     }
 
@@ -590,6 +609,7 @@ public abstract class WMShellModule {
             RecentsTransitionHandler recentsTransitionHandler,
             MultiInstanceHelper multiInstanceHelper,
             @ShellMainThread ShellExecutor mainExecutor,
+            @ShellMainThread Handler mainHandler,
             Optional<DesktopTasksLimiter> desktopTasksLimiter,
             Optional<RecentTasksController> recentTasksController,
             InteractionJankMonitor interactionJankMonitor) {
@@ -602,7 +622,7 @@ public abstract class WMShellModule {
                 dragToDesktopTransitionHandler, desktopModeTaskRepository,
                 desktopModeLoggerTransitionObserver, launchAdjacentController,
                 recentsTransitionHandler, multiInstanceHelper, mainExecutor, desktopTasksLimiter,
-                recentTasksController.orElse(null), interactionJankMonitor);
+                recentTasksController.orElse(null), interactionJankMonitor, mainHandler);
     }
 
     @WMSingleton
@@ -612,7 +632,8 @@ public abstract class WMShellModule {
             Transitions transitions,
             @DynamicOverride DesktopModeTaskRepository desktopModeTaskRepository,
             ShellTaskOrganizer shellTaskOrganizer,
-            InteractionJankMonitor interactionJankMonitor) {
+            InteractionJankMonitor interactionJankMonitor,
+            @ShellMainThread Handler handler) {
         int maxTaskLimit = DesktopModeStatus.getMaxTaskLimit(context);
         if (!DesktopModeStatus.canEnterDesktopMode(context)
                 || !ENABLE_DESKTOP_WINDOWING_TASK_LIMIT.isEnabled(context)
@@ -626,7 +647,8 @@ public abstract class WMShellModule {
                         shellTaskOrganizer,
                         maxTaskLimit,
                         interactionJankMonitor,
-                        context)
+                        context,
+                        handler)
         );
     }
 
@@ -673,9 +695,10 @@ public abstract class WMShellModule {
     static ExitDesktopTaskTransitionHandler provideExitDesktopTaskTransitionHandler(
             Transitions transitions,
             Context context,
-            InteractionJankMonitor interactionJankMonitor) {
+            InteractionJankMonitor interactionJankMonitor,
+            @ShellMainThread Handler handler) {
         return new ExitDesktopTaskTransitionHandler(
-            transitions, context, interactionJankMonitor);
+            transitions, context, interactionJankMonitor, handler);
     }
 
     @WMSingleton
@@ -756,6 +779,12 @@ public abstract class WMShellModule {
             Context context,
             AppHandleEducationDatastoreRepository appHandleEducationDatastoreRepository) {
         return new AppHandleEducationFilter(context, appHandleEducationDatastoreRepository);
+    }
+
+    @WMSingleton
+    @Provides
+    static WindowDecorCaptionHandleRepository provideAppHandleRepository() {
+        return new WindowDecorCaptionHandleRepository();
     }
 
     @WMSingleton

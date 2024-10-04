@@ -110,15 +110,16 @@ class DeviceSettingRepositoryImpl(
             if (settingId == DeviceSettingId.DEVICE_SETTING_ID_BLUETOOTH_PROFILES) {
                 BluetoothProfilesItem(
                     settingId,
+                    highlighted,
                     preferenceKey!!,
                     extras.getStringArrayList(DeviceSettingContract.INVISIBLE_PROFILES)
                         ?: emptyList()
                 )
             } else {
-                CommonBuiltinItem(settingId, preferenceKey!!)
+                CommonBuiltinItem(settingId, highlighted, preferenceKey!!)
             }
         } else {
-            AppProvidedItem(settingId)
+            AppProvidedItem(settingId, highlighted)
         }
     }
 
@@ -158,7 +159,7 @@ class DeviceSettingRepositoryImpl(
                     title = pref.title,
                     toggles = pref.toggleInfos.map { it.toModel() },
                     isAllowedChangingState = pref.isAllowedChangingState,
-                    isActive = true,
+                    isActive = pref.isActive,
                     state = DeviceSettingStateModel.MultiTogglePreferenceState(pref.state),
                     updateState = { newState ->
                         coroutineScope.launch(backgroundCoroutineContext) {

@@ -28,6 +28,7 @@ import android.app.ActivityManager;
 import android.app.WindowConfiguration;
 import android.content.Context;
 import android.graphics.Rect;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.ArrayMap;
 import android.view.SurfaceControl;
@@ -43,6 +44,7 @@ import com.android.internal.jank.InteractionJankMonitor;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.desktopmode.DesktopModeTaskRepository;
+import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.windowdecor.WindowDecorViewModel;
@@ -65,6 +67,8 @@ public class FreeformTaskTransitionHandler
     private final InteractionJankMonitor mInteractionJankMonitor;
     private final ShellExecutor mMainExecutor;
     private final ShellExecutor mAnimExecutor;
+    @ShellMainThread
+    private final Handler mHandler;
 
     private final List<IBinder> mPendingTransitionTokens = new ArrayList<>();
 
@@ -79,7 +83,8 @@ public class FreeformTaskTransitionHandler
             ShellExecutor mainExecutor,
             ShellExecutor animExecutor,
             DesktopModeTaskRepository desktopModeTaskRepository,
-            InteractionJankMonitor interactionJankMonitor) {
+            InteractionJankMonitor interactionJankMonitor,
+            @ShellMainThread Handler handler) {
         mTransitions = transitions;
         mContext = context;
         mWindowDecorViewModel = windowDecorViewModel;
@@ -88,6 +93,7 @@ public class FreeformTaskTransitionHandler
         mInteractionJankMonitor = interactionJankMonitor;
         mMainExecutor = mainExecutor;
         mAnimExecutor = animExecutor;
+        mHandler = handler;
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             shellInit.addInitCallback(this::onInit, this);
         }
@@ -118,7 +124,7 @@ public class FreeformTaskTransitionHandler
 
     @Override
     public IBinder startMinimizedModeTransition(WindowContainerTransaction wct) {
-        final int type = WindowManager.TRANSIT_TO_BACK;
+        final int type = Transitions.TRANSIT_MINIMIZE;
         final IBinder token = mTransitions.startTransition(type, wct, this);
         mPendingTransitionTokens.add(token);
         return token;
@@ -161,7 +167,8 @@ public class FreeformTaskTransitionHandler
                             transition, info.getType(), change);
                     break;
                 case WindowManager.TRANSIT_TO_BACK:
-                    transitionHandled |= startMinimizeTransition(transition);
+                    transitionHandled |= startMinimizeTransition(
+                            transition, info.getType(), change);
                     break;
                 case WindowManager.TRANSIT_CLOSE:
                     if (change.getTaskInfo().getWindowingMode() == WINDOWING_MODE_FREEFORM) {
@@ -227,8 +234,20 @@ public class FreeformTaskTransitionHandler
         return handled;
     }
 
-    private boolean startMinimizeTransition(IBinder transition) {
-        return mPendingTransitionTokens.contains(transition);
+    private boolean startMinimizeTransition(
+            IBinder transition,
+            int type,
+            TransitionInfo.Change change) {
+        if (!mPendingTransitionTokens.contains(transition)) {
+            return false;
+        }
+
+        final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
+        if (type != Transitions.TRANSIT_MINIMIZE) {
+            return false;
+        }
+        // TODO(b/361524575): Add minimize animations
+        return true;
     }
 
     private boolean startCloseTransition(IBinder transition, TransitionInfo.Change change,
@@ -254,7 +273,7 @@ public class FreeformTaskTransitionHandler
                         change.getTaskInfo().displayId) == 1) {
             // Starting the jank trace if closing the last window in desktop mode.
             mInteractionJankMonitor.begin(
-                    sc, mContext, CUJ_DESKTOP_MODE_EXIT_MODE_ON_LAST_WINDOW_CLOSE);
+                    sc, mContext, mHandler, CUJ_DESKTOP_MODE_EXIT_MODE_ON_LAST_WINDOW_CLOSE);
         }
         animator.addListener(
                 new AnimatorListenerAdapter() {

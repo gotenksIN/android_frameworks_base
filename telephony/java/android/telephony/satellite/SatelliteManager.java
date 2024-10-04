@@ -19,6 +19,7 @@ package android.telephony.satellite;
 import android.Manifest;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
+import android.annotation.Hide;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -1220,6 +1221,12 @@ public final class SatelliteManager {
                                         () -> callback.onReceiveDatagramStateChanged(
                                                 state, receivePendingCount, errorCode)));
                             }
+
+                            @Override
+                            public void onSendDatagramRequested(int datagramType) {
+                                executor.execute(() -> Binder.withCleanCallingIdentity(
+                                        () -> callback.onSendDatagramRequested(datagramType)));
+                            }
                         };
                 sSatelliteTransmissionUpdateCallbackMap.put(callback, internalCallback);
                 telephony.startSatelliteTransmissionUpdates(errorCallback, internalCallback);
@@ -1572,6 +1579,13 @@ public final class SatelliteManager {
                     public void onEmergencyModeChanged(boolean isEmergency) {
                         executor.execute(() -> Binder.withCleanCallingIdentity(() ->
                                 callback.onEmergencyModeChanged(isEmergency)));
+                    }
+
+                    @Hide
+                    @Override
+                    public void onRegistrationFailure(int causeCode) {
+                        executor.execute(() -> Binder.withCleanCallingIdentity(() ->
+                                callback.onRegistrationFailure(causeCode)));
                     }
                 };
                 sSatelliteModemStateCallbackMap.put(callback, internalCallback);

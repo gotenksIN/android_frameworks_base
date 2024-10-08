@@ -4063,8 +4063,9 @@ public class SizeCompatTests extends WindowTestsBase {
                         .setInsetsSize(Insets.of(0, 0, 0, 150))
         };
         display.getDisplayPolicy().addWindowLw(navbar, navbar.mAttrs);
-        assertTrue(display.getDisplayPolicy().updateDecorInsetsInfo());
-        display.sendNewConfiguration();
+        if (display.getDisplayPolicy().updateDecorInsetsInfo()) {
+            display.sendNewConfiguration();
+        }
 
         final ActivityRecord activity = getActivityBuilderOnSameTask()
                 .setScreenOrientation(SCREEN_ORIENTATION_PORTRAIT)
@@ -4097,8 +4098,9 @@ public class SizeCompatTests extends WindowTestsBase {
                         .setInsetsSize(Insets.of(0, 0, 0, 150))
         };
         display.getDisplayPolicy().addWindowLw(navbar, navbar.mAttrs);
-        assertTrue(display.getDisplayPolicy().updateDecorInsetsInfo());
-        display.sendNewConfiguration();
+        if (display.getDisplayPolicy().updateDecorInsetsInfo()) {
+            display.sendNewConfiguration();
+        }
 
         final ActivityRecord activity = getActivityBuilderOnSameTask()
                 .setScreenOrientation(SCREEN_ORIENTATION_PORTRAIT)
@@ -4126,8 +4128,9 @@ public class SizeCompatTests extends WindowTestsBase {
                         .setInsetsSize(Insets.of(0, 0, 0, 150))
         };
         dc.getDisplayPolicy().addWindowLw(navbar, navbar.mAttrs);
-        assertTrue(dc.getDisplayPolicy().updateDecorInsetsInfo());
-        dc.sendNewConfiguration();
+        if (dc.getDisplayPolicy().updateDecorInsetsInfo()) {
+            dc.sendNewConfiguration();
+        }
 
         final ActivityRecord activity = getActivityBuilderOnSameTask()
                 .setResizeMode(RESIZE_MODE_UNRESIZEABLE)
@@ -4843,6 +4846,39 @@ public class SizeCompatTests extends WindowTestsBase {
                 computeAspectRatio(minAspectRatioAppBounds), DELTA_ASPECT_RATIO_TOLERANCE);
         assertEquals(targetMinAspectRatio,
                 computeAspectRatio(sizeCompatAppBounds), DELTA_ASPECT_RATIO_TOLERANCE);
+    }
+
+    @Test
+    public void testUniversalResizeable() {
+        mWm.mConstants.mIgnoreActivityOrientationRequest = true;
+        setUpApp(mDisplayContent);
+        final float maxAspect = 1.8f;
+        final float minAspect = 1.5f;
+        prepareLimitedBounds(mActivity, maxAspect, minAspect,
+                ActivityInfo.SCREEN_ORIENTATION_LOCKED, true /* isUnresizable */);
+
+        assertTrue(mActivity.isUniversalResizeable());
+        assertTrue(mActivity.isResizeable());
+        assertFalse(mActivity.shouldCreateAppCompatDisplayInsets());
+        assertEquals(SCREEN_ORIENTATION_UNSPECIFIED, mActivity.getOverrideOrientation());
+        assertEquals(mActivity.getTask().getBounds(), mActivity.getBounds());
+        final AppCompatAspectRatioPolicy aspectRatioPolicy = mActivity.mAppCompatController
+                .getAppCompatAspectRatioPolicy();
+        assertEquals(0, aspectRatioPolicy.getMaxAspectRatio(), 0 /* delta */);
+        assertEquals(0, aspectRatioPolicy.getMinAspectRatio(), 0 /* delta */);
+
+        // Compat override can still take effect.
+        final AppCompatAspectRatioOverrides aspectRatioOverrides =
+                mActivity.mAppCompatController.getAppCompatAspectRatioOverrides();
+        spyOn(aspectRatioOverrides);
+        doReturn(true).when(aspectRatioOverrides).shouldOverrideMinAspectRatio();
+        assertEquals(minAspect, aspectRatioPolicy.getMinAspectRatio(), 0 /* delta */);
+
+        // User override can still take effect.
+        doReturn(true).when(aspectRatioOverrides).shouldApplyUserMinAspectRatioOverride();
+        assertFalse(mActivity.isResizeable());
+        assertEquals(maxAspect, aspectRatioPolicy.getMaxAspectRatio(), 0 /* delta */);
+        assertNotEquals(SCREEN_ORIENTATION_UNSPECIFIED, mActivity.getOverrideOrientation());
     }
 
     @Test

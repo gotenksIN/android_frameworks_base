@@ -2282,7 +2282,8 @@ public class DisplayPolicy {
         final DecorInsets.Info newInfo = mDecorInsets.mTmpInfo;
         final InsetsState newInsetsState = newInfo.update(mDisplayContent, rotation, dw, dh);
         final DecorInsets.Info currentInfo = getDecorInsetsInfo(rotation, dw, dh);
-        if (newInfo.mConfigFrame.equals(currentInfo.mConfigFrame)
+        final boolean sameConfigFrame = newInfo.mConfigFrame.equals(currentInfo.mConfigFrame);
+        if (sameConfigFrame
                 && newInfo.mOverrideConfigFrame.equals(currentInfo.mOverrideConfigFrame)) {
             // Even if the config frame is not changed in current rotation, it may change the
             // insets in other rotations if the frame of insets source is changed.
@@ -2306,7 +2307,12 @@ public class DisplayPolicy {
         }
         mDecorInsets.invalidate();
         mDecorInsets.mInfoForRotation[rotation].set(newInfo);
-        return true;
+        if (!mService.mDisplayEnabled) {
+            // There could be other pending changes during booting. It might be better to let the
+            // clients receive the new states earlier.
+            return true;
+        }
+        return !sameConfigFrame;
     }
 
     DecorInsets.Info getDecorInsetsInfo(int rotation, int w, int h) {

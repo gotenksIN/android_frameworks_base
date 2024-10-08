@@ -1,20 +1,27 @@
 package com.android.systemui.scene
 
+import android.view.View
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.classifier.domain.interactor.falsingInteractor
+import com.android.systemui.haptics.msdl.msdlPlayer
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
+import com.android.systemui.scene.domain.interactor.systemGestureExclusionInteractor
 import com.android.systemui.scene.shared.logger.sceneLogger
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.FakeOverlay
+import com.android.systemui.scene.ui.viewmodel.SceneContainerGestureFilter
+import com.android.systemui.scene.ui.viewmodel.SceneContainerHapticsViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.scene.ui.viewmodel.splitEdgeDetector
+import com.android.systemui.settings.displayTracker
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.mockito.kotlin.mock
 
 var Kosmos.sceneKeys by Fixture {
     listOf(
@@ -30,10 +37,7 @@ var Kosmos.sceneKeys by Fixture {
 val Kosmos.initialSceneKey by Fixture { Scenes.Lockscreen }
 
 var Kosmos.overlayKeys by Fixture {
-    listOf(
-        Overlays.NotificationsShade,
-        Overlays.QuickSettingsShade,
-    )
+    listOf(Overlays.NotificationsShade, Overlays.QuickSettingsShade)
 }
 
 val Kosmos.fakeOverlaysByKeys by Fixture { overlayKeys.associateWith { FakeOverlay(it) } }
@@ -68,14 +72,54 @@ val Kosmos.transitionState by Fixture {
 }
 
 val Kosmos.sceneContainerViewModel by Fixture {
-    SceneContainerViewModel(
-            sceneInteractor = sceneInteractor,
-            falsingInteractor = falsingInteractor,
-            powerInteractor = powerInteractor,
-            shadeInteractor = shadeInteractor,
-            splitEdgeDetector = splitEdgeDetector,
-            motionEventHandlerReceiver = {},
-            logger = sceneLogger
-        )
-        .apply { setTransitionState(transitionState) }
+    sceneContainerViewModelFactory.create(mock<View>(), displayTracker.defaultDisplayId, {}).apply {
+        setTransitionState(transitionState)
+    }
+}
+
+val Kosmos.sceneContainerViewModelFactory by Fixture {
+    object : SceneContainerViewModel.Factory {
+        override fun create(
+            view: View,
+            displayId: Int,
+            motionEventHandlerReceiver: (SceneContainerViewModel.MotionEventHandler?) -> Unit,
+        ): SceneContainerViewModel =
+            SceneContainerViewModel(
+                sceneInteractor = sceneInteractor,
+                falsingInteractor = falsingInteractor,
+                powerInteractor = powerInteractor,
+                shadeInteractor = shadeInteractor,
+                splitEdgeDetector = splitEdgeDetector,
+                logger = sceneLogger,
+                gestureFilterFactory = sceneContainerGestureFilterFactory,
+                hapticsViewModelFactory = sceneContainerHapticsViewModelFactory,
+                view = view,
+                displayId = displayId,
+                motionEventHandlerReceiver = motionEventHandlerReceiver,
+            )
+    }
+}
+
+val Kosmos.sceneContainerGestureFilterFactory by Fixture {
+    object : SceneContainerGestureFilter.Factory {
+        override fun create(displayId: Int): SceneContainerGestureFilter {
+            return SceneContainerGestureFilter(
+                interactor = systemGestureExclusionInteractor,
+                displayId = displayId,
+            )
+        }
+    }
+}
+
+val Kosmos.sceneContainerHapticsViewModelFactory by Fixture {
+    object : SceneContainerHapticsViewModel.Factory {
+        override fun create(view: View): SceneContainerHapticsViewModel {
+            return SceneContainerHapticsViewModel(
+                view = view,
+                sceneInteractor = sceneInteractor,
+                shadeInteractor = shadeInteractor,
+                msdlPlayer = msdlPlayer,
+            )
+        }
+    }
 }

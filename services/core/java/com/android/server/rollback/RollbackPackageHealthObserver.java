@@ -81,7 +81,7 @@ import java.util.function.Consumer;
 public final class RollbackPackageHealthObserver implements PackageHealthObserver {
     private static final String TAG = "RollbackPackageHealthObserver";
     private static final String NAME = "rollback-observer";
-    private static final String ACTION_NAME = RollbackPackageHealthObserver.class.getName();
+    private static final String CLASS_NAME = RollbackPackageHealthObserver.class.getName();
 
     private static final int PERSISTENT_MASK = ApplicationInfo.FLAG_PERSISTENT
             | ApplicationInfo.FLAG_SYSTEM;
@@ -99,6 +99,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     // True if needing to roll back only rebootless apexes when native crash happens
     private boolean mTwoPhaseRollbackEnabled;
 
+    /** @hide */
     @VisibleForTesting
     public RollbackPackageHealthObserver(Context context, ApexManager apexManager) {
         mContext = context;
@@ -123,7 +124,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         }
     }
 
-    RollbackPackageHealthObserver(Context context) {
+    public RollbackPackageHealthObserver(@NonNull Context context) {
         this(context, ApexManager.getInstance());
     }
 
@@ -239,8 +240,8 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
         return false;
     }
 
-
     @Override
+    @NonNull
     public String getUniqueIdentifier() {
         return NAME;
     }
@@ -251,7 +252,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
     }
 
     @Override
-    public boolean mayObservePackage(String packageName) {
+    public boolean mayObservePackage(@NonNull String packageName) {
         if (getAvailableRollbacks().isEmpty()) {
             return false;
         }
@@ -281,12 +282,14 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
      * This may cause {@code packages} to be rolled back if they crash too freqeuntly.
      */
     @AnyThread
-    void startObservingHealth(List<String> packages, long durationMs) {
+    @NonNull
+    public void startObservingHealth(@NonNull List<String> packages, @NonNull long durationMs) {
         PackageWatchdog.getInstance(mContext).startObservingHealth(this, packages, durationMs);
     }
 
     @AnyThread
-    void notifyRollbackAvailable(RollbackInfo rollback) {
+    @NonNull
+    public void notifyRollbackAvailable(@NonNull RollbackInfo rollback) {
         mHandler.post(() -> {
             // Enable two-phase rollback when a rebootless apex rollback is made available.
             // We assume the rebootless apex is stable and is less likely to be the cause
@@ -314,7 +317,7 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
      * to check for native crashes and mitigate them if needed.
      */
     @AnyThread
-    void onBootCompletedAsync() {
+    public void onBootCompletedAsync() {
         mHandler.post(()->onBootCompleted());
     }
 
@@ -610,14 +613,16 @@ public final class RollbackPackageHealthObserver implements PackageHealthObserve
                 }
             };
 
+            String intentActionName = CLASS_NAME + rollback.getRollbackId();
             // Register the BroadcastReceiver
             mContext.registerReceiver(rollbackReceiver,
-                    new IntentFilter(ACTION_NAME),
+                    new IntentFilter(intentActionName),
                     Context.RECEIVER_NOT_EXPORTED);
 
-            Intent intentReceiver = new Intent(ACTION_NAME);
+            Intent intentReceiver = new Intent(intentActionName);
             intentReceiver.putExtra("rollbackId", rollback.getRollbackId());
             intentReceiver.setPackage(mContext.getPackageName());
+            intentReceiver.setFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
 
             PendingIntent rollbackPendingIntent = PendingIntent.getBroadcast(mContext,
                     rollback.getRollbackId(),

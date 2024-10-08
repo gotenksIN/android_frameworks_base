@@ -184,7 +184,7 @@ public final class CameraManager {
      * @hide
      */
     @TestApi
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_FOR_FREEFORM)
+    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     public static final int ROTATION_OVERRIDE_NONE = ICameraService.ROTATION_OVERRIDE_NONE;
 
     /**
@@ -194,7 +194,7 @@ public final class CameraManager {
      * @hide
      */
     @TestApi
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_FOR_FREEFORM)
+    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     public static final int ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT =
             ICameraService.ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT;
 
@@ -204,7 +204,7 @@ public final class CameraManager {
      * @hide
      */
     @TestApi
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_FOR_FREEFORM)
+    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     public static final int ROTATION_OVERRIDE_ROTATION_ONLY =
             ICameraService.ROTATION_OVERRIDE_ROTATION_ONLY;
 
@@ -821,7 +821,7 @@ public final class CameraManager {
             }
 
             boolean hasConcurrentStreams =
-                    CameraManagerGlobal.get().cameraIdHasConcurrentStreamsLocked(cameraId,
+                    CameraManagerGlobal.get().cameraIdHasConcurrentStreams(cameraId,
                             mContext.getDeviceId(), getDevicePolicyFromContext(mContext));
             metadata.setHasMandatoryConcurrentStreams(hasConcurrentStreams);
 
@@ -1565,7 +1565,7 @@ public final class CameraManager {
      */
     public static int getRotationOverride(@Nullable Context context,
             @Nullable PackageManager packageManager, @Nullable String packageName) {
-        if (com.android.window.flags.Flags.cameraCompatForFreeform()) {
+        if (com.android.window.flags.Flags.enableCameraCompatForDesktopWindowing()) {
             return getRotationOverrideInternal(context, packageManager, packageName);
         } else {
             return shouldOverrideToPortrait(packageManager, packageName)
@@ -1577,7 +1577,7 @@ public final class CameraManager {
     /**
      * @hide
      */
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_FOR_FREEFORM)
+    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     @TestApi
     public static int getRotationOverrideInternal(@Nullable Context context,
             @Nullable PackageManager packageManager, @Nullable String packageName) {
@@ -2647,24 +2647,26 @@ public final class CameraManager {
          * @return Whether the camera device was found in the set of combinations returned by
          *         getConcurrentCameraIds
          */
-        public boolean cameraIdHasConcurrentStreamsLocked(String cameraId, int deviceId,
+        public boolean cameraIdHasConcurrentStreams(String cameraId, int deviceId,
                 int devicePolicy) {
-            DeviceCameraInfo info = new DeviceCameraInfo(cameraId,
-                    devicePolicy == DEVICE_POLICY_DEFAULT ? DEVICE_ID_DEFAULT : deviceId);
-            if (!mDeviceStatus.containsKey(info)) {
-                // physical camera ids aren't advertised in concurrent camera id combinations.
-                if (DEBUG) {
-                    Log.v(TAG, " physical camera id " + cameraId + " is hidden." +
-                            " Available logical camera ids : " + mDeviceStatus);
+            synchronized (mLock) {
+                DeviceCameraInfo info = new DeviceCameraInfo(cameraId,
+                        devicePolicy == DEVICE_POLICY_DEFAULT ? DEVICE_ID_DEFAULT : deviceId);
+                if (!mDeviceStatus.containsKey(info)) {
+                    // physical camera ids aren't advertised in concurrent camera id combinations.
+                    if (DEBUG) {
+                        Log.v(TAG, " physical camera id " + cameraId + " is hidden."
+                                + " Available logical camera ids : " + mDeviceStatus);
+                    }
+                    return false;
+                }
+                for (Set<DeviceCameraInfo> comb : mConcurrentCameraIdCombinations) {
+                    if (comb.contains(info)) {
+                        return true;
+                    }
                 }
                 return false;
             }
-            for (Set<DeviceCameraInfo> comb : mConcurrentCameraIdCombinations) {
-                if (comb.contains(info)) {
-                    return true;
-                }
-            }
-            return false;
         }
 
         public void setTorchMode(

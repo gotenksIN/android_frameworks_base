@@ -130,8 +130,6 @@ import static android.window.flags.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.enableBufferTransformHintFromDisplay;
-import static com.android.window.flags.Flags.insetsControlChangedItem;
-import static com.android.window.flags.Flags.insetsControlSeq;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 import static com.android.window.flags.Flags.systemUiImmersiveConfirmationDialog;
 
@@ -890,10 +888,7 @@ public final class ViewRootImpl implements ViewParent,
     /** Non-{@code null} if {@link #mActivityConfigCallback} is not {@code null}. */
     @Nullable
     private ActivityWindowInfo mLastReportedActivityWindowInfo;
-    @Nullable
-    private final ClientWindowFrames mLastReportedFrames = insetsControlSeq()
-            ? new ClientWindowFrames()
-            : null;
+    private final ClientWindowFrames mLastReportedFrames = new ClientWindowFrames();
     private int mLastReportedInsetsStateSeq = getInitSeq();
     private int mLastReportedActiveControlsSeq = getInitSeq();
 
@@ -2072,7 +2067,11 @@ public final class ViewRootImpl implements ViewParent,
         if (mAttachInfo.mThreadedRenderer == null) return;
         if (mAttachInfo.mThreadedRenderer.setForceDark(determineForceDarkType())) {
             // TODO: Don't require regenerating all display lists to apply this setting
-            invalidateWorld(mView);
+            if (forceInvertColor()) {
+                destroyAndInvalidate();
+            } else {
+                invalidateWorld(mView);
+            }
         }
     }
 
@@ -2320,9 +2319,6 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private void onClientWindowFramesChanged(@NonNull ClientWindowFrames inOutFrames) {
-        if (mLastReportedFrames == null) {
-            return;
-        }
         if (isIncomingSeqStale(mLastReportedFrames.seq, inOutFrames.seq)) {
             // If the incoming is stale, use the last reported instead.
             inOutFrames.setTo(mLastReportedFrames);
@@ -2333,14 +2329,12 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private void onInsetsStateChanged(@NonNull InsetsState insetsState) {
-        if (insetsControlSeq()) {
-            if (isIncomingSeqStale(mLastReportedInsetsStateSeq, insetsState.getSeq())) {
-                // The incoming is stale. Skip.
-                return;
-            }
-            // Keep track of the latest.
-            mLastReportedInsetsStateSeq = insetsState.getSeq();
+        if (isIncomingSeqStale(mLastReportedInsetsStateSeq, insetsState.getSeq())) {
+            // The incoming is stale. Skip.
+            return;
         }
+        // Keep track of the latest.
+        mLastReportedInsetsStateSeq = insetsState.getSeq();
 
         if (mTranslator != null) {
             mTranslator.translateInsetsStateInScreenToAppWindow(insetsState);
@@ -2355,15 +2349,13 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
 
-        if (insetsControlSeq()) {
-            if (isIncomingSeqStale(mLastReportedActiveControlsSeq, activeControls.getSeq())) {
-                // The incoming is stale. Skip.
-                activeControls.release();
-                return;
-            }
-            // Keep track of the latest.
-            mLastReportedActiveControlsSeq = activeControls.getSeq();
+        if (isIncomingSeqStale(mLastReportedActiveControlsSeq, activeControls.getSeq())) {
+            // The incoming is stale. Skip.
+            activeControls.release();
+            return;
         }
+        // Keep track of the latest.
+        mLastReportedActiveControlsSeq = activeControls.getSeq();
 
         final InsetsSourceControl[] controls = activeControls.get();
         if (mTranslator != null) {
@@ -3218,10 +3210,10 @@ public final class ViewRootImpl implements ViewParent,
             typesToShow |= Type.navigationBars();
         }
         if (captionIsHiddenByFlags && !captionWasHiddenByFlags
-                && ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isEnabled()) {
+                && ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isTrue()) {
             typesToHide |= Type.captionBar();
         } else if (!captionIsHiddenByFlags && captionWasHiddenByFlags
-                && ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isEnabled()) {
+                && ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isTrue()) {
             typesToShow |= Type.captionBar();
         }
         if (typesToHide != 0) {
@@ -11532,12 +11524,8 @@ public final class ViewRootImpl implements ViewParent,
         public void insetsControlChanged(InsetsState insetsState,
                 InsetsSourceControl.Array activeControls) {
             final boolean isFromInsetsControlChangeItem;
-            if (insetsControlChangedItem()) {
-                isFromInsetsControlChangeItem = mIsFromTransactionItem;
-                mIsFromTransactionItem = false;
-            } else {
-                isFromInsetsControlChangeItem = false;
-            }
+            isFromInsetsControlChangeItem = mIsFromTransactionItem;
+            mIsFromTransactionItem = false;
             final ViewRootImpl viewAncestor = mViewAncestor.get();
             if (viewAncestor == null) {
                 if (isFromInsetsControlChangeItem) {
@@ -11940,12 +11928,20 @@ public final class ViewRootImpl implements ViewParent,
         public void onHighTextContrastStateChanged(boolean enabled) {
             ThreadedRenderer.setHighContrastText(enabled);
 
-            // Destroy Displaylists so they can be recreated with high contrast recordings
-            destroyHardwareResources();
-
-            // Schedule redraw, which will rerecord + redraw all text
-            invalidate();
+            destroyAndInvalidate();
         }
+    }
+
+    /**
+     * Destroy Displaylists so they can be recreated with new recordings, in case you are changing
+     * the way things are rendered (e.g. high contrast, force dark), then invalidate to trigger a
+     * redraw.
+     */
+    private void destroyAndInvalidate() {
+        destroyHardwareResources();
+
+        // Schedule redraw, which will rerecord + redraw all text
+        invalidate();
     }
 
     /**
@@ -12420,6 +12416,7 @@ public final class ViewRootImpl implements ViewParent,
         transaction.setBlurRegions(surfaceControl, regionCopy);
 
         if (mBlastBufferQueue != null) {
+            transaction.onMergeWithNextTransaction(getTitle());
             mBlastBufferQueue.mergeWithNextTransaction(transaction, frameNumber);
         }
     }
@@ -12446,6 +12443,9 @@ public final class ViewRootImpl implements ViewParent,
      */
     public void mergeWithNextTransaction(Transaction t, long frameNumber) {
         if (mBlastBufferQueue != null) {
+            if (t != null) {
+                t.onMergeWithNextTransaction(getTitle());
+            }
             mBlastBufferQueue.mergeWithNextTransaction(t, frameNumber);
         } else {
             t.apply();

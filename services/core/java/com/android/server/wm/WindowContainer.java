@@ -457,7 +457,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         source.setFrame(provider.getArbitraryRectangle())
                 .updateSideHint(getBounds())
                 .setBoundingRects(provider.getBoundingRects());
-        if (ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isEnabled()) {
+        if (ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isTrue()) {
             source.setFlags(provider.getFlags());
         }
         mLocalInsetsSources.put(id, source);
@@ -4351,4 +4351,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         t.merge(mSyncTransaction);
     }
 
+    int getSyncTransactionCommitCallbackDepth() {
+        return mSyncTransactionCommitCallbackDepth;
+    }
 }

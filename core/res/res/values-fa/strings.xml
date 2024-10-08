@@ -22,7 +22,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="byteShort" msgid="202579285008794431">"بایت"</string>
     <string name="fileSizeSuffix" msgid="4233671691980131257">"<xliff:g id="NUMBER">%1$s</xliff:g> ‏<xliff:g id="UNIT">%2$s</xliff:g>"</string>
-    <string name="untitled" msgid="3381766946944136678">"‏&lt;بدون عنوان&gt;"</string>
+    <string name="untitled" msgid="3381766946944136678">"‏&lt;بی‌عنوان&gt;"</string>
     <string name="emptyPhoneNumber" msgid="5812172618020360048">"(بدون شماره تلفن)"</string>
     <string name="unknownName" msgid="7078697621109055330">"نامشخص"</string>
     <string name="defaultVoiceMailAlphaTag" msgid="2190754495304236490">"پست صوتی"</string>
@@ -196,7 +196,7 @@
     <string name="ssl_ca_cert_noti_by_unknown" msgid="4961102218216815242">"توسط یک شخص ثالث ناشناس"</string>
     <string name="ssl_ca_cert_noti_by_administrator" msgid="4564941950768783879">"توسط سرپرست نمایه کاری شما"</string>
     <string name="ssl_ca_cert_noti_managed" msgid="217337232273211674">"توسط <xliff:g id="MANAGING_DOMAIN">%s</xliff:g>"</string>
-    <string name="work_profile_deleted" msgid="5891181538182009328">"نمایه کار حذف شد"</string>
+    <string name="work_profile_deleted" msgid="5891181538182009328">"نمایه کاری حذف شد"</string>
     <string name="work_profile_deleted_details" msgid="3773706828364418016">"برنامه سرپرست نمایه کاری یا وجود ندارد یا خراب است. در نتیجه، نمایه کاری شما و داده‌های مرتبط با آن حذف شده است. برای دریافت راهنمایی با سرپرست سیستم تماس بگیرید."</string>
     <string name="work_profile_deleted_description_dpm_wipe" msgid="2477244968924647232">"نمایه کاری شما دیگر در این دستگاه دردسترس نیست"</string>
     <string name="work_profile_deleted_reason_maximum_password_failure" msgid="1080323158315663167">"تلاش‌های بسیار زیادی برای وارد کردن گذرواژه انجام شده است"</string>
@@ -2010,8 +2010,7 @@
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"قفل صفحه تنظیم کنید"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"تنظیم قفل صفحه"</string>
     <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"برای استفاده از فضای خصوصی، قفل صفحه تنظیم کنید"</string>
-    <!-- no translation found for private_space_set_up_screen_lock_for_reset (7817091386408432097) -->
-    <skip />
+    <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"برای حذف کردن فضای خصوصی، قفل صفحه در این دستگاه تنظیم کنید"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"برنامه در دسترس نیست"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> درحال‌حاضر در دسترس نیست."</string>
     <string name="app_streaming_blocked_title" msgid="6090945835898766139">"<xliff:g id="ACTIVITY">%1$s</xliff:g> دردسترس نیست"</string>

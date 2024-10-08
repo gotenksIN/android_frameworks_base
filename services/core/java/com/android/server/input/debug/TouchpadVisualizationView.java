@@ -18,6 +18,7 @@ package com.android.server.input.debug;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.Slog;
@@ -29,6 +30,7 @@ import com.android.server.input.TouchpadHardwareState;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class TouchpadVisualizationView extends View {
@@ -49,6 +51,7 @@ public class TouchpadVisualizationView extends View {
     private final Paint mOvalFillPaint;
     private final Paint mTracePaint;
     private final Paint mCenterPointPaint;
+    private final Paint mPressureTextPaint;
     private final RectF mTempOvalRect = new RectF();
 
     public TouchpadVisualizationView(Context context,
@@ -58,11 +61,9 @@ public class TouchpadVisualizationView extends View {
         mScaleFactor = 1;
         mOvalStrokePaint = new Paint();
         mOvalStrokePaint.setAntiAlias(true);
-        mOvalStrokePaint.setARGB(255, 0, 0, 0);
         mOvalStrokePaint.setStyle(Paint.Style.STROKE);
         mOvalFillPaint = new Paint();
         mOvalFillPaint.setAntiAlias(true);
-        mOvalFillPaint.setARGB(255, 0, 0, 0);
         mTracePaint = new Paint();
         mTracePaint.setAntiAlias(false);
         mTracePaint.setARGB(255, 0, 0, 255);
@@ -72,6 +73,8 @@ public class TouchpadVisualizationView extends View {
         mCenterPointPaint.setAntiAlias(true);
         mCenterPointPaint.setARGB(255, 255, 0, 0);
         mCenterPointPaint.setStrokeWidth(2);
+        mPressureTextPaint = new Paint();
+        mPressureTextPaint.setAntiAlias(true);
     }
 
     private void removeOldPoints() {
@@ -135,6 +138,13 @@ public class TouchpadVisualizationView extends View {
             mOvalFillPaint.setAlpha((int) pressureToOpacity);
 
             drawOval(canvas, newX, newY, newTouchMajor, newTouchMinor, newAngle);
+
+            String formattedPressure = String.format(Locale.getDefault(), "Ps: %.2f",
+                    touchpadFingerState.getPressure());
+            float textWidth = mPressureTextPaint.measureText(formattedPressure);
+
+            canvas.drawText(formattedPressure, newX - textWidth / 2,
+                    newY - newTouchMajor / 2, mPressureTextPaint);
         }
 
         mTempFingerStatesByTrackingId.clear();
@@ -193,6 +203,26 @@ public class TouchpadVisualizationView extends View {
      */
     public void updateScaleFactor(float scaleFactor) {
         mScaleFactor = scaleFactor;
+    }
+
+    /**
+     * Change the colors of the objects inside the view to light mode theme.
+     */
+    public void setLightModeTheme() {
+        this.setBackgroundColor(Color.rgb(20, 20, 20));
+        mPressureTextPaint.setARGB(255, 255, 255, 255);
+        mOvalFillPaint.setARGB(255, 255, 255, 255);
+        mOvalStrokePaint.setARGB(255, 255, 255, 255);
+    }
+
+    /**
+     * Change the colors of the objects inside the view to night mode theme.
+     */
+    public void setNightModeTheme() {
+        this.setBackgroundColor(Color.rgb(240, 240, 240));
+        mPressureTextPaint.setARGB(255, 0, 0, 0);
+        mOvalFillPaint.setARGB(255, 0, 0, 0);
+        mOvalStrokePaint.setARGB(255, 0, 0, 0);
     }
 
     private float translateX(float x) {

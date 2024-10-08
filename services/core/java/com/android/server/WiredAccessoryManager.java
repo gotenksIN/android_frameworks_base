@@ -139,8 +139,11 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             if (mInputManager.getSwitchState(-1, InputDevice.SOURCE_ANY, SW_LINEOUT_INSERT) == 1) {
                 switchValues |= SW_LINEOUT_INSERT_BIT;
             }
-            notifyWiredAccessoryChanged(0, switchValues,
-                    SW_HEADPHONE_INSERT_BIT | SW_MICROPHONE_INSERT_BIT | SW_LINEOUT_INSERT_BIT);
+            notifyWiredAccessoryChanged(
+                    0,
+                    switchValues,
+                    SW_HEADPHONE_INSERT_BIT | SW_MICROPHONE_INSERT_BIT | SW_LINEOUT_INSERT_BIT,
+                    true /*isSynchronous*/);
         }
 
 
@@ -156,7 +159,13 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     }
 
     @Override
-    public void notifyWiredAccessoryChanged(long whenNanos, int switchValues, int switchMask) {
+    public void notifyWiredAccessoryChanged(
+            long whenNanos, int switchValues, int switchMask) {
+        notifyWiredAccessoryChanged(whenNanos, switchValues, switchMask, false /*isSynchronous*/);
+    }
+
+    public void notifyWiredAccessoryChanged(
+            long whenNanos, int switchValues, int switchMask, boolean isSynchronous) {
         if (LOG) {
             Slog.v(TAG, "notifyWiredAccessoryChanged: when=" + whenNanos
                     + " bits=" + switchCodeToString(switchValues, switchMask)
@@ -193,8 +202,11 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                     break;
             }
 
-            updateLocked(NAME_H2W, "",
-                    (mHeadsetState & ~(BIT_HEADSET | BIT_HEADSET_NO_MIC | BIT_LINEOUT)) | headset);
+            updateLocked(
+                    NAME_H2W,
+                    "",
+                    (mHeadsetState & ~(BIT_HEADSET | BIT_HEADSET_NO_MIC | BIT_LINEOUT)) | headset,
+                    isSynchronous);
         }
     }
 
@@ -219,8 +231,9 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
      *
      * @param newName  One of the NAME_xxx variables defined above.
      * @param newState 0 or one of the BIT_xxx variables defined above.
+     * @param isSynchronous boolean to determine whether should happen sync or async
      */
-    private void updateLocked(String newName, String address, int newState) {
+    private void updateLocked(String newName, String address, int newState, boolean isSynchronous) {
         // Retain only relevant bits
         int headsetState = newState & SUPPORTED_HEADSETS;
         int newDpState = newState & BIT_HDMI_AUDIO;
@@ -282,7 +295,6 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
         Log.i(TAG, "MSG_NEW_DEVICE_STATE");
 
-        Message msg;
         // send a combined name, address string separated by |
         if (newName.startsWith(NAME_DP_AUDIO)) {
             int pseudoHeadsetState = mHeadsetState;
@@ -290,20 +302,25 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                 // One DP already connected, so allow request to connect second.
                 pseudoHeadsetState = mHeadsetState & (~BIT_HDMI_AUDIO);
             }
-            msg = mHandler.obtainMessage(MSG_NEW_DEVICE_STATE, headsetState,
+            Message msg = mHandler.obtainMessage(MSG_NEW_DEVICE_STATE, headsetState,
                                          pseudoHeadsetState,
                                          NAME_DP_AUDIO+"/"+address);
+            mHandler.sendMessage(msg);
 
             if ((headsetState == 0) && (mDpCount != 0)) {
                 // Atleast one DP is connected, so keep mHeadsetState's DP bit set.
                 headsetState = headsetState | BIT_HDMI_AUDIO;
             }
         } else {
-            msg = mHandler.obtainMessage(MSG_NEW_DEVICE_STATE, headsetState,
-                                         mHeadsetState,
-                                         newName+"/"+address);
+            if (isSynchronous) {
+              setDevicesState(headsetState, mHeadsetState, "");
+            } else {
+              Message msg = mHandler.obtainMessage(MSG_NEW_DEVICE_STATE, headsetState,
+                                           mHeadsetState,
+                                           newName+"/"+address);
+              mHandler.sendMessage(msg);
+            }
         }
-        mHandler.sendMessage(msg);
 
         mHeadsetState = headsetState;
     }
@@ -627,9 +644,10 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                         int newControllerIdx = (mDetectedIntf.equals(INTF_DP)) ? 0 : 1;
                         uei.setCableIndex(newControllerIdx);
                     }
-                    updateLocked(name, uei.getDevAddress(),
-                                 uei.computeNewHeadsetState(mHeadsetState,
-                                                            state));
+                    updateLocked(name,
+                                 uei.getDevAddress(),
+                                 uei.computeNewHeadsetState(mHeadsetState, state),
+                                 false /*isSynchronous*/);
 
                     if (state == 0) {
                         removeDevice(devPath);
@@ -901,7 +919,11 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             synchronized (mLock) {
                 int mask = maskAndState.first;
                 int state = maskAndState.second;
-                updateLocked(name, "", mHeadsetState & ~(mask & ~state) | (mask & state));
+                updateLocked(
+                        name,
+                        "",
+                        mHeadsetState & ~(mask & ~state) | (mask & state),
+                        false /*isSynchronous*/);
                 return;
             }
         }

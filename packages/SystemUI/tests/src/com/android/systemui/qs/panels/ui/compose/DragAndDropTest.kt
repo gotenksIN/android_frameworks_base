@@ -60,14 +60,13 @@ class DragAndDropTest : SysuiTestCase() {
         onSetTiles: (List<TileSpec>) -> Unit,
     ) {
         DefaultEditTileGrid(
-            currentListState = listState,
+            listState = listState,
             otherTiles = listOf(),
             columns = 4,
             modifier = Modifier.fillMaxSize(),
-            onAddTile = { _, _ -> },
             onRemoveTile = {},
             onSetTiles = onSetTiles,
-            onResize = {},
+            onResize = { _, _ -> },
         )
     }
 

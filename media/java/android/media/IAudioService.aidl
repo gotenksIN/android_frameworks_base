@@ -717,6 +717,10 @@ interface IAudioService {
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     List<AudioFocusInfo> getFocusStack();
 
+    @EnforcePermission("MODIFY_AUDIO_ROUTING")
+    oneway void sendFocusLossAndUpdate(in AudioFocusInfo focusLoser, in IAudioPolicyCallback apcb);
+
+    @EnforcePermission("MODIFY_AUDIO_ROUTING")
     boolean sendFocusLoss(in AudioFocusInfo focusLoser, in IAudioPolicyCallback apcb);
 
     @EnforcePermission("MODIFY_AUDIO_ROUTING")

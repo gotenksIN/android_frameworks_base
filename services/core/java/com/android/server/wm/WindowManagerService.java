@@ -9045,7 +9045,9 @@ public class WindowManagerService extends IWindowManager.Stub
 
         final boolean isInputTargetNotFocused =
                 mFocusedInputTarget != t && mFocusedInputTarget != null;
-        if (!isInputTargetNotFocused) {
+        final boolean isTouchOnFocusedDisplay = mFocusedInputTarget != null
+                && t.getDisplayId() == mFocusedInputTarget.getDisplayId();
+        if (!(isInputTargetNotFocused && isTouchOnFocusedDisplay)) {
             return false;
         }
 

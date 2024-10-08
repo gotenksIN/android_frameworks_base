@@ -4386,7 +4386,7 @@
              modes dimensions {@link config_minPercentageMultiWindowSupportWidth} the device
              supports to determine if the activity can be shown in multi windowing modes.
     -->
-    <integer name="config_respectsActivityMinWidthHeightMultiWindow">0</integer>
+    <integer name="config_respectsActivityMinWidthHeightMultiWindow">-1</integer>
 
     <!-- This value is only used when the device checks activity min height to determine if it
          can be shown in multi windowing modes.
@@ -4462,6 +4462,11 @@
 
     <!-- Bytes that the PinnerService will pin for WebView -->
     <integer name="config_pinnerWebviewPinBytes">0</integer>
+
+    <!-- Maximum memory that PinnerService will pin for apps expressed
+         as a percentage of total device memory [0,100].
+         Example: 10, means 10% of total memory will be the maximum pinned memory -->
+    <integer name="config_pinnerMaxPinnedMemoryPercentage">10</integer>
 
     <!-- Number of days preloaded file cache should be preserved on a device before it can be
          deleted -->
@@ -6197,6 +6202,10 @@
         is enabled and activity is connected to the camera in fullscreen. -->
     <bool name="config_isWindowManagerCameraCompatSplitScreenAspectRatioEnabled">false</bool>
 
+    <!-- Which aspect ratio to use when camera compat treatment is enabled and an activity eligible
+        for treatment is connected to the camera. -->
+    <item name="config_windowManagerCameraCompatAspectRatio" format="float" type="dimen">1.0</item>
+
     <!-- Docking is a uiMode configuration change and will cause activities to relaunch if it's not
          handled. If true, the configuration change will be sent but activities will not be
          relaunched upon docking. Apps with desk resources will behave like normal, since they may
@@ -7160,4 +7169,8 @@
     <!-- Whether to enable scaling and fading animation to scrollviews while scrolling.
          P.S this is a change only intended for wear devices. -->
     <bool name="config_enableViewGroupScalingFading">false</bool>
+    <!-- Action for opening identity check settings page [CHAR LIMIT=NONE] [DO NOT TRANSLATE] -->
+    <string name="identity_check_settings_action"></string>
+    <!-- Package for opening identity check settings page [CHAR LIMIT=NONE] [DO NOT TRANSLATE] -->
+    <string name="identity_check_settings_package_name">com\u002eandroid\u002esettings</string>
 </resources>

@@ -1440,7 +1440,7 @@ public class SoundTriggerService extends SystemService {
                 runOrAddOperation(new Operation(
                         // always execute:
                         () -> {
-                            if (!mRecognitionConfig.allowMultipleTriggers) {
+                            if (!mRecognitionConfig.isAllowMultipleTriggers()) {
                                 // Unregister this remoteService once op is done
                                 synchronized (mCallbacksLock) {
                                     mCallbacks.remove(mPuuid.getUuid());

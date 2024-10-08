@@ -644,7 +644,7 @@
     <string name="permdesc_mediaLocation" msgid="597912899423578138">"Umožňuje aplikácii čítať polohy zo zbierky médií."</string>
     <string name="biometric_app_setting_name" msgid="3339209978734534457">"Použiť biometrické údaje"</string>
     <string name="biometric_or_screen_lock_app_setting_name" msgid="5348462421758257752">"Použiť biometrické údaje alebo zámku obrazovky"</string>
-    <string name="biometric_dialog_default_title" msgid="55026799173208210">"Overenie, že ste to vy"</string>
+    <string name="biometric_dialog_default_title" msgid="55026799173208210">"Potvrďte, že ste to vy"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Ak chcete pokračovať, použite biometrický údaj"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Pokračujte použitím biometrických údajov alebo zámky obrazovky"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Biometrický hardvér nie je k dispozícii"</string>
@@ -2012,8 +2012,7 @@
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Nastavte zámku obrazovky"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Nastaviť zámku obrazovky"</string>
     <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Ak chcete používať súkromný priestor, nastavte v tomto zariadení zámku obrazovky"</string>
-    <!-- no translation found for private_space_set_up_screen_lock_for_reset (7817091386408432097) -->
-    <skip />
+    <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"Ak chcete odstrániť súkromný priestor, nastavte v tomto zariadení zámku obrazovky"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"Aplikácia nie je dostupná"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"Aplikácia <xliff:g id="APP_NAME">%1$s</xliff:g> nie je teraz dostupná."</string>
     <string name="app_streaming_blocked_title" msgid="6090945835898766139">"<xliff:g id="ACTIVITY">%1$s</xliff:g> nie je k dispozícii"</string>
@@ -2411,9 +2410,9 @@
     <string name="keyboard_layout_notification_more_than_three_selected_message" msgid="1581834181578206937">"Rozloženie klávesnice je nastavené na jazyky <xliff:g id="LAYOUT_1">%1$s</xliff:g>, <xliff:g id="LAYOUT_2">%2$s</xliff:g> a <xliff:g id="LAYOUT_3">%3$s</xliff:g>… Môžete to zmeniť klepnutím."</string>
     <string name="keyboard_layout_notification_multiple_selected_title" msgid="5242444914367024499">"Fyzické klávesnice sú nakonfigurované"</string>
     <string name="keyboard_layout_notification_multiple_selected_message" msgid="6576533454124419202">"Klávesnice si zobrazíte klepnutím"</string>
-    <string name="profile_label_private" msgid="6463418670715290696">"Súkromné"</string>
+    <string name="profile_label_private" msgid="6463418670715290696">"Súkromný"</string>
     <string name="profile_label_clone" msgid="769106052210954285">"Klon"</string>
-    <string name="profile_label_work" msgid="3495359133038584618">"Pracovné"</string>
+    <string name="profile_label_work" msgid="3495359133038584618">"Pracovný"</string>
     <string name="profile_label_work_2" msgid="4691533661598632135">"2. pracovný"</string>
     <string name="profile_label_work_3" msgid="4834572253956798917">"3. pracovný"</string>
     <string name="profile_label_test" msgid="9168641926186071947">"Testovací"</string>

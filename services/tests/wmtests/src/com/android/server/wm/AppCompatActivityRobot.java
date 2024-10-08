@@ -186,7 +186,8 @@ class AppCompatActivityRobot {
 
     void setTopActivityCameraActive(boolean enabled) {
         doReturn(enabled).when(getTopDisplayRotationCompatPolicy())
-                .isCameraActive(eq(mActivityStack.top()), /* mustBeFullscreen= */ eq(true));
+                .isCameraRunningAndWindowingModeEligible(eq(mActivityStack.top()),
+                        /* mustBeFullscreen= */ eq(true));
     }
 
     void setTopActivityEligibleForOrientationOverride(boolean enabled) {
@@ -228,6 +229,10 @@ class AppCompatActivityRobot {
 
     void setIgnoreOrientationRequest(boolean enabled) {
         mDisplayContent.setIgnoreOrientationRequest(enabled);
+    }
+
+    void setTopActivityOrganizedTask() {
+        doReturn(mTaskStack.top()).when(mActivityStack.top()).getOrganizedTask();
     }
 
     void setTopTaskInMultiWindowMode(boolean inMultiWindowMode) {

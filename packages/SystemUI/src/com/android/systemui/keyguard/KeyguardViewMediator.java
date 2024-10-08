@@ -148,6 +148,7 @@ import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.SystemPropertiesHelper;
 import com.android.systemui.keyguard.dagger.KeyguardModule;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionBootInteractor;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.navigationbar.NavigationModeController;
@@ -266,6 +267,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private static final int NOTIFY_STARTED_GOING_TO_SLEEP = 17;
     private static final int SYSTEM_READY = 18;
     private static final int CANCEL_KEYGUARD_EXIT_ANIM = 19;
+    private static final int BOOT_INTERACTOR = 20;
 
     /** Enum for reasons behind updating wakeAndUnlock state. */
     @Retention(RetentionPolicy.SOURCE)
@@ -1393,6 +1395,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private final DozeParameters mDozeParameters;
     private final SelectedUserInteractor mSelectedUserInteractor;
     private final KeyguardInteractor mKeyguardInteractor;
+    private final KeyguardTransitionBootInteractor mTransitionBootInteractor;
     @VisibleForTesting
     protected FoldGracePeriodProvider mFoldGracePeriodProvider =
             new FoldGracePeriodProvider();
@@ -1483,6 +1486,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             Lazy<WindowManagerLockscreenVisibilityManager> wmLockscreenVisibilityManager,
             SelectedUserInteractor selectedUserInteractor,
             KeyguardInteractor keyguardInteractor,
+            KeyguardTransitionBootInteractor transitionBootInteractor,
             WindowManagerOcclusionManager wmOcclusionManager) {
         mContext = context;
         mUserTracker = userTracker;
@@ -1523,6 +1527,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mDozeParameters = dozeParameters;
         mSelectedUserInteractor = selectedUserInteractor;
         mKeyguardInteractor = keyguardInteractor;
+        mTransitionBootInteractor = transitionBootInteractor;
 
         mStatusBarStateController = statusBarStateController;
         statusBarStateController.addCallback(this);
@@ -1676,6 +1681,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             mUpdateMonitor.registerCallback(mUpdateCallback);
             adjustStatusBarLocked();
             mDreamOverlayStateController.addCallback(mDreamOverlayStateCallback);
+
+            mHandler.obtainMessage(BOOT_INTERACTOR).sendToTarget();
 
             final DreamViewModel dreamViewModel = mDreamViewModel.get();
             final CommunalTransitionViewModel communalViewModel =
@@ -2709,10 +2716,18 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                     message = "SYSTEM_READY";
                     handleSystemReady();
                     break;
+                case BOOT_INTERACTOR:
+                    message = "BOOT_INTERACTOR";
+                    handleBootInteractor();
+                    break;
             }
             Log.d(TAG, "KeyguardViewMediator queue processing message: " + message);
         }
     };
+
+    private void handleBootInteractor() {
+        mTransitionBootInteractor.start();
+    }
 
     private void tryKeyguardDone() {
         if (DEBUG) {
@@ -3318,7 +3333,11 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
         setShowingLocked(false, "onKeyguardExitFinished: " + reason);
         mWakeAndUnlocking = false;
-        mDismissCallbackRegistry.notifyDismissSucceeded();
+
+        if (!KeyguardWmStateRefactor.isEnabled()) {
+            mDismissCallbackRegistry.notifyDismissSucceeded();
+        }
+
         resetKeyguardDonePendingLocked();
         mHideAnimationRun = false;
         adjustStatusBarLocked();

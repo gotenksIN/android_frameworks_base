@@ -72,9 +72,7 @@ import java.util.ArrayList;
  */
 class ScreenRotationAnimation {
     static final int MAX_ANIMATION_DURATION = 10 * 1000;
-    static final int ANIMATION_HINT_HAS_WALLPAPER = 1 << 8;
-    /** It must cover all WindowManager#ROTATION_ANIMATION_*. */
-    private static final int ANIMATION_TYPE_MASK = 0xff;
+    static final int FLAG_HAS_WALLPAPER = 1;
 
     private final Context mContext;
     private final TransactionPool mTransactionPool;
@@ -82,7 +80,7 @@ class ScreenRotationAnimation {
     /** The leash of the changing window container. */
     private final SurfaceControl mSurfaceControl;
 
-    private final int mAnimType;
+    private final int mAnimHint;
     private final int mStartWidth;
     private final int mStartHeight;
     private final int mEndWidth;
@@ -118,11 +116,11 @@ class ScreenRotationAnimation {
     /** Intensity of light/whiteness of the layout after rotation occurs. */
     private float mEndLuma;
 
-    ScreenRotationAnimation(Context context, TransactionPool pool,
-            Transaction t, TransitionInfo.Change change, SurfaceControl rootLeash, int animHint) {
+    ScreenRotationAnimation(Context context, TransactionPool pool, Transaction t,
+            TransitionInfo.Change change, SurfaceControl rootLeash, int animHint, int flags) {
         mContext = context;
         mTransactionPool = pool;
-        mAnimType = animHint & ANIMATION_TYPE_MASK;
+        mAnimHint = animHint;
 
         mSurfaceControl = change.getLeash();
         mStartWidth = change.getStartAbsBounds().width();
@@ -177,7 +175,7 @@ class ScreenRotationAnimation {
                 }
                 hardwareBuffer.close();
             }
-            if ((animHint & ANIMATION_HINT_HAS_WALLPAPER) != 0) {
+            if ((flags & FLAG_HAS_WALLPAPER) != 0) {
                 mBackEffectSurface = new SurfaceControl.Builder()
                         .setCallsite("ShellRotationAnimation").setParent(rootLeash)
                         .setEffectLayer().setOpaque(true).setName("BackEffect").build();
@@ -215,7 +213,7 @@ class ScreenRotationAnimation {
     }
 
     private boolean isCustomRotate() {
-        return mAnimType == ROTATION_ANIMATION_CROSSFADE || mAnimType == ROTATION_ANIMATION_JUMPCUT;
+        return mAnimHint == ROTATION_ANIMATION_CROSSFADE || mAnimHint == ROTATION_ANIMATION_JUMPCUT;
     }
 
     /** Returns the surface which contains the real content to animate enter. */
@@ -281,7 +279,7 @@ class ScreenRotationAnimation {
         final boolean customRotate = isCustomRotate();
         if (customRotate) {
             mRotateExitAnimation = AnimationUtils.loadAnimation(mContext,
-                    mAnimType == ROTATION_ANIMATION_JUMPCUT ? R.anim.rotation_animation_jump_exit
+                    mAnimHint == ROTATION_ANIMATION_JUMPCUT ? R.anim.rotation_animation_jump_exit
                             : R.anim.rotation_animation_xfade_exit);
             mRotateEnterAnimation = AnimationUtils.loadAnimation(mContext,
                     R.anim.rotation_animation_enter);
@@ -375,8 +373,8 @@ class ScreenRotationAnimation {
         // Align the end with the enter animation.
         animation.setStartOffset(mRotateEnterAnimation.getDuration() - durationMillis);
         final LumaAnimationAdapter adapter = new LumaAnimationAdapter(surface, startLuma, endLuma);
-        buildSurfaceAnimation(animations, animation, finishCallback, mTransactionPool,
-                mainExecutor, adapter);
+        DefaultSurfaceAnimator.buildSurfaceAnimation(animations, animation, finishCallback,
+                mTransactionPool, mainExecutor, adapter);
     }
 
     public void kill() {
@@ -405,7 +403,7 @@ class ScreenRotationAnimation {
         }
     }
 
-    private static class LumaAnimationAdapter extends DefaultTransitionHandler.AnimationAdapter {
+    private static class LumaAnimationAdapter extends DefaultSurfaceAnimator.AnimationAdapter {
         final float[] mColorArray = new float[3];
         final float mStartLuma;
         final float mEndLuma;
@@ -423,7 +421,7 @@ class ScreenRotationAnimation {
         }
 
         @Override
-        void applyTransformation(ValueAnimator animator) {
+        void applyTransformation(ValueAnimator animator, long currentPlayTime) {
             final float fraction = mInterpolation != null
                     ? mInterpolation.getInterpolation(animator.getAnimatedFraction())
                     : animator.getAnimatedFraction();

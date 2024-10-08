@@ -377,11 +377,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         mConfig = MobileMappings.Config.readConfig(mContext);
         mTelephonyManager = mTelephonyManager.createForSubscriptionId(mDefaultDataSubId);
         mSubIdTelephonyManagerMap.put(mDefaultDataSubId, mTelephonyManager);
-        InternetTelephonyCallback telephonyCallback =
-                new InternetTelephonyCallback(mDefaultDataSubId);
-        mSubIdTelephonyCallbackMap.put(mDefaultDataSubId, telephonyCallback);
-        mTelephonyManager.registerTelephonyCallback(mExecutor, telephonyCallback);
-
+        registerInternetTelephonyCallback(mTelephonyManager, mDefaultDataSubId);
         // Listen the connectivity changes
         mConnectivityManager.registerDefaultNetworkCallback(mConnectivityManagerNetworkCallback);
         mCanConfigWifi = canConfigWifi;
@@ -419,6 +415,23 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         mConnectedWifiInternetMonitor.unregisterCallback();
         mCallback = null;
         unregisterFiveGStateMonitor();
+    }
+
+    /**
+     * This is to generate and register the new callback to Telephony for uncached subscription id,
+     * then cache it. Telephony also cached this callback into
+     * {@link com.android.server.TelephonyRegistry}, so if subscription id and callback were cached
+     * already, it shall do nothing to avoid registering redundant callback to Telephony.
+     */
+    private void registerInternetTelephonyCallback(
+            TelephonyManager telephonyManager, int subId) {
+        if (mSubIdTelephonyCallbackMap.containsKey(subId)) {
+            // Avoid to generate and register unnecessary callback to Telephony.
+            return;
+        }
+        InternetTelephonyCallback telephonyCallback = new InternetTelephonyCallback(subId);
+        mSubIdTelephonyCallbackMap.put(subId, telephonyCallback);
+        telephonyManager.registerTelephonyCallback(mExecutor, telephonyCallback);
     }
 
     boolean isAirplaneModeEnabled() {
@@ -750,9 +763,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             int subId = subInfo.getSubscriptionId();
             if (mSubIdTelephonyManagerMap.get(subId) == null) {
                 TelephonyManager secondaryTm = mTelephonyManager.createForSubscriptionId(subId);
-                InternetTelephonyCallback telephonyCallback = new InternetTelephonyCallback(subId);
-                secondaryTm.registerTelephonyCallback(mExecutor, telephonyCallback);
-                mSubIdTelephonyCallbackMap.put(subId, telephonyCallback);
+                registerInternetTelephonyCallback(secondaryTm, subId);
                 mSubIdTelephonyManagerMap.put(subId, secondaryTm);
             }
             Log.d(TAG, "getActiveAutoSwitchNonDdsSubId: " + subId);
@@ -1604,6 +1615,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         if (DEBUG) {
             Log.d(TAG, "DDS: defaultDataSubId:" + defaultDataSubId);
         }
+
         if (SubscriptionManager.isUsableSubscriptionId(defaultDataSubId)) {
             updateNddsSubId(defaultDataSubId);
             // clean up old defaultDataSubId
@@ -1620,9 +1632,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             // create for new defaultDataSubId
             mTelephonyManager = mTelephonyManager.createForSubscriptionId(defaultDataSubId);
             mSubIdTelephonyManagerMap.put(defaultDataSubId, mTelephonyManager);
-            InternetTelephonyCallback newCallback = new InternetTelephonyCallback(defaultDataSubId);
-            mSubIdTelephonyCallbackMap.put(defaultDataSubId, newCallback);
-            mTelephonyManager.registerTelephonyCallback(mHandler::post, newCallback);
+            registerInternetTelephonyCallback(mTelephonyManager, defaultDataSubId);
             if (mCallback != null) {
                 mCallback.onSubscriptionsChanged(defaultDataSubId);
             }

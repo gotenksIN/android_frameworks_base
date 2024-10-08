@@ -23,6 +23,7 @@ import static com.android.app.animation.Interpolators.EMPHASIZED_ACCELERATE;
 import static com.android.app.animation.Interpolators.EMPHASIZED_DECELERATE;
 import static com.android.keyguard.KeyguardClockSwitch.LARGE;
 import static com.android.keyguard.KeyguardClockSwitch.SMALL;
+import static com.android.systemui.Flags.msdlFeedback;
 import static com.android.systemui.Flags.predictiveBackAnimateShade;
 import static com.android.systemui.Flags.smartspaceRelocateToBottom;
 import static com.android.systemui.classifier.Classifier.BOUNCER_UNLOCK;
@@ -238,6 +239,9 @@ import com.android.wm.shell.animation.FlingAnimationUtils;
 
 import dalvik.annotation.optimization.NeverCompile;
 
+import com.google.android.msdl.data.model.MSDLToken;
+import com.google.android.msdl.domain.MSDLPlayer;
+
 import kotlin.Unit;
 
 import kotlinx.coroutines.CoroutineDispatcher;
@@ -314,6 +318,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private final StatusBarStateListener mStatusBarStateListener = new StatusBarStateListener();
     private final NotificationPanelView mView;
     private final VibratorHelper mVibratorHelper;
+    private final MSDLPlayer mMSDLPlayer;
     private final MetricsLogger mMetricsLogger;
     private final ConfigurationController mConfigurationController;
     private final Provider<FlingAnimationUtils.Builder> mFlingAnimationUtilsBuilder;
@@ -784,7 +789,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             SplitShadeStateController splitShadeStateController,
             PowerInteractor powerInteractor,
             KeyguardClockPositionAlgorithm keyguardClockPositionAlgorithm,
-            NaturalScrollingSettingObserver naturalScrollingSettingObserver) {
+            NaturalScrollingSettingObserver naturalScrollingSettingObserver,
+            MSDLPlayer msdlPlayer) {
         SceneContainerFlag.assertInLegacyMode();
         keyguardStateController.addCallback(new KeyguardStateController.Callback() {
             @Override
@@ -862,6 +868,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mNotificationsDragEnabled = mResources.getBoolean(
                 R.bool.config_enableNotificationShadeDrag);
         mVibratorHelper = vibratorHelper;
+        mMSDLPlayer = msdlPlayer;
         mVibrateOnOpening = mResources.getBoolean(R.bool.config_vibrateOnIconAnimation);
         mStatusBarTouchableRegionManager = statusBarTouchableRegionManager;
         mSystemClock = systemClock;
@@ -2232,6 +2239,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     @VisibleForTesting
     void onFlingEnd(boolean cancelled) {
         mIsFlinging = false;
+        mExpectingSynthesizedDown = false;
         // No overshoot when the animation ends
         setOverExpansionInternal(0, false /* isFromGesture */);
         setAnimator(null);
@@ -2364,7 +2372,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             return;
         }
         if (mExpectingSynthesizedDown) {
-            mExpectingSynthesizedDown = false;
             // Window never will receive touch events that typically trigger haptic on open.
             maybeVibrateOnOpening(false /* openingWithTouch */);
             fling(velocity > 1f ? 1000f * velocity : 0  /* expand */);
@@ -2923,7 +2930,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         }
 
         if (!mStatusBarStateController.isDozing()) {
-            mVibratorHelper.performHapticFeedback(mView, HapticFeedbackConstants.REJECT);
+            performHapticFeedback(HapticFeedbackConstants.REJECT);
         }
     }
 
@@ -3291,7 +3298,20 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     public void performHapticFeedback(int constant) {
-        mVibratorHelper.performHapticFeedback(mView, constant);
+        if (msdlFeedback()) {
+            MSDLToken token;
+            switch (constant) {
+                case HapticFeedbackConstants.GESTURE_START ->
+                        token = MSDLToken.SWIPE_THRESHOLD_INDICATOR;
+                case HapticFeedbackConstants.REJECT -> token = MSDLToken.FAILURE;
+                default -> token = null;
+            }
+            if (token != null) {
+                mMSDLPlayer.playToken(token, null);
+            }
+        } else {
+            mVibratorHelper.performHapticFeedback(mView, constant);
+        }
     }
 
     private class ShadeHeadsUpTrackerImpl implements ShadeHeadsUpTracker {
@@ -3748,10 +3768,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private void maybeVibrateOnOpening(boolean openingWithTouch) {
         if (mVibrateOnOpening && mBarState != KEYGUARD && mBarState != SHADE_LOCKED) {
             if (!openingWithTouch || !mHasVibratedOnOpen) {
-                mVibratorHelper.performHapticFeedback(
-                        mView,
-                        HapticFeedbackConstants.GESTURE_START
-                );
+                performHapticFeedback(HapticFeedbackConstants.GESTURE_START);
                 mHasVibratedOnOpen = true;
                 mShadeLog.v("Vibrating on opening, mHasVibratedOnOpen=true");
             }
@@ -4006,6 +4023,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             }
             mExpandedFraction = Math.min(1f,
                     maxPanelHeight == 0 ? 0 : mExpandedHeight / maxPanelHeight);
+            if (mExpandedFraction > 0f && mExpectingSynthesizedDown) {
+                mExpectingSynthesizedDown = false;
+            }
             mShadeRepository.setLegacyShadeExpansion(mExpandedFraction);
             mQsController.setShadeExpansion(mExpandedHeight, mExpandedFraction);
             mExpansionDragDownAmountPx = h;

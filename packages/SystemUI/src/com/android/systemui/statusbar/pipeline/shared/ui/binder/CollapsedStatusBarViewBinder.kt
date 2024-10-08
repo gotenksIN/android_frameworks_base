@@ -21,6 +21,7 @@ import android.animation.AnimatorListenerAdapter
 import android.view.View
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.android.app.animation.Interpolators
 import com.android.systemui.Flags
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.lifecycle.repeatWhenAttached
@@ -28,7 +29,9 @@ import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.statusbar.chips.ui.binder.OngoingActivityChipBinder
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
+import com.android.systemui.statusbar.core.StatusBarSimpleFragment
 import com.android.systemui.statusbar.notification.shared.NotificationsLiveDataStoreRefactor
+import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragment
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.CollapsedStatusBarViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -86,19 +89,30 @@ class CollapsedStatusBarViewBinderImpl @Inject constructor() : CollapsedStatusBa
                     launch {
                         viewModel.primaryOngoingActivityChip.collect { primaryChipModel ->
                             OngoingActivityChipBinder.bind(primaryChipModel, primaryChipView)
-                            when (primaryChipModel) {
-                                is OngoingActivityChipModel.Shown ->
-                                    listener.onOngoingActivityStatusChanged(
-                                        hasPrimaryOngoingActivity = true,
-                                        hasSecondaryOngoingActivity = false,
-                                        shouldAnimate = true,
-                                    )
-                                is OngoingActivityChipModel.Hidden ->
-                                    listener.onOngoingActivityStatusChanged(
-                                        hasPrimaryOngoingActivity = false,
-                                        hasSecondaryOngoingActivity = false,
-                                        shouldAnimate = primaryChipModel.shouldAnimate,
-                                    )
+                            if (StatusBarSimpleFragment.isEnabled) {
+                                when (primaryChipModel) {
+                                    is OngoingActivityChipModel.Shown ->
+                                        primaryChipView.show(shouldAnimateChange = true)
+                                    is OngoingActivityChipModel.Hidden ->
+                                        primaryChipView.hide(
+                                            shouldAnimateChange = primaryChipModel.shouldAnimate
+                                        )
+                                }
+                            } else {
+                                when (primaryChipModel) {
+                                    is OngoingActivityChipModel.Shown ->
+                                        listener.onOngoingActivityStatusChanged(
+                                            hasPrimaryOngoingActivity = true,
+                                            hasSecondaryOngoingActivity = false,
+                                            shouldAnimate = true,
+                                        )
+                                    is OngoingActivityChipModel.Hidden ->
+                                        listener.onOngoingActivityStatusChanged(
+                                            hasPrimaryOngoingActivity = false,
+                                            hasSecondaryOngoingActivity = false,
+                                            shouldAnimate = primaryChipModel.shouldAnimate,
+                                        )
+                                }
                             }
                         }
                     }
@@ -115,14 +129,22 @@ class CollapsedStatusBarViewBinderImpl @Inject constructor() : CollapsedStatusBa
                             // TODO(b/364653005): Don't show the secondary chip if there isn't
                             // enough space for it.
                             OngoingActivityChipBinder.bind(chips.secondary, secondaryChipView)
-                            listener.onOngoingActivityStatusChanged(
-                                hasPrimaryOngoingActivity =
-                                    chips.primary is OngoingActivityChipModel.Shown,
-                                hasSecondaryOngoingActivity =
-                                    chips.secondary is OngoingActivityChipModel.Shown,
-                                // TODO(b/364653005): Figure out the animation story here.
-                                shouldAnimate = true,
-                            )
+
+                            if (StatusBarSimpleFragment.isEnabled) {
+                                primaryChipView.adjustVisibility(chips.primary.toVisibilityModel())
+                                secondaryChipView.adjustVisibility(
+                                    chips.secondary.toVisibilityModel()
+                                )
+                            } else {
+                                listener.onOngoingActivityStatusChanged(
+                                    hasPrimaryOngoingActivity =
+                                        chips.primary is OngoingActivityChipModel.Shown,
+                                    hasSecondaryOngoingActivity =
+                                        chips.secondary is OngoingActivityChipModel.Shown,
+                                    // TODO(b/364653005): Figure out the animation story here.
+                                    shouldAnimate = true,
+                                )
+                            }
                         }
                     }
                 }
@@ -134,8 +156,40 @@ class CollapsedStatusBarViewBinderImpl @Inject constructor() : CollapsedStatusBa
                         }
                     }
                 }
+
+                if (StatusBarSimpleFragment.isEnabled) {
+                    val clockView = view.requireViewById<View>(R.id.clock)
+                    launch { viewModel.isClockVisible.collect { clockView.adjustVisibility(it) } }
+
+                    val notificationIconsArea = view.requireViewById<View>(R.id.notificationIcons)
+                    launch {
+                        viewModel.isNotificationIconContainerVisible.collect {
+                            notificationIconsArea.adjustVisibility(it)
+                        }
+                    }
+
+                    val systemInfoView =
+                        view.requireViewById<View>(R.id.status_bar_end_side_content)
+                    // TODO(b/364360986): Also handle operator name view.
+                    launch {
+                        viewModel.isSystemInfoVisible.collect {
+                            systemInfoView.adjustVisibility(it)
+                            // TODO(b/364360986): The system info view has a custom alpha controller
+                            // in CollapsedStatusBarFragment.
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private fun OngoingActivityChipModel.toVisibilityModel():
+        CollapsedStatusBarViewModel.VisibilityModel {
+        return CollapsedStatusBarViewModel.VisibilityModel(
+            visibility = if (this is OngoingActivityChipModel.Shown) View.VISIBLE else View.GONE,
+            // TODO(b/364653005): Figure out the animation story here.
+            shouldAnimateChange = true,
+        )
     }
 
     private fun animateLightsOutView(view: View, visible: Boolean) {
@@ -166,6 +220,54 @@ class CollapsedStatusBarViewBinderImpl @Inject constructor() : CollapsedStatusBa
                 }
             )
             .start()
+    }
+
+    private fun View.adjustVisibility(model: CollapsedStatusBarViewModel.VisibilityModel) {
+        if (model.visibility == View.VISIBLE) {
+            this.show(model.shouldAnimateChange)
+        } else {
+            this.hide(model.visibility, model.shouldAnimateChange)
+        }
+    }
+
+    // See CollapsedStatusBarFragment#hide.
+    private fun View.hide(state: Int = View.INVISIBLE, shouldAnimateChange: Boolean) {
+        val v = this
+        v.animate().cancel()
+        if (!shouldAnimateChange) {
+            v.alpha = 0f
+            v.visibility = state
+            return
+        }
+
+        v.animate()
+            .alpha(0f)
+            .setDuration(CollapsedStatusBarFragment.FADE_OUT_DURATION.toLong())
+            .setStartDelay(0)
+            .setInterpolator(Interpolators.ALPHA_OUT)
+            .withEndAction { v.visibility = state }
+    }
+
+    // See CollapsedStatusBarFragment#show.
+    private fun View.show(shouldAnimateChange: Boolean) {
+        val v = this
+        v.animate().cancel()
+        v.visibility = View.VISIBLE
+        if (!shouldAnimateChange) {
+            v.alpha = 1f
+            return
+        }
+        v.animate()
+            .alpha(1f)
+            .setDuration(CollapsedStatusBarFragment.FADE_IN_DURATION.toLong())
+            .setInterpolator(Interpolators.ALPHA_IN)
+            .setStartDelay(CollapsedStatusBarFragment.FADE_IN_DELAY.toLong())
+            // We need to clean up any pending end action from animateHide if we call both hide and
+            // show in the same frame before the animation actually gets started.
+            // cancel() doesn't really remove the end action.
+            .withEndAction(null)
+
+        // TODO(b/364360986): Synchronize the motion with the Keyguard fading if necessary.
     }
 }
 

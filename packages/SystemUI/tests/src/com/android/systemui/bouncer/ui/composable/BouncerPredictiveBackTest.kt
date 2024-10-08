@@ -19,6 +19,7 @@ package com.android.systemui.bouncer.ui.composable
 import android.app.AlertDialog
 import android.platform.test.annotations.MotionTest
 import android.testing.TestableLooper.RunWithLooper
+import android.view.View
 import androidx.activity.BackEventCompat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -52,26 +53,23 @@ import com.android.systemui.bouncer.ui.BouncerDialogFactory
 import com.android.systemui.bouncer.ui.viewmodel.BouncerSceneContentViewModel
 import com.android.systemui.bouncer.ui.viewmodel.BouncerUserActionsViewModel
 import com.android.systemui.bouncer.ui.viewmodel.bouncerSceneContentViewModel
-import com.android.systemui.classifier.domain.interactor.falsingInteractor
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.motion.createSysUiComposeMotionTestRule
-import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
-import com.android.systemui.scene.shared.logger.sceneLogger
+import com.android.systemui.scene.sceneContainerViewModelFactory
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.sceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.Scene
 import com.android.systemui.scene.ui.composable.SceneContainer
-import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
-import com.android.systemui.scene.ui.viewmodel.splitEdgeDetector
-import com.android.systemui.shade.domain.interactor.shadeInteractor
+import com.android.systemui.settings.displayTracker
 import com.android.systemui.testKosmos
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,6 +80,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.MockitoAnnotations
+import org.mockito.kotlin.mock
 import platform.test.motion.compose.ComposeFeatureCaptures.positionInRoot
 import platform.test.motion.compose.ComposeRecordingSpec
 import platform.test.motion.compose.MotionControl
@@ -115,29 +114,20 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
     private val Kosmos.sceneKeys by Fixture { listOf(Scenes.Lockscreen, Scenes.Bouncer) }
     private val Kosmos.initialSceneKey by Fixture { Scenes.Bouncer }
     private val Kosmos.sceneContainerConfig by Fixture {
-        val navigationDistances =
-            mapOf(
-                Scenes.Lockscreen to 1,
-                Scenes.Bouncer to 0,
-            )
+        val navigationDistances = mapOf(Scenes.Lockscreen to 1, Scenes.Bouncer to 0)
         SceneContainerConfig(sceneKeys, initialSceneKey, emptyList(), navigationDistances)
     }
+    private val view = mock<View>()
 
     private val transitionState by lazy {
         MutableStateFlow<ObservableTransitionState>(
             ObservableTransitionState.Idle(kosmos.sceneContainerConfig.initialSceneKey)
         )
     }
+
     private val sceneContainerViewModel by lazy {
-        SceneContainerViewModel(
-                sceneInteractor = kosmos.sceneInteractor,
-                falsingInteractor = kosmos.falsingInteractor,
-                powerInteractor = kosmos.powerInteractor,
-                shadeInteractor = kosmos.shadeInteractor,
-                splitEdgeDetector = kosmos.splitEdgeDetector,
-                logger = kosmos.sceneLogger,
-                motionEventHandlerReceiver = {},
-            )
+        kosmos.sceneContainerViewModelFactory
+            .create(view, kosmos.displayTracker.defaultDisplayId, {})
             .apply { setTransitionState(transitionState) }
     }
 
@@ -160,7 +150,7 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
         BouncerScene(
             bouncerSceneActionsViewModelFactory,
             bouncerSceneContentViewModelFactory,
-            bouncerDialogFactory
+            bouncerDialogFactory,
         )
 
     @Before
@@ -175,7 +165,7 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
 
     @Test
     fun bouncerPredictiveBackMotion() =
-        motionTestRule.runTest {
+        motionTestRule.runTest(timeout = 30.seconds) {
             val motion =
                 recordMotion(
                     content = { play ->
@@ -189,11 +179,11 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
                                 sceneByKey =
                                     mapOf(
                                         Scenes.Lockscreen to FakeLockscreen(),
-                                        Scenes.Bouncer to bouncerScene
+                                        Scenes.Bouncer to bouncerScene,
                                     ),
                                 initialSceneKey = Scenes.Bouncer,
                                 overlayByKey = emptyMap(),
-                                dataSourceDelegator = kosmos.sceneDataSourceDelegator
+                                dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                             )
                         }
                     },
@@ -215,14 +205,14 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
                         feature(
                             isElement(Bouncer.Elements.Content),
                             positionInRoot,
-                            "content_offset"
+                            "content_offset",
                         )
                         feature(
                             isElement(Bouncer.Elements.Background),
                             elementAlpha,
-                            "background_alpha"
+                            "background_alpha",
                         )
-                    }
+                    },
                 )
 
             assertThat(motion).timeSeriesMatchesGolden()
@@ -240,7 +230,7 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
                 }
                 backProgress.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 500)
+                    animationSpec = tween(durationMillis = 500),
                 ) {
                     androidComposeTestRule.runOnUiThread {
                         dispatcher.dispatchOnBackProgressed(
@@ -309,10 +299,10 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
                                         is JSONObject ->
                                             Offset(
                                                 pivot.getDouble("x").toFloat(),
-                                                pivot.getDouble("y").toFloat()
+                                                pivot.getDouble("y").toFloat(),
                                             )
                                         else -> throw UnknownTypeException()
-                                    }
+                                    },
                             )
                         }
                         else -> throw UnknownTypeException()
@@ -337,12 +327,12 @@ class BouncerPredictiveBackTest : SysuiTestCase() {
                                                 put("x", it.pivot.x)
                                                 put("y", it.pivot.y)
                                             }
-                                    }
+                                    },
                                 )
                             }
                         }
                     }
-                }
+                },
             )
     }
 }

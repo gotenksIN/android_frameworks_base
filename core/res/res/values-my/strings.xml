@@ -797,7 +797,7 @@
     <string name="permlab_accessNotifications" msgid="7130360248191984741">"သတိပေးချက်များအား အသုံးပြုခွင့်"</string>
     <string name="permdesc_accessNotifications" msgid="761730149268789668">"အပလီကေးရှင်းကို အကြောင်းကြားချက်များအား ထုတ်လုပ်ရန်၊ လေ့လာရန်၊ ဖျက်ရန် ခွင့်ပြုခြင်း။ တခြား အပလီကေးရှင်းများမှ သတိပေးချက်များလည်း ပါဝင်ပါသည်"</string>
     <string name="permlab_bindNotificationListenerService" msgid="5848096702733262458">"သတိပေးချက် နားထောင်ခြင်း ဆားဗစ် နှင့် ပူးပေါင်းခြင်း"</string>
-    <string name="permdesc_bindNotificationListenerService" msgid="4970553694467137126">"ဖုန်းကိုင်ထားသူနှင့် အကြောင်းကြားချက် နားစွင့်သော ဆားဗစ်မှ ထိပ်ပိုင်းအင်တာဖေ့စ် ကို ပူးပေါင်းခွင့်ပေးခြင်း။ ပုံမှန် အက်ပ်များအတွက် ဘယ်တော့မှ မလိုအပ်ပါ"</string>
+    <string name="permdesc_bindNotificationListenerService" msgid="4970553694467137126">"ဖုန်းကိုင်ထားသူနှင့် အကြောင်းကြားချက် နားစွင့်သော ဆားဗစ်မှ ထိပ်ပိုင်းအင်တာဖေ့စ် ကို ပူးပေါင်းခွင့်ပေးသည်။ ပုံမှန် အက်ပ်များအတွက် ဘယ်တော့မှ မလိုအပ်ပါ။"</string>
     <string name="permlab_bindConditionProviderService" msgid="5245421224814878483">"အခြေအနေ စီမံပေးရေး ဝန်ဆောင်မှု တစ်ခုဆီသို့ ချိတ်တွဲခြင်း"</string>
     <string name="permdesc_bindConditionProviderService" msgid="6106018791256120258">"စွဲကိုင်ထားသူအား အခြေအနေကို စီမံပေးသူ၏ ထိပ်သီး အဆင့် အင်တာဖေ့စ်သို့ ချိတ်တွဲခွင့်ကို ပေးသည်။ သာမန် အက်ပ်များ အတွက် ဘယ်တော့မှ မလိုအပ်နိုင်ပါ။"</string>
     <string name="permlab_bindDreamService" msgid="4776175992848982706">"အိပ်မက် ဝန်ဆောင်မှုသို့ ပေါင်းစည်းမည်"</string>
@@ -2010,8 +2010,7 @@
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"ဖန်သားပြင်လော့ခ် သတ်မှတ်ပါ"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"ဖန်သားပြင်လော့ခ် သတ်မှတ်ရန်"</string>
     <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"သင့်သီးသန့်နေရာသုံးရန် ဤစက်၌ ဖန်သားပြင်လော့ခ် သတ်မှတ်ပါ"</string>
-    <!-- no translation found for private_space_set_up_screen_lock_for_reset (7817091386408432097) -->
-    <skip />
+    <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"သီးသန့်နေရာကို ဖျက်ရန်အတွက် ဤစက်တွင် ဖန်သားပြင်လော့ခ် သတ်မှတ်ပါ"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"အက်ပ်ကို မရနိုင်ပါ"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> ကို ယခု မရနိုင်ပါ။"</string>
     <string name="app_streaming_blocked_title" msgid="6090945835898766139">"<xliff:g id="ACTIVITY">%1$s</xliff:g> မရနိုင်ပါ"</string>

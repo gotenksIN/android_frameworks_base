@@ -83,7 +83,7 @@ import org.mockito.Mockito.doNothing
 import org.mockito.Mockito.never
 import org.mockito.Mockito.spy
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyZeroInteractions
+import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.whenever
 
@@ -177,7 +177,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
             )
 
         verify(eventLogger).logNoteTaskOpened(expectedInfo)
-        verifyZeroInteractions(bubbles, keyguardManager, userManager)
+        verifyNoMoreInteractions(bubbles, keyguardManager, userManager)
     }
 
     @Test
@@ -192,7 +192,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
             )
 
         verify(eventLogger).logNoteTaskClosed(expectedInfo)
-        verifyZeroInteractions(bubbles, keyguardManager, userManager)
+        verifyNoMoreInteractions(bubbles, keyguardManager, userManager)
     }
 
     @Test
@@ -206,7 +206,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
                 key = Bubble.getAppBubbleKeyForApp(expectedInfo.packageName, expectedInfo.user),
             )
 
-        verifyZeroInteractions(bubbles, keyguardManager, userManager, eventLogger)
+        verifyNoMoreInteractions(bubbles, keyguardManager, userManager, eventLogger)
     }
 
     @Test
@@ -220,7 +220,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
                 key = Bubble.getAppBubbleKeyForApp(expectedInfo.packageName, expectedInfo.user),
             )
 
-        verifyZeroInteractions(bubbles, keyguardManager, userManager, eventLogger)
+        verifyNoMoreInteractions(bubbles, keyguardManager, userManager, eventLogger)
     }
 
     @Test
@@ -231,7 +231,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
                 key = "any other key",
             )
 
-        verifyZeroInteractions(bubbles, keyguardManager, userManager, eventLogger)
+        verifyNoMoreInteractions(bubbles, keyguardManager, userManager, eventLogger)
     }
 
     @Test
@@ -242,7 +242,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
                 key = Bubble.getAppBubbleKeyForApp(NOTE_TASK_INFO.packageName, NOTE_TASK_INFO.user),
             )
 
-        verifyZeroInteractions(bubbles, keyguardManager, userManager, eventLogger)
+        verifyNoMoreInteractions(bubbles, keyguardManager, userManager, eventLogger)
     }
 
     // endregion
@@ -276,7 +276,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         }
         assertThat(userCaptor.value).isEqualTo(user10)
         verify(eventLogger).logNoteTaskOpened(expectedInfo)
-        verifyZeroInteractions(bubbles)
+        verifyNoMoreInteractions(bubbles)
     }
 
     @Test
@@ -300,7 +300,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         }
         assertThat(userCaptor.value).isEqualTo(userTracker.userHandle)
         verify(eventLogger).logNoteTaskOpened(expectedInfo)
-        verifyZeroInteractions(bubbles)
+        verifyNoMoreInteractions(bubbles)
     }
 
     @Test
@@ -323,7 +323,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         }
         assertThat(userCaptor.value).isEqualTo(userTracker.userHandle)
         verify(eventLogger).logNoteTaskClosed(expectedInfo)
-        verifyZeroInteractions(bubbles)
+        verifyNoMoreInteractions(bubbles)
     }
 
     @Test
@@ -337,7 +337,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         // Context package name used to create bubble icon from drawable resource id
         verify(context, atLeastOnce()).packageName
         verifyNoteTaskOpenInBubbleInUser(userTracker.userHandle)
-        verifyZeroInteractions(eventLogger)
+        verifyNoMoreInteractions(eventLogger)
     }
 
     @Test
@@ -353,7 +353,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         // Context package name used to create bubble icon from drawable resource id
         verify(context, atLeastOnce()).packageName
         verifyNoteTaskOpenInBubbleInUser(userTracker.userHandle)
-        verifyZeroInteractions(eventLogger)
+        verifyNoMoreInteractions(eventLogger)
     }
 
     @Test
@@ -394,14 +394,14 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         }
         assertThat(userCaptor.value).isEqualTo(user10)
         verify(eventLogger).logNoteTaskOpened(expectedInfo)
-        verifyZeroInteractions(bubbles)
+        verifyNoMoreInteractions(bubbles)
     }
 
     @Test
     fun showNoteTask_bubblesIsNull_shouldDoNothing() {
         createNoteTaskController(bubbles = null).showNoteTask(entryPoint = TAIL_BUTTON)
 
-        verifyZeroInteractions(bubbles, eventLogger)
+        verifyNoMoreInteractions(bubbles, eventLogger)
     }
 
     @Test
@@ -413,14 +413,14 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         noteTaskController.showNoteTask(entryPoint = TAIL_BUTTON)
 
         verify(noteTaskController).showNoDefaultNotesAppToast()
-        verifyZeroInteractions(bubbles, eventLogger)
+        verifyNoMoreInteractions(bubbles, eventLogger)
     }
 
     @Test
     fun showNoteTask_flagDisabled_shouldDoNothing() {
         createNoteTaskController(isEnabled = false).showNoteTask(entryPoint = TAIL_BUTTON)
 
-        verifyZeroInteractions(bubbles, eventLogger)
+        verifyNoMoreInteractions(bubbles, eventLogger)
     }
 
     @Test
@@ -429,7 +429,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
 
         createNoteTaskController().showNoteTask(entryPoint = TAIL_BUTTON)
 
-        verifyZeroInteractions(bubbles, eventLogger)
+        verifyNoMoreInteractions(bubbles, eventLogger)
     }
 
     @Test
@@ -454,7 +454,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
         }
         assertThat(userCaptor.value).isEqualTo(userTracker.userHandle)
         verify(eventLogger).logNoteTaskOpened(expectedInfo)
-        verifyZeroInteractions(bubbles)
+        verifyNoMoreInteractions(bubbles)
     }
 
     // endregion
@@ -551,7 +551,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
 
         createNoteTaskController().showNoteTask(entryPoint = QUICK_AFFORDANCE)
 
-        verifyZeroInteractions(bubbles, eventLogger)
+        verifyNoMoreInteractions(bubbles, eventLogger)
     }
 
     @Test
@@ -567,7 +567,7 @@ internal class NoteTaskControllerTest : SysuiTestCase() {
 
         createNoteTaskController().showNoteTask(entryPoint = QUICK_AFFORDANCE)
 
-        verifyZeroInteractions(bubbles, eventLogger)
+        verifyNoMoreInteractions(bubbles, eventLogger)
     }
 
     @Test

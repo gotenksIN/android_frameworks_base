@@ -30,6 +30,7 @@ import android.graphics.drawable.shapes.RoundRectShape
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
+import android.view.accessibility.AccessibilityEvent
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -47,7 +48,7 @@ import com.android.internal.R.attr.materialColorSurfaceContainerLow
 import com.android.internal.R.attr.materialColorSurfaceDim
 import com.android.window.flags.Flags.enableMinimizeButton
 import com.android.wm.shell.R
-import com.android.wm.shell.shared.desktopmode.DesktopModeFlags
+import android.window.flags.DesktopModeFlags
 import com.android.wm.shell.windowdecor.MaximizeButtonView
 import com.android.wm.shell.windowdecor.common.DecorThemeUtil
 import com.android.wm.shell.windowdecor.common.OPACITY_100
@@ -157,7 +158,7 @@ class AppHeaderViewHolder(
         height: Int,
         isCaptionVisible: Boolean
     ) {
-        if (DesktopModeFlags.THEMED_APP_HEADERS.isEnabled(context)) {
+        if (DesktopModeFlags.ENABLE_THEMED_APP_HEADERS.isTrue()) {
             bindDataWithThemedHeaders(taskInfo)
         } else {
             bindDataLegacy(taskInfo)
@@ -263,7 +264,11 @@ class AppHeaderViewHolder(
 
     override fun onHandleMenuOpened() {}
 
-    override fun onHandleMenuClosed() {}
+    override fun onHandleMenuClosed() {
+        openMenuButton.post {
+            openMenuButton.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
+        }
+    }
 
     fun setAnimatingTaskResizeOrReposition(animatingTaskResizeOrReposition: Boolean) {
         // If animating a task resize or reposition, cancel any running hover animations
@@ -307,6 +312,12 @@ class AppHeaderViewHolder(
             /* right = */ appChipBoundsInWindow[0] + openMenuButton.width,
             /* bottom = */ appChipBoundsInWindow[1] + openMenuButton.height
         )
+    }
+
+    fun requestAccessibilityFocus() {
+        maximizeWindowButton.post {
+            maximizeWindowButton.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED)
+        }
     }
 
     private fun getHeaderStyle(header: Header): HeaderStyle {

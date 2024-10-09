@@ -1326,4 +1326,12 @@ public abstract class ActivityManagerInternal {
      */
     public abstract void killApplicationSync(String pkgName, int appId, int userId,
             String reason, int exitInfoReason);
+
+    /**
+     * Add a creator token for all embedded intents (stored as extra) of the given intent.
+     *
+     * @param intent The given intent
+     * @hide
+     */
+    public abstract void addCreatorToken(Intent intent);
 }

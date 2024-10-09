@@ -68,6 +68,13 @@ flag {
 }
 
 flag {
+    name: "multiuser_widget"
+    namespace: "multiuser"
+    description: "Implement the Multiuser Widget"
+    bug: "365748524"
+}
+
+flag {
     name: "enable_biometrics_to_unlock_private_space"
     is_exported: true
     namespace: "profile_experiences"
@@ -195,6 +202,36 @@ flag {
     namespace: "multiuser"
     description: "Cache getProfileParent to avoid unnecessary binder calls"
     bug: "350417399"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+    name: "cache_profile_ids"
+    namespace: "multiuser"
+    description: "Cache getProfileIds to avoid unnecessary binder calls"
+    bug: "350421409"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+    name: "cache_profile_type"
+    namespace: "multiuser"
+    description: "Cache getProfileType to avoid unnecessary binder calls"
+    bug: "350417403"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+    name: "cache_profiles"
+    namespace: "multiuser"
+    description: "Cache getProfiles to avoid unnecessary binder calls"
+    bug: "350419395"
     metadata {
         purpose: PURPOSE_BUGFIX
   }
@@ -449,11 +486,20 @@ flag {
   }
 }
 
-
 flag {
     name: "caching_development_improvements"
     namespace: "multiuser"
     description: "System API to simplify caching implamentations"
     bug: "364947162"
     is_fixed_read_only: true
+}
+
+flag {
+  name: "show_custom_unlock_title_inside_private_profile"
+  namespace: "profile_experiences"
+  description: "When private space is unlocked show dynamic title in unlock factor screens based on lock factor set for the profile"
+  bug: "323835257"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

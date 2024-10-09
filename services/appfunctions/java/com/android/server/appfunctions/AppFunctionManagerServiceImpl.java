@@ -16,8 +16,6 @@
 
 package com.android.server.appfunctions;
 
-import static android.app.appfunctions.AppFunctionManager.APP_FUNCTION_STATE_DISABLED;
-import static android.app.appfunctions.AppFunctionManager.APP_FUNCTION_STATE_ENABLED;
 import static android.app.appfunctions.AppFunctionRuntimeMetadata.APP_FUNCTION_RUNTIME_METADATA_DB;
 import static android.app.appfunctions.AppFunctionRuntimeMetadata.APP_FUNCTION_RUNTIME_NAMESPACE;
 
@@ -53,6 +51,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.CancellationSignal;
+import android.os.IBinder;
 import android.os.ICancellationSignal;
 import android.os.OutcomeReceiver;
 import android.os.ParcelableException;
@@ -160,7 +159,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                                 callingUid,
                                 callingPid,
                                 localCancelTransport,
-                                safeExecuteAppFunctionCallback);
+                                safeExecuteAppFunctionCallback,
+                                executeAppFunctionCallback.asBinder());
                     } catch (Exception e) {
                         safeExecuteAppFunctionCallback.onResult(
                                 mapExceptionToExecuteAppFunctionResponse(e));
@@ -171,11 +171,12 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
 
     @WorkerThread
     private void executeAppFunctionInternal(
-            ExecuteAppFunctionAidlRequest requestInternal,
+            @NonNull ExecuteAppFunctionAidlRequest requestInternal,
             int callingUid,
             int callingPid,
-            ICancellationSignal localCancelTransport,
-            SafeOneTimeExecuteAppFunctionCallback safeExecuteAppFunctionCallback) {
+            @NonNull ICancellationSignal localCancelTransport,
+            @NonNull SafeOneTimeExecuteAppFunctionCallback safeExecuteAppFunctionCallback,
+            @NonNull IBinder callerBinder) {
         UserHandle targetUser = requestInternal.getUserHandle();
         // TODO(b/354956319): Add and honor the new enterprise policies.
         if (mCallerValidator.isUserOrganizationManaged(targetUser)) {
@@ -202,6 +203,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                 .verifyCallerCanExecuteAppFunction(
                         callingUid,
                         callingPid,
+                        targetUser,
                         requestInternal.getCallingPackage(),
                         targetPackageName,
                         requestInternal.getClientRequest().getFunctionIdentifier())
@@ -250,7 +252,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                                     localCancelTransport,
                                     safeExecuteAppFunctionCallback,
                                     /* bindFlags= */ Context.BIND_AUTO_CREATE
-                                            | Context.BIND_FOREGROUND_SERVICE);
+                                            | Context.BIND_FOREGROUND_SERVICE,
+                                    callerBinder);
                         })
                 .exceptionally(
                         ex -> {
@@ -326,8 +329,9 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
 
     /**
      * Sets the enabled status of a specified app function.
-     * <p>
-     * Required to hold a lock to call this function to avoid document changes during the process.
+     *
+     * <p>Required to hold a lock to call this function to avoid document changes during the
+     * process.
      */
     @WorkerThread
     @GuardedBy("mLock")
@@ -357,32 +361,19 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                                     callingPackage,
                                     functionIdentifier,
                                     runtimeMetadataSearchSession));
-            AppFunctionRuntimeMetadata.Builder newMetadata =
-                    new AppFunctionRuntimeMetadata.Builder(existingMetadata);
-            switch (enabledState) {
-                case AppFunctionManager.APP_FUNCTION_STATE_DEFAULT -> {
-                    newMetadata.setEnabled(null);
-                }
-                case APP_FUNCTION_STATE_ENABLED -> {
-                    newMetadata.setEnabled(true);
-                }
-                case APP_FUNCTION_STATE_DISABLED -> {
-                    newMetadata.setEnabled(false);
-                }
-                default ->
-                        throw new IllegalArgumentException(
-                                "Value of EnabledState is unsupported.");
-            }
+            AppFunctionRuntimeMetadata newMetadata =
+                    new AppFunctionRuntimeMetadata.Builder(existingMetadata)
+                            .setEnabled(enabledState).build();
             AppSearchBatchResult<String, Void> putDocumentBatchResult =
                     runtimeMetadataSearchSession
                             .put(
                                     new PutDocumentsRequest.Builder()
-                                            .addGenericDocuments(newMetadata.build())
+                                            .addGenericDocuments(newMetadata)
                                             .build())
                             .get();
             if (!putDocumentBatchResult.isSuccess()) {
-                throw new IllegalStateException("Failed writing updated doc to AppSearch due to "
-                        + putDocumentBatchResult);
+                throw new IllegalStateException(
+                        "Failed writing updated doc to AppSearch due to " + putDocumentBatchResult);
             }
         }
     }
@@ -414,7 +405,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             @NonNull UserHandle targetUser,
             @NonNull ICancellationSignal cancellationSignalTransport,
             @NonNull SafeOneTimeExecuteAppFunctionCallback safeExecuteAppFunctionCallback,
-            int bindFlags) {
+            int bindFlags,
+            @NonNull IBinder callerBinder) {
         CancellationSignal cancellationSignal =
                 CancellationSignal.fromTransport(cancellationSignalTransport);
         ICancellationCallback cancellationCallback =
@@ -430,53 +422,19 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                         serviceIntent,
                         bindFlags,
                         targetUser,
-                        new RunServiceCallCallback<IAppFunctionService>() {
-                            @Override
-                            public void onServiceConnected(
-                                    @NonNull IAppFunctionService service,
-                                    @NonNull
-                                            ServiceUsageCompleteListener
-                                                    serviceUsageCompleteListener) {
-                                try {
-                                    service.executeAppFunction(
-                                            requestInternal.getClientRequest(),
-                                            cancellationCallback,
-                                            new IExecuteAppFunctionCallback.Stub() {
-                                                @Override
-                                                public void onResult(
-                                                        ExecuteAppFunctionResponse response) {
-                                                    safeExecuteAppFunctionCallback.onResult(
-                                                            response);
-                                                    serviceUsageCompleteListener.onCompleted();
-                                                }
-                                            });
-                                } catch (Exception e) {
-                                    safeExecuteAppFunctionCallback.onResult(
-                                            ExecuteAppFunctionResponse.newFailure(
-                                                    ExecuteAppFunctionResponse
-                                                            .RESULT_APP_UNKNOWN_ERROR,
-                                                    e.getMessage(),
-                                                    /* extras= */ null));
-                                    serviceUsageCompleteListener.onCompleted();
-                                }
-                            }
-
-                            @Override
-                            public void onFailedToConnect() {
-                                Slog.e(TAG, "Failed to connect to service");
-                                safeExecuteAppFunctionCallback.onResult(
-                                        ExecuteAppFunctionResponse.newFailure(
-                                                ExecuteAppFunctionResponse.RESULT_APP_UNKNOWN_ERROR,
-                                                "Failed to connect to AppFunctionService",
-                                                /* extras= */ null));
-                            }
-                        });
+                        mServiceConfig.getExecuteAppFunctionCancellationTimeoutMillis(),
+                        cancellationSignal,
+                        RunAppFunctionServiceCallback.create(
+                                requestInternal,
+                                cancellationCallback,
+                                safeExecuteAppFunctionCallback),
+                        callerBinder);
 
         if (!bindServiceResult) {
             Slog.e(TAG, "Failed to bind to the AppFunctionService");
             safeExecuteAppFunctionCallback.onResult(
                     ExecuteAppFunctionResponse.newFailure(
-                            ExecuteAppFunctionResponse.RESULT_TIMED_OUT,
+                            ExecuteAppFunctionResponse.RESULT_INTERNAL_ERROR,
                             "Failed to bind the AppFunctionService.",
                             /* extras= */ null));
         }

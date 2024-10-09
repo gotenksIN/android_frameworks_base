@@ -291,6 +291,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -1605,8 +1606,11 @@ public class AudioService extends IAudioService.Stub
 
         synchronized (mCachedAbsVolDrivingStreamsLock) {
             mCachedAbsVolDrivingStreams.forEach((dev, stream) -> {
-                mAudioSystem.setDeviceAbsoluteVolumeEnabled(dev, /*address=*/"", /*enabled=*/true,
-                        stream);
+                boolean enabled = true;
+                if (dev == AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP) {
+                    enabled = mAvrcpAbsVolSupported;
+                }
+                mAudioSystem.setDeviceAbsoluteVolumeEnabled(dev, /*address=*/"", enabled, stream);
             });
         }
     }
@@ -4073,7 +4077,6 @@ public class AudioService extends IAudioService.Stub
                             && isFullVolumeDevice(device);
                     boolean tvConditions = mHdmiTvClient != null
                             && mHdmiSystemAudioSupported
-                            && isFullVolumeDevice(device)
                             && !isAbsoluteVolumeDevice(device)
                             && !isA2dpAbsoluteVolumeDevice(device);
 
@@ -4927,7 +4930,7 @@ public class AudioService extends IAudioService.Stub
                 if (absDev == AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP) {
                     enabled = mAvrcpAbsVolSupported;
                 }
-                if (stream != streamType) {
+                if (stream != streamType || !enabled) {
                     mAudioSystem.setDeviceAbsoluteVolumeEnabled(absDev, /*address=*/"",
                             enabled, streamType);
                 }
@@ -10182,9 +10185,6 @@ public class AudioService extends IAudioService.Stub
 
                 case MSG_INIT_SPATIALIZER:
                     onInitSpatializer();
-                    // the device inventory can only be synchronized after the
-                    // spatializer has been initialized
-                    mDeviceBroker.postSynchronizeAdiDevicesInInventory(null);
                     mAudioEventWakeLock.release();
                     break;
 
@@ -10468,10 +10468,10 @@ public class AudioService extends IAudioService.Stub
     }
 
     /*package*/ void setAvrcpAbsoluteVolumeSupported(boolean support) {
-        mAvrcpAbsVolSupported = support;
-        if (absVolumeIndexFix()) {
-            int a2dpDev = AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP;
-            synchronized (mCachedAbsVolDrivingStreamsLock) {
+        synchronized (mCachedAbsVolDrivingStreamsLock) {
+            mAvrcpAbsVolSupported = support;
+            if (absVolumeIndexFix()) {
+                int a2dpDev = AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP;
                 mCachedAbsVolDrivingStreams.compute(a2dpDev, (dev, stream) -> {
                     if (!mAvrcpAbsVolSupported) {
                         mAudioSystem.setDeviceAbsoluteVolumeEnabled(a2dpDev, /*address=*/
@@ -12584,6 +12584,12 @@ public class AudioService extends IAudioService.Stub
         pw.println("\n");
         pw.println("\nLoudness alignment:");
         mLoudnessCodecHelper.dump(pw);
+
+        pw.println("\nAbsolute voume devices:");
+        synchronized (mCachedAbsVolDrivingStreamsLock) {
+            mCachedAbsVolDrivingStreams.forEach((dev, stream) -> pw.println(
+                    "Device type: 0x" + Integer.toHexString(dev) + ", driving stream " + stream));
+        }
 
         mAudioSystem.dump(pw);
     }

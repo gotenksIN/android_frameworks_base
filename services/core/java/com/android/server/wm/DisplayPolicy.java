@@ -73,14 +73,15 @@ import static android.view.WindowManagerPolicyConstants.NAV_BAR_LEFT;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_RIGHT;
 import static android.window.DisplayAreaOrganizer.FEATURE_UNDEFINED;
 
-import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_ANIM;
-import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_SCREEN_ON;
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ANIM;
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_SCREEN_ON;
 import static com.android.server.policy.PhoneWindowManager.TOAST_WINDOW_TIMEOUT;
 import static com.android.server.policy.WindowManagerPolicy.TRANSIT_PREVIEW_DONE;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_ABSENT;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_LAYOUT;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
+import static com.android.window.flags.Flags.enableFullyImmersiveInDesktop;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -1224,7 +1225,8 @@ public class DisplayPolicy {
 
         final String systemUiPermission =
                 mService.isCallerVirtualDeviceOwner(mDisplayContent.getDisplayId(), callingUid)
-                        // Allow virtual device owners to add system windows on their displays.
+                        && mDisplayContent.isTrusted()
+                        // Virtual device owners can add system windows on their trusted displays.
                         ? android.Manifest.permission.CREATE_VIRTUAL_DEVICE
                         : android.Manifest.permission.STATUS_BAR_SERVICE;
 
@@ -2665,10 +2667,16 @@ public class DisplayPolicy {
                 defaultTaskDisplayArea.getRootTask(task -> task.isVisible()
                         && task.getTopLeafTask().getAdjacentTask() != null)
                         != null;
-        final boolean freeformRootTaskVisible =
-                defaultTaskDisplayArea.isRootTaskVisible(WINDOWING_MODE_FREEFORM);
+        final Task topFreeformTask = defaultTaskDisplayArea
+                .getTopRootTaskInWindowingMode(WINDOWING_MODE_FREEFORM);
+        final boolean freeformRootTaskVisible = topFreeformTask != null
+                && topFreeformTask.isVisible();
+        final boolean inNonFullscreenFreeformMode = freeformRootTaskVisible
+                && !topFreeformTask.getBounds().equals(mDisplayContent.getBounds());
 
-        getInsetsPolicy().updateSystemBars(win, adjacentTasksVisible, freeformRootTaskVisible);
+        getInsetsPolicy().updateSystemBars(win, adjacentTasksVisible,
+                enableFullyImmersiveInDesktop()
+                        ? inNonFullscreenFreeformMode : freeformRootTaskVisible);
 
         final boolean topAppHidesStatusBar = topAppHidesSystemBar(Type.statusBars());
         if (getStatusBar() != null) {

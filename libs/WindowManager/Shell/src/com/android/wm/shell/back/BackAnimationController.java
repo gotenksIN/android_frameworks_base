@@ -352,16 +352,12 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         public void onBackMotion(
                 float touchX,
                 float touchY,
-                float velocityX,
-                float velocityY,
                 int keyAction,
                 @BackEvent.SwipeEdge int swipeEdge
         ) {
             mShellExecutor.execute(() -> onMotionEvent(
                     /* touchX = */ touchX,
                     /* touchY = */ touchY,
-                    /* velocityX = */ velocityX,
-                    /* velocityY = */ velocityY,
                     /* keyAction = */ keyAction,
                     /* swipeEdge = */ swipeEdge));
         }
@@ -500,14 +496,12 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
     public void onMotionEvent(
             float touchX,
             float touchY,
-            float velocityX,
-            float velocityY,
             int keyAction,
             @BackEvent.SwipeEdge int swipeEdge) {
 
         BackTouchTracker activeTouchTracker = getActiveTracker();
         if (activeTouchTracker != null) {
-            activeTouchTracker.update(touchX, touchY, velocityX, velocityY);
+            activeTouchTracker.update(touchX, touchY);
         }
 
         // two gestures are waiting to be processed at the moment, skip any further user touches
@@ -1501,10 +1495,6 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                 int rootIdx = -1;
                 for (int i = info.getChanges().size() - 1; i >= 0; --i) {
                     final TransitionInfo.Change c = info.getChanges().get(i);
-                    if (c.hasFlags(FLAG_IS_WALLPAPER)) {
-                        st.setAlpha(c.getLeash(), 1.0f);
-                        continue;
-                    }
                     if (TransitionUtil.isOpeningMode(c.getMode())) {
                         final Point offset = c.getEndRelOffset();
                         st.setPosition(c.getLeash(), offset.x, offset.y);

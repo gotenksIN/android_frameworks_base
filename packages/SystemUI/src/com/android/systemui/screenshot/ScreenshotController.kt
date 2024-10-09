@@ -97,12 +97,13 @@ internal constructor(
     private val window: ScreenshotWindow
     private val actionExecutor: ActionExecutor
     private val copyBroadcastReceiver: BroadcastReceiver
+    private val currentRequestCallbacks: MutableList<TakeScreenshotService.RequestCallback> =
+        mutableListOf()
 
     private var screenshotSoundController: ScreenshotSoundController? = null
     private var screenBitmap: Bitmap? = null
     private var screenshotTakenInPortrait = false
     private var screenshotAnimation: Animator? = null
-    private var currentRequestCallback: TakeScreenshotService.RequestCallback? = null
     private var packageName = ""
 
     /** Tracks config changes that require re-creating UI */
@@ -169,8 +170,8 @@ internal constructor(
         requestCallback: TakeScreenshotService.RequestCallback,
     ) {
         Assert.isMainThread()
+        screenshotHandler.resetTimeout()
 
-        currentRequestCallback = requestCallback
         if (screenshot.type == TAKE_SCREENSHOT_FULLSCREEN && screenshot.bitmap == null) {
             val bounds = fullScreenRect
             screenshot.bitmap = imageCapture.captureDisplay(display.displayId, bounds)
@@ -181,7 +182,7 @@ internal constructor(
         if (currentBitmap == null) {
             Log.e(TAG, "handleScreenshot: Screenshot bitmap was null")
             notificationController.notifyScreenshotError(R.string.screenshot_failed_to_capture_text)
-            currentRequestCallback?.reportError()
+            requestCallback.reportError()
             return
         }
 
@@ -194,8 +195,10 @@ internal constructor(
             // User setup isn't complete, so we don't want to show any UI beyond a toast, as editing
             // and sharing shouldn't be exposed to the user.
             saveScreenshotAndToast(screenshot, finisher)
+            requestCallback.onFinish()
             return
         }
+        currentRequestCallbacks.add(requestCallback)
 
         broadcastSender.sendBroadcast(
             Intent(ClipboardOverlayController.SCREENSHOT_ACTION),
@@ -214,11 +217,7 @@ internal constructor(
         saveScreenshotInBackground(screenshot, requestId, finisher) { result ->
             if (result.uri != null) {
                 val savedScreenshot =
-                    ScreenshotSavedResult(
-                        result.uri,
-                        screenshot.getUserOrDefault(),
-                        result.timestamp,
-                    )
+                    ScreenshotSavedResult(result.uri, screenshot.userHandle, result.timestamp)
                 actionsController.setCompletedScreenshot(requestId, savedScreenshot)
             }
         }
@@ -235,7 +234,7 @@ internal constructor(
         window.setFocusable(true)
         viewProxy.requestFocus()
 
-        enqueueScrollCaptureRequest(requestId, screenshot.userHandle!!)
+        enqueueScrollCaptureRequest(requestId, screenshot.userHandle)
 
         window.attachWindow()
 
@@ -267,7 +266,7 @@ internal constructor(
 
     private fun prepareViewForNewScreenshot(screenshot: ScreenshotData, oldPackageName: String?) {
         window.whenWindowAttached {
-            announcementResolver.getScreenshotAnnouncement(screenshot.userHandle!!.identifier) {
+            announcementResolver.getScreenshotAnnouncement(screenshot.userHandle.identifier) {
                 viewProxy.announceForAccessibility(it)
             }
         }
@@ -499,8 +498,8 @@ internal constructor(
         Log.d(TAG, "finishDismiss")
         actionsController.endScreenshotSession()
         scrollCaptureExecutor.close()
-        currentRequestCallback?.onFinish()
-        currentRequestCallback = null
+        currentRequestCallbacks.forEach { it.onFinish() }
+        currentRequestCallbacks.clear()
         viewProxy.reset()
         removeWindow()
         screenshotHandler.cancelTimeout()
@@ -517,7 +516,7 @@ internal constructor(
                 bgExecutor,
                 requestId,
                 screenshot.bitmap,
-                screenshot.getUserOrDefault(),
+                screenshot.userHandle,
                 display.displayId,
             )
         future.addListener(
@@ -525,7 +524,7 @@ internal constructor(
                 try {
                     val result = future.get()
                     Log.d(TAG, "Saved screenshot: $result")
-                    logScreenshotResultStatus(result.uri, screenshot.userHandle!!)
+                    logScreenshotResultStatus(result.uri, screenshot.userHandle)
                     onResult.accept(result)
                     if (LogConfig.DEBUG_CALLBACK) {
                         Log.d(TAG, "finished bg processing, calling back with uri: ${result.uri}")

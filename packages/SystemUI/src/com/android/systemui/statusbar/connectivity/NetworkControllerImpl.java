@@ -605,7 +605,8 @@ public class NetworkControllerImpl extends BroadcastReceiver
             // NetworkCapabilities, but we need to convert it into TRANSPORT_WIFI in order to
             // distinguish it from VCN over Cellular.
             if (transportTypes[i] == NetworkCapabilities.TRANSPORT_CELLULAR
-                    && Utils.tryGetWifiInfoForVcn(networkCapabilities) != null) {
+                    && Utils.tryGetWifiInfoForVcn(mConnectivityManager, networkCapabilities)
+                            != null) {
                 transportTypes[i] = NetworkCapabilities.TRANSPORT_WIFI;
                 break;
             }
@@ -1123,7 +1124,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
                     continue;
                 }
                 if (transportType == NetworkCapabilities.TRANSPORT_CELLULAR
-                        && Utils.tryGetWifiInfoForVcn(mLastDefaultNetworkCapabilities) != null) {
+                        && Utils.tryGetWifiInfoForVcn(
+                                        mConnectivityManager, mLastDefaultNetworkCapabilities)
+                                != null) {
                     mConnectedTransports.set(NetworkCapabilities.TRANSPORT_WIFI);
                     if (mLastDefaultNetworkCapabilities.hasCapability(NET_CAPABILITY_VALIDATED)) {
                         mValidatedTransports.set(NetworkCapabilities.TRANSPORT_WIFI);

@@ -179,6 +179,7 @@ import com.android.systemui.util.settings.SecureSettings;
 import com.android.systemui.util.settings.SystemSettings;
 import com.android.systemui.util.time.SystemClock;
 import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
+import com.android.window.flags.Flags;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
 import dagger.Lazy;
@@ -237,6 +238,9 @@ import java.util.function.Consumer;
  */
 public class KeyguardViewMediator implements CoreStartable, Dumpable,
         StatusBarStateController.StateListener {
+
+    private static final boolean ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS =
+            Flags.ensureKeyguardDoesTransitionStarting();
     private static final int KEYGUARD_DISPLAY_TIMEOUT_DELAY_DEFAULT = 30000;
     private static final long KEYGUARD_DONE_PENDING_TIMEOUT_MS = 3000;
 
@@ -2869,9 +2873,14 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 return;
             }
 
-            try {
-                mActivityTaskManagerService.setLockScreenShown(showing, aodShowing);
-            } catch (RemoteException ignored) {
+            if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS) {
+                mKeyguardTransitions.startKeyguardTransition(showing, aodShowing);
+            } else {
+                try {
+
+                    mActivityTaskManagerService.setLockScreenShown(showing, aodShowing);
+                } catch (RemoteException ignored) {
+                }
             }
         });
     }
@@ -3002,18 +3011,23 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
             // Handled in WmLockscreenVisibilityManager if flag is enabled.
             if (!KeyguardWmStateRefactor.isEnabled()) {
-                    // Don't actually hide the Keyguard at the moment, wait for window manager 
-                    // until it tells us it's safe to do so with startKeyguardExitAnimation.
-		    // Posting to mUiOffloadThread to ensure that calls to ActivityTaskManager 
-		    // will be in order.
-		    final int keyguardFlag = flags;
-		    mUiBgExecutor.execute(() -> {
-		        try {
-		            mActivityTaskManagerService.keyguardGoingAway(keyguardFlag);
-		        } catch (RemoteException e) {
-		            Log.e(TAG, "Error while calling WindowManager", e);
-		        }
-		    });
+                // Don't actually hide the Keyguard at the moment, wait for window manager
+                // until it tells us it's safe to do so with startKeyguardExitAnimation.
+                // Posting to mUiOffloadThread to ensure that calls to ActivityTaskManager
+                // will be in order.
+                final int keyguardFlag = flags;
+                mUiBgExecutor.execute(() -> {
+                    if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS) {
+                        mKeyguardTransitions.startKeyguardTransition(
+                                false /* keyguardShowing */, false /* aodShowing */);
+                        return;
+                    }
+                    try {
+                        mActivityTaskManagerService.keyguardGoingAway(keyguardFlag);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "Error while calling WindowManager", e);
+                    }
+                });
             }
 
             Trace.endSection();
@@ -3467,6 +3481,12 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
      */
     public void showSurfaceBehindKeyguard() {
         mSurfaceBehindRemoteAnimationRequested = true;
+
+        if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS) {
+            mKeyguardTransitions.startKeyguardTransition(
+                    false /* keyguardShowing */, false /* aodShowing */);
+            return;
+        }
 
         try {
             int flags = KEYGUARD_GOING_AWAY_FLAG_NO_WINDOW_ANIMATIONS

@@ -1027,6 +1027,7 @@ android_app {
     defaults: [
         "platform_app_defaults",
         "SystemUI_optimized_defaults",
+        "wmshell_defaults",
     ],
     static_libs: [
         "SystemUI-core",

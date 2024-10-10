@@ -50,6 +50,7 @@
 #define ENCODING_DTS_HD_MA 29
 #define ENCODING_DTS_UHD_P2 30
 #define ENCODING_DSD 31
+#define ENCODING_AC4_L4 32
 
 #define ENCODING_AMR_NB     100
 #define ENCODING_AMR_WB     101
@@ -105,8 +106,8 @@ static inline audio_format_t audioFormatToNative(int audioFormat)
         return AUDIO_FORMAT_AAC_XHE;
     case ENCODING_AC4:
         return AUDIO_FORMAT_AC4;
-    // case ENCODING_E_AC3_JOC:  // FIXME Not defined on the native side yet
-    //     return AUDIO_FORMAT_E_AC3_JOC;
+    case ENCODING_AC4_L4:
+        return AUDIO_FORMAT_AC4_L4;
     case ENCODING_AMR_NB:
         return AUDIO_FORMAT_AMR_NB;
     case ENCODING_AMR_WB:
@@ -207,8 +208,8 @@ static inline int audioFormatFromNative(audio_format_t nativeFormat)
         return ENCODING_AAC_XHE;
     case AUDIO_FORMAT_AC4:
         return ENCODING_AC4;
-    // case AUDIO_FORMAT_E_AC3_JOC: // FIXME Not defined on the native side yet
-    //     return ENCODING_E_AC3_JOC;
+    case AUDIO_FORMAT_AC4_L4:
+        return ENCODING_AC4_L4;
     case AUDIO_FORMAT_AMR_NB:
         return ENCODING_AMR_NB;
     case AUDIO_FORMAT_AMR_WB:

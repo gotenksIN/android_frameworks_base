@@ -896,8 +896,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     })
     @interface SplashScreenBehavior { }
 
-    // TODO: Have a WindowContainer state for tracking exiting/deferred removal.
-    boolean mIsExiting;
     // Force an app transition to be ran in the case the visibility of the app did not change.
     // We use this for the case of moving a Root Task to the back with multiple activities, and the
     // top activity enters PIP; the bottom activity's visibility stays the same, but we need to
@@ -1243,10 +1241,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             pw.print(" lastAllDrawn="); pw.print(mLastAllDrawn);
             pw.println(")");
         }
-        if (mStartingData != null || firstWindowDrawn || mIsExiting) {
+        if (mStartingData != null || firstWindowDrawn) {
             pw.print(prefix); pw.print("startingData="); pw.print(mStartingData);
-            pw.print(" firstWindowDrawn="); pw.print(firstWindowDrawn);
-            pw.print(" mIsExiting="); pw.println(mIsExiting);
+            pw.print(" firstWindowDrawn="); pw.println(firstWindowDrawn);
         }
         if (mStartingWindow != null || mStartingData != null || mStartingSurface != null
                 || startingMoved || mVisibleSetFromTransferredStartingWindow) {
@@ -4400,21 +4397,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         mActivityRecordInputSink.releaseSurfaceControl();
 
         super.removeImmediately();
-    }
-
-    @Override
-    void removeIfPossible() {
-        mIsExiting = false;
-        removeAllWindowsIfPossible();
-        removeImmediately();
-    }
-
-    @Override
-    boolean handleCompleteDeferredRemoval() {
-        if (mIsExiting) {
-            removeIfPossible();
-        }
-        return super.handleCompleteDeferredRemoval();
     }
 
     void onRemovedFromDisplay() {

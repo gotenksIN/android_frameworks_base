@@ -33,7 +33,6 @@ import static android.app.ActivityOptions.ANIM_UNDEFINED;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.AppOpsManager.MODE_ALLOWED;
 import static android.app.AppOpsManager.OP_PICTURE_IN_PICTURE;
-import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_NONE;
 import static android.app.WaitResult.INVALID_DELAY;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_DREAM;
@@ -42,7 +41,6 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
-import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
@@ -3221,6 +3219,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (!compatEnabled && !mWmService.mConstants.mIgnoreActivityOrientationRequest) {
             return false;
         }
+        if (mWmService.mConstants.isPackageOptOutIgnoreActivityOrientationRequest(packageName)) {
+            return false;
+        }
         // If the user preference respects aspect ratio, then it becomes non-resizable.
         return !mAppCompatController.getAppCompatOverrides().getAppCompatAspectRatioOverrides()
                 .shouldApplyUserMinAspectRatioOverride();
@@ -5909,6 +5910,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return;
         }
 
+        final State prevState = mState;
         mState = state;
 
         callServiceTrackeronActivityStatechange(state, false);
@@ -5950,6 +5952,14 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             case PAUSED:
                 mAtmService.updateBatteryStats(this, false);
                 mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_PAUSED);
+                break;
+            case STOPPING:
+                // It is possible that an Activity is scheduled to be STOPPED directly from RESUMED
+                // state. Updating the PAUSED usage state in that case, since the Activity will be
+                // STOPPED while cycled through the PAUSED state.
+                if (prevState == RESUMED) {
+                    mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_PAUSED);
+                }
                 break;
             case STOPPED:
                 mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_STOPPED);
@@ -8559,15 +8569,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // and back which can cause visible issues (see b/184078928).
         final int parentWindowingMode =
                 newParentConfiguration.windowConfiguration.getWindowingMode();
-        final boolean isInCameraCompatFreeform = parentWindowingMode == WINDOWING_MODE_FREEFORM
-                && mAppCompatController.getAppCompatCameraOverrides().getFreeformCameraCompatMode()
-                        != CAMERA_COMPAT_FREEFORM_NONE;
 
         // Bubble activities should always fill their parent and should not be letterboxed.
         final boolean isFixedOrientationLetterboxAllowed = !getLaunchedFromBubble()
                 && (parentWindowingMode == WINDOWING_MODE_MULTI_WINDOW
                         || parentWindowingMode == WINDOWING_MODE_FULLSCREEN
-                        || isInCameraCompatFreeform
+                        || AppCompatCameraPolicy.shouldCameraCompatControlOrientation(this)
                         // When starting to switch between PiP and fullscreen, the task is pinned
                         // and the activity is fullscreen. But only allow to apply letterbox if the
                         // activity is exiting PiP because an entered PiP should fill the task.

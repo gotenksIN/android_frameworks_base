@@ -638,6 +638,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSZ");
 
     OomAdjuster mOomAdjuster;
+    @GuardedBy("this")
+    ProcessStateController mProcessStateController;
 
     static final String EXTRA_TITLE = "android.intent.extra.TITLE";
     static final String EXTRA_DESCRIPTION = "android.intent.extra.DESCRIPTION";
@@ -1990,7 +1992,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         new HostingRecord(HostingRecord.HOSTING_TYPE_SYSTEM));
                 app.setPersistent(true);
                 app.setPid(MY_PID);
-                app.mState.setMaxAdj(ProcessList.SYSTEM_ADJ);
+                mProcessStateController.setMaxAdj(app, ProcessList.SYSTEM_ADJ);
                 app.makeActive(new ApplicationThreadDeferred(mSystemThread.getApplicationThread()),
                         mProcessStats);
                 app.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_SYSTEM);
@@ -2426,9 +2428,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         mProcessList.init(this, activeUids, mPlatformCompat);
         mAppProfiler = new AppProfiler(this, BackgroundThread.getHandler().getLooper(), null);
         mPhantomProcessList = new PhantomProcessList(this);
-        mOomAdjuster = mConstants.ENABLE_NEW_OOMADJ
-                ? new OomAdjusterModernImpl(this, mProcessList, activeUids, handlerThread)
-                : new OomAdjuster(this, mProcessList, activeUids, handlerThread);
+        mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
+                .setHandlerThread(handlerThread)
+                .useModernOomAdjuster(mConstants.ENABLE_NEW_OOMADJ)
+                .build();
+        mOomAdjuster = mProcessStateController.getOomAdjuster();
 
         mIntentFirewall = injector.getIntentFirewall();
         mProcessStats = new ProcessStatsService(this, mContext.getCacheDir());
@@ -2491,9 +2495,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         mAppProfiler = new AppProfiler(this, BackgroundThread.getHandler().getLooper(),
                 new LowMemDetector(this));
         mPhantomProcessList = new PhantomProcessList(this);
-        mOomAdjuster = mConstants.ENABLE_NEW_OOMADJ
-                ? new OomAdjusterModernImpl(this, mProcessList, activeUids)
-                : new OomAdjuster(this, mProcessList, activeUids);
+        mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
+                .useModernOomAdjuster(mConstants.ENABLE_NEW_OOMADJ)
+                .build();
+        mOomAdjuster = mProcessStateController.getOomAdjuster();
 
         mBroadcastQueue = mInjector.getBroadcastQueue(this);
         mBroadcastController = new BroadcastController(mContext, this, mBroadcastQueue);
@@ -4671,7 +4676,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         synchronized (mProcLock) {
-            mOomAdjuster.setAttachingProcessStatesLSP(app);
+            mProcessStateController.setAttachingProcessStatesLSP(app);
             clearProcessForegroundLocked(app);
             app.setDebugging(false);
             app.setKilledByAm(false);
@@ -4867,7 +4872,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 app.makeActive(new ApplicationThreadDeferred(thread), mProcessStats);
                 checkTime(startTime, "attachApplicationLocked: immediately after bindApplication");
             }
-            app.setPendingFinishAttach(true);
+            mProcessStateController.setPendingFinishAttach(app, true);
 
             updateLruProcessLocked(app, false, null);
             checkTime(startTime, "attachApplicationLocked: after updateLruProcessLocked");
@@ -4951,7 +4956,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         synchronized (this) {
             // Mark the finish attach application phase as completed
-            app.setPendingFinishAttach(false);
+            mProcessStateController.setPendingFinishAttach(app, false);
 
             final boolean normalMode = mProcessesReady || isAllowedWhileBooting(app.info);
             final String processName = app.processName;
@@ -5106,7 +5111,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         // If another follow up update is needed, it will be scheduled by OomAdjuster.
         mHandler.removeMessages(FOLLOW_UP_OOMADJUSTER_UPDATE_MSG);
         synchronized (this) {
-            mOomAdjuster.updateOomAdjFollowUpTargetsLocked();
+            mProcessStateController.runFollowUpUpdate();
         }
     }
 
@@ -5907,10 +5912,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                 if (pr == null) {
                     return;
                 }
-                pr.mState.setForcingToImportant(null);
+                mProcessStateController.setForcingToImportant(pr, null);
                 clearProcessForegroundLocked(pr);
             }
-            updateOomAdjLocked(pr, OOM_ADJ_REASON_UI_VISIBILITY);
+            mProcessStateController.runUpdate(pr, OOM_ADJ_REASON_UI_VISIBILITY);
         }
     }
 
@@ -5933,7 +5938,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     oldToken.token.unlinkToDeath(oldToken, 0);
                     mImportantProcesses.remove(pid);
                     if (pr != null) {
-                        pr.mState.setForcingToImportant(null);
+                        mProcessStateController.setForcingToImportant(pr, null);
                     }
                     changed = true;
                 }
@@ -5947,7 +5952,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     try {
                         token.linkToDeath(newToken, 0);
                         mImportantProcesses.put(pid, newToken);
-                        pr.mState.setForcingToImportant(newToken);
+                        mProcessStateController.setForcingToImportant(pr, newToken);
                         changed = true;
                     } catch (RemoteException e) {
                         // If the process died while doing this, we will later
@@ -5957,7 +5962,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
 
             if (changed) {
-                updateOomAdjLocked(pr, OOM_ADJ_REASON_UI_VISIBILITY);
+                mProcessStateController.runUpdate(pr, OOM_ADJ_REASON_UI_VISIBILITY);
             }
         }
     }
@@ -7377,7 +7382,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         if ((info.flags & PERSISTENT_MASK) == PERSISTENT_MASK) {
             app.setPersistent(true);
-            app.mState.setMaxAdj(ProcessList.PERSISTENT_PROC_ADJ);
+            mProcessStateController.setMaxAdj(app, ProcessList.PERSISTENT_PROC_ADJ);
         }
         if (app.getThread() == null && mPersistentStartingProcesses.indexOf(app) < 0) {
             mPersistentStartingProcesses.add(app);
@@ -7480,7 +7485,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mServices.updateScreenStateLocked(isAwake);
                 reportCurWakefulnessUsageEvent();
                 mActivityTaskManager.onScreenAwakeChanged(isAwake);
-                mOomAdjuster.onWakefulnessChanged(wakefulness);
+                mProcessStateController.setWakefulness(wakefulness);
 
                 updateOomAdjLocked(OOM_ADJ_REASON_UI_VISIBILITY);
             }
@@ -8449,16 +8454,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                         Slog.w(TAG, "setHasTopUi called on unknown pid: " + pid);
                         return;
                     }
-                    if (pr.mState.hasTopUi() != hasTopUi) {
-                        if (DEBUG_OOM_ADJ) {
-                            Slog.d(TAG, "Setting hasTopUi=" + hasTopUi + " for pid=" + pid);
-                        }
-                        pr.mState.setHasTopUi(hasTopUi);
-                        changed = true;
-                    }
+                    changed = mProcessStateController.setHasTopUi(pr, hasTopUi);
                 }
                 if (changed) {
-                    updateOomAdjLocked(pr, OOM_ADJ_REASON_UI_VISIBILITY);
+                    mProcessStateController.runUpdate(pr, OOM_ADJ_REASON_UI_VISIBILITY);
                 }
             }
         } finally {
@@ -14209,10 +14208,14 @@ public class ActivityManagerService extends IActivityManager.Stub
                 proc.setInFullBackup(true);
             }
             r.app = proc;
+            // TODO(b/369300367): This code suggests there could be a previous backup being
+            //  replaced here, but an OomAdjsuter update is not triggered on the previous app
+            //  (whose state will change from being removed from mBackupTargets).
             final BackupRecord backupTarget = mBackupTargets.get(targetUserId);
             oldBackupUid = backupTarget != null ? backupTarget.appInfo.uid : -1;
             newBackupUid = proc.isInFullBackup() ? r.appInfo.uid : -1;
             mBackupTargets.put(targetUserId, r);
+            mProcessStateController.setBackupTarget(proc, targetUserId);
 
             proc.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_BACKUP);
 
@@ -14266,6 +14269,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
                 mBackupTargets.removeAt(indexOfKey);
             }
+            mProcessStateController.stopBackupTarget(userId);
         }
 
         JobSchedulerInternal js = LocalServices.getService(JobSchedulerInternal.class);
@@ -14344,6 +14348,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
                 // Not backing this app up any more; reset its OOM adjustment
                 final ProcessRecord proc = backupTarget.app;
+                // TODO(b/369300367): Triggering the update before the state is actually set
+                //  seems wrong.
                 updateOomAdjLocked(proc, OOM_ADJ_REASON_BACKUP);
                 proc.setInFullBackup(false);
                 proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BACKUP);
@@ -14362,6 +14368,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             } finally {
                 mBackupTargets.delete(userId);
+                mProcessStateController.stopBackupTarget(userId);
             }
         }
 
@@ -15434,7 +15441,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                             proc.info.packageName, proc.info.uid, proc.getPid(), isForeground);
                 }
             }
-            psr.setHasForegroundServices(isForeground, fgServiceTypes, hasTypeNoneFgs);
+            mProcessStateController.setHasForegroundServices(psr, isForeground, fgServiceTypes,
+                    hasTypeNoneFgs);
             ArrayList<ProcessRecord> curProcs = mForegroundPackages.get(proc.info.packageName,
                     proc.info.uid);
             if (isForeground) {
@@ -15465,7 +15473,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     ProcessChangeItem.CHANGE_FOREGROUND_SERVICES, fgServiceTypes);
         }
         if (oomAdj) {
-            updateOomAdjLocked(proc, OOM_ADJ_REASON_UI_VISIBILITY);
+            mProcessStateController.runUpdate(proc, OOM_ADJ_REASON_UI_VISIBILITY);
         }
     }
 
@@ -15515,7 +15523,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     @GuardedBy("this")
     void enqueueOomAdjTargetLocked(ProcessRecord app) {
-        mOomAdjuster.enqueueOomAdjTargetLocked(app);
+        mProcessStateController.enqueueUpdateTarget(app);
     }
 
     /**
@@ -15523,7 +15531,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     @GuardedBy("this")
     void removeOomAdjTargetLocked(ProcessRecord app, boolean procDied) {
-        mOomAdjuster.removeOomAdjTargetLocked(app, procDied);
+        mProcessStateController.removeUpdateTarget(app, procDied);
     }
 
     /**
@@ -15532,7 +15540,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     @GuardedBy("this")
     void updateOomAdjPendingTargetsLocked(@OomAdjReason int oomAdjReason) {
-        mOomAdjuster.updateOomAdjPendingTargetsLocked(oomAdjReason);
+        mProcessStateController.runPendingUpdate(oomAdjReason);
     }
 
     static final class ProcStatsRunnable implements Runnable {
@@ -15551,7 +15559,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @GuardedBy("this")
     final void updateOomAdjLocked(@OomAdjReason int oomAdjReason) {
-        mOomAdjuster.updateOomAdjLocked(oomAdjReason);
+        mProcessStateController.runFullUpdate(oomAdjReason);
     }
 
     /**
@@ -15563,7 +15571,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     @GuardedBy("this")
     final boolean updateOomAdjLocked(ProcessRecord app, @OomAdjReason int oomAdjReason) {
-        return mOomAdjuster.updateOomAdjLocked(app, oomAdjReason);
+        return mProcessStateController.runUpdate(app, oomAdjReason);
     }
 
     @Override
@@ -15828,7 +15836,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @GuardedBy({"this", "mProcLock"})
     final void setUidTempAllowlistStateLSP(int uid, boolean onAllowlist) {
-        mOomAdjuster.setUidTempAllowlistStateLSP(uid, onAllowlist);
+        mProcessStateController.setUidTempAllowlistStateLSP(uid, onAllowlist);
     }
 
     private void trimApplications(boolean forceFullOomAdj, @OomAdjReason int oomAdjReason) {
@@ -16883,12 +16891,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                         return;
                     }
                 }
-                if (pr.mState.hasOverlayUi() == hasOverlayUi) {
-                    return;
+                if (mProcessStateController.setHasOverlayUi(pr, hasOverlayUi)) {
+                    mProcessStateController.runUpdate(pr, OOM_ADJ_REASON_UI_VISIBILITY);
                 }
-                pr.mState.setHasOverlayUi(hasOverlayUi);
-                //Slog.i(TAG, "Setting hasOverlayUi=" + pr.hasOverlayUi + " for pid=" + pid);
-                updateOomAdjLocked(pr, OOM_ADJ_REASON_UI_VISIBILITY);
             }
         }
 

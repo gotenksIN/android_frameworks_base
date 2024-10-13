@@ -17,6 +17,7 @@
 package com.android.server.am;
 
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_ACTIVITY;
+import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
 
 import static com.android.internal.util.Preconditions.checkArgument;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
@@ -1223,7 +1224,7 @@ class ProcessRecord implements WindowProcessListener {
         setWaitingToKill(null);
 
         mState.onCleanupApplicationRecordLSP();
-        mServices.onCleanupApplicationRecordLocked();
+        mService.mProcessStateController.onCleanupApplicationRecord(mServices);
         mReceivers.onCleanupApplicationRecordLocked();
         mService.mOomAdjuster.onProcessEndLocked(this);
 
@@ -1680,7 +1681,7 @@ class ProcessRecord implements WindowProcessListener {
             updateProcessInfo(false /* updateServiceConnectionActivities */,
                     true /* activityChange */, true /* updateOomAdj */);
             setPendingUiClean(true);
-            mState.setHasShownUi(true);
+            mService.mProcessStateController.setHasShownUi(this, true);
             mState.forceProcessStateUpTo(topProcessState);
         }
     }
@@ -1699,7 +1700,10 @@ class ProcessRecord implements WindowProcessListener {
             return;
         }
         synchronized (mService) {
-            mState.setRunningRemoteAnimation(runningRemoteAnimation);
+            if (mService.mProcessStateController.setRunningRemoteAnimation(this,
+                    runningRemoteAnimation)) {
+                mService.mProcessStateController.runUpdate(this, OOM_ADJ_REASON_UI_VISIBILITY);
+            }
         }
     }
 

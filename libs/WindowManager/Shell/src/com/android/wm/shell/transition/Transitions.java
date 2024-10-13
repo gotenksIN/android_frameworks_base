@@ -393,8 +393,6 @@ public class Transitions implements RemoteCallable<Transitions>,
 
         mShellCommandHandler.addCommandCallback("transitions", this, this);
         mShellCommandHandler.addDumpCallback(this::dump, this);
-
-        registerObserver(mFocusTransitionObserver);
     }
 
     public boolean isRegistered() {

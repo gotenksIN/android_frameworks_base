@@ -217,6 +217,16 @@ public class DisplayManagerFlags {
             Flags::enableUserRefreshRateForExternalDisplay
     );
 
+    private final FlagState mEnableWaitingConfirmationBeforeMirroring = new FlagState(
+            Flags.FLAG_ENABLE_WAITING_CONFIRMATION_BEFORE_MIRRORING,
+            Flags::enableWaitingConfirmationBeforeMirroring
+    );
+
+    private final FlagState mEnableApplyDisplayChangedDuringDisplayAdded = new FlagState(
+            Flags.FLAG_ENABLE_APPLY_DISPLAY_CHANGED_DURING_DISPLAY_ADDED,
+            Flags::enableApplyDisplayChangedDuringDisplayAdded
+    );
+
     private final FlagState mEnableBatteryStatsForAllDisplays = new FlagState(
             Flags.FLAG_ENABLE_BATTERY_STATS_FOR_ALL_DISPLAYS,
             Flags::enableBatteryStatsForAllDisplays
@@ -445,11 +455,26 @@ public class DisplayManagerFlags {
     }
 
     /**
+      * @return {@code true} if mirroring won't be enabled until boot completes and the user enables
+      * the display.
+      */
+    public boolean isWaitingConfirmationBeforeMirroringEnabled() {
+        return mEnableWaitingConfirmationBeforeMirroring.isEnabled();
+    }
+
+    /**
       * @return {@code true} if battery stats is enabled for all displays, not just the primary
       * display.
       */
     public boolean isBatteryStatsEnabledForAllDisplays() {
         return mEnableBatteryStatsForAllDisplays.isEnabled();
+    }
+
+    /**
+      * @return {@code true} if need to apply display changes during display added event.
+      */
+    public boolean isApplyDisplayChangedDuringDisplayAddedEnabled() {
+        return mEnableApplyDisplayChangedDuringDisplayAdded.isEnabled();
     }
 
     /**
@@ -511,7 +536,9 @@ public class DisplayManagerFlags {
         pw.println(" " + mVirtualDisplayLimit);
         pw.println(" " + mNormalBrightnessForDozeParameter);
         pw.println(" " + mIdleScreenConfigInSubscribingLightSensor);
+        pw.println(" " + mEnableWaitingConfirmationBeforeMirroring);
         pw.println(" " + mEnableBatteryStatsForAllDisplays);
+        pw.println(" " + mEnableApplyDisplayChangedDuringDisplayAdded);
         pw.println(" " + mBlockAutobrightnessChangesOnStylusUsage);
         pw.println(" " + mIsUserRefreshRateForExternalDisplayEnabled);
     }

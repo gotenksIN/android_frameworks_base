@@ -2170,12 +2170,6 @@ public class CarrierConfigManager {
             "carrier_nr_availabilities_int_array";
 
     /**
-     * Flag specifying whether CDMA call waiting and call forwarding are enabled
-     * @hide
-     */
-    public static final String KEY_CDMA_CW_CF_ENABLED_BOOL = "cdma_cw_cf_enabled_bool";
-
-    /**
      * Boolean to decide whether LTE is enabled.
      */
     public static final String KEY_LTE_ENABLED_BOOL = "lte_enabled_bool";
@@ -10955,7 +10949,6 @@ public class CarrierConfigManager {
                 new String[]{"default", "mms", "dun", "supl", "enterprise"});
         sDefaults.putStringArray(KEY_CARRIER_METERED_ROAMING_APN_TYPES_STRINGS,
                 new String[]{"default", "mms", "dun", "supl", "enterprise"});
-        sDefaults.putBoolean(KEY_CDMA_CW_CF_ENABLED_BOOL, false);
         sDefaults.putIntArray(KEY_ONLY_SINGLE_DC_ALLOWED_INT_ARRAY,
                 new int[] {TelephonyManager.NETWORK_TYPE_CDMA, TelephonyManager.NETWORK_TYPE_1xRTT,
                         TelephonyManager.NETWORK_TYPE_EVDO_0, TelephonyManager.NETWORK_TYPE_EVDO_A,

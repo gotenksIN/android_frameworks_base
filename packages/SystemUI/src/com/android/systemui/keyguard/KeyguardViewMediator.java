@@ -140,7 +140,6 @@ import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.communal.ui.viewmodel.CommunalTransitionViewModel;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
-import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor;
 import com.android.systemui.dreams.DreamOverlayStateController;
 import com.android.systemui.dreams.ui.viewmodel.DreamViewModel;
 import com.android.systemui.dump.DumpManager;
@@ -3573,9 +3572,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         }
 
         // Ensure that keyguard becomes visible if the going away animation is canceled
-        if (showKeyguard && !KeyguardWmStateRefactor.isEnabled()
-                && (MigrateClocksToBlueprint.isEnabled()
-                    || DeviceEntryUdfpsRefactor.isEnabled())) {
+        if (showKeyguard && !KeyguardWmStateRefactor.isEnabled()) {
             mKeyguardInteractor.showKeyguard();
         }
     }

@@ -82,6 +82,7 @@ import com.android.wm.shell.desktopmode.DesktopRepository.VisibleTasksListener
 import com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.DragStartState
 import com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.IndicatorType
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler.DragToDesktopStateListener
+import com.android.wm.shell.desktopmode.minimize.DesktopWindowLimitRemoteHandler
 import com.android.wm.shell.draganddrop.DragAndDropController
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.recents.RecentTasksController
@@ -562,10 +563,20 @@ class DesktopTasksController(
             )
     }
 
-    /** Move a task to the front */
-    fun moveTaskToFront(taskId: Int) {
+    /**
+     * Move a task to the front, using [remoteTransition].
+     *
+     * Note: beyond moving a task to the front, this method will minimize a task if we reach the
+     * Desktop task limit, so [remoteTransition] should also handle any such minimize change.
+     */
+    @JvmOverloads
+    fun moveTaskToFront(taskId: Int, remoteTransition: RemoteTransition? = null) {
         val task = shellTaskOrganizer.getRunningTaskInfo(taskId)
-        if (task == null) moveBackgroundTaskToFront(taskId) else moveTaskToFront(task)
+        if (task == null) {
+            moveBackgroundTaskToFront(taskId, remoteTransition)
+        } else {
+            moveTaskToFront(task, remoteTransition)
+        }
     }
 
     /**
@@ -573,12 +584,10 @@ class DesktopTasksController(
      * desktop. If outside of desktop and want to launch a background task in desktop, use
      * [moveBackgroundTaskToDesktop] instead.
      */
-    private fun moveBackgroundTaskToFront(taskId: Int) {
+    private fun moveBackgroundTaskToFront(taskId: Int, remoteTransition: RemoteTransition?) {
         logV("moveBackgroundTaskToFront taskId=%s", taskId)
         val wct = WindowContainerTransaction()
         // TODO: b/342378842 - Instead of using default display, support multiple displays
-        val taskToMinimize: RunningTaskInfo? =
-            addAndGetMinimizeChangesIfNeeded(DEFAULT_DISPLAY, wct, taskId)
         val runOnTransit = immersiveTransitionHandler
             .exitImmersiveIfApplicable(wct, DEFAULT_DISPLAY)
         wct.startTask(
@@ -587,24 +596,54 @@ class DesktopTasksController(
                 launchWindowingMode = WINDOWING_MODE_FREEFORM
             }.toBundle(),
         )
-        val transition = transitions.startTransition(TRANSIT_OPEN, wct, null /* handler */)
-        addPendingMinimizeTransition(transition, taskToMinimize)
+        val transition = startLaunchTransition(TRANSIT_OPEN, wct, taskId, remoteTransition)
         runOnTransit?.invoke(transition)
     }
 
-    /** Move a task to the front */
-    fun moveTaskToFront(taskInfo: RunningTaskInfo) {
+    /**
+     * Move a task to the front, using [remoteTransition].
+     *
+     * Note: beyond moving a task to the front, this method will minimize a task if we reach the
+     * Desktop task limit, so [remoteTransition] should also handle any such minimize change.
+     */
+    @JvmOverloads
+    fun moveTaskToFront(taskInfo: RunningTaskInfo, remoteTransition: RemoteTransition? = null) {
         logV("moveTaskToFront taskId=%s", taskInfo.taskId)
         val wct = WindowContainerTransaction()
         wct.reorder(taskInfo.token, true /* onTop */, true /* includingParents */)
         val runOnTransit = immersiveTransitionHandler.exitImmersiveIfApplicable(
             wct, taskInfo.displayId)
-        val taskToMinimize =
-            addAndGetMinimizeChangesIfNeeded(taskInfo.displayId, wct, taskInfo.taskId)
-
-        val transition = transitions.startTransition(TRANSIT_TO_FRONT, wct, null /* handler */)
-        addPendingMinimizeTransition(transition, taskToMinimize)
+        val transition =
+            startLaunchTransition(TRANSIT_TO_FRONT, wct, taskInfo.taskId, remoteTransition)
         runOnTransit?.invoke(transition)
+    }
+
+    private fun startLaunchTransition(
+        transitionType: Int,
+        wct: WindowContainerTransaction,
+        taskId: Int,
+        remoteTransition: RemoteTransition?,
+    ): IBinder {
+        val taskToMinimize: RunningTaskInfo? =
+            addAndGetMinimizeChangesIfNeeded(DEFAULT_DISPLAY, wct, taskId)
+        if (remoteTransition == null) {
+            val t = transitions.startTransition(transitionType, wct, null /* handler */)
+            addPendingMinimizeTransition(t, taskToMinimize)
+            return t
+        }
+        if (taskToMinimize == null) {
+            val remoteTransitionHandler = OneShotRemoteHandler(mainExecutor, remoteTransition)
+            val t = transitions.startTransition(transitionType, wct, remoteTransitionHandler)
+            remoteTransitionHandler.setTransition(t)
+            return t
+        }
+        val remoteTransitionHandler =
+            DesktopWindowLimitRemoteHandler(
+                mainExecutor, rootTaskDisplayAreaOrganizer, remoteTransition, taskToMinimize.taskId)
+        val t = transitions.startTransition(transitionType, wct, remoteTransitionHandler)
+        remoteTransitionHandler.setTransition(t)
+        addPendingMinimizeTransition(t, taskToMinimize)
+        return t
     }
 
     /**
@@ -659,6 +698,7 @@ class DesktopTasksController(
         }
 
         val wct = WindowContainerTransaction()
+        if (!task.isFreeform) addMoveToDesktopChanges(wct, task, displayId)
         wct.reparent(task.token, displayAreaInfo.token, true /* onTop */)
 
         transitions.startTransition(TRANSIT_CHANGE, wct, null /* handler */)
@@ -1184,7 +1224,13 @@ class DesktopTasksController(
         val options = createNewWindowOptions(callingTask)
         if (options.launchWindowingMode == WINDOWING_MODE_FREEFORM) {
             wct.startTask(requestedTaskId, options.toBundle())
-            transitions.startTransition(TRANSIT_OPEN, wct, null)
+            val taskToMinimize = bringDesktopAppsToFrontBeforeShowingNewTask(
+                callingTask.displayId, wct, requestedTaskId)
+            val runOnTransit = immersiveTransitionHandler
+                .exitImmersiveIfApplicable(wct, callingTask.displayId)
+            val transition = transitions.startTransition(TRANSIT_OPEN, wct, null)
+            addPendingMinimizeTransition(transition, taskToMinimize)
+            runOnTransit?.invoke(transition)
         } else {
             val splitPosition = splitScreenController.determineNewInstancePosition(callingTask)
             splitScreenController.startTask(requestedTaskId, splitPosition,
@@ -1218,7 +1264,8 @@ class DesktopTasksController(
                     .determineNewInstancePosition(callingTaskInfo)
                 splitScreenController.startIntent(
                     launchIntent, context.userId, fillIn, splitPosition,
-                    options.toBundle(), null /* hideTaskToken */
+                    options.toBundle(), null /* hideTaskToken */,
+                    true /* forceLaunchNewTask */
                 )
             }
             WINDOWING_MODE_FREEFORM -> {
@@ -1245,7 +1292,7 @@ class DesktopTasksController(
         val bounds = when (newTaskWindowingMode) {
             WINDOWING_MODE_FREEFORM -> {
                 displayController.getDisplayLayout(callingTask.displayId)
-                    ?.let { getInitialBounds(it, callingTask) }
+                    ?.let { getInitialBounds(it, callingTask, callingTask.displayId) }
             }
             WINDOWING_MODE_MULTI_WINDOW -> {
                 Rect()
@@ -1311,7 +1358,7 @@ class DesktopTasksController(
             val displayLayout = displayController.getDisplayLayout(task.displayId)
             if (displayLayout != null) {
                 val initialBounds = Rect(task.configuration.windowConfiguration.bounds)
-                cascadeWindow(task, initialBounds, displayLayout)
+                cascadeWindow(initialBounds, displayLayout, task.displayId)
                 wct.setBounds(task.token, initialBounds)
             }
         }
@@ -1399,13 +1446,19 @@ class DesktopTasksController(
         return if (wct.isEmpty) null else wct
     }
 
+    /**
+     * Apply all changes required when task is first added to desktop. Uses the task's current
+     * display by default to apply initial bounds and placement relative to the display.
+     * Use a different [displayId] if the task should be moved to a different display.
+     */
     @VisibleForTesting
     fun addMoveToDesktopChanges(
         wct: WindowContainerTransaction,
-        taskInfo: RunningTaskInfo
+        taskInfo: RunningTaskInfo,
+        displayId: Int = taskInfo.displayId,
     ) {
-        val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
-        val tdaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(taskInfo.displayId)!!
+        val displayLayout = displayController.getDisplayLayout(displayId) ?: return
+        val tdaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(displayId)!!
         val tdaWindowingMode = tdaInfo.configuration.windowConfiguration.windowingMode
         val targetWindowingMode =
             if (tdaWindowingMode == WINDOWING_MODE_FREEFORM) {
@@ -1414,7 +1467,7 @@ class DesktopTasksController(
             } else {
                 WINDOWING_MODE_FREEFORM
             }
-        val initialBounds = getInitialBounds(displayLayout, taskInfo)
+        val initialBounds = getInitialBounds(displayLayout, taskInfo, displayId)
 
         if (canChangeTaskPosition(taskInfo)) {
             wct.setBounds(taskInfo.token, initialBounds)
@@ -1428,7 +1481,8 @@ class DesktopTasksController(
 
     private fun getInitialBounds(
         displayLayout: DisplayLayout,
-        taskInfo: RunningTaskInfo
+        taskInfo: RunningTaskInfo,
+        displayId: Int,
     ): Rect {
         val bounds = if (ENABLE_WINDOWING_DYNAMIC_INITIAL_BOUNDS.isTrue) {
             calculateInitialBounds(displayLayout, taskInfo)
@@ -1437,7 +1491,7 @@ class DesktopTasksController(
         }
 
         if (DesktopModeFlags.ENABLE_CASCADING_WINDOWS.isTrue) {
-            cascadeWindow(taskInfo, bounds, displayLayout)
+            cascadeWindow(bounds, displayLayout, displayId)
         }
         return bounds
     }
@@ -1466,11 +1520,11 @@ class DesktopTasksController(
         }
     }
 
-    private fun cascadeWindow(task: TaskInfo, bounds: Rect, displayLayout: DisplayLayout) {
+    private fun cascadeWindow(bounds: Rect, displayLayout: DisplayLayout, displayId: Int) {
         val stableBounds = Rect()
         displayLayout.getStableBoundsForDesktopMode(stableBounds)
 
-        val activeTasks = taskRepository.getActiveNonMinimizedOrderedTasks(task.displayId)
+        val activeTasks = taskRepository.getActiveNonMinimizedOrderedTasks(displayId)
         activeTasks.firstOrNull()?.let { activeTask ->
             shellTaskOrganizer.getRunningTaskInfo(activeTask)?.let {
                 cascadeWindow(context.resources, stableBounds,
@@ -2016,9 +2070,9 @@ class DesktopTasksController(
             }
         }
 
-        override fun showDesktopApp(taskId: Int) {
+        override fun showDesktopApp(taskId: Int, remoteTransition: RemoteTransition?) {
             executeRemoteCallWithTaskPermission(controller, "showDesktopApp") { c ->
-                c.moveTaskToFront(taskId)
+                c.moveTaskToFront(taskId, remoteTransition)
             }
         }
 
@@ -2067,6 +2121,12 @@ class DesktopTasksController(
         override fun removeDesktop(displayId: Int) {
             executeRemoteCallWithTaskPermission(controller, "removeDesktop") { c ->
                 c.removeDesktop(displayId)
+            }
+        }
+
+        override fun moveToExternalDisplay(taskId: Int) {
+            executeRemoteCallWithTaskPermission(controller, "moveTaskToExternalDisplay") { c ->
+                c.moveToNextDisplay(taskId)
             }
         }
     }

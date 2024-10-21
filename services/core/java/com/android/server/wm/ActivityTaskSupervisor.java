@@ -2423,6 +2423,9 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
      * sent to the new top resumed activity.
      */
     ActivityRecord updateTopResumedActivityIfNeeded(String reason) {
+        if (!readyToResume()) {
+            return mTopResumedActivity;
+        }
         final ActivityRecord prevTopActivity = mTopResumedActivity;
         final Task topRootTask = mRootWindowContainer.getTopDisplayFocusedRootTask();
         if (topRootTask == null || topRootTask.getTopResumedActivity() == prevTopActivity) {

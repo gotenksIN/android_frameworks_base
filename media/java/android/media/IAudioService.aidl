@@ -234,7 +234,7 @@ interface IAudioService {
 
     int getEncodedSurroundMode(int targetSdkVersion);
 
-    void setSpeakerphoneOn(IBinder cb, boolean on);
+    void setSpeakerphoneOn(IBinder cb, boolean on, in AttributionSource attributionSource);
 
     boolean isSpeakerphoneOn();
 
@@ -266,9 +266,10 @@ interface IAudioService {
     void setSwbParameters(in String keyValuePairs);
     void setScoParameters(in String name, boolean hasNrecEnabled, boolean hasWbsEnabled);
 
-    void startBluetoothSco(IBinder cb, int targetSdkVersion);
-    void startBluetoothScoVirtualCall(IBinder cb);
-    void stopBluetoothSco(IBinder cb);
+    void startBluetoothSco(IBinder cb, int targetSdkVersion,
+            in AttributionSource attributionSource);
+    void startBluetoothScoVirtualCall(IBinder cb, in AttributionSource attributionSource);
+    void stopBluetoothSco(IBinder cb, in AttributionSource attributionSource);
 
     void forceVolumeControlStream(int streamType, IBinder cb);
 
@@ -550,7 +551,7 @@ interface IAudioService {
 
     int[] getAvailableCommunicationDeviceIds();
 
-    boolean setCommunicationDevice(IBinder cb, int portId);
+    boolean setCommunicationDevice(IBinder cb, int portId, in AttributionSource attributionSource);
 
     int getCommunicationDevice();
 

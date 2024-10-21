@@ -506,6 +506,11 @@ class Task extends TaskFragment {
     boolean mIsTrimmableFromRecents;
 
     /**
+     * Sets whether the launch-adjacent flag is respected or not for this task or its child tasks.
+     */
+    private boolean mLaunchAdjacentDisabled;
+
+    /**
      * Bounds offset should be applied when calculating compatible configuration for apps targeting
      * SDK level 34 or before.
      */
@@ -3819,6 +3824,9 @@ class Task extends TaskFragment {
         pw.print(prefix); pw.print("lastActiveTime="); pw.print(lastActiveTime);
         pw.println(" (inactive for " + (getInactiveDuration() / 1000) + "s)");
         pw.print(prefix); pw.println(" isTrimmable=" + mIsTrimmableFromRecents);
+        if (mLaunchAdjacentDisabled) {
+            pw.println(prefix + "mLaunchAdjacentDisabled=true");
+        }
     }
 
     @Override
@@ -5758,6 +5766,12 @@ class Task extends TaskFragment {
     }
 
     private boolean canMoveTaskToBack(Task task) {
+        // Checks whether a task is a child of this task because it can be reparented when
+        // transition is deferred.
+        if (task != this && !task.isDescendantOf(this)) {
+            return false;
+        }
+
         // In LockTask mode, moving a locked task to the back of the root task may expose unlocked
         // ones. Therefore we need to check if this operation is allowed.
         if (!mAtmService.getLockTaskController().canMoveTaskToBack(task)) {
@@ -5827,7 +5841,7 @@ class Task extends TaskFragment {
                     (deferred) -> {
                         // Need to check again if deferred since the system might
                         // be in a different state.
-                        if (!isAttached() || (deferred && !canMoveTaskToBack(tr))) {
+                        if (!tr.isAttached() || (deferred && !canMoveTaskToBack(tr))) {
                             Slog.e(TAG, "Failed to move task to back after saying we could: "
                                     + tr.mTaskId);
                             transition.abort();
@@ -6296,6 +6310,28 @@ class Task extends TaskFragment {
 
     void setTrimmableFromRecents(boolean isTrimmable) {
         mIsTrimmableFromRecents = isTrimmable;
+    }
+
+    /**
+     * Sets this task and its children to disable respecting launch-adjacent.
+     */
+    void setLaunchAdjacentDisabled(boolean disabled) {
+        mLaunchAdjacentDisabled = disabled;
+    }
+
+    /**
+     * Returns whether this task or any of its ancestors have disabled respecting the
+     * launch-adjacent flag.
+     */
+    boolean isLaunchAdjacentDisabled() {
+        Task t = this;
+        while (t != null) {
+            if (t.mLaunchAdjacentDisabled) {
+                return true;
+            }
+            t = t.getParent().asTask();
+        }
+        return false;
     }
 
     /**

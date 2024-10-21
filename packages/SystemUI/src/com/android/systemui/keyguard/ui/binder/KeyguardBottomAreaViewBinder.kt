@@ -36,8 +36,8 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.app.animation.Interpolators
-import com.android.app.tracing.coroutines.launch
 import com.android.keyguard.EmergencyCarrierArea
+import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.settingslib.Utils
 import com.android.systemui.animation.ActivityTransitionAnimator
 import com.android.systemui.animation.Expandable

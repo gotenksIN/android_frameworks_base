@@ -550,6 +550,7 @@ public class OomAdjuster {
         mProcessGroupHandler = new Handler(adjusterThread.getLooper(), msg -> {
             final int pid = msg.arg1;
             final int group = msg.arg2;
+            final ProcessRecord app = (ProcessRecord)msg.obj;
             if (pid == ActivityManagerService.MY_PID) {
                 // Skip setting the process group for system_server, keep it as default.
                 return true;
@@ -557,14 +558,15 @@ public class OomAdjuster {
             final boolean traceEnabled = Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER);
             if (traceEnabled) {
                 Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "setProcessGroup "
-                        + msg.obj + " to " + group);
+                        + app.processName + " to " + group);
             }
             try {
-                //if (mEnableProcessGroupCgroupFollow) {
-                //    setCgroupProcsProcessGroup(app.info.uid, pid, group, mProcessGroupCgroupFollowDex2oatOnly);
-                //} else {
+                if (mEnableProcessGroupCgroupFollow) {
+                    setCgroupProcsProcessGroup(app.info.uid, pid, group,
+                            mProcessGroupCgroupFollowDex2oatOnly);
+                } else {
                     setProcessGroup(pid, group);
-                //}
+                }
             } catch (Exception e) {
                 if (DEBUG_ALL) {
                     Slog.w(TAG, "Failed setting process group of " + pid + " to " + group, e);
@@ -3646,7 +3648,7 @@ public class OomAdjuster {
                     break;
             }
             mProcessGroupHandler.sendMessage(mProcessGroupHandler.obtainMessage(
-                    0 /* unused */, app.getPid(), processGroup, app.processName));
+                    0 /* unused */, app.getPid(), processGroup, app));
             try {
                 final int renderThreadTid = app.getRenderThreadTid();
                 if (curSchedGroup == SCHED_GROUP_TOP_APP) {

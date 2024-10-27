@@ -19,14 +19,17 @@ package com.android.systemui.touchpad.tutorial.ui.composable
 import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import com.airbnb.lottie.compose.rememberLottieDynamicProperties
 import com.android.compose.theme.LocalAndroidColorScheme
 import com.android.systemui.inputdevice.tutorial.ui.composable.TutorialScreenConfig
 import com.android.systemui.inputdevice.tutorial.ui.composable.rememberColorFilterProperty
 import com.android.systemui.res.R
+import com.android.systemui.touchpad.tutorial.ui.gesture.GestureFlowAdapter
 import com.android.systemui.touchpad.tutorial.ui.gesture.GestureRecognizer
-import com.android.systemui.touchpad.tutorial.ui.gesture.GestureState
 import com.android.systemui.touchpad.tutorial.ui.gesture.RecentAppsGestureRecognizer
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 @Composable
 fun RecentAppsGestureTutorialScreen(onDoneButtonClicked: () -> Unit, onBack: () -> Unit) {
@@ -46,26 +49,28 @@ fun RecentAppsGestureTutorialScreen(onDoneButtonClicked: () -> Unit, onBack: () 
                     successResId = R.raw.trackpad_recent_apps_success,
                 ),
         )
-    val gestureRecognizerProvider =
-        object : GestureRecognizerProvider {
-            @Composable
-            override fun rememberGestureRecognizer(
-                resources: Resources,
-                gestureStateChangedCallback: (GestureState) -> Unit,
-            ): GestureRecognizer {
-                val distanceThresholdPx =
-                    resources.getDimensionPixelSize(
-                        com.android.internal.R.dimen.system_gestures_distance_threshold
-                    )
-                val velocityThresholdPxPerMs =
-                    resources.getDimension(R.dimen.touchpad_recent_apps_gesture_velocity_threshold)
-                return remember(distanceThresholdPx, velocityThresholdPxPerMs) {
-                    RecentAppsGestureRecognizer(distanceThresholdPx, velocityThresholdPxPerMs)
-                        .also { it.addGestureStateCallback(gestureStateChangedCallback) }
-                }
+    val recognizer = rememberRecentAppsGestureRecognizer(LocalContext.current.resources)
+    val gestureUiState: Flow<GestureUiState> =
+        remember(recognizer) {
+            GestureFlowAdapter(recognizer).gestureStateAsFlow.map {
+                it.toGestureUiState(
+                    progressStartMark = "",
+                    progressEndMark = "",
+                    successAnimation = R.raw.trackpad_recent_apps_success,
+                )
             }
         }
-    GestureTutorialScreen(screenConfig, gestureRecognizerProvider, onDoneButtonClicked, onBack)
+    GestureTutorialScreen(screenConfig, recognizer, gestureUiState, onDoneButtonClicked, onBack)
+}
+
+@Composable
+private fun rememberRecentAppsGestureRecognizer(resources: Resources): GestureRecognizer {
+    val distance =
+        resources.getDimensionPixelSize(
+            com.android.internal.R.dimen.system_gestures_distance_threshold
+        )
+    val velocity = resources.getDimension(R.dimen.touchpad_recent_apps_gesture_velocity_threshold)
+    return remember(distance, velocity) { RecentAppsGestureRecognizer(distance, velocity) }
 }
 
 @Composable

@@ -29226,8 +29226,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                     + " shadowX=" + shadowTouchPoint.x + " shadowY=" + shadowTouchPoint.y);
         }
 
-        final SurfaceSession session = new SurfaceSession();
-        final SurfaceControl surfaceControl = new SurfaceControl.Builder(session)
+        final SurfaceControl surfaceControl = new SurfaceControl.Builder()
                 .setName("drag surface")
                 .setParent(root.getSurfaceControl())
                 .setBufferSize(shadowSize.x, shadowSize.y)
@@ -29293,7 +29292,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             if (token == null) {
                 surface.destroy();
             }
-            session.kill();
             surfaceControl.release();
         }
     }

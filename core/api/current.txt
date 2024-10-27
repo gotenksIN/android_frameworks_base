@@ -10864,6 +10864,7 @@ package android.content {
     field public static final String IPSEC_SERVICE = "ipsec";
     field public static final String JOB_SCHEDULER_SERVICE = "jobscheduler";
     field public static final String KEYGUARD_SERVICE = "keyguard";
+    field @FlaggedApi("android.security.keystore_grant_api") public static final String KEYSTORE_SERVICE = "keystore";
     field public static final String LAUNCHER_APPS_SERVICE = "launcherapps";
     field @UiContext public static final String LAYOUT_INFLATER_SERVICE = "layout_inflater";
     field public static final String LOCALE_SERVICE = "locale";
@@ -11239,6 +11240,7 @@ package android.content {
     method public void removeCategory(String);
     method public void removeExtra(String);
     method public void removeFlags(int);
+    method @FlaggedApi("android.security.prevent_intent_redirect") public void removeLaunchSecurityProtection();
     method @NonNull public android.content.Intent replaceExtras(@NonNull android.content.Intent);
     method @NonNull public android.content.Intent replaceExtras(@Nullable android.os.Bundle);
     method public android.content.ComponentName resolveActivity(@NonNull android.content.pm.PackageManager);
@@ -16103,6 +16105,7 @@ package android.graphics {
     enum_constant public static final android.graphics.ColorSpace.Named CIE_LAB;
     enum_constant public static final android.graphics.ColorSpace.Named CIE_XYZ;
     enum_constant public static final android.graphics.ColorSpace.Named DCI_P3;
+    enum_constant @FlaggedApi("com.android.graphics.flags.display_bt2020_colorspace") public static final android.graphics.ColorSpace.Named DISPLAY_BT2020;
     enum_constant public static final android.graphics.ColorSpace.Named DISPLAY_P3;
     enum_constant public static final android.graphics.ColorSpace.Named EXTENDED_SRGB;
     enum_constant public static final android.graphics.ColorSpace.Named LINEAR_EXTENDED_SRGB;
@@ -18619,6 +18622,7 @@ package android.hardware {
     field public static final int DATASPACE_BT709 = 281083904; // 0x10c10000
     field public static final int DATASPACE_DCI_P3 = 155844608; // 0x94a0000
     field public static final int DATASPACE_DEPTH = 4096; // 0x1000
+    field @FlaggedApi("com.android.graphics.flags.display_bt2020_colorspace") public static final int DATASPACE_DISPLAY_BT2020 = 142999552; // 0x8860000
     field public static final int DATASPACE_DISPLAY_P3 = 143261696; // 0x88a0000
     field public static final int DATASPACE_DYNAMIC_DEPTH = 4098; // 0x1002
     field public static final int DATASPACE_HEIF = 4100; // 0x1004
@@ -33969,9 +33973,12 @@ package android.os {
   public class RemoteCallbackList<E extends android.os.IInterface> {
     ctor public RemoteCallbackList();
     method public int beginBroadcast();
+    method @FlaggedApi("android.os.binder_frozen_state_change_callback") public void broadcast(@NonNull java.util.function.Consumer<E>);
     method public void finishBroadcast();
     method public Object getBroadcastCookie(int);
     method public E getBroadcastItem(int);
+    method @FlaggedApi("android.os.binder_frozen_state_change_callback") public int getFrozenCalleePolicy();
+    method @FlaggedApi("android.os.binder_frozen_state_change_callback") public int getMaxQueueSize();
     method public Object getRegisteredCallbackCookie(int);
     method public int getRegisteredCallbackCount();
     method public E getRegisteredCallbackItem(int);
@@ -33981,6 +33988,16 @@ package android.os {
     method public boolean register(E);
     method public boolean register(E, Object);
     method public boolean unregister(E);
+    field @FlaggedApi("android.os.binder_frozen_state_change_callback") public static final int FROZEN_CALLEE_POLICY_DROP = 3; // 0x3
+    field @FlaggedApi("android.os.binder_frozen_state_change_callback") public static final int FROZEN_CALLEE_POLICY_ENQUEUE_ALL = 1; // 0x1
+    field @FlaggedApi("android.os.binder_frozen_state_change_callback") public static final int FROZEN_CALLEE_POLICY_ENQUEUE_MOST_RECENT = 2; // 0x2
+    field @FlaggedApi("android.os.binder_frozen_state_change_callback") public static final int FROZEN_CALLEE_POLICY_UNSET = 0; // 0x0
+  }
+
+  @FlaggedApi("android.os.binder_frozen_state_change_callback") public static final class RemoteCallbackList.Builder<E extends android.os.IInterface> {
+    ctor public RemoteCallbackList.Builder(int);
+    method @NonNull public android.os.RemoteCallbackList<E> build();
+    method @NonNull public android.os.RemoteCallbackList.Builder setMaxQueueSize(int);
   }
 
   public class RemoteException extends android.util.AndroidException {
@@ -40151,6 +40168,14 @@ package android.security.keystore {
     method @Deprecated @NonNull public android.security.keystore.KeyProtection.Builder setUserAuthenticationValidityDurationSeconds(@IntRange(from=0xffffffff) int);
     method @NonNull public android.security.keystore.KeyProtection.Builder setUserConfirmationRequired(boolean);
     method @NonNull public android.security.keystore.KeyProtection.Builder setUserPresenceRequired(boolean);
+  }
+
+  @FlaggedApi("android.security.keystore_grant_api") public class KeyStoreManager {
+    method @NonNull public java.util.List<java.security.cert.X509Certificate> getGrantedCertificateChainFromId(long) throws android.security.keystore.KeyPermanentlyInvalidatedException, java.security.UnrecoverableKeyException;
+    method @NonNull public java.security.Key getGrantedKeyFromId(long) throws android.security.keystore.KeyPermanentlyInvalidatedException, java.security.UnrecoverableKeyException;
+    method @NonNull public java.security.KeyPair getGrantedKeyPairFromId(long) throws android.security.keystore.KeyPermanentlyInvalidatedException, java.security.UnrecoverableKeyException;
+    method public long grantKeyAccess(@NonNull String, int) throws android.security.KeyStoreException, java.security.UnrecoverableKeyException;
+    method public void revokeKeyAccess(@NonNull String, int) throws android.security.KeyStoreException, java.security.UnrecoverableKeyException;
   }
 
   public class SecureKeyImportUnavailableException extends java.security.ProviderException {
@@ -52218,7 +52243,7 @@ package android.view {
     method public void clear();
     method public void copyFrom(android.view.MotionEvent.PointerCoords);
     method public float getAxisValue(int);
-    method @FlaggedApi("com.android.hardware.input.pointer_coords_is_resampled_api") public boolean isResampled();
+    method public boolean isResampled();
     method public void setAxisValue(int, float);
     field public float orientation;
     field public float pressure;
@@ -52468,6 +52493,7 @@ package android.view {
     method public android.graphics.Canvas lockHardwareCanvas();
     method public void readFromParcel(android.os.Parcel);
     method public void release();
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public void setFrameRate(@NonNull android.view.Surface.FrameRateParams);
     method public void setFrameRate(@FloatRange(from=0.0) float, int, int);
     method public void setFrameRate(@FloatRange(from=0.0) float, int);
     method @Deprecated public void unlockCanvas(android.graphics.Canvas);
@@ -52482,6 +52508,22 @@ package android.view {
     field public static final int ROTATION_180 = 2; // 0x2
     field public static final int ROTATION_270 = 3; // 0x3
     field public static final int ROTATION_90 = 1; // 0x1
+  }
+
+  @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public static class Surface.FrameRateParams {
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public int getChangeFrameRateStrategy();
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getDesiredMaxRate();
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getDesiredMinRate();
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getFixedSourceRate();
+    field @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public static final android.view.Surface.FrameRateParams IGNORE;
+  }
+
+  @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public static final class Surface.FrameRateParams.Builder {
+    ctor public Surface.FrameRateParams.Builder();
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") @NonNull public android.view.Surface.FrameRateParams build();
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") @NonNull public android.view.Surface.FrameRateParams.Builder setChangeFrameRateStrategy(int);
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") @NonNull public android.view.Surface.FrameRateParams.Builder setDesiredRateRange(@FloatRange(from=0.0) float, @FloatRange(from=0.0) float);
+    method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") @NonNull public android.view.Surface.FrameRateParams.Builder setFixedSourceRate(@FloatRange(from=0.0) float);
   }
 
   public static class Surface.OutOfResourcesException extends java.lang.RuntimeException {
@@ -52635,6 +52677,8 @@ package android.view {
     ctor public SurfaceView(android.content.Context, android.util.AttributeSet, int);
     ctor public SurfaceView(android.content.Context, android.util.AttributeSet, int, int);
     method public void applyTransactionToFrame(@NonNull android.view.SurfaceControl.Transaction);
+    method @FlaggedApi("android.view.flags.surface_view_get_surface_package") public void clearChildSurfacePackage();
+    method @FlaggedApi("android.view.flags.surface_view_get_surface_package") @Nullable public android.view.SurfaceControlViewHost.SurfacePackage getChildSurfacePackage();
     method @FlaggedApi("android.view.flags.surface_view_set_composition_order") public int getCompositionOrder();
     method public android.view.SurfaceHolder getHolder();
     method @Deprecated @Nullable public android.os.IBinder getHostToken();
@@ -58168,12 +58212,16 @@ package android.webkit {
     method public abstract String[] getAcceptTypes();
     method @Nullable public abstract String getFilenameHint();
     method public abstract int getMode();
+    method @FlaggedApi("android.webkit.file_system_access") public int getPermissionMode();
     method @Nullable public abstract CharSequence getTitle();
     method public abstract boolean isCaptureEnabled();
     method @Nullable public static android.net.Uri[] parseResult(int, android.content.Intent);
     field public static final int MODE_OPEN = 0; // 0x0
+    field @FlaggedApi("android.webkit.file_system_access") public static final int MODE_OPEN_FOLDER = 2; // 0x2
     field public static final int MODE_OPEN_MULTIPLE = 1; // 0x1
     field public static final int MODE_SAVE = 3; // 0x3
+    field @FlaggedApi("android.webkit.file_system_access") public static final int PERMISSION_MODE_READ = 0; // 0x0
+    field @FlaggedApi("android.webkit.file_system_access") public static final int PERMISSION_MODE_READ_WRITE = 1; // 0x1
   }
 
   public abstract class WebHistoryItem implements java.lang.Cloneable {
@@ -58530,7 +58578,7 @@ package android.webkit {
     method public void setWebViewRenderProcessClient(@Nullable android.webkit.WebViewRenderProcessClient);
     method @Deprecated public boolean shouldDelayChildPressedState();
     method @Deprecated public boolean showFindDialog(@Nullable String, boolean);
-    method public static void startSafeBrowsing(@NonNull android.content.Context, @Nullable android.webkit.ValueCallback<java.lang.Boolean>);
+    method @Deprecated @FlaggedApi("android.webkit.deprecate_start_safe_browsing") public static void startSafeBrowsing(@NonNull android.content.Context, @Nullable android.webkit.ValueCallback<java.lang.Boolean>);
     method public void stopLoading();
     method public void zoomBy(float);
     method public boolean zoomIn();
@@ -61732,6 +61780,7 @@ package android.window {
     method public float getTouchX();
     method public float getTouchY();
     field public static final int EDGE_LEFT = 0; // 0x0
+    field @FlaggedApi("com.android.window.flags.predictive_back_swipe_edge_none_api") public static final int EDGE_NONE = 2; // 0x2
     field public static final int EDGE_RIGHT = 1; // 0x1
   }
 

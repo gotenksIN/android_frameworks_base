@@ -240,9 +240,9 @@ public class PropertyInvalidatedCache<Query, Result> {
     // This is the initial value of all cache keys.  It is changed when a cache is invalidated.
     private static final int NONCE_UNSET = 0;
     // This value is used in two ways.  First, it is used internally to indicate that the cache is
-    // disabled for the current query.  Secondly, it is used to global disable the cache across the
-    // entire system.  Once a cache is disabled, there is no way to enable it again.  The global
-    // behavior is unused and will likely be removed in the future.
+    // disabled for the current query.  Secondly, it is used to globally disable the cache across
+    // the entire system.  Once a cache is disabled, there is no way to enable it again.  The
+    // global behavior is unused and will likely be removed in the future.
     private static final int NONCE_DISABLED = 1;
     // The cache is corked, which means that clients must act as though the cache is always
     // invalid.  This is used when the server is processing updates that continuously invalidate
@@ -264,9 +264,21 @@ public class PropertyInvalidatedCache<Query, Result> {
     private static final String[] sNonceName =
             new String[]{ "unset", "disabled", "corked", "bypass" };
 
+    // The standard tag for logging.
     private static final String TAG = "PropertyInvalidatedCache";
+
+    // Set this true to enable very chatty logging.  Never commit this true.
     private static final boolean DEBUG = false;
+
+    // Set this true to enable cache verification.  On every cache hit, the cache will compare the
+    // cached value to a value pulled directly from the source.  This completely negates any
+    // performance advantage of the cache.  Enable it only to test if a particular cache is not
+    // being properly invalidated.
     private static final boolean VERIFY = false;
+
+    // The test mode. This is only used to ensure that the test functions setTestMode() and
+    // testPropertyName() are used correctly.
+    private static boolean sTestMode = false;
 
     /**
      * The object-private lock.
@@ -410,12 +422,53 @@ public class PropertyInvalidatedCache<Query, Result> {
         @GuardedBy("mLock")
         private int mCorks = 0;
 
-        // The methods to get and set a nonce from whatever storage is being used.
-        abstract long getNonce();
-        abstract void setNonce(long value);
+        // True if this handler is in test mode.  If it is in test mode, then nonces are stored
+        // and retrieved from mTestNonce.
+        @GuardedBy("mLock")
+        private boolean mTestMode = false;
+
+        /**
+         * The local value of the handler, used during testing but also used directly by the
+         * NonceLocal handler.
+         */
+        @GuardedBy("mLock")
+        protected long mTestNonce = NONCE_UNSET;
+
+        /**
+         * The methods to get and set a nonce from whatever storage is being used.  mLock may be
+         * held when these methods are called.  Implementations that take locks must behave as
+         * though mLock could be held.
+         */
+        abstract long getNonceInternal();
+        abstract void setNonceInternal(long value);
 
         NonceHandler(@NonNull String name) {
             mName = name;
+        }
+
+        /**
+         * Get a nonce from storage.  If the handler is in test mode, the nonce is returned from
+         * the local mTestNonce.
+         */
+        long getNonce() {
+            synchronized (mLock) {
+                if (mTestMode) return mTestNonce;
+            }
+            return getNonceInternal();
+        }
+
+        /**
+         * Write a nonce to storage.  If the handler is in test mode, the nonce is written to the
+         * local mTestNonce and storage is not affected.
+         */
+        void setNonce(long val) {
+            synchronized (mLock) {
+                if (mTestMode) {
+                    mTestNonce = val;
+                    return;
+                }
+            }
+            setNonceInternal(val);
         }
 
         /**
@@ -528,6 +581,10 @@ public class PropertyInvalidatedCache<Query, Result> {
             }
         }
 
+        /**
+         * Globally (that is, system-wide) disable all caches that use this key.  There is no way
+         * to re-enable these caches.
+         */
         void disable() {
             if (!sEnabled) {
                 return;
@@ -537,6 +594,21 @@ public class PropertyInvalidatedCache<Query, Result> {
             }
         }
 
+        /**
+         * Put this handler in or out of test mode.  Regardless of the current and next mode, the
+         * test nonce variable is reset to UNSET.
+         */
+        void setTestMode(boolean mode) {
+            synchronized (mLock) {
+                mTestMode = mode;
+                mTestNonce = NONCE_UNSET;
+            }
+        }
+
+        /**
+         * Return the statistics associated with the key.  These statistics are not associated
+         * with any individual cache.
+         */
         record Stats(int invalidated, int corkedInvalidates) {}
         Stats getStats() {
             synchronized (mLock) {
@@ -556,21 +628,32 @@ public class PropertyInvalidatedCache<Query, Result> {
             super(name);
         }
 
+        /**
+         * Retrieve the nonce from the system property.  If the handle is null, this method
+         * attempts to create a handle.  If handle creation fails, the method returns UNSET.  If
+         * the handle is not null, the method returns a value read via the handle.  This read
+         * occurs outside any lock.
+         */
         @Override
-        long getNonce() {
+        long getNonceInternal() {
             if (mHandle == null) {
                 synchronized (mLock) {
-                    mHandle = SystemProperties.find(mName);
                     if (mHandle == null) {
-                        return NONCE_UNSET;
+                        mHandle = SystemProperties.find(mName);
+                        if (mHandle == null) {
+                            return NONCE_UNSET;
+                        }
                     }
                 }
             }
             return mHandle.getLong(NONCE_UNSET);
         }
 
+        /**
+         * Write a nonce to a system property.
+         */
         @Override
-        void setNonce(long value) {
+        void setNonceInternal(long value) {
             // Failing to set the nonce is a fatal error.  Failures setting a system property have
             // been reported; given that the failure is probably transient, this function includes
             // a retry.
@@ -607,42 +690,32 @@ public class PropertyInvalidatedCache<Query, Result> {
 
     /**
      * SystemProperties and shared storage are protected and cannot be written by random
-     * processes.  So, for testing purposes, the NonceTest handler stores the nonce locally.
+     * processes.  So, for testing purposes, the NonceLocal handler stores the nonce locally.  The
+     * NonceLocal uses the mTestNonce in the superclass, regardless of test mode.
      */
-    private static class NonceTest extends NonceHandler {
+    private static class NonceLocal extends NonceHandler {
         // The saved nonce.
         private long mValue;
 
-        // If this flag is false, the handler has been shutdown during a test.  Access to the
-        // handler in this state is an error.
-        private boolean mIsActive = true;
-
-        NonceTest(@NonNull String name) {
+        NonceLocal(@NonNull String name) {
             super(name);
         }
 
-        void shutdown() {
-            // The handler has been discarded as part of test cleanup.  Further access is an
-            // error.
-            mIsActive = false;
+        @Override
+        long getNonceInternal() {
+            return mTestNonce;
         }
 
         @Override
-        long getNonce() {
-            if (!mIsActive) {
-                throw new IllegalStateException("handler " + mName + " is shutdown");
-            }
-            return mValue;
-        }
-
-        @Override
-        void setNonce(long value) {
-            if (!mIsActive) {
-                throw new IllegalStateException("handler " + mName + " is shutdown");
-            }
-            mValue = value;
+        void setNonceInternal(long value) {
+            mTestNonce = value;
         }
     }
+
+    /**
+     * Complete key prefixes.
+     */
+    private static final String PREFIX_TEST = CACHE_KEY_PREFIX + "." + MODULE_TEST + ".";
 
     /**
      * A static list of nonce handlers, indexed by name.  NonceHandlers can be safely shared by
@@ -662,8 +735,8 @@ public class PropertyInvalidatedCache<Query, Result> {
             synchronized (sGlobalLock) {
                 h = sHandlers.get(name);
                 if (h == null) {
-                    if (name.startsWith("cache_key.test.")) {
-                        h = new NonceTest(name);
+                    if (name.startsWith(PREFIX_TEST)) {
+                        h = new NonceLocal(name);
                     } else {
                         h = new NonceSysprop(name);
                     }
@@ -776,44 +849,55 @@ public class PropertyInvalidatedCache<Query, Result> {
     }
 
     /**
-     * Enable or disable testing.  At this time, no action is taken when testing begins.
+     * Enable or disable testing.  The protocol requires that the mode toggle: for instance, it is
+     * illegal to clear the test mode if the test mode is already off.  The purpose is solely to
+     * ensure that test clients do not forget to use the test mode properly, even though the
+     * current logic does not care.
      * @hide
      */
     @TestApi
     public static void setTestMode(boolean mode) {
-        if (mode) {
-            // No action when testing begins.
-        } else {
-            resetAfterTest();
+        synchronized (sGlobalLock) {
+            if (sTestMode == mode) {
+                throw new IllegalStateException("cannot set test mode redundantly: mode=" + mode);
+            }
+            sTestMode = mode;
+            if (mode) {
+                // No action when testing begins.
+            } else {
+                resetAfterTestLocked();
+            }
         }
     }
 
     /**
-     * Enable testing the specific cache key.  This is a legacy API that will be removed as part of
-     * b/360897450.
+     * Clean up when testing ends. All handlers are reset out of test mode.  NonceLocal handlers
+     * (MODULE_TEST) are reset to the NONCE_UNSET state.  This has no effect on any other handlers
+     * that were not originally in test mode.
+     */
+    @GuardedBy("sGlobalLock")
+    private static void resetAfterTestLocked() {
+        for (Iterator<String> e = sHandlers.keys().asIterator(); e.hasNext(); ) {
+            String s = e.next();
+            final NonceHandler h = sHandlers.get(s);
+            h.setTestMode(false);
+        }
+    }
+
+    /**
+     * Enable testing the specific cache key.  This API allows a test process to invalidate caches
+     * for which it would not otherwise have permission.  Caches in test mode do NOT write their
+     * values to the system properties.  The effect is local to the current process.  Test mode
+     * must be true when this method is called.
      * @hide
      */
     @TestApi
     public void testPropertyName() {
-    }
-
-    /**
-     * Clean up when testing ends. All NonceTest handlers are erased from the global list and are
-     * poisoned, just in case the test program has retained a handle to one of the associated
-     * caches.
-     * @hide
-     */
-    @VisibleForTesting
-    public static void resetAfterTest() {
         synchronized (sGlobalLock) {
-            for (Iterator<String> e = sHandlers.keys().asIterator(); e.hasNext(); ) {
-                String s = e.next();
-                final NonceHandler h = sHandlers.get(s);
-                if (h instanceof NonceTest t) {
-                    t.shutdown();
-                    sHandlers.remove(s);
-                }
+            if (sTestMode == false) {
+                throw new IllegalStateException("cannot test property name with test mode off");
             }
+            mNonce.setTestMode(true);
         }
     }
 
@@ -1119,8 +1203,9 @@ public class PropertyInvalidatedCache<Query, Result> {
     }
 
     /**
-     * Non-static convenience version of invalidateCache() for situations in which only a single
-     * PropertyInvalidatedCache is keyed on a particular property value.
+     * Non-static version of invalidateCache() for situations in which a cache instance is
+     * available.  This is slightly faster than than the static versions because it does not have
+     * to look up the NonceHandler for a given property name.
      * @hide
      */
     @TestApi

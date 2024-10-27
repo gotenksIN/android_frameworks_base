@@ -2423,9 +2423,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
      * sent to the new top resumed activity.
      */
     ActivityRecord updateTopResumedActivityIfNeeded(String reason) {
-        if (!readyToResume()) {
-            return mTopResumedActivity;
-        }
         final ActivityRecord prevTopActivity = mTopResumedActivity;
         final Task topRootTask = mRootWindowContainer.getTopDisplayFocusedRootTask();
         if (topRootTask == null || topRootTask.getTopResumedActivity() == prevTopActivity) {
@@ -2718,14 +2715,21 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         wpc.computeProcessActivityState();
     }
 
-    void computeProcessActivityStateBatch() {
+    boolean computeProcessActivityStateBatch() {
         if (mActivityStateChangedProcs.isEmpty()) {
-            return;
+            return false;
         }
+        boolean changed = false;
         for (int i = mActivityStateChangedProcs.size() - 1; i >= 0; i--) {
-            mActivityStateChangedProcs.get(i).computeProcessActivityState();
+            final WindowProcessController wpc = mActivityStateChangedProcs.get(i);
+            final int prevState = wpc.getActivityStateFlags();
+            wpc.computeProcessActivityState();
+            if (!changed && prevState != wpc.getActivityStateFlags()) {
+                changed = true;
+            }
         }
         mActivityStateChangedProcs.clear();
+        return changed;
     }
 
     /**

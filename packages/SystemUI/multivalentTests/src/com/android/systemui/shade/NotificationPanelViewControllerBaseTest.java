@@ -86,7 +86,6 @@ import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.classifier.FalsingCollectorFake;
 import com.android.systemui.classifier.FalsingManagerFake;
-import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository;
 import com.android.systemui.common.ui.view.LongPressHandlingView;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor;
@@ -436,15 +435,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 new ShadeInteractorLegacyImpl(
                         mTestScope.getBackgroundScope(),
                         mFakeKeyguardRepository,
-                        new SharedNotificationContainerInteractor(
-                                new FakeConfigurationRepository(),
-                                mContext,
-                                () -> splitShadeStateController,
-                                () -> mShadeInteractor,
-                                mKeyguardInteractor,
-                                deviceEntryUdfpsInteractor,
-                                () -> mLargeScreenHeaderHelper
-                        ),
                         mShadeRepository
                 ),
                 mKosmos.getShadeModeInteractor());

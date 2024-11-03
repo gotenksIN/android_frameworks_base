@@ -5481,6 +5481,14 @@ public final class Settings {
         public static final String VOLUME_MASTER = "volume_master";
 
         /**
+         * The mapping of input device to its input gain index.
+         *
+         * @hide
+         */
+        @Readable
+        public static final String INPUT_GAIN_INDEX_SETTINGS = "input_gain_index_settings";
+
+        /**
          * Master mono (int 1 = mono, 0 = normal).
          *
          * @hide
@@ -8401,7 +8409,6 @@ public final class Settings {
         @Readable
         public static final String LOCK_SCREEN_LOCK_AFTER_TIMEOUT = "lock_screen_lock_after_timeout";
 
-
         /**
          * This preference contains the string that shows for owner info on LockScreen.
          * @hide
@@ -11292,7 +11299,8 @@ public final class Settings {
                 "assist_long_press_home_enabled";
 
         /**
-         * Whether all entrypoints can trigger search. Replaces individual settings.
+         * Whether all entrypoints (e.g. long-press home, long-press nav handle)
+         * can trigger contextual search.
          *
          * @hide
          */

@@ -11684,6 +11684,7 @@ public class Intent implements Parcelable, Cloneable {
                 Log.w(TAG, "Failure filling in extras", e);
             }
         }
+        mCreatorTokenInfo = other.mCreatorTokenInfo;
         if (mayHaveCopiedUris && mContentUserHint == UserHandle.USER_CURRENT
                 && other.mContentUserHint != UserHandle.USER_CURRENT) {
             mContentUserHint = other.mContentUserHint;
@@ -12237,6 +12238,13 @@ public class Intent implements Parcelable, Cloneable {
     }
 
     /** @hide */
+    public void removeCreatorToken() {
+        if (mCreatorTokenInfo != null) {
+            mCreatorTokenInfo.mCreatorToken = null;
+        }
+    }
+
+    /** @hide */
     public @Nullable IBinder getCreatorToken() {
         return mCreatorTokenInfo == null ? null : mCreatorTokenInfo.mCreatorToken;
     }
@@ -12263,7 +12271,7 @@ public class Intent implements Parcelable, Cloneable {
     public void collectExtraIntentKeys() {
         if (!isPreventIntentRedirectEnabled()) return;
 
-        if (mExtras != null && !mExtras.isParcelled() && !mExtras.isEmpty()) {
+        if (mExtras != null && !mExtras.isEmpty()) {
             for (String key : mExtras.keySet()) {
                 if (mExtras.get(key) instanceof Intent) {
                     if (mCreatorTokenInfo == null) {
@@ -12846,6 +12854,8 @@ public class Intent implements Parcelable, Cloneable {
     private boolean isImageCaptureIntent() {
         return (MediaStore.ACTION_IMAGE_CAPTURE.equals(mAction)
                 || MediaStore.ACTION_IMAGE_CAPTURE_SECURE.equals(mAction)
+                || MediaStore.ACTION_MOTION_PHOTO_CAPTURE.equals(mAction)
+                || MediaStore.ACTION_MOTION_PHOTO_CAPTURE_SECURE.equals(mAction)
                 || MediaStore.ACTION_VIDEO_CAPTURE.equals(mAction));
     }
 

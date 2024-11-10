@@ -151,6 +151,7 @@ import android.hardware.hdmi.HdmiPlaybackClient;
 import android.hardware.hdmi.HdmiPlaybackClient.OneTouchPlayCallback;
 import android.hardware.input.AppLaunchData;
 import android.hardware.input.InputManager;
+import android.hardware.input.InputSettings;
 import android.hardware.input.KeyGestureEvent;
 import android.media.AudioManager;
 import android.media.AudioManagerInternal;
@@ -3641,6 +3642,68 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     }
                 }
                 break;
+            case KeyEvent.KEYCODE_3:
+                if (InputSettings.isAccessibilityBounceKeysFeatureEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (firstDown && event.isMetaPressed()
+                            && event.isAltPressed()) {
+                        final boolean bounceKeysEnabled =
+                                InputSettings.isAccessibilityBounceKeysEnabled(
+                                        mContext);
+                        InputSettings.setAccessibilityBounceKeysThreshold(mContext,
+                                bounceKeysEnabled ? 0
+                                        : InputSettings.DEFAULT_BOUNCE_KEYS_THRESHOLD_MILLIS);
+                        notifyKeyGestureCompleted(event,
+                                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_BOUNCE_KEYS);
+                        return true;
+                    }
+                }
+                break;
+            case KeyEvent.KEYCODE_4:
+                if (InputSettings.isAccessibilityMouseKeysFeatureFlagEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (firstDown && event.isMetaPressed() && event.isAltPressed()) {
+                        final boolean mouseKeysEnabled =
+                                InputSettings.isAccessibilityMouseKeysEnabled(
+                                        mContext);
+                        InputSettings.setAccessibilityMouseKeysEnabled(mContext,
+                                !mouseKeysEnabled);
+                        notifyKeyGestureCompleted(event,
+                                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MOUSE_KEYS);
+                        return true;
+                    }
+                }
+                break;
+            case KeyEvent.KEYCODE_5:
+                if (InputSettings.isAccessibilityStickyKeysFeatureEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (firstDown && event.isMetaPressed() && event.isAltPressed()) {
+                        final boolean stickyKeysEnabled =
+                                InputSettings.isAccessibilityStickyKeysEnabled(
+                                        mContext);
+                        InputSettings.setAccessibilityStickyKeysEnabled(mContext,
+                                !stickyKeysEnabled);
+                        notifyKeyGestureCompleted(event,
+                                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_STICKY_KEYS);
+                        return true;
+                    }
+                }
+                break;
+            case KeyEvent.KEYCODE_6:
+                if (InputSettings.isAccessibilitySlowKeysFeatureFlagEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (firstDown && event.isMetaPressed() && event.isAltPressed()) {
+                        final boolean slowKeysEnabled =
+                                InputSettings.isAccessibilitySlowKeysEnabled(mContext);
+                        InputSettings.setAccessibilitySlowKeysThreshold(mContext,
+                                slowKeysEnabled ? 0
+                                        : InputSettings.DEFAULT_SLOW_KEYS_THRESHOLD_MILLIS);
+                        notifyKeyGestureCompleted(event,
+                                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SLOW_KEYS);
+                        return true;
+                    }
+                }
+                break;
             case KeyEvent.KEYCODE_DEL:
                 if (newBugreportKeyboardShortcut()) {
                     if (mEnableBugReportKeyboardShortcut && firstDown
@@ -4077,6 +4140,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 .isAccessibilityShortcutAvailable(false);
                     case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_TALKBACK:
                         return keyboardA11yShortcutControl();
+                    case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SLOW_KEYS:
+                        return InputSettings.isAccessibilitySlowKeysFeatureFlagEnabled()
+                                && keyboardA11yShortcutControl();
+                    case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_BOUNCE_KEYS:
+                        return InputSettings.isAccessibilityBounceKeysFeatureEnabled()
+                                && keyboardA11yShortcutControl();
+                    case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MOUSE_KEYS:
+                        return InputSettings.isAccessibilityMouseKeysFeatureFlagEnabled()
+                                && keyboardA11yShortcutControl();
+                    case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_STICKY_KEYS:
+                        return InputSettings.isAccessibilityStickyKeysFeatureEnabled()
+                                && keyboardA11yShortcutControl();
                     default:
                         return false;
                 }
@@ -4310,6 +4385,57 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (complete && isUserSetupComplete() && !keyguardOn
                         && data != null && mModifierShortcutManager.launchApplication(data)) {
                     dismissKeyboardShortcutsMenu();
+                }
+                return true;
+            case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_BOUNCE_KEYS:
+                if (InputSettings.isAccessibilityBounceKeysFeatureEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (complete) {
+                        final boolean bounceKeysEnabled =
+                                InputSettings.isAccessibilityBounceKeysEnabled(
+                                        mContext);
+                        InputSettings.setAccessibilityBounceKeysThreshold(mContext,
+                                bounceKeysEnabled ? 0
+                                        : InputSettings.DEFAULT_BOUNCE_KEYS_THRESHOLD_MILLIS);
+                    }
+                    return true;
+                }
+                break;
+            case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MOUSE_KEYS:
+                if (InputSettings.isAccessibilityMouseKeysFeatureFlagEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (complete) {
+                        final boolean mouseKeysEnabled =
+                                InputSettings.isAccessibilityMouseKeysEnabled(
+                                        mContext);
+                        InputSettings.setAccessibilityMouseKeysEnabled(mContext,
+                                !mouseKeysEnabled);
+                    }
+                    return true;
+                }
+                break;
+            case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_STICKY_KEYS:
+                if (InputSettings.isAccessibilityStickyKeysFeatureEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (complete) {
+                        final boolean stickyKeysEnabled =
+                                InputSettings.isAccessibilityStickyKeysEnabled(mContext);
+                        InputSettings.setAccessibilityStickyKeysEnabled(mContext,
+                                !stickyKeysEnabled);
+                    }
+                    return true;
+                }
+                break;
+            case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SLOW_KEYS:
+                if (InputSettings.isAccessibilitySlowKeysFeatureFlagEnabled()
+                        && keyboardA11yShortcutControl()) {
+                    if (complete) {
+                        final boolean slowKeysEnabled =
+                                InputSettings.isAccessibilitySlowKeysEnabled(mContext);
+                        InputSettings.setAccessibilitySlowKeysThreshold(mContext,
+                                slowKeysEnabled ? 0
+                                        : InputSettings.DEFAULT_SLOW_KEYS_THRESHOLD_MILLIS);
+                    }
                     return true;
                 }
                 break;

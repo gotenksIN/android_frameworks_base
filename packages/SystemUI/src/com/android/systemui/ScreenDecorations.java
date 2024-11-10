@@ -92,7 +92,6 @@ import com.android.systemui.statusbar.commandline.CommandRegistry;
 import com.android.systemui.statusbar.events.PrivacyDotViewController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.util.concurrency.DelayableExecutor;
-import com.android.systemui.util.concurrency.ThreadFactory;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.settings.SecureSettings;
 
@@ -150,7 +149,6 @@ public class ScreenDecorations implements
     private CameraAvailabilityListener mCameraListener;
     private final UserTracker mUserTracker;
     private final PrivacyDotViewController mDotViewController;
-    private final ThreadFactory mThreadFactory;
     private final DecorProviderFactory mDotFactory;
     private final FaceScanningProviderFactory mFaceScanningFactory;
     private final CameraProtectionLoader mCameraProtectionLoader;
@@ -175,7 +173,6 @@ public class ScreenDecorations implements
     private ViewCaptureAwareWindowManager mWindowManager;
     private int mRotation;
     private UserSettingObserver mColorInversionSetting;
-    @Nullable
     private DelayableExecutor mExecutor;
     private Handler mHandler;
     boolean mPendingConfigChange;
@@ -330,27 +327,28 @@ public class ScreenDecorations implements
     }
 
     @Inject
-    public ScreenDecorations(Context context,
+    public ScreenDecorations(
+            Context context,
             SecureSettings secureSettings,
             CommandRegistry commandRegistry,
             UserTracker userTracker,
             DisplayTracker displayTracker,
             PrivacyDotViewController dotViewController,
-            ThreadFactory threadFactory,
             PrivacyDotDecorProviderFactory dotFactory,
             FaceScanningProviderFactory faceScanningFactory,
             ScreenDecorationsLogger logger,
             FacePropertyRepository facePropertyRepository,
             JavaAdapter javaAdapter,
             CameraProtectionLoader cameraProtectionLoader,
-            ViewCaptureAwareWindowManager viewCaptureAwareWindowManager) {
+            ViewCaptureAwareWindowManager viewCaptureAwareWindowManager,
+            @ScreenDecorationsThread Handler handler,
+            @ScreenDecorationsThread DelayableExecutor executor) {
         mContext = context;
         mSecureSettings = secureSettings;
         mCommandRegistry = commandRegistry;
         mUserTracker = userTracker;
         mDisplayTracker = displayTracker;
         mDotViewController = dotViewController;
-        mThreadFactory = threadFactory;
         mDotFactory = dotFactory;
         mFaceScanningFactory = faceScanningFactory;
         mCameraProtectionLoader = cameraProtectionLoader;
@@ -359,6 +357,8 @@ public class ScreenDecorations implements
         mFacePropertyRepository = facePropertyRepository;
         mJavaAdapter = javaAdapter;
         mWindowManager = viewCaptureAwareWindowManager;
+        mHandler = handler;
+        mExecutor = executor;
     }
 
     private final ScreenDecorCommand.Callback mScreenDecorCommandCallback = (cmd, pw) -> {
@@ -406,10 +406,7 @@ public class ScreenDecorations implements
             Log.i(TAG, "ScreenDecorations is disabled");
             return;
         }
-        mHandler = mThreadFactory.buildHandlerOnNewThread("ScreenDecorations");
-        mExecutor = mThreadFactory.buildDelayableExecutorOnHandler(mHandler);
         mExecutor.execute(this::startOnScreenDecorationsThread);
-        mDotViewController.setUiExecutor(mExecutor);
         mCommandRegistry.registerCommand(ScreenDecorCommand.SCREEN_DECOR_CMD_NAME,
                 () -> new ScreenDecorCommand(mScreenDecorCommandCallback));
     }

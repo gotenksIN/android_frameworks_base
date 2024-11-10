@@ -639,6 +639,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     // The locusId associated with this activity, if set.
     private LocusId mLocusId;
 
+    // Whether the activity is requesting to limit the system's educational dialogs
+    public boolean mShouldLimitSystemEducationDialogs;
+
     // Whether the activity was launched from a bubble.
     private boolean mLaunchedFromBubble;
 
@@ -1808,8 +1811,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         prevDc.onRunningActivityChanged();
 
-        // TODO(b/169035022): move to a more-appropriate place.
-        mTransitionController.collect(this);
         if (prevDc.mOpeningApps.remove(this)) {
             // Transfer opening transition to new display.
             mDisplayContent.mOpeningApps.add(this);
@@ -6578,7 +6579,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         returningOptions = null;
 
         if (canTurnScreenOn()) {
-            mTaskSupervisor.wakeUp("turnScreenOnFlag");
+            mTaskSupervisor.wakeUp(getDisplayId(), "turnScreenOnFlag");
         } else {
             // If the screen is going to turn on because the caller explicitly requested it and
             // the keyguard is not showing don't attempt to sleep. Otherwise the Activity will
@@ -7468,6 +7469,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     LocusId getLocusId() {
         return mLocusId;
+    }
+
+    void setLimitSystemEducationDialogs(boolean limitSystemEducationDialogs) {
+        if (mShouldLimitSystemEducationDialogs == limitSystemEducationDialogs) return;
+        mShouldLimitSystemEducationDialogs = limitSystemEducationDialogs;
+        final Task task = getTask();
+        if (task != null) {
+            final boolean force = isVisibleRequested() && this == task.getTopNonFinishingActivity();
+            getTask().dispatchTaskInfoChangedIfNeeded(force);
+        }
     }
 
     public void reportScreenCaptured() {

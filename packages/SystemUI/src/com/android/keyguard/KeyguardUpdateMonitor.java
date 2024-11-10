@@ -171,6 +171,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -586,43 +587,68 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     }
 
     private void handleSimSubscriptionInfoChanged() {
-        Assert.isMainThread();
         mSimLogger.v("onSubscriptionInfoChanged()");
-        List<SubscriptionInfo> subscriptionInfos = getSubscriptionInfo(true /* forceReload */);
-        if (!subscriptionInfos.isEmpty()) {
-            for (SubscriptionInfo subInfo : subscriptionInfos) {
-                mSimLogger.logSubInfo(subInfo);
-            }
-        } else {
-            mSimLogger.v("onSubscriptionInfoChanged: list is null");
-        }
-
-        // Hack level over 9000: Because the subscription id is not yet valid when we see the
-        // first update in handleSimStateChange, we need to force refresh all all SIM states
-        // so the subscription id for them is consistent.
-        ArrayList<SubscriptionInfo> changedSubscriptions = new ArrayList<>();
-        for (int i = 0; i < subscriptionInfos.size(); i++) {
-            SubscriptionInfo info = subscriptionInfos.get(i);
-            boolean changed = refreshSimState(info.getSubscriptionId(), info.getSimSlotIndex());
-            if (changed) {
-                changedSubscriptions.add(info);
-            }
-        }
-        synchronized (mSimDataLockObject) {
-            for (int i = 0; i < changedSubscriptions.size(); i++) {
-                SimData data = mSimDatas.get(changedSubscriptions.get(i).getSimSlotIndex());
-                if (data == null) {
-                    continue;
+        mBackgroundExecutor.execute(() -> {
+            final List<SubscriptionInfo> subscriptionInfos =
+                    getSubscriptionInfo(true /* forceReload */);
+            mMainExecutor.execute(() -> {
+                if (!subscriptionInfos.isEmpty()) {
+                    for (SubscriptionInfo subInfo : subscriptionInfos) {
+                        mSimLogger.logSubInfo(subInfo);
+                    }
+                } else {
+                    mSimLogger.v("onSubscriptionInfoChanged: list is null");
                 }
-                for (int j = 0; j < mCallbacks.size(); j++) {
-                    KeyguardUpdateMonitorCallback cb = mCallbacks.get(j).get();
-                    if (cb != null) {
-                        cb.onSimStateChanged(data.subId, data.slotId, data.simState);
+
+                // Hack level over 9000: Because the subscription id is not yet valid when we see
+                // the first update in handleSimStateChange, we need to force refresh all SIM states
+                // so the subscription id for them is consistent.
+                ArrayList<SubscriptionInfo> changedSubscriptions = new ArrayList<>();
+                Set<Integer> activeSubIds = new HashSet<>();
+                for (int i = 0; i < subscriptionInfos.size(); i++) {
+                    SubscriptionInfo info = subscriptionInfos.get(i);
+                    activeSubIds.add(info.getSubscriptionId());
+                    boolean changed = refreshSimState(info.getSubscriptionId(),
+                            info.getSimSlotIndex());
+                    if (changed) {
+                        changedSubscriptions.add(info);
                     }
                 }
-            }
-            callbacksRefreshCarrierInfo();
-        }
+
+                // It is possible for active subscriptions to become invalid (-1), and these will
+                // not be present in the subscriptionInfo list
+                synchronized (mSimDataLockObject) {
+                    Iterator<Map.Entry<Integer, SimData>> iter = mSimDatas.entrySet().iterator();
+                    while (iter.hasNext()) {
+                        Map.Entry<Integer, SimData> simData = iter.next();
+                        if (!activeSubIds.contains(simData.getKey())) {
+                            mSimLogger.logInvalidSubId(simData.getKey());
+                            iter.remove();
+
+                            SimData data = simData.getValue();
+                            for (int j = 0; j < mCallbacks.size(); j++) {
+                                KeyguardUpdateMonitorCallback cb = mCallbacks.get(j).get();
+                                if (cb != null) {
+                                    cb.onSimStateChanged(data.subId, data.slotId, data.simState);
+                                }
+                            }
+                        }
+                    }
+
+                    for (int i = 0; i < changedSubscriptions.size(); i++) {
+                        SimData data = mSimDatas.get(
+                                changedSubscriptions.get(i).getSubscriptionId());
+                        for (int j = 0; j < mCallbacks.size(); j++) {
+                            KeyguardUpdateMonitorCallback cb = mCallbacks.get(j).get();
+                            if (cb != null) {
+                                cb.onSimStateChanged(data.subId, data.slotId, data.simState);
+                            }
+                        }
+                    }
+                    callbacksRefreshCarrierInfo();
+                }
+            });
+        });
     }
 
     private void handleAirplaneModeChanged() {
@@ -2510,6 +2536,11 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         if (mUserTracker.isUserSwitching()) {
             handleUserSwitching(mUserTracker.getUserId(), () -> {});
         }
+
+        // Force the cache to be initialized
+        mBackgroundExecutor.execute(() -> {
+            getSubscriptionInfo(/* forceReload= */ true);
+        });
     }
 
     @VisibleForTesting
@@ -3869,11 +3900,14 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
      * @see #isSimPinSecure(int)
      */
     public boolean isSimPinSecure() {
-        // True if any SIM is pin secure
-        for (SubscriptionInfo info : getSubscriptionInfo(false /* forceReload */)) {
-            if (isSimPinSecure(getSimState(info.getSubscriptionId()))) return true;
+        synchronized (mSimDataLockObject) {
+            for (SimData data : mSimDatas.values()) {
+                if (isSimPinSecure(data.simState)) {
+                    return true;
+                }
+            }
+            return false;
         }
-        return false;
     }
 
     public int getSimState(int subId) {

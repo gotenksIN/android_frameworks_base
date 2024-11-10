@@ -321,7 +321,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private static final String ATTR_APPLICATION_ENABLED_SETTING_PERSISTENT =
             "applicationEnabledSettingPersistent";
     private static final String ATTR_DOMAIN = "domain";
-    private static final String ATTR_VERIFICATION_POLICY = "verificationPolicy";
+    private static final String ATTR_INITIAL_VERIFICATION_POLICY = "initialVerificationPolicy";
+    private static final String ATTR_CURRENT_VERIFICATION_POLICY = "currentVerificationPolicy";
 
     private static final String PROPERTY_NAME_INHERIT_NATIVE = "pi.inherit_native_on_dont_kill";
     private static final int[] EMPTY_CHILD_SESSION_ARRAY = EmptyArray.INT;
@@ -419,10 +420,14 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private final PackageSessionProvider mSessionProvider;
     private final SilentUpdatePolicy mSilentUpdatePolicy;
     /**
-     * The verification policy applied to this session, which might be different from the default
-     * verification policy used by the system.
+     * The initial verification policy assigned to this session when it was first created.
      */
-    private final AtomicInteger mVerificationPolicy;
+    private final int mInitialVerificationPolicy;
+    /**
+     * The active verification policy, which might be different from the initial verification policy
+     * assigned to this session or the default policy currently used by the system.
+     */
+    private final AtomicInteger mCurrentVerificationPolicy;
     /**
      * Note all calls must be done outside {@link #mLock} to prevent lock inversion.
      */
@@ -1190,7 +1195,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             boolean isFailed, boolean isApplied, int sessionErrorCode,
             String sessionErrorMessage, DomainSet preVerifiedDomains,
             @NonNull VerifierController verifierController,
-            @PackageInstaller.VerificationPolicy int verificationPolicy) {
+            @PackageInstaller.VerificationPolicy int initialVerificationPolicy,
+            @PackageInstaller.VerificationPolicy int currentVerificationPolicy) {
         mCallback = callback;
         mContext = context;
         mPm = pm;
@@ -1200,7 +1206,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         mHandler = new Handler(looper, mHandlerCallback);
         mStagingManager = stagingManager;
         mVerifierController = verifierController;
-        mVerificationPolicy = new AtomicInteger(verificationPolicy);
+        mInitialVerificationPolicy = initialVerificationPolicy;
+        mCurrentVerificationPolicy = new AtomicInteger(currentVerificationPolicy);
 
         this.sessionId = sessionId;
         this.userId = userId;
@@ -1310,7 +1317,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     mStageDirInUse, mDestroyed, mFds.size(), mBridges.size(), mFinalStatus,
                     mFinalMessage, params, mParentSessionId, getChildSessionIdsLocked(),
                     mSessionApplied, mSessionFailed, mSessionReady, mSessionErrorCode,
-                    mSessionErrorMessage, mPreapprovalDetails, mPreVerifiedDomains, mPackageName);
+                    mSessionErrorMessage, mPreapprovalDetails, mPreVerifiedDomains, mPackageName,
+                    mInitialVerificationPolicy, mCurrentVerificationPolicy.get());
         }
     }
 
@@ -2907,8 +2915,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             final VerifierCallback verifierCallback = new VerifierCallback();
             if (!mVerifierController.startVerificationSession(mPm::snapshotComputer, userId,
                     sessionId, getPackageName(), Uri.fromFile(stageDir), signingInfo,
-                    declaredLibraries, mVerificationPolicy.get(), /* extensionParams= */ null,
-                    verifierCallback, /* retry= */ false)) {
+                    declaredLibraries, mCurrentVerificationPolicy.get(),
+                    /* extensionParams= */ null, verifierCallback, /* retry= */ false)) {
                 // A verifier is installed but cannot be connected.
                 verifierCallback.onConnectionFailed();
             }
@@ -2987,7 +2995,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
          * verification policy for this session.
          */
         public @PackageInstaller.VerificationPolicy int getVerificationPolicy() {
-            return mVerificationPolicy.get();
+            return mCurrentVerificationPolicy.get();
         }
         /**
          * Called by the VerifierController when the verifier requests to change the verification
@@ -2997,7 +3005,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             if (!isValidVerificationPolicy(policy)) {
                 return false;
             }
-            mVerificationPolicy.set(policy);
+            mCurrentVerificationPolicy.set(policy);
             return true;
         }
         /**
@@ -3043,7 +3051,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // TODO: handle extension response
             mHandler.post(() -> {
                 if (statusReceived.isVerified()
-                        || mVerificationPolicy.get() == VERIFICATION_POLICY_NONE) {
+                        || mCurrentVerificationPolicy.get() == VERIFICATION_POLICY_NONE) {
                     // Continue with the rest of the verification and installation.
                     resumeVerify();
                     return;
@@ -3087,13 +3095,14 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         }
 
         private void handleNonPackageBlockedFailure(Runnable onFailWarning, Runnable onFailClosed) {
-            final Runnable r = switch (mVerificationPolicy.get()) {
+            final Runnable r = switch (mCurrentVerificationPolicy.get()) {
                 case VERIFICATION_POLICY_NONE, VERIFICATION_POLICY_BLOCK_FAIL_OPEN ->
                         PackageInstallerSession.this::resumeVerify;
                 case VERIFICATION_POLICY_BLOCK_FAIL_WARN -> onFailWarning;
                 case VERIFICATION_POLICY_BLOCK_FAIL_CLOSED -> onFailClosed;
                 default -> {
-                    Log.wtf(TAG, "Unknown verification policy: " + mVerificationPolicy.get());
+                    Log.wtf(TAG, "Unknown verification policy: "
+                            + mCurrentVerificationPolicy.get());
                     yield onFailClosed;
                 }
             };
@@ -5460,12 +5469,21 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     /**
+     * @return the initial policy for the verification request assigned to the session when created.
+     */
+    @VisibleForTesting
+    public @PackageInstaller.VerificationPolicy int getInitialVerificationPolicy() {
+        assertCallerIsOwnerOrRoot();
+        return mInitialVerificationPolicy;
+    }
+
+    /**
      * @return the current policy for the verification request associated with this session.
      */
     @VisibleForTesting
-    public @PackageInstaller.VerificationPolicy int getVerificationPolicy() {
+    public @PackageInstaller.VerificationPolicy int getCurrentVerificationPolicy() {
         assertCallerIsOwnerOrRoot();
-        return mVerificationPolicy.get();
+        return mCurrentVerificationPolicy.get();
     }
 
     void setSessionReady() {
@@ -5705,6 +5723,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         if (mPreVerifiedDomains != null) {
             pw.printPair("mPreVerifiedDomains", mPreVerifiedDomains);
         }
+        pw.printPair("mInitialVerificationPolicy", mInitialVerificationPolicy);
+        pw.printPair("mCurrentVerificationPolicy", mCurrentVerificationPolicy.get());
         pw.println();
 
         pw.decreaseIndent();
@@ -5929,7 +5949,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             out.attributeInt(null, ATTR_INSTALL_REASON, params.installReason);
             writeBooleanAttribute(out, ATTR_APPLICATION_ENABLED_SETTING_PERSISTENT,
                     params.applicationEnabledSettingPersistent);
-            out.attributeInt(null, ATTR_VERIFICATION_POLICY, mVerificationPolicy.get());
+            out.attributeInt(null, ATTR_INITIAL_VERIFICATION_POLICY, mInitialVerificationPolicy);
+            out.attributeInt(null, ATTR_CURRENT_VERIFICATION_POLICY,
+                    mCurrentVerificationPolicy.get());
 
             final boolean isDataLoader = params.dataLoaderParams != null;
             writeBooleanAttribute(out, ATTR_IS_DATALOADER, isDataLoader);
@@ -6080,8 +6102,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         final boolean sealed = in.getAttributeBoolean(null, ATTR_SEALED, false);
         final int parentSessionId = in.getAttributeInt(null, ATTR_PARENT_SESSION_ID,
                 SessionInfo.INVALID_ID);
-        final int verificationPolicy = in.getAttributeInt(null, ATTR_VERIFICATION_POLICY,
-                VERIFICATION_POLICY_NONE);
+        final int initialVerificationPolicy = in.getAttributeInt(null,
+                ATTR_INITIAL_VERIFICATION_POLICY, VERIFICATION_POLICY_NONE);
+        final int currentVerificationPolicy = in.getAttributeInt(null,
+                ATTR_CURRENT_VERIFICATION_POLICY, VERIFICATION_POLICY_NONE);
 
         final SessionParams params = new SessionParams(
                 SessionParams.MODE_INVALID);
@@ -6257,6 +6281,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 stageCid, fileArray, checksumsMap, prepared, committed, destroyed, sealed,
                 childSessionIdsArray, parentSessionId, isReady, isFailed, isApplied,
                 sessionErrorCode, sessionErrorMessage, preVerifiedDomains, verifierController,
-                verificationPolicy);
+                initialVerificationPolicy, currentVerificationPolicy);
     }
 }

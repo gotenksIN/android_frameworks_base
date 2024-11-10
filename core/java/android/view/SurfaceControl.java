@@ -87,6 +87,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -463,7 +464,7 @@ public final class SurfaceControl implements Parcelable {
         /**
          * Called when new jank classifications are available.
          */
-        void onJankDataAvailable(JankData[] jankData);
+        void onJankDataAvailable(@NonNull List<JankData> jankData);
 
     }
 
@@ -1801,6 +1802,7 @@ public final class SurfaceControl implements Parcelable {
         public int activeDisplayModeId;
         public float renderFrameRate;
         public boolean hasArrSupport;
+        public FrameRateCategoryRate frameRateCategoryRate;
 
         public int[] supportedColorModes;
         public int activeColorMode;
@@ -1819,6 +1821,7 @@ public final class SurfaceControl implements Parcelable {
                     + ", activeDisplayModeId=" + activeDisplayModeId
                     + ", renderFrameRate=" + renderFrameRate
                     + ", hasArrSupport=" + hasArrSupport
+                    + ", frameRateCategoryRate=" + frameRateCategoryRate
                     + ", supportedColorModes=" + Arrays.toString(supportedColorModes)
                     + ", activeColorMode=" + activeColorMode
                     + ", hdrCapabilities=" + hdrCapabilities
@@ -1839,13 +1842,15 @@ public final class SurfaceControl implements Parcelable {
                 && activeColorMode == that.activeColorMode
                 && Objects.equals(hdrCapabilities, that.hdrCapabilities)
                 && preferredBootDisplayMode == that.preferredBootDisplayMode
-                && hasArrSupport == that.hasArrSupport;
+                && hasArrSupport == that.hasArrSupport
+                && Objects.equals(frameRateCategoryRate, that.frameRateCategoryRate);
         }
 
         @Override
         public int hashCode() {
             return Objects.hash(Arrays.hashCode(supportedDisplayModes), activeDisplayModeId,
-                    renderFrameRate, activeColorMode, hdrCapabilities, hasArrSupport);
+                    renderFrameRate, activeColorMode, hdrCapabilities, hasArrSupport,
+                    frameRateCategoryRate);
         }
     }
 
@@ -2685,7 +2690,9 @@ public final class SurfaceControl implements Parcelable {
      * Adds a callback to be informed about SF's jank classification for this surface.
      * @hide
      */
-    public OnJankDataListenerRegistration addJankDataListener(OnJankDataListener listener) {
+    @NonNull
+    public OnJankDataListenerRegistration addOnJankDataListener(
+            @NonNull OnJankDataListener listener) {
         return new OnJankDataListenerRegistration(this, listener);
     }
 
@@ -3458,15 +3465,15 @@ public final class SurfaceControl implements Parcelable {
          * @return this This transaction for chaining
          * @hide
          */
-        public @NonNull Transaction setCrop(@NonNull SurfaceControl sc, float top, float left,
-                float bottom, float right) {
+        public @NonNull Transaction setCrop(@NonNull SurfaceControl sc, float left, float top,
+                float right, float bottom) {
             checkPreconditions(sc);
             if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
                 SurfaceControlRegistry.getProcessInstance().checkCallStackDebugging(
                         "setCrop", this, sc, "crop={" + top + ", " + left + ", " +
                         bottom + ", " + right + "}");
             }
-            nativeSetCrop(mNativeObject, sc.mNativeObject, top, left, bottom, right);
+            nativeSetCrop(mNativeObject, sc.mNativeObject, left, top, right, bottom);
             return this;
         }
 
@@ -3918,6 +3925,52 @@ public final class SurfaceControl implements Parcelable {
             checkPreconditions(sc);
             nativeSetFrameRate(mNativeObject, sc.mNativeObject, frameRate, compatibility,
                     changeFrameRateStrategy);
+            return this;
+        }
+
+        /**
+         * Sets the intended frame rate for the surface {@link SurfaceControl}.
+         *
+         * <p>On devices that are capable of running the display at different frame rates,
+         * the system may choose a display refresh rate to better match this surface's frame
+         * rate. Usage of this API won't introduce frame rate throttling, or affect other
+         * aspects of the application's frame production pipeline. However, because the system
+         * may change the display refresh rate, calls to this function may result in changes
+         * to {@link Choreographer} callback timings, and changes to the time interval at which the
+         * system releases buffers back to the application.</p>
+         *
+         * <p>Note that this only has an effect for surfaces presented on the display. If this
+         * surface is consumed by something other than the system compositor, e.g. a media
+         * codec, this call has no effect.</p>
+         *
+         * @param sc The SurfaceControl to specify the frame rate of.
+         * @param frameRateParams The parameters describing the intended frame rate of this surface.
+         *         Refer to {@link Surface.FrameRateParams} for details.
+         * @return This transaction object.
+         *
+         * @see #clearFrameRate(SurfaceControl)
+         */
+        @NonNull
+        @FlaggedApi(com.android.graphics.surfaceflinger.flags.Flags
+                        .FLAG_ARR_SURFACECONTROL_SETFRAMERATE_API)
+        public Transaction setFrameRate(@NonNull SurfaceControl sc,
+                @NonNull Surface.FrameRateParams frameRateParams) {
+            checkPreconditions(sc);
+
+            if (com.android.graphics.surfaceflinger.flags.Flags.arrSetframerateApi()) {
+                // TODO(b/362798998): Logic currently incomplete: it uses fixed source rate over the
+                // desired min/max rates. Fix when plumbing is upgraded.
+                int compatibility = frameRateParams.getFixedSourceRate() == 0
+                        ? Surface.FRAME_RATE_COMPATIBILITY_DEFAULT
+                        : Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
+                float frameRate = compatibility == Surface.FRAME_RATE_COMPATIBILITY_DEFAULT
+                        ? frameRateParams.getDesiredMinRate()
+                        : frameRateParams.getFixedSourceRate();
+                nativeSetFrameRate(mNativeObject, sc.mNativeObject, frameRate, compatibility,
+                        frameRateParams.getChangeFrameRateStrategy());
+            } else {
+                Log.w(TAG, "setFrameRate was called but flag arr_setframerate_api is disabled");
+            }
             return this;
         }
 

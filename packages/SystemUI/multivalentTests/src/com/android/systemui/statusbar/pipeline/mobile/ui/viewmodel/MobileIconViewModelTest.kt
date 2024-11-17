@@ -163,7 +163,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 MutableStateFlow(null),
                 MutableStateFlow(false),
                 iconsInteractor.carrierNameCustomization,
-                MobileIconCarrierIdOverridesFake()
+                MobileIconCarrierIdOverridesFake(),
             )
         createAndSetViewModel()
     }
@@ -371,7 +371,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
             connectionsRepository.mobileIsDefault.value = true
             repository.setNetworkTypeKey(connectionsRepository.GSM_KEY)
@@ -418,7 +418,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
             repository.setNetworkTypeKey(connectionsRepository.GSM_KEY)
             repository.setDataEnabled(true)
@@ -438,7 +438,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val initial =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
 
             repository.setNetworkTypeKey(connectionsRepository.GSM_KEY)
@@ -460,7 +460,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
             repository.dataEnabled.value = true
             var latest: Icon? = null
@@ -489,7 +489,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
             assertThat(latest).isEqualTo(expected)
 
@@ -511,7 +511,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
             assertThat(latest).isEqualTo(expected)
 
@@ -532,7 +532,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
             assertThat(latest).isEqualTo(expected)
 
@@ -554,7 +554,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     connectionsRepository.defaultMobileIconGroup.value.dataType,
-                    ContentDescription.Resource(G.dataContentDescription)
+                    ContentDescription.Resource(G.dataContentDescription),
                 )
 
             assertThat(latest).isEqualTo(expected)
@@ -576,7 +576,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             val expected =
                 Icon.Resource(
                     THREE_G.dataType,
-                    ContentDescription.Resource(THREE_G.dataContentDescription)
+                    ContentDescription.Resource(THREE_G.dataContentDescription),
                 )
             assertThat(latest).isEqualTo(expected)
 
@@ -633,10 +633,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 underTest.activityInVisible.onEach { containerVisible = it }.launchIn(this)
 
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = true,
-                    hasActivityOut = true,
-                )
+                DataActivityModel(hasActivityIn = true, hasActivityOut = true)
 
             assertThat(inVisible).isFalse()
             assertThat(outVisible).isFalse()
@@ -666,10 +663,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 underTest.activityContainerVisible.onEach { containerVisible = it }.launchIn(this)
 
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = true,
-                    hasActivityOut = false,
-                )
+                DataActivityModel(hasActivityIn = true, hasActivityOut = false)
 
             yield()
 
@@ -678,20 +672,14 @@ class MobileIconViewModelTest : SysuiTestCase() {
             assertThat(containerVisible).isTrue()
 
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = false,
-                    hasActivityOut = true,
-                )
+                DataActivityModel(hasActivityIn = false, hasActivityOut = true)
 
             assertThat(inVisible).isFalse()
             assertThat(outVisible).isTrue()
             assertThat(containerVisible).isTrue()
 
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = false,
-                    hasActivityOut = false,
-                )
+                DataActivityModel(hasActivityIn = false, hasActivityOut = false)
 
             assertThat(inVisible).isFalse()
             assertThat(outVisible).isFalse()
@@ -721,10 +709,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 underTest.activityContainerVisible.onEach { containerVisible = it }.launchIn(this)
 
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = true,
-                    hasActivityOut = false,
-                )
+                DataActivityModel(hasActivityIn = true, hasActivityOut = false)
 
             yield()
 
@@ -733,20 +718,14 @@ class MobileIconViewModelTest : SysuiTestCase() {
             assertThat(containerVisible).isTrue()
 
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = false,
-                    hasActivityOut = true,
-                )
+                DataActivityModel(hasActivityIn = false, hasActivityOut = true)
 
             assertThat(inVisible).isFalse()
             assertThat(outVisible).isTrue()
             assertThat(containerVisible).isTrue()
 
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = false,
-                    hasActivityOut = false,
-                )
+                DataActivityModel(hasActivityIn = false, hasActivityOut = false)
 
             assertThat(inVisible).isFalse()
             assertThat(outVisible).isFalse()
@@ -836,10 +815,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
             // sets the background on cellular
             repository.hasPrioritizedNetworkCapabilities.value = true
             repository.dataActivityDirection.value =
-                DataActivityModel(
-                    hasActivityIn = true,
-                    hasActivityOut = true,
-                )
+                DataActivityModel(hasActivityIn = true, hasActivityOut = true)
 
             assertThat(roaming).isFalse()
             assertThat(networkTypeIcon).isNull()
@@ -850,11 +826,13 @@ class MobileIconViewModelTest : SysuiTestCase() {
         }
 
     @EnableFlags(com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ENABLED_SATELLITE_FLAG)
+    @DisableFlags(com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ROAMING_NB_IOT_NTN)
     @Test
-    fun nonTerrestrial_usesSatelliteIcon() =
+    fun nonTerrestrial_usesSatelliteIcon_flagOff() =
         testScope.runTest {
             repository.isNonTerrestrial.value = true
             repository.setAllLevels(0)
+            repository.satelliteLevel.value = 0
 
             val latest by
                 collectLastValue(underTest.icon.filterIsInstance(SignalIconModel.Satellite::class))
@@ -865,28 +843,66 @@ class MobileIconViewModelTest : SysuiTestCase() {
 
             // 1-2 -> 1 bar
             repository.setAllLevels(1)
+            repository.satelliteLevel.value = 1
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
 
             repository.setAllLevels(2)
+            repository.satelliteLevel.value = 2
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
 
             // 3-4 -> 2 bars
             repository.setAllLevels(3)
+            repository.satelliteLevel.value = 3
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
 
             repository.setAllLevels(4)
+            repository.satelliteLevel.value = 4
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
+        }
+
+    @EnableFlags(
+        com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ENABLED_SATELLITE_FLAG,
+        com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ROAMING_NB_IOT_NTN,
+    )
+    @Test
+    fun nonTerrestrial_usesSatelliteIcon_flagOn() =
+        testScope.runTest {
+            repository.isNonTerrestrial.value = true
+            repository.satelliteLevel.value = 0
+
+            val latest by
+                collectLastValue(underTest.icon.filterIsInstance(SignalIconModel.Satellite::class))
+
+            // Level 0 -> no connection
+            assertThat(latest).isNotNull()
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_0)
+
+            // 1-2 -> 1 bar
+            repository.satelliteLevel.value = 1
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
+
+            repository.satelliteLevel.value = 2
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
+
+            // 3-4 -> 2 bars
+            repository.satelliteLevel.value = 3
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
+
+            repository.satelliteLevel.value = 4
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
         }
 
     @EnableFlags(com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ENABLED_SATELLITE_FLAG)
+    @DisableFlags(com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ROAMING_NB_IOT_NTN)
     @Test
-    fun satelliteIcon_ignoresInflateSignalStrength() =
+    fun satelliteIcon_ignoresInflateSignalStrength_flagOff() =
         testScope.runTest {
             // Note that this is the exact same test as above, but with inflateSignalStrength set to
             // true we note that the level is unaffected by inflation
             repository.inflateSignalStrength.value = true
             repository.isNonTerrestrial.value = true
             repository.setAllLevels(0)
+            repository.satelliteLevel.value = 0
 
             val latest by
                 collectLastValue(underTest.icon.filterIsInstance(SignalIconModel.Satellite::class))
@@ -897,16 +913,55 @@ class MobileIconViewModelTest : SysuiTestCase() {
 
             // 1-2 -> 1 bar
             repository.setAllLevels(1)
+            repository.satelliteLevel.value = 1
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
 
             repository.setAllLevels(2)
+            repository.satelliteLevel.value = 2
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
 
             // 3-4 -> 2 bars
             repository.setAllLevels(3)
+            repository.satelliteLevel.value = 3
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
 
             repository.setAllLevels(4)
+            repository.satelliteLevel.value = 4
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
+        }
+
+    @EnableFlags(
+        com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ENABLED_SATELLITE_FLAG,
+        com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ROAMING_NB_IOT_NTN,
+    )
+    @Test
+    fun satelliteIcon_ignoresInflateSignalStrength_flagOn() =
+        testScope.runTest {
+            // Note that this is the exact same test as above, but with inflateSignalStrength set to
+            // true we note that the level is unaffected by inflation
+            repository.inflateSignalStrength.value = true
+            repository.isNonTerrestrial.value = true
+            repository.satelliteLevel.value = 0
+
+            val latest by
+                collectLastValue(underTest.icon.filterIsInstance(SignalIconModel.Satellite::class))
+
+            // Level 0 -> no connection
+            assertThat(latest).isNotNull()
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_0)
+
+            // 1-2 -> 1 bar
+            repository.satelliteLevel.value = 1
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
+
+            repository.satelliteLevel.value = 2
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_1)
+
+            // 3-4 -> 2 bars
+            repository.satelliteLevel.value = 3
+            assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
+
+            repository.satelliteLevel.value = 4
             assertThat(latest!!.icon.res).isEqualTo(R.drawable.ic_satellite_connected_2)
         }
 

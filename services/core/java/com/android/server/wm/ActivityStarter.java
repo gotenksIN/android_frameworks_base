@@ -1038,7 +1038,6 @@ class ActivityStarter {
         mLastStartReason = request.reason;
         mLastStartActivityTimeMs = System.currentTimeMillis();
 
-        final ActivityRecord previousStart = mLastStartActivityRecord;
         final IApplicationThread caller = request.caller;
         Intent intent = request.intent;
         NeededUriGrants intentGrants = request.intentGrants;
@@ -2352,7 +2351,8 @@ class ActivityStarter {
         // When there is a reused activity and the current result is a trampoline activity,
         // set the reused activity as the result.
         if (mLastStartActivityRecord != null
-                && (mLastStartActivityRecord.finishing || mLastStartActivityRecord.noDisplay)) {
+                && (mLastStartActivityRecord.finishing
+                    || mLastStartActivityRecord.isNoDisplay())) {
             mLastStartActivityRecord = targetTaskTop;
         }
 

@@ -2253,8 +2253,8 @@ public class CarrierConfigManager {
      * Maximum size in bytes of the PDU to send or download when connected to a non-terrestrial
      * network. MmsService will return a result code of MMS_ERROR_TOO_LARGE_FOR_TRANSPORT if
      * the PDU exceeds this limit when connected to a non-terrestrial network.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_MMS_MAX_NTN_PAYLOAD_SIZE_BYTES_INT =
             "mms_max_ntn_payload_size_bytes_int";
 
@@ -9927,9 +9927,8 @@ public class CarrierConfigManager {
      * manually scanning available cellular network.
      * If key is {@code true}, satellite plmn should not be exposed to user and should be
      * automatically set, {@code false} otherwise. Default value is {@code true}.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_REMOVE_SATELLITE_PLMN_IN_MANUAL_NETWORK_SCAN_BOOL =
             "remove_satellite_plmn_in_manual_network_scan_bool";
 
@@ -9954,18 +9953,18 @@ public class CarrierConfigManager {
 
     /**
      * Doesn't support unrestricted traffic on satellite network.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final int SATELLITE_DATA_SUPPORT_ONLY_RESTRICTED = 0;
     /**
      * Support unrestricted but bandwidth_constrained traffic on satellite network.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final int SATELLITE_DATA_SUPPORT_BANDWIDTH_CONSTRAINED = 1;
     /**
      * Support unrestricted satellite network that serves all traffic.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final int SATELLITE_DATA_SUPPORT_ALL = 2;
     /**
      * Indicates what kind of traffic an {@link NetworkCapabilities#NET_CAPABILITY_NOT_RESTRICTED}
@@ -9975,8 +9974,8 @@ public class CarrierConfigManager {
      * {@link ApnSetting#INFRASTRUCTURE_SATELLITE} from APN infrastructure_bitmask, and this
      * configuration is ignored.
      * By default it only supports restricted data.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_SATELLITE_DATA_SUPPORT_MODE_INT =
             "satellite_data_support_mode_int";
 
@@ -9988,8 +9987,8 @@ public class CarrierConfigManager {
      *                 {@link com.android.ims.ImsConfig.WfcModeFeatureValueConstants#WIFI_PREFERRED}
      * {@code false} - roaming preference can be changed by user independently and is not
      *                 overridden when device is connected to non-terrestrial network.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_OVERRIDE_WFC_ROAMING_MODE_WHILE_USING_NTN_BOOL =
             "override_wfc_roaming_mode_while_using_ntn_bool";
 
@@ -10022,8 +10021,8 @@ public class CarrierConfigManager {
      * Reference: GSMA TS.43-v11, 2.8.5 Fast Authentication and Token Management.
      * `app_name` is an optional attribute in the request and may vary depending on the carrier
      * requirement.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_SATELLITE_ENTITLEMENT_APP_NAME_STRING =
             "satellite_entitlement_app_name_string";
 
@@ -10031,9 +10030,8 @@ public class CarrierConfigManager {
      * URL to redirect user to get more information about the carrier support for satellite.
      *
      * The default value is empty string.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_SATELLITE_INFORMATION_REDIRECT_URL_STRING =
             "satellite_information_redirect_url_string";
     /**
@@ -10043,9 +10041,8 @@ public class CarrierConfigManager {
      * This will need agreement with carriers before enabling this flag.
      *
      * The default value is false.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_EMERGENCY_MESSAGING_SUPPORTED_BOOL =
             "emergency_messaging_supported_bool";
 
@@ -10060,9 +10057,8 @@ public class CarrierConfigManager {
      * prompt user to switch to using satellite emergency messaging.
      *
      * The default value is 30 seconds.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_EMERGENCY_CALL_TO_SATELLITE_T911_HANDOVER_TIMEOUT_MILLIS_INT =
             "emergency_call_to_satellite_t911_handover_timeout_millis_int";
 
@@ -10075,9 +10071,8 @@ public class CarrierConfigManager {
      * The default capabilities are
      * {@link NetworkRegistrationInfo#SERVICE_TYPE_SMS}, and
      * {@link NetworkRegistrationInfo#SERVICE_TYPE_MMS}
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_CARRIER_ROAMING_SATELLITE_DEFAULT_SERVICES_INT_ARRAY =
             "carrier_roaming_satellite_default_services_int_array";
 
@@ -10108,9 +10103,8 @@ public class CarrierConfigManager {
      * Defines the NIDD (Non-IP Data Delivery) APN to be used for carrier roaming to satellite
      * attachment. For more on NIDD, see 3GPP TS 29.542.
      * Note this config is the only source of truth regarding the definition of the APN.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_SATELLITE_NIDD_APN_NAME_STRING =
             "satellite_nidd_apn_name_string";
 
@@ -10121,9 +10115,8 @@ public class CarrierConfigManager {
      *
      * If {@code false}, the emergency call is always blocked if device is in emergency satellite
      * mode. Note if device is NOT in emergency satellite mode, emergency call is always allowed.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_SATELLITE_ROAMING_TURN_OFF_SESSION_FOR_EMERGENCY_CALL_BOOL =
             "satellite_roaming_turn_off_session_for_emergency_call_bool";
 
@@ -10136,14 +10129,14 @@ public class CarrierConfigManager {
 
     /**
      * Device can connect to carrier roaming non-terrestrial network automatically.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final int CARRIER_ROAMING_NTN_CONNECT_AUTOMATIC = 0;
     /**
      * Device can connect to carrier roaming non-terrestrial network only if user manually triggers
      * satellite connection.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final int CARRIER_ROAMING_NTN_CONNECT_MANUAL = 1;
     /**
      * Indicates carrier roaming non-terrestrial network connect type that the device can use to
@@ -10151,8 +10144,8 @@ public class CarrierConfigManager {
      * If this key is set to CARRIER_ROAMING_NTN_CONNECT_MANUAL then connect button will be
      * displayed to user when the device is eligible to use carrier roaming
      * non-terrestrial network.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_CARRIER_ROAMING_NTN_CONNECT_TYPE_INT =
             "carrier_roaming_ntn_connect_type_int";
 
@@ -10165,7 +10158,6 @@ public class CarrierConfigManager {
      * will be made to T911.
      *
      * The default value is {@link SatelliteManager#EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_T911}.
-     *
      */
     @FlaggedApi(Flags.FLAG_CARRIER_ROAMING_NB_IOT_NTN)
     public static final String
@@ -10182,9 +10174,8 @@ public class CarrierConfigManager {
      * After the timer is expired, device is marked as eligible for satellite communication.
      *
      * The default value is 180 seconds.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_CARRIER_SUPPORTED_SATELLITE_NOTIFICATION_HYSTERESIS_SEC_INT =
             "carrier_supported_satellite_notification_hysteresis_sec_int";
 
@@ -10230,13 +10221,23 @@ public class CarrierConfigManager {
             "satellite_roaming_esos_inactivity_timeout_sec_int";
 
     /**
+     * A string array containing the list of messaging apps that support satellite.
+     *
+     * The default value contains only "com.google.android.apps.messaging"
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_OEM_ENABLED_SATELLITE_FLAG)
+    public static final String KEY_SATELLITE_SUPPORTED_MSG_APPS_STRING_ARRAY =
+            "satellite_supported_msg_apps_string_array";
+
+    /**
      * Indicating whether DUN APN should be disabled when the device is roaming. In that case,
      * the default APN (i.e. internet) will be used for tethering.
      *
      * This config is only available when using Preset APN(not user edited) as Preferred APN.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_DISABLE_DUN_APN_WHILE_ROAMING_WITH_PRESET_APN_BOOL =
             "disable_dun_apn_while_roaming_with_preset_apn_bool";
 
@@ -11519,6 +11520,8 @@ public class CarrierConfigManager {
                         NetworkRegistrationInfo.SERVICE_TYPE_SMS,
                         NetworkRegistrationInfo.SERVICE_TYPE_MMS
                 });
+        sDefaults.putStringArray(KEY_SATELLITE_SUPPORTED_MSG_APPS_STRING_ARRAY, new String[]{
+                "com.google.android.apps.messaging"});
         sDefaults.putBoolean(KEY_DISABLE_DUN_APN_WHILE_ROAMING_WITH_PRESET_APN_BOOL, false);
         sDefaults.putBoolean(KEY_EMERGENCY_MESSAGING_SUPPORTED_BOOL, false);
         sDefaults.putInt(KEY_EMERGENCY_CALL_TO_SATELLITE_T911_HANDOVER_TIMEOUT_MILLIS_INT,

@@ -1016,6 +1016,7 @@
             android:autoRemoveFromRecents="true"
             android:launchMode="singleTop"
             android:showForAllUsers="true"
+            android:turnScreenOn="true"
             android:exported="false">
         </activity>
 

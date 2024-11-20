@@ -313,7 +313,7 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             }
         } else {
             if (isSynchronous) {
-              setDevicesState(headsetState, mHeadsetState, "");
+              setDevicesState(headsetState, mHeadsetState, newName+"/"+address);
             } else {
               Message msg = mHandler.obtainMessage(MSG_NEW_DEVICE_STATE, headsetState,
                                            mHeadsetState,

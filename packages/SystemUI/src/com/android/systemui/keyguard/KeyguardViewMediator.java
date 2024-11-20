@@ -2879,7 +2879,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             }
 
             if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS) {
-                mKeyguardTransitions.startKeyguardTransition(showing, aodShowing);
+                startKeyguardTransition(showing, aodShowing);
             } else {
                 try {
 
@@ -3023,7 +3023,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 final int keyguardFlag = flags;
                 mUiBgExecutor.execute(() -> {
                     if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS) {
-                        mKeyguardTransitions.startKeyguardTransition(
+                        startKeyguardTransition(
                                 false /* keyguardShowing */, false /* aodShowing */);
                         return;
                     }
@@ -3038,6 +3038,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             Trace.endSection();
         }
     };
+
+    private void startKeyguardTransition(boolean keyguardShowing, boolean aodShowing) {
+        mKeyguardTransitions.startKeyguardTransition(keyguardShowing, aodShowing);
+    }
 
     private final Runnable mHideAnimationFinishedRunnable = () -> {
         Log.e(TAG, "mHideAnimationFinishedRunnable#run");
@@ -3494,8 +3498,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mSurfaceBehindRemoteAnimationRequested = true;
 
         if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS) {
-            mKeyguardTransitions.startKeyguardTransition(
-                    false /* keyguardShowing */, false /* aodShowing */);
+            startKeyguardTransition(false /* keyguardShowing */, false /* aodShowing */);
             return;
         }
 

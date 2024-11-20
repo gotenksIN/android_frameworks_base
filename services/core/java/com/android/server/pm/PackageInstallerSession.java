@@ -145,6 +145,7 @@ import android.os.FileUtils;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.OutcomeReceiver;
 import android.os.ParcelFileDescriptor;
 import android.os.ParcelableException;
 import android.os.PersistableBundle;
@@ -440,6 +441,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private BoostFramework mPerfBoostInstall = null;
     private boolean mIsPerfLockAcquired = false;
     private final int MAX_INSTALL_DURATION = 20000;
+
+    private final InstallDependencyHelper mInstallDependencyHelper;
 
     final int sessionId;
     final int userId;
@@ -1196,7 +1199,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             String sessionErrorMessage, DomainSet preVerifiedDomains,
             @NonNull VerifierController verifierController,
             @PackageInstaller.VerificationPolicy int initialVerificationPolicy,
-            @PackageInstaller.VerificationPolicy int currentVerificationPolicy) {
+            @PackageInstaller.VerificationPolicy int currentVerificationPolicy,
+            InstallDependencyHelper installDependencyHelper) {
         mCallback = callback;
         mContext = context;
         mPm = pm;
@@ -1208,6 +1212,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         mVerifierController = verifierController;
         mInitialVerificationPolicy = initialVerificationPolicy;
         mCurrentVerificationPolicy = new AtomicInteger(currentVerificationPolicy);
+        mInstallDependencyHelper = installDependencyHelper;
 
         this.sessionId = sessionId;
         this.userId = userId;
@@ -1432,6 +1437,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             info.packageSource = params.packageSource;
             info.applicationEnabledSettingPersistent = params.applicationEnabledSettingPersistent;
             info.pendingUserActionReason = userActionRequirementToReason(mUserActionRequirement);
+            info.isAutoInstallingDependenciesEnabled = params.isAutoInstallDependenciesEnabled;
         }
         return info;
     }
@@ -2631,6 +2637,13 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         maybeFinishChildSessions(error, msg);
     }
 
+    private void onSessionDependencyResolveFailure(int error, String msg) {
+        Slog.e(TAG, "Failed to resolve dependency for session " + sessionId);
+        // Dispatch message to remove session from PackageInstallerService.
+        dispatchSessionFinished(error, msg, null);
+        maybeFinishChildSessions(error, msg);
+    }
+
     private void onSystemDataLoaderUnrecoverable() {
         final String packageName = getPackageName();
         if (TextUtils.isEmpty(packageName)) {
@@ -3422,7 +3435,36 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     /* extras= */ null, /* forPreapproval= */ false);
             return;
         }
-        install();
+
+        if (Flags.sdkDependencyInstaller()
+                && params.isAutoInstallDependenciesEnabled
+                && !isMultiPackage()) {
+            resolveLibraryDependenciesIfNeeded();
+        } else {
+            install();
+        }
+    }
+
+
+    private void resolveLibraryDependenciesIfNeeded() {
+        synchronized (mLock) {
+            mInstallDependencyHelper.resolveLibraryDependenciesIfNeeded(mPackageLite,
+                    mPm.snapshotComputer(), userId, mHandler,
+                    new OutcomeReceiver<>() {
+
+                        @Override
+                        public void onResult(Void result) {
+                            install();
+                        }
+
+                        @Override
+                        public void onError(@NonNull PackageManagerException e) {
+                            final String completeMsg = ExceptionUtils.getCompleteMessage(e);
+                            setSessionFailed(e.error, completeMsg);
+                            onSessionDependencyResolveFailure(e.error, completeMsg);
+                        }
+                    });
+        }
     }
 
     /**
@@ -6072,7 +6114,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             @NonNull StagingManager stagingManager, @NonNull File sessionsDir,
             @NonNull PackageSessionProvider sessionProvider,
             @NonNull SilentUpdatePolicy silentUpdatePolicy,
-            @NonNull VerifierController verifierController)
+            @NonNull VerifierController verifierController,
+            @NonNull InstallDependencyHelper installDependencyHelper)
             throws IOException, XmlPullParserException {
         final int sessionId = in.getAttributeInt(null, ATTR_SESSION_ID);
         final int userId = in.getAttributeInt(null, ATTR_USER_ID);
@@ -6281,6 +6324,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 stageCid, fileArray, checksumsMap, prepared, committed, destroyed, sealed,
                 childSessionIdsArray, parentSessionId, isReady, isFailed, isApplied,
                 sessionErrorCode, sessionErrorMessage, preVerifiedDomains, verifierController,
-                initialVerificationPolicy, currentVerificationPolicy);
+                initialVerificationPolicy, currentVerificationPolicy, installDependencyHelper);
     }
 }

@@ -149,7 +149,6 @@ import com.android.systemui.statusbar.QsFrameTranslateController;
 import com.android.systemui.statusbar.StatusBarStateControllerImpl;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.VibratorHelper;
-import com.android.systemui.statusbar.disableflags.data.repository.FakeDisableFlagsRepository;
 import com.android.systemui.statusbar.notification.ConversationNotificationManager;
 import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.HeadsUpTouchHelper;
@@ -430,7 +429,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mShadeInteractor = new ShadeInteractorImpl(
                 mTestScope.getBackgroundScope(),
                 mKosmos.getDeviceProvisioningInteractor(),
-                new FakeDisableFlagsRepository(),
+                mKosmos.getDisableFlagsInteractor(),
                 mDozeParameters,
                 mFakeKeyguardRepository,
                 mKeyguardTransitionInteractor,

@@ -88,7 +88,6 @@ import static com.android.hardware.input.Flags.enableTalkbackAndMagnifierKeyGest
 import static com.android.hardware.input.Flags.keyboardA11yShortcutControl;
 import static com.android.hardware.input.Flags.modifierShortcutDump;
 import static com.android.hardware.input.Flags.useKeyGestureEventHandler;
-import static com.android.hardware.input.Flags.useKeyGestureEventHandlerMultiPressGestures;
 import static com.android.server.flags.Flags.modifierShortcutManagerMultiuser;
 import static com.android.server.flags.Flags.newBugreportKeyboardShortcut;
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.SCREENSHOT_KEYCHORD_DELAY;
@@ -2520,7 +2519,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private void initKeyCombinationRules() {
         mKeyCombinationManager = new KeyCombinationManager(mHandler);
-        if (useKeyGestureEventHandler() && useKeyGestureEventHandlerMultiPressGestures()) {
+        if (InputSettings.doesKeyGestureEventHandlerSupportMultiKeyGestures()) {
             return;
         }
         final boolean screenshotChordEnabled = mContext.getResources().getBoolean(
@@ -3466,7 +3465,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             + keyguardOn() + " canceled=" + event.isCanceled());
         }
 
-        if (!useKeyGestureEventHandler()) {
+        if (!InputSettings.doesKeyGestureEventHandlerSupportMultiKeyGestures()) {
             if (mKeyCombinationManager.isKeyConsumed(event)) {
                 return keyConsumed;
             }
@@ -5746,7 +5745,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void handleKeyGesture(KeyEvent event, boolean interactive, boolean defaultDisplayOn) {
-        if (mKeyCombinationManager.interceptKey(event, interactive)) {
+        if (!InputSettings.doesKeyGestureEventHandlerSupportMultiKeyGestures()
+                && mKeyCombinationManager.interceptKey(event, interactive)) {
             // handled by combo keys manager.
             mSingleKeyGestureDetector.reset();
             return;
@@ -6636,6 +6636,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // In normal flow, systemReady is called before other system services are ready.
         // So it is better not to bind keyguard here.
         mKeyguardDelegate.onSystemReady();
+        mModifierShortcutManager.onSystemReady();
 
         mVrManagerInternal = LocalServices.getService(VrManagerInternal.class);
         if (mVrManagerInternal != null) {

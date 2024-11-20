@@ -187,6 +187,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
     private static final int MSG_INCREASE_SENDSTRING_COUNT = 21;
     private static final int MSG_UPDATE_USB_SPEED = 22;
     private static final int MSG_UPDATE_HAL_VERSION = 23;
+    private static final int MSG_USER_UNLOCKED_AFTER_BOOT = 24;
 
     // Delay for debouncing USB disconnects.
     // We often get rapid connect/disconnect events when enabling USB functions,
@@ -416,6 +417,17 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             }
         };
 
+        if (Flags.checkUserActionUnlocked()) {
+            BroadcastReceiver userUnlockedAfterBootReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    mHandler.sendEmptyMessage(MSG_USER_UNLOCKED_AFTER_BOOT);
+                }
+            };
+            mContext.registerReceiver(userUnlockedAfterBootReceiver,
+                    new IntentFilter(Intent.ACTION_USER_UNLOCKED));
+        }
+
         mContext.registerReceiver(portReceiver,
                 new IntentFilter(UsbManager.ACTION_USB_PORT_CHANGED));
         mContext.registerReceiver(chargingReceiver,
@@ -477,6 +489,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         mHandler.sendEmptyMessage(MSG_SYSTEM_READY);
     }
 
+    // Same as ACTION_LOCKED_BOOT_COMPLETED.
     public void bootCompleted() {
         if (DEBUG) Slog.d(TAG, "boot completed");
         mHandler.sendEmptyMessage(MSG_BOOT_COMPLETED);
@@ -635,7 +648,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         protected int mUsbSpeed;
         protected int mCurrentGadgetHalVersion;
         protected boolean mPendingBootAccessoryHandshakeBroadcast;
-
+        protected boolean mUserUnlockedAfterBoot;
         /**
          * The persistent property which stores whether adb is enabled or not.
          * May also contain vendor-specific default functions for testing purposes.
@@ -840,6 +853,12 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             return !userManager.hasUserRestriction(UserManager.DISALLOW_USB_FILE_TRANSFER);
         }
 
+        private void attachAccessory() {
+            mUsbDeviceManager.getCurrentSettings().accessoryAttached(mCurrentAccessory);
+            removeMessages(MSG_ACCESSORY_HANDSHAKE_TIMEOUT);
+            broadcastUsbAccessoryHandshake();
+        }
+
         private void updateCurrentAccessory() {
             // We are entering accessory mode if we have received a request from the host
             // and the request has not timed out yet.
@@ -866,10 +885,13 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
                     Slog.d(TAG, "entering USB accessory mode: " + mCurrentAccessory);
                     // defer accessoryAttached if system is not ready
-                    if (mBootCompleted) {
-                        mUsbDeviceManager.getCurrentSettings().accessoryAttached(mCurrentAccessory);
-                        removeMessages(MSG_ACCESSORY_HANDSHAKE_TIMEOUT);
-                        broadcastUsbAccessoryHandshake();
+                    if (!Flags.checkUserActionUnlocked() && mBootCompleted) {
+                        attachAccessory();
+                    }
+                    // Defer accessoryAttached till user unlocks after boot.
+                    // When no pin pattern is set, ACTION_USER_UNLOCKED would fire anyways
+                    if (Flags.checkUserActionUnlocked() && mUserUnlockedAfterBoot) {
+                        attachAccessory();
                     } // else handle in boot completed
                 } else {
                     Slog.e(TAG, "nativeGetAccessoryStrings failed");
@@ -890,7 +912,10 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             setEnabledFunctions(UsbManager.FUNCTION_NONE, false, operationId);
 
             if (mCurrentAccessory != null) {
-                if (mBootCompleted) {
+                if (!Flags.checkUserActionUnlocked() && mBootCompleted) {
+                    mPermissionManager.usbAccessoryRemoved(mCurrentAccessory);
+                }
+                if (Flags.checkUserActionUnlocked() && mUserUnlockedAfterBoot) {
                     mPermissionManager.usbAccessoryRemoved(mCurrentAccessory);
                 }
                 mCurrentAccessory = null;
@@ -1380,6 +1405,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 case MSG_BOOT_COMPLETED:
                     operationId = sUsbOperationCount.incrementAndGet();
                     mBootCompleted = true;
+                    if (DEBUG) Slog.d(TAG, "MSG_BOOT_COMPLETED");
                     finishBoot(operationId);
                     break;
                 case MSG_USER_SWITCHED: {
@@ -1426,14 +1452,38 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 }
                 case MSG_INCREASE_SENDSTRING_COUNT: {
                     mSendStringCount = mSendStringCount + 1;
+                    break;
+                }
+                case MSG_USER_UNLOCKED_AFTER_BOOT: {
+                    if (DEBUG) Slog.d(TAG, "MSG_USER_UNLOCKED_AFTER_BOOT");
+                    if (mUserUnlockedAfterBoot) {
+                        break;
+                    }
+                    mUserUnlockedAfterBoot = true;
+                    if (mCurrentUsbFunctionsReceived && mUserUnlockedAfterBoot) {
+                        attachAccessoryAfterBoot();
+                    }
+                    break;
                 }
             }
+        }
+
+        private void attachAccessoryAfterBoot() {
+            if (mCurrentAccessory != null) {
+                Slog.i(TAG, "AccessoryAttached");
+                mUsbDeviceManager.getCurrentSettings().accessoryAttached(mCurrentAccessory);
+                broadcastUsbAccessoryHandshake();
+            } else if (mPendingBootAccessoryHandshakeBroadcast) {
+                broadcastUsbAccessoryHandshake();
+            }
+            mPendingBootAccessoryHandshakeBroadcast = false;
         }
 
         public abstract void handlerInitDone(int operationId);
 
         protected void finishBoot(int operationId) {
             if (mBootCompleted && mCurrentUsbFunctionsReceived && mSystemReady) {
+                if (DEBUG) Slog.d(TAG, "finishBoot all flags true");
                 if (mPendingBootBroadcast) {
                     updateUsbStateBroadcastIfNeeded(getAppliedFunctions(mCurrentFunctions));
                     mPendingBootBroadcast = false;
@@ -1444,14 +1494,12 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 } else {
                     setEnabledFunctions(UsbManager.FUNCTION_NONE, false, operationId);
                 }
-                if (mCurrentAccessory != null) {
-                    mUsbDeviceManager.getCurrentSettings().accessoryAttached(mCurrentAccessory);
-                    broadcastUsbAccessoryHandshake();
-                } else if (mPendingBootAccessoryHandshakeBroadcast) {
-                    broadcastUsbAccessoryHandshake();
+                if (!Flags.checkUserActionUnlocked()) {
+                    attachAccessoryAfterBoot();
                 }
-
-                mPendingBootAccessoryHandshakeBroadcast = false;
+                if (Flags.checkUserActionUnlocked() && mUserUnlockedAfterBoot) {
+                    attachAccessoryAfterBoot();
+                }
                 updateUsbNotification(false);
                 updateAdbNotification(false);
                 updateUsbFunctions();

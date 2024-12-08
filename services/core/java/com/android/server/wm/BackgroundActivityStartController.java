@@ -1017,7 +1017,8 @@ public class BackgroundActivityStartController {
         }
         if (state.mCallingUidHasNonAppVisibleWindow) {
             return new BalVerdict(BAL_ALLOW_NON_APP_VISIBLE_WINDOW,
-                    /*background*/ false, "callingUid has non-app visible window");
+                    /*background*/ false, "callingUid has non-app visible window "
+                    + mService.mActiveUids.getNonAppVisibleWindowDetails(state.mCallingUid));
         }
         // Don't abort if the callerApp or other processes of that uid are considered to be in the
         // foreground.
@@ -1143,7 +1144,8 @@ public class BackgroundActivityStartController {
         }
         if (state.mRealCallingUidHasNonAppVisibleWindow) {
             return new BalVerdict(BAL_ALLOW_NON_APP_VISIBLE_WINDOW,
-                    /*background*/ false, "realCallingUid has non-app visible window");
+                    /*background*/ false, "realCallingUid has non-app visible window "
+                    + mService.mActiveUids.getNonAppVisibleWindowDetails(state.mRealCallingUid));
         }
 
         // Don't abort if the realCallerApp or other processes of that uid are considered to be in
@@ -1895,20 +1897,8 @@ public class BackgroundActivityStartController {
                             (state.mOriginatingPendingIntent != null));
         }
 
-        if (finalVerdict.getRawCode() == BAL_ALLOW_GRACE_PERIOD) {
-            if (state.realCallerExplicitOptInOrAutoOptIn()
-                    && state.mResultForRealCaller.allows()
-                    && state.mResultForRealCaller.getRawCode() != BAL_ALLOW_GRACE_PERIOD) {
-                // real caller could allow with a different exemption
-            } else if (state.callerExplicitOptInOrAutoOptIn() && state.mResultForCaller.allows()
-                    && state.mResultForCaller.getRawCode() != BAL_ALLOW_GRACE_PERIOD) {
-                // caller could allow with a different exemption
-            } else {
-                // log to determine grace period length distribution
-                Slog.wtf(TAG, "Activity start ONLY allowed by BAL_ALLOW_GRACE_PERIOD "
-                        + finalVerdict.mMessage + ": " + state);
-            }
-        }
+        logIfOnlyAllowedBy(finalVerdict, state, BAL_ALLOW_GRACE_PERIOD);
+        logIfOnlyAllowedBy(finalVerdict, state, BAL_ALLOW_NON_APP_VISIBLE_WINDOW);
 
         if (balImprovedMetrics()) {
             if (shouldLogStats(finalVerdict, state)) {
@@ -1945,6 +1935,30 @@ public class BackgroundActivityStartController {
             }
         }
         return finalVerdict;
+    }
+
+    /**
+     * Logs details about the activity starts if the only reason it is allowed is the provided
+     * {@code balCode}.
+     */
+    private static void logIfOnlyAllowedBy(BalVerdict finalVerdict, BalState state, int balCode) {
+        if (finalVerdict.getRawCode() == balCode) {
+            if (state.realCallerExplicitOptInOrAutoOptIn()
+                    && state.mResultForRealCaller != null
+                    && state.mResultForRealCaller.allows()
+                    && state.mResultForRealCaller.getRawCode() != balCode) {
+                // real caller could allow with a different exemption
+            } else if (state.callerExplicitOptInOrAutoOptIn()
+                    && state.mResultForCaller != null
+                    && state.mResultForCaller.allows()
+                    && state.mResultForCaller.getRawCode() != balCode) {
+                // caller could allow with a different exemption
+            } else {
+                // log to determine grace period length distribution
+                Slog.wtf(TAG, "Activity start ONLY allowed by " + balCodeToString(balCode) + " "
+                        + finalVerdict.mMessage + ": " + state);
+            }
+        }
     }
 
     @VisibleForTesting

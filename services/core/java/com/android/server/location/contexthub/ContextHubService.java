@@ -325,9 +325,16 @@ public class ContextHubService extends IContextHubService.Stub {
             return;
         }
 
-        if (Flags.offloadApi()) {
-            mHubInfoRegistry = new HubInfoRegistry(mContextHubWrapper);
-            Log.i(TAG, "Enabling generic offload API");
+        if (Flags.offloadApi() && Flags.offloadImplementation()) {
+            HubInfoRegistry registry;
+            try {
+                registry = new HubInfoRegistry(mContextHubWrapper);
+                Log.i(TAG, "Enabling generic offload API");
+            } catch (UnsupportedOperationException e) {
+                registry = null;
+                Log.w(TAG, "Generic offload API not supported, disabling");
+            }
+            mHubInfoRegistry = registry;
         } else {
             mHubInfoRegistry = null;
             Log.i(TAG, "Disabling generic offload API");
@@ -520,8 +527,8 @@ public class ContextHubService extends IContextHubService.Stub {
         try {
             mContextHubWrapper.registerEndpointCallback(
                     new ContextHubHalEndpointCallback(mHubInfoRegistry));
-        } catch (RemoteException e) {
-            Log.e(TAG, "RemoteException while registering IEndpointCallback", e);
+        } catch (RemoteException | UnsupportedOperationException e) {
+            Log.e(TAG, "Exception while registering IEndpointCallback", e);
         }
     }
 

@@ -16,6 +16,8 @@
 
 package android.media;
 
+
+import static android.media.audio.Flags.FLAG_IAMF_DEFINITIONS_API;
 import static android.media.codec.Flags.FLAG_IN_PROCESS_SW_AUDIO_CODEC;
 import static android.media.codec.Flags.FLAG_NUM_INPUT_SLOTS;
 import static android.media.codec.Flags.FLAG_REGION_OF_INTEREST;
@@ -267,6 +269,11 @@ public final class MediaFormat {
      * MIME type for the IEC61937 audio stream encapsulation. This type isn't defined by IANA.
      */
     public static final String MIMETYPE_AUDIO_IEC61937 = "audio/x-iec61937";
+    /**
+     * MIME type for IAMF audio stream
+     */
+    @FlaggedApi(FLAG_IAMF_DEFINITIONS_API)
+    public static final String MIMETYPE_AUDIO_IAMF = "audio/iamf";
 
     /**
      * MIME type for HEIF still image data encoded in HEVC.
@@ -1753,6 +1760,7 @@ public final class MediaFormat {
             (1 << MediaCodecInfo.SECURITY_MODEL_MEMORY_SAFE);
     /**
      * Flag for {@link MediaCodecInfo#SECURITY_MODEL_TRUSTED_CONTENT_ONLY}.
+     * @hide
      */
     @FlaggedApi(FLAG_IN_PROCESS_SW_AUDIO_CODEC)
     public static final int FLAG_SECURITY_MODEL_TRUSTED_CONTENT_ONLY =
@@ -1764,8 +1772,7 @@ public final class MediaFormat {
      * The associated value is a flag of the following values:
      * {@link FLAG_SECURITY_MODEL_SANDBOXED},
      * {@link FLAG_SECURITY_MODEL_MEMORY_SAFE},
-     * {@link FLAG_SECURITY_MODEL_TRUSTED_CONTENT_ONLY}. The default value is
-     * {@link FLAG_SECURITY_MODEL_SANDBOXED}.
+     * The default value is {@link FLAG_SECURITY_MODEL_SANDBOXED}.
      * <p>
      * When passed to {@link MediaCodecList#findDecoderForFormat} or
      * {@link MediaCodecList#findEncoderForFormat}, MediaCodecList filters

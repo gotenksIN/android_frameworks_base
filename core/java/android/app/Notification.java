@@ -814,8 +814,8 @@ public class Notification implements Parcelable
         if (Flags.notificationsRedesignTemplates()) {
             return switch (layoutId) {
                 case R.layout.notification_2025_template_collapsed_base,
+                     R.layout.notification_2025_template_heads_up_base,
                      R.layout.notification_2025_template_header,
-                     R.layout.notification_template_material_heads_up_base,
                      R.layout.notification_template_material_big_base,
                      R.layout.notification_template_material_big_picture,
                      R.layout.notification_template_material_big_text,
@@ -3160,12 +3160,16 @@ public class Notification implements Parcelable
                 callPerson.visitUris(visitor);
             }
             visitIconUri(visitor, extras.getParcelable(EXTRA_VERIFICATION_ICON, Icon.class));
-        }
 
-        if (Flags.apiRichOngoing()) {
-            visitIconUri(visitor, extras.getParcelable(EXTRA_PROGRESS_TRACKER_ICON, Icon.class));
-            visitIconUri(visitor, extras.getParcelable(EXTRA_PROGRESS_START_ICON, Icon.class));
-            visitIconUri(visitor, extras.getParcelable(EXTRA_PROGRESS_END_ICON, Icon.class));
+
+            if (Flags.apiRichOngoing()) {
+                visitIconUri(visitor, extras.getParcelable(EXTRA_PROGRESS_TRACKER_ICON,
+                    Icon.class));
+                visitIconUri(visitor, extras.getParcelable(EXTRA_PROGRESS_START_ICON,
+                    Icon.class));
+                visitIconUri(visitor, extras.getParcelable(EXTRA_PROGRESS_END_ICON,
+                    Icon.class));
+            }
         }
 
         if (mBubbleMetadata != null) {
@@ -3257,7 +3261,7 @@ public class Notification implements Parcelable
      */
     @FlaggedApi(Flags.FLAG_UI_RICH_ONGOING)
     public boolean hasPromotableCharacteristics() {
-        return isColorized()
+        return isColorizedRequested()
                 && hasTitle()
                 && !containsCustomViews()
                 && hasPromotableStyle();
@@ -4081,6 +4085,12 @@ public class Notification implements Parcelable
             if ((flags & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY) != 0) {
                 flagStrings.add("LIFETIME_EXTENDED_BY_DIRECT_REPLY");
                 flags &= ~FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
+            }
+        }
+        if (Flags.apiRichOngoing()) {
+            if ((flags & FLAG_PROMOTED_ONGOING) != 0) {
+                flagStrings.add("PROMOTED_ONGOING");
+                flags &= ~FLAG_PROMOTED_ONGOING;
             }
         }
 
@@ -7128,7 +7138,9 @@ public class Notification implements Parcelable
          */
         public CharSequence ensureColorSpanContrastOrStripStyling(CharSequence cs,
                 int buttonFillColor) {
-            if (Flags.cleanUpSpansAndNewLines()) {
+            // Ongoing promoted notifications are allowed to have styling.
+            final boolean isPromotedOngoing = mN.isPromotedOngoing();
+            if (!isPromotedOngoing && Flags.cleanUpSpansAndNewLines()) {
                 return stripStyling(cs);
             }
 
@@ -7517,7 +7529,11 @@ public class Notification implements Parcelable
         }
 
         private int getHeadsUpBaseLayoutResource() {
-            return R.layout.notification_template_material_heads_up_base;
+            if (Flags.notificationsRedesignTemplates()) {
+                return R.layout.notification_2025_template_heads_up_base;
+            } else {
+                return R.layout.notification_template_material_heads_up_base;
+            }
         }
 
         private int getCompactHeadsUpBaseLayoutResource() {
@@ -7788,8 +7804,16 @@ public class Notification implements Parcelable
      * @hide
      */
     public boolean isColorized() {
-        return extras.getBoolean(EXTRA_COLORIZED)
-                && (hasColorizedPermission() || isFgsOrUij());
+        return isColorizedRequested()
+                && (hasColorizedPermission() || isFgsOrUij() || isPromotedOngoing());
+    }
+
+    /**
+     * @return true if this notification has requested to be colorized, regardless of whether it
+     * meets the requirements to be displayed that way.
+     */
+    private boolean isColorizedRequested() {
+        return extras.getBoolean(EXTRA_COLORIZED);
     }
 
     /**
@@ -7800,6 +7824,19 @@ public class Notification implements Parcelable
      */
     public boolean hasColorizedPermission() {
         return (flags & Notification.FLAG_CAN_COLORIZE) != 0;
+    }
+
+    /**
+     * Returns whether this notification is a promoted ongoing notification.
+     *
+     * This requires the Notification.FLAG_PROMOTED_ONGOING flag to be set
+     * (which may be true once the api_rich_ongoing feature flag is enabled),
+     * and requires that the ui_rich_ongoing feature flag is enabled.
+     *
+     * @hide
+     */
+    public boolean isPromotedOngoing() {
+        return Flags.uiRichOngoing() && (flags & Notification.FLAG_PROMOTED_ONGOING) != 0;
     }
 
     /**
@@ -8655,7 +8692,9 @@ public class Notification implements Parcelable
 
             // Replace the text with the big text, but only if the big text is not empty.
             CharSequence bigTextText = mBuilder.processLegacyText(mBigText);
-            if (Flags.cleanUpSpansAndNewLines()) {
+            // Ongoing promoted notifications are allowed to have styling.
+            final boolean isPromotedOngoing = mBuilder.mN.isPromotedOngoing();
+            if (!isPromotedOngoing && Flags.cleanUpSpansAndNewLines()) {
                 bigTextText = normalizeBigText(stripStyling(bigTextText));
             }
             if (!TextUtils.isEmpty(bigTextText)) {
@@ -11559,11 +11598,9 @@ public class Notification implements Parcelable
             contentView.setBundle(R.id.progress,
                     "setProgressModel", model.toBundle());
 
-            if (mTrackerIcon != null) {
-                contentView.setIcon(R.id.progress,
-                        "setProgressTrackerIcon",
-                        mTrackerIcon);
-            }
+            contentView.setIcon(R.id.progress,
+                    "setProgressTrackerIcon",
+                    mTrackerIcon);
 
             return contentView;
         }
@@ -11669,8 +11706,10 @@ public class Notification implements Parcelable
             return points;
         }
 
-        @NonNull
-        private NotificationProgressModel createProgressModel(int defaultProgressColor,
+        /**
+         * @hide
+         */
+        public @NonNull NotificationProgressModel createProgressModel(int defaultProgressColor,
                 int backgroundColor) {
             final NotificationProgressModel model;
             if (mIndeterminate) {

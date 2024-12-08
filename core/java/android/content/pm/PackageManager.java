@@ -3200,6 +3200,16 @@ public abstract class PackageManager {
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device is capable of ranging with
+     * other devices using channel sounding via Bluetooth Low Energy radio.
+     */
+    @FlaggedApi(com.android.ranging.flags.Flags.FLAG_RANGING_CS_ENABLED)
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_BLUETOOTH_LE_CHANNEL_SOUNDING =
+             "android.hardware.bluetooth_le.channel_sounding";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
      * {@link #hasSystemFeature}: The device has a camera facing away
      * from the screen.
      */
@@ -5170,25 +5180,6 @@ public abstract class PackageManager {
     @SystemApi
     public static final String ACTION_REQUEST_PERMISSIONS_FOR_OTHER =
             "android.content.pm.action.REQUEST_PERMISSIONS_FOR_OTHER";
-
-    /**
-     * Used by the system to query a {@link android.content.pm.verify.pkg.VerifierService} provider,
-     * which registers itself via an intent-filter handling this action.
-     *
-     * <p class="note">Only the system can bind to such a verifier service. This is protected by the
-     * {@link android.Manifest.permission#BIND_VERIFICATION_AGENT} permission. The verifier service
-     * app should protect the service by adding this permission in the service declaration in its
-     * manifest.
-     * <p>
-     * A verifier service must be a privileged app and hold the
-     * {@link android.Manifest.permission#VERIFICATION_AGENT} permission.
-     *
-     * @hide
-     */
-    @SystemApi
-    @FlaggedApi(android.content.pm.Flags.FLAG_VERIFICATION_SERVICE)
-    @SdkConstant(SdkConstantType.SERVICE_ACTION)
-    public static final String ACTION_VERIFY_PACKAGE = "android.content.pm.action.VERIFY_PACKAGE";
 
     /**
      * The names of the requested permissions.

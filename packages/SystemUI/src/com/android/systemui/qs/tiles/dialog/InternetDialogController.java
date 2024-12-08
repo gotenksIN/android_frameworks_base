@@ -98,6 +98,7 @@ import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.res.R;
+import com.android.systemui.shade.ShadeDisplayAware;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
@@ -301,7 +302,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     }
 
     @Inject
-    public InternetDialogController(@NonNull Context context, UiEventLogger uiEventLogger,
+    public InternetDialogController(@ShadeDisplayAware Context context, UiEventLogger uiEventLogger,
             ActivityStarter starter, AccessPointController accessPointController,
             SubscriptionManager subscriptionManager, TelephonyManager telephonyManager,
             @Nullable WifiManager wifiManager, ConnectivityManager connectivityManager,

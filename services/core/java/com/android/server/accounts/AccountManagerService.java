@@ -16,6 +16,10 @@
 
 package com.android.server.accounts;
 
+import static android.Manifest.permission.COPY_ACCOUNTS;
+import static android.Manifest.permission.REMOVE_ACCOUNTS;
+import static android.app.admin.flags.Flags.splitCreateManagedProfileEnabled;
+
 import android.Manifest;
 import android.accounts.AbstractAccountAuthenticator;
 import android.accounts.Account;
@@ -1741,9 +1745,11 @@ public class AccountManagerService
     public void copyAccountToUser(final IAccountManagerResponse response, final Account account,
             final int userFrom, int userTo) {
         int callingUid = Binder.getCallingUid();
-        if (isCrossUser(callingUid, UserHandle.USER_ALL)) {
+        if (isCrossUser(callingUid, UserHandle.USER_ALL)
+                && !hasCopyAccountsPermission()) {
             throw new SecurityException("Calling copyAccountToUser requires "
-                    + android.Manifest.permission.INTERACT_ACROSS_USERS_FULL);
+                    + android.Manifest.permission.INTERACT_ACROSS_USERS_FULL
+                    + " or " + COPY_ACCOUNTS);
         }
         final UserAccounts fromAccounts = getUserAccounts(userFrom);
         final UserAccounts toAccounts = getUserAccounts(userTo);
@@ -1793,6 +1799,12 @@ public class AccountManagerService
         } finally {
             restoreCallingIdentity(identityToken);
         }
+    }
+
+    private boolean hasCopyAccountsPermission() {
+        return splitCreateManagedProfileEnabled()
+                && mContext.checkCallingOrSelfPermission(COPY_ACCOUNTS)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     @Override
@@ -2348,7 +2360,8 @@ public class AccountManagerService
         UserHandle user = UserHandle.of(userId);
         if (!isAccountManagedByCaller(account.type, callingUid, user.getIdentifier())
                 && !isSystemUid(callingUid)
-                && !isProfileOwner(callingUid)) {
+                && !isProfileOwner(callingUid)
+                && !hasRemoveAccountsPermission()) {
             String msg = String.format(
                     "uid %s cannot remove accounts of type: %s",
                     callingUid,
@@ -2408,6 +2421,12 @@ public class AccountManagerService
         } finally {
             restoreCallingIdentity(identityToken);
         }
+    }
+
+    private boolean hasRemoveAccountsPermission() {
+        return splitCreateManagedProfileEnabled()
+                && mContext.checkCallingOrSelfPermission(REMOVE_ACCOUNTS)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     @Override

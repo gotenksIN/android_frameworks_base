@@ -251,6 +251,12 @@ class RefreshRatePolicy {
                     SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_OVERRIDE_CHILDREN);
         }
 
+        // If insets animation is running, do not convey the preferred app refresh rate to let VRI
+        // to control the refresh rate.
+        if (w.isInsetsAnimationRunning()) {
+            return w.mFrameRateVote.reset();
+        }
+
         // If the app set a preferredDisplayModeId, the preferred refresh rate is the refresh rate
         // of that mode id.
         if (refreshRateSwitchingType != SWITCHING_TYPE_RENDER_FRAME_RATE_ONLY) {
@@ -289,7 +295,7 @@ class RefreshRatePolicy {
     float getPreferredMinRefreshRate(WindowState w) {
         // If app is animating, it's not able to control refresh rate because we want the animation
         // to run in default refresh rate.
-        if (w.isAnimationRunningSelfOrParent()) {
+        if (w.isAnimationRunningSelfOrParent() || w.isInsetsAnimationRunning()) {
             return 0;
         }
 
@@ -312,7 +318,7 @@ class RefreshRatePolicy {
     float getPreferredMaxRefreshRate(WindowState w) {
         // If app is animating, it's not able to control refresh rate because we want the animation
         // to run in default refresh rate.
-        if (w.isAnimationRunningSelfOrParent()) {
+        if (w.isAnimationRunningSelfOrParent() || w.isInsetsAnimationRunning()) {
             return 0;
         }
 

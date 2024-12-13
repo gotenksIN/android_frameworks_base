@@ -155,16 +155,21 @@ public class CarrierNameCustomization {
         boolean isInService = false;
         ServiceState ss = mKeyguardUpdateMonitor.getServiceState(subId);
         if (ss != null) {
-            dataNetworkType = ss.getVoiceNetworkType();
-            voiceNetworkType = ss.getDataNetworkType();
+            dataNetworkType = ss.getDataNetworkType();
+            voiceNetworkType = ss.getVoiceNetworkType();
             isInService = (ss.getDataRegState() == ServiceState.STATE_IN_SERVICE
                     || ss.getVoiceRegState() == ServiceState.STATE_IN_SERVICE);
         }
         SubscriptionInfo sub = mKeyguardUpdateMonitor.getSubscriptionInfoForSubId(subId);
-        FiveGServiceClient.FiveGServiceState fiveGServiceState =
-                mFiveGServiceClient.getCurrentServiceState(sub.getSimSlotIndex());
-        return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-                fiveGServiceState.getNrIconType());
+        if (sub == null) {
+            return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
+                    NrIconType.INVALID);
+        } else {
+            FiveGServiceClient.FiveGServiceState fiveGServiceState =
+                    mFiveGServiceClient.getCurrentServiceState(sub.getSimSlotIndex());
+            return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
+                    fiveGServiceState.getNrIconType());
+        }
     }
 
     public String getCustomizeCarrierNameModern(int subId, String originCarrierName,

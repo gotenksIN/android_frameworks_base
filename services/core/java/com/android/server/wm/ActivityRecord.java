@@ -3235,26 +3235,46 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      * will be ignored.
      */
     boolean isUniversalResizeable() {
-        if (info.applicationInfo.category == ApplicationInfo.CATEGORY_GAME) {
-            return false;
-        }
-        final boolean compatEnabled = Flags.universalResizableByDefault()
-                && mDisplayContent != null && mDisplayContent.getConfiguration()
-                    .smallestScreenWidthDp >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
-                && mDisplayContent.getIgnoreOrientationRequest()
-                && info.isChangeEnabled(ActivityInfo.UNIVERSAL_RESIZABLE_BY_DEFAULT);
-        if (!compatEnabled && !mWmService.mConstants.mIgnoreActivityOrientationRequest) {
-            return false;
-        }
-        if (mWmService.mConstants.isPackageOptOutIgnoreActivityOrientationRequest(packageName)) {
+        final boolean isLargeScreen = mDisplayContent != null && mDisplayContent.getConfiguration()
+                .smallestScreenWidthDp >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
+                && mDisplayContent.getIgnoreOrientationRequest();
+        if (!canBeUniversalResizeable(info.applicationInfo, mWmService, isLargeScreen,
+                true /* forActivity */)) {
             return false;
         }
         if (mAppCompatController.mAllowRestrictedResizability.getAsBoolean()) {
             return false;
         }
         // If the user preference respects aspect ratio, then it becomes non-resizable.
-        return !mAppCompatController.getAppCompatOverrides().getAppCompatAspectRatioOverrides()
-                .shouldApplyUserMinAspectRatioOverride();
+        return mAppCompatController.getAppCompatOverrides().getAppCompatAspectRatioOverrides()
+                .userPreferenceCompatibleWithNonResizability();
+    }
+
+    /**
+     * Returns {@code true} if the fixed orientation, aspect ratio, resizability of the application
+     * can be ignored.
+     */
+    static boolean canBeUniversalResizeable(ApplicationInfo appInfo, WindowManagerService wms,
+            boolean isLargeScreen, boolean forActivity) {
+        if (appInfo.category == ApplicationInfo.CATEGORY_GAME) {
+            return false;
+        }
+        final boolean compatEnabled = isLargeScreen && Flags.universalResizableByDefault()
+                && appInfo.isChangeEnabled(ActivityInfo.UNIVERSAL_RESIZABLE_BY_DEFAULT);
+        final boolean configEnabled = (isLargeScreen
+                ? wms.mConstants.mIgnoreActivityOrientationRequestLargeScreen
+                : wms.mConstants.mIgnoreActivityOrientationRequestSmallScreen)
+                && !wms.mConstants.isPackageOptOutIgnoreActivityOrientationRequest(
+                        appInfo.packageName);
+        if (!compatEnabled && !configEnabled) {
+            return false;
+        }
+        if (forActivity) {
+            // The caller will check both application and activity level property.
+            return true;
+        }
+        return !AppCompatController.allowRestrictedResizability(wms.mContext.getPackageManager(),
+                appInfo.packageName);
     }
 
     boolean isResizeable() {
@@ -3690,16 +3710,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
             pauseKeyDispatchingLocked();
 
-            // We are finishing the top focused activity and its task has nothing to be focused so
-            // the next focusable task should be focused.
-            if (mayAdjustTop && task.topRunningActivity(true /* focusableOnly */)
-                    == null) {
-                task.adjustFocusToNextFocusableTask("finish-top", false /* allowFocusSelf */,
-                            shouldAdjustGlobalFocus);
-            }
-
-            finishActivityResults(resultCode, resultData, resultGrants);
-
             final boolean endTask = task.getTopNonFinishingActivity() == null
                     && !task.isClearingToReuseTask();
             final WindowContainer<?> trigger = endTask ? task : this;
@@ -3710,6 +3720,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             if (transition != null) {
                 transition.collectClose(trigger);
             }
+            // We are finishing the top focused activity and its task has nothing to be focused so
+            // the next focusable task should be focused.
+            if (mayAdjustTop && task.topRunningActivity(true /* focusableOnly */)
+                    == null) {
+                task.adjustFocusToNextFocusableTask("finish-top", false /* allowFocusSelf */,
+                            shouldAdjustGlobalFocus);
+            }
+
+            finishActivityResults(resultCode, resultData, resultGrants);
+
             if (isState(RESUMED)) {
                 if (endTask) {
                     mAtmService.getTaskChangeNotificationController().notifyTaskRemovalStarted(
@@ -4607,12 +4627,35 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // at #postWindowRemoveCleanupLocked
                 return false;
             }
+
+            // Link the fixed rotation transform to this activity since we are transferring the
+            // starting window.
+            if (fromActivity.hasFixedRotationTransform()) {
+                mDisplayContent.handleTopActivityLaunchingInDifferentOrientation(this,
+                        false /* checkOpening */);
+            }
             // Do not transfer if the orientation doesn't match, redraw starting window while it is
             // on top will cause flicker.
-            if (fromActivity.getRequestedConfigurationOrientation()
-                    != getRequestedConfigurationOrientation()) {
+            final int fromOrientation = fromActivity.getConfiguration().orientation;
+            final int requestedOrientation = getRequestedConfigurationOrientation();
+            if (requestedOrientation == ORIENTATION_UNDEFINED) {
+                if (fromOrientation != getConfiguration().orientation) {
+                    return false;
+                }
+            } else if (fromOrientation != requestedOrientation) {
                 return false;
             }
+
+            // If another activity above the activity which has starting window, allows to steal the
+            // starting window if the above activity isn't drawn.
+            if (task.getChildCount() >= 3
+                    && fromActivity.mStartingData.mAssociatedTask == null) {
+                final ActivityRecord aboveFrom = task.getActivityAbove(fromActivity);
+                if (aboveFrom != null && aboveFrom != this && !aboveFrom.mReportedDrawn) {
+                    return false;
+                }
+            }
+
             // In this case, the starting icon has already been displayed, so start
             // letting windows get shown immediately without any more transitions.
             if (fromActivity.mVisible) {
@@ -4624,13 +4667,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
             final long origId = Binder.clearCallingIdentity();
             try {
-                // Link the fixed rotation transform to this activity since we are transferring the
-                // starting window.
-                if (fromActivity.hasFixedRotationTransform()) {
-                    mDisplayContent.handleTopActivityLaunchingInDifferentOrientation(this,
-                            false /* checkOpening */);
-                }
-
                 // Transfer the starting window over to the new token.
                 mStartingData = fromActivity.mStartingData;
                 mStartingSurface = fromActivity.mStartingSurface;
@@ -4642,6 +4678,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 fromActivity.startingMoved = true;
                 tStartingWindow.mToken = this;
                 tStartingWindow.mActivityRecord = this;
+
+                if (mStartingData.mRemoveAfterTransaction == AFTER_TRANSACTION_REMOVE_DIRECTLY) {
+                    // The removal of starting window should wait for window drawn of current
+                    // activity.
+                    final WindowState mainWin = findMainWindow(false /* includeStartingApp */);
+                    if (mainWin == null || !mainWin.isDrawn()) {
+                        mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_IDLE;
+                        mStartingData.mPrepareRemoveAnimation = false;
+                    }
+                }
 
                 ProtoLog.v(WM_DEBUG_ADD_REMOVE,
                         "Removing starting %s from %s", tStartingWindow, fromActivity);
@@ -10465,7 +10511,15 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 .isVisibilityUnknown(this)) {
             return false;
         }
-        if (!isVisibleRequested()) return true;
+        if (!isVisibleRequested()) {
+            // TODO(b/294925498): Remove this finishing check once we have accurate ready tracking.
+            if (task != null && task.getPausingActivity() == this) {
+                // Visibility of starting activities isn't calculated until pause-complete, so if
+                // this is not paused yet, don't consider it ready.
+                return false;
+            }
+            return true;
+        }
         if (mPendingRelaunchCount > 0) return false;
         // Wait for attach. That is the earliest time where we know if there will be an associated
         // display rotation. If we don't wait, the starting-window can finishDrawing first and

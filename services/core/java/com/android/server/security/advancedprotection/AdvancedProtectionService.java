@@ -46,7 +46,9 @@ import com.android.server.SystemService;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.security.advancedprotection.features.AdvancedProtectionHook;
 import com.android.server.security.advancedprotection.features.AdvancedProtectionProvider;
+import com.android.server.security.advancedprotection.features.DisallowCellular2GAdvancedProtectionHook;
 import com.android.server.security.advancedprotection.features.DisallowInstallUnknownSourcesAdvancedProtectionHook;
+import com.android.server.security.advancedprotection.features.MemoryTaggingExtensionHook;
 
 import java.io.FileDescriptor;
 import java.util.ArrayList;
@@ -78,7 +80,25 @@ public class AdvancedProtectionService extends IAdvancedProtectionService.Stub  
 
     private void initFeatures(boolean enabled) {
         if (android.security.Flags.aapmFeatureDisableInstallUnknownSources()) {
+          try {
             mHooks.add(new DisallowInstallUnknownSourcesAdvancedProtectionHook(mContext, enabled));
+          } catch (Exception e) {
+            Slog.e(TAG, "Failed to initialize DisallowInstallUnknownSources", e);
+          }
+        }
+        if (android.security.Flags.aapmFeatureMemoryTaggingExtension()) {
+          try {
+            mHooks.add(new MemoryTaggingExtensionHook(mContext, enabled));
+          } catch (Exception e) {
+            Slog.e(TAG, "Failed to initialize MemoryTaggingExtension", e);
+          }
+        }
+        if (android.security.Flags.aapmFeatureDisableCellular2g()) {
+          try {
+            mHooks.add(new DisallowCellular2GAdvancedProtectionHook(mContext, enabled));
+          } catch (Exception e) {
+            Slog.e(TAG, "Failed to initialize DisallowCellular2g", e);
+          }
         }
     }
 
@@ -191,7 +211,7 @@ public class AdvancedProtectionService extends IAdvancedProtectionService.Stub  
     }
 
     void sendCallbackAdded(boolean enabled, IAdvancedProtectionCallback callback) {
-        Message.obtain(mHandler, MODE_CHANGED, /*enabled*/ enabled ? 1 : 0, /*unused*/ -1,
+        Message.obtain(mHandler, CALLBACK_ADDED, /*enabled*/ enabled ? 1 : 0, /*unused*/ -1,
                         /*callback*/ callback)
                 .sendToTarget();
     }
@@ -270,8 +290,13 @@ public class AdvancedProtectionService extends IAdvancedProtectionService.Stub  
 
             for (int i = 0; i < mHooks.size(); i++) {
                 AdvancedProtectionHook feature = mHooks.get(i);
-                if (feature.isAvailable()) {
-                    feature.onAdvancedProtectionChanged(enabled);
+                try {
+                    if (feature.isAvailable()) {
+                        feature.onAdvancedProtectionChanged(enabled);
+                    }
+                } catch (Exception e) {
+                    Slog.e(TAG, "Failed to call hook for feature "
+                            + feature.getFeature().getId(), e);
                 }
             }
             synchronized (mCallbacks) {

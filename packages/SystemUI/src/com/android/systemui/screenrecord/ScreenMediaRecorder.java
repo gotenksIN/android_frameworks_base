@@ -41,6 +41,7 @@ import android.media.projection.IMediaProjection;
 import android.media.projection.IMediaProjectionManager;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
+import android.media.projection.StopReason;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.IBinder;
@@ -302,7 +303,7 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
     /**
      * End screen recording, throws an exception if stopping recording failed
      */
-    void end() throws IOException {
+    void end(@StopReason int stopReason) throws IOException {
         Closer closer = new Closer();
 
         // MediaRecorder might throw RuntimeException if stopped immediately after starting
@@ -311,7 +312,17 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         closer.register(mMediaRecorder::release);
         closer.register(mInputSurface::release);
         closer.register(mVirtualDisplay::release);
-        closer.register(mMediaProjection::stop);
+        closer.register(() -> {
+            if (stopReason == StopReason.STOP_UNKNOWN) {
+                // Attempt to call MediaProjection#stop() even if it might have already been called.
+                // If projection has already been stopped, then nothing will happen. Else, stop
+                // will be logged as a manually requested stop from host app.
+                mMediaProjection.stop();
+            } else {
+                // In any other case, the stop reason is related to the recorder, so pass it on here
+                mMediaProjection.stop(stopReason);
+            }
+        });
         closer.register(this::stopInternalAudioRecording);
 
         closer.close();
@@ -325,7 +336,7 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
     @Override
     public void onStop() {
         Log.d(TAG, "The system notified about stopping the projection");
-        mListener.onStopped();
+        mListener.onStopped(StopReason.STOP_UNKNOWN);
     }
 
     private void stopInternalAudioRecording() {
@@ -455,7 +466,7 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
          * For example, this might happen when doing partial screen sharing of an app
          * and the app that is being captured is closed.
          */
-        void onStopped();
+        void onStopped(@StopReason int stopReason);
     }
 
     /**

@@ -24,6 +24,7 @@ import android.service.quicksettings.Tile.STATE_INACTIVE
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
@@ -77,10 +78,12 @@ import com.android.systemui.haptics.msdl.qs.TileHapticsViewModel
 import com.android.systemui.haptics.msdl.qs.TileHapticsViewModelFactoryProvider
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.plugins.qs.QSTile
+import com.android.systemui.qs.flags.QsDetailedView
 import com.android.systemui.qs.panels.ui.compose.BounceableInfo
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.InactiveCornerRadius
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.TileHeight
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.longPressLabel
+import com.android.systemui.qs.panels.ui.viewmodel.DetailsViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.TileUiState
 import com.android.systemui.qs.panels.ui.viewmodel.TileViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.toUiState
@@ -121,8 +124,9 @@ fun Tile(
     bounceableInfo: BounceableInfo,
     tileHapticsViewModelFactoryProvider: TileHapticsViewModelFactoryProvider,
     modifier: Modifier = Modifier,
+    detailsViewModel: DetailsViewModel?,
 ) {
-    val state by tile.state.collectAsStateWithLifecycle(tile.currentState)
+    val state: QSTile.State by tile.state.collectAsStateWithLifecycle(tile.currentState)
     val currentBounceableInfo by rememberUpdatedState(bounceableInfo)
     val resources = resources()
     val uiState = remember(state, resources) { state.toUiState(resources) }
@@ -163,12 +167,20 @@ fun Tile(
                 .takeIf { uiState.handlesLongClick }
         TileContainer(
             onClick = {
-                tile.onClick(expandable)
-                hapticsViewModel?.setTileInteractionState(
-                    TileHapticsViewModel.TileInteractionState.CLICKED
-                )
-                if (uiState.accessibilityUiState.toggleableState != null) {
-                    coroutineScope.launch { currentBounceableInfo.bounceable.animateBounce() }
+                var hasDetails = false
+                if (QsDetailedView.isEnabled) {
+                    hasDetails = detailsViewModel?.onTileClicked(tile.spec) == true
+                }
+                if (!hasDetails) {
+                    // For those tile's who doesn't have a detailed view, process with their
+                    // `onClick` behavior.
+                    tile.onClick(expandable)
+                    hapticsViewModel?.setTileInteractionState(
+                        TileHapticsViewModel.TileInteractionState.CLICKED
+                    )
+                    if (uiState.accessibilityUiState.toggleableState != null) {
+                        coroutineScope.launch { currentBounceableInfo.bounceable.animateBounce() }
+                    }
                 }
             },
             onLongClick = longClick,
@@ -249,6 +261,28 @@ fun TileContainer(
                 .tilePadding(),
         content = content,
     )
+}
+
+@Composable
+fun LargeStaticTile(uiState: TileUiState, modifier: Modifier = Modifier) {
+    val colors = TileDefaults.getColorForState(uiState = uiState, iconOnly = false)
+
+    Box(
+        modifier
+            .clip(TileDefaults.animateTileShape(state = uiState.state))
+            .background(colors.background)
+            .height(TileHeight)
+            .tilePadding()
+    ) {
+        LargeTileContent(
+            label = uiState.label,
+            secondaryLabel = "",
+            icon = getTileIcon(icon = uiState.icon),
+            sideDrawable = null,
+            colors = colors,
+            squishiness = { 1f },
+        )
+    }
 }
 
 @Composable

@@ -33,12 +33,13 @@ import com.android.systemui.keyboard.shortcut.shared.model.Shortcut
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategory
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategoryType
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCommand
+import com.android.systemui.keyboard.shortcut.shared.model.ShortcutHelperExclusions
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutIcon
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutKey
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutSubCategory
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.withContext
 
 class ShortcutCategoriesUtils
 @Inject
@@ -46,6 +47,7 @@ constructor(
     private val context: Context,
     @Background private val backgroundCoroutineContext: CoroutineContext,
     private val inputManager: InputManager,
+    private val shortcutHelperExclusions: ShortcutHelperExclusions,
 ) {
 
     fun removeUnsupportedModifiers(modifierMask: Int): Int {
@@ -116,7 +118,10 @@ constructor(
             .filter {
                 // Allow KEYCODE_UNKNOWN (0) because shortcuts can have just modifiers and no
                 // keycode, or they could have a baseCharacter instead of a keycode.
-                it.keycode == KeyEvent.KEYCODE_UNKNOWN || supportedKeyCodes.contains(it.keycode)
+                it.keycode == KeyEvent.KEYCODE_UNKNOWN ||
+                    supportedKeyCodes.contains(it.keycode) ||
+                    // Support keyboard function row key codes
+                    keyGlyphMap?.functionRowKeys?.contains(it.keycode) ?: false
             }
             .mapNotNull { toShortcut(keyGlyphMap, keyCharacterMap, it, keepIcons) }
 
@@ -132,6 +137,8 @@ constructor(
             label = shortcutInfo.label,
             icon = toShortcutIcon(keepIcon, shortcutInfo),
             commands = listOf(shortcutCommand),
+            isCustomizable =
+                shortcutHelperExclusions.isShortcutCustomizable(shortcutInfo.label),
         )
     }
 

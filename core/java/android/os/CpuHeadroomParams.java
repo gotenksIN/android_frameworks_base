@@ -18,10 +18,13 @@ package android.os;
 
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
+import android.annotation.IntRange;
+import android.annotation.NonNull;
 import android.os.health.SystemHealthManager;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Arrays;
 
 /**
  * Headroom request params used by {@link SystemHealthManager#getCpuHeadroom(CpuHeadroomParams)}.
@@ -53,6 +56,10 @@ public final class CpuHeadroomParams {
      */
     public static final int CPU_HEADROOM_CALCULATION_TYPE_AVERAGE = 1;
 
+    private static final int CALCULATION_WINDOW_MILLIS_MIN = 50;
+    private static final int CALCULATION_WINDOW_MILLIS_MAX = 10000;
+    private static final int MAX_TID_COUNT = 5;
+
     /**
      * Sets the headroom calculation type.
      * <p>
@@ -80,6 +87,61 @@ public final class CpuHeadroomParams {
             default -> CPU_HEADROOM_CALCULATION_TYPE_MIN;
         };
         return validatedType;
+    }
+
+    /**
+     * Sets the headroom calculation window size in milliseconds.
+     * <p>
+     *
+     * @param windowMillis the window size in milliseconds ranges from [50, 10000]. The smaller the
+     *                     window size, the larger fluctuation in the headroom value should be
+     *                     expected. The default value can be retrieved from the
+     *                     {@link #getCalculationWindowMillis}. The device will try to use the
+     *                     closest feasible window size to this param.
+     * @throws IllegalArgumentException if the window size is not in allowed range.
+     */
+    public void setCalculationWindowMillis(
+            @IntRange(from = CALCULATION_WINDOW_MILLIS_MIN, to =
+                    CALCULATION_WINDOW_MILLIS_MAX) int windowMillis) {
+        if (windowMillis < CALCULATION_WINDOW_MILLIS_MIN
+                || windowMillis > CALCULATION_WINDOW_MILLIS_MAX) {
+            throw new IllegalArgumentException("Invalid calculation window: " + windowMillis);
+        }
+        mInternal.calculationWindowMillis = windowMillis;
+    }
+
+    /**
+     * Gets the headroom calculation window size in milliseconds.
+     * <p>
+     * This will return the default value chosen by the device if the params is not set.
+     */
+    public @IntRange(from = CALCULATION_WINDOW_MILLIS_MIN, to =
+            CALCULATION_WINDOW_MILLIS_MAX) long getCalculationWindowMillis() {
+        return mInternal.calculationWindowMillis;
+    }
+
+    /**
+     * Sets the thread TIDs to track.
+     * <p>
+     * The TIDs should belong to the same of the process that will the headroom call. And they
+     * should not have different core affinity.
+     * <p>
+     * If not set, the headroom will be based on the PID of the process making the call.
+     *
+     * @param tids non-empty list of TIDs, maximum 5.
+     * @throws IllegalArgumentException if the list size is not in allowed range or TID is not
+     *                                  positive.
+     */
+    public void setTids(@NonNull int... tids) {
+        if (tids.length == 0 || tids.length > MAX_TID_COUNT) {
+            throw new IllegalArgumentException("Invalid number of TIDs: " + tids.length);
+        }
+        for (int tid : tids) {
+            if (tid <= 0) {
+                throw new IllegalArgumentException("Invalid TID: " + tid);
+            }
+        }
+        mInternal.tids = Arrays.copyOf(tids, tids.length);
     }
 
     /**

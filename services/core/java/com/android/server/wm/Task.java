@@ -3442,6 +3442,7 @@ class Task extends TaskFragment {
         info.isTopActivityNoDisplay = top != null && top.isNoDisplay();
         info.isSleeping = shouldSleepActivities();
         info.isTopActivityTransparent = top != null && !top.fillsParent();
+        info.isActivityStackTransparent = !topTask.forAllActivities(r -> (r.occludesParent()));
         info.lastNonFullscreenBounds = topTask.mLastNonFullscreenBounds;
         final WindowState windowState = top != null
                 ? top.findMainWindow(/* includeStartingApp= */ false) : null;
@@ -6321,12 +6322,6 @@ class Task extends TaskFragment {
                             mActivityPluginDelegate.activitySuspendNotification
                                 (r.info.applicationInfo.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN, false);
                         }
-    }
-
-    @Override
-    void executeAppTransition(ActivityOptions options) {
-        mDisplayContent.executeAppTransition();
-        ActivityOptions.abort(options);
     }
 
     private Rect getRawBounds() {

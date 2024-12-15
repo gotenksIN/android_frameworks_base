@@ -128,6 +128,7 @@ import com.android.internal.R;
 import com.android.internal.util.Preconditions;
 import com.android.internal.widget.IRemoteViewsFactory;
 import com.android.internal.widget.remotecompose.core.operations.Theme;
+import com.android.internal.widget.remotecompose.core.CoreDocument;
 import com.android.internal.widget.remotecompose.player.RemoteComposeDocument;
 import com.android.internal.widget.remotecompose.player.RemoteComposePlayer;
 
@@ -1298,7 +1299,13 @@ public class RemoteViews implements Parcelable, Filter {
 
         @Override
         public void visitUris(@NonNull Consumer<Uri> visitor) {
-            if (mIntentId != -1 || mItems == null) {
+            if (mItems == null) {
+                // Null item indicates adapter conversion took place, so the URIs in cached items
+                // need to be validated.
+                RemoteCollectionItems cachedItems = mCollectionCache.getItemsForId(mIntentId);
+                if (cachedItems != null) {
+                    cachedItems.visitUris(visitor);
+                }
                 return;
             }
 
@@ -5819,7 +5826,7 @@ public class RemoteViews implements Parcelable, Filter {
                 }
                 try (ByteArrayInputStream is = new ByteArrayInputStream(bytes.get(0))) {
                     player.setDocument(new RemoteComposeDocument(is));
-                    player.addClickListener((viewId, metadata) -> {
+                    player.addIdActionListener((viewId, metadata) -> {
                         mActions.forEach(action -> {
                             if (viewId == action.mViewId
                                     && action instanceof SetOnClickResponse setOnClickResponse) {
@@ -9333,7 +9340,11 @@ public class RemoteViews implements Parcelable, Filter {
         Set<Integer> bitmapIdSet = getBitmapIdsUsedByActions(new HashSet<>());
         int result = 0;
         for (int bitmapId: bitmapIdSet) {
-            result += mBitmapCache.getBitmapForId(bitmapId).getAllocationByteCount();
+            Bitmap currentBitmap = mBitmapCache.getBitmapForId(bitmapId);
+            if (currentBitmap == null) {
+                continue;
+            }
+            result += currentBitmap.getAllocationByteCount();
         }
 
         return result;
@@ -9819,7 +9830,7 @@ public class RemoteViews implements Parcelable, Filter {
          */
         @FlaggedApi(FLAG_DRAW_DATA_PARCEL)
         public static long getSupportedVersion() {
-            return VERSION;
+            return (long) CoreDocument.getDocumentApiLevel();
         }
 
         /**

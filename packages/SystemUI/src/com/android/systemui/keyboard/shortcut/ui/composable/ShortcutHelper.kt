@@ -19,6 +19,7 @@ package com.android.systemui.keyboard.shortcut.ui.composable
 import android.graphics.drawable.Icon
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,6 +57,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -96,6 +98,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -121,8 +125,8 @@ import com.android.systemui.keyboard.shortcut.ui.model.IconSource
 import com.android.systemui.keyboard.shortcut.ui.model.ShortcutCategoryUi
 import com.android.systemui.keyboard.shortcut.ui.model.ShortcutsUiState
 import com.android.systemui.res.R
-import com.android.systemui.keyboard.shortcut.shared.model.Shortcut as ShortcutModel
 import kotlinx.coroutines.delay
+import com.android.systemui.keyboard.shortcut.shared.model.Shortcut as ShortcutModel
 
 @Composable
 fun ShortcutHelper(
@@ -185,6 +189,7 @@ private fun ActiveShortcutHelper(
             onKeyboardSettingsClicked,
             shortcutsUiState.isShortcutCustomizerFlagEnabled,
             onCustomizationRequested,
+            shortcutsUiState.shouldShowResetButton
         )
     }
 }
@@ -375,6 +380,7 @@ private fun ShortcutHelperTwoPane(
     onKeyboardSettingsClicked: () -> Unit,
     isShortcutCustomizerFlagEnabled: Boolean,
     onCustomizationRequested: (ShortcutCustomizationRequestInfo) -> Unit = {},
+    shouldShowResetButton: Boolean
 ) {
     val selectedCategory = categories.fastFirstOrNull { it.type == selectedCategoryType }
     var isCustomizing by remember { mutableStateOf(false) }
@@ -387,11 +393,14 @@ private fun ShortcutHelperTwoPane(
                     TitleBar(isCustomizing)
                 }
                 if (isShortcutCustomizerFlagEnabled) {
-                    if (isCustomizing) {
-                        DoneButton(onClick = { isCustomizing = false })
-                    } else {
-                        CustomizeButton(onClick = { isCustomizing = true })
-                    }
+                    CustomizationButtonsContainer(
+                        isCustomizing = isCustomizing,
+                        onToggleCustomizationMode = { isCustomizing = !isCustomizing },
+                        onReset = {
+                            onCustomizationRequested(ShortcutCustomizationRequestInfo.Reset)
+                        },
+                        shouldShowResetButton = shouldShowResetButton,
+                    )
                 } else {
                     Spacer(modifier = Modifier.width(if (isCustomizing) 69.dp else 133.dp))
                 }
@@ -417,6 +426,38 @@ private fun ShortcutHelperTwoPane(
             )
         }
     }
+}
+
+@Composable
+private fun CustomizationButtonsContainer(
+    isCustomizing: Boolean,
+    shouldShowResetButton: Boolean,
+    onToggleCustomizationMode: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (isCustomizing) {
+            if (shouldShowResetButton) {
+                ResetButton(onClick = onReset)
+            }
+            DoneButton(onClick = onToggleCustomizationMode)
+        } else {
+            CustomizeButton(onClick = onToggleCustomizationMode)
+        }
+    }
+}
+
+@Composable
+private fun ResetButton(onClick: () -> Unit) {
+    ShortcutHelperButton(
+        onClick = onClick,
+        color = Color.Transparent,
+        width = 99.dp,
+        iconSource = IconSource(imageVector = Icons.Default.Refresh),
+        text = stringResource(id = R.string.shortcut_helper_reset_button_text),
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(color = MaterialTheme.colorScheme.outlineVariant, width = 1.dp),
+    )
 }
 
 @Composable
@@ -461,18 +502,17 @@ private fun EndSidePanel(
             SubCategoryContainerDualPane(
                 searchQuery = searchQuery,
                 subCategory = subcategory,
-                isCustomizing = isCustomizing,
+                isCustomizing = isCustomizing and category.type.includeInCustomization,
                 onCustomizationRequested = { requestInfo ->
                     when (requestInfo) {
                         is ShortcutCustomizationRequestInfo.Add ->
-                            onCustomizationRequested(
-                                requestInfo.copy(categoryType = category.type)
-                            )
+                            onCustomizationRequested(requestInfo.copy(categoryType = category.type))
 
                         is ShortcutCustomizationRequestInfo.Delete ->
-                            onCustomizationRequested(
-                                requestInfo.copy(categoryType = category.type)
-                            )
+                            onCustomizationRequested(requestInfo.copy(categoryType = category.type))
+
+                        ShortcutCustomizationRequestInfo.Reset ->
+                            onCustomizationRequested(requestInfo)
                     }
                 },
             )
@@ -525,7 +565,7 @@ private fun SubCategoryContainerDualPane(
                     modifier = Modifier.padding(vertical = 8.dp),
                     searchQuery = searchQuery,
                     shortcut = shortcut,
-                    isCustomizing = isCustomizing,
+                    isCustomizing = isCustomizing && shortcut.isCustomizable,
                     onCustomizationRequested = { requestInfo ->
                         when (requestInfo) {
                             is ShortcutCustomizationRequestInfo.Add ->
@@ -537,6 +577,9 @@ private fun SubCategoryContainerDualPane(
                                 onCustomizationRequested(
                                     requestInfo.copy(subCategoryLabel = subCategory.label)
                                 )
+
+                            ShortcutCustomizationRequestInfo.Reset ->
+                                onCustomizationRequested(requestInfo)
                         }
                     },
                 )
@@ -572,20 +615,31 @@ private fun Shortcut(
             }
             .focusable(interactionSource = interactionSource)
             .padding(8.dp)
+            .semantics { contentDescription = shortcut.contentDescription }
     ) {
         Row(
-            modifier = Modifier.width(128.dp).align(Alignment.CenterVertically).weight(0.333f),
+            modifier =
+                Modifier.width(128.dp).align(Alignment.CenterVertically).weight(0.333f).semantics {
+                    hideFromAccessibility()
+                },
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (shortcut.icon != null) {
-                ShortcutIcon(shortcut.icon, modifier = Modifier.size(24.dp))
+                ShortcutIcon(
+                    shortcut.icon,
+                    modifier = Modifier.size(24.dp).semantics { hideFromAccessibility() },
+                )
             }
-            ShortcutDescriptionText(searchQuery = searchQuery, shortcut = shortcut)
+            ShortcutDescriptionText(
+                searchQuery = searchQuery,
+                shortcut = shortcut,
+                modifier = Modifier.semantics { hideFromAccessibility() },
+            )
         }
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(24.dp).semantics { hideFromAccessibility() })
         ShortcutKeyCombinations(
-            modifier = Modifier.weight(.666f),
+            modifier = Modifier.weight(.666f).semantics { hideFromAccessibility() },
             shortcut = shortcut,
             isCustomizing = isCustomizing,
             onAddShortcutRequested = {
@@ -786,7 +840,7 @@ private fun ShortcutDescriptionText(
     Text(
         modifier = modifier,
         text = textWithHighlightedSearchQuery(shortcut.label, searchQuery),
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurface,
     )
 }
@@ -904,7 +958,7 @@ private fun CategoryItemTwoPane(
                 Text(
                     fontSize = 18.sp,
                     color = colors.textColor(selected).value,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleSmall,
                     text = label,
                 )
             }
@@ -1000,9 +1054,11 @@ private fun KeyboardSettings(horizontalPadding: Dp, verticalPadding: Dp, onClick
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stringResource(id = R.string.shortcut_helper_keyboard_settings_buttons_label),
+                text =
+                    stringResource(id = R.string.shortcut_helper_keyboard_settings_buttons_label),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 16.sp,
+                style = MaterialTheme.typography.titleSmall,
             )
             Spacer(modifier = Modifier.weight(1f))
             Icon(

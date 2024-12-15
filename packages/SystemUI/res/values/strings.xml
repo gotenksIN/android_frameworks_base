@@ -758,7 +758,7 @@
     <!-- QuickSettings: Bluetooth dialog device in audio sharing default summary [CHAR LIMIT=50]-->
     <string name="quick_settings_bluetooth_device_audio_sharing">Audio Sharing</string>
     <!-- QuickSettings: Bluetooth dialog device summary for devices that are capable of audio sharing and switching to active[CHAR LIMIT=NONE]-->
-    <string name="quick_settings_bluetooth_device_audio_sharing_or_switch_active">Tap to switch or share audio</string>
+    <string name="quick_settings_bluetooth_device_audio_sharing_or_switch_active">Supports audio sharing</string>
     <!-- QuickSettings: Bluetooth dialog device saved default summary [CHAR LIMIT=NONE]-->
     <string name="quick_settings_bluetooth_device_saved">Saved</string>
     <!-- QuickSettings: Accessibility label to disconnect a device [CHAR LIMIT=NONE]-->
@@ -1341,10 +1341,12 @@
     <string name="communal_widgets_disclaimer_text">To open an app using a widget, you\u2019ll need to verify it\u2019s you. Also, keep in mind that anyone can view them, even when your tablet\u2019s locked. Some widgets may not have been intended for your lock screen and may be unsafe to add here.</string>
     <!-- Button for user to verify they understand the information presented. [CHAR LIMIT=50] -->
     <string name="communal_widgets_disclaimer_button">Got it</string>
-    <!-- Lockscreen affordance to open glanceable hub. [CHAR LIMIT=20] -->
+    <!-- Label for a lock screen affordance to show widgets on the lock screen. [CHAR LIMIT=20] -->
     <string name="glanceable_hub_lockscreen_affordance_label">Widgets</string>
-    <!-- Text explaining that the glanceable hub affordance is disabled. [CHAR LIMIT=NONE] -->
-    <string name="glanceable_hub_lockscreen_affordance_disabled_text">To add Widgets on the lock screen as a shortcut, make sure it is enabled in settings.</string>
+    <!-- Text explaining why the lock screen affordance to show widgets on the lockscreen is disabled and how to enable the affordance in settings. [CHAR LIMIT=NONE] -->
+    <string name="glanceable_hub_lockscreen_affordance_disabled_text">To add the \"Widgets\" shortcut, make sure \"Show widgets on lock screen\" is enabled in settings.</string>
+    <!-- Label for a button used to open Settings in order to enable showing widgets on the lock screen. [CHAR LIMIT=NONE] -->
+    <string name="glanceable_hub_lockscreen_affordance_action_button_label">Settings</string>
 
     <!-- Related to user switcher --><skip/>
 
@@ -1815,6 +1817,7 @@
 
     <string name="volume_ringer_change">Tap to change ringer mode</string>
     <string name="volume_ringer_mode">ringer mode</string>
+    <string name="volume_ringer_drawer_closed_content_description"><xliff:g id="volume ringer status" example="Ring">%1$s</xliff:g>, tap to change ringer mode </string>
 
     <!-- Hint for accessibility. For example: double tap to mute [CHAR_LIMIT=NONE] -->
     <string name="volume_ringer_hint_mute">mute</string>
@@ -2292,6 +2295,14 @@
     <string name="system_multitasking_replace">During split screen: replace an app from one to another</string>
     <!-- User visible title for the keyboard shortcut that moves a focused task to a next display [CHAR LIMIT=70] -->
     <string name="system_multitasking_move_to_next_display">Move active window between displays</string>
+    <!-- User visible title for the keyboard shortcut that snaps a task to the left in desktop mode [CHAR LIMIT=70] -->
+    <string name="system_desktop_mode_snap_left_window">Move window to the left</string>
+    <!-- User visible title for the keyboard shortcut that snaps a task to the right in desktop mode [CHAR LIMIT=70] -->
+    <string name="system_desktop_mode_snap_right_window">Move window to the right</string>
+    <!-- User visible title for the keyboard shortcut that toggles between maximizing and restoring a task's previous bounds in desktop mode [CHAR LIMIT=70] -->
+    <string name="system_desktop_mode_toggle_maximize_window">Maximize window</string>
+    <!-- User visible title for the keyboard shortcut that minimizes a task in desktop mode [CHAR LIMIT=70] -->
+    <string name="system_desktop_mode_minimize_window">Minimize window</string>
 
     <!-- User visible title for the input keyboard shortcuts list. [CHAR LIMIT=70] -->
     <string name="keyboard_shortcut_group_input">Input</string>
@@ -3744,10 +3755,6 @@
          that shows the user which keyboard shortcuts they can use. The "Multitasking" shortcuts are
          for example "Enter split screen". [CHAR LIMIT=NONE] -->
     <string name="shortcut_helper_category_multitasking">Multitasking</string>
-    <!-- Title of the keyboard shortcut helper category "Recent apps". The helper is a component
-         that shows the user which keyboard shortcuts they can use. The "Recent apps" shortcuts are
-         for example "Cycle through recent apps". [CHAR LIMIT=NONE] -->
-    <string name="shortcutHelper_category_recent_apps">Recent apps</string>
     <!-- Title of the keyboard shortcut helper category "Split screen". The helper is a component
          that shows the user which keyboard shortcuts they can use. The "Split screen" shortcuts are
          for example "Move current app to left split". [CHAR LIMIT=NONE] -->
@@ -3780,6 +3787,11 @@
          The helper is a component that shows the user which keyboard shortcuts they can use. Also
          allows the user to add/remove custom shortcuts.[CHAR LIMIT=NONE] -->
     <string name="shortcut_customize_mode_remove_shortcut_dialog_title">Remove shortcut?</string>
+    <!-- Title at the top of the keyboard shortcut helper reset shortcut dialog. This dialog allows
+         the user to remove all custom shortcuts the user has set, resetting to default shortcuts only.
+         Shortcut helper is a component that shows the user which keyboard shortcuts they can use. Also
+         allows the user to add/remove custom shortcuts.[CHAR LIMIT=NONE] -->
+    <string name="shortcut_customize_mode_reset_shortcut_dialog_title">Reset back to default?</string>
     <!-- Sub title at the top of the keyboard shortcut helper customization dialog. Explains to the
          user what action they need to take in the customization dialog to assign a new custom shortcut.
          The shortcut customize dialog allows users to add/remove custom shortcuts
@@ -3790,6 +3802,10 @@
          users to add/remove custom shortcuts
          [CHAR LIMIT=NONE] -->
     <string name="shortcut_customize_mode_remove_shortcut_description">This will delete your custom shortcut permanently.</string>
+    <!-- Sub title at the top of the reset custom shortcut dialog. Explains to the user that the action
+         they're about to take will remove all custom shortcuts they have set, resetting to default shortcuts only.
+         The shortcut customize dialog allows users to add/remove custom shortcuts [CHAR LIMIT=NONE] -->
+    <string name="shortcut_customize_mode_reset_shortcut_description">This will delete all your custom shortcuts permanently.</string>
     <!-- Placeholder text shown in the search box of the keyboard shortcut helper, when the user
          hasn't typed in anything in the search box yet. The helper is a  component that shows the
          user which keyboard shortcuts they can use. [CHAR LIMIT=NONE] -->
@@ -3815,6 +3831,9 @@
          shortcut helper The helper is a  component that shows the  user which keyboard shortcuts
          they can use. [CHAR LIMIT=NONE] -->
     <string name="shortcut_helper_customize_button_text">Customize</string>
+    <!-- Description text of the button that allows user to resets all custom shortcuts in keyboard
+         shortcut helper when in customization mode. [CHAR LIMIT=NONE] -->
+    <string name="shortcut_helper_reset_button_text">Reset</string>
     <!-- Description text of the button that allows user to exit shortcut customization mode in
          keyboard shortcut helper The helper is a  component that shows the  user which keyboard
          shortcuts they can use. [CHAR LIMIT=NONE] -->
@@ -3832,6 +3851,14 @@
          [CHAR LIMIT=NONE]
           -->
     <string name="shortcut_helper_key_combinations_or_separator">or</string>
+    <!-- Word that combines different possible key combinations of a shortcut. For example the
+         "Go to home screen" shortcut could be triggered using "ctrl" plus "h".
+         This is only used for accessibility content descriptions of the key combinations.
+         [CHAR LIMIT=NONE] -->
+    <string name="shortcut_helper_key_combinations_and_conjunction">plus</string>
+    <!-- Word that represents the forward slash character "/". To be used only in accessibility
+         content descriptions. [CHAR LIMIT=NONE] -->
+    <string name="shortcut_helper_key_combinations_forward_slash">forward slash</string>
     <!-- Content description of the drag handle that allows to swipe to dismiss the shortcut helper.
          The helper is a  component that shows the  user which keyboard shortcuts they can
          use. The helper shows shortcuts in categories, which can be collapsed or expanded.
@@ -3849,6 +3876,10 @@
          confirm and remove previously added custom shortcut. The helper is a  component that
          shows the user which keyboard shortcuts they can use. [CHAR LIMIT=NONE] -->
     <string name="shortcut_helper_customize_dialog_remove_button_label">Remove</string>
+    <!-- Label on the reset shortcut button in keyboard shortcut helper customize dialog, that allows user to
+         confirm and reset all added custom shortcut. The helper is a  component that
+         shows the user which keyboard shortcuts they can use. [CHAR LIMIT=NONE] -->
+    <string name="shortcut_helper_customize_dialog_reset_button_label">Yes, reset</string>
     <!-- Label on the cancel button in keyboard shortcut helper customize dialog, that allows user to
          cancel and exit shortcut customization dialog, returning to the main shortcut helper page.
          The helper is a  component that shows the user which keyboard shortcuts they can use.
@@ -3935,6 +3966,8 @@
     <string name="tutorial_action_key_success_title">Well done!</string>
     <!-- Text shown to the user after they complete action key tutorial [CHAR LIMIT=NONE] -->
     <string name="tutorial_action_key_success_body">You completed the view all apps gesture</string>
+    <!-- Content description for the animation playing during the tutorial. The user can click the animation to pause and unpause playback. [CHAR LIMIT=NONE] -->
+    <string name="tutorial_animation_content_description">Tutorial animation, click to pause and resume play.</string>
 
     <!-- Content description for keyboard backlight brightness dialog [CHAR LIMIT=NONE] -->
     <string name="keyboard_backlight_dialog_title">Keyboard backlight</string>

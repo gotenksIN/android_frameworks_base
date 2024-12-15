@@ -28286,11 +28286,25 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         mPrivateFlags |= PFLAG_FORCE_LAYOUT;
         mPrivateFlags |= PFLAG_INVALIDATED;
 
-        if (mParent != null && !mParent.isLayoutRequested()) {
-            mParent.requestLayout();
+        if (mParent != null) {
+            if (!mParent.isLayoutRequested()) {
+                mParent.requestLayout();
+            } else {
+                clearMeasureCacheOfAncestors();
+            }
         }
         if (mAttachInfo != null && mAttachInfo.mViewRequestingLayout == this) {
             mAttachInfo.mViewRequestingLayout = null;
+        }
+    }
+
+    private void clearMeasureCacheOfAncestors() {
+        ViewParent parent = mParent;
+        while (parent instanceof View view) {
+            if (view.mMeasureCache != null) {
+                view.mMeasureCache.clear();
+            }
+            parent = view.mParent;
         }
     }
 
@@ -28649,8 +28663,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     @RemotableViewMethod
     public void setMinimumHeight(int minHeight) {
-        mMinHeight = minHeight;
-        requestLayout();
+        if (mMinHeight != minHeight) {
+            mMinHeight = minHeight;
+            requestLayout();
+        }
     }
 
     /**
@@ -28680,8 +28696,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     @RemotableViewMethod
     public void setMinimumWidth(int minWidth) {
-        mMinWidth = minWidth;
-        requestLayout();
+        if (mMinWidth != minWidth) {
+            mMinWidth = minWidth;
+            requestLayout();
+        }
 
     }
 

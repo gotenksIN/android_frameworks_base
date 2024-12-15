@@ -3796,6 +3796,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             r.setPictureInPictureParams(params);
             enterPipTransition.setPipActivity(r);
             r.mAutoEnteringPip = isAutoEnter;
+
+            if (r.getTaskFragment() != null && r.getTaskFragment().isEmbeddedWithBoundsOverride()
+                    && enterPipTransition != null) {
+                enterPipTransition.addFlag(FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY);
+            }
+
             getTransitionController().startCollectOrQueue(enterPipTransition, (deferred) -> {
                 getTransitionController().requestStartTransition(enterPipTransition,
                         r.getTask(), null /* remoteTransition */, null /* displayChange */);

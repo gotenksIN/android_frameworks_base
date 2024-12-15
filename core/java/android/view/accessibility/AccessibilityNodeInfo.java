@@ -6540,6 +6540,15 @@ public class AccessibilityNodeInfo implements Parcelable {
      * Class with information if a node is a range.
      */
     public static final class RangeInfo {
+        /** @hide */
+        @IntDef(prefix = { "RANGE_TYPE_" }, value = {
+                RANGE_TYPE_INT,
+                RANGE_TYPE_FLOAT,
+                RANGE_TYPE_PERCENT,
+                RANGE_TYPE_INDETERMINATE
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface RangeType {}
 
         /** Range type: integer. */
         public static final int RANGE_TYPE_INT = 0;
@@ -6551,15 +6560,23 @@ public class AccessibilityNodeInfo implements Parcelable {
         /**
          * Range type: indeterminate.
          *
-         * A {@link RangeInfo} type used to represent a node which may typically expose range
-         * information but is presently in an indeterminate state, such as a {@link
-         * android.widget.ProgressBar} representing a loading operation of unknown duration.
          * When using this type, the {@code min}, {@code max}, and {@code current} values used to
-         * construct an instance may be ignored. It is recommended to use {@code Float.NaN} for
-         * these values.
+         * construct an instance may be ignored.
+         *
+         *  @see #INDETERMINATE
          */
         @FlaggedApi(Flags.FLAG_INDETERMINATE_RANGE_INFO)
         public static final int RANGE_TYPE_INDETERMINATE = 3;
+
+        /**
+         * A {@link RangeInfo} type used to represent a node which may typically expose range
+         * information but is presently in an indeterminate state, such as a {@link
+         * android.widget.ProgressBar} representing a loading operation of unknown duration.
+         */
+        @NonNull
+        @FlaggedApi(Flags.FLAG_INDETERMINATE_RANGE_INFO)
+        public static final RangeInfo INDETERMINATE = new RangeInfo(RANGE_TYPE_INDETERMINATE, 0.0f,
+                0.0f, 0.0f);
 
         private int mType;
         private float mMin;
@@ -6580,7 +6597,7 @@ public class AccessibilityNodeInfo implements Parcelable {
          * @param current The current value.
          */
         @Deprecated
-        public static RangeInfo obtain(int type, float min, float max, float current) {
+        public static RangeInfo obtain(@RangeType int type, float min, float max, float current) {
             return new RangeInfo(type, min, max, current);
         }
 
@@ -6594,7 +6611,7 @@ public class AccessibilityNodeInfo implements Parcelable {
          *            maximum.
          * @param current The current value.
          */
-        public RangeInfo(int type, float min, float max, float current) {
+        public RangeInfo(@RangeType int type, float min, float max, float current) {
             mType = type;
             mMin = min;
             mMax = max;
@@ -6610,6 +6627,7 @@ public class AccessibilityNodeInfo implements Parcelable {
          * @see #RANGE_TYPE_FLOAT
          * @see #RANGE_TYPE_PERCENT
          */
+        @RangeType
         public int getType() {
             return mType;
         }

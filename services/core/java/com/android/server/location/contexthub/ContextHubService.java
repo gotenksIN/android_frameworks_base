@@ -34,6 +34,7 @@ import android.hardware.contexthub.ErrorCode;
 import android.hardware.contexthub.HubEndpointInfo;
 import android.hardware.contexthub.IContextHubEndpoint;
 import android.hardware.contexthub.IContextHubEndpointCallback;
+import android.hardware.contexthub.IContextHubEndpointDiscoveryCallback;
 import android.hardware.contexthub.MessageDeliveryStatus;
 import android.hardware.location.ContextHubInfo;
 import android.hardware.location.ContextHubMessage;
@@ -153,6 +154,9 @@ public class ContextHubService extends IContextHubService.Stub {
 
     // The manager for sending messages to/from clients
     private ContextHubClientManager mClientManager;
+
+    // Manages endpoint and its sessions between apps and HAL
+    private ContextHubEndpointManager mEndpointManager;
 
     // The default client for old API clients
     private Map<Integer, IContextHubClient> mDefaultClientMap;
@@ -329,14 +333,18 @@ public class ContextHubService extends IContextHubService.Stub {
             HubInfoRegistry registry;
             try {
                 registry = new HubInfoRegistry(mContextHubWrapper);
+                mEndpointManager =
+                        new ContextHubEndpointManager(mContext, mContextHubWrapper, registry);
                 Log.i(TAG, "Enabling generic offload API");
             } catch (UnsupportedOperationException e) {
+                mEndpointManager = null;
                 registry = null;
                 Log.w(TAG, "Generic offload API not supported, disabling");
             }
             mHubInfoRegistry = registry;
         } else {
             mHubInfoRegistry = null;
+            mEndpointManager = null;
             Log.i(TAG, "Disabling generic offload API");
         }
 
@@ -526,7 +534,7 @@ public class ContextHubService extends IContextHubService.Stub {
         }
         try {
             mContextHubWrapper.registerEndpointCallback(
-                    new ContextHubHalEndpointCallback(mHubInfoRegistry));
+                    new ContextHubHalEndpointCallback(mHubInfoRegistry, mEndpointManager));
         } catch (RemoteException | UnsupportedOperationException e) {
             Log.e(TAG, "Exception while registering IEndpointCallback", e);
         }
@@ -789,8 +797,36 @@ public class ContextHubService extends IContextHubService.Stub {
             HubEndpointInfo pendingHubEndpointInfo, IContextHubEndpointCallback callback)
             throws RemoteException {
         super.registerEndpoint_enforcePermission();
+        if (mEndpointManager == null) {
+            Log.e(TAG, "ContextHubService.registerEndpoint: endpoint manager failed to initialize");
+            throw new UnsupportedOperationException("Endpoint registration is not supported");
+        }
+        return mEndpointManager.registerEndpoint(pendingHubEndpointInfo, callback);
+    }
+
+    @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_CONTEXT_HUB)
+    @Override
+    public void registerEndpointDiscoveryCallbackId(
+            long endpointId, IContextHubEndpointDiscoveryCallback callback) throws RemoteException {
+        super.registerEndpointDiscoveryCallbackId_enforcePermission();
         // TODO(b/375487784): Implement this
-        return null;
+    }
+
+    @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_CONTEXT_HUB)
+    @Override
+    public void registerEndpointDiscoveryCallbackDescriptor(
+            String serviceDescriptor, IContextHubEndpointDiscoveryCallback callback)
+            throws RemoteException {
+        super.registerEndpointDiscoveryCallbackDescriptor_enforcePermission();
+        // TODO(b/375487784): Implement this
+    }
+
+    @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_CONTEXT_HUB)
+    @Override
+    public void unregisterEndpointDiscoveryCallback(IContextHubEndpointDiscoveryCallback callback)
+            throws RemoteException {
+        super.unregisterEndpointDiscoveryCallback_enforcePermission();
+        // TODO(b/375487784): Implement this
     }
 
     /**

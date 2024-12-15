@@ -20,6 +20,7 @@ import android.app.ActivityManager.RunningTaskInfo
 import android.graphics.Rect
 import android.os.Binder
 import android.os.Handler
+import android.os.UserManager
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
@@ -42,7 +43,7 @@ import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_BACK_NAVIGAT
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.ShellExecutor
-import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createFreeformTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import com.android.wm.shell.desktopmode.persistence.DesktopPersistentRepository
 import com.android.wm.shell.desktopmode.persistence.DesktopRepositoryInitializer
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
@@ -73,7 +74,6 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.quality.Strictness
 
-
 /**
  * Test class for {@link DesktopTasksLimiter}
  *
@@ -95,9 +95,11 @@ class DesktopTasksLimiterTest : ShellTestCase() {
     @Mock lateinit var testExecutor: ShellExecutor
     @Mock lateinit var persistentRepository: DesktopPersistentRepository
     @Mock lateinit var repositoryInitializer: DesktopRepositoryInitializer
+    @Mock lateinit var userManager: UserManager
 
     private lateinit var mockitoSession: StaticMockitoSession
     private lateinit var desktopTasksLimiter: DesktopTasksLimiter
+    private lateinit var userRepositories: DesktopUserRepositories
     private lateinit var desktopTaskRepo: DesktopRepository
     private lateinit var shellInit: ShellInit
     private lateinit var testScope: CoroutineScope
@@ -111,16 +113,18 @@ class DesktopTasksLimiterTest : ShellTestCase() {
         Dispatchers.setMain(StandardTestDispatcher())
         testScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
 
-        desktopTaskRepo =
-            DesktopRepository(
+        userRepositories =
+            DesktopUserRepositories(
                 context,
                 shellInit,
                 persistentRepository,
                 repositoryInitializer,
-                testScope
+                testScope,
+                userManager
             )
+        desktopTaskRepo = userRepositories.current
         desktopTasksLimiter =
-            DesktopTasksLimiter(transitions, desktopTaskRepo, shellTaskOrganizer, MAX_TASK_LIMIT,
+            DesktopTasksLimiter(transitions, userRepositories, shellTaskOrganizer, MAX_TASK_LIMIT,
                 interactionJankMonitor, mContext, handler)
     }
 
@@ -133,7 +137,7 @@ class DesktopTasksLimiterTest : ShellTestCase() {
     @Test
     fun createDesktopTasksLimiter_withZeroLimit_shouldThrow() {
         assertFailsWith<IllegalArgumentException> {
-            DesktopTasksLimiter(transitions, desktopTaskRepo, shellTaskOrganizer, 0,
+            DesktopTasksLimiter(transitions, userRepositories, shellTaskOrganizer, 0,
                 interactionJankMonitor, mContext, handler)
         }
     }
@@ -141,7 +145,7 @@ class DesktopTasksLimiterTest : ShellTestCase() {
     @Test
     fun createDesktopTasksLimiter_withNegativeLimit_shouldThrow() {
         assertFailsWith<IllegalArgumentException> {
-            DesktopTasksLimiter(transitions, desktopTaskRepo, shellTaskOrganizer, -5,
+            DesktopTasksLimiter(transitions, userRepositories, shellTaskOrganizer, -5,
                 interactionJankMonitor, mContext, handler)
         }
     }
@@ -411,7 +415,7 @@ class DesktopTasksLimiterTest : ShellTestCase() {
     @Test
     fun getTaskToMinimize_tasksAboveLimit_otherLimit_returnsBackTask() {
         desktopTasksLimiter =
-            DesktopTasksLimiter(transitions, desktopTaskRepo, shellTaskOrganizer, MAX_TASK_LIMIT2,
+            DesktopTasksLimiter(transitions, userRepositories, shellTaskOrganizer, MAX_TASK_LIMIT2,
                 interactionJankMonitor, mContext, handler)
         val tasks = (1..MAX_TASK_LIMIT2 + 1).map { setUpFreeformTask() }
 

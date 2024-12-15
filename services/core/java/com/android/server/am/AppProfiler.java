@@ -1997,7 +1997,7 @@ public class AppProfiler {
     }
 
     @GuardedBy("mProfilerLock")
-    private void stopProfilerLPf(ProcessRecord proc, int profileType) {
+    private void stopProfilerLPf(ProcessRecord proc, ProfilerInfo profilerInfo, int profileType) {
         if (proc == null || proc == mProfileData.getProfileProc()) {
             proc = mProfileData.getProfileProc();
             profileType = mProfileType;
@@ -2011,7 +2011,7 @@ public class AppProfiler {
             return;
         }
         try {
-            thread.profilerControl(false, null, profileType);
+            thread.profilerControl(false, profilerInfo, profileType);
         } catch (RemoteException e) {
             throw new IllegalStateException("Process disappeared");
         }
@@ -2046,41 +2046,58 @@ public class AppProfiler {
             ProfilerInfo profilerInfo, int profileType) {
         try {
             if (start) {
-                stopProfilerLPf(null, 0);
+                boolean needsFile = (profileType == ProfilerInfo.PROFILE_TYPE_REGULAR);
+                stopProfilerLPf(null, null, 0);
                 mService.setProfileApp(proc.info, proc.processName, profilerInfo,
-                        proc.isSdkSandbox ? proc.getClientInfoForSdkSandbox() : null);
+                        proc.isSdkSandbox ? proc.getClientInfoForSdkSandbox() : null, profileType);
                 mProfileData.setProfileProc(proc);
                 mProfileType = profileType;
-                ParcelFileDescriptor fd = profilerInfo.profileFd;
-                try {
-                    fd = fd.dup();
-                } catch (IOException e) {
-                    fd = null;
-                }
-                profilerInfo.profileFd = fd;
-                proc.mProfile.getThread().profilerControl(start, profilerInfo, profileType);
-                fd = null;
-                try {
-                    mProfileData.getProfilerInfo().profileFd.close();
-                } catch (IOException e) {
-                }
-                mProfileData.getProfilerInfo().profileFd = null;
 
-                if (proc.getPid() == mService.MY_PID) {
-                    // When profiling the system server itself, avoid closing the file
-                    // descriptor, as profilerControl will not create a copy.
-                    // Note: it is also not correct to just set profileFd to null, as the
-                    //       whole ProfilerInfo instance is passed down!
-                    profilerInfo = null;
-                }
-            } else {
-                stopProfilerLPf(proc, profileType);
-                if (profilerInfo != null && profilerInfo.profileFd != null) {
+                ParcelFileDescriptor fd = null;
+                if (needsFile) {
+                    fd = profilerInfo.profileFd;
                     try {
-                        profilerInfo.profileFd.close();
+                        fd = fd.dup();
+                    } catch (IOException e) {
+                        fd = null;
+                    }
+                    profilerInfo.profileFd = fd;
+                }
+
+                proc.mProfile.getThread().profilerControl(start, profilerInfo, profileType);
+
+                if (needsFile) {
+                    fd = null;
+                    try {
+                        mProfileData.getProfilerInfo().profileFd.close();
                     } catch (IOException e) {
                     }
+                    mProfileData.getProfilerInfo().profileFd = null;
+
+                    if (proc.getPid() == mService.MY_PID) {
+                        // When profiling the system server itself, avoid closing the file
+                        // descriptor, as profilerControl will not create a copy.
+                        // Note: it is also not correct to just set profileFd to null, as the
+                        //       whole ProfilerInfo instance is passed down!
+                        profilerInfo = null;
+                    }
                 }
+            } else {
+                boolean mayNeedFile = (profileType == ProfilerInfo.PROFILE_TYPE_LOW_OVERHEAD);
+                if (profilerInfo != null && profilerInfo.profileFd != null) {
+                    ParcelFileDescriptor fd = profilerInfo.profileFd;
+                    try {
+                        if (mayNeedFile) {
+                            fd = fd.dup();
+                        } else {
+                            fd.close();
+                        }
+                    } catch (IOException e) {
+                        fd = null;
+                    }
+                    profilerInfo.profileFd = fd;
+                }
+                stopProfilerLPf(proc, profilerInfo, profileType);
             }
 
             return true;
@@ -2097,7 +2114,7 @@ public class AppProfiler {
     }
 
     @GuardedBy("mProfilerLock")
-    void setProfileAppLPf(String processName, ProfilerInfo profilerInfo) {
+    void setProfileAppLPf(String processName, ProfilerInfo profilerInfo, int profileType) {
         mProfileData.setProfileApp(processName);
 
         if (mProfileData.getProfilerInfo() != null) {
@@ -2108,8 +2125,10 @@ public class AppProfiler {
                 }
             }
         }
-        mProfileData.setProfilerInfo(new ProfilerInfo(profilerInfo));
-        mProfileType = 0;
+        if (profilerInfo != null) {
+            mProfileData.setProfilerInfo(new ProfilerInfo(profilerInfo));
+        }
+        mProfileType = profileType;
     }
 
     @GuardedBy("mProfilerLock")

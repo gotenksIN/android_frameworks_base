@@ -1867,8 +1867,12 @@
          16 KB device. 4 KB natives libs will be loaded app-compat mode if they are eligible.
          @FlaggedApi(android.content.pm.Flags.FLAG_APP_COMPAT_OPTION_16KB) -->
     <attr name="pageSizeCompat">
-        <enum name="enabled" value="5" />
-        <enum name="disabled" value="6" />
+        <!-- value for enabled must match with
+        ApplicationInfo.PAGE_SIZE_APP_COMPAT_FLAG_MANIFEST_OVERRIDE_ENABLED -->
+        <enum name="enabled" value="32" />
+        <!-- value for disabled must match with
+        ApplicationInfo.PAGE_SIZE_APP_COMPAT_FLAG_MANIFEST_OVERRIDE_DISABLED -->
+        <enum name="disabled" value="64" />
     </attr>
 
 
@@ -2568,6 +2572,8 @@
              against a development branch, in which case it will only work against
              the development builds. -->
         <attr name="minSdkVersion" format="integer|string" />
+        <!-- @FlaggedApi(android.sdk.Flags.FLAG_MAJOR_MINOR_VERSIONING_SCHEME) -->
+        <attr name="minSdkVersionFull" format="string" />
         <!-- This is the SDK version number that the application is targeting.
              It is able to run on older versions (down to minSdkVersion), but
              was explicitly tested to work with the version specified here.

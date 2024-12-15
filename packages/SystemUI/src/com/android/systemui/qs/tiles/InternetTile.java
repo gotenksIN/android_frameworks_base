@@ -36,7 +36,7 @@ import android.service.quicksettings.Tile;
 import android.text.Html;
 import android.text.TextUtils;
 import android.util.Log;
-import android.widget.Switch;
+import android.widget.Button;
 
 import androidx.annotation.Nullable;
 
@@ -146,7 +146,7 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
     }
 
     @Override
-    public void secondaryClick(@Nullable Expandable expandable) {
+    public void handleSecondaryClick(@Nullable Expandable expandable) {
         // TODO(b/358352265): Figure out the correct action for the secondary click
         // Toggle Wifi
         mWifiStateWorker.setWifiEnabled(!mWifiStateWorker.isWifiEnabled());
@@ -545,10 +545,10 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
         if (cb.mAirplaneModeEnabled) {
             if (!state.value) {
                 state.state = Tile.STATE_INACTIVE;
-                state.icon = ResourceIcon.get(R.drawable.ic_qs_no_internet_unavailable);
+                state.icon = maybeLoadResourceIcon(R.drawable.ic_qs_no_internet_unavailable);
                 state.secondaryLabel = r.getString(R.string.status_bar_airplane);
             } else if (!wifiConnected) {
-                state.icon = ResourceIcon.get(R.drawable.ic_qs_no_internet_unavailable);
+                state.icon = maybeLoadResourceIcon(R.drawable.ic_qs_no_internet_unavailable);
                 if (cb.mNoNetworksAvailable) {
                     state.secondaryLabel =
                             r.getString(R.string.quick_settings_networks_unavailable);
@@ -557,28 +557,28 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
                             r.getString(R.string.quick_settings_networks_available);
                 }
             } else {
-                state.icon = ResourceIcon.get(cb.mWifiSignalIconId);
+                state.icon = maybeLoadResourceIcon(cb.mWifiSignalIconId);
             }
         } else if (cb.mNoDefaultNetwork) {
             if (cb.mNoNetworksAvailable || !cb.mEnabled) {
-                state.icon = ResourceIcon.get(R.drawable.ic_qs_no_internet_unavailable);
+                state.icon = maybeLoadResourceIcon(R.drawable.ic_qs_no_internet_unavailable);
                 state.secondaryLabel = r.getString(R.string.quick_settings_networks_unavailable);
             } else {
-                state.icon = ResourceIcon.get(R.drawable.ic_qs_no_internet_available);
+                state.icon = maybeLoadResourceIcon(R.drawable.ic_qs_no_internet_available);
                 state.secondaryLabel = r.getString(R.string.quick_settings_networks_available);
             }
         } else if (cb.mIsTransient) {
-            state.icon = ResourceIcon.get(
+            state.icon = maybeLoadResourceIcon(
                 com.android.internal.R.drawable.ic_signal_wifi_transient_animation);
         } else if (!state.value) {
             state.state = Tile.STATE_INACTIVE;
-            state.icon = ResourceIcon.get(WifiIcons.QS_WIFI_DISABLED);
+            state.icon = maybeLoadResourceIcon(WifiIcons.QS_WIFI_DISABLED);
         } else if (wifiConnected) {
-            state.icon = ResourceIcon.get(cb.mWifiSignalIconId);
+            state.icon = maybeLoadResourceIcon(cb.mWifiSignalIconId);
         } else if (wifiNotConnected) {
-            state.icon = ResourceIcon.get(WifiIcons.QS_WIFI_NO_NETWORK);
+            state.icon = maybeLoadResourceIcon(WifiIcons.QS_WIFI_NO_NETWORK);
         } else {
-            state.icon = ResourceIcon.get(WifiIcons.QS_WIFI_NO_NETWORK);
+            state.icon = maybeLoadResourceIcon(WifiIcons.QS_WIFI_NO_NETWORK);
         }
         minimalContentDescription.append(
             mContext.getString(R.string.quick_settings_internet_label)).append(",");
@@ -593,7 +593,7 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
         state.contentDescription = minimalContentDescription.toString();
         state.dualLabelContentDescription = r.getString(
                 R.string.accessibility_quick_settings_open_settings, getTileLabel());
-        state.expandedAccessibilityClassName = Switch.class.getName();
+        state.expandedAccessibilityClassName = Button.class.getName();
         if (DEBUG) {
             Log.d(TAG, "handleUpdateWifiState: " + "BooleanState = " + state.toString());
         }
@@ -610,18 +610,18 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
         boolean mobileDataEnabled = mDataController.isMobileDataSupported()
                 && mDataController.isMobileDataEnabled();
         state.value = mobileDataEnabled;
-        state.expandedAccessibilityClassName = Switch.class.getName();
+        state.expandedAccessibilityClassName = Button.class.getName();
 
         if (cb.mAirplaneModeEnabled && cb.mQsTypeIcon != TelephonyIcons.ICON_CWF) {
             state.state = Tile.STATE_INACTIVE;
-            state.icon = ResourceIcon.get(R.drawable.ic_qs_no_internet_unavailable);
+            state.icon = maybeLoadResourceIcon(R.drawable.ic_qs_no_internet_unavailable);
             state.secondaryLabel = r.getString(R.string.status_bar_airplane);
         } else if (cb.mNoDefaultNetwork) {
             if (cb.mNoNetworksAvailable || !mSignalCallback.mWifiInfo.mEnabled) {
-                state.icon = ResourceIcon.get(R.drawable.ic_qs_no_internet_unavailable);
+                state.icon = maybeLoadResourceIcon(R.drawable.ic_qs_no_internet_unavailable);
                 state.secondaryLabel = r.getString(R.string.quick_settings_networks_unavailable);
             } else {
-                state.icon = ResourceIcon.get(R.drawable.ic_qs_no_internet_available);
+                state.icon = maybeLoadResourceIcon(R.drawable.ic_qs_no_internet_available);
                 state.secondaryLabel = r.getString(R.string.quick_settings_networks_available);
             }
         } else {
@@ -653,7 +653,7 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
         final Resources r = mContext.getResources();
         state.label = r.getString(R.string.quick_settings_internet_label);
         state.state = Tile.STATE_ACTIVE;
-        state.icon = ResourceIcon.get(cb.mEthernetSignalIconId);
+        state.icon = maybeLoadResourceIcon(cb.mEthernetSignalIconId);
         state.secondaryLabel = cb.mEthernetContentDescription;
         if (DEBUG) {
             Log.d(TAG, "handleUpdateEthernetState: " + "BooleanState = " + state.toString());

@@ -16,6 +16,7 @@
 
 package com.android.systemui.brightness.ui.compose
 
+import android.view.MotionEvent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -32,6 +33,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -41,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
@@ -103,11 +106,11 @@ private fun BrightnessSlider(
             null
         }
 
-    val overriddenByAppState =
+    val overriddenByAppState by
         if (Flags.showToastWhenAppControlBrightness()) {
-            viewModel.brightnessOverriddenByWindow.collectAsStateWithLifecycle().value
+            viewModel.brightnessOverriddenByWindow.collectAsStateWithLifecycle()
         } else {
-            false
+            remember { mutableStateOf(false) }
         }
 
     PlatformSlider(
@@ -221,7 +224,16 @@ fun BrightnessSliderContainer(
                     )
                     .then(if (viewModel.showMirror) Modifier.drawInOverlay() else Modifier)
                     .sliderBackground(containerColor)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .pointerInteropFilter {
+                        if (
+                            it.actionMasked == MotionEvent.ACTION_UP ||
+                                it.actionMasked == MotionEvent.ACTION_CANCEL
+                        ) {
+                            viewModel.emitBrightnessTouchForFalsing()
+                        }
+                        false
+                    },
             formatter = viewModel::formatValue,
             hapticsViewModelFactory = viewModel.hapticsViewModelFactory,
         )

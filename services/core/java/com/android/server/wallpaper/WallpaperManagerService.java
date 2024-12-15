@@ -50,6 +50,7 @@ import static com.android.window.flags.Flags.multiCrop;
 import static com.android.window.flags.Flags.offloadColorExtraction;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
 import android.app.AppGlobals;
@@ -1513,11 +1514,15 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
             }
             if (wallpaper.getComponent() != null
                     && isPackageModified(wallpaper.getComponent().getPackageName())) {
+                ServiceInfo serviceInfo = null;
                 try {
-                    mContext.getPackageManager().getServiceInfo(wallpaper.getComponent(),
-                            PackageManager.MATCH_DIRECT_BOOT_AWARE
-                                    | PackageManager.MATCH_DIRECT_BOOT_UNAWARE);
-                } catch (NameNotFoundException e) {
+                    serviceInfo = mIPackageManager.getServiceInfo(
+                            wallpaper.getComponent(), PackageManager.MATCH_DIRECT_BOOT_AWARE
+                                    | PackageManager.MATCH_DIRECT_BOOT_UNAWARE, wallpaper.userId);
+                } catch (RemoteException e) {
+                    Slog.w(TAG, "Failed to call IPackageManager.getServiceInfo", e);
+                }
+                if (serviceInfo == null) {
                     Slog.e(TAG, "Wallpaper component gone, removing: "
                             + wallpaper.getComponent());
                     clearWallpaperLocked(wallpaper.mWhich, wallpaper.userId, false, null);
@@ -2483,7 +2488,8 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
     @Override
     public WallpaperInfo getWallpaperInfoWithFlags(@SetWallpaperFlags int which, int userId) {
         if (liveWallpaperContentHandling()) {
-            return getWallpaperInstance(which, userId, false).getInfo();
+            WallpaperInstance instance = getWallpaperInstance(which, userId, false);
+            return (instance != null) ? instance.getInfo() : null;
         }
 
         userId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
@@ -2505,7 +2511,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
         return null;
     }
 
-    @NonNull
+    @Nullable
     @Override
     public WallpaperInstance getWallpaperInstance(@SetWallpaperFlags int which, int userId) {
         return getWallpaperInstance(which, userId, true);
@@ -2513,28 +2519,27 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
     private WallpaperInstance getWallpaperInstance(@SetWallpaperFlags int which, int userId,
             boolean requireReadWallpaper) {
-        final WallpaperInstance defaultInstance = new WallpaperInstance(null,
-                new WallpaperDescription.Builder().build());
         userId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
                 Binder.getCallingUid(), userId, false, true, "getWallpaperInfo", null);
         synchronized (mLock) {
             WallpaperData wallpaper = (which == FLAG_LOCK) ? mLockWallpaperMap.get(userId)
                     : mWallpaperMap.get(userId);
-            if (wallpaper == null
-                    || wallpaper.connection == null
-                    || wallpaper.connection.mInfo == null) {
-                return defaultInstance;
-            }
+            if (wallpaper == null || wallpaper.connection == null) return null;
 
             WallpaperInfo info = wallpaper.connection.mInfo;
-            boolean canQueryPackage = mPackageManagerInternal.canQueryPackage(
+            boolean canQueryPackage = (info == null) ||  mPackageManagerInternal.canQueryPackage(
                     Binder.getCallingUid(), info.getComponent().getPackageName());
             if (hasPermission(READ_WALLPAPER_INTERNAL)
                     || (canQueryPackage && !requireReadWallpaper)) {
-                return new WallpaperInstance(info, wallpaper.getDescription());
+                // TODO(b/380245309) Remove this when crops are part of the description.
+                WallpaperDescription description =
+                        wallpaper.getDescription().toBuilder().setCropHints(
+                                wallpaper.mCropHints).build();
+                return new WallpaperInstance(info, description);
+            } else {
+                return null;
             }
         }
-        return defaultInstance;
     }
 
     @Override
@@ -3177,7 +3182,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                     throw new IllegalArgumentException("Invalid crop rect supplied: " + crop);
                 }
                 int orientation = screenOrientations[i];
-                if (orientation == ORIENTATION_UNKNOWN && cropMap.size() > 1) {
+                if (orientation == ORIENTATION_UNKNOWN && crops.size() > 1) {
                     throw new IllegalArgumentException("Invalid crops supplied: the UNKNOWN"
                             + "screen orientation should only be used in a singleton map");
                 }

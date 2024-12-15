@@ -76,6 +76,7 @@ import android.telephony.satellite.ISatelliteTransmissionUpdateCallback;
 import android.telephony.satellite.ISatelliteProvisionStateCallback;
 import android.telephony.satellite.ISatelliteSupportedStateCallback;
 import android.telephony.satellite.ISatelliteModemStateCallback;
+import android.telephony.satellite.ISelectedNbIotSatelliteSubscriptionCallback;
 import android.telephony.satellite.NtnSignalStrength;
 import android.telephony.satellite.SatelliteCapabilities;
 import android.telephony.satellite.SatelliteDatagram;
@@ -3030,6 +3031,30 @@ interface ITelephony {
     void requestSelectedNbIotSatelliteSubscriptionId(in ResultReceiver receiver);
 
     /**
+     * Registers for selected satellite subscription changed event from the satellite service.
+     *
+     * @param executor The executor on which the callback will be called.
+     * @param callback The callback to handle the satellite subscription changed event.
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+            + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    int registerForSelectedNbIotSatelliteSubscriptionChanged(
+            in ISelectedNbIotSatelliteSubscriptionCallback callback);
+
+    /**
+     * Unregisters for selected satellite subscription changed event from the satellite service. If
+     * callback was not registered before, the request will be ignored.
+     *
+     * @param callback The callback that was passed to {@link
+     *     #registerForSelectedNbIotSatelliteSubscriptionChanged(Executor,
+     *     SelectedNbIotSatelliteSubscriptionCallback)}.
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+            + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    void unregisterForSelectedNbIotSatelliteSubscriptionChanged(
+            in ISelectedNbIotSatelliteSubscriptionCallback callback);
+
+    /**
      * Inform whether the device is aligned with the satellite in both real and demo mode.
      *
      * @param isAligned {@true} Device is aligned with the satellite.
@@ -3143,7 +3168,7 @@ interface ITelephony {
      */
     boolean setSatelliteAccessControlOverlayConfigs(in boolean reset, in boolean isAllowed,
             in String s2CellFile, in long locationFreshDurationNanos,
-            in List<String> satelliteCountryCodes);
+            in List<String> satelliteCountryCodes, String satelliteAccessConfigurationFile);
 
     /**
      * This API can be used in only testing to override oem-enabled satellite provision status.
@@ -3446,6 +3471,17 @@ interface ITelephony {
     void requestSatelliteSubscriberProvisionStatus(in ResultReceiver result);
 
     /**
+     * Request to get the name to display for Satellite subscription.
+     *
+     * @param receiver The result receiver that returns the diplay name to be used for the satellite
+     * subscription.
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+            + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    void requestSatelliteDisplayName(in ResultReceiver receiver);
+
+    /**
      * Deliver the list of provisioned satellite subscriber infos.
      *
      * @param list The list of provisioned satellite subscriber infos.
@@ -3519,4 +3555,15 @@ interface ITelephony {
     * @hide
     */
     void setNtnSmsSupported(boolean ntnSmsSupported);
+
+    /**
+     * Returns carrier id maps to the passing {@link CarrierIdentifier}.
+     *
+     * @param {@link CarrierIdentifier}.
+     *
+     * @return carrier id from passing {@link CarrierIdentifier} or {@link #UNKNOWN_CARRIER_ID}
+     * if the carrier cannot be identified
+     * @hide
+     */
+    int getCarrierIdFromIdentifier(in CarrierIdentifier carrierIdentifier);
 }

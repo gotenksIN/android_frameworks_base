@@ -16,29 +16,25 @@
 
 package com.android.systemui.shade.domain.interactor
 
-import android.content.Context
-import android.content.MutableContextWrapper
+import android.content.mockedContext
 import android.content.res.Configuration
-import android.content.res.Resources
+import android.content.res.mockResources
 import android.view.Display
-import android.view.WindowManager
-import android.view.WindowManager.LayoutParams.TYPE_NOTIFICATION_SHADE
+import android.view.mockWindowManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.display.data.repository.FakeDisplayWindowPropertiesRepository
-import com.android.systemui.display.shared.model.DisplayWindowProperties
-import com.android.systemui.scene.ui.view.WindowRootView
-import com.android.systemui.shade.data.repository.FakeShadeDisplayRepository
-import com.android.systemui.statusbar.phone.ConfigurationForwarder
+import com.android.systemui.kosmos.testScope
+import com.android.systemui.kosmos.useUnconfinedTestDispatcher
+import com.android.systemui.scene.ui.view.mockShadeRootView
+import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
+import com.android.systemui.testKosmos
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mockito.verify
+import org.mockito.Mockito.inOrder
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
@@ -49,31 +45,18 @@ import org.mockito.kotlin.whenever
 @RunWith(AndroidJUnit4::class)
 @SmallTest
 class ShadeDisplaysInteractorTest : SysuiTestCase() {
+    val kosmos = testKosmos().useUnconfinedTestDispatcher()
 
-    private val shadeRootview = mock<WindowRootView>()
-    private val positionRepository = FakeShadeDisplayRepository()
-    private val defaultContext = mock<Context>()
-    private val secondaryContext = mock<Context>()
-    private val contextStore = FakeDisplayWindowPropertiesRepository()
-    private val testScope = TestScope(UnconfinedTestDispatcher())
-    private val configurationForwarder = mock<ConfigurationForwarder>()
-    private val defaultWm = mock<WindowManager>()
-    private val secondaryWm = mock<WindowManager>()
-    private val resources = mock<Resources>()
+    private val shadeRootview = kosmos.mockShadeRootView
+    private val positionRepository = kosmos.fakeShadeDisplaysRepository
+    private val shadeContext = kosmos.mockedContext
+    private val testScope = kosmos.testScope
+    private val shadeWm = kosmos.mockWindowManager
+    private val resources = kosmos.mockResources
     private val configuration = mock<Configuration>()
     private val display = mock<Display>()
 
-    private val interactor =
-        ShadeDisplaysInteractor(
-            shadeRootview,
-            positionRepository,
-            MutableContextWrapper(defaultContext),
-            resources,
-            contextStore,
-            testScope.backgroundScope,
-            configurationForwarder,
-            testScope.backgroundScope.coroutineContext,
-        )
+    private val underTest = kosmos.shadeDisplaysInteractor
 
     @Before
     fun setup() {
@@ -82,74 +65,46 @@ class ShadeDisplaysInteractorTest : SysuiTestCase() {
 
         whenever(resources.configuration).thenReturn(configuration)
 
-        whenever(defaultContext.displayId).thenReturn(0)
-        whenever(defaultContext.getSystemService(any())).thenReturn(defaultWm)
-        whenever(defaultContext.resources).thenReturn(resources)
-        contextStore.insert(
-            DisplayWindowProperties(
-                displayId = 0,
-                windowType = TYPE_NOTIFICATION_SHADE,
-                context = defaultContext,
-                windowManager = defaultWm,
-                layoutInflater = mock(),
-            )
-        )
-
-        whenever(secondaryContext.displayId).thenReturn(1)
-        whenever(secondaryContext.getSystemService(any())).thenReturn(secondaryWm)
-        whenever(secondaryContext.resources).thenReturn(resources)
-        contextStore.insert(
-            DisplayWindowProperties(
-                displayId = 1,
-                windowType = TYPE_NOTIFICATION_SHADE,
-                context = secondaryContext,
-                windowManager = secondaryWm,
-                layoutInflater = mock(),
-            )
-        )
+        whenever(shadeContext.displayId).thenReturn(0)
+        whenever(shadeContext.getSystemService(any())).thenReturn(shadeWm)
+        whenever(shadeContext.resources).thenReturn(resources)
     }
 
     @Test
     fun start_shadeInCorrectPosition_notAddedOrRemoved() {
         whenever(display.displayId).thenReturn(0)
         positionRepository.setDisplayId(0)
-        interactor.start()
-        testScope.advanceUntilIdle()
 
-        verifyNoMoreInteractions(defaultWm)
-        verifyNoMoreInteractions(secondaryWm)
+        underTest.start()
+
+        verifyNoMoreInteractions(shadeWm)
     }
 
     @Test
     fun start_shadeInWrongPosition_changes() {
         whenever(display.displayId).thenReturn(0)
         positionRepository.setDisplayId(1)
-        interactor.start()
 
-        verify(defaultWm).removeView(eq(shadeRootview))
-        verify(secondaryWm).addView(eq(shadeRootview), any())
+        underTest.start()
+
+        inOrder(shadeWm).apply {
+            verify(shadeWm).removeView(eq(shadeRootview))
+            verify(shadeWm).addView(eq(shadeRootview), any())
+        }
     }
 
     @Test
     fun start_shadePositionChanges_removedThenAdded() {
         whenever(display.displayId).thenReturn(0)
         positionRepository.setDisplayId(0)
-        interactor.start()
+        underTest.start()
 
         positionRepository.setDisplayId(1)
+        testScope.advanceUntilIdle()
 
-        verify(defaultWm).removeView(eq(shadeRootview))
-        verify(secondaryWm).addView(eq(shadeRootview), any())
-    }
-
-    @Test
-    fun start_shadePositionChanges_newConfigPropagated() {
-        whenever(display.displayId).thenReturn(0)
-        positionRepository.setDisplayId(0)
-        interactor.start()
-
-        positionRepository.setDisplayId(1)
-
-        verify(configurationForwarder).onConfigurationChanged(eq(configuration))
+        inOrder(shadeWm).apply {
+            verify(shadeWm).removeView(eq(shadeRootview))
+            verify(shadeWm).addView(eq(shadeRootview), any())
+        }
     }
 }

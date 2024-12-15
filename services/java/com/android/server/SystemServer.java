@@ -16,6 +16,7 @@
 
 package com.android.server;
 
+import static android.media.tv.flags.Flags.mediaQualityFw;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_HIGH;
@@ -428,10 +429,14 @@ public final class SystemServer implements Dumpable {
             "com.android.server.wifi.aware.WifiAwareService";
     private static final String WIFI_P2P_SERVICE_CLASS =
             "com.android.server.wifi.p2p.WifiP2pService";
+    private static final String WIFI_USD_SERVICE_CLASS =
+            "com.android.server.wifi.usd.UsdService";
     private static final String CONNECTIVITY_SERVICE_APEX_PATH =
             "/apex/com.android.tethering/javalib/service-connectivity.jar";
     private static final String CONNECTIVITY_SERVICE_INITIALIZER_CLASS =
             "com.android.server.ConnectivityServiceInitializer";
+    private static final String CONNECTIVITY_SERVICE_INITIALIZER_B_CLASS =
+            "com.android.server.ConnectivityServiceInitializerB";
     private static final String NETWORK_STATS_SERVICE_INITIALIZER_CLASS =
             "com.android.server.NetworkStatsServiceInitializer";
     private static final String UWB_APEX_SERVICE_JAR_PATH =
@@ -1487,7 +1492,6 @@ public final class SystemServer implements Dumpable {
         IStorageManager storageManager = null;
         NetworkManagementService networkManagement = null;
         VpnManagerService vpnManager = null;
-        VcnManagementService vcnManagement = null;
         NetworkPolicyManagerService networkPolicy = null;
         WindowManagerService wm = null;
         NetworkTimeUpdateService networkTimeUpdater = null;
@@ -2155,6 +2159,13 @@ public final class SystemServer implements Dumpable {
                 mSystemServiceManager.startServiceFromJar(
                         WIFI_SCANNING_SERVICE_CLASS, WIFI_APEX_SERVICE_JAR_PATH);
                 t.traceEnd();
+                // Start USD service
+                if (android.net.wifi.flags.Flags.usd()) {
+                    t.traceBegin("StartUsd");
+                    mSystemServiceManager.startServiceFromJar(
+                            WIFI_USD_SERVICE_CLASS, WIFI_APEX_SERVICE_JAR_PATH);
+                    t.traceEnd();
+                }
             }
 
             if (context.getPackageManager().hasSystemFeature(
@@ -2232,8 +2243,10 @@ public final class SystemServer implements Dumpable {
 
             t.traceBegin("StartVcnManagementService");
             try {
-                vcnManagement = VcnManagementService.create(context);
-                ServiceManager.addService(Context.VCN_MANAGEMENT_SERVICE, vcnManagement);
+                // TODO: b/375213246 When VCN is in mainline module, load it from the apex path.
+                // Whether VCN will be in apex or in the platform will be gated by a build system
+                // flag.
+                mSystemServiceManager.startService(CONNECTIVITY_SERVICE_INITIALIZER_B_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting VCN Management Service", e);
             }
@@ -2645,9 +2658,11 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            t.traceBegin("StartMediaQuality");
-            mSystemServiceManager.startService(MediaQualityService.class);
-            t.traceEnd();
+            if (mediaQualityFw() && isTv) {
+                t.traceBegin("StartMediaQuality");
+                mSystemServiceManager.startService(MediaQualityService.class);
+                t.traceEnd();
+            }
 
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
                 t.traceBegin("StartMediaResourceMonitor");
@@ -3204,7 +3219,6 @@ public final class SystemServer implements Dumpable {
         final MediaRouterService mediaRouterF = mediaRouter;
         final MmsServiceBroker mmsServiceF = mmsService;
         final VpnManagerService vpnManagerF = vpnManager;
-        final VcnManagementService vcnManagementF = vcnManagement;
         final WindowManagerService windowManagerF = wm;
         final ConnectivityManager connectivityF = (ConnectivityManager)
                 context.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -3329,15 +3343,6 @@ public final class SystemServer implements Dumpable {
                 }
             } catch (Throwable e) {
                 reportWtf("making VpnManagerService ready", e);
-            }
-            t.traceEnd();
-            t.traceBegin("MakeVcnManagementServiceReady");
-            try {
-                if (vcnManagementF != null) {
-                    vcnManagementF.systemReady();
-                }
-            } catch (Throwable e) {
-                reportWtf("making VcnManagementService ready", e);
             }
             t.traceEnd();
             t.traceBegin("MakeNetworkPolicyServiceReady");

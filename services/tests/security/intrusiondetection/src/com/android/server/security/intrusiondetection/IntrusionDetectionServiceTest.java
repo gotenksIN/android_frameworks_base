@@ -16,14 +16,20 @@
 
 package com.android.server.security.intrusiondetection;
 
+import static android.Manifest.permission.INTERNET;
 import static android.Manifest.permission.MANAGE_INTRUSION_DETECTION_STATE;
 import static android.Manifest.permission.READ_INTRUSION_DETECTION_STATE;
+import static android.Manifest.permission.BIND_INTRUSION_DETECTION_EVENT_TRANSPORT_SERVICE;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
@@ -33,8 +39,15 @@ import static org.mockito.Mockito.verify;
 import android.annotation.SuppressLint;
 import android.app.admin.ConnectEvent;
 import android.app.admin.DnsEvent;
+import android.app.admin.SecurityLog;
 import android.app.admin.SecurityLog.SecurityEvent;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.Manifest;
+import android.os.IBinder;
+import android.os.Bundle;
 import android.os.Looper;
 import android.os.PermissionEnforcer;
 import android.os.RemoteException;
@@ -43,19 +56,47 @@ import android.os.test.TestLooper;
 import android.security.intrusiondetection.IIntrusionDetectionServiceCommandCallback;
 import android.security.intrusiondetection.IIntrusionDetectionServiceStateCallback;
 import android.security.intrusiondetection.IntrusionDetectionEvent;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Log;
 
 import androidx.test.core.app.ApplicationProvider;
 
+import com.android.bedstead.harrier.BedsteadJUnit4;
+import com.android.bedstead.harrier.annotations.AfterClass;
+import com.android.bedstead.harrier.annotations.BeforeClass;
+import com.android.bedstead.multiuser.annotations.RequireRunOnSystemUser;
+import com.android.bedstead.nene.TestApis;
+import com.android.bedstead.nene.devicepolicy.DeviceOwner;
+import com.android.bedstead.nene.exceptions.NeneException;
+import com.android.bedstead.permissions.CommonPermissions;
+import com.android.bedstead.permissions.PermissionContext;
+import com.android.bedstead.permissions.annotations.EnsureHasPermission;
+import com.android.coretests.apps.testapp.LocalIntrusionDetectionEventTransport;
+import com.android.internal.infra.AndroidFuture;
 import com.android.server.ServiceThread;
 
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.GeneralSecurityException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
+@RunWith(BedsteadJUnit4.class)
 public class IntrusionDetectionServiceTest {
     private static final int STATE_UNKNOWN =
             IIntrusionDetectionServiceStateCallback.State.UNKNOWN;
@@ -73,24 +114,54 @@ public class IntrusionDetectionServiceTest {
     private static final int ERROR_DATA_SOURCE_UNAVAILABLE =
             IIntrusionDetectionServiceCommandCallback.ErrorCode.DATA_SOURCE_UNAVAILABLE;
 
+    private static DeviceOwner sDeviceOwner;
+
     private Context mContext;
     private IntrusionDetectionEventTransportConnection mIntrusionDetectionEventTransportConnection;
     private DataAggregator mDataAggregator;
     private IntrusionDetectionService mIntrusionDetectionService;
+    private IBinder mService;
     private TestLooper mTestLooper;
     private Looper mLooper;
     private TestLooper mTestLooperOfDataAggregator;
     private Looper mLooperOfDataAggregator;
     private FakePermissionEnforcer mPermissionEnforcer;
+    private boolean mBoundToLoggingService = false;
+    private static final String TEST_PKG =
+        "com.android.coretests.apps.testapp";
+    private static final String TEST_SERVICE = TEST_PKG + ".TestLoggingService";
+
+    @BeforeClass
+    public static void setDeviceOwner() {
+        ComponentName admin =
+                new ComponentName(
+                        ApplicationProvider.getApplicationContext(),
+                        IntrusionDetectionAdminReceiver.class);
+        try {
+            sDeviceOwner = TestApis.devicePolicy().setDeviceOwner(admin);
+        } catch (NeneException e) {
+            fail("Failed to set device owner " + admin.flattenToString() + ": " + e);
+        }
+    }
+
+    @AfterClass
+    public static void removeDeviceOwner() {
+        try {
+            sDeviceOwner.remove();
+        } catch (NeneException e) {
+            fail("Failed to remove device owner : " + e);
+        }
+    }
 
     @SuppressLint("VisibleForTests")
     @Before
-    public void setUp() {
-        mContext = spy(ApplicationProvider.getApplicationContext());
+    public void setUp() throws Exception {
+        mContext = ApplicationProvider.getApplicationContext();
 
         mPermissionEnforcer = new FakePermissionEnforcer();
         mPermissionEnforcer.grant(READ_INTRUSION_DETECTION_STATE);
         mPermissionEnforcer.grant(MANAGE_INTRUSION_DETECTION_STATE);
+        mPermissionEnforcer.grant(BIND_INTRUSION_DETECTION_EVENT_TRANSPORT_SERVICE);
 
         mTestLooper = new TestLooper();
         mLooper = mTestLooper.getLooper();
@@ -341,6 +412,251 @@ public class IntrusionDetectionServiceTest {
 
         assertEquals(receivedEvents.get(2).getType(), IntrusionDetectionEvent.NETWORK_EVENT_DNS);
         assertNotNull(receivedEvents.get(2).getDnsEvent());
+    }
+
+    @Test
+    @RequireRunOnSystemUser
+    public void testDataSources_Initialize_HasDeviceOwner() throws Exception {
+        NetworkLogSource networkLogSource = new NetworkLogSource(mContext, mDataAggregator);
+        SecurityLogSource securityLogSource = new SecurityLogSource(mContext, mDataAggregator);
+
+        assertTrue(networkLogSource.initialize());
+        assertTrue(securityLogSource.initialize());
+    }
+
+    @Test
+    @RequireRunOnSystemUser
+    public void testDataSources_Initialize_NoDeviceOwner() throws Exception {
+        NetworkLogSource networkLogSource = new NetworkLogSource(mContext, mDataAggregator);
+        SecurityLogSource securityLogSource = new SecurityLogSource(mContext, mDataAggregator);
+        ComponentName admin = sDeviceOwner.componentName();
+
+        try {
+            sDeviceOwner.remove();
+            assertFalse(networkLogSource.initialize());
+            assertFalse(securityLogSource.initialize());
+        } finally {
+            sDeviceOwner = TestApis.devicePolicy().setDeviceOwner(admin);
+        }
+    }
+
+    @Test
+    @RequireRunOnSystemUser
+    @EnsureHasPermission(CommonPermissions.MANAGE_DEVICE_POLICY_AUDIT_LOGGING)
+    public void testDataAggregator_AddSecurityEvent() throws Exception {
+        mIntrusionDetectionService.setState(STATE_ENABLED);
+        ServiceThread mockThread = spy(ServiceThread.class);
+        mDataAggregator.setHandler(mLooperOfDataAggregator, mockThread);
+        assertTrue(mDataAggregator.initialize());
+
+        // SecurityLogging generates a number of events and callbacks, so create a latch to wait for
+        // the given event.
+        String eventString = this.getClass().getName() + ".testSecurityEvent";
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        // TODO: Replace this mock when the IntrusionDetectionEventTransportConnection is ready.
+        doAnswer(
+                    new Answer<Boolean>() {
+                        @Override
+                        public Boolean answer(InvocationOnMock input) {
+                            List<IntrusionDetectionEvent> receivedEvents =
+                                    (List<IntrusionDetectionEvent>) input.getArguments()[0];
+                            for (IntrusionDetectionEvent event : receivedEvents) {
+                                if (event.getType() == IntrusionDetectionEvent.SECURITY_EVENT) {
+                                    SecurityEvent securityEvent = event.getSecurityEvent();
+                                    Object[] eventData = (Object[]) securityEvent.getData();
+                                    if (securityEvent.getTag() == SecurityLog.TAG_KEY_GENERATED
+                                            && eventData[1].equals(eventString)) {
+                                        latch.countDown();
+                                    }
+                                }
+                            }
+                            return true;
+                        }
+                    })
+            .when(mIntrusionDetectionEventTransportConnection).addData(any());
+        mDataAggregator.enable();
+
+        // Generate the security event.
+        generateSecurityEvent(eventString);
+        TestApis.devicePolicy().forceSecurityLogs();
+
+        // Verify the event is received.
+        mTestLooper.startAutoDispatch();
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
+        mTestLooper.stopAutoDispatch();
+
+        mDataAggregator.disable();
+    }
+
+    @Test
+    @RequireRunOnSystemUser
+    @EnsureHasPermission(CommonPermissions.MANAGE_DEVICE_POLICY_AUDIT_LOGGING)
+    public void testDataAggregator_AddNetworkEvent() throws Exception {
+        mIntrusionDetectionService.setState(STATE_ENABLED);
+        ServiceThread mockThread = spy(ServiceThread.class);
+        mDataAggregator.setHandler(mLooperOfDataAggregator, mockThread);
+        assertTrue(mDataAggregator.initialize());
+
+        // Network logging may log multiple and callbacks, so create a latch to wait for
+        // the given event.
+        // eventServer must be a valid domain to generate a network log event.
+        String eventServer = "google.com";
+        final CountDownLatch latch = new CountDownLatch(1);
+        // TODO: Replace this mock when the IntrusionDetectionEventTransportConnection is ready.
+        doAnswer(
+                    new Answer<Boolean>() {
+                        @Override
+                        public Boolean answer(InvocationOnMock input) {
+                            List<IntrusionDetectionEvent> receivedEvents =
+                                    (List<IntrusionDetectionEvent>) input.getArguments()[0];
+                            for (IntrusionDetectionEvent event : receivedEvents) {
+                                if (event.getType()
+                                        == IntrusionDetectionEvent.NETWORK_EVENT_DNS) {
+                                    DnsEvent dnsEvent = event.getDnsEvent();
+                                    if (dnsEvent.getHostname().equals(eventServer)) {
+                                        latch.countDown();
+                                    }
+                                }
+                            }
+                            return true;
+                        }
+                    })
+            .when(mIntrusionDetectionEventTransportConnection).addData(any());
+        mDataAggregator.enable();
+
+        // Generate the network event.
+        generateNetworkEvent(eventServer);
+        TestApis.devicePolicy().forceNetworkLogs();
+
+        // Verify the event is received.
+        mTestLooper.startAutoDispatch();
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
+        mTestLooper.stopAutoDispatch();
+
+        mDataAggregator.disable();
+    }
+
+    /** Emits a given string into security log (if enabled). */
+    private void generateSecurityEvent(String eventString)
+            throws IllegalArgumentException, GeneralSecurityException, IOException {
+        if (eventString == null || eventString.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Error generating security event: eventString must not be empty");
+        }
+
+        final KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "AndroidKeyStore");
+        keyGen.initialize(
+                new KeyGenParameterSpec.Builder(eventString, KeyProperties.PURPOSE_SIGN).build());
+        // Emit key generation event.
+        final KeyPair keyPair = keyGen.generateKeyPair();
+        assertNotNull(keyPair);
+
+        final KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
+        ks.load(null);
+        // Emit key destruction event.
+        ks.deleteEntry(eventString);
+    }
+
+    /** Emits a given string into network log (if enabled). */
+    private void generateNetworkEvent(String server) throws IllegalArgumentException, IOException {
+        if (server == null || server.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Error generating network event: server must not be empty");
+        }
+
+        HttpURLConnection urlConnection = null;
+        int connectionTimeoutMS = 2_000;
+        try (PermissionContext p = TestApis.permissions().withPermission(INTERNET)) {
+            final URL url = new URL("http://" + server);
+            urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection.setConnectTimeout(connectionTimeoutMS);
+            urlConnection.setReadTimeout(connectionTimeoutMS);
+            urlConnection.getResponseCode();
+        } finally {
+            if (urlConnection != null) {
+                urlConnection.disconnect();
+            }
+        }
+    }
+
+    @Test
+    @RequireRunOnSystemUser
+    @EnsureHasPermission(
+            android.Manifest.permission.BIND_INTRUSION_DETECTION_EVENT_TRANSPORT_SERVICE)
+    public void test_StartIntrusionDetectionEventTransportService() {
+        final String TAG = "test_StartIntrusionDetectionEventTransportService";
+        ServiceConnection serviceConnection = null;
+
+        assertEquals(false, mBoundToLoggingService);
+        try {
+            serviceConnection = startTestService();
+            assertEquals(true, mBoundToLoggingService);
+            assertNotNull(serviceConnection);
+        } catch (SecurityException e) {
+            Log.e(TAG, "SecurityException while starting: ", e);
+            fail("Exception thrown while connecting to service");
+        } catch (InterruptedException e) {
+            Log.e(TAG, "InterruptedException while starting: ", e);
+            fail("Interrupted while connecting to service");
+        } finally {
+            mContext.unbindService(serviceConnection);
+        }
+    }
+
+    private ServiceConnection startTestService() throws SecurityException, InterruptedException {
+        final String TAG = "startTestService";
+        final CountDownLatch latch = new CountDownLatch(1);
+        LocalIntrusionDetectionEventTransport transport =
+                new LocalIntrusionDetectionEventTransport();
+
+        ServiceConnection serviceConnection = new ServiceConnection() {
+            // Called when connection with the service is established.
+            @Override
+            public void onServiceConnected(ComponentName className, IBinder service) {
+                mService = transport.getBinder();
+                mBoundToLoggingService = true;
+                latch.countDown();
+            }
+
+            // Called when the connection with the service disconnects unexpectedly.
+            @Override
+            public void onServiceDisconnected(ComponentName className) {
+                Log.d(TAG, "onServiceDisconnected");
+                mBoundToLoggingService = false;
+            }
+        };
+
+        Intent intent = new Intent();
+        intent.setComponent(new ComponentName(TEST_PKG, TEST_SERVICE));
+        mContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        latch.await(5, TimeUnit.SECONDS);
+
+        // call the methods on the transport object
+        IntrusionDetectionEvent event =
+                new IntrusionDetectionEvent(new SecurityEvent(123, new byte[15]));
+        List<IntrusionDetectionEvent> events = new ArrayList<>();
+        events.add(event);
+        assertTrue(transport.initialize());
+        assertTrue(transport.addData(events));
+        assertTrue(transport.release());
+        assertEquals(1, transport.getEvents().size());
+
+        return serviceConnection;
+    }
+
+    @Test
+    @RequireRunOnSystemUser
+    @EnsureHasPermission(
+            android.Manifest.permission.BIND_INTRUSION_DETECTION_EVENT_TRANSPORT_SERVICE)
+    public void testIntrusionDetectionEventTransportConnection_isValidAndBinds()
+            throws InterruptedException {
+        IntrusionDetectionEventTransportConnection intrusionDetectionEventTransportConnection =
+                new IntrusionDetectionEventTransportConnection(mContext);
+        // In a real scenario, the connection will be initialized by the service.
+        // Just to show that the connection is valid and able to bind,
+        // we initialize it here.
+        assertTrue(intrusionDetectionEventTransportConnection.initialize());
     }
 
     private class MockInjector implements IntrusionDetectionService.Injector {

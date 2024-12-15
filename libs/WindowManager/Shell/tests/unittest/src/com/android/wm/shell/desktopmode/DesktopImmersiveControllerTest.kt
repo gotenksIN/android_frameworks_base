@@ -43,7 +43,7 @@ import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.desktopmode.DesktopImmersiveController.ExitReason.USER_INTERACTION
-import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createFreeformTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.util.StubTransaction
@@ -76,18 +76,19 @@ class DesktopImmersiveControllerTest : ShellTestCase() {
     @JvmField @Rule val animatorTestRule = AnimatorTestRule(this)
 
     @Mock private lateinit var mockTransitions: Transitions
-    private lateinit var desktopRepository: DesktopRepository
+    private lateinit var userRepositories: DesktopUserRepositories
     @Mock private lateinit var mockDisplayController: DisplayController
     @Mock private lateinit var mockShellTaskOrganizer: ShellTaskOrganizer
     @Mock private lateinit var mockDisplayLayout: DisplayLayout
     private val transactionSupplier = { StubTransaction() }
 
     private lateinit var controller: DesktopImmersiveController
+    private lateinit var desktopRepository: DesktopRepository
 
     @Before
     fun setUp() {
-        desktopRepository = DesktopRepository(
-            context, ShellInit(TestShellExecutor()), mock(), mock(), mock()
+        userRepositories = DesktopUserRepositories(
+            context, ShellInit(TestShellExecutor()), mock(), mock(), mock(), mock()
         )
         whenever(mockDisplayController.getDisplayLayout(DEFAULT_DISPLAY))
             .thenReturn(mockDisplayLayout)
@@ -97,12 +98,13 @@ class DesktopImmersiveControllerTest : ShellTestCase() {
         controller = DesktopImmersiveController(
             shellInit = mock(),
             transitions = mockTransitions,
-            desktopRepository = desktopRepository,
+            desktopUserRepositories = userRepositories,
             displayController = mockDisplayController,
             shellTaskOrganizer = mockShellTaskOrganizer,
             shellCommandHandler = mock(),
             transactionSupplier = transactionSupplier,
         )
+        desktopRepository = userRepositories.current
     }
 
     @Test

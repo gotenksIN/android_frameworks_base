@@ -17,6 +17,7 @@
 package com.android.systemui.animation
 
 import android.app.ActivityManager
+import android.app.ActivityOptions
 import android.app.ActivityTaskManager
 import android.app.PendingIntent
 import android.app.TaskInfo
@@ -423,19 +424,19 @@ constructor(
                         newKeyguardOccludedState: Boolean?
                     ) {
                         super.onTransitionAnimationCancelled(newKeyguardOccludedState)
-                        cleanUp()
+                        onDispose()
                     }
 
                     override fun onTransitionAnimationEnd(isExpandingFullyAbove: Boolean) {
                         super.onTransitionAnimationEnd(isExpandingFullyAbove)
-                        cleanUp()
+                        onDispose()
                     }
 
-                    private fun cleanUp() {
+                    override fun onDispose() {
+                        super.onDispose()
                         cleanUpRunnable?.run()
                     }
-                },
-                initializeLazily = longLivedReturnAnimationsEnabled(),
+                }
             )
 
         // mTypeSet and mModes match back signals only, and not home. This is on purpose, because
@@ -478,8 +479,8 @@ constructor(
     /** Create a new animation [Runner] controlled by [controller]. */
     @VisibleForTesting
     @JvmOverloads
-    fun createRunner(controller: Controller, initializeLazily: Boolean = false): Runner {
-        if (initializeLazily) assertLongLivedReturnAnimations()
+    fun createRunner(controller: Controller, longLived: Boolean = false): Runner {
+        if (longLived) assertLongLivedReturnAnimations()
 
         // Make sure we use the modified timings when animating a dialog into an app.
         val transitionAnimator =
@@ -489,13 +490,7 @@ constructor(
                 transitionAnimator
             }
 
-        return Runner(
-            controller,
-            callback!!,
-            transitionAnimator,
-            lifecycleListener,
-            initializeLazily,
-        )
+        return Runner(controller, callback!!, transitionAnimator, lifecycleListener, longLived)
     }
 
     interface PendingIntentStarter {
@@ -566,6 +561,7 @@ constructor(
                 cookie: TransitionCookie? = null,
                 component: ComponentName? = null,
                 returnCujType: Int? = null,
+                isEphemeral: Boolean = true,
             ): Controller? {
                 // Make sure the View we launch from implements LaunchableView to avoid visibility
                 // issues.
@@ -593,6 +589,7 @@ constructor(
                     cookie,
                     component,
                     returnCujType,
+                    isEphemeral,
                 )
             }
         }
@@ -653,6 +650,9 @@ constructor(
          * appropriately.
          */
         fun onTransitionAnimationCancelled(newKeyguardOccludedState: Boolean? = null) {}
+
+        /** The controller will not be used again. Clean up the relevant internal state. */
+        fun onDispose() {}
     }
 
     /**
@@ -699,7 +699,7 @@ constructor(
             }
         val launchRemoteTransition =
             RemoteTransition(
-                OriginTransition(createRunner(controller, initializeLazily = true)),
+                OriginTransition(createRunner(controller, longLived = true)),
                 "${cookie}_launchTransition",
             )
         transitionRegister.register(launchFilter, launchRemoteTransition, includeTakeover = true)
@@ -708,6 +708,8 @@ constructor(
             object : Controller by controller {
                 override val isLaunching: Boolean = false
             }
+        // Cross-task close transitions should not use this animation, so we only register it for
+        // when the opening window is Launcher.
         val returnFilter =
             TransitionFilter().apply {
                 mRequirements =
@@ -716,12 +718,16 @@ constructor(
                             mActivityType = WindowConfiguration.ACTIVITY_TYPE_STANDARD
                             mModes = intArrayOf(TRANSIT_CLOSE, TRANSIT_TO_BACK)
                             mTopActivity = component
-                        }
+                        },
+                        TransitionFilter.Requirement().apply {
+                            mActivityType = WindowConfiguration.ACTIVITY_TYPE_HOME
+                            mModes = intArrayOf(TRANSIT_OPEN, TRANSIT_TO_FRONT)
+                        },
                     )
             }
         val returnRemoteTransition =
             RemoteTransition(
-                OriginTransition(createRunner(returnController, initializeLazily = true)),
+                OriginTransition(createRunner(returnController, longLived = true)),
                 "${cookie}_returnTransition",
             )
         transitionRegister.register(returnFilter, returnRemoteTransition, includeTakeover = true)
@@ -910,14 +916,22 @@ constructor(
 
     @VisibleForTesting
     inner class Runner(
-        private val controller: Controller,
+        /**
+         * This can hold a reference to a view, so it needs to be cleaned up and can't be held on to
+         * forever when ![longLived].
+         */
+        private var controller: Controller?,
         private val callback: Callback,
         /** The animator to use to animate the window transition. */
         private val transitionAnimator: TransitionAnimator,
         /** Listener for animation lifecycle events. */
         private val listener: Listener? = null,
-        /** Whether the internal [delegate] should be initialized lazily. */
-        private val initializeLazily: Boolean = false,
+        /**
+         * Whether the internal should be kept around after execution for later usage. IMPORTANT:
+         * should always be false if this [Runner] is to be used directly with [ActivityOptions]
+         * (i.e. for ephemeral launches), or the controller will leak its view.
+         */
+        private val longLived: Boolean = false,
     ) : IRemoteAnimationRunner.Stub() {
         // This is being passed across IPC boundaries and cycles (through PendingIntentRecords,
         // etc.) are possible. So we need to make sure we drop any references that might
@@ -926,7 +940,7 @@ constructor(
 
         init {
             delegate = null
-            if (!initializeLazily) {
+            if (!longLived) {
                 // Ephemeral launches bundle the runner with the launch request (instead of being
                 // registered ahead of time for later use). This means that there could be a timeout
                 // between creation and invocation, so the delegate needs to exist from the
@@ -1004,16 +1018,17 @@ constructor(
 
         @AnyThread
         private fun maybeSetUp() {
-            if (!initializeLazily || delegate != null) return
+            if (!longLived || delegate != null) return
             createDelegate()
         }
 
         @AnyThread
         private fun createDelegate() {
+            if (controller == null) return
             delegate =
                 AnimationDelegate(
                     mainExecutor,
-                    controller,
+                    controller!!,
                     callback,
                     DelegatingAnimationCompletionListener(listener, this::dispose),
                     transitionAnimator,
@@ -1025,7 +1040,12 @@ constructor(
         fun dispose() {
             // Drop references to animation controller once we're done with the animation
             // to avoid leaking.
-            mainExecutor.execute { delegate = null }
+            mainExecutor.execute {
+                delegate = null
+                // When long lived, the same Runner can be used more than once. In this case we need
+                // to keep the controller around so we can rebuild the delegate on demand.
+                if (!longLived) controller = null
+            }
         }
     }
 

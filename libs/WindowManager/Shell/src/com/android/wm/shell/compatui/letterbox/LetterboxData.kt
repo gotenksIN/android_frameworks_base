@@ -21,5 +21,13 @@ import android.view.SurfaceControl
 // The key to use for identify the letterbox sessions.
 data class LetterboxKey(val displayId: Int, val taskId: Int)
 
-// Encapsulate the objects for the specific letterbox session.
-data class LetterboxItem(val fullWindowSurface: SurfaceControl?)
+// Encapsulates the surfaces in the multiple surfaces scenario.
+data class LetterboxSurfaces(
+    var leftSurface: SurfaceControl? = null,
+    var topSurface: SurfaceControl? = null,
+    var rightSurface: SurfaceControl? = null,
+    var bottomSurface: SurfaceControl? = null
+) : Iterable<SurfaceControl?> {
+    override fun iterator() =
+        listOf(leftSurface, topSurface, rightSurface, bottomSurface).iterator()
+}

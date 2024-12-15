@@ -48,9 +48,7 @@ import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategoryType.
 import com.android.systemui.res.R
 import javax.inject.Inject
 
-class InputGestureMaps
-@Inject
-constructor(private val context: Context) {
+class InputGestureMaps @Inject constructor(private val context: Context) {
     val gestureToShortcutCategoryTypeMap =
         mapOf(
             // System Category
@@ -106,7 +104,6 @@ constructor(private val context: Context) {
                 R.string.shortcut_helper_category_system_apps,
 
             // Multitasking Category
-            KEY_GESTURE_TYPE_RECENT_APPS_SWITCHER to R.string.shortcutHelper_category_recent_apps,
             KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT to
                 R.string.shortcutHelper_category_split_screen,
             KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT to
@@ -180,9 +177,10 @@ constructor(private val context: Context) {
         )
 
     val shortcutLabelToKeyGestureTypeMap: Map<String, Int>
-        get() = gestureToInternalKeyboardShortcutInfoLabelResIdMap.entries.associateBy({
-            context.getString(it.value)
-        }) {
-            it.key
-        }
+        get() =
+            gestureToInternalKeyboardShortcutInfoLabelResIdMap.entries.associateBy({
+                context.getString(it.value)
+            }) {
+                it.key
+            }
 }

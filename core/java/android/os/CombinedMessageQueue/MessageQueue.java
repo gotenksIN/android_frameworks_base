@@ -32,6 +32,8 @@ import android.util.Printer;
 import android.util.SparseArray;
 import android.util.proto.ProtoOutputStream;
 
+import com.android.internal.ravenwood.RavenwoodEnvironment;
+
 import dalvik.annotation.optimization.NeverCompile;
 
 import java.io.FileDescriptor;
@@ -88,14 +90,20 @@ public final class MessageQueue {
     // queue for async messages when inserting a message at the tail.
     private int mAsyncMessageCount;
 
-    /*
+    /**
      * Select between two implementations of message queue. The legacy implementation is used
      * by default as it provides maximum compatibility with applications and tests that
      * reach into MessageQueue via the mMessages field. The concurrent implemmentation is used for
      * system processes and provides a higher level of concurrency and higher enqueue throughput
      * than the legacy implementation.
      */
-    private boolean mUseConcurrent;
+    private final boolean mUseConcurrent;
+
+    /**
+     * Caches process-level checks that determine `mUseConcurrent`.
+     * This is to avoid redoing checks that shouldn't change during the process's lifetime.
+     */
+    private static Boolean sIsProcessAllowedToUseConcurrent = null;
 
     @RavenwoodRedirect
     private native static long nativeInit();
@@ -112,37 +120,67 @@ public final class MessageQueue {
     private native static void nativeSetFileDescriptorEvents(long ptr, int fd, int events);
 
     MessageQueue(boolean quitAllowed) {
-        // Concurrent mode modifies behavior that is observable via reflection and is commonly used
-        // by tests.
-        // For now, we limit it to system processes to avoid breaking apps and their tests.
-        mUseConcurrent = UserHandle.isCore(Process.myUid());
-        // Even then, we don't use it if instrumentation is loaded as it breaks some
-        // platform tests.
-        final Instrumentation instrumentation = getInstrumentation();
-        mUseConcurrent &= instrumentation == null || !instrumentation.isInstrumenting();
-        // We can lift this restriction in the future after we've made it possible for test authors
-        // to test Looper and MessageQueue without resorting to reflection.
-
-        // Holdback study.
-        if (mUseConcurrent && Flags.messageQueueForceLegacy()) {
-            mUseConcurrent = false;
-        }
-
+        initIsProcessAllowedToUseConcurrent();
+        mUseConcurrent = sIsProcessAllowedToUseConcurrent && !isInstrumenting();
         mQuitAllowed = quitAllowed;
         mPtr = nativeInit();
     }
 
-    @android.ravenwood.annotation.RavenwoodReplace(blockedBy = ActivityThread.class)
-    private static Instrumentation getInstrumentation() {
-        final ActivityThread activityThread = ActivityThread.currentActivityThread();
-        if (activityThread != null) {
-            return activityThread.getInstrumentation();
+    private static void initIsProcessAllowedToUseConcurrent() {
+        if (sIsProcessAllowedToUseConcurrent != null) {
+            return;
         }
-        return null;
+
+        if (RavenwoodEnvironment.getInstance().isRunningOnRavenwood()) {
+            sIsProcessAllowedToUseConcurrent = false;
+            return;
+        }
+
+        final String processName = Process.myProcessName();
+        if (processName == null) {
+            // Assume that this is a host-side test and avoid concurrent mode for now.
+            sIsProcessAllowedToUseConcurrent = false;
+            return;
+        }
+
+        // Concurrent mode modifies behavior that is observable via reflection and is commonly
+        // used by tests.
+        // For now, we limit it to system processes to avoid breaking apps and their tests.
+        sIsProcessAllowedToUseConcurrent = UserHandle.isCore(Process.myUid());
+
+        if (sIsProcessAllowedToUseConcurrent) {
+            // Some platform tests run in core UIDs.
+            // Use this awful heuristic to detect them.
+            if (processName.contains("test") || processName.contains("Test")) {
+                sIsProcessAllowedToUseConcurrent = false;
+            }
+        } else {
+            // Also explicitly allow SystemUI processes.
+            // SystemUI doesn't run in a core UID, but we want to give it the performance boost,
+            // and we know that it's safe to use the concurrent implementation in SystemUI.
+            sIsProcessAllowedToUseConcurrent =
+                    processName.equals("com.android.systemui")
+                            || processName.startsWith("com.android.systemui:");
+            // On Android distributions where SystemUI has a different process name,
+            // the above condition may need to be adjusted accordingly.
+        }
+
+        // We can lift these restrictions in the future after we've made it possible for test
+        // authors to test Looper and MessageQueue without resorting to reflection.
+
+        // Holdback study.
+        if (sIsProcessAllowedToUseConcurrent && Flags.messageQueueForceLegacy()) {
+            sIsProcessAllowedToUseConcurrent = false;
+        }
     }
 
-    private static Instrumentation getInstrumentation$ravenwood() {
-        return null; // Instrumentation not supported on Ravenwood yet.
+    private static boolean isInstrumenting() {
+        final ActivityThread activityThread = ActivityThread.currentActivityThread();
+        if (activityThread == null) {
+            return false;
+        }
+        final Instrumentation instrumentation = activityThread.getInstrumentation();
+        return instrumentation != null && instrumentation.isInstrumenting();
     }
 
     @Override

@@ -17,6 +17,8 @@
 package com.android.systemui.keyguard.data.quickaffordance
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.util.Log
 import com.android.systemui.Flags.glanceableHubShortcutButton
 import com.android.systemui.animation.Expandable
@@ -25,6 +27,7 @@ import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.communal.data.repository.CommunalSceneRepository
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.shared.model.CommunalScenes
+import com.android.systemui.communal.shared.model.CommunalTransitionKeys
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.res.R
@@ -85,7 +88,13 @@ constructor(
         } else if (!communalInteractor.isCommunalEnabled.value) {
             Log.i(TAG, "Button disabled in picker: hub not enabled in settings.")
             KeyguardQuickAffordanceConfig.PickerScreenState.Disabled(
-                context.getString(R.string.glanceable_hub_lockscreen_affordance_disabled_text)
+                explanation =
+                    context.getString(R.string.glanceable_hub_lockscreen_affordance_disabled_text),
+                actionText =
+                    context.getString(
+                        R.string.glanceable_hub_lockscreen_affordance_action_button_label
+                    ),
+                actionIntent = Intent(Settings.ACTION_LOCKSCREEN_SETTINGS),
             )
         } else {
             KeyguardQuickAffordanceConfig.PickerScreenState.Default()
@@ -98,7 +107,10 @@ constructor(
         if (SceneContainerFlag.isEnabled) {
             sceneInteractor.changeScene(Scenes.Communal, "lockscreen to communal from shortcut")
         } else {
-            communalSceneRepository.changeScene(CommunalScenes.Communal, null)
+            communalSceneRepository.changeScene(
+                CommunalScenes.Communal,
+                transitionKey = CommunalTransitionKeys.SimpleFade,
+            )
         }
         return KeyguardQuickAffordanceConfig.OnTriggeredResult.Handled
     }

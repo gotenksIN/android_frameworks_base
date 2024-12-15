@@ -18,6 +18,7 @@ package android.hardware.contexthub;
 
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
@@ -31,6 +32,8 @@ import android.util.SparseArray;
 
 import androidx.annotation.GuardedBy;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,6 +51,46 @@ import java.util.concurrent.Executor;
 public class HubEndpoint {
     private static final String TAG = "HubEndpoint";
 
+    /**
+     * Constants describing the outcome of operations through HubEndpoints (like opening/closing of
+     * sessions or stopping of endpoints).
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(
+            prefix = {"REASON_"},
+            value = {
+                REASON_FAILURE,
+                REASON_OPEN_ENDPOINT_SESSION_REQUEST_REJECTED,
+                REASON_CLOSE_ENDPOINT_SESSION_REQUESTED,
+                REASON_ENDPOINT_INVALID,
+                REASON_ENDPOINT_STOPPED,
+            })
+    public @interface Reason {}
+
+    /** Unclassified failure */
+    public static final int REASON_FAILURE = 0;
+
+    // The values 1 and 2 are reserved at the Context Hub HAL but not exposed to apps.
+
+    /** The peer rejected the request to open this endpoint session. */
+    public static final int REASON_OPEN_ENDPOINT_SESSION_REQUEST_REJECTED = 3;
+
+    /** The peer closed this endpoint session. */
+    public static final int REASON_CLOSE_ENDPOINT_SESSION_REQUESTED = 4;
+
+    /** The peer endpoint is invalid. */
+    public static final int REASON_ENDPOINT_INVALID = 5;
+
+    /**
+     * The endpoint is now stopped. The app should retrieve the endpoint info using {@link
+     * android.hardware.location.ContextHubManager#findEndpoints} or register updates through
+     * {@link android.hardware.location.ContextHubManager#registerEndpointDiscoveryCallback}
+     * to get notified if the endpoint restarts.
+     */
+    public static final int REASON_ENDPOINT_STOPPED = 6;
+
     private final Object mLock = new Object();
     private final HubEndpointInfo mPendingHubEndpointInfo;
     @Nullable private final IHubEndpointLifecycleCallback mLifecycleCallback;
@@ -64,7 +107,7 @@ public class HubEndpoint {
                 public void onSessionOpenRequest(
                         int sessionId,
                         HubEndpointInfo initiator,
-                        @Nullable HubServiceInfo serviceInfo)
+                        @Nullable String serviceDescriptor)
                         throws RemoteException {
                     HubEndpointSession activeSession;
                     synchronized (mLock) {
@@ -85,16 +128,16 @@ public class HubEndpoint {
                                         processSessionOpenRequestResult(
                                                 sessionId,
                                                 initiator,
-                                                serviceInfo,
+                                                serviceDescriptor,
                                                 mLifecycleCallback.onSessionOpenRequest(
-                                                        initiator, serviceInfo)));
+                                                        initiator, serviceDescriptor)));
                     }
                 }
 
                 private void processSessionOpenRequestResult(
                         int sessionId,
                         HubEndpointInfo initiator,
-                        @Nullable HubServiceInfo serviceInfo,
+                        @Nullable String serviceDescriptor,
                         HubEndpointSessionResult result) {
                     if (result == null) {
                         throw new IllegalArgumentException(
@@ -102,7 +145,7 @@ public class HubEndpoint {
                     }
 
                     if (result.isAccepted()) {
-                        acceptSession(sessionId, initiator, serviceInfo);
+                        acceptSession(sessionId, initiator, serviceDescriptor);
                     } else {
                         Log.i(
                                 TAG,
@@ -119,7 +162,7 @@ public class HubEndpoint {
                 private void acceptSession(
                         int sessionId,
                         HubEndpointInfo initiator,
-                        @Nullable HubServiceInfo serviceInfo) {
+                        @Nullable String serviceDescriptor) {
                     if (mServiceToken == null || mAssignedHubEndpointInfo == null) {
                         // No longer registered?
                         return;
@@ -144,7 +187,7 @@ public class HubEndpoint {
                                         HubEndpoint.this,
                                         mAssignedHubEndpointInfo,
                                         initiator,
-                                        serviceInfo);
+                                        serviceDescriptor);
                         try {
                             // oneway call to notify system service that the request is completed
                             mServiceToken.openSessionRequestComplete(sessionId);
@@ -173,9 +216,7 @@ public class HubEndpoint {
 
                     try {
                         mServiceToken.closeSession(
-                                sessionId,
-                                IHubEndpointLifecycleCallback
-                                        .REASON_OPEN_ENDPOINT_SESSION_REQUEST_REJECTED);
+                                sessionId, REASON_OPEN_ENDPOINT_SESSION_REQUEST_REJECTED);
                     } catch (RemoteException e) {
                         e.rethrowFromSystemServer();
                     }
@@ -293,7 +334,6 @@ public class HubEndpoint {
             @Nullable IHubEndpointMessageCallback endpointMessageCallback,
             @NonNull Executor messageCallbackExecutor) {
         mPendingHubEndpointInfo = pendingEndpointInfo;
-
         mLifecycleCallback = endpointLifecycleCallback;
         mLifecycleCallbackExecutor = lifecycleCallbackExecutor;
         mMessageCallback = endpointMessageCallback;
@@ -346,7 +386,7 @@ public class HubEndpoint {
     }
 
     /** @hide */
-    public void openSession(HubEndpointInfo destinationInfo, @Nullable HubServiceInfo serviceInfo) {
+    public void openSession(HubEndpointInfo destinationInfo, @Nullable String serviceDescriptor) {
         // TODO(b/378974199): Consider refactor these assertions
         if (mServiceToken == null || mAssignedHubEndpointInfo == null) {
             // No longer registered?
@@ -356,7 +396,7 @@ public class HubEndpoint {
         HubEndpointSession newSession;
         try {
             // Request system service to assign session id.
-            int sessionId = mServiceToken.openSession(destinationInfo, serviceInfo);
+            int sessionId = mServiceToken.openSession(destinationInfo, serviceDescriptor);
 
             // Save the newly created session
             synchronized (mLock) {
@@ -366,7 +406,7 @@ public class HubEndpoint {
                                 HubEndpoint.this,
                                 destinationInfo,
                                 mAssignedHubEndpointInfo,
-                                serviceInfo);
+                                serviceDescriptor);
                 mActiveSessions.put(sessionId, newSession);
             }
         } catch (RemoteException e) {
@@ -396,9 +436,7 @@ public class HubEndpoint {
 
         try {
             // Oneway notification to system service
-            serviceToken.closeSession(
-                    session.getId(),
-                    IHubEndpointLifecycleCallback.REASON_CLOSE_ENDPOINT_SESSION_REQUESTED);
+            serviceToken.closeSession(session.getId(), REASON_CLOSE_ENDPOINT_SESSION_REQUESTED);
         } catch (RemoteException e) {
             Log.e(TAG, "closeSession: failed to close session " + session, e);
             e.rethrowFromSystemServer();

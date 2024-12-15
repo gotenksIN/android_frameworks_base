@@ -18,7 +18,6 @@ package com.android.server.power.hint;
 
 
 import static com.android.server.power.hint.HintManagerService.CLEAN_UP_UID_DELAY_MILLIS;
-import static com.android.server.power.hint.HintManagerService.DEFAULT_HEADROOM_PID;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -53,10 +52,13 @@ import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.power.ChannelConfig;
 import android.hardware.power.ChannelMessage;
 import android.hardware.power.CpuHeadroomParams;
+import android.hardware.power.CpuHeadroomResult;
 import android.hardware.power.GpuHeadroomParams;
+import android.hardware.power.GpuHeadroomResult;
 import android.hardware.power.IPower;
 import android.hardware.power.SessionConfig;
 import android.hardware.power.SessionTag;
+import android.hardware.power.SupportInfo;
 import android.hardware.power.WorkDuration;
 import android.os.Binder;
 import android.os.CpuHeadroomParamsInternal;
@@ -158,6 +160,7 @@ public class HintManagerServiceTest {
 
     private HintManagerService mService;
     private ChannelConfig mConfig;
+    private SupportInfo mSupportInfo;
 
     private static Answer<Long> fakeCreateWithConfig(Long ptr, Long sessionId) {
         return new Answer<Long>() {
@@ -178,6 +181,12 @@ public class HintManagerServiceTest {
         mConfig.eventFlagDescriptor = new MQDescriptor<Byte, Byte>();
         ApplicationInfo applicationInfo = new ApplicationInfo();
         applicationInfo.category = ApplicationInfo.CATEGORY_GAME;
+        mSupportInfo = new SupportInfo();
+        mSupportInfo.headroom = new SupportInfo.HeadroomSupportInfo();
+        mSupportInfo.headroom.isCpuSupported = true;
+        mSupportInfo.headroom.cpuMinIntervalMillis = 2000;
+        mSupportInfo.headroom.isGpuSupported = true;
+        mSupportInfo.headroom.gpuMinIntervalMillis = 2000;
         when(mContext.getPackageManager()).thenReturn(mMockPackageManager);
         when(mMockPackageManager.getNameForUid(anyInt())).thenReturn(TEST_APP_NAME);
         when(mMockPackageManager.getApplicationInfo(eq(TEST_APP_NAME), anyInt()))
@@ -204,6 +213,7 @@ public class HintManagerServiceTest {
                     SESSION_IDS[2]));
 
         when(mIPowerMock.getInterfaceVersion()).thenReturn(6);
+        when(mIPowerMock.getSupportInfo()).thenReturn(mSupportInfo);
         when(mIPowerMock.getSessionChannel(anyInt(), anyInt())).thenReturn(mConfig);
         LocalServices.removeServiceForTest(ActivityManagerInternal.class);
         LocalServices.addService(ActivityManagerInternal.class, mAmInternalMock);
@@ -1246,135 +1256,147 @@ public class HintManagerServiceTest {
 
     @Test
     public void testCpuHeadroomCache() throws Exception {
-        when(mIPowerMock.getCpuHeadroomMinIntervalMillis()).thenReturn(2000L);
         CpuHeadroomParamsInternal params1 = new CpuHeadroomParamsInternal();
         CpuHeadroomParams halParams1 = new CpuHeadroomParams();
         halParams1.calculationType = CpuHeadroomParams.CalculationType.MIN;
-        halParams1.selectionType = CpuHeadroomParams.SelectionType.ALL;
-        halParams1.pid = Process.myPid();
+        halParams1.tids = new int[]{Process.myPid()};
 
         CpuHeadroomParamsInternal params2 = new CpuHeadroomParamsInternal();
         params2.usesDeviceHeadroom = true;
-        params2.calculationType = CpuHeadroomParams.CalculationType.AVERAGE;
-        params2.selectionType = CpuHeadroomParams.SelectionType.PER_CORE;
+        params2.calculationType = CpuHeadroomParams.CalculationType.MIN;
         CpuHeadroomParams halParams2 = new CpuHeadroomParams();
-        halParams2.calculationType = CpuHeadroomParams.CalculationType.AVERAGE;
-        halParams2.selectionType = CpuHeadroomParams.SelectionType.PER_CORE;
-        halParams2.pid = DEFAULT_HEADROOM_PID;
+        halParams2.calculationType = CpuHeadroomParams.CalculationType.MIN;
+        halParams2.tids = new int[]{};
 
-        float[] headroom1 = new float[] {0.1f};
-        when(mIPowerMock.getCpuHeadroom(eq(halParams1))).thenReturn(headroom1);
-        float[] headroom2 = new float[] {0.1f, 0.5f};
-        when(mIPowerMock.getCpuHeadroom(eq(halParams2))).thenReturn(headroom2);
+        CpuHeadroomParamsInternal params3 = new CpuHeadroomParamsInternal();
+        params3.calculationType = CpuHeadroomParams.CalculationType.AVERAGE;
+        CpuHeadroomParams halParams3 = new CpuHeadroomParams();
+        halParams3.calculationType = CpuHeadroomParams.CalculationType.AVERAGE;
+        halParams3.tids = new int[]{Process.myPid()};
+
+        // this params should not be cached as the window is not default
+        CpuHeadroomParamsInternal params4 = new CpuHeadroomParamsInternal();
+        params4.calculationWindowMillis = 123;
+        CpuHeadroomParams halParams4 = new CpuHeadroomParams();
+        halParams4.calculationType = CpuHeadroomParams.CalculationType.MIN;
+        halParams4.calculationWindowMillis = 123;
+        halParams4.tids = new int[]{Process.myPid()};
+
+        float headroom1 = 0.1f;
+        CpuHeadroomResult halRet1 = CpuHeadroomResult.globalHeadroom(headroom1);
+        when(mIPowerMock.getCpuHeadroom(eq(halParams1))).thenReturn(halRet1);
+        float headroom2 = 0.2f;
+        CpuHeadroomResult halRet2 = CpuHeadroomResult.globalHeadroom(headroom2);
+        when(mIPowerMock.getCpuHeadroom(eq(halParams2))).thenReturn(halRet2);
+        float headroom3 = 0.3f;
+        CpuHeadroomResult halRet3 = CpuHeadroomResult.globalHeadroom(headroom3);
+        when(mIPowerMock.getCpuHeadroom(eq(halParams3))).thenReturn(halRet3);
+        float headroom4 = 0.4f;
+        CpuHeadroomResult halRet4 = CpuHeadroomResult.globalHeadroom(headroom4);
+        when(mIPowerMock.getCpuHeadroom(eq(halParams4))).thenReturn(halRet4);
 
         HintManagerService service = createService();
         clearInvocations(mIPowerMock);
 
-        service.getBinderServiceInstance().getCpuHeadroomMinIntervalMillis();
-        verify(mIPowerMock, times(0)).getCpuHeadroomMinIntervalMillis();
-        service.getBinderServiceInstance().getCpuHeadroom(params1);
+        assertEquals(halRet1, service.getBinderServiceInstance().getCpuHeadroom(params1));
         verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams1));
-        service.getBinderServiceInstance().getCpuHeadroom(params2);
+        assertEquals(halRet2, service.getBinderServiceInstance().getCpuHeadroom(params2));
         verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams2));
+        assertEquals(halRet3, service.getBinderServiceInstance().getCpuHeadroom(params3));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams3));
+        assertEquals(halRet4, service.getBinderServiceInstance().getCpuHeadroom(params4));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams4));
 
         // verify cache is working
         clearInvocations(mIPowerMock);
-        assertArrayEquals(headroom1, service.getBinderServiceInstance().getCpuHeadroom(params1),
-                0.01f);
-        assertArrayEquals(headroom2, service.getBinderServiceInstance().getCpuHeadroom(params2),
-                0.01f);
-        verify(mIPowerMock, times(0)).getCpuHeadroom(any());
+        assertEquals(halRet1, service.getBinderServiceInstance().getCpuHeadroom(params1));
+        assertEquals(halRet2, service.getBinderServiceInstance().getCpuHeadroom(params2));
+        assertEquals(halRet3, service.getBinderServiceInstance().getCpuHeadroom(params3));
+        assertEquals(halRet4, service.getBinderServiceInstance().getCpuHeadroom(params4));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(any());
+        verify(mIPowerMock, times(0)).getCpuHeadroom(eq(halParams1));
+        verify(mIPowerMock, times(0)).getCpuHeadroom(eq(halParams2));
+        verify(mIPowerMock, times(0)).getCpuHeadroom(eq(halParams3));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams4));
 
         // after 1 more second it should be served with cache still
         Thread.sleep(1000);
         clearInvocations(mIPowerMock);
-        assertArrayEquals(headroom1, service.getBinderServiceInstance().getCpuHeadroom(params1),
-                0.01f);
-        assertArrayEquals(headroom2, service.getBinderServiceInstance().getCpuHeadroom(params2),
-                0.01f);
-        verify(mIPowerMock, times(0)).getCpuHeadroom(any());
-
-        // after 1.5 more second it should be served with cache still as timer reset
-        Thread.sleep(1500);
-        clearInvocations(mIPowerMock);
-        assertArrayEquals(headroom1, service.getBinderServiceInstance().getCpuHeadroom(params1),
-                0.01f);
-        assertArrayEquals(headroom2, service.getBinderServiceInstance().getCpuHeadroom(params2),
-                0.01f);
-        verify(mIPowerMock, times(0)).getCpuHeadroom(any());
+        assertEquals(halRet1, service.getBinderServiceInstance().getCpuHeadroom(params1));
+        assertEquals(halRet2, service.getBinderServiceInstance().getCpuHeadroom(params2));
+        assertEquals(halRet3, service.getBinderServiceInstance().getCpuHeadroom(params3));
+        assertEquals(halRet4, service.getBinderServiceInstance().getCpuHeadroom(params4));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(any());
+        verify(mIPowerMock, times(0)).getCpuHeadroom(eq(halParams1));
+        verify(mIPowerMock, times(0)).getCpuHeadroom(eq(halParams2));
+        verify(mIPowerMock, times(0)).getCpuHeadroom(eq(halParams3));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams4));
 
         // after 2+ seconds it should be served from HAL as it exceeds 2000 millis interval
-        Thread.sleep(2100);
+        Thread.sleep(1100);
         clearInvocations(mIPowerMock);
-        assertArrayEquals(headroom1, service.getBinderServiceInstance().getCpuHeadroom(params1),
-                0.01f);
-        assertArrayEquals(headroom2, service.getBinderServiceInstance().getCpuHeadroom(params2),
-                0.01f);
+        assertEquals(halRet1, service.getBinderServiceInstance().getCpuHeadroom(params1));
+        assertEquals(halRet2, service.getBinderServiceInstance().getCpuHeadroom(params2));
+        assertEquals(halRet3, service.getBinderServiceInstance().getCpuHeadroom(params3));
+        assertEquals(halRet4, service.getBinderServiceInstance().getCpuHeadroom(params4));
+        verify(mIPowerMock, times(4)).getCpuHeadroom(any());
         verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams1));
         verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams2));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams3));
+        verify(mIPowerMock, times(1)).getCpuHeadroom(eq(halParams4));
     }
 
     @Test
     public void testGpuHeadroomCache() throws Exception {
-        when(mIPowerMock.getGpuHeadroomMinIntervalMillis()).thenReturn(2000L);
         GpuHeadroomParamsInternal params1 = new GpuHeadroomParamsInternal();
         GpuHeadroomParams halParams1 = new GpuHeadroomParams();
         halParams1.calculationType = GpuHeadroomParams.CalculationType.MIN;
 
         GpuHeadroomParamsInternal params2 = new GpuHeadroomParamsInternal();
+        params2.calculationType = GpuHeadroomParams.CalculationType.AVERAGE;
+        params2.calculationWindowMillis = 123;
         GpuHeadroomParams halParams2 = new GpuHeadroomParams();
-        params2.calculationType =
-                halParams2.calculationType = GpuHeadroomParams.CalculationType.AVERAGE;
+        halParams2.calculationType = GpuHeadroomParams.CalculationType.AVERAGE;
+        halParams2.calculationWindowMillis = 123;
 
         float headroom1 = 0.1f;
-        when(mIPowerMock.getGpuHeadroom(eq(halParams1))).thenReturn(headroom1);
+        GpuHeadroomResult halRet1 = GpuHeadroomResult.globalHeadroom(headroom1);
+        when(mIPowerMock.getGpuHeadroom(eq(halParams1))).thenReturn(halRet1);
         float headroom2 = 0.2f;
-        when(mIPowerMock.getGpuHeadroom(eq(halParams2))).thenReturn(headroom2);
+        GpuHeadroomResult halRet2 = GpuHeadroomResult.globalHeadroom(headroom2);
+        when(mIPowerMock.getGpuHeadroom(eq(halParams2))).thenReturn(halRet2);
         HintManagerService service = createService();
         clearInvocations(mIPowerMock);
 
-        service.getBinderServiceInstance().getGpuHeadroomMinIntervalMillis();
-        verify(mIPowerMock, times(0)).getGpuHeadroomMinIntervalMillis();
-        assertEquals(headroom1, service.getBinderServiceInstance().getGpuHeadroom(params1),
-                0.01f);
-        assertEquals(headroom2, service.getBinderServiceInstance().getGpuHeadroom(params2),
-                0.01f);
+        assertEquals(halRet1, service.getBinderServiceInstance().getGpuHeadroom(params1));
+        assertEquals(halRet2, service.getBinderServiceInstance().getGpuHeadroom(params2));
+        verify(mIPowerMock, times(2)).getGpuHeadroom(any());
         verify(mIPowerMock, times(1)).getGpuHeadroom(eq(halParams1));
         verify(mIPowerMock, times(1)).getGpuHeadroom(eq(halParams2));
 
         // verify cache is working
         clearInvocations(mIPowerMock);
-        assertEquals(headroom1, service.getBinderServiceInstance().getGpuHeadroom(params1),
-                0.01f);
-        assertEquals(headroom2, service.getBinderServiceInstance().getGpuHeadroom(params2),
-                0.01f);
-        verify(mIPowerMock, times(0)).getGpuHeadroom(any());
+        assertEquals(halRet1, service.getBinderServiceInstance().getGpuHeadroom(params1));
+        assertEquals(halRet2, service.getBinderServiceInstance().getGpuHeadroom(params2));
+        verify(mIPowerMock, times(1)).getGpuHeadroom(any());
+        verify(mIPowerMock, times(0)).getGpuHeadroom(eq(halParams1));
+        verify(mIPowerMock, times(1)).getGpuHeadroom(eq(halParams2));
 
         // after 1 more second it should be served with cache still
         Thread.sleep(1000);
         clearInvocations(mIPowerMock);
-        assertEquals(headroom1, service.getBinderServiceInstance().getGpuHeadroom(params1),
-                0.01f);
-        assertEquals(headroom2, service.getBinderServiceInstance().getGpuHeadroom(params2),
-                0.01f);
-        verify(mIPowerMock, times(0)).getGpuHeadroom(any());
-
-        // after 1.5 more second it should be served with cache still as timer reset
-        Thread.sleep(1500);
-        clearInvocations(mIPowerMock);
-        assertEquals(headroom1, service.getBinderServiceInstance().getGpuHeadroom(params1),
-                0.01f);
-        assertEquals(headroom2, service.getBinderServiceInstance().getGpuHeadroom(params2),
-                0.01f);
-        verify(mIPowerMock, times(0)).getGpuHeadroom(any());
+        assertEquals(halRet1, service.getBinderServiceInstance().getGpuHeadroom(params1));
+        assertEquals(halRet2, service.getBinderServiceInstance().getGpuHeadroom(params2));
+        verify(mIPowerMock, times(1)).getGpuHeadroom(any());
+        verify(mIPowerMock, times(0)).getGpuHeadroom(eq(halParams1));
+        verify(mIPowerMock, times(1)).getGpuHeadroom(eq(halParams2));
 
         // after 2+ seconds it should be served from HAL as it exceeds 2000 millis interval
-        Thread.sleep(2100);
+        Thread.sleep(1100);
         clearInvocations(mIPowerMock);
-        assertEquals(headroom1, service.getBinderServiceInstance().getGpuHeadroom(params1),
-                0.01f);
-        assertEquals(headroom2, service.getBinderServiceInstance().getGpuHeadroom(params2),
-                0.01f);
+        assertEquals(halRet1, service.getBinderServiceInstance().getGpuHeadroom(params1));
+        assertEquals(halRet2, service.getBinderServiceInstance().getGpuHeadroom(params2));
+        verify(mIPowerMock, times(2)).getGpuHeadroom(any());
         verify(mIPowerMock, times(1)).getGpuHeadroom(eq(halParams1));
         verify(mIPowerMock, times(1)).getGpuHeadroom(eq(halParams2));
     }

@@ -16,6 +16,7 @@
 
 package android.content.pm;
 
+import static android.content.pm.SigningInfo.AppSigningSchemeVersion;
 import static android.media.audio.Flags.FLAG_FEATURE_SPATIAL_AUDIO_HEADTRACKING_LOW_LATENCY;
 
 import static com.android.internal.pm.pkg.parsing.ParsingPackageUtils.PARSE_COLLECT_CERTIFICATES;
@@ -59,6 +60,8 @@ import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.pm.PackageInstaller.SessionParams;
 import android.content.pm.dex.ArtManager;
+import android.content.pm.parsing.result.ParseResult;
+import android.content.pm.parsing.result.ParseTypeImpl;
 import android.content.pm.verify.domain.DomainVerificationManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -94,6 +97,7 @@ import android.telephony.ims.RcsUceAdapter;
 import android.telephony.ims.SipDelegateManager;
 import android.util.AndroidException;
 import android.util.Log;
+import android.util.apk.ApkSignatureVerifier;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.pm.parsing.PackageInfoCommonUtils;
@@ -803,7 +807,6 @@ public abstract class PackageManager {
                 inputSignatures = "private final @android.annotation.Nullable java.lang.String mPackageName\nprivate final @android.annotation.Nullable android.content.ComponentName mComponentName\nprivate final @android.content.pm.PackageManager.EnabledState int mEnabledState\nprivate final @android.content.pm.PackageManager.EnabledFlags int mEnabledFlags\npublic @android.annotation.NonNull java.lang.String getPackageName()\npublic @android.annotation.Nullable java.lang.String getClassName()\npublic  boolean isComponent()\nclass ComponentEnabledSetting extends java.lang.Object implements [android.os.Parcelable]\n@com.android.internal.util.DataClass(genConstructor=false)")
         @Deprecated
         private void __metadata() {}
-
 
         //@formatter:on
         // End of generated code
@@ -3146,6 +3149,16 @@ public abstract class PackageManager {
      * agent to return (in milliseconds).
      */
     public static final long MAXIMUM_VERIFICATION_TIMEOUT = 60*60*1000;
+
+    /**
+     * As the generated feature count is useful for classes that may not be compiled in the same
+     * annotation processing unit as PackageManager, we redeclare it here for visibility.
+     *
+     * @hide
+     */
+    @VisibleForTesting
+    public static final int SDK_FEATURE_COUNT =
+            com.android.internal.pm.SystemFeaturesMetadata.SDK_FEATURE_COUNT;
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device's
@@ -6729,6 +6742,11 @@ public abstract class PackageManager {
      * If the given permission already exists, the info you supply here
      * will be used to update it.
      *
+     * @deprecated Support for dynamic permissions is going to be removed, and apps that use dynamic
+     * permissions should declare their permissions statically inside their app manifest instead.
+     * This method will become a no-op in a future Android release and eventually be removed from
+     * the SDK.
+     *
      * @param info Description of the permission to be added.
      *
      * @return Returns true if a new permission was created, false if an
@@ -6739,7 +6757,9 @@ public abstract class PackageManager {
      *
      * @see #removePermission(String)
      */
-    //@Deprecated
+    @SuppressWarnings("HiddenAbstractMethod")
+    @FlaggedApi(android.permission.flags.Flags.FLAG_PERMISSION_TREE_APIS_DEPRECATED)
+    @Deprecated
     public abstract boolean addPermission(@NonNull PermissionInfo info);
 
     /**
@@ -6748,8 +6768,15 @@ public abstract class PackageManager {
      * allowing it to return quicker and batch a series of adds at the
      * expense of no guarantee the added permission will be retained if
      * the device is rebooted before it is written.
+     *
+     * @deprecated Support for dynamic permissions is going to be removed, and apps that use dynamic
+     * permissions should declare their permissions statically inside their app manifest instead.
+     * This method will become a no-op in a future Android release and eventually be removed from
+     * the SDK.
      */
-    //@Deprecated
+    @SuppressWarnings("HiddenAbstractMethod")
+    @FlaggedApi(android.permission.flags.Flags.FLAG_PERMISSION_TREE_APIS_DEPRECATED)
+    @Deprecated
     public abstract boolean addPermissionAsync(@NonNull PermissionInfo info);
 
     /**
@@ -6758,6 +6785,11 @@ public abstract class PackageManager {
      * -- you are only allowed to remove permissions that you are allowed
      * to add.
      *
+     * @deprecated Support for dynamic permissions is going to be removed, and apps that use dynamic
+     * permissions should declare their permissions statically inside their app manifest instead.
+     * This method will become a no-op in a future Android release and eventually be removed from
+     * the SDK.
+     *
      * @param permName The name of the permission to remove.
      *
      * @throws SecurityException if you are not allowed to remove the
@@ -6765,7 +6797,9 @@ public abstract class PackageManager {
      *
      * @see #addPermission(PermissionInfo)
      */
-    //@Deprecated
+    @SuppressWarnings("HiddenAbstractMethod")
+    @FlaggedApi(android.permission.flags.Flags.FLAG_PERMISSION_TREE_APIS_DEPRECATED)
+    @Deprecated
     public abstract void removePermission(@NonNull String permName);
 
     /**
@@ -10987,6 +11021,41 @@ public abstract class PackageManager {
     }
 
     /**
+     * Set the page compat mode override for given package
+     *
+     * @hide
+     */
+    @FlaggedApi(android.content.pm.Flags.FLAG_APP_COMPAT_OPTION_16KB)
+    public void setPageSizeAppCompatFlagsSettingsOverride(@NonNull String packageName,
+            boolean enabled) {
+        throw new UnsupportedOperationException(
+                "setPageSizeAppCompatFlagsSettingsOverride not implemented in subclass");
+    }
+
+    /**
+     * Check whether page size app compat mode is enabled for given package
+     *
+     * @hide
+     */
+    @FlaggedApi(android.content.pm.Flags.FLAG_APP_COMPAT_OPTION_16KB)
+    public boolean isPageSizeCompatEnabled(@NonNull String packageName) {
+        throw new UnsupportedOperationException(
+                "isPageSizeCompatEnabled not implemented in subclass");
+    }
+
+    /**
+     * Get the page size app compat warning dialog to show at app launch time
+     *
+     * @hide
+     */
+    @Nullable
+    @FlaggedApi(android.content.pm.Flags.FLAG_APP_COMPAT_OPTION_16KB)
+    public String getPageSizeCompatWarningMessage(@NonNull String packageName) {
+        throw new UnsupportedOperationException(
+                "getPageSizeCompatWarningMessage not implemented in subclass");
+    }
+
+     /**
      * Returns the harmful app warning string for the given app, or null if there is none set.
      *
      * @param packageName The full name of the desired package.
@@ -11582,7 +11651,7 @@ public abstract class PackageManager {
     private static final PropertyInvalidatedCache<ApplicationInfoQuery, ApplicationInfo>
             sApplicationInfoCache =
             new PropertyInvalidatedCache<ApplicationInfoQuery, ApplicationInfo>(
-                    2048, PermissionManager.CACHE_KEY_PACKAGE_INFO,
+                    2048, PermissionManager.CACHE_KEY_PACKAGE_INFO_CACHE,
                     "getApplicationInfo") {
                 @Override
                 public ApplicationInfo recompute(ApplicationInfoQuery query) {
@@ -11611,18 +11680,6 @@ public abstract class PackageManager {
      */
     public static void disableApplicationInfoCache() {
         sApplicationInfoCache.disableLocal();
-    }
-
-    private static final PropertyInvalidatedCache.AutoCorker sCacheAutoCorker =
-            new PropertyInvalidatedCache.AutoCorker(PermissionManager.CACHE_KEY_PACKAGE_INFO);
-
-    /**
-     * Invalidate caches of package and permission information system-wide.
-     *
-     * @hide
-     */
-    public static void invalidatePackageInfoCache() {
-        sCacheAutoCorker.autoCork();
     }
 
     // Some of the flags don't affect the query result, but let's be conservative and cache
@@ -11683,7 +11740,7 @@ public abstract class PackageManager {
     private static final PropertyInvalidatedCache<PackageInfoQuery, PackageInfo>
             sPackageInfoCache =
             new PropertyInvalidatedCache<PackageInfoQuery, PackageInfo>(
-                    2048, PermissionManager.CACHE_KEY_PACKAGE_INFO,
+                    2048, PermissionManager.CACHE_KEY_PACKAGE_INFO_CACHE,
                     "getPackageInfo") {
                 @Override
                 public PackageInfo recompute(PackageInfoQuery query) {
@@ -11715,17 +11772,40 @@ public abstract class PackageManager {
     /**
      * Inhibit package info cache invalidations when correct.
      *
-     * @hide */
+     * @hide
+     */
     public static void corkPackageInfoCache() {
-        PropertyInvalidatedCache.corkInvalidations(PermissionManager.CACHE_KEY_PACKAGE_INFO);
+        sPackageInfoCache.corkInvalidations();
     }
 
     /**
      * Enable package info cache invalidations.
      *
-     * @hide */
+     * @hide
+     */
     public static void uncorkPackageInfoCache() {
-        PropertyInvalidatedCache.uncorkInvalidations(PermissionManager.CACHE_KEY_PACKAGE_INFO);
+        sPackageInfoCache.uncorkInvalidations();
+    }
+
+    // This auto-corker is obsolete once the separate permission notifications feature is
+    // committed.
+    private static final PropertyInvalidatedCache.AutoCorker sCacheAutoCorker =
+            PropertyInvalidatedCache.separatePermissionNotificationsEnabled()
+            ? null
+            : new PropertyInvalidatedCache
+                    .AutoCorker(PermissionManager.CACHE_KEY_PACKAGE_INFO_CACHE);
+
+    /**
+     * Invalidate caches of package and permission information system-wide.
+     *
+     * @hide
+     */
+    public static void invalidatePackageInfoCache() {
+        if (PropertyInvalidatedCache.separatePermissionNotificationsEnabled()) {
+            sPackageInfoCache.invalidateCache();
+        } else {
+            sCacheAutoCorker.autoCork();
+        }
     }
 
     /**
@@ -11931,5 +12011,32 @@ public abstract class PackageManager {
             String rootTag, int[] attributes) {
         throw new UnsupportedOperationException(
                 "parseServiceMetadata not implemented in subclass");
+    }
+
+    /**
+     * Verifies and returns the
+     * <a href="https://source.android.com/docs/security/features/apksigning">app signing</a>
+     * information of the file at the given path. This operation takes a few milliseconds.
+     *
+     * Unlike {@link #getPackageArchiveInfo(String, PackageInfoFlags)} with {@link
+     * #GET_SIGNING_CERTIFICATES}, this method does not require the file to be a package archive
+     * file.
+     *
+     * @throws SigningInfoException if the verification fails
+     *
+     * @hide
+     */
+    @FlaggedApi(android.content.pm.Flags.FLAG_CLOUD_COMPILATION_PM)
+    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
+    public static @NonNull SigningInfo getVerifiedSigningInfo(@NonNull String path,
+            @AppSigningSchemeVersion int minAppSigningSchemeVersion) throws SigningInfoException {
+        ParseTypeImpl input = ParseTypeImpl.forDefaultParsing();
+        ParseResult<SigningDetails> result =
+                ApkSignatureVerifier.verify(input, path, minAppSigningSchemeVersion);
+        if (result.isError()) {
+            throw new SigningInfoException(
+                    result.getErrorCode(), result.getErrorMessage(), result.getException());
+        }
+        return new SigningInfo(result.getResult());
     }
 }

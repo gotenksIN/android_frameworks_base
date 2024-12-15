@@ -18,9 +18,10 @@ package android.nfc;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
+import android.nfc.cardemulation.CardEmulation;
 
 /**
- * Represents an AID entry in current routing table.
+ * Represents an Application ID (AID) entry in current routing table.
  * @hide
  */
 @FlaggedApi(Flags.FLAG_NFC_OEM_EXTENSION)
@@ -29,8 +30,9 @@ public class RoutingTableAidEntry extends NfcRoutingTableEntry {
     private final String mValue;
 
     /** @hide */
-    public RoutingTableAidEntry(int nfceeId, String value) {
-        super(nfceeId);
+    public RoutingTableAidEntry(int nfceeId, String value,
+            @CardEmulation.ProtocolAndTechnologyRoute int routeType) {
+        super(nfceeId, TYPE_AID, routeType);
         this.mValue = value;
     }
 

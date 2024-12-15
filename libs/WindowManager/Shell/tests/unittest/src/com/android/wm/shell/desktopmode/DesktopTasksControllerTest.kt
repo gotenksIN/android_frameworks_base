@@ -44,6 +44,7 @@ import android.os.Binder
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
+import android.os.UserManager
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
@@ -93,16 +94,17 @@ import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.common.MultiInstanceHelper
 import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.common.SyncTransactionQueue
+import com.android.wm.shell.desktopmode.common.ToggleTaskSizeInteraction
 import com.android.wm.shell.desktopmode.DesktopImmersiveController.ExitResult
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.InputMethod
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger
 import com.android.wm.shell.desktopmode.DesktopTasksController.DesktopModeEntryExitTransitionListener
 import com.android.wm.shell.desktopmode.DesktopTasksController.SnapPosition
 import com.android.wm.shell.desktopmode.DesktopTasksController.TaskbarDesktopTaskListener
-import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createFreeformTask
-import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createFullscreenTask
-import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createHomeTask
-import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createSplitScreenTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFullscreenTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.createHomeTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.createSplitScreenTask
 import com.android.wm.shell.desktopmode.EnterDesktopTaskTransitionHandler.FREEFORM_ANIMATION_DURATION
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler.FULLSCREEN_ANIMATION_DURATION
 import com.android.wm.shell.desktopmode.minimize.DesktopWindowLimitRemoteHandler
@@ -220,6 +222,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
   @Mock private lateinit var freeformTaskTransitionStarter: FreeformTaskTransitionStarter
   @Mock private lateinit var mockHandler: Handler
   @Mock private lateinit var desktopModeEventLogger: DesktopModeEventLogger
+  @Mock private lateinit var desktopModeUiEventLogger: DesktopModeUiEventLogger
   @Mock lateinit var persistentRepository: DesktopPersistentRepository
   @Mock lateinit var motionEvent: MotionEvent
   @Mock lateinit var repositoryInitializer: DesktopRepositoryInitializer
@@ -232,9 +235,11 @@ class DesktopTasksControllerTest : ShellTestCase() {
   @Mock private lateinit var resources: Resources
   @Mock
   lateinit var desktopModeEnterExitTransitionListener: DesktopModeEntryExitTransitionListener
+  @Mock private lateinit var userManager: UserManager
   private lateinit var controller: DesktopTasksController
   private lateinit var shellInit: ShellInit
   private lateinit var taskRepository: DesktopRepository
+  private lateinit var userRepositories: DesktopUserRepositories
   private lateinit var desktopTasksLimiter: DesktopTasksLimiter
   private lateinit var recentsTransitionStateListener: RecentsTransitionStateListener
   private lateinit var testScope: CoroutineScope
@@ -266,12 +271,18 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
     testScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
     shellInit = spy(ShellInit(testExecutor))
-    taskRepository =
-      DesktopRepository(context, shellInit, persistentRepository, repositoryInitializer, testScope)
+    userRepositories =
+      DesktopUserRepositories(
+        context,
+        shellInit,
+        persistentRepository,
+        repositoryInitializer,
+        testScope,
+        userManager)
     desktopTasksLimiter =
         DesktopTasksLimiter(
             transitions,
-            taskRepository,
+            userRepositories,
             shellTaskOrganizer,
             MAX_TASK_LIMIT,
             mockInteractionJankMonitor,
@@ -314,6 +325,8 @@ class DesktopTasksControllerTest : ShellTestCase() {
     controller.taskbarDesktopTaskListener = taskbarDesktopTaskListener
 
     assumeTrue(ENABLE_SHELL_TRANSITIONS)
+
+    taskRepository = userRepositories.current
   }
 
   private fun createController(): DesktopTasksController {
@@ -337,7 +350,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         toggleResizeDesktopTaskTransitionHandler,
         dragToDesktopTransitionHandler,
         mMockDesktopImmersiveController,
-        taskRepository,
+        userRepositories,
         recentsTransitionHandler,
         multiInstanceHelper,
         shellExecutor,
@@ -346,6 +359,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         mockInteractionJankMonitor,
         mockHandler,
         desktopModeEventLogger,
+        desktopModeUiEventLogger,
         desktopTilingDecorViewModel,
       )
   }
@@ -375,12 +389,19 @@ class DesktopTasksControllerTest : ShellTestCase() {
     val task1 = setUpFreeformTask()
 
     val argumentCaptor = ArgumentCaptor.forClass(Boolean::class.java)
-    controller.toggleDesktopTaskSize(task1, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task1,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
 
     verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(argumentCaptor.capture())
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
       ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
+      InputMethod.TOUCH,
       task1,
       STABLE_BOUNDS.width(),
       STABLE_BOUNDS.height(),
@@ -397,21 +418,29 @@ class DesktopTasksControllerTest : ShellTestCase() {
   }
 
   @Test
-  fun doesAnyTaskRequireTaskbarRounding_toggleResizeOfFullScreenTask_returnFalse() {
+  fun doesAnyTaskRequireTaskbarRounding_toggleResizeOfMaximizedTask_returnFalse() {
     val stableBounds = Rect().apply { displayLayout.getStableBounds(this) }
     val task1 = setUpFreeformTask(bounds = stableBounds, active = true)
 
     val argumentCaptor = ArgumentCaptor.forClass(Boolean::class.java)
-    controller.toggleDesktopTaskSize(task1, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task1,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.RESTORE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_RESTORE,
+        InputMethod.TOUCH
+      )
+    )
 
     verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(argumentCaptor.capture())
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
-      ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
-      task1,
-      0,
-      0,
-      displayController
+      eq(ResizeTrigger.MAXIMIZE_BUTTON),
+      eq(InputMethod.TOUCH),
+      eq(task1),
+      anyOrNull(),
+      anyOrNull(),
+      eq(displayController),
+      anyOrNull()
     )
     assertThat(argumentCaptor.value).isFalse()
   }
@@ -1122,7 +1151,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
   fun moveRunningTaskToDesktop_topActivityTranslucentWithoutDisplay_taskIsMovedToDesktop() {
     val task =
       setUpFullscreenTask().apply {
-        isTopActivityTransparent = true
+        isActivityStackTransparent = true
         isTopActivityNoDisplay = true
         numActivities = 1
       }
@@ -1138,7 +1167,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
   fun moveRunningTaskToDesktop_topActivityTranslucentWithDisplay_doesNothing() {
     val task =
       setUpFullscreenTask().apply {
-        isTopActivityTransparent = true
+        isActivityStackTransparent = true
         isTopActivityNoDisplay = false
         numActivities = 1
       }
@@ -2231,7 +2260,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
     val task =
       setUpFullscreenTask().apply {
-        isTopActivityTransparent = true
+        isActivityStackTransparent = true
         isTopActivityNoDisplay = true
         numActivities = 1
       }
@@ -2249,7 +2278,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
     val task =
       setUpFreeformTask().apply {
-        isTopActivityTransparent = true
+        isActivityStackTransparent = true
         isTopActivityNoDisplay = false
         numActivities = 1
       }
@@ -3276,44 +3305,41 @@ class DesktopTasksControllerTest : ShellTestCase() {
     setUpLandscapeDisplay()
     val task = setUpFreeformTask()
     val taskToRequest = setUpFreeformTask()
-    val wctCaptor = ArgumentCaptor.forClass(WindowContainerTransaction::class.java)
     runOpenInstance(task, taskToRequest.taskId)
-    verify(transitions).startTransition(anyInt(), wctCaptor.capture(), anyOrNull())
-    assertThat(ActivityOptions.fromBundle(wctCaptor.value.hierarchyOps[0].launchOptions)
-      .launchWindowingMode).isEqualTo(WINDOWING_MODE_FREEFORM)
+    verify(desktopMixedTransitionHandler).startLaunchTransition(anyInt(), any(), anyInt(),
+      anyOrNull(), anyOrNull())
+    val wct = getLatestDesktopMixedTaskWct(type = TRANSIT_TO_FRONT)
+    assertThat(wct.hierarchyOps).hasSize(1)
+    wct.assertReorderAt(index = 0, taskToRequest)
   }
 
   @Test
   @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MULTI_INSTANCE_FEATURES)
   fun openInstance_fromFreeform_minimizesIfNeeded() {
     setUpLandscapeDisplay()
-    val homeTask = setUpHomeTask()
     val freeformTasks = (1..MAX_TASK_LIMIT + 1).map { _ -> setUpFreeformTask() }
     val oldestTask = freeformTasks.first()
     val newestTask = freeformTasks.last()
 
+    val transition = Binder()
+    val wctCaptor = argumentCaptor<WindowContainerTransaction>()
+    whenever(desktopMixedTransitionHandler.startLaunchTransition(anyInt(), wctCaptor.capture(),
+      anyInt(), anyOrNull(), anyOrNull()
+    ))
+      .thenReturn(transition)
+
     runOpenInstance(newestTask, freeformTasks[1].taskId)
 
-    val wct = getLatestWct(type = TRANSIT_OPEN)
-    // Home is moved to front of everything.
-    assertThat(
-      wct.hierarchyOps.any { hop ->
-        hop.container == homeTask.token.asBinder() && hop.toTop
-      }
-    ).isTrue()
-    // And the oldest task isn't moved in front of home, effectively minimizing it.
-    assertThat(
-      wct.hierarchyOps.none { hop ->
-        hop.container == oldestTask.token.asBinder() && hop.toTop
-      }
-    ).isTrue()
+    val wct = wctCaptor.firstValue
+    assertThat(wct.hierarchyOps.size).isEqualTo(2) // move-to-front + minimize
+    wct.assertReorderAt(0, freeformTasks[1], toTop = true)
+    wct.assertReorderAt(1, oldestTask, toTop = false)
   }
 
   @Test
   @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MULTI_INSTANCE_FEATURES)
   fun openInstance_fromFreeform_exitsImmersiveIfNeeded() {
     setUpLandscapeDisplay()
-    val homeTask = setUpHomeTask()
     val freeformTask = setUpFreeformTask()
     val immersiveTask = setUpFreeformTask()
     taskRepository.setTaskInFullImmersiveState(
@@ -3323,11 +3349,13 @@ class DesktopTasksControllerTest : ShellTestCase() {
     )
     val runOnStartTransit = RunOnStartTransitionCallback()
     val transition = Binder()
-    whenever(transitions.startTransition(eq(TRANSIT_OPEN), any(), anyOrNull()))
+    whenever(desktopMixedTransitionHandler.startLaunchTransition(anyInt(), any(), anyInt(),
+      anyOrNull(), anyOrNull()
+    ))
       .thenReturn(transition)
     whenever(mMockDesktopImmersiveController
       .exitImmersiveIfApplicable(
-        any(), eq(immersiveTask.displayId), eq(freeformTask.taskId), any()))
+        any(), eq(DEFAULT_DISPLAY), eq(freeformTask.taskId), any()))
       .thenReturn(
         ExitResult.Exit(
         exitingTask = immersiveTask.taskId,
@@ -3357,14 +3385,21 @@ class DesktopTasksControllerTest : ShellTestCase() {
     val bounds = Rect(0, 0, 100, 100)
     val task = setUpFreeformTask(DEFAULT_DISPLAY, bounds)
 
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
 
     // Assert bounds set to stable bounds
     val wct = getLatestToggleResizeDesktopTaskWct()
     assertThat(findBoundsChange(wct, task)).isEqualTo(STABLE_BOUNDS)
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
       ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
+      InputMethod.TOUCH,
       task,
       STABLE_BOUNDS.width(),
       STABLE_BOUNDS.height(),
@@ -3582,14 +3617,21 @@ class DesktopTasksControllerTest : ShellTestCase() {
     // Bounds should be 1000 x 500, vertically centered in the 1000 x 1000 stable bounds
     val expectedBounds = Rect(STABLE_BOUNDS.left, 250, STABLE_BOUNDS.right, 750)
 
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
 
     // Assert bounds set to stable bounds
     val wct = getLatestToggleResizeDesktopTaskWct()
     assertThat(findBoundsChange(wct, task)).isEqualTo(expectedBounds)
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
       ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
+      InputMethod.TOUCH,
       task,
       expectedBounds.width(),
       expectedBounds.height(),
@@ -3602,7 +3644,15 @@ class DesktopTasksControllerTest : ShellTestCase() {
     val bounds = Rect(0, 0, 100, 100)
     val task = setUpFreeformTask(DEFAULT_DISPLAY, bounds)
 
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
+
     assertThat(taskRepository.removeBoundsBeforeMaximize(task.taskId)).isEqualTo(bounds)
     verify(desktopModeEventLogger, never()).logTaskResizingEnded(
       any(), any(), any(), any(),
@@ -3616,18 +3666,32 @@ class DesktopTasksControllerTest : ShellTestCase() {
     val task = setUpFreeformTask(DEFAULT_DISPLAY, boundsBeforeMaximize)
 
     // Maximize
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
     task.configuration.windowConfiguration.bounds.set(STABLE_BOUNDS)
 
     // Restore
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.RESTORE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_RESTORE,
+        InputMethod.TOUCH
+      )
+    )
 
     // Assert bounds set to last bounds before maximize
     val wct = getLatestToggleResizeDesktopTaskWct()
     assertThat(findBoundsChange(wct, task)).isEqualTo(boundsBeforeMaximize)
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
       ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
+      InputMethod.TOUCH,
       task,
       boundsBeforeMaximize.width(),
       boundsBeforeMaximize.height(),
@@ -3643,19 +3707,33 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     // Maximize
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
     task.configuration.windowConfiguration.bounds.set(STABLE_BOUNDS.left,
       boundsBeforeMaximize.top, STABLE_BOUNDS.right, boundsBeforeMaximize.bottom)
 
     // Restore
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.RESTORE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_RESTORE,
+        InputMethod.TOUCH
+      )
+    )
 
     // Assert bounds set to last bounds before maximize
     val wct = getLatestToggleResizeDesktopTaskWct()
     assertThat(findBoundsChange(wct, task)).isEqualTo(boundsBeforeMaximize)
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
       ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
+      InputMethod.TOUCH,
       task,
       boundsBeforeMaximize.width(),
       boundsBeforeMaximize.height(),
@@ -3671,19 +3749,33 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     // Maximize
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
     task.configuration.windowConfiguration.bounds.set(boundsBeforeMaximize.left,
       STABLE_BOUNDS.top, boundsBeforeMaximize.right, STABLE_BOUNDS.bottom)
 
     // Restore
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.RESTORE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_RESTORE,
+        InputMethod.TOUCH
+      )
+    )
 
     // Assert bounds set to last bounds before maximize
     val wct = getLatestToggleResizeDesktopTaskWct()
     assertThat(findBoundsChange(wct, task)).isEqualTo(boundsBeforeMaximize)
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
       ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
+      InputMethod.TOUCH,
       task,
       boundsBeforeMaximize.width(),
       boundsBeforeMaximize.height(),
@@ -3697,17 +3789,31 @@ class DesktopTasksControllerTest : ShellTestCase() {
     val task = setUpFreeformTask(DEFAULT_DISPLAY, boundsBeforeMaximize)
 
     // Maximize
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+        InputMethod.TOUCH
+      )
+    )
     task.configuration.windowConfiguration.bounds.set(STABLE_BOUNDS)
 
     // Restore
-    controller.toggleDesktopTaskSize(task, ResizeTrigger.MAXIMIZE_BUTTON, motionEvent)
+    controller.toggleDesktopTaskSize(
+      task,
+      ToggleTaskSizeInteraction(
+        ToggleTaskSizeInteraction.Direction.RESTORE,
+        ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_RESTORE,
+        InputMethod.TOUCH
+      )
+    )
 
     // Assert last bounds before maximize removed after use
     assertThat(taskRepository.removeBoundsBeforeMaximize(task.taskId)).isNull()
     verify(desktopModeEventLogger, times(1)).logTaskResizingEnded(
       ResizeTrigger.MAXIMIZE_BUTTON,
-      InputMethod.UNKNOWN_INPUT_METHOD,
+      InputMethod.TOUCH,
       task,
       boundsBeforeMaximize.width(),
       boundsBeforeMaximize.height(),
@@ -3746,26 +3852,6 @@ class DesktopTasksControllerTest : ShellTestCase() {
   @Test
   fun shellController_registersUserChangeListener() {
       verify(shellController, times(1)).addUserChangeListener(any())
-  }
-
-  @Test
-  fun toggleImmersive_enter_movesToImmersive() {
-    val task = setUpFreeformTask(DEFAULT_DISPLAY)
-    taskRepository.setTaskInFullImmersiveState(DEFAULT_DISPLAY, task.taskId, false /* immersive */)
-
-    controller.toggleDesktopTaskFullImmersiveState(task)
-
-    verify(mMockDesktopImmersiveController).moveTaskToImmersive(task)
-  }
-
-  @Test
-  fun toggleImmersive_exit_movesToNonImmersive() {
-    val task = setUpFreeformTask(DEFAULT_DISPLAY)
-    taskRepository.setTaskInFullImmersiveState(DEFAULT_DISPLAY, task.taskId, true /* immersive */)
-
-    controller.toggleDesktopTaskFullImmersiveState(task)
-
-    verify(mMockDesktopImmersiveController).moveTaskToNonImmersive(eq(task), any())
   }
 
   @Test

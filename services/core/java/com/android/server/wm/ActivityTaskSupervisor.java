@@ -2122,6 +2122,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 break;
             }
         }
+        long timeRemaining = endTime - System.currentTimeMillis();
+        mWindowManager.mSnapshotController.mTaskSnapshotController.waitFlush(timeRemaining);
 
         // Force checkReadyForSleep to complete.
         checkReadyForSleepLocked(false /* allowDelay */);

@@ -42,7 +42,6 @@ import android.aconfigd.Aconfigd.StorageReturnMessages;
 import static com.android.aconfig_new_storage.Flags.enableAconfigStorageDaemon;
 import static com.android.aconfig_new_storage.Flags.supportImmediateLocalOverrides;
 import static com.android.aconfig_new_storage.Flags.supportClearLocalOverridesImmediately;
-import static com.android.aconfig.flags.Flags.enableSystemAconfigdRust;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -140,7 +139,16 @@ public class SettingsToPropertiesMapper {
     // The list is sorted.
     @VisibleForTesting
     static final String[] sDeviceConfigAconfigScopes = new String[] {
+        "tv_os",
+        "aaos_carframework_triage",
+        "aaos_performance_triage",
+        "aaos_user_triage",
+        "aaos_window_triage",
+        "aaos_audio_triage",
+        "aaos_power_triage",
+        "aaos_storage_triage",
         "aaos_sdv",
+        "aaos_vac_triage",
         "accessibility",
         "android_core_networking",
         "android_health_services",
@@ -459,9 +467,8 @@ public class SettingsToPropertiesMapper {
     static ProtoInputStream sendAconfigdRequests(ProtoOutputStream requests) {
         // connect to aconfigd socket
         LocalSocket client = new LocalSocket();
-        String socketName = enableSystemAconfigdRust()
-                    ? "aconfigd_system" : "aconfigd";
-        try{
+        String socketName = "aconfigd_system";
+        try {
             client.connect(new LocalSocketAddress(
                 socketName, LocalSocketAddress.Namespace.RESERVED));
             Slog.d(TAG, "connected to aconfigd socket");
@@ -533,9 +540,8 @@ public class SettingsToPropertiesMapper {
      * @param packageName the package of the flag
      * @param flagName the name of the flag
      * @param immediate if true, clear immediately; otherwise, clear on next reboot
-     *
-     * @hide
      */
+    @VisibleForTesting
     public static void writeFlagOverrideRemovalRequest(
         ProtoOutputStream proto, String packageName, String flagName, boolean immediate) {
       long msgsToken = proto.start(StorageRequestMessages.MSGS);
@@ -591,7 +597,8 @@ public class SettingsToPropertiesMapper {
      * apply flag local override in aconfig new storage
      * @param props
      */
-    static void setLocalOverridesInNewStorage(DeviceConfig.Properties props) {
+    @VisibleForTesting
+    public static void setLocalOverridesInNewStorage(DeviceConfig.Properties props) {
         int num_requests = 0;
         ProtoOutputStream requests = new ProtoOutputStream();
         for (String flagName : props.getKeyset()) {

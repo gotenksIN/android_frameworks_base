@@ -23,6 +23,7 @@ import static android.Manifest.permission.LOCK_DEVICE;
 import static android.Manifest.permission.MANAGE_DEVICE_ADMINS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACCOUNT_MANAGEMENT;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_APPS_CONTROL;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_APP_FUNCTIONS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CAMERA;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CERTIFICATES;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_COMMON_CRITERIA_MODE;
@@ -3931,6 +3932,11 @@ public class DevicePolicyManager {
     @FlaggedApi(android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED)
     public static final int OPERATION_SET_CONTENT_PROTECTION_POLICY = 41;
 
+    /** @hide */
+    @TestApi
+    @FlaggedApi(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER)
+    public static final int OPERATION_SET_APP_FUNCTIONS_POLICY = 42;
+
     private static final String PREFIX_OPERATION = "OPERATION_";
 
     /** @hide */
@@ -3975,7 +3981,8 @@ public class DevicePolicyManager {
             OPERATION_SET_PERMISSION_POLICY,
             OPERATION_SET_RESTRICTIONS_PROVIDER,
             OPERATION_UNINSTALL_CA_CERT,
-            OPERATION_SET_CONTENT_PROTECTION_POLICY
+            OPERATION_SET_CONTENT_PROTECTION_POLICY,
+            OPERATION_SET_APP_FUNCTIONS_POLICY
     })
     @Retention(RetentionPolicy.SOURCE)
     public static @interface DevicePolicyOperation {
@@ -4177,6 +4184,35 @@ public class DevicePolicyManager {
         }
     }
 
+
+    /**
+     * Similar to the public variant of {@link #setMtePolicy} but for use by the system.
+     *
+     * <p>Called by a system service only, meaning that the caller's UID must be equal to
+     * {@link Process#SYSTEM_UID}.
+     *
+     * @throws SecurityException if caller is not permitted to set Mte policy
+     * @throws UnsupportedOperationException if the device does not support MTE
+     * @param systemEntity  The service entity that adds the restriction. A user restriction set by
+     *                       a service entity can only be cleared by the same entity. This can be
+     *                       just the calling package name, or any string of the caller's choice
+     *                       can be used.
+     * @param policy the MTE policy to be set
+     * @hide
+     */
+    public void setMtePolicy(@NonNull String systemEntity, @MtePolicy int policy) {
+        throwIfParentInstance("setMtePolicyForUser");
+        if (mService != null) {
+            try {
+                mService.setMtePolicyBySystem(systemEntity, policy);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+
+
     /**
      * Called by a device owner, profile owner of an organization-owned device to
      * get the Memory Tagging Extension (MTE) policy
@@ -4315,6 +4351,90 @@ public class DevicePolicyManager {
             }
         }
         return CONTENT_PROTECTION_DISABLED;
+    }
+
+    /**
+     * Indicates that app functions are not controlled by policy.
+     *
+     * <p>If no admin set this policy, it means appfunctions are enabled.
+     */
+    @FlaggedApi(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER)
+    public static final int APP_FUNCTIONS_NOT_CONTROLLED_BY_POLICY = 0;
+
+    /** Indicates that app functions are controlled and disabled by a policy. */
+    @FlaggedApi(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER)
+    public static final int APP_FUNCTIONS_DISABLED = 1;
+
+    /**
+     * Indicates that app functions are controlled and disabled by a policy for cross profile
+     * interactions only.
+     *
+     * <p>This is different from {@link #APP_FUNCTIONS_DISABLED} in that it only disables cross
+     * profile interactions (even if the caller has permissions required to interact across users).
+     * appfunctions can still be used within the a user profile boundary.
+     */
+    @FlaggedApi(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER)
+    public static final int APP_FUNCTIONS_DISABLED_CROSS_PROFILE = 2;
+
+    /** @hide */
+    @IntDef(
+            prefix = {"APP_FUNCTIONS_"},
+            value = {
+                    APP_FUNCTIONS_NOT_CONTROLLED_BY_POLICY,
+                    APP_FUNCTIONS_DISABLED,
+                    APP_FUNCTIONS_DISABLED_CROSS_PROFILE
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface AppFunctionsPolicy {}
+
+    /**
+     * Sets the app functions policy which controls app functions operations on the device.
+     *
+     * <p>This function can only be called by a device owner, a profile owner or holders of the
+     * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_APP_FUNCTIONS}.
+     *
+     * @param policy The app functions policy to set. One of {@link
+     *               #APP_FUNCTIONS_NOT_CONTROLLED_BY_POLICY},
+     *               {@link #APP_FUNCTIONS_DISABLED} or
+     *               {@link #APP_FUNCTIONS_DISABLED_CROSS_PROFILE}
+     * @throws SecurityException if caller is not a device owner, a profile owner or a holder
+     * of the permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_APP_FUNCTIONS}.
+     */
+    @RequiresPermission(value = MANAGE_DEVICE_POLICY_APP_FUNCTIONS, conditional = true)
+    @FlaggedApi(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER)
+    public void setAppFunctionsPolicy(@AppFunctionsPolicy int policy) {
+        throwIfParentInstance("setAppFunctionsPolicy");
+        if (mService != null) {
+            try {
+                mService.setAppFunctionsPolicy(mContext.getPackageName(), policy);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Returns the current app functions policy.
+     *
+     * <p>The returned policy will be the current resolved policy rather than the policy set by the
+     * calling admin.
+     *
+     * @throws SecurityException if caller is not a device owner, a profile owner or a holder
+     * of the permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_APP_FUNCTIONS}.
+     */
+    @RequiresPermission(value = MANAGE_DEVICE_POLICY_APP_FUNCTIONS, conditional = true)
+    @FlaggedApi(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER)
+    public @AppFunctionsPolicy int getAppFunctionsPolicy() {
+        throwIfParentInstance("getAppFunctionsPolicy");
+        if (mService != null) {
+            try {
+                return mService.getAppFunctionsPolicy(mContext.getPackageName(),
+                        myUserId());
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return APP_FUNCTIONS_NOT_CONTROLLED_BY_POLICY;
     }
 
     /**
@@ -12457,6 +12577,36 @@ public class DevicePolicyManager {
     }
 
     /**
+     * Returns the {@link EnforcingAdmin} who have set this policy.
+     *
+     * <p>Important: this API is a temporary solution, hence should be kept hidden. That is because
+     * the string argument can't define policies with arguments.
+     *
+     * <p>Note that for {@link #POLICY_SUSPEND_PACKAGES} it returns the PO or DO to keep the
+     * behavior the same as before the bug fix for b/192245204.
+     *
+     * <p>This API is only callable by the system UID
+     *
+     * @param userId     The user for whom to retrieve the information.
+     * @param identifier The policy enforced by admins. It could be any user restriction or
+     *                   policy like {@link DevicePolicyManager#POLICY_DISABLE_CAMERA} and
+     *                   {@link DevicePolicyManager#POLICY_DISABLE_SCREEN_CAPTURE}. This also works
+     *                   for {@link DevicePolicyIdentifiers#MEMORY_TAGGING_POLICY}.
+     *
+     * @hide
+     */
+    public @Nullable EnforcingAdmin getEnforcingAdmin(int userId, String identifier) {
+        if (mService != null) {
+            try {
+                return mService.getEnforcingAdmin(userId, identifier);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns the list of {@link EnforcingAdmin}s who have set this restriction.
      *
      * <p>Note that for {@link #POLICY_SUSPEND_PACKAGES} it returns the PO or DO to keep the
@@ -14453,7 +14603,7 @@ public class DevicePolicyManager {
      * </ul>
      * <p>
      * The following methods are supported for the parent instance but can only be called by the
-     * profile owner of a managed profile that was created during the device provisioning flow:
+     * profile owner on an <a href="#organization-owned">organization owned</a> managed profile:
      * <ul>
      * <li>{@link #getPasswordComplexity}</li>
      * <li>{@link #setCameraDisabled}</li>
@@ -14461,11 +14611,6 @@ public class DevicePolicyManager {
      * <li>{@link #setAccountManagementDisabled(ComponentName, String, boolean)}</li>
      * <li>{@link #setPermittedInputMethods}</li>
      * <li>{@link #getPermittedInputMethods}</li>
-     * </ul>
-     *
-     * <p>The following methods can be called by the profile owner of a managed profile
-     * on an organization-owned device:
-     * <ul>
      * <li>{@link #wipeData}</li>
      * </ul>
      *

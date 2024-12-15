@@ -55,6 +55,7 @@ import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.BadParcelableException;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.BundleMerger;
@@ -6199,7 +6200,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@link #EXTRA_CHOOSER_MODIFY_SHARE_ACTION},
      * {@link #EXTRA_METADATA_TEXT},
      * {@link #EXTRA_CHOOSER_REFINEMENT_INTENT_SENDER},
-     * {@link #EXTRA_CHOOSER_RESULT_INTENT_SENDER}.
+     * {@link #EXTRA_CHOOSER_RESULT_INTENT_SENDER},
+     * {@link #EXTRA_EXCLUDE_COMPONENTS}.
      * </p>
      */
     public static final String EXTRA_CHOOSER_ADDITIONAL_CONTENT_URI =
@@ -7732,6 +7734,7 @@ public class Intent implements Parcelable, Cloneable {
     @IntDef(flag = true, prefix = { "EXTENDED_FLAG_" }, value = {
             EXTENDED_FLAG_FILTER_MISMATCH,
             EXTENDED_FLAG_MISSING_CREATOR_OR_INVALID_TOKEN,
+            EXTENDED_FLAG_NESTED_INTENT_KEYS_COLLECTED,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ExtendedFlags {}
@@ -7751,6 +7754,13 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     public static final int EXTENDED_FLAG_MISSING_CREATOR_OR_INVALID_TOKEN = 1 << 1;
+
+    /**
+     * This flag indicates this intent called {@link #collectExtraIntentKeys()}.
+     *
+     * @hide
+     */
+    public static final int EXTENDED_FLAG_NESTED_INTENT_KEYS_COLLECTED = 1 << 2;
 
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
@@ -7859,6 +7869,10 @@ public class Intent implements Parcelable, Cloneable {
      * that can handle it.</p>
      */
     public static final int URI_ALLOW_UNSAFE = 1<<2;
+
+    static {
+        Bundle.intentClass = Intent.class;
+    }
 
     // ---------------------------------------------------------------------
 
@@ -7971,6 +7985,24 @@ public class Intent implements Parcelable, Cloneable {
      */
     public @NonNull Intent cloneFilter() {
         return new Intent(this, COPY_MODE_FILTER);
+    }
+
+    /**
+     * Make a copy of all members important to identify an intent with its creator token.
+     * @hide
+     */
+    public @NonNull Intent cloneForCreatorToken() {
+        Intent clone = new Intent()
+                .setAction(this.mAction)
+                .setDataAndType(this.mData, this.mType)
+                .setPackage(this.mPackage)
+                .setComponent(this.mComponent)
+                .setFlags(this.mFlags & IMMUTABLE_FLAGS);
+        if (this.mClipData != null) {
+            clone.setClipData(this.mClipData.cloneOnlyUriItems());
+        }
+        clone.mCreatorTokenInfo = this.mCreatorTokenInfo;
+        return clone;
     }
 
     /**
@@ -11688,12 +11720,51 @@ public class Intent implements Parcelable, Cloneable {
                 Log.w(TAG, "Failure filling in extras", e);
             }
         }
-        mCreatorTokenInfo = other.mCreatorTokenInfo;
+        fillInCreatorTokenInfo(other.mCreatorTokenInfo, changes);
         if (mayHaveCopiedUris && mContentUserHint == UserHandle.USER_CURRENT
                 && other.mContentUserHint != UserHandle.USER_CURRENT) {
             mContentUserHint = other.mContentUserHint;
         }
         return changes;
+    }
+
+    // keep original creator token and merge nested intent keys.
+    private void fillInCreatorTokenInfo(CreatorTokenInfo otherCreatorTokenInfo, int changes) {
+        if (otherCreatorTokenInfo != null && otherCreatorTokenInfo.mNestedIntentKeys != null) {
+            if (mCreatorTokenInfo == null) {
+                mCreatorTokenInfo = new CreatorTokenInfo();
+            }
+            ArraySet<NestedIntentKey> otherNestedIntentKeys =
+                    otherCreatorTokenInfo.mNestedIntentKeys;
+            if (mCreatorTokenInfo.mNestedIntentKeys == null) {
+                mCreatorTokenInfo.mNestedIntentKeys = new ArraySet<>(otherNestedIntentKeys);
+            } else {
+                ArraySet<NestedIntentKey> otherKeys;
+                if ((changes & FILL_IN_CLIP_DATA) == 0) {
+                    // If clip data is Not filled in from other, do not merge clip data keys.
+                    otherKeys = new ArraySet<>();
+                    int N = otherNestedIntentKeys.size();
+                    for (int i = 0; i < N; i++) {
+                        NestedIntentKey key = otherNestedIntentKeys.valueAt(i);
+                        if (key.mType != NestedIntentKey.NESTED_INTENT_KEY_TYPE_CLIP_DATA) {
+                            otherKeys.add(key);
+                        }
+                    }
+                } else {
+                    // If clip data is filled in from other, remove clip data keys from this
+                    // creatorTokenInfo and then merge every key from the others.
+                    int N = mCreatorTokenInfo.mNestedIntentKeys.size();
+                    for (int i = N - 1; i >= 0; i--) {
+                        NestedIntentKey key = mCreatorTokenInfo.mNestedIntentKeys.valueAt(i);
+                        if (key.mType == NestedIntentKey.NESTED_INTENT_KEY_TYPE_CLIP_DATA) {
+                            mCreatorTokenInfo.mNestedIntentKeys.removeAt(i);
+                        }
+                    }
+                    otherKeys = otherNestedIntentKeys;
+                }
+                mCreatorTokenInfo.mNestedIntentKeys.addAll(otherKeys);
+            }
+        }
     }
 
     /**
@@ -12232,6 +12303,7 @@ public class Intent implements Parcelable, Cloneable {
         private IBinder mCreatorToken;
         // Stores all extra keys whose values are intents for a top level intent.
         private ArraySet<NestedIntentKey> mNestedIntentKeys;
+
     }
 
     /**
@@ -12340,10 +12412,22 @@ public class Intent implements Parcelable, Cloneable {
     }
 
     private void collectNestedIntentKeysRecur(Set<Intent> visited) {
-        if (mExtras != null && !mExtras.isParcelled() && !mExtras.isEmpty()) {
+        addExtendedFlags(EXTENDED_FLAG_NESTED_INTENT_KEYS_COLLECTED);
+        if (mExtras != null && !mExtras.isEmpty()) {
             for (String key : mExtras.keySet()) {
-                Object value = mExtras.get(key);
-
+                Object value;
+                try {
+                    value = mExtras.get(key);
+                } catch (BadParcelableException e) {
+                    // This could happen when the key points to a LazyValue whose class cannot be
+                    // found by the classLoader - A nested object more than 1 level deeper who is
+                    // of type of a custom class could trigger this situation. In such case, we
+                    // ignore it since it is not an intent. However, it could be a custom type that
+                    // extends from Intent. If such an object is retrieved later in another
+                    // component, then trying to launch such a custom class object will fail unless
+                    // removeLaunchSecurityProtection() is called before it is launched.
+                    value = null;
+                }
                 if (value instanceof Intent intent && !visited.contains(intent)) {
                     handleNestedIntent(intent, visited, new NestedIntentKey(
                             NestedIntentKey.NESTED_INTENT_KEY_TYPE_EXTRA_PARCEL, key, 0));

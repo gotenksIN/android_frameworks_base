@@ -343,7 +343,7 @@ public final class UsbAlsaManager {
                                       deviceAddress, hasOutput, hasInput,
                                       isInputHeadset, isOutputHeadset, isDock);
             alsaDevice.setDeviceNameAndDescription(
-                      cardRec.getCardName(), cardRec.getCardDescription());
+                    usbDevice.getProductName(), cardRec.getCardDescription());
             if (mIsSingleMode) {
                 deselectCurrentDevice(alsaDevice.getInputDeviceType());
                 deselectCurrentDevice(alsaDevice.getOutputDeviceType());

@@ -25,6 +25,8 @@ import com.android.systemui.back.domain.interactor.BackActionInteractor
 import com.android.systemui.biometrics.BiometricNotificationService
 import com.android.systemui.bouncer.domain.startable.BouncerStartable
 import com.android.systemui.clipboardoverlay.ClipboardListener
+import com.android.systemui.complication.ComplicationTypesUpdater
+import com.android.systemui.complication.DreamClockTimeComplication
 import com.android.systemui.controls.dagger.StartControlsStartableModule
 import com.android.systemui.dagger.qualifiers.PerUser
 import com.android.systemui.dreams.AssistantAttentionMonitor
@@ -52,7 +54,7 @@ import com.android.systemui.shortcut.ShortcutKeyDispatcher
 import com.android.systemui.statusbar.ImmersiveModeConfirmation
 import com.android.systemui.statusbar.gesture.GesturePointerEventListener
 import com.android.systemui.statusbar.notification.InstantAppNotifier
-import com.android.systemui.statusbar.phone.StatusBarHeadsUpChangeListener
+import com.android.systemui.statusbar.notification.headsup.StatusBarHeadsUpChangeListener
 import com.android.systemui.statusbar.policy.BatteryControllerStartable
 import com.android.systemui.stylus.StylusUsiPowerStartable
 import com.android.systemui.temporarydisplay.chipbar.ChipbarCoordinator
@@ -337,4 +339,18 @@ abstract class SystemUICoreStartableModule {
     abstract fun bindDreamOverlayRegistrant(
         dreamOverlayRegistrant: DreamOverlayRegistrant
     ): CoreStartable
+
+    /** Inject into DreamClockTimeComplication.Registrant */
+    @Binds
+    @IntoMap
+    @ClassKey(DreamClockTimeComplication.Registrant::class)
+    abstract fun bindDreamClockTimeComplicationRegistrant(
+        registrant: DreamClockTimeComplication.Registrant
+    ): CoreStartable
+
+    /** Inject into ComplicationTypesUpdater. */
+    @Binds
+    @IntoMap
+    @ClassKey(ComplicationTypesUpdater::class)
+    abstract fun bindComplicationTypesUpdater(updater: ComplicationTypesUpdater): CoreStartable
 }

@@ -93,10 +93,18 @@ public abstract class RemoteContext {
     /**
      * Load a path under an id. Paths can be use in clip drawPath and drawTweenPath
      *
-     * @param instanceId
-     * @param floatPath
+     * @param instanceId the id to save this path under
+     * @param floatPath the path as a float array
      */
     public abstract void loadPathData(int instanceId, @NonNull float[] floatPath);
+
+    /**
+     * Load a path under an id. Paths can be use in clip drawPath and drawTweenPath
+     *
+     * @param instanceId
+     * @return the a
+     */
+    public abstract @Nullable float[] getPathData(int instanceId);
 
     /**
      * Associate a name with a give id.
@@ -205,6 +213,13 @@ public abstract class RemoteContext {
      * @param type 0 = none, 1-21 ,see HapticFeedbackConstants
      */
     public abstract void hapticEffect(int type);
+
+    /** Set the repaint flag. This will trigger a repaint of the current document. */
+    public void needsRepaint() {
+        if (mPaintContext != null) {
+            mPaintContext.needsRepaint();
+        }
+    }
 
     /**
      * The context can be used in a few different mode, allowing operations to skip being executed:
@@ -478,6 +493,9 @@ public abstract class RemoteContext {
 
     public static final int ID_DENSITY = 27;
 
+    /** Defines when the last build was made */
+    public static final int ID_API_LEVEL = 28;
+
     public static final float FLOAT_DENSITY = Utils.asNan(ID_DENSITY);
 
     /** CONTINUOUS_SEC is seconds from midnight looping every hour 0-3600 */
@@ -550,6 +568,9 @@ public abstract class RemoteContext {
 
     /** Ambient light level in SI lux */
     public static final float FLOAT_LIGHT = Utils.asNan(ID_LIGHT);
+
+    /** When was this player built */
+    public static final float FLOAT_API_LEVEL = Utils.asNan(ID_API_LEVEL);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     // Click handling

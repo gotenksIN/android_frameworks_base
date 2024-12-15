@@ -73,16 +73,17 @@ public:
     MOCK_METHOD(ScopedAStatus, closeSessionChannel, (), (override));
     MOCK_METHOD(ScopedAStatus, getCpuHeadroom,
                 (const ::aidl::android::os::CpuHeadroomParamsInternal& in_params,
-                 std::vector<float>* _aidl_return),
+                 std::optional<hal::CpuHeadroomResult>* _aidl_return),
                 (override));
     MOCK_METHOD(ScopedAStatus, getCpuHeadroomMinIntervalMillis, (int64_t* _aidl_return),
                 (override));
     MOCK_METHOD(ScopedAStatus, getGpuHeadroom,
                 (const ::aidl::android::os::GpuHeadroomParamsInternal& in_params,
-                 float* _aidl_return),
+                 std::optional<hal::GpuHeadroomResult>* _aidl_return),
                 (override));
     MOCK_METHOD(ScopedAStatus, getGpuHeadroomMinIntervalMillis, (int64_t* _aidl_return),
                 (override));
+    MOCK_METHOD(ScopedAStatus, passSessionManagerBinder, (const SpAIBinder& sessionManager));
     MOCK_METHOD(SpAIBinder, asBinder, (), (override));
     MOCK_METHOD(bool, isRemote, (), (override));
 };
@@ -99,6 +100,8 @@ public:
     MOCK_METHOD(ScopedAStatus, close, (), (override));
     MOCK_METHOD(ScopedAStatus, reportActualWorkDuration2,
                 (const ::std::vector<hal::WorkDuration>& workDurations), (override));
+    MOCK_METHOD(ScopedAStatus, associateToLayers,
+                (const std::vector<::ndk::SpAIBinder>& in_layerTokens), (override));
     MOCK_METHOD(SpAIBinder, asBinder, (), (override));
     MOCK_METHOD(bool, isRemote, (), (override));
 };

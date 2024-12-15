@@ -636,7 +636,7 @@ public class AutofillFeatureFlags {
         return DeviceConfig.getBoolean(
                 DeviceConfig.NAMESPACE_AUTOFILL,
                 DEVICE_CONFIG_ENABLE_RELAYOUT,
-                false);
+                true);
     }
 
     /** @hide */
@@ -644,7 +644,7 @@ public class AutofillFeatureFlags {
         return DeviceConfig.getBoolean(
                 DeviceConfig.NAMESPACE_AUTOFILL,
                 DEVICE_CONFIG_ENABLE_RELATIVE_LOCATION_FOR_RELAYOUT,
-                false);
+                true);
     }
 
     /** @hide **/

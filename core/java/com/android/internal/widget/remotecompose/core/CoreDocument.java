@@ -18,17 +18,19 @@ package com.android.internal.widget.remotecompose.core;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.widget.remotecompose.core.operations.ComponentValue;
 import com.android.internal.widget.remotecompose.core.operations.FloatExpression;
 import com.android.internal.widget.remotecompose.core.operations.IntegerExpression;
 import com.android.internal.widget.remotecompose.core.operations.NamedVariable;
 import com.android.internal.widget.remotecompose.core.operations.RootContentBehavior;
+import com.android.internal.widget.remotecompose.core.operations.ShaderData;
+import com.android.internal.widget.remotecompose.core.operations.TextData;
 import com.android.internal.widget.remotecompose.core.operations.Theme;
 import com.android.internal.widget.remotecompose.core.operations.layout.ClickModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.Component;
 import com.android.internal.widget.remotecompose.core.operations.layout.ComponentEnd;
 import com.android.internal.widget.remotecompose.core.operations.layout.ComponentStartOperation;
-import com.android.internal.widget.remotecompose.core.operations.layout.LayoutComponent;
 import com.android.internal.widget.remotecompose.core.operations.layout.LoopEnd;
 import com.android.internal.widget.remotecompose.core.operations.layout.LoopOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.OperationsListEnd;
@@ -38,12 +40,14 @@ import com.android.internal.widget.remotecompose.core.operations.layout.TouchDow
 import com.android.internal.widget.remotecompose.core.operations.layout.TouchUpModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ComponentModifiers;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ModifierOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ScrollModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.utilities.StringSerializer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -53,13 +57,14 @@ import java.util.Set;
 public class CoreDocument {
 
     private static final boolean DEBUG = false;
+    private static final int DOCUMENT_API_LEVEL = 2;
 
     @NonNull ArrayList<Operation> mOperations = new ArrayList<>();
 
     @Nullable RootLayoutComponent mRootLayoutComponent = null;
 
     @NonNull RemoteComposeState mRemoteComposeState = new RemoteComposeState();
-    @NonNull TimeVariables mTimeVariables = new TimeVariables();
+    @VisibleForTesting @NonNull public TimeVariables mTimeVariables = new TimeVariables();
     // Semantic version of the document
     @NonNull Version mVersion = new Version(0, 1, 0);
 
@@ -85,6 +90,11 @@ public class CoreDocument {
     private HashSet<Component> mAppliedTouchOperations = new HashSet<>();
 
     private int mLastId = 1; // last component id when inflating the file
+
+    /** Returns a version number that is monotonically increasing. */
+    public static int getDocumentApiLevel() {
+        return DOCUMENT_API_LEVEL;
+    }
 
     @Nullable
     public String getContentDescription() {
@@ -434,11 +444,11 @@ public class CoreDocument {
         mActionListeners.clear();
     }
 
-    public interface ClickCallbacks {
-        void click(int id, @Nullable String metadata);
+    public interface IdActionCallback {
+        void onAction(int id, @Nullable String metadata);
     }
 
-    @NonNull HashSet<ClickCallbacks> mClickListeners = new HashSet<>();
+    @NonNull HashSet<IdActionCallback> mIdActionListeners = new HashSet<>();
     @NonNull HashSet<TouchListener> mTouchListeners = new HashSet<>();
     @NonNull HashSet<ClickAreaRepresentation> mClickAreas = new HashSet<>();
 
@@ -462,6 +472,21 @@ public class CoreDocument {
         float mRight;
         float mBottom;
         @Nullable final String mMetadata;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof ClickAreaRepresentation)) return false;
+            ClickAreaRepresentation that = (ClickAreaRepresentation) o;
+            return mId == that.mId
+                    && Objects.equals(mContentDescription, that.mContentDescription)
+                    && Objects.equals(mMetadata, that.mMetadata);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(mId, mContentDescription, mMetadata);
+        }
 
         public ClickAreaRepresentation(
                 int id,
@@ -565,6 +590,7 @@ public class CoreDocument {
         TouchUpModifierOperation currentTouchUpModifier = null;
         TouchCancelModifierOperation currentTouchCancelModifier = null;
         LoopOperation currentLoop = null;
+        ScrollModifierOperation currentScrollModifier = null;
 
         mLastId = -1;
         for (Operation o : operations) {
@@ -579,8 +605,8 @@ public class CoreDocument {
                     mLastId = component.getComponentId();
                 }
             } else if (o instanceof ComponentEnd) {
-                if (currentComponent instanceof LayoutComponent) {
-                    ((LayoutComponent) currentComponent).inflate();
+                if (currentComponent != null) {
+                    currentComponent.inflate();
                 }
                 components.remove(components.size() - 1);
                 if (!components.isEmpty()) {
@@ -602,6 +628,9 @@ public class CoreDocument {
             } else if (o instanceof TouchCancelModifierOperation) {
                 currentTouchCancelModifier = (TouchCancelModifierOperation) o;
                 ops = currentTouchCancelModifier.getList();
+            } else if (o instanceof ScrollModifierOperation) {
+                currentScrollModifier = (ScrollModifierOperation) o;
+                ops = currentScrollModifier.getList();
             } else if (o instanceof OperationsListEnd) {
                 ops = currentComponent.getList();
                 if (currentClickModifier != null) {
@@ -616,6 +645,9 @@ public class CoreDocument {
                 } else if (currentTouchCancelModifier != null) {
                     ops.add(currentTouchCancelModifier);
                     currentTouchCancelModifier = null;
+                } else if (currentScrollModifier != null) {
+                    ops.add(currentScrollModifier);
+                    currentScrollModifier = null;
                 }
             } else if (o instanceof LoopOperation) {
                 currentLoop = (LoopOperation) o;
@@ -665,6 +697,7 @@ public class CoreDocument {
                     }
                 }
             }
+            op.markNotDirty();
             op.apply(context);
         }
     }
@@ -740,9 +773,13 @@ public class CoreDocument {
             float right,
             float bottom,
             @Nullable String metadata) {
-        mClickAreas.add(
+
+        ClickAreaRepresentation car =
                 new ClickAreaRepresentation(
-                        id, contentDescription, left, top, right, bottom, metadata));
+                        id, contentDescription, left, top, right, bottom, metadata);
+
+        boolean old = mClickAreas.remove(car);
+        mClickAreas.add(car);
     }
 
     /**
@@ -755,12 +792,12 @@ public class CoreDocument {
     }
 
     /**
-     * Add a click listener. This will get called when a click is detected on the document
+     * Add an id action listener. This will get called when e.g. a click is detected on the document
      *
-     * @param callback called when a click area has been hit, passing the click are id and metadata.
+     * @param callback called when an action is executed, passing the id and metadata.
      */
-    public void addClickListener(@NonNull ClickCallbacks callback) {
-        mClickListeners.add(callback);
+    public void addIdActionListener(@NonNull IdActionCallback callback) {
+        mIdActionListeners.add(callback);
     }
 
     /**
@@ -769,8 +806,8 @@ public class CoreDocument {
      * @return set of click listeners
      */
     @NonNull
-    public HashSet<CoreDocument.ClickCallbacks> getClickListeners() {
-        return mClickListeners;
+    public HashSet<IdActionCallback> getIdActionListeners() {
+        return mIdActionListeners;
     }
 
     /**
@@ -799,15 +836,15 @@ public class CoreDocument {
                 warnClickListeners(clickArea);
             }
         }
-        for (ClickCallbacks listener : mClickListeners) {
-            listener.click(id, "");
+        for (IdActionCallback listener : mIdActionListeners) {
+            listener.onAction(id, "");
         }
     }
 
     /** Warn click listeners when a click area is activated */
     private void warnClickListeners(@NonNull ClickAreaRepresentation clickArea) {
-        for (ClickCallbacks listener : mClickListeners) {
-            listener.click(clickArea.mId, clickArea.mMetadata);
+        for (IdActionCallback listener : mIdActionListeners) {
+            listener.onAction(clickArea.mId, clickArea.mMetadata);
         }
     }
 
@@ -881,7 +918,7 @@ public class CoreDocument {
         }
         if (mRootLayoutComponent != null) {
             for (Component component : mAppliedTouchOperations) {
-                component.onTouchUp(context, this, x, y, true);
+                component.onTouchUp(context, this, x, y, dx, dy, true);
             }
             mAppliedTouchOperations.clear();
         }
@@ -1039,7 +1076,13 @@ public class CoreDocument {
                                 || context.getTheme() == Theme.UNSPECIFIED;
             }
             if (apply) {
-                op.apply(context);
+                if (op.isDirty() || op instanceof PaintOperation) {
+                    if (op.isDirty() && op instanceof VariableSupport) {
+                        op.markNotDirty();
+                        ((VariableSupport) op).updateVariables(context);
+                    }
+                    op.apply(context);
+                }
             }
         }
         if (context.getPaintContext().doesNeedsRepaint()
@@ -1047,7 +1090,6 @@ public class CoreDocument {
             mRepaintNext = 1;
         }
         context.mMode = RemoteContext.ContextMode.UNSET;
-        // System.out.println(">>   " + (  System.nanoTime() - time)*1E-6f+" ms");
         if (DEBUG && mRootLayoutComponent != null) {
             System.out.println(mRootLayoutComponent.displayHierarchy());
         }
@@ -1142,5 +1184,31 @@ public class CoreDocument {
     @NonNull
     public List<Operation> getOperations() {
         return mOperations;
+    }
+
+    /** defines if a shader can be run */
+    public interface ShaderControl {
+        boolean isShaderValid(String shader);
+    }
+
+    /**
+     * validate the shaders
+     *
+     * @param context the remote context
+     * @param ctl the call back to allow evaluation of shaders
+     */
+    public void checkShaders(RemoteContext context, ShaderControl ctl) {
+        int count = 0;
+        for (Operation op : mOperations) {
+            if (op instanceof TextData) {
+                op.apply(context);
+            }
+            if (op instanceof ShaderData) {
+                ShaderData sd = (ShaderData) op;
+                int id = sd.getShaderTextId();
+                String str = context.getText(id);
+                sd.enable(ctl.isShaderValid(str));
+            }
+        }
     }
 }

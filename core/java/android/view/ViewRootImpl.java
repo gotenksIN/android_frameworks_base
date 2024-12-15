@@ -16,6 +16,7 @@
 
 package android.view;
 
+import static android.adpf.Flags.adpfViewrootimplActionDownBoost;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.content.pm.ActivityInfo.OVERRIDE_SANDBOX_VIEW_BOUNDS_APIS;
 import static android.graphics.HardwareRenderer.SYNC_CONTEXT_IS_STOPPED;
@@ -1211,6 +1212,8 @@ public final class ViewRootImpl implements ViewParent,
     private long mRenderThreadDrawStartTimeNs = -1;
     private long mFirstFramePresentedTimeNs = -1;
 
+    private final boolean mSendPerfHintOnTouch;
+
     private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
     private static boolean sToolkitFrameRateFunctionEnablingReadOnlyFlagValue;
     private static boolean sToolkitMetricsForFrameRateDecisionFlagValue;
@@ -1238,6 +1241,8 @@ public final class ViewRootImpl implements ViewParent,
     private MotionEvent mPointerIconEvent = null;
     private @ActivityInfo.ColorMode int mCurrentColorMode = ActivityInfo.COLOR_MODE_DEFAULT;
     private long mColorModeLastSetMillis = -1;
+
+    private final boolean mIsSubscribeGranularDisplayEventsEnabled;
 
     public ViewRootImpl(Context context, Display display) {
         this(context, display, WindowManagerGlobal.getWindowSession(), new WindowLayout());
@@ -1336,6 +1341,10 @@ public final class ViewRootImpl implements ViewParent,
         // Disable DRAW_WAKE_LOCK starting U.
         mDisableDrawWakeLock =
                 CompatChanges.isChangeEnabled(DISABLE_DRAW_WAKE_LOCK) && disableDrawWakeLock();
+        mIsSubscribeGranularDisplayEventsEnabled =
+                com.android.server.display.feature.flags.Flags.subscribeGranularDisplayEvents();
+
+        mSendPerfHintOnTouch = adpfViewrootimplActionDownBoost();
     }
 
     public static void addFirstDrawHandler(Runnable callback) {
@@ -1813,14 +1822,22 @@ public final class ViewRootImpl implements ViewParent,
                 mAccessibilityInteractionConnectionManager, mHandler);
         mAccessibilityManager.addHighContrastTextStateChangeListener(
                 mExecutor, mHighContrastTextManager);
+
+
+        long eventsToBeRegistered =
+                (mIsSubscribeGranularDisplayEventsEnabled)
+                ? DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_ADDED
+                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_STATE
+                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED
+                : DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_ADDED
+                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CHANGED
+                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED;
         DisplayManagerGlobal
                 .getInstance()
                 .registerDisplayListener(
                         mDisplayListener,
                         mHandler,
-                        DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_ADDED
-                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CHANGED
-                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED,
+                        eventsToBeRegistered,
                         mBasePackageName);
 
         if (forceInvertColor()) {
@@ -2240,7 +2257,7 @@ public final class ViewRootImpl implements ViewParent,
 
         onClientWindowFramesChanged(frames);
 
-        CompatibilityInfo.applyOverrideScaleIfNeeded(mergedConfiguration);
+        CompatibilityInfo.applyOverrideIfNeeded(mergedConfiguration);
         final Rect frame = frames.frame;
         final Rect displayFrame = frames.displayFrame;
         final Rect attachedFrame = frames.attachedFrame;
@@ -7102,6 +7119,10 @@ public final class ViewRootImpl implements ViewParent,
                 + "touch mode is " + mAttachInfo.mInTouchMode);
         if (mAttachInfo.mInTouchMode == inTouchMode) return false;
 
+        if (inTouchMode && mAttachInfo.mThreadedRenderer != null && mSendPerfHintOnTouch) {
+            mAttachInfo.mThreadedRenderer.notifyExpensiveFrame();
+        }
+
         // tell the window manager
         try {
             IWindowManager windowManager = WindowManagerGlobal.getWindowManagerService();
@@ -9445,7 +9466,7 @@ public final class ViewRootImpl implements ViewParent,
                 mTranslator.translateRectInScreenToAppWindow(mTmpFrames.attachedFrame);
             }
             mInvCompatScale = 1f / mTmpFrames.compatScale;
-            CompatibilityInfo.applyOverrideScaleIfNeeded(mPendingMergedConfiguration);
+            CompatibilityInfo.applyOverrideIfNeeded(mPendingMergedConfiguration);
             handleInsetsControlChanged(mTempInsets, mTempControls);
 
             mPendingAlwaysConsumeSystemBars =

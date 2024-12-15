@@ -29,6 +29,7 @@ import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_UNEXPECTED_
 import static android.os.Build.VERSION_CODES.DONUT;
 import static android.os.Build.VERSION_CODES.O;
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
+import static android.sdk.Flags.majorMinorVersioningScheme;
 
 import static com.android.internal.pm.pkg.parsing.ParsingUtils.parseKnownActivityEmbeddingCerts;
 
@@ -541,6 +542,7 @@ public class ParsingPackageUtils {
 
         pkg.setGwpAsanMode(-1);
         pkg.setMemtagMode(-1);
+        pkg.setPageSizeAppCompatFlags(ApplicationInfo.PAGE_SIZE_APP_COMPAT_FLAG_UNDEFINED);
 
         afterParseBaseApplication(pkg);
 
@@ -1688,6 +1690,21 @@ public class ParsingPackageUtils {
                     targetCode = minCode;
                 }
 
+                if (majorMinorVersioningScheme()) {
+                    val = sa.peekValue(R.styleable.AndroidManifestUsesSdk_minSdkVersionFull);
+                    if (val != null) {
+                        if (val.type == TypedValue.TYPE_STRING && val.string != null) {
+                            String minSdkVersionFullString = val.string.toString();
+                            ParseResult<Void> minSdkVersionFullResult =
+                                    FrameworkParsingPackageUtils.verifyMinSdkVersionFull(
+                                        minSdkVersionFullString, Build.VERSION.SDK_INT_FULL, input);
+                            if (minSdkVersionFullResult.isError()) {
+                                return input.error(minSdkVersionFullResult);
+                            }
+                        }
+                    }
+                }
+
                 if (isApkInApex) {
                     val = sa.peekValue(R.styleable.AndroidManifestUsesSdk_maxSdkVersion);
                     if (val != null) {
@@ -2182,6 +2199,13 @@ public class ParsingPackageUtils {
 
             pkg.setGwpAsanMode(sa.getInt(R.styleable.AndroidManifestApplication_gwpAsanMode, -1));
             pkg.setMemtagMode(sa.getInt(R.styleable.AndroidManifestApplication_memtagMode, -1));
+
+            if (Flags.appCompatOption16kb()) {
+                pkg.setPageSizeAppCompatFlags(
+                        sa.getInt(R.styleable.AndroidManifestApplication_pageSizeCompat,
+                                ApplicationInfo.PAGE_SIZE_APP_COMPAT_FLAG_UNDEFINED));
+            }
+
             if (sa.hasValue(R.styleable.AndroidManifestApplication_nativeHeapZeroInitialized)) {
                 final boolean v = sa.getBoolean(
                         R.styleable.AndroidManifestApplication_nativeHeapZeroInitialized, false);

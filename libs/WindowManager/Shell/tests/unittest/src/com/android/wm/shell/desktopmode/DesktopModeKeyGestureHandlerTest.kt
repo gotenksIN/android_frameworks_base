@@ -38,7 +38,7 @@ import com.android.wm.shell.MockToken
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
-import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createFreeformTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,10 +53,10 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn
 import com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession
 import com.android.dx.mockito.inline.extended.StaticMockitoSession
 import com.android.window.flags.Flags.FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS
+import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
-import com.android.wm.shell.common.ShellExecutor
-import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger
+import com.android.wm.shell.desktopmode.common.ToggleTaskSizeInteraction
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecorViewModel
@@ -91,7 +91,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
     private val rootTaskDisplayAreaOrganizer = mock<RootTaskDisplayAreaOrganizer>()
     private val shellTaskOrganizer = mock<ShellTaskOrganizer>()
     private val focusTransitionObserver = mock<FocusTransitionObserver>()
-    private val testExecutor = mock<ShellExecutor>()
+    private val testExecutor = TestShellExecutor()
     private val inputManager = mock<InputManager>()
     private val displayController = mock<DisplayController>()
     private val displayLayout = mock<DisplayLayout>()
@@ -134,6 +134,17 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
             null
         }.whenever(inputManager).registerKeyGestureEventHandler(any())
         shellInit.init()
+
+        desktopModeKeyGestureHandler = DesktopModeKeyGestureHandler(
+            context,
+            Optional.of(desktopModeWindowDecorViewModel),
+            Optional.of(desktopTasksController),
+            inputManager,
+            shellTaskOrganizer,
+            focusTransitionObserver,
+            testExecutor,
+            displayController
+        )
     }
 
     @After
@@ -142,6 +153,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
 
         runningTasks.clear()
         testScope.cancel()
+        testExecutor.flushAll()
     }
 
     @Test
@@ -151,11 +163,6 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
         FLAG_USE_KEY_GESTURE_EVENT_HANDLER
     )
     fun keyGestureMoveToNextDisplay_shouldMoveToNextDisplay() {
-        desktopModeKeyGestureHandler = DesktopModeKeyGestureHandler(
-            context,
-            Optional.of(desktopModeWindowDecorViewModel), Optional.of(desktopTasksController),
-            inputManager, shellTaskOrganizer, focusTransitionObserver
-        )
         // Set up two display ids
         whenever(rootTaskDisplayAreaOrganizer.displayIds)
             .thenReturn(intArrayOf(DEFAULT_DISPLAY, SECOND_DISPLAY))
@@ -176,6 +183,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
             .setModifierState(KeyEvent.META_META_ON or KeyEvent.META_CTRL_ON)
             .build()
         val result = keyGestureEventHandler.handleKeyGestureEvent(event, null)
+        testExecutor.flushAll()
 
         assertThat(result).isTrue()
         verify(desktopTasksController).moveToNextDisplay(task.taskId)
@@ -187,11 +195,6 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
         FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS
     )
     fun keyGestureSnapLeft_shouldSnapResizeTaskToLeft() {
-        desktopModeKeyGestureHandler = DesktopModeKeyGestureHandler(
-            context,
-            Optional.of(desktopModeWindowDecorViewModel), Optional.of(desktopTasksController),
-            inputManager, shellTaskOrganizer, focusTransitionObserver
-        )
         val task = setUpFreeformTask()
         task.isFocused = true
         whenever(shellTaskOrganizer.getRunningTasks()).thenReturn(arrayListOf(task))
@@ -203,10 +206,14 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
             .setModifierState(KeyEvent.META_META_ON)
             .build()
         val result = keyGestureEventHandler.handleKeyGestureEvent(event, null)
+        testExecutor.flushAll()
 
         assertThat(result).isTrue()
         verify(desktopModeWindowDecorViewModel).onSnapResize(
-            task.taskId, true, DesktopModeEventLogger.Companion.InputMethod.KEYBOARD
+            task.taskId,
+            true,
+            DesktopModeEventLogger.Companion.InputMethod.KEYBOARD,
+            /* fromMenu= */ false
         )
     }
 
@@ -216,11 +223,6 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
         FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS
     )
     fun keyGestureSnapRight_shouldSnapResizeTaskToRight() {
-        desktopModeKeyGestureHandler = DesktopModeKeyGestureHandler(
-            context,
-            Optional.of(desktopModeWindowDecorViewModel), Optional.of(desktopTasksController),
-            inputManager, shellTaskOrganizer, focusTransitionObserver
-        )
         val task = setUpFreeformTask()
         task.isFocused = true
         whenever(shellTaskOrganizer.getRunningTasks()).thenReturn(arrayListOf(task))
@@ -232,10 +234,14 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
             .setModifierState(KeyEvent.META_META_ON)
             .build()
         val result = keyGestureEventHandler.handleKeyGestureEvent(event, null)
+        testExecutor.flushAll()
 
         assertThat(result).isTrue()
         verify(desktopModeWindowDecorViewModel).onSnapResize(
-            task.taskId, false, DesktopModeEventLogger.Companion.InputMethod.KEYBOARD
+            task.taskId,
+            false,
+            DesktopModeEventLogger.Companion.InputMethod.KEYBOARD,
+            /* fromMenu= */ false
         )
     }
 
@@ -245,11 +251,6 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
         FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS
     )
     fun keyGestureToggleFreeformWindowSize_shouldToggleTaskSize() {
-        desktopModeKeyGestureHandler = DesktopModeKeyGestureHandler(
-            context,
-            Optional.of(desktopModeWindowDecorViewModel), Optional.of(desktopTasksController),
-            inputManager, shellTaskOrganizer, focusTransitionObserver
-        )
         val task = setUpFreeformTask()
         task.isFocused = true
         whenever(shellTaskOrganizer.getRunningTasks()).thenReturn(arrayListOf(task))
@@ -261,12 +262,17 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
             .setModifierState(KeyEvent.META_META_ON)
             .build()
         val result = keyGestureEventHandler.handleKeyGestureEvent(event, null)
+        testExecutor.flushAll()
 
         assertThat(result).isTrue()
         verify(desktopTasksController).toggleDesktopTaskSize(
             task,
-            ResizeTrigger.MAXIMIZE_MENU,
-            null
+            ToggleTaskSizeInteraction(
+                isMaximized = isTaskMaximized(task, displayController),
+                source = ToggleTaskSizeInteraction.Source.KEYBOARD_SHORTCUT,
+                inputMethod =
+                    DesktopModeEventLogger.Companion.InputMethod.KEYBOARD,
+            ),
         )
     }
 
@@ -276,11 +282,6 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
         FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS
     )
     fun keyGestureMinimizeFreeformWindow_shouldMinimizeTask() {
-        desktopModeKeyGestureHandler = DesktopModeKeyGestureHandler(
-            context,
-            Optional.of(desktopModeWindowDecorViewModel), Optional.of(desktopTasksController),
-            inputManager, shellTaskOrganizer, focusTransitionObserver
-        )
         val task = setUpFreeformTask()
         task.isFocused = true
         whenever(shellTaskOrganizer.getRunningTasks()).thenReturn(arrayListOf(task))
@@ -292,6 +293,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
             .setModifierState(KeyEvent.META_META_ON)
             .build()
         val result = keyGestureEventHandler.handleKeyGestureEvent(event, null)
+        testExecutor.flushAll()
 
         assertThat(result).isTrue()
         verify(desktopTasksController).minimizeTask(task)

@@ -130,7 +130,6 @@ import android.util.Slog;
 import android.util.Xml;
 
 import com.android.internal.annotations.GuardedBy;
-import com.android.internal.annotations.Immutable;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.pm.RoSystemFeatures;
@@ -799,7 +798,7 @@ public class ApplicationPackageManager extends PackageManager {
     private final static PropertyInvalidatedCache<HasSystemFeatureQuery, Boolean>
             mHasSystemFeatureCache = new PropertyInvalidatedCache<>(
                 new PropertyInvalidatedCache.Args(MODULE_SYSTEM)
-                .api(HAS_SYSTEM_FEATURE_API).maxEntries(256).isolateUids(false),
+                .api(HAS_SYSTEM_FEATURE_API).maxEntries(SDK_FEATURE_COUNT).isolateUids(false),
                 HAS_SYSTEM_FEATURE_API, null) {
 
                 @Override
@@ -1015,6 +1014,33 @@ public class ApplicationPackageManager extends PackageManager {
             int uid, byte[] certificate, @CertificateInputType int type) {
         try {
             return mPM.hasUidSigningCertificate(uid, certificate, type);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    @Override
+    public void setPageSizeAppCompatFlagsSettingsOverride(String packageName, boolean enabled) {
+        try {
+            mPM.setPageSizeAppCompatFlagsSettingsOverride(packageName, enabled);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    @Override
+    public boolean isPageSizeCompatEnabled(String packageName) {
+        try {
+            return mPM.isPageSizeCompatEnabled(packageName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    @Override
+    public String getPageSizeCompatWarningMessage(String packageName) {
+        try {
+            return mPM.getPageSizeCompatWarningMessage(packageName);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

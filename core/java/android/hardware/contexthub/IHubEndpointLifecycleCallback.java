@@ -17,14 +17,10 @@
 package android.hardware.contexthub;
 
 import android.annotation.FlaggedApi;
-import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.chre.flags.Flags;
-
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 
 /**
  * Interface for listening to lifecycle events of a hub endpoint.
@@ -34,34 +30,16 @@ import java.lang.annotation.RetentionPolicy;
 @SystemApi
 @FlaggedApi(Flags.FLAG_OFFLOAD_API)
 public interface IHubEndpointLifecycleCallback {
-    /** Unknown reason. */
-    int REASON_UNSPECIFIED = 0;
-
-    /** The peer rejected the request to open this endpoint session. */
-    int REASON_OPEN_ENDPOINT_SESSION_REQUEST_REJECTED = 3;
-
-    /** The peer closed this endpoint session. */
-    int REASON_CLOSE_ENDPOINT_SESSION_REQUESTED = 4;
-
-    /** @hide */
-    @Retention(RetentionPolicy.SOURCE)
-    @IntDef({
-        REASON_UNSPECIFIED,
-        REASON_OPEN_ENDPOINT_SESSION_REQUEST_REJECTED,
-        REASON_CLOSE_ENDPOINT_SESSION_REQUESTED,
-    })
-    @interface EndpointLifecycleReason {}
-
     /**
      * Called when an endpoint is requesting a session be opened with another endpoint.
      *
      * @param requester The {@link HubEndpointInfo} object representing the requester
-     * @param serviceInfo The {@link HubServiceInfo} object representing the service associated with
-     *     this session. Null indicates that there is no service associated with this session.
+     * @param serviceDescriptor A string describing the service associated with this session. Null
+     *     indicates that there is no service associated with this session.
      */
     @NonNull
     HubEndpointSessionResult onSessionOpenRequest(
-            @NonNull HubEndpointInfo requester, @Nullable HubServiceInfo serviceInfo);
+            @NonNull HubEndpointInfo requester, @Nullable String serviceDescriptor);
 
     /**
      * Called when a communication session is opened and ready to be used.
@@ -78,5 +56,5 @@ public interface IHubEndpointLifecycleCallback {
      *     used.
      * @param reason The reason why this session was closed.
      */
-    void onSessionClosed(@NonNull HubEndpointSession session, @EndpointLifecycleReason int reason);
+    void onSessionClosed(@NonNull HubEndpointSession session, @HubEndpoint.Reason int reason);
 }

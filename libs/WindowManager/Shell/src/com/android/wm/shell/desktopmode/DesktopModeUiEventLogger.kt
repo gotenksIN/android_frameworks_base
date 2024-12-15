@@ -75,7 +75,7 @@ class DesktopModeUiEventLogger(
         instanceId: InstanceId,
         uid: Int,
         packageName: String,
-        event: DesktopUiEventEnum
+        event: DesktopUiEventEnum,
     ) {
         if (packageName.isEmpty() || uid < 0) {
             logD("Skip logging since package name is empty or bad uid")
@@ -84,11 +84,12 @@ class DesktopModeUiEventLogger(
         uiEventLogger.logWithInstanceId(event, uid, packageName, instanceId)
     }
 
-    private fun getUid(packageName: String, userId: Int): Int = try {
-        packageManager.getApplicationInfoAsUser(packageName, /* flags= */ 0, userId).uid
-    } catch (e: PackageManager.NameNotFoundException) {
-        INVALID_PACKAGE_UID
-    }
+    private fun getUid(packageName: String, userId: Int): Int =
+        try {
+            packageManager.getApplicationInfoAsUser(packageName, /* flags= */ 0, userId).uid
+        } catch (e: PackageManager.NameNotFoundException) {
+            INVALID_PACKAGE_UID
+        }
 
     private fun logD(msg: String, vararg arguments: Any?) {
         ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
@@ -103,10 +104,48 @@ class DesktopModeUiEventLogger(
         DESKTOP_WINDOW_CORNER_DRAG_RESIZE(1722),
         @UiEvent(doc = "Tap on the window header maximize button in desktop windowing mode")
         DESKTOP_WINDOW_MAXIMIZE_BUTTON_TAP(1723),
+        @UiEvent(doc = "Tap on the window header restore button in desktop windowing mode")
+        DESKTOP_WINDOW_RESTORE_BUTTON_TAP(2017),
         @UiEvent(doc = "Double tap on window header to maximize it in desktop windowing mode")
         DESKTOP_WINDOW_HEADER_DOUBLE_TAP_TO_MAXIMIZE(1724),
+        @UiEvent(doc = "Double tap on window header to restore from maximize in desktop windowing")
+        DESKTOP_WINDOW_HEADER_DOUBLE_TAP_TO_RESTORE(2018),
         @UiEvent(doc = "Tap on the window Handle to open the Handle Menu")
-        DESKTOP_WINDOW_APP_HANDLE_TAP(1998);
+        DESKTOP_WINDOW_APP_HANDLE_TAP(1998),
+        @UiEvent(doc = "Tap on the desktop mode option under app handle menu")
+        DESKTOP_WINDOW_APP_HANDLE_MENU_TAP_TO_DESKTOP_MODE(1999),
+        @UiEvent(doc = "Tap on the split screen option under app handle menu")
+        DESKTOP_WINDOW_APP_HANDLE_MENU_TAP_TO_SPLIT_SCREEN(2000),
+        @UiEvent(doc = "Tap on the full screen option under app handle menu")
+        DESKTOP_WINDOW_APP_HANDLE_MENU_TAP_TO_FULL_SCREEN(2001),
+        @UiEvent(doc = "When user successfully drags the app handle to desktop mode")
+        DESKTOP_WINDOW_APP_HANDLE_DRAG_TO_DESKTOP_MODE(2002),
+        @UiEvent(doc = "When user successfully drags the app handle to split screen")
+        DESKTOP_WINDOW_APP_HANDLE_DRAG_TO_SPLIT_SCREEN(2003),
+        @UiEvent(doc = "When user successfully drags the app handle to full screen")
+        DESKTOP_WINDOW_APP_HANDLE_DRAG_TO_FULL_SCREEN(2004),
+        @UiEvent(doc = "Drag the window header to the top to switch to full screen mode")
+        DESKTOP_WINDOW_APP_HEADER_DRAG_TO_FULL_SCREEN(2005),
+        @UiEvent(doc = "Drag the window header to an edge to tile it to the left side")
+        DESKTOP_WINDOW_APP_HEADER_DRAG_TO_TILE_TO_LEFT(2006),
+        @UiEvent(doc = "Drag the window header to an edge to tile it to the right side")
+        DESKTOP_WINDOW_APP_HEADER_DRAG_TO_TILE_TO_RIGHT(2007),
+        @UiEvent(doc = "Hover or long press the maximize button to reveal the menu")
+        DESKTOP_WINDOW_MAXIMIZE_BUTTON_REVEAL_MENU(2015),
+        @UiEvent(doc = "Tap on the maximize option in the maximize button menu")
+        DESKTOP_WINDOW_MAXIMIZE_BUTTON_MENU_TAP_TO_MAXIMIZE(2009),
+        @UiEvent(doc = "Tap on the immersive option in the maximize button menu")
+        DESKTOP_WINDOW_MAXIMIZE_BUTTON_MENU_TAP_TO_IMMERSIVE(2010),
+        @UiEvent(doc = "Tap on the restore option in the maximize button menu")
+        DESKTOP_WINDOW_MAXIMIZE_BUTTON_MENU_TAP_TO_RESTORE(2011),
+        @UiEvent(doc = "Tap on the tile to left option in the maximize button menu")
+        DESKTOP_WINDOW_MAXIMIZE_BUTTON_MENU_TAP_TO_TILE_TO_LEFT(2012),
+        @UiEvent(doc = "Tap on the tile to right option in the maximize button menu")
+        DESKTOP_WINDOW_MAXIMIZE_BUTTON_MENU_TAP_TO_TILE_TO_RIGHT(2013),
+        @UiEvent(doc = "Moving the desktop window by dragging the header")
+        DESKTOP_WINDOW_MOVE_BY_HEADER_DRAG(2021),
+        @UiEvent(doc = "Double tap on the window header to refocus a desktop window")
+        DESKTOP_WINDOW_HEADER_TAP_TO_REFOCUS(2022);
 
         override fun getId(): Int = mId
     }

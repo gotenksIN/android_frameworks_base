@@ -19,10 +19,11 @@ package com.android.wm.shell.recents;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.content.pm.PackageManager.FEATURE_PC;
+import static android.view.Display.INVALID_DISPLAY;
 
 import static com.android.wm.shell.Flags.enableShellTopTaskTracking;
+import static com.android.wm.shell.desktopmode.DesktopWallpaperActivity.isWallpaperTask;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_TASK_OBSERVER;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_RECENT_TASKS;
 
 import android.Manifest;
 import android.annotation.RequiresPermission;
@@ -53,6 +54,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.protolog.ProtoLog;
+import com.android.launcher3.Flags;
 import com.android.wm.shell.common.ExternalInterfaceBinder;
 import com.android.wm.shell.common.RemoteCallable;
 import com.android.wm.shell.common.ShellExecutor;
@@ -60,6 +62,7 @@ import com.android.wm.shell.common.SingleInstanceRemoteListener;
 import com.android.wm.shell.common.TaskStackListenerCallback;
 import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.desktopmode.DesktopRepository;
+import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.GroupedTaskInfo;
 import com.android.wm.shell.shared.annotations.ExternalThread;
@@ -69,6 +72,7 @@ import com.android.wm.shell.shared.split.SplitBounds;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
+import com.android.wm.shell.sysui.UserChangeListener;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -86,13 +90,14 @@ import java.util.function.Consumer;
  */
 public class RecentTasksController implements TaskStackListenerCallback,
         RemoteCallable<RecentTasksController>, DesktopRepository.ActiveTasksListener,
-        TaskStackTransitionObserver.TaskStackTransitionObserverListener {
+        TaskStackTransitionObserver.TaskStackTransitionObserverListener, UserChangeListener {
     private static final String TAG = RecentTasksController.class.getSimpleName();
 
     private final Context mContext;
     private final ShellController mShellController;
     private final ShellCommandHandler mShellCommandHandler;
-    private final Optional<DesktopRepository> mDesktopRepository;
+    private final Optional<DesktopUserRepositories> mDesktopUserRepositories;
+
     private final ShellExecutor mMainExecutor;
     private final TaskStackListenerImpl mTaskStackListener;
     private final RecentTasksImpl mImpl = new RecentTasksImpl();
@@ -105,6 +110,8 @@ public class RecentTasksController implements TaskStackListenerCallback,
     // Mapping of split task ids, mappings are symmetrical (ie. if t1 is the taskid of a task in a
     // pair, then mSplitTasks[t1] = t2, and mSplitTasks[t2] = t1)
     private final SparseIntArray mSplitTasks = new SparseIntArray();
+
+    private int mUserId;
     /**
      * Maps taskId to {@link SplitBounds} for both taskIDs.
      * Meaning there will be two taskId integers mapping to the same object.
@@ -130,7 +137,7 @@ public class RecentTasksController implements TaskStackListenerCallback,
             ShellCommandHandler shellCommandHandler,
             TaskStackListenerImpl taskStackListener,
             ActivityTaskManager activityTaskManager,
-            Optional<DesktopRepository> desktopRepository,
+            Optional<DesktopUserRepositories> desktopUserRepositories,
             TaskStackTransitionObserver taskStackTransitionObserver,
             @ShellMainThread ShellExecutor mainExecutor
     ) {
@@ -138,7 +145,7 @@ public class RecentTasksController implements TaskStackListenerCallback,
             return null;
         }
         return new RecentTasksController(context, shellInit, shellController, shellCommandHandler,
-                taskStackListener, activityTaskManager, desktopRepository,
+                taskStackListener, activityTaskManager, desktopUserRepositories,
                 taskStackTransitionObserver, mainExecutor);
     }
 
@@ -148,7 +155,7 @@ public class RecentTasksController implements TaskStackListenerCallback,
             ShellCommandHandler shellCommandHandler,
             TaskStackListenerImpl taskStackListener,
             ActivityTaskManager activityTaskManager,
-            Optional<DesktopRepository> desktopRepository,
+            Optional<DesktopUserRepositories> desktopUserRepositories,
             TaskStackTransitionObserver taskStackTransitionObserver,
             ShellExecutor mainExecutor) {
         mContext = context;
@@ -157,7 +164,7 @@ public class RecentTasksController implements TaskStackListenerCallback,
         mActivityTaskManager = activityTaskManager;
         mPcFeatureEnabled = mContext.getPackageManager().hasSystemFeature(FEATURE_PC);
         mTaskStackListener = taskStackListener;
-        mDesktopRepository = desktopRepository;
+        mDesktopUserRepositories = desktopUserRepositories;
         mTaskStackTransitionObserver = taskStackTransitionObserver;
         mMainExecutor = mainExecutor;
         shellInit.addInitCallback(this::onInit, this);
@@ -172,12 +179,15 @@ public class RecentTasksController implements TaskStackListenerCallback,
     }
 
     @RequiresPermission(Manifest.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE)
-    private void onInit() {
-        mShellController.addExternalInterface(KEY_EXTRA_SHELL_RECENT_TASKS,
+    void onInit() {
+        mShellController.addExternalInterface(IRecentTasks.DESCRIPTOR,
                 this::createExternalInterface, this);
         mShellCommandHandler.addDumpCallback(this::dump, this);
+        mUserId = ActivityManager.getCurrentUser();
+        mDesktopUserRepositories.ifPresent(
+                desktopUserRepositories ->
+                        desktopUserRepositories.getCurrent().addActiveTaskListener(this));
         mTaskStackListener.addListener(this);
-        mDesktopRepository.ifPresent(it -> it.addActiveTaskListener(this));
         mTaskStackTransitionObserver.addTaskStackTransitionObserverListener(this,
                 mMainExecutor);
         mContext.getSystemService(KeyguardManager.class).addKeyguardLockedStateListener(
@@ -280,6 +290,17 @@ public class RecentTasksController implements TaskStackListenerCallback,
         // so we should also invalidate the change id to ensure we load a new list instead of
         // reusing a stale list.
         notifyRecentTasksChanged();
+    }
+
+    /**
+     * This method only gets notified when a task is removed from recents as a result of another
+     * task being added to recent tasks.
+     */
+    @Override
+    public void onRecentTaskRemovedForAddTask(int taskId) {
+        mDesktopUserRepositories.ifPresent(
+                desktopUserRepositories -> desktopUserRepositories.getCurrent().removeFreeformTask(
+                        INVALID_DISPLAY, taskId));
     }
 
     public void onTaskAdded(RunningTaskInfo taskInfo) {
@@ -498,10 +519,9 @@ public class RecentTasksController implements TaskStackListenerCallback,
                 // If it's not in the mapping, then it was already paired with another task
                 continue;
             }
-
-            if (DesktopModeStatus.canEnterDesktopMode(mContext)
-                    && mDesktopRepository.isPresent()
-                    && mDesktopRepository.get().isActiveTask(taskInfo.taskId)) {
+            if (DesktopModeStatus.canEnterDesktopMode(mContext) &&
+                mDesktopUserRepositories.isPresent()
+                    && mDesktopUserRepositories.get().getCurrent().isActiveTask(taskInfo.taskId)) {
                 // Freeform tasks will be added as a separate entry
                 if (mostRecentFreeformTaskIndex == Integer.MAX_VALUE) {
                     mostRecentFreeformTaskIndex = groupedTasks.size();
@@ -517,7 +537,7 @@ public class RecentTasksController implements TaskStackListenerCallback,
                             taskInfo.lastNonFullscreenBounds.top);
                 }
                 freeformTasks.add(taskInfo);
-                if (mDesktopRepository.get().isMinimizedTask(taskInfo.taskId)) {
+                if (mDesktopUserRepositories.get().getCurrent().isMinimizedTask(taskInfo.taskId)) {
                     minimizedFreeformTasks.add(taskInfo.taskId);
                 }
                 continue;
@@ -530,6 +550,10 @@ public class RecentTasksController implements TaskStackListenerCallback,
                 groupedTasks.add(GroupedTaskInfo.forSplitTasks(taskInfo, pairedTaskInfo,
                         mTaskSplitBoundsMap.get(pairedTaskId)));
             } else {
+                if (Flags.enableRefactorTaskThumbnail() && isWallpaperTask(taskInfo)) {
+                    // Don't add the wallpaper task as an entry in grouped tasks
+                    continue;
+                }
                 // TODO(346588978): Consolidate multiple visible fullscreen tasks into the same
                 //  grouped task
                 groupedTasks.add(GroupedTaskInfo.forFullscreenTasks(taskInfo));
@@ -685,6 +709,21 @@ public class RecentTasksController implements TaskStackListenerCallback,
         }
     }
 
+    @Override
+    public void onUserChanged(int newUserId, @NonNull Context userContext) {
+        if (mDesktopUserRepositories.isEmpty()) return;
+
+        DesktopRepository previousUserRepository =
+                mDesktopUserRepositories.get().getProfile(mUserId);
+        mUserId = newUserId;
+        DesktopRepository currentUserRepository =
+                mDesktopUserRepositories.get().getProfile(newUserId);
+
+        // No-op if both profile ids map to the same user.
+        if (previousUserRepository.getUserId() == currentUserRepository.getUserId()) return;
+        previousUserRepository.removeActiveTasksListener(this);
+        currentUserRepository.addActiveTaskListener(this);
+    }
 
     /**
      * The interface for calls from outside the host process.

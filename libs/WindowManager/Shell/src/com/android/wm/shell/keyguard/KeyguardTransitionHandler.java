@@ -42,7 +42,6 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.ArrayMap;
 import android.util.Log;
-import android.view.Display;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.IRemoteTransition;
@@ -64,6 +63,7 @@ import com.android.wm.shell.shared.annotations.ExternalThread;
 import com.android.wm.shell.sysui.KeyguardChangeListener;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
+import com.android.wm.shell.transition.FocusTransitionObserver;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.transition.Transitions.TransitionFinishCallback;
 
@@ -89,6 +89,7 @@ public class KeyguardTransitionHandler
 
     private final ArrayMap<IBinder, StartedTransition> mStartedTransitions = new ArrayMap<>();
     private final TaskStackListenerImpl mTaskStackListener;
+    private final FocusTransitionObserver mFocusTransitionObserver;
 
     /**
      * Local IRemoteTransition implementations registered by the keyguard service.
@@ -129,7 +130,8 @@ public class KeyguardTransitionHandler
             @NonNull Transitions transitions,
             @NonNull TaskStackListenerImpl taskStackListener,
             @NonNull Handler mainHandler,
-            @NonNull ShellExecutor mainExecutor) {
+            @NonNull ShellExecutor mainExecutor,
+            @NonNull FocusTransitionObserver focusTransitionObserver) {
         mTransitions = transitions;
         mShellController = shellController;
         mDisplayController = displayController;
@@ -137,6 +139,7 @@ public class KeyguardTransitionHandler
         mMainExecutor = mainExecutor;
         mTaskStackListener = taskStackListener;
         shellInit.addInitCallback(this::onInit, this);
+        mFocusTransitionObserver = focusTransitionObserver;
     }
 
     private void onInit() {
@@ -396,7 +399,8 @@ public class KeyguardTransitionHandler
             final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
             if (taskInfo != null && taskInfo.taskId != INVALID_TASK_ID
                     && taskInfo.getWindowingMode() == WINDOWING_MODE_FREEFORM
-                    && taskInfo.isFocused && change.getContainer() != null) {
+                    && mFocusTransitionObserver.hasGlobalFocus(taskInfo)
+                    && change.getContainer() != null) {
                 wct.setWindowingMode(change.getContainer(), WINDOWING_MODE_FULLSCREEN);
                 wct.setBounds(change.getContainer(), null);
                 return;
@@ -439,10 +443,8 @@ public class KeyguardTransitionHandler
         @Override
         public void startKeyguardTransition(boolean keyguardShowing, boolean aodShowing) {
             final WindowContainerTransaction wct = new WindowContainerTransaction();
-            for (Display display : mDisplayController.getDisplays()) {
-                wct.addKeyguardState(new KeyguardState.Builder(display.getDisplayId())
-                        .setKeyguardShowing(keyguardShowing).setAodShowing(aodShowing).build());
-            }
+            wct.addKeyguardState(new KeyguardState.Builder().setKeyguardShowing(keyguardShowing)
+                    .setAodShowing(aodShowing).build());
             mMainExecutor.execute(() -> {
                 mTransitions.startTransition(keyguardShowing ? TRANSIT_TO_FRONT : TRANSIT_TO_BACK,
                         wct, KeyguardTransitionHandler.this);

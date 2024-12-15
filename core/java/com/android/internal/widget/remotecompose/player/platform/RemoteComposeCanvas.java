@@ -205,19 +205,46 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
         return count;
     }
 
+    /**
+     * set a float externally
+     *
+     * @param id
+     * @param value
+     */
     public void setExternalFloat(int id, float value) {
         mARContext.loadFloat(id, value);
+    }
+
+    /**
+     * Returns true if the document supports drag touch events
+     *
+     * @return true if draggable content, false otherwise
+     */
+    public boolean isDraggable() {
+        if (mDocument == null) {
+            return false;
+        }
+        return mDocument.getDocument().hasTouchListener();
+    }
+
+    /**
+     * Check shaders and disable them
+     *
+     * @param shaderControl the callback to validate the shader
+     */
+    public void checkShaders(CoreDocument.ShaderControl shaderControl) {
+        mDocument.getDocument().checkShaders(mARContext, shaderControl);
     }
 
     public interface ClickCallbacks {
         void click(int id, String metadata);
     }
 
-    public void addClickListener(ClickCallbacks callback) {
+    public void addIdActionListener(ClickCallbacks callback) {
         if (mDocument == null) {
             return;
         }
-        mDocument.getDocument().addClickListener((id, metadata) -> callback.click(id, metadata));
+        mDocument.getDocument().addIdActionListener((id, metadata) -> callback.click(id, metadata));
     }
 
     public int getTheme() {
@@ -241,9 +268,9 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
             case MotionEvent.ACTION_DOWN:
                 mActionDownPoint.x = (int) event.getX();
                 mActionDownPoint.y = (int) event.getY();
-                mInActionDown = true;
                 CoreDocument doc = mDocument.getDocument();
                 if (doc.hasTouchListener()) {
+                    mInActionDown = true;
                     if (mVelocityTracker == null) {
                         mVelocityTracker = VelocityTracker.obtain();
                     } else {
@@ -251,8 +278,10 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
                     }
                     mVelocityTracker.addMovement(event);
                     doc.touchDown(mARContext, event.getX(), event.getY());
+                    invalidate();
+                    return true;
                 }
-                return true;
+                return false;
 
             case MotionEvent.ACTION_CANCEL:
                 mInActionDown = false;
@@ -262,8 +291,11 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
                     float dx = mVelocityTracker.getXVelocity(pointerId);
                     float dy = mVelocityTracker.getYVelocity(pointerId);
                     doc.touchCancel(mARContext, event.getX(), event.getY(), dx, dy);
+                    invalidate();
+                    return true;
                 }
-                return true;
+                return false;
+
             case MotionEvent.ACTION_UP:
                 mInActionDown = false;
                 performClick();
@@ -273,8 +305,10 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
                     float dx = mVelocityTracker.getXVelocity(pointerId);
                     float dy = mVelocityTracker.getYVelocity(pointerId);
                     doc.touchUp(mARContext, event.getX(), event.getY(), dx, dy);
+                    invalidate();
+                    return true;
                 }
-                return true;
+                return false;
 
             case MotionEvent.ACTION_MOVE:
                 if (mInActionDown) {
@@ -286,7 +320,9 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
                             invalidate();
                         }
                     }
+                    return true;
                 }
+                return false;
         }
         return false;
     }
@@ -349,6 +385,27 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
 
     private int mCount;
     private long mTime = System.nanoTime();
+    private long mDuration;
+    private boolean mEvalTime = false;
+
+    /**
+     * This returns the amount of time in ms the player used to evalueate a pass it is averaged over
+     * a number of evaluations.
+     *
+     * @return time in ms
+     */
+    public float getEvalTime() {
+        if (!mEvalTime) {
+            mEvalTime = true;
+            return 0.0f;
+        }
+        double avg = mDuration / (double) mCount;
+        if (mCount > 100) {
+            mDuration /= 2;
+            mCount /= 2;
+        }
+        return (float) (avg * 1E-6); // ms
+    }
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -356,6 +413,7 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
         if (mDocument == null) {
             return;
         }
+        long start = mEvalTime ? System.nanoTime() : 0;
         mARContext.setAnimationEnabled(true);
         mARContext.currentTime = System.currentTimeMillis();
         mARContext.setDebug(mDebug);
@@ -375,6 +433,10 @@ public class RemoteComposeCanvas extends FrameLayout implements View.OnAttachSta
         }
         if (mDocument.needsRepaint() > 0) {
             invalidate();
+        }
+        if (mEvalTime) {
+            mDuration += System.nanoTime() - start;
+            mCount++;
         }
     }
 }

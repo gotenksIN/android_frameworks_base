@@ -41,7 +41,16 @@ constructor(private val customShortcutRepository: CustomShortcutCategoriesReposi
         customShortcutRepository.onCustomizationRequested(requestInfo)
     }
 
-    suspend fun confirmAndSetShortcutCurrentlyBeingCustomized(): ShortcutCustomizationRequestResult {
+    suspend fun confirmAndSetShortcutCurrentlyBeingCustomized():
+        ShortcutCustomizationRequestResult {
         return customShortcutRepository.confirmAndSetShortcutCurrentlyBeingCustomized()
+    }
+
+    suspend fun deleteShortcutCurrentlyBeingCustomized(): ShortcutCustomizationRequestResult {
+        return customShortcutRepository.deleteShortcutCurrentlyBeingCustomized()
+    }
+
+    suspend fun resetAllCustomShortcuts(): ShortcutCustomizationRequestResult {
+        return customShortcutRepository.resetAllCustomShortcuts()
     }
 }

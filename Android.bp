@@ -83,11 +83,11 @@ filegroup {
         ":framework-telecomm-sources",
         ":framework-telephony-common-sources",
         ":framework-telephony-sources",
-        ":framework-vcn-util-sources",
         ":framework-wifi-annotations",
         ":framework-wifi-non-updatable-sources",
         ":PacProcessor-aidl-sources",
         ":ProxyHandler-aidl-sources",
+        ":vcn-utils-platform-sources",
         ":net-utils-framework-common-srcs",
 
         // AIDL from frameworks/base/native/
@@ -320,9 +320,9 @@ java_defaults {
             ":framework-telecomm-sources",
             ":framework-telephony-common-sources",
             ":framework-telephony-sources",
-            ":framework-vcn-util-sources",
             ":framework-wifi-annotations",
             ":framework-wifi-non-updatable-sources",
+            ":vcn-utils-platform-sources",
             ":PacProcessor-aidl-sources",
             ":ProxyHandler-aidl-sources",
             ":net-utils-framework-common-srcs",
@@ -378,6 +378,7 @@ java_defaults {
         "view-inspector-annotation-processor",
         "staledataclass-annotation-processor",
         "error_prone_android_framework",
+        "systemfeatures-metadata-processor",
     ],
     // Exports needed for staledataclass-annotation-processor, see b/139342589.
     javacflags: [
@@ -604,7 +605,7 @@ filegroup {
     srcs: [
         "core/java/com/android/internal/util/HexDump.java",
         "core/java/com/android/internal/util/WakeupMessage.java",
-        "services/core/java/com/android/server/vcn/util/PersistableBundleUtils.java",
+        "packages/Vcn/framework-b/src/android/net/vcn/util/PersistableBundleUtils.java",
         "telephony/java/android/telephony/Annotation.java",
     ],
 }

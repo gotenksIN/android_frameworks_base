@@ -41,7 +41,7 @@ import java.util.List;
  * Operation to deal with bitmap data On getting an Image during a draw call the bitmap is
  * compressed and saved in playback the image is decompressed
  */
-public class ShaderData implements Operation, VariableSupport {
+public class ShaderData extends Operation implements VariableSupport {
     private static final int OP_CODE = Operations.DATA_SHADER;
     private static final String CLASS_NAME = "ShaderData";
     int mShaderTextId; // the actual text of a shader
@@ -50,6 +50,7 @@ public class ShaderData implements Operation, VariableSupport {
     @Nullable HashMap<String, float[]> mUniformFloatMap = null;
     @Nullable HashMap<String, int[]> mUniformIntMap;
     @Nullable HashMap<String, Integer> mUniformBitmapMap = null;
+    private boolean mShaderValid = false;
 
     public ShaderData(
             int shaderID,
@@ -198,11 +199,21 @@ public class ShaderData implements Operation, VariableSupport {
         }
     }
 
+    /**
+     * The name of the class
+     *
+     * @return the name
+     */
     @NonNull
     public static String name() {
         return CLASS_NAME;
     }
 
+    /**
+     * The OP_CODE for this command
+     *
+     * @return the opcode
+     */
     public static int id() {
         return OP_CODE;
     }
@@ -266,6 +277,12 @@ public class ShaderData implements Operation, VariableSupport {
         }
     }
 
+    /**
+     * Read this operation and add it to the list of operations
+     *
+     * @param buffer the buffer to read
+     * @param operations the list of operations that will be added to
+     */
     public static void read(@NonNull WireBuffer buffer, @NonNull List<Operation> operations) {
         int shaderID = buffer.readInt();
         int shaderTextId = buffer.readInt();
@@ -318,6 +335,11 @@ public class ShaderData implements Operation, VariableSupport {
         operations.add(new ShaderData(shaderID, shaderTextId, floatMap, intMap, bitmapMap));
     }
 
+    /**
+     * Populate the documentation with a description of this operation
+     *
+     * @param doc to append the description to.
+     */
     public static void documentation(@NonNull DocumentationBuilder doc) {
         doc.operation("Data Operations", OP_CODE, CLASS_NAME)
                 .description("Shader")
@@ -337,12 +359,23 @@ public class ShaderData implements Operation, VariableSupport {
 
     @Override
     public void apply(@NonNull RemoteContext context) {
-        context.loadShader(mShaderID, this);
+        if (mShaderValid) {
+            context.loadShader(mShaderID, this);
+        }
     }
 
     @NonNull
     @Override
     public String deepToString(@NonNull String indent) {
         return indent + toString();
+    }
+
+    /**
+     * Enable or disable the shader
+     *
+     * @param shaderValid if true shader can be used
+     */
+    public void enable(boolean shaderValid) {
+        mShaderValid = shaderValid;
     }
 }

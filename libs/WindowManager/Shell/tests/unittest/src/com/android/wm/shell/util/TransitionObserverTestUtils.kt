@@ -36,7 +36,6 @@ import android.window.TransitionInfo.TransitionMode
 import android.window.WindowContainerToken
 import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
 import com.android.wm.shell.transition.Transitions.TransitionObserver
-import org.mockito.Mockito
 import org.mockito.kotlin.mock
 
 @DslMarker
@@ -78,6 +77,30 @@ class TransitionObserverTestContext : TransitionObserverTestStep {
         validateObj.validate()
     }
 
+    fun validateOnMerged(
+        validate:
+        TransitionObserverOnTransitionMergedValidation.() -> Unit
+    ) {
+        val validateObj = TransitionObserverOnTransitionMergedValidation()
+        transitionObserver.onTransitionMerged(
+            validateObj.playing,
+            validateObj.merged
+        )
+        validateObj.validate()
+    }
+
+    fun validateOnFinished(
+        validate:
+        TransitionObserverOnTransitionFinishedValidation.() -> Unit
+    ) {
+        val validateObj = TransitionObserverOnTransitionFinishedValidation()
+        transitionObserver.onTransitionFinished(
+            transitionReadyInput.transition,
+            validateObj.aborted
+        )
+        validateObj.validate()
+    }
+
     fun invokeObservable() {
         transitionObserver.onTransitionReady(
             transitionReadyInput.transition,
@@ -93,10 +116,10 @@ class TransitionObserverTestContext : TransitionObserverTestStep {
  */
 class TransitionObserverInputBuilder : TransitionObserverTestStep {
 
-    private val transition = Mockito.mock(IBinder::class.java)
+    private val transition = mock<IBinder>()
     private var transitionInfo: TransitionInfo? = null
-    private val startTransaction = Mockito.mock(Transaction::class.java)
-    private val finishTransaction = Mockito.mock(Transaction::class.java)
+    private val startTransaction = mock<Transaction>()
+    private val finishTransaction = mock<Transaction>()
 
     fun buildTransitionInfo(
         @TransitionType type: Int = TRANSIT_NONE,
@@ -143,7 +166,7 @@ class TransitionObserverInputBuilder : TransitionObserverTestStep {
             taskId = id
             displayId = DEFAULT_DISPLAY
             configuration.windowConfiguration.windowingMode = windowingMode
-            token = WindowContainerToken(Mockito.mock(IWindowContainerToken::class.java))
+            token = WindowContainerToken(mock<IWindowContainerToken>())
             baseIntent = Intent().apply {
                 component = ComponentName("package", "component.name")
             }
@@ -161,6 +184,28 @@ class TransitionObserverInputBuilder : TransitionObserverTestStep {
  * Phase responsible for the execution of validation methods.
  */
 class TransitionObserverResultValidation : TransitionObserverTestStep
+
+/**
+ * Phase responsible for the execution of validation methods after the
+ * [TransitionObservable#onTransitionMerged] has been executed.
+ */
+class TransitionObserverOnTransitionMergedValidation : TransitionObserverTestStep {
+    val merged = mock<IBinder>()
+    val playing = mock<IBinder>()
+
+    init {
+        spyOn(merged)
+        spyOn(playing)
+    }
+}
+
+/**
+ * Phase responsible for the execution of validation methods after the
+ * [TransitionObservable#onTransitionFinished] has been executed.
+ */
+class TransitionObserverOnTransitionFinishedValidation : TransitionObserverTestStep {
+    var aborted: Boolean = false
+}
 
 /**
  * Allows to run a test about a specific [TransitionObserver] passing the specific

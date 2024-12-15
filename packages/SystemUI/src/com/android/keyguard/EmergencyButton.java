@@ -16,8 +16,11 @@
 
 package com.android.keyguard;
 
+import static com.android.systemui.Flags.gsfBouncer;
+
 import android.content.Context;
 import com.android.systemui.Dependency;
+import android.graphics.Typeface;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -131,6 +134,9 @@ public class EmergencyButton extends Button {
                 textId = com.android.internal.R.string.lockscreen_emergency_call;
             }
             setText(textId);
+            if (gsfBouncer()) {
+                setTypeface(Typeface.create("gsf-title-medium", Typeface.NORMAL));
+            }
         } else {
             setVisibility(View.GONE);
         }

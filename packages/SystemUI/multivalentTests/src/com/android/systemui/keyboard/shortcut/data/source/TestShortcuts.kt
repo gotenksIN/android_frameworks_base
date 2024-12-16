@@ -543,12 +543,12 @@ object TestShortcuts {
             simpleShortcutCategory(
                 MultiTasking,
                 "Split screen",
-                "Switch from split screen to full screen",
+                "Switch to full screen",
             ),
             simpleShortcutCategory(
                 MultiTasking,
                 "Split screen",
-                "Use split screen with current app on the left",
+                "Use split screen with app on the left",
             ),
             simpleShortcutCategory(
                 MultiTasking,
@@ -558,7 +558,7 @@ object TestShortcuts {
             simpleShortcutCategory(
                 MultiTasking,
                 "Split screen",
-                "Use split screen with current app on the right",
+                "Use split screen with app on the right",
             ),
             simpleShortcutCategory(
                 MultiTasking,
@@ -567,13 +567,6 @@ object TestShortcuts {
             ),
             simpleShortcutCategory(System, "System controls", "Show shortcuts"),
             simpleShortcutCategory(System, "System controls", "View recent apps"),
-            simpleShortcutCategory(AppCategories, "Applications", "Calculator"),
-            simpleShortcutCategory(AppCategories, "Applications", "Calendar"),
-            simpleShortcutCategory(AppCategories, "Applications", "Browser"),
-            simpleShortcutCategory(AppCategories, "Applications", "Contacts"),
-            simpleShortcutCategory(AppCategories, "Applications", "Email"),
-            simpleShortcutCategory(AppCategories, "Applications", "Maps"),
-            simpleShortcutCategory(AppCategories, "Applications", "SMS"),
         )
     val customInputGestureTypeHome = simpleInputGestureData(keyGestureType = KEY_GESTURE_TYPE_HOME)
 
@@ -614,27 +607,6 @@ object TestShortcuts {
                 keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER
             ),
             simpleInputGestureData(keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_RECENT_APPS),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_DEFAULT_CALCULATOR
-            ),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_DEFAULT_CALENDAR
-            ),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_DEFAULT_BROWSER
-            ),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_DEFAULT_CONTACTS
-            ),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_DEFAULT_EMAIL
-            ),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_DEFAULT_MAPS
-            ),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_DEFAULT_MESSAGING
-            ),
             simpleInputGestureData(
                 keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_RECENT_APPS_SWITCHER
             ),

@@ -31,6 +31,7 @@ import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.view.Display.INVALID_DISPLAY;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ORIENTATION;
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_TASKS;
 import static com.android.server.wm.ActivityRecord.State.DESTROYED;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityRecord.State.STOPPED;
@@ -920,6 +921,10 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
                 if (candidateTask.getParent() == null) {
                     addChild(candidateTask, position);
                 } else {
+                    if (candidateTask.getRootTask().mReparentLeafTaskIfRelaunch) {
+                        ProtoLog.d(WM_DEBUG_TASKS, "Reparenting to display area on relaunch: "
+                                + "rootTaskId=%d toTop=%b", candidateTask.mTaskId, onTop);
+                    }
                     candidateTask.reparent(this, onTop);
                 }
             }

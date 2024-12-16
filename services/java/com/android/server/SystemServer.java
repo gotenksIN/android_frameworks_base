@@ -202,7 +202,6 @@ import com.android.server.net.watchlist.NetworkWatchlistService;
 import com.android.server.notification.NotificationManagerService;
 import com.android.server.oemlock.OemLockService;
 import com.android.server.om.OverlayManagerService;
-import com.android.server.ondeviceintelligence.OnDeviceIntelligenceManagerService;
 import com.android.server.os.BugreportManagerService;
 import com.android.server.os.DeviceIdentifiersPolicyService;
 import com.android.server.os.NativeTombstoneManagerService;
@@ -398,6 +397,8 @@ public final class SystemServer implements Dumpable {
             "com.android.server.sdksandbox.SdkSandboxManagerService$Lifecycle";
     private static final String AD_SERVICES_MANAGER_SERVICE_CLASS =
             "com.android.server.adservices.AdServicesManagerService$Lifecycle";
+    private static final String ON_DEVICE_INTELLIGENCE_MANAGER_SERVICE_CLASS =
+            "com.android.server.ondeviceintelligence.OnDeviceIntelligenceManagerService";
     private static final String ON_DEVICE_PERSONALIZATION_SYSTEM_SERVICE_CLASS =
             "com.android.server.ondevicepersonalization."
                     + "OnDevicePersonalizationSystemService$Lifecycle";
@@ -2970,7 +2971,7 @@ public final class SystemServer implements Dumpable {
         t.traceEnd();
 
         // UprobeStats DynamicInstrumentationManager
-        if (com.android.art.flags.Flags.executableMethodFileOffsets()) {
+        if (android.uprobestats.flags.Flags.executableMethodFileOffsets()) {
             t.traceBegin("StartDynamicInstrumentationManager");
             mSystemServiceManager.startService(DynamicInstrumentationManagerService.class);
             t.traceEnd();
@@ -3510,7 +3511,7 @@ public final class SystemServer implements Dumpable {
 
     private void startOnDeviceIntelligenceService(TimingsTraceAndSlog t) {
         t.traceBegin("startOnDeviceIntelligenceManagerService");
-        mSystemServiceManager.startService(OnDeviceIntelligenceManagerService.class);
+        mSystemServiceManager.startService(ON_DEVICE_INTELLIGENCE_MANAGER_SERVICE_CLASS);
         t.traceEnd();
     }
 

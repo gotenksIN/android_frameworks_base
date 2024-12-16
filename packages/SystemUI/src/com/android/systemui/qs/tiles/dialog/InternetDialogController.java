@@ -219,7 +219,10 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     private boolean mHasActiveSubIdOnDds;
     private int mNonDdsCallState = TelephonyManager.CALL_STATE_IDLE;
     private int mActiveDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+    private boolean mIsMobileDataEnabled = false;
 
+    @VisibleForTesting
+    Map<Integer, ServiceState> mSubIdServiceState = new HashMap<>();
     @VisibleForTesting
     static final float TOAST_PARAMS_HORIZONTAL_WEIGHT = 1.0f;
     @VisibleForTesting
@@ -757,6 +760,12 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             // sets the non-DDS to be not found to hide its visual
             return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         }
+        int activeDataSubId = SubscriptionManager.getActiveDataSubscriptionId();
+        if (activeDataSubId == SubscriptionManager.INVALID_SUBSCRIPTION_ID
+                || mDefaultDataSubId == activeDataSubId) {
+            return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        }
+
         SubscriptionInfo subInfo = mSubscriptionManager.getActiveSubscriptionInfo(
                 SubscriptionManager.getActiveDataSubscriptionId());
         if (subInfo != null && subInfo.getSubscriptionId() != mDefaultDataSubId
@@ -847,7 +856,6 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         if (!isMobileDataEnabled(subId)) {
             return context.getString(R.string.mobile_data_off_summary);
         }
-
         String summary = networkTypeDescription;
         boolean isSmartDdsEnabled = Settings.Global.getInt(context.getContentResolver(),
                 Settings.Global.SMART_DDS_SWITCH, 0) == 1;
@@ -863,9 +871,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
                             // if nonDds is active, explains Dds status as poor connection
                             isForDds || isSmartDdsEnabled
                                     ? (isOnNonDds && !isSmartDdsEnabled
-                                            ? R.string.mobile_data_poor_connection
-                                            : R.string.mobile_data_connection_active)
-                            : R.string.mobile_data_temp_connection_active),
+                                    ? R.string.mobile_data_poor_connection
+                                    : R.string.mobile_data_connection_active)
+                                    : R.string.mobile_data_temp_connection_active),
                     networkTypeDescription);
         } else if (!isDataStateInService(subId)) {
             summary = context.getString(R.string.mobile_data_no_connection);
@@ -1094,6 +1102,13 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         return mTelephonyManager.createForSubscriptionId(subId).isDataEnabled();
     }
 
+        /**
+     * Return {@code true} if mobile data is enabled
+     */
+    boolean isMobileDataEnabled() {
+        return mIsMobileDataEnabled;
+    }
+
     boolean isMobileDataEnabledWithNddsOverrideConsidered(int subId) {
         if (subId != getDefaultDataSubscriptionId()) {
             Log.i(TAG, "isMobileDataEnabled：mIsNddsDataEnabled = " + mIsNddsDataEnabled);
@@ -1152,8 +1167,8 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     }
 
     boolean isDataStateInService(int subId) {
-        TelephonyManager tm = mSubIdTelephonyManagerMap.getOrDefault(subId, mTelephonyManager);
-        final ServiceState serviceState = tm.getServiceState();
+        final ServiceState serviceState = mSubIdServiceState.getOrDefault(subId,
+                new ServiceState());
         NetworkRegistrationInfo regInfo =
                 (serviceState == null) ? null : serviceState.getNetworkRegistrationInfo(
                         NetworkRegistrationInfo.DOMAIN_PS,
@@ -1169,8 +1184,8 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             return false;
         }
 
-        TelephonyManager tm = mSubIdTelephonyManagerMap.getOrDefault(subId, mTelephonyManager);
-        final ServiceState serviceState = tm.getServiceState();
+        final ServiceState serviceState = mSubIdServiceState.getOrDefault(subId,
+                new ServiceState());
         return serviceState != null
                 && serviceState.getState() == serviceState.STATE_IN_SERVICE;
     }
@@ -1196,6 +1211,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
 
         final Network activeNetwork = mConnectivityManager.getActiveNetwork();
         if (activeNetwork == null) {
+            Log.d(TAG, "getActiveNetwork is null.");
             return false;
         }
         final NetworkCapabilities networkCapabilities =
@@ -1412,6 +1428,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     }
 
     private class InternetTelephonyCallback extends TelephonyCallback implements
+            TelephonyCallback.DataEnabledListener,
             TelephonyCallback.DataConnectionStateListener,
             TelephonyCallback.DisplayInfoListener,
             TelephonyCallback.ServiceStateListener,
@@ -1421,6 +1438,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             TelephonyCallback.ActiveDataSubscriptionIdListener {
 
         private final int mSubId;
+
         private InternetTelephonyCallback(int subId) {
             mSubId = subId;
         }
@@ -1430,6 +1448,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             if (mCallback != null) {
                 mCallback.onServiceStateChanged(serviceState);
             }
+            mSubIdServiceState.put(mSubId, serviceState);
         }
 
         @Override
@@ -1474,6 +1493,13 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             mActiveDataSubId = subId;
             if (mCallback != null) {
                 mCallback.onTempDdsSwitchHappened();
+            }
+        }
+
+        @Override
+        public void onDataEnabledChanged(boolean b, int i) {
+            if (mSubId == mDefaultDataSubId) {
+                mIsMobileDataEnabled = b;
             }
         }
     }

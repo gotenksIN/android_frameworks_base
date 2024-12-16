@@ -17190,7 +17190,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         final WindowManager windowManager = mContext.getSystemService(WindowManager.class);
         final WindowMetrics metrics = windowManager.getMaximumWindowMetrics();
         final Insets insets = metrics.getWindowInsets().getInsets(
-                WindowInsets.Type.navigationBars() | WindowInsets.Type.displayCutout());
+                WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
         outRect.set(metrics.getBounds());
         outRect.inset(insets);
         outRect.offsetTo(0, 0);

@@ -3465,11 +3465,20 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                 updateTelephonyCapable(true);
             } else if (state == TelephonyManager.SIM_STATE_NOT_READY) {
                 becameNotReady = true;
-                for (SimData data : mSimDatas.values()) {
-                    if (data.slotId == slotId) {
-                        data.simState = TelephonyManager.SIM_STATE_NOT_READY;
+                if (simPinUseSlotId()) {
+                    for (SimData data : mSimDatasBySlotId.values()) {
+                        if (data.slotId == slotId) {
+                            data.simState = TelephonyManager.SIM_STATE_NOT_READY;
+                        }
+                    }
+                } else {
+                    for (SimData data : mSimDatas.values()) {
+                        if (data.slotId == slotId) {
+                            data.simState = TelephonyManager.SIM_STATE_NOT_READY;
+                        }
                     }
                 }
+
             }
             invalidateSlot(slotId);
         }
@@ -3936,9 +3945,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                     + "simPinUseSlotId");
         }
         synchronized (mSimDataLockObject) {
-            int slotId = SubscriptionManager.getSlotIndex(subId);
-            if (mSimDatas.containsKey(slotId)) {
-                return mSimDatas.get(slotId).simState;
+            if (mSimDatas.containsKey(subId)) {
+                return mSimDatas.get(subId).simState;
             } else {
                 return TelephonyManager.SIM_STATE_UNKNOWN;
             }
@@ -4154,11 +4162,21 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
             final SubscriptionInfo info = list.get(i);
             final int id = info.getSubscriptionId();
             int slotId = SubscriptionManager.getSlotIndex(id);
-            if (state == getSimState(id) && (KeyguardViewMediator.getUnlockTrackSimState(slotId)
-                    != TelephonyManager.SIM_STATE_READY)) {
-                resultId = id;
-                break;
+            if (simPinUseSlotId()) {
+                if (state == getSimStateForSlotId(slotId)
+                        && (KeyguardViewMediator.getUnlockTrackSimState(slotId)
+                        != TelephonyManager.SIM_STATE_READY)) {
+                    resultId = id;
+                    break;
+                }
+            } else {
+                if (state == getSimState(id) && (KeyguardViewMediator.getUnlockTrackSimState(slotId)
+                        != TelephonyManager.SIM_STATE_READY)) {
+                    resultId = id;
+                    break;
+                }
             }
+
         }
         return resultId;
     }

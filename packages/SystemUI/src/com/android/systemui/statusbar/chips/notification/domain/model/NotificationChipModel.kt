@@ -17,10 +17,11 @@
 package com.android.systemui.statusbar.chips.notification.domain.model
 
 import com.android.systemui.statusbar.StatusBarIconView
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 
 /** Modeling all the data needed to render a status bar notification chip. */
 data class NotificationChipModel(
     val key: String,
     val statusBarChipIconView: StatusBarIconView?,
-    val whenTime: Long,
+    val promotedContent: PromotedNotificationContentModel,
 )

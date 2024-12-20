@@ -149,6 +149,13 @@ flag {
 }
 
 flag {
+    name: "cache_sdk_system_features"
+    namespace: "system_performance"
+    description: "Feature flag to enable optimized cache for SDK-defined system feature lookups."
+    bug: "375000483"
+}
+
+flag {
     name: "provide_info_of_apk_in_apex"
     is_exported: true
     namespace: "package_manager_service"
@@ -362,3 +369,9 @@ flag {
     is_fixed_read_only: true
 }
 
+flag {
+    name: "remove_hidden_module_usage"
+    namespace: "modularization"
+    description: "Feature flag to remove the consumption of the hidden module status (ModuleInfo#IsHidden) in the Android source tree."
+    bug: "363952383"
+}

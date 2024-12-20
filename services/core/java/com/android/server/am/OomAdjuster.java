@@ -2949,7 +2949,6 @@ public class OomAdjuster {
                             return true;
                         }
                     }
-                    capability |= PROCESS_CAPABILITY_CPU_TIME;
                 }
                 // Not doing bind OOM management, so treat
                 // this guy more like a started service.
@@ -3198,7 +3197,6 @@ public class OomAdjuster {
                         return true;
                     }
                 }
-                capability |= PROCESS_CAPABILITY_CPU_TIME;
             }
         }
         if (cr.hasFlag(Context.BIND_TREAT_LIKE_ACTIVITY)) {
@@ -4396,6 +4394,11 @@ public class OomAdjuster {
                         != client.getSetCapability()) {
             // The connection might elevate the importance of the service's capabilities.
             needDryRun = true;
+        } else if (Flags.useCpuTimeCapability()
+                && (client.getSetCapability() & ~app.getSetCapability()
+                    & PROCESS_CAPABILITY_CPU_TIME) != 0) {
+            // The connection might grant PROCESS_CAPABILITY_CPU_TIME to the service.
+            needDryRun = true;
         } else if (Flags.unfreezeBindPolicyFix()
                 && cr.hasFlag(Context.BIND_WAIVE_PRIORITY
                             | Context.BIND_ALLOW_OOM_MANAGEMENT)) {
@@ -4443,6 +4446,10 @@ public class OomAdjuster {
                 && client.mOptRecord.shouldNotFreeze()) {
             // Process has shouldNotFreeze and it could have gotten it from the client.
             return true;
+        } else if (Flags.useCpuTimeCapability()
+                && (client.getSetCapability() & app.getSetCapability()
+                    & PROCESS_CAPABILITY_CPU_TIME) != 0) {
+            return true;
         }
         return false;
     }
@@ -4461,6 +4468,11 @@ public class OomAdjuster {
         } else if (Flags.unfreezeBindPolicyFix()
                 && client.mOptRecord.shouldNotFreeze()
                 && !app.mOptRecord.shouldNotFreeze()) {
+            needDryRun = true;
+        } else if (Flags.useCpuTimeCapability()
+                && (client.getSetCapability() & ~app.getSetCapability()
+                    & PROCESS_CAPABILITY_CPU_TIME) != 0) {
+            // The connection might grant PROCESS_CAPABILITY_CPU_TIME to the provider.
             needDryRun = true;
         }
 
@@ -4487,6 +4499,10 @@ public class OomAdjuster {
                 && app.mOptRecord.shouldNotFreeze()
                 && client.mOptRecord.shouldNotFreeze()) {
             // Process has shouldNotFreeze and it could have gotten it from the client.
+            return true;
+        } else if (Flags.useCpuTimeCapability()
+                && (client.getSetCapability() & app.getSetCapability()
+                    & PROCESS_CAPABILITY_CPU_TIME) != 0) {
             return true;
         }
 

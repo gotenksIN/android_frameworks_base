@@ -30,17 +30,25 @@ import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.statusbar.StatusBarIconView
+import com.android.systemui.statusbar.data.repository.fakeStatusBarModeRepository
+import com.android.systemui.statusbar.gesture.swipeStatusBarAwayGestureHandler
 import com.android.systemui.statusbar.notification.data.model.activeNotificationModel
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationsStore
 import com.android.systemui.statusbar.notification.data.repository.activeNotificationListRepository
 import com.android.systemui.statusbar.notification.shared.CallType
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallModel
+import com.android.systemui.statusbar.window.fakeStatusBarWindowControllerStore
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
@@ -48,6 +56,11 @@ class OngoingCallInteractorTest : SysuiTestCase() {
     private val kosmos = Kosmos().useUnconfinedTestDispatcher()
     private val repository = kosmos.activeNotificationListRepository
     private val underTest = kosmos.ongoingCallInteractor
+
+    @Before
+    fun setUp() {
+        underTest.start()
+    }
 
     @Test
     fun noNotification_emitsNoCall() = runTest {
@@ -72,7 +85,7 @@ class OngoingCallInteractorTest : SysuiTestCase() {
                                 whenTime = 1000L,
                                 callType = CallType.Ongoing,
                                 statusBarChipIcon = testIconView,
-                                contentIntent = testIntent
+                                contentIntent = testIntent,
                             )
                         )
                     }
@@ -95,7 +108,9 @@ class OngoingCallInteractorTest : SysuiTestCase() {
                     .apply {
                         addIndividualNotif(
                             activeNotificationModel(
-                                key = "notif1", whenTime = 1000L, callType = CallType.Ongoing
+                                key = "notif1",
+                                whenTime = 1000L,
+                                callType = CallType.Ongoing,
                             )
                         )
                     }
@@ -114,7 +129,9 @@ class OngoingCallInteractorTest : SysuiTestCase() {
                     .apply {
                         addIndividualNotif(
                             activeNotificationModel(
-                                key = "notif1", whenTime = 1000L, callType = CallType.Ongoing
+                                key = "notif1",
+                                whenTime = 1000L,
+                                callType = CallType.Ongoing,
                             )
                         )
                     }
@@ -138,7 +155,7 @@ class OngoingCallInteractorTest : SysuiTestCase() {
                                 key = "notif1",
                                 whenTime = 1000L,
                                 callType = CallType.Ongoing,
-                                uid = UID
+                                uid = UID,
                             )
                         )
                     }
@@ -161,7 +178,7 @@ class OngoingCallInteractorTest : SysuiTestCase() {
                                 key = "notif1",
                                 whenTime = 1000L,
                                 callType = CallType.Ongoing,
-                                uid = UID
+                                uid = UID,
                             )
                         )
                     }
@@ -185,13 +202,12 @@ class OngoingCallInteractorTest : SysuiTestCase() {
                                 key = "notif1",
                                 whenTime = 1000L,
                                 callType = CallType.Ongoing,
-                                uid = UID
+                                uid = UID,
                             )
                         )
                     }
                     .build()
-            assertThat(latest)
-                .isInstanceOf(OngoingCallModel.InCall::class.java)
+            assertThat(latest).isInstanceOf(OngoingCallModel.InCall::class.java)
 
             // App becomes visible
             kosmos.activityManagerRepository.fake.setIsAppVisible(UID, true)
@@ -201,6 +217,176 @@ class OngoingCallInteractorTest : SysuiTestCase() {
             kosmos.activityManagerRepository.fake.setIsAppVisible(UID, false)
             assertThat(latest).isInstanceOf(OngoingCallModel.InCall::class.java)
         }
+
+    @Test
+    fun ongoingCallNotification_setsRequiresStatusBarVisibleTrue() =
+        kosmos.runTest {
+            val isStatusBarRequired by collectLastValue(underTest.isStatusBarRequiredForOngoingCall)
+            val requiresStatusBarVisibleInRepository by
+                collectLastValue(
+                    kosmos.fakeStatusBarModeRepository.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+            val requiresStatusBarVisibleInWindowController by
+                collectLastValue(
+                    kosmos.fakeStatusBarWindowControllerStore.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+            postOngoingCallNotification()
+
+            assertThat(isStatusBarRequired).isTrue()
+            assertThat(requiresStatusBarVisibleInRepository).isTrue()
+            assertThat(requiresStatusBarVisibleInWindowController).isTrue()
+        }
+
+    @Test
+    fun notificationRemoved_setsRequiresStatusBarVisibleFalse() =
+        kosmos.runTest {
+            val isStatusBarRequired by collectLastValue(underTest.isStatusBarRequiredForOngoingCall)
+            val requiresStatusBarVisibleInRepository by
+                collectLastValue(
+                    kosmos.fakeStatusBarModeRepository.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+            val requiresStatusBarVisibleInWindowController by
+                collectLastValue(
+                    kosmos.fakeStatusBarWindowControllerStore.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+
+            postOngoingCallNotification()
+
+            repository.activeNotifications.value = ActiveNotificationsStore()
+
+            assertThat(isStatusBarRequired).isFalse()
+            assertThat(requiresStatusBarVisibleInRepository).isFalse()
+            assertThat(requiresStatusBarVisibleInWindowController).isFalse()
+        }
+
+    @Test
+    fun ongoingCallNotification_appBecomesVisible_setsRequiresStatusBarVisibleFalse() =
+        kosmos.runTest {
+            val ongoingCallState by collectLastValue(underTest.ongoingCallState)
+
+            val requiresStatusBarVisibleInRepository by
+                collectLastValue(
+                    kosmos.fakeStatusBarModeRepository.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+            val requiresStatusBarVisibleInWindowController by
+                collectLastValue(
+                    kosmos.fakeStatusBarWindowControllerStore.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+
+            kosmos.activityManagerRepository.fake.startingIsAppVisibleValue = false
+
+            postOngoingCallNotification()
+
+            assertThat(ongoingCallState).isInstanceOf(OngoingCallModel.InCall::class.java)
+            assertThat(requiresStatusBarVisibleInRepository).isTrue()
+            assertThat(requiresStatusBarVisibleInWindowController).isTrue()
+
+            kosmos.activityManagerRepository.fake.setIsAppVisible(UID, true)
+
+            assertThat(ongoingCallState)
+                .isInstanceOf(OngoingCallModel.InCallWithVisibleApp::class.java)
+            assertThat(requiresStatusBarVisibleInRepository).isFalse()
+            assertThat(requiresStatusBarVisibleInWindowController).isFalse()
+        }
+
+    @Test
+    fun gestureHandler_inCall_notFullscreen_doesNotListen() =
+        kosmos.runTest {
+            val ongoingCallState by collectLastValue(underTest.ongoingCallState)
+
+            clearInvocations(kosmos.swipeStatusBarAwayGestureHandler)
+            // Set up notification but not in fullscreen
+            kosmos.fakeStatusBarModeRepository.defaultDisplay.isInFullscreenMode.value = false
+            postOngoingCallNotification()
+
+            assertThat(ongoingCallState).isInstanceOf(OngoingCallModel.InCall::class.java)
+            verify(kosmos.swipeStatusBarAwayGestureHandler, never())
+                .addOnGestureDetectedCallback(any(), any())
+        }
+
+    @Test
+    fun gestureHandler_inCall_fullscreen_addsListener() =
+        kosmos.runTest {
+            val isGestureListeningEnabled by collectLastValue(underTest.isGestureListeningEnabled)
+
+            // Set up notification and fullscreen mode
+            kosmos.fakeStatusBarModeRepository.defaultDisplay.isInFullscreenMode.value = true
+            postOngoingCallNotification()
+
+            assertThat(isGestureListeningEnabled).isTrue()
+            verify(kosmos.swipeStatusBarAwayGestureHandler)
+                .addOnGestureDetectedCallback(any(), any())
+        }
+
+    @Test
+    fun gestureHandler_inCall_fullscreen_chipSwiped_removesListener() =
+        kosmos.runTest {
+            val swipeAwayState by collectLastValue(underTest.isChipSwipedAway)
+
+            // Set up notification and fullscreen mode
+            kosmos.fakeStatusBarModeRepository.defaultDisplay.isInFullscreenMode.value = true
+            postOngoingCallNotification()
+
+            clearInvocations(kosmos.swipeStatusBarAwayGestureHandler)
+
+            underTest.onStatusBarSwiped()
+
+            assertThat(swipeAwayState).isTrue()
+            verify(kosmos.swipeStatusBarAwayGestureHandler).removeOnGestureDetectedCallback(any())
+        }
+
+    @Test
+    fun chipSwipedAway_setsRequiresStatusBarVisibleFalse() =
+        kosmos.runTest {
+            val isStatusBarRequiredForOngoingCall by
+                collectLastValue(underTest.isStatusBarRequiredForOngoingCall)
+            val requiresStatusBarVisibleInRepository by
+                collectLastValue(
+                    kosmos.fakeStatusBarModeRepository.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+            val requiresStatusBarVisibleInWindowController by
+                collectLastValue(
+                    kosmos.fakeStatusBarWindowControllerStore.defaultDisplay
+                        .ongoingProcessRequiresStatusBarVisible
+                )
+
+            // Start with an ongoing call (which should set status bar required)
+            postOngoingCallNotification()
+
+            assertThat(isStatusBarRequiredForOngoingCall).isTrue()
+            assertThat(requiresStatusBarVisibleInRepository).isTrue()
+            assertThat(requiresStatusBarVisibleInWindowController).isTrue()
+
+            // Swipe away the chip
+            underTest.onStatusBarSwiped()
+
+            // Verify status bar is no longer required
+            assertThat(requiresStatusBarVisibleInRepository).isFalse()
+            assertThat(requiresStatusBarVisibleInWindowController).isFalse()
+        }
+
+    private fun postOngoingCallNotification() {
+        repository.activeNotifications.value =
+            ActiveNotificationsStore.Builder()
+                .apply {
+                    addIndividualNotif(
+                        activeNotificationModel(
+                            key = "notif1",
+                            whenTime = 1000L,
+                            callType = CallType.Ongoing,
+                            uid = UID,
+                        )
+                    )
+                }
+                .build()
+    }
 
     companion object {
         private const val UID = 885

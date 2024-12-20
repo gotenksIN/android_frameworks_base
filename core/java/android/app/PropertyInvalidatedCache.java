@@ -17,13 +17,13 @@
 package android.app;
 
 import static android.text.TextUtils.formatSimple;
+
 import static com.android.internal.util.Preconditions.checkArgumentPositive;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.TestApi;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -1356,7 +1356,7 @@ public class PropertyInvalidatedCache<Query, Result> {
             @Nullable QueryHandler<Query, Result> computer) {
         mPropertyName = createPropertyName(args.mModule, args.mApi);
         mCacheName = cacheName;
-        mCacheNullResults = args.mCacheNulls && Flags.picCacheNulls();
+        mCacheNullResults = args.mCacheNulls;
         mNonce = getNonceHandler(mPropertyName);
         mMaxEntries = args.mMaxEntries;
         mCache = new CacheMap<>(args.mIsolateUids, args.mTestMode);
@@ -2322,6 +2322,19 @@ public class PropertyInvalidatedCache<Query, Result> {
             barray.close();
         } catch (IOException e) {
             Log.e(TAG, "Failed to dump PropertyInvalidatedCache instances");
+        }
+    }
+
+    /**
+     * This dumps the detailed entries (Query and Result) inside the current instance of the
+     * {@link PropertyInvalidatedCache}.
+     *
+     * @param pw The PrintWriter object for the output stream.
+     * @hide
+     */
+    public void dumpCacheEntries(@NonNull PrintWriter pw) {
+        synchronized (mLock) {
+            mCache.dumpDetailed(pw);
         }
     }
 

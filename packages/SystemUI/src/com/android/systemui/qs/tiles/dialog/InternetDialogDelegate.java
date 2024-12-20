@@ -130,6 +130,7 @@ public class InternetDialogDelegate implements
     private final Handler mHandler;
     private final Executor mBackgroundExecutor;
     private final DialogTransitionAnimator mDialogTransitionAnimator;
+    private final Context mContext;
     private final boolean mAboveStatusBar;
     private final SystemUIDialog.Factory mSystemUIDialogFactory;
 
@@ -286,6 +287,7 @@ public class InternetDialogDelegate implements
             @Background Executor executor,
             KeyguardStateController keyguardStateController,
             SystemUIDialog.Factory systemUIDialogFactory) {
+        mContext = context;
         mAboveStatusBar = aboveStatusBar;
         mSystemUIDialogFactory = systemUIDialogFactory;
         if (DEBUG) {
@@ -315,7 +317,7 @@ public class InternetDialogDelegate implements
 
     @Override
     public SystemUIDialog createDialog() {
-        SystemUIDialog dialog = mSystemUIDialogFactory.create(this);
+        SystemUIDialog dialog = mSystemUIDialogFactory.create(this, mContext);
         if (!mAboveStatusBar) {
             dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
         }

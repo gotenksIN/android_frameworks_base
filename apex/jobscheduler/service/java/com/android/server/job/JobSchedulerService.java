@@ -16,6 +16,7 @@
 
 package com.android.server.job;
 
+import static android.app.job.JobParameters.OVERRIDE_HANDLE_ABANDONED_JOBS;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
 import static android.Manifest.permission.MANAGE_ACTIVITY_TASKS;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
@@ -1718,8 +1719,9 @@ public class JobSchedulerService extends com.android.server.SystemService
             int userId, @Nullable String namespace, String tag) {
         // Rate limit excessive schedule() calls.
         final String servicePkg = job.getService().getPackageName();
-        if (job.isPersisted() && (packageName == null || packageName.equals(servicePkg))) {
-            // Only limit schedule calls for persisted jobs scheduled by the app itself.
+        if (job.isPersisted() && (Flags.enforceScheduleLimitToProxyJobs()
+                || (packageName == null || packageName.equals(servicePkg)))) {
+            // limit excessive schedule calls for persisted jobs.
             final String pkg = packageName == null ? servicePkg : packageName;
             if (!mQuotaTracker.isWithinQuota(userId, pkg, QUOTA_TRACKER_SCHEDULE_PERSISTED_TAG)) {
                 if (mQuotaTracker.isWithinQuota(userId, pkg, QUOTA_TRACKER_SCHEDULE_LOGGED)) {
@@ -1985,8 +1987,8 @@ public class JobSchedulerService extends com.android.server.SystemService
                     jobStatus.getNumAbandonedFailures(),
                     /* 0 is reserved for UNKNOWN_POLICY */
                     jobStatus.getJob().getBackoffPolicy() + 1,
-                    shouldUseAggressiveBackoff(jobStatus.getNumAbandonedFailures()));
-
+                    shouldUseAggressiveBackoff(
+                            jobStatus.getNumAbandonedFailures(), jobStatus.getSourceUid()));
 
             // If the job is immediately ready to run, then we can just immediately
             // put it in the pending list and try to schedule it.  This is especially
@@ -2431,7 +2433,8 @@ public class JobSchedulerService extends com.android.server.SystemService
                     cancelled.getNumAbandonedFailures(),
                     /* 0 is reserved for UNKNOWN_POLICY */
                     cancelled.getJob().getBackoffPolicy() + 1,
-                    shouldUseAggressiveBackoff(cancelled.getNumAbandonedFailures()));
+                    shouldUseAggressiveBackoff(
+                            cancelled.getNumAbandonedFailures(), cancelled.getSourceUid()));
         }
         // If this is a replacement, bring in the new version of the job
         if (incomingJob != null) {
@@ -3023,6 +3026,7 @@ public class JobSchedulerService extends com.android.server.SystemService
         int numFailures = failureToReschedule.getNumFailures();
         int numAbandonedFailures = failureToReschedule.getNumAbandonedFailures();
         int numSystemStops = failureToReschedule.getNumSystemStops();
+        final int uid = failureToReschedule.getSourceUid();
         // We should back off slowly if JobScheduler keeps stopping the job,
         // but back off immediately if the issue appeared to be the app's fault
         // or the user stopped the job somehow.
@@ -3032,6 +3036,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                 || stopReason == JobParameters.STOP_REASON_USER) {
             numFailures++;
         } else if (android.app.job.Flags.handleAbandonedJobs()
+                && !CompatChanges.isChangeEnabled(OVERRIDE_HANDLE_ABANDONED_JOBS, uid)
                 && internalStopReason == JobParameters.INTERNAL_STOP_REASON_TIMEOUT_ABANDONED) {
             numAbandonedFailures++;
             numFailures++;
@@ -3040,7 +3045,7 @@ public class JobSchedulerService extends com.android.server.SystemService
         }
 
         int backoffPolicy = job.getBackoffPolicy();
-        if (shouldUseAggressiveBackoff(numAbandonedFailures)) {
+        if (shouldUseAggressiveBackoff(numAbandonedFailures, uid)) {
             backoffPolicy = JobInfo.BACKOFF_POLICY_EXPONENTIAL;
         }
 
@@ -3111,8 +3116,9 @@ public class JobSchedulerService extends com.android.server.SystemService
      * @return {@code true} if the given number of abandoned failures indicates that JobScheduler
      *     should use an aggressive backoff policy.
      */
-    public boolean shouldUseAggressiveBackoff(int numAbandonedFailures) {
+    public boolean shouldUseAggressiveBackoff(int numAbandonedFailures, int uid) {
         return android.app.job.Flags.handleAbandonedJobs()
+                && !CompatChanges.isChangeEnabled(OVERRIDE_HANDLE_ABANDONED_JOBS, uid)
                 && numAbandonedFailures
                         > mConstants.ABANDONED_JOB_TIMEOUTS_BEFORE_AGGRESSIVE_BACKOFF;
     }
@@ -3222,7 +3228,9 @@ public class JobSchedulerService extends com.android.server.SystemService
     @VisibleForTesting
     void maybeProcessBuggyJob(@NonNull JobStatus jobStatus, int debugStopReason) {
         boolean jobTimedOut = debugStopReason == JobParameters.INTERNAL_STOP_REASON_TIMEOUT;
-        if (android.app.job.Flags.handleAbandonedJobs()) {
+        if (android.app.job.Flags.handleAbandonedJobs()
+                && !CompatChanges.isChangeEnabled(
+                        OVERRIDE_HANDLE_ABANDONED_JOBS, jobStatus.getSourceUid())) {
             jobTimedOut |= (debugStopReason
                 == JobParameters.INTERNAL_STOP_REASON_TIMEOUT_ABANDONED);
         }
@@ -3308,6 +3316,8 @@ public class JobSchedulerService extends com.android.server.SystemService
         final JobStatus rescheduledJob = needsReschedule
                 ? getRescheduleJobForFailureLocked(jobStatus, stopReason, debugStopReason) : null;
         final boolean isStopReasonAbandoned = android.app.job.Flags.handleAbandonedJobs()
+                && !CompatChanges.isChangeEnabled(
+                        OVERRIDE_HANDLE_ABANDONED_JOBS, jobStatus.getSourceUid())
                 && (debugStopReason == JobParameters.INTERNAL_STOP_REASON_TIMEOUT_ABANDONED);
         if (rescheduledJob != null
                 && !rescheduledJob.shouldTreatAsUserInitiatedJob()

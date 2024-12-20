@@ -1955,6 +1955,21 @@
     <!-- Text displayed indicating that the user might be able to use satellite SOS. -->
     <string name="satellite_emergency_only_carrier_text">Emergency calls or SOS</string>
 
+    <!-- Content description skeleton. Input strings should be carrier name and signal bar description [CHAR LIMIT=NONE]-->
+    <string name="accessibility_phone_string_format"><xliff:g id="carrier_name" example="Carrier Name">%1$s</xliff:g>, <xliff:g id="signal_strength_description" example="two bars">%2$s</xliff:g>.</string>
+    <!-- Content description describing 0 signal bars. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_no_signal">no signal</string>
+    <!-- Content description describing 1 signal bar. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_one_bar">one bar</string>
+    <!-- Content description describing 2 signal bars. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_two_bars">two bars</string>
+    <!-- Content description describing 3 signal bars. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_three_bars">three bars</string>
+    <!-- Content description describing 4 signal bars. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_four_bars">four bars</string>
+    <!-- Content description describing full signal bars. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_signal_full">signal full</string>
+
     <!-- Accessibility label for managed profile icon (not shown on screen) [CHAR LIMIT=NONE] -->
     <string name="accessibility_managed_profile">Work profile</string>
 
@@ -2051,8 +2066,9 @@
     <!-- Text shown in notification guts for conversation notifications that don't implement the full feature -->
     <string name="no_shortcut"><xliff:g id="app_name" example="YouTube">%1$s</xliff:g> doesn\u2019t support conversation features</string>
 
+    <!-- TODO: b/381099727 - Mark translatable once feedback layout is finalized. -->
     <!-- [CHAR LIMIT=80] Text shown in feedback button in notification guts for a bundled notification -->
-    <string name="notification_guts_bundle_feedback">Provide Bundle Feedback</string>
+    <string name="notification_guts_bundle_feedback" translatable="false">Provide Bundle Feedback</string>
 
     <!-- Notification: Control panel: Label that displays when the app's notifications cannot be blocked. -->
     <string name="notification_unblockable_desc">These notifications can\'t be modified.</string>
@@ -2580,8 +2596,6 @@
     <!-- Tuner string -->
     <!-- Tuner string -->
 
-    <!-- Message shown during shutdown when Find My Device with Dead Battery Finder is active  [CHAR LIMIT=300] -->
-    <string name="finder_active">You can locate this phone with Find My Device even when powered off</string>
     <!-- Shutdown Progress Dialog. This is shown if the user chooses to power off the phone. [CHAR LIMIT=60] -->
     <string name="shutdown_progress">Shutting down\u2026</string>
 
@@ -3934,6 +3948,8 @@
     <string name="touchpad_tutorial_recent_apps_gesture_button">View recent apps</string>
     <!-- Label for button finishing touchpad tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_tutorial_done_button">Done</string>
+    <!-- Screen title after gesture was not done correctly [CHAR LIMIT=NONE] -->
+    <string name="gesture_error_title">Try again!</string>
     <!-- BACK GESTURE -->
     <!-- Touchpad back gesture action name in tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_back_gesture_action_title">Go back</string>
@@ -3943,6 +3959,8 @@
     <string name="touchpad_back_gesture_success_title">Nice!</string>
     <!-- Text shown to the user after they complete back gesture tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_back_gesture_success_body">You completed the go back gesture.</string>
+    <!-- Text shown to the user after back gesture was not done correctly [CHAR LIMIT=NONE] -->
+    <string name="touchpad_back_gesture_error_body">To go back using your touchpad, swipe left or right using three fingers</string>
     <!-- HOME GESTURE -->
     <!-- Touchpad home gesture action name in tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_home_gesture_action_title">Go home</string>
@@ -3952,6 +3970,8 @@
     <string name="touchpad_home_gesture_success_title">Great job!</string>
     <!-- Text shown to the user after they complete home gesture tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_home_gesture_success_body">You completed the go home gesture</string>
+    <!-- Text shown to the user after home gesture was not done correctly [CHAR LIMIT=NONE] -->
+    <string name="touchpad_home_gesture_error_body">Swipe up with three fingers on your touchpad to go to your home screen</string>
     <!-- RECENT APPS GESTURE -->
     <!-- Touchpad recent apps gesture action name in tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_recent_apps_gesture_action_title">View recent apps</string>
@@ -3961,6 +3981,8 @@
     <string name="touchpad_recent_apps_gesture_success_title">Great job!</string>
     <!-- Text shown to the user after they complete recent apps gesture tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_recent_apps_gesture_success_body">You completed the view recent apps gesture.</string>
+    <!-- Text shown to the user after recent gesture was not done correctly [CHAR LIMIT=NONE] -->
+    <string name="touchpad_recent_gesture_error_body">To view recent apps, swipe up and hold using three fingers on your touchpad</string>
 
     <!-- KEYBOARD TUTORIAL-->
     <!-- Action key tutorial title [CHAR LIMIT=NONE] -->
@@ -3971,6 +3993,9 @@
     <string name="tutorial_action_key_success_title">Well done!</string>
     <!-- Text shown to the user after they complete action key tutorial [CHAR LIMIT=NONE] -->
     <string name="tutorial_action_key_success_body">You completed the view all apps gesture</string>
+    <!-- Text shown to the user after action key tutorial was not done correctly [CHAR LIMIT=NONE] -->
+    <string name="touchpad_action_key_error_body">Press the action key on your keyboard to view all of your apps</string>
+
     <!-- Content description for the animation playing during the tutorial. The user can click the animation to pause and unpause playback. [CHAR LIMIT=NONE] -->
     <string name="tutorial_animation_content_description">Tutorial animation, click to pause and resume play.</string>
 

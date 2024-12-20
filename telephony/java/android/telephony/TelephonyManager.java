@@ -3292,12 +3292,6 @@ public class TelephonyManager {
      * For 5G NSA, the network type will be {@link #NETWORK_TYPE_LTE}.
      */
     public static final int NETWORK_TYPE_NR = TelephonyProtoEnums.NETWORK_TYPE_NR; // 20.
-    /**
-     * 3GPP NB-IOT (Narrowband Internet of Things) over Non-Terrestrial-Networks technology.
-     */
-    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
-    public static final int NETWORK_TYPE_NB_IOT_NTN =
-            TelephonyProtoEnums.NETWORK_TYPE_NB_IOT_NTN; // 21
 
     private static final @NetworkType int[] NETWORK_TYPES = {
             NETWORK_TYPE_GPRS,
@@ -3374,7 +3368,6 @@ public class TelephonyManager {
      * @see #NETWORK_TYPE_EHRPD
      * @see #NETWORK_TYPE_HSPAP
      * @see #NETWORK_TYPE_NR
-     * @see #NETWORK_TYPE_NB_IOT_NTN
      *
      * @hide
      */
@@ -3435,7 +3428,6 @@ public class TelephonyManager {
      * @see #NETWORK_TYPE_EHRPD
      * @see #NETWORK_TYPE_HSPAP
      * @see #NETWORK_TYPE_NR
-     * @see #NETWORK_TYPE_NB_IOT_NTN
      *
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_RADIO_ACCESS}.
@@ -3586,8 +3578,6 @@ public class TelephonyManager {
                 return "LTE_CA";
             case NETWORK_TYPE_NR:
                 return "NR";
-            case NETWORK_TYPE_NB_IOT_NTN:
-                return "NB_IOT_NTN";
             case NETWORK_TYPE_UNKNOWN:
                 return "UNKNOWN";
             default:
@@ -3638,8 +3628,6 @@ public class TelephonyManager {
                 return NETWORK_TYPE_BITMASK_LTE;
             case NETWORK_TYPE_NR:
                 return NETWORK_TYPE_BITMASK_NR;
-            case NETWORK_TYPE_NB_IOT_NTN:
-                return NETWORK_TYPE_BITMASK_NB_IOT_NTN;
             case NETWORK_TYPE_IWLAN:
                 return NETWORK_TYPE_BITMASK_IWLAN;
             case NETWORK_TYPE_IDEN:
@@ -6485,6 +6473,7 @@ public class TelephonyManager {
      * @deprecated use {@link #getImsPrivateUserIdentity()}
      */
     @UnsupportedAppUsage
+    @Deprecated
     public String getIsimImpi() {
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
@@ -6574,6 +6563,7 @@ public class TelephonyManager {
      * @deprecated use {@link #getImsPublicUserIdentities()}
      */
     @UnsupportedAppUsage
+    @Deprecated
     @Nullable
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public String[] getIsimImpu() {
@@ -8608,7 +8598,9 @@ public class TelephonyManager {
             if (telephony == null) {
                 throw new IllegalStateException("telephony service is null.");
             }
-            telephony.rebootModem(getSlotIndex());
+            if (!telephony.rebootModem(getSlotIndex())) {
+                throw new RuntimeException("Couldn't reboot modem (it may be not supported)");
+            }
         } catch (RemoteException ex) {
             Rlog.e(TAG, "rebootRadio RemoteException", ex);
             throw ex.rethrowAsRuntimeException();
@@ -10433,9 +10425,6 @@ public class TelephonyManager {
      * This API will result in allowing an intersection of allowed network types for all reasons,
      * including the configuration done through other reasons.
      *
-     * If device supports satellite service, then
-     * {@link #NETWORK_TYPE_NB_IOT_NTN} is added to allowed network types for reason by default.
-     *
      * @param reason the reason the allowed network type change is taking place
      * @param allowedNetworkTypes The bitmask of allowed network type
      * @throws IllegalStateException if the Telephony process is not currently available.
@@ -10484,10 +10473,6 @@ public class TelephonyManager {
      * specific reason.
      * <p>Requires permission: android.Manifest.READ_PRIVILEGED_PHONE_STATE or
      * that the calling app has carrier privileges (see {@link #hasCarrierPrivileges}).
-     *
-     * If device supports satellite service, then
-     * {@link #NETWORK_TYPE_NB_IOT_NTN} is added to allowed network types for reason by
-     * default.
      *
      * @param reason the reason the allowed network type change is taking place
      * @return the allowed network type bitmask
@@ -10555,7 +10540,7 @@ public class TelephonyManager {
      */
     public static String convertNetworkTypeBitmaskToString(
             @NetworkTypeBitMask long networkTypeBitmask) {
-        String networkTypeName = IntStream.rangeClosed(NETWORK_TYPE_GPRS, NETWORK_TYPE_NB_IOT_NTN)
+        String networkTypeName = IntStream.rangeClosed(NETWORK_TYPE_GPRS, NETWORK_TYPE_NR)
                 .filter(x -> {
                     return (networkTypeBitmask & getBitMaskForNetworkType(x))
                             == getBitMaskForNetworkType(x);
@@ -14149,6 +14134,7 @@ public class TelephonyManager {
      * @hide
      */
     @SystemApi
+    @Deprecated
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CARRIERLOCK)
     public int setAllowedCarriers(int slotIndex, List<CarrierIdentifier> carriers) {
@@ -15236,8 +15222,7 @@ public class TelephonyManager {
                     NETWORK_TYPE_BITMASK_LTE_CA,
                     NETWORK_TYPE_BITMASK_NR,
                     NETWORK_TYPE_BITMASK_IWLAN,
-                    NETWORK_TYPE_BITMASK_IDEN,
-                    NETWORK_TYPE_BITMASK_NB_IOT_NTN
+                    NETWORK_TYPE_BITMASK_IDEN
             })
     public @interface NetworkTypeBitMask {}
 
@@ -15344,12 +15329,6 @@ public class TelephonyManager {
      */
     public static final long NETWORK_TYPE_BITMASK_IWLAN = (1 << (NETWORK_TYPE_IWLAN -1));
 
-    /**
-     * network type bitmask indicating the support of readio tech NB IOT NTN.
-     */
-    @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
-    public static final long NETWORK_TYPE_BITMASK_NB_IOT_NTN = (1 << (NETWORK_TYPE_NB_IOT_NTN - 1));
-
     /** @hide */
     public static final long NETWORK_CLASS_BITMASK_2G = NETWORK_TYPE_BITMASK_GSM
                 | NETWORK_TYPE_BITMASK_GPRS
@@ -15378,9 +15357,6 @@ public class TelephonyManager {
     public static final long NETWORK_CLASS_BITMASK_5G = NETWORK_TYPE_BITMASK_NR;
 
     /** @hide */
-    public static final long NETWORK_CLASS_BITMASK_NTN = NETWORK_TYPE_BITMASK_NB_IOT_NTN;
-
-    /** @hide */
     public static final long NETWORK_STANDARDS_FAMILY_BITMASK_3GPP = NETWORK_TYPE_BITMASK_GSM
             | NETWORK_TYPE_BITMASK_GPRS
             | NETWORK_TYPE_BITMASK_EDGE
@@ -15392,8 +15368,7 @@ public class TelephonyManager {
             | NETWORK_TYPE_BITMASK_TD_SCDMA
             | NETWORK_TYPE_BITMASK_LTE
             | NETWORK_TYPE_BITMASK_LTE_CA
-            | NETWORK_TYPE_BITMASK_NR
-            | NETWORK_TYPE_BITMASK_NB_IOT_NTN;
+            | NETWORK_TYPE_BITMASK_NR;
 
     /** @hide
      * @deprecated Legacy CDMA is unsupported.
@@ -18434,7 +18409,7 @@ public class TelephonyManager {
      */
     public static boolean isNetworkTypeValid(@NetworkType int networkType) {
         return networkType >= TelephonyManager.NETWORK_TYPE_UNKNOWN &&
-                networkType <= TelephonyManager.NETWORK_TYPE_NB_IOT_NTN;
+                networkType <= TelephonyManager.NETWORK_TYPE_NR;
     }
 
     /**

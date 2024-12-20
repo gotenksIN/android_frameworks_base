@@ -193,7 +193,7 @@ class DeferredDisplayUpdater {
             final Rect startBounds = new Rect(0, 0, mDisplayContent.mInitialDisplayWidth,
                     mDisplayContent.mInitialDisplayHeight);
             final int fromRotation = mDisplayContent.getRotation();
-            if (Flags.blastSyncNotificationShadeOnDisplaySwitch() && physicalDisplayUpdated) {
+            if (physicalDisplayUpdated) {
                 final WindowState notificationShade =
                         mDisplayContent.getDisplayPolicy().getNotificationShade();
                 if (notificationShade != null && notificationShade.isVisible()
@@ -432,7 +432,8 @@ class DeferredDisplayUpdater {
                 || !first.thermalRefreshRateThrottling.contentEquals(
                 second.thermalRefreshRateThrottling)
                 || !Objects.equals(first.thermalBrightnessThrottlingDataId,
-                second.thermalBrightnessThrottlingDataId)) {
+                second.thermalBrightnessThrottlingDataId)
+                || first.canHostTasks != second.canHostTasks) {
             diff |= DIFF_NOT_WM_DEFERRABLE;
         }
 

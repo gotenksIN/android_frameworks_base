@@ -427,11 +427,14 @@ public final class BatteryStatsService extends IBatteryStats.Stub
                 com.android.internal.R.bool.config_batteryStatsResetOnUnplugHighBatteryLevel);
         final boolean resetOnUnplugAfterSignificantCharge = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_batteryStatsResetOnUnplugAfterSignificantCharge);
+        final int batteryHistoryStorageSize = context.getResources().getInteger(
+                com.android.internal.R.integer.config_batteryHistoryStorageSize);
         BatteryStatsImpl.BatteryStatsConfig.Builder batteryStatsConfigBuilder =
                 new BatteryStatsImpl.BatteryStatsConfig.Builder()
                         .setResetOnUnplugHighBatteryLevel(resetOnUnplugHighBatteryLevel)
                         .setResetOnUnplugAfterSignificantCharge(
-                                resetOnUnplugAfterSignificantCharge);
+                                resetOnUnplugAfterSignificantCharge)
+                        .setMaxHistorySizeBytes(batteryHistoryStorageSize);
         setPowerStatsThrottlePeriods(batteryStatsConfigBuilder, context.getResources().getString(
                 com.android.internal.R.string.config_powerStatsThrottlePeriods));
         mBatteryStatsConfig = batteryStatsConfigBuilder.build();
@@ -1101,6 +1104,9 @@ public final class BatteryStatsService extends IBatteryStats.Stub
 
     /** StatsPullAtomCallback for pulling BatteryUsageStats data. */
     private class StatsPullAtomCallbackImpl implements StatsManager.StatsPullAtomCallback {
+        private static final long BATTERY_USAGE_STATS_PER_UID_MAX_STATS_AGE =
+                TimeUnit.HOURS.toMillis(2);
+
         @Override
         public int onPullAtom(int atomTag, List<StatsEvent> data) {
             final BatteryUsageStats bus;
@@ -1168,7 +1174,8 @@ public final class BatteryStatsService extends IBatteryStats.Stub
                             .setMinConsumedPowerThreshold(minConsumedPowerThreshold);
 
                     if (isBatteryUsageStatsAccumulationSupported()) {
-                        query.accumulated();
+                        query.accumulated()
+                                .setMaxStatsAgeMs(BATTERY_USAGE_STATS_PER_UID_MAX_STATS_AGE);
                     }
 
                     bus = getBatteryUsageStats(List.of(query.build())).get(0);

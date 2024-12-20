@@ -26,9 +26,9 @@ import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.statusbar.StatusBarIconView
-import com.android.systemui.statusbar.chips.notification.domain.model.NotificationChipModel
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.notification.data.model.activeNotificationModel
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -46,7 +46,11 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
         kosmos.runTest {
             val icon = mock<StatusBarIconView>()
             val startingNotif =
-                activeNotificationModel(key = "notif1", statusBarChipIcon = icon, whenTime = 5432)
+                activeNotificationModel(
+                    key = "notif1",
+                    statusBarChipIcon = icon,
+                    promotedContent = PROMOTED_CONTENT,
+                )
 
             val underTest = factory.create(startingNotif)
 
@@ -54,7 +58,7 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
 
             assertThat(latest!!.key).isEqualTo("notif1")
             assertThat(latest!!.statusBarChipIconView).isEqualTo(icon)
-            assertThat(latest!!.whenTime).isEqualTo(5432)
+            assertThat(latest!!.promotedContent).isEqualTo(PROMOTED_CONTENT)
         }
 
     @Test
@@ -63,7 +67,11 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
             val originalIconView = mock<StatusBarIconView>()
             val underTest =
                 factory.create(
-                    activeNotificationModel(key = "notif1", statusBarChipIcon = originalIconView)
+                    activeNotificationModel(
+                        key = "notif1",
+                        statusBarChipIcon = originalIconView,
+                        promotedContent = PROMOTED_CONTENT,
+                    )
                 )
 
             val latest by collectLastValue(underTest.notificationChip)
@@ -73,13 +81,12 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
                 activeNotificationModel(
                     key = "notif1",
                     statusBarChipIcon = newIconView,
-                    whenTime = 6543,
+                    promotedContent = PROMOTED_CONTENT,
                 )
             )
 
             assertThat(latest!!.key).isEqualTo("notif1")
             assertThat(latest!!.statusBarChipIconView).isEqualTo(newIconView)
-            assertThat(latest!!.whenTime).isEqualTo(6543)
         }
 
     @Test
@@ -88,14 +95,22 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
             val originalIconView = mock<StatusBarIconView>()
             val underTest =
                 factory.create(
-                    activeNotificationModel(key = "notif1", statusBarChipIcon = originalIconView)
+                    activeNotificationModel(
+                        key = "notif1",
+                        statusBarChipIcon = originalIconView,
+                        promotedContent = PROMOTED_CONTENT,
+                    )
                 )
 
             val latest by collectLastValue(underTest.notificationChip)
 
             val newIconView = mock<StatusBarIconView>()
             underTest.setNotification(
-                activeNotificationModel(key = "other_notif", statusBarChipIcon = newIconView)
+                activeNotificationModel(
+                    key = "other_notif",
+                    statusBarChipIcon = newIconView,
+                    promotedContent = PROMOTED_CONTENT,
+                )
             )
 
             assertThat(latest!!.key).isEqualTo("notif1")
@@ -103,10 +118,43 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
         }
 
     @Test
+    fun notificationChip_ignoresSetWithNullPromotedContent() =
+        kosmos.runTest {
+            val originalIconView = mock<StatusBarIconView>()
+            val underTest =
+                factory.create(
+                    activeNotificationModel(
+                        key = "notif1",
+                        statusBarChipIcon = originalIconView,
+                        promotedContent = PROMOTED_CONTENT,
+                    )
+                )
+
+            val latest by collectLastValue(underTest.notificationChip)
+
+            val newIconView = mock<StatusBarIconView>()
+            underTest.setNotification(
+                activeNotificationModel(
+                    key = "notif1",
+                    statusBarChipIcon = newIconView,
+                    promotedContent = null,
+                )
+            )
+
+            assertThat(latest!!.statusBarChipIconView).isEqualTo(originalIconView)
+        }
+
+    @Test
     fun notificationChip_missingStatusBarIconChipView_inConstructor_emitsNull() =
         kosmos.runTest {
             val underTest =
-                factory.create(activeNotificationModel(key = "notif1", statusBarChipIcon = null))
+                factory.create(
+                    activeNotificationModel(
+                        key = "notif1",
+                        statusBarChipIcon = null,
+                        promotedContent = PROMOTED_CONTENT,
+                    )
+                )
 
             val latest by collectLastValue(underTest.notificationChip)
 
@@ -122,28 +170,35 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
                     activeNotificationModel(
                         key = "notif1",
                         statusBarChipIcon = null,
-                        whenTime = 123L,
+                        promotedContent = PROMOTED_CONTENT,
                     )
                 )
 
             val latest by collectLastValue(underTest.notificationChip)
 
-            assertThat(latest)
-                .isEqualTo(
-                    NotificationChipModel("notif1", statusBarChipIconView = null, whenTime = 123L)
-                )
+            assertThat(latest).isNotNull()
+            assertThat(latest!!.key).isEqualTo("notif1")
         }
 
     @Test
     fun notificationChip_missingStatusBarIconChipView_inSet_emitsNull() =
         kosmos.runTest {
-            val startingNotif = activeNotificationModel(key = "notif1", statusBarChipIcon = mock())
+            val startingNotif =
+                activeNotificationModel(
+                    key = "notif1",
+                    statusBarChipIcon = mock(),
+                    promotedContent = PROMOTED_CONTENT,
+                )
             val underTest = factory.create(startingNotif)
             val latest by collectLastValue(underTest.notificationChip)
             assertThat(latest).isNotNull()
 
             underTest.setNotification(
-                activeNotificationModel(key = "notif1", statusBarChipIcon = null)
+                activeNotificationModel(
+                    key = "notif1",
+                    statusBarChipIcon = null,
+                    promotedContent = PROMOTED_CONTENT,
+                )
             )
 
             assertThat(latest).isNull()
@@ -153,23 +208,43 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
     @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
     fun notificationChip_missingStatusBarIconChipView_inSet_cdEnabled_emitsNotNull() =
         kosmos.runTest {
-            val startingNotif = activeNotificationModel(key = "notif1", statusBarChipIcon = mock())
+            val startingNotif =
+                activeNotificationModel(
+                    key = "notif1",
+                    statusBarChipIcon = mock(),
+                    promotedContent = PROMOTED_CONTENT,
+                )
             val underTest = factory.create(startingNotif)
             val latest by collectLastValue(underTest.notificationChip)
             assertThat(latest).isNotNull()
 
             underTest.setNotification(
-                activeNotificationModel(key = "notif1", statusBarChipIcon = null, whenTime = 123L)
+                activeNotificationModel(
+                    key = "notif1",
+                    statusBarChipIcon = null,
+                    promotedContent = PROMOTED_CONTENT,
+                )
             )
 
-            assertThat(latest)
-                .isEqualTo(
-                    NotificationChipModel(
+            assertThat(latest).isNotNull()
+            assertThat(latest!!.key).isEqualTo("notif1")
+        }
+
+    @Test
+    fun notificationChip_missingPromotedContent_inConstructor_emitsNull() =
+        kosmos.runTest {
+            val underTest =
+                factory.create(
+                    activeNotificationModel(
                         key = "notif1",
-                        statusBarChipIconView = null,
-                        whenTime = 123L,
+                        statusBarChipIcon = mock(),
+                        promotedContent = null,
                     )
                 )
+
+            val latest by collectLastValue(underTest.notificationChip)
+
+            assertThat(latest).isNull()
         }
 
     @Test
@@ -179,7 +254,12 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
 
             val underTest =
                 factory.create(
-                    activeNotificationModel(key = "notif", uid = UID, statusBarChipIcon = mock())
+                    activeNotificationModel(
+                        key = "notif",
+                        uid = UID,
+                        statusBarChipIcon = mock(),
+                        promotedContent = PROMOTED_CONTENT,
+                    )
                 )
 
             val latest by collectLastValue(underTest.notificationChip)
@@ -194,7 +274,12 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
 
             val underTest =
                 factory.create(
-                    activeNotificationModel(key = "notif", uid = UID, statusBarChipIcon = mock())
+                    activeNotificationModel(
+                        key = "notif",
+                        uid = UID,
+                        statusBarChipIcon = mock(),
+                        promotedContent = PROMOTED_CONTENT,
+                    )
                 )
 
             val latest by collectLastValue(underTest.notificationChip)
@@ -207,7 +292,12 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
         kosmos.runTest {
             val underTest =
                 factory.create(
-                    activeNotificationModel(key = "notif", uid = UID, statusBarChipIcon = mock())
+                    activeNotificationModel(
+                        key = "notif",
+                        uid = UID,
+                        statusBarChipIcon = mock(),
+                        promotedContent = PROMOTED_CONTENT,
+                    )
                 )
 
             val latest by collectLastValue(underTest.notificationChip)
@@ -239,6 +329,7 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
                         key = "notif",
                         uid = hiddenUid,
                         statusBarChipIcon = mock(),
+                        promotedContent = PROMOTED_CONTENT,
                     )
                 )
             val latest by collectLastValue(underTest.notificationChip)
@@ -247,7 +338,12 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
             // WHEN the notif gets a new UID that starts as visible
             activityManagerRepository.fake.startingIsAppVisibleValue = true
             underTest.setNotification(
-                activeNotificationModel(key = "notif", uid = shownUid, statusBarChipIcon = mock())
+                activeNotificationModel(
+                    key = "notif",
+                    uid = shownUid,
+                    statusBarChipIcon = mock(),
+                    promotedContent = PROMOTED_CONTENT,
+                )
             )
 
             // THEN we re-fetch the app visibility state with the new UID, and since that UID is
@@ -257,5 +353,6 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
 
     companion object {
         private const val UID = 885
+        private val PROMOTED_CONTENT = PromotedNotificationContentModel.Builder("notif1").build()
     }
 }

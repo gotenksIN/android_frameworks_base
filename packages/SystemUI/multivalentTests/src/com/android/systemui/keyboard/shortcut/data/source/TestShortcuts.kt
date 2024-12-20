@@ -40,15 +40,15 @@ import com.android.systemui.keyboard.shortcut.shared.model.KeyCombination
 import com.android.systemui.keyboard.shortcut.shared.model.Shortcut
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategory
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategoryType
-import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategoryType.AppCategories
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategoryType.MultiTasking
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCategoryType.System
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCommand
-import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCustomizationRequestInfo
+import com.android.systemui.keyboard.shortcut.shared.model.ShortcutCustomizationRequestInfo.SingleShortcutCustomization
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutKey
 import com.android.systemui.keyboard.shortcut.shared.model.ShortcutSubCategory
 import com.android.systemui.keyboard.shortcut.shared.model.shortcut
 import com.android.systemui.keyboard.shortcut.shared.model.shortcutCategory
+import com.android.systemui.keyboard.shortcut.shared.model.shortcutCommand
 import com.android.systemui.res.R
 
 object TestShortcuts {
@@ -553,17 +553,7 @@ object TestShortcuts {
             simpleShortcutCategory(
                 MultiTasking,
                 "Split screen",
-                "Switch to app on left or above while using split screen",
-            ),
-            simpleShortcutCategory(
-                MultiTasking,
-                "Split screen",
                 "Use split screen with app on the right",
-            ),
-            simpleShortcutCategory(
-                MultiTasking,
-                "Split screen",
-                "Switch to app on right or below while using split screen",
             ),
             simpleShortcutCategory(System, "System controls", "Show shortcuts"),
             simpleShortcutCategory(System, "System controls", "View recent apps"),
@@ -595,13 +585,7 @@ object TestShortcuts {
                 keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT
             ),
             simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_LEFT
-            ),
-            simpleInputGestureData(
                 keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT
-            ),
-            simpleInputGestureData(
-                keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_RIGHT
             ),
             simpleInputGestureData(
                 keyGestureType = KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER
@@ -613,14 +597,27 @@ object TestShortcuts {
         )
 
     val allAppsShortcutAddRequest =
-        ShortcutCustomizationRequestInfo.Add(
+        SingleShortcutCustomization.Add(
             label = "Open apps list",
             categoryType = System,
             subCategoryLabel = "System controls",
         )
 
+    val launchCalendarShortcutAddRequest =
+        SingleShortcutCustomization.Add(
+            label = "Calendar",
+            categoryType = ShortcutCategoryType.AppCategories,
+            subCategoryLabel = "Applications",
+            shortcutCommand =
+                shortcutCommand {
+                    key("Ctrl")
+                    key("Alt")
+                    key("A")
+                },
+        )
+
     val allAppsShortcutDeleteRequest =
-        ShortcutCustomizationRequestInfo.Delete(
+        SingleShortcutCustomization.Delete(
             label = "Open apps list",
             categoryType = System,
             subCategoryLabel = "System controls",
@@ -715,7 +712,7 @@ object TestShortcuts {
         )
 
     val standardAddShortcutRequest =
-        ShortcutCustomizationRequestInfo.Add(
+        SingleShortcutCustomization.Add(
             label = "Standard shortcut",
             categoryType = System,
             subCategoryLabel = "Standard subcategory",

@@ -17,6 +17,7 @@
 package android.view;
 
 import static android.adpf.Flags.adpfViewrootimplActionDownBoost;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.content.pm.ActivityInfo.OVERRIDE_SANDBOX_VIEW_BOUNDS_APIS;
 import static android.graphics.HardwareRenderer.SYNC_CONTEXT_IS_STOPPED;
@@ -2774,6 +2775,7 @@ public final class ViewRootImpl implements ViewParent,
         mBlastBufferQueue = new BLASTBufferQueue(mTag, mSurfaceControl,
                 mSurfaceSize.x, mSurfaceSize.y, mWindowAttributes.format);
         mBlastBufferQueue.setTransactionHangCallback(sTransactionHangCallback);
+        mBlastBufferQueue.setWaitForBufferReleaseCallback(mChoreographer::onWaitForBufferRelease);
         ScrollOptimizer.setBLASTBufferQueue(mBlastBufferQueue);
         // If we create and destroy BBQ without recreating the SurfaceControl, we can end up
         // queuing buffers on multiple apply tokens causing out of order buffer submissions. We
@@ -4437,7 +4439,8 @@ public final class ViewRootImpl implements ViewParent,
                 // merged with a sync group or BLASTBufferQueue before making it to this point
                 // But better a one or two frame flicker than steady-state broken from dropping
                 // whatever is in this transaction
-                mPendingTransaction.apply();
+                // apply immediately with bbq apply token
+                mergeWithNextTransaction(mPendingTransaction, 0);
                 mHasPendingTransactions = false;
             }
             mSyncBuffer = false;
@@ -5503,7 +5506,8 @@ public final class ViewRootImpl implements ViewParent,
                 Log.d(mTag, "Pending transaction will not be applied in sync with a draw due to "
                         + logReason);
             }
-            pendingTransaction.apply();
+            // apply immediately with bbq apply token
+            mergeWithNextTransaction(pendingTransaction, 0);
         }
     }
     /**
@@ -7981,8 +7985,9 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         private boolean moveFocusToAdjacentWindow(@FocusDirection int direction) {
-            if (getConfiguration().windowConfiguration.getWindowingMode()
-                    != WINDOWING_MODE_MULTI_WINDOW) {
+            final int windowingMode = getConfiguration().windowConfiguration.getWindowingMode();
+            if (windowingMode != WINDOWING_MODE_MULTI_WINDOW
+                    && windowingMode != WINDOWING_MODE_FREEFORM) {
                 return false;
             }
             try {

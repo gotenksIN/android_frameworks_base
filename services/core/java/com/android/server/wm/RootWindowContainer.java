@@ -159,6 +159,7 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
 import com.android.server.am.ProcessFreezerManager;
 import com.android.server.wm.utils.RegionUtils;
+import com.android.window.flags.Flags;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -271,6 +272,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     int mCurrentUser;
     /** Root task id of the front root task when user switched, indexed by userId. */
     SparseIntArray mUserRootTaskInFront = new SparseIntArray(2);
+    SparseArray<IntArray> mUserVisibleRootTasks = new SparseArray<>();
 
     /**
      * A list of tokens that cause the top activity to be put to sleep.
@@ -1803,12 +1805,24 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     activityAssistInfos.clear();
                     activityAssistInfos.add(new ActivityAssistInfo(top));
                     // Check if the activity on the split screen.
-                    final Task adjacentTask = top.getTask().getAdjacentTask();
-                    if (adjacentTask != null) {
-                        final ActivityRecord adjacentActivityRecord =
-                                adjacentTask.getTopNonFinishingActivity();
-                        if (adjacentActivityRecord != null) {
-                            activityAssistInfos.add(new ActivityAssistInfo(adjacentActivityRecord));
+                    if (Flags.allowMultipleAdjacentTaskFragments()) {
+                        top.getTask().forOtherAdjacentTasks(task -> {
+                            final ActivityRecord adjacentActivityRecord =
+                                    task.getTopNonFinishingActivity();
+                            if (adjacentActivityRecord != null) {
+                                activityAssistInfos.add(
+                                        new ActivityAssistInfo(adjacentActivityRecord));
+                            }
+                        });
+                    } else {
+                        final Task adjacentTask = top.getTask().getAdjacentTask();
+                        if (adjacentTask != null) {
+                            final ActivityRecord adjacentActivityRecord =
+                                    adjacentTask.getTopNonFinishingActivity();
+                            if (adjacentActivityRecord != null) {
+                                activityAssistInfos.add(
+                                        new ActivityAssistInfo(adjacentActivityRecord));
+                            }
                         }
                     }
                     if (rootTask == topFocusedRootTask) {
@@ -1933,7 +1947,18 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // appropriate.
         removeRootTasksInWindowingModes(WINDOWING_MODE_PINNED);
 
-        mUserRootTaskInFront.put(mCurrentUser, focusRootTaskId);
+        if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
+            final IntArray visibleRootTasks = new IntArray();
+            forAllRootTasks(rootTask -> {
+                if (mCurrentUser == rootTask.mUserId && rootTask.isVisibleRequested()) {
+                    visibleRootTasks.add(rootTask.getRootTaskId());
+                }
+            }, /* traverseTopToBottom */ false);
+            mUserVisibleRootTasks.put(mCurrentUser, visibleRootTasks);
+        } else {
+            mUserRootTaskInFront.put(mCurrentUser, focusRootTaskId);
+        }
+
         mCurrentUser = userId;
 
         mTaskSupervisor.mStartingUsers.add(uss);
@@ -1946,22 +1971,60 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             Slog.i(TAG, "Persisting top task because it belongs to an always-visible user");
             // For a normal user-switch, we will restore the new user's task. But if the pre-switch
             // top task is an always-visible (Communal) one, keep it even after the switch.
-            mUserRootTaskInFront.put(mCurrentUser, focusRootTaskId);
+            if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
+                final IntArray rootTasks = mUserVisibleRootTasks.get(mCurrentUser);
+                rootTasks.add(focusRootTaskId);
+                mUserVisibleRootTasks.put(mCurrentUser, rootTasks);
+            } else {
+                mUserRootTaskInFront.put(mCurrentUser, focusRootTaskId);
+            }
+
         }
 
         final int restoreRootTaskId = mUserRootTaskInFront.get(userId);
+        final IntArray rootTaskIdsToRestore = mUserVisibleRootTasks.get(userId);
+        boolean homeInFront = false;
+        if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
+            if (rootTaskIdsToRestore == null) {
+                // If there are no root tasks saved, try restore id 0 which should create and launch
+                // the home task.
+                handleRootTaskLaunchOnUserSwitch(/* restoreRootTaskId */INVALID_TASK_ID);
+                homeInFront = true;
+            } else {
+                for (int i = 0; i < rootTaskIdsToRestore.size(); i++) {
+                    handleRootTaskLaunchOnUserSwitch(rootTaskIdsToRestore.get(i));
+                }
+                // Check if the top task is type home
+                if (rootTaskIdsToRestore.size() > 0) {
+                    final int topRootTaskId = rootTaskIdsToRestore.get(
+                            rootTaskIdsToRestore.size() - 1);
+                    homeInFront = isHomeTask(topRootTaskId);
+                }
+            }
+        } else {
+            handleRootTaskLaunchOnUserSwitch(restoreRootTaskId);
+            // Check if the top task is type home
+            homeInFront = isHomeTask(restoreRootTaskId);
+        }
+        return homeInFront;
+    }
+
+    private boolean isHomeTask(int taskId) {
+        final Task rootTask = getRootTask(taskId);
+        return rootTask != null && rootTask.isActivityTypeHome();
+    }
+
+    private void handleRootTaskLaunchOnUserSwitch(int restoreRootTaskId) {
         Task rootTask = getRootTask(restoreRootTaskId);
         if (rootTask == null) {
             rootTask = getDefaultTaskDisplayArea().getOrCreateRootHomeTask();
         }
-        final boolean homeInFront = rootTask.isActivityTypeHome();
         if (rootTask.isOnHomeDisplay()) {
             rootTask.moveToFront("switchUserOnHomeDisplay");
         } else {
             // Root task was moved to another display while user was swapped out.
             resumeHomeActivity(null, "switchUserOnOtherDisplay", getDefaultTaskDisplayArea());
         }
-        return homeInFront;
     }
 
     /** Returns whether the given user is to be always-visible (e.g. a communal profile). */
@@ -1972,7 +2035,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     void removeUser(int userId) {
-        mUserRootTaskInFront.delete(userId);
+        if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
+            mUserVisibleRootTasks.delete(userId);
+        } else {
+            mUserRootTaskInFront.delete(userId);
+        }
     }
 
     /**
@@ -1985,7 +2052,13 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 rootTask = getDefaultTaskDisplayArea().getOrCreateRootHomeTask();
             }
 
-            mUserRootTaskInFront.put(userId, rootTask.getRootTaskId());
+            if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
+                final IntArray rootTasks = mUserVisibleRootTasks.get(userId, new IntArray());
+                rootTasks.add(rootTask.getRootTaskId());
+                mUserVisibleRootTasks.put(userId, rootTasks);
+            } else {
+                mUserRootTaskInFront.put(userId, rootTask.getRootTaskId());
+            }
         }
     }
 
@@ -2133,7 +2206,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     if (!tf.isOrganizedTaskFragment()) {
                         return;
                     }
-                    tf.resetAdjacentTaskFragment();
+                    tf.clearAdjacentTaskFragments();
                     tf.setCompanionTaskFragment(null /* companionTaskFragment */);
                     tf.setAnimationParams(TaskFragmentAnimationParams.DEFAULT);
                     if (tf.getTopNonFinishingActivity() != null) {

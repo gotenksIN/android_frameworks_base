@@ -18,7 +18,6 @@ package com.android.server;
 
 import static android.service.quickaccesswallet.Flags.launchWalletOptionOnPowerDoubleTap;
 
-import static com.android.hardware.input.Flags.overridePowerKeyBehaviorInFocusedWindow;
 import static com.android.internal.R.integer.config_defaultMinEmergencyGestureTapDurationMillis;
 
 import android.app.ActivityManager;
@@ -78,8 +77,7 @@ public class GestureLauncherService extends SystemService {
      * Time in milliseconds in which the power button must be pressed twice so it will be considered
      * as a camera launch.
      */
-    @VisibleForTesting
-    static final long POWER_DOUBLE_TAP_MAX_TIME_MS = 300;
+    @VisibleForTesting static final long POWER_DOUBLE_TAP_MAX_TIME_MS = 300;
 
 
     /**
@@ -229,23 +227,17 @@ public class GestureLauncherService extends SystemService {
         }
     }
     public GestureLauncherService(Context context) {
-        this(
-                context,
-                new MetricsLogger(),
-                QuickAccessWalletClient.create(context),
-                new UiEventLoggerImpl());
+        this(context, new MetricsLogger(),
+                QuickAccessWalletClient.create(context), new UiEventLoggerImpl());
     }
 
     @VisibleForTesting
-    public GestureLauncherService(
-            Context context,
-            MetricsLogger metricsLogger,
-            QuickAccessWalletClient quickAccessWalletClient,
-            UiEventLogger uiEventLogger) {
+    GestureLauncherService(Context context, MetricsLogger metricsLogger,
+            QuickAccessWalletClient quickAccessWalletClient, UiEventLogger uiEventLogger) {
         super(context);
         mContext = context;
-        mQuickAccessWalletClient = quickAccessWalletClient;
         mMetricsLogger = metricsLogger;
+        mQuickAccessWalletClient = quickAccessWalletClient;
         mUiEventLogger = uiEventLogger;
     }
 
@@ -286,12 +278,24 @@ public class GestureLauncherService extends SystemService {
     }
 
     private void registerContentObservers() {
-        mContext.getContentResolver().registerContentObserver(
-                Settings.Secure.getUriFor(Settings.Secure.CAMERA_GESTURE_DISABLED),
-                false, mSettingObserver, mUserId);
-        mContext.getContentResolver().registerContentObserver(
-                Settings.Secure.getUriFor(Settings.Secure.CAMERA_DOUBLE_TAP_POWER_GESTURE_DISABLED),
-                false, mSettingObserver, mUserId);
+        if (launchWalletOptionOnPowerDoubleTap()) {
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(
+                            Settings.Secure.DOUBLE_TAP_POWER_BUTTON_GESTURE_ENABLED),
+                    false, mSettingObserver, mUserId);
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(
+                            Settings.Secure.DOUBLE_TAP_POWER_BUTTON_GESTURE),
+                    false, mSettingObserver, mUserId);
+        } else {
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(Settings.Secure.CAMERA_GESTURE_DISABLED),
+                    false, mSettingObserver, mUserId);
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(
+                            Settings.Secure.CAMERA_DOUBLE_TAP_POWER_GESTURE_DISABLED),
+                    false, mSettingObserver, mUserId);
+        }
         mContext.getContentResolver().registerContentObserver(
                 Settings.Secure.getUriFor(Settings.Secure.CAMERA_LIFT_TRIGGER_ENABLED),
                 false, mSettingObserver, mUserId);
@@ -462,6 +466,7 @@ public class GestureLauncherService extends SystemService {
                         Settings.Secure.CAMERA_GESTURE_DISABLED, 0, userId) == 0);
     }
 
+
     /** Checks if camera should be launched on double press of the power button. */
     public static boolean isCameraDoubleTapPowerSettingEnabled(Context context, int userId) {
         boolean res;
@@ -488,7 +493,7 @@ public class GestureLauncherService extends SystemService {
 
         return isDoubleTapPowerGestureSettingEnabled(context, userId)
                 && getDoubleTapPowerGestureAction(context, userId)
-                        == LAUNCH_WALLET_ON_DOUBLE_TAP_POWER;
+                == LAUNCH_WALLET_ON_DOUBLE_TAP_POWER;
     }
 
     public static boolean isCameraLiftTriggerSettingEnabled(Context context, int userId) {
@@ -519,11 +524,11 @@ public class GestureLauncherService extends SystemService {
     /** Whether the shortcut to launch app on power double press is enabled. */
     private static boolean isDoubleTapPowerGestureSettingEnabled(Context context, int userId) {
         return Settings.Secure.getIntForUser(
-                                context.getContentResolver(),
-                                Settings.Secure.DOUBLE_TAP_POWER_BUTTON_GESTURE_ENABLED,
-                                isDoubleTapConfigEnabled(context.getResources()) ? 1 : 0,
-                                userId)
-                        == 1;
+                context.getContentResolver(),
+                Settings.Secure.DOUBLE_TAP_POWER_BUTTON_GESTURE_ENABLED,
+                isDoubleTapConfigEnabled(context.getResources()) ? 1 : 0,
+                userId)
+                == 1;
     }
 
     private static boolean isDoubleTapConfigEnabled(Resources resources) {
@@ -595,45 +600,6 @@ public class GestureLauncherService extends SystemService {
         return res;
     }
 
-    /**
-     * Processes a power key event in GestureLauncherService without performing an action. This
-     * method is called on every KEYCODE_POWER ACTION_DOWN event and ensures that, even if
-     * KEYCODE_POWER events are passed to and handled by the app, the GestureLauncherService still
-     * keeps track of all running KEYCODE_POWER events for its gesture detection and relevant
-     * actions.
-     */
-    public void processPowerKeyDown(KeyEvent event) {
-        if (mEmergencyGestureEnabled && mEmergencyGesturePowerButtonCooldownPeriodMs >= 0
-                && event.getEventTime() - mLastEmergencyGestureTriggered
-                < mEmergencyGesturePowerButtonCooldownPeriodMs) {
-            return;
-        }
-        if (event.isLongPress()) {
-            return;
-        }
-
-        final long powerTapInterval;
-
-        synchronized (this) {
-            powerTapInterval = event.getEventTime() - mLastPowerDown;
-            mLastPowerDown = event.getEventTime();
-            if (powerTapInterval >= POWER_SHORT_TAP_SEQUENCE_MAX_INTERVAL_MS) {
-                // Tap too slow, reset consecutive tap counts.
-                mFirstPowerDown = event.getEventTime();
-                mPowerButtonConsecutiveTaps = 1;
-                mPowerButtonSlowConsecutiveTaps = 1;
-            } else if (powerTapInterval >= POWER_DOUBLE_TAP_MAX_TIME_MS) {
-                // Tap too slow for shortcuts
-                mFirstPowerDown = event.getEventTime();
-                mPowerButtonConsecutiveTaps = 1;
-                mPowerButtonSlowConsecutiveTaps++;
-            } else if (powerTapInterval > 0) {
-                // Fast consecutive tap
-                mPowerButtonConsecutiveTaps++;
-                mPowerButtonSlowConsecutiveTaps++;
-            }
-        }
-    }
 
     /**
      * Attempts to intercept power key down event by detecting certain gesture patterns
@@ -642,8 +608,8 @@ public class GestureLauncherService extends SystemService {
      * @param outLaunched true if some action is taken as part of the key intercept (eg, app launch)
      * @return true if the key down event is intercepted
      */
-    public boolean interceptPowerKeyDown(
-            KeyEvent event, boolean interactive, MutableBoolean outLaunched) {
+    public boolean interceptPowerKeyDown(KeyEvent event, boolean interactive,
+            MutableBoolean outLaunched) {
         if (mEmergencyGestureEnabled && mEmergencyGesturePowerButtonCooldownPeriodMs >= 0
                 && event.getEventTime() - mLastEmergencyGestureTriggered
                 < mEmergencyGesturePowerButtonCooldownPeriodMs) {
@@ -682,7 +648,7 @@ public class GestureLauncherService extends SystemService {
                 mFirstPowerDown  = event.getEventTime();
                 mPowerButtonConsecutiveTaps = 1;
                 mPowerButtonSlowConsecutiveTaps++;
-            } else if (!overridePowerKeyBehaviorInFocusedWindow() || powerTapInterval > 0) {
+            } else {
                 // Fast consecutive tap
                 mPowerButtonConsecutiveTaps++;
                 mPowerButtonSlowConsecutiveTaps++;
@@ -837,6 +803,7 @@ public class GestureLauncherService extends SystemService {
         }
     }
 
+
     /**
      * @return true if camera was launched, false otherwise.
      */
@@ -909,39 +876,37 @@ public class GestureLauncherService extends SystemService {
                 Settings.Secure.USER_SETUP_COMPLETE, 0, UserHandle.USER_CURRENT) != 0;
     }
 
-    private final BroadcastReceiver mUserReceiver =
-            new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    if (Intent.ACTION_USER_SWITCHED.equals(intent.getAction())) {
-                        mUserId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0);
-                        mContext.getContentResolver().unregisterContentObserver(mSettingObserver);
-                        registerContentObservers();
-                        updateCameraRegistered();
-                        updateCameraDoubleTapPowerEnabled();
-                        if (launchWalletOptionOnPowerDoubleTap()) {
-                            updateWalletDoubleTapPowerEnabled();
-                        }
-                        updateEmergencyGestureEnabled();
-                        updateEmergencyGesturePowerButtonCooldownPeriodMs();
-                    }
+    private final BroadcastReceiver mUserReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_USER_SWITCHED.equals(intent.getAction())) {
+                mUserId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0);
+                mContext.getContentResolver().unregisterContentObserver(mSettingObserver);
+                registerContentObservers();
+                updateCameraRegistered();
+                updateCameraDoubleTapPowerEnabled();
+                if (launchWalletOptionOnPowerDoubleTap()) {
+                    updateWalletDoubleTapPowerEnabled();
                 }
-            };
+                updateEmergencyGestureEnabled();
+                updateEmergencyGesturePowerButtonCooldownPeriodMs();
+            }
+        }
+    };
 
-    private final ContentObserver mSettingObserver =
-            new ContentObserver(new Handler()) {
-                public void onChange(boolean selfChange, android.net.Uri uri, int userId) {
-                    if (userId == mUserId) {
-                        updateCameraRegistered();
-                        updateCameraDoubleTapPowerEnabled();
-                        if (launchWalletOptionOnPowerDoubleTap()) {
-                            updateWalletDoubleTapPowerEnabled();
-                        }
-                        updateEmergencyGestureEnabled();
-                        updateEmergencyGesturePowerButtonCooldownPeriodMs();
-                    }
+    private final ContentObserver mSettingObserver = new ContentObserver(new Handler()) {
+        public void onChange(boolean selfChange, android.net.Uri uri, int userId) {
+            if (userId == mUserId) {
+                updateCameraRegistered();
+                updateCameraDoubleTapPowerEnabled();
+                if (launchWalletOptionOnPowerDoubleTap()) {
+                    updateWalletDoubleTapPowerEnabled();
                 }
-            };
+                updateEmergencyGestureEnabled();
+                updateEmergencyGesturePowerButtonCooldownPeriodMs();
+            }
+        }
+    };
 
     private final class GestureEventListener implements SensorEventListener {
         @Override

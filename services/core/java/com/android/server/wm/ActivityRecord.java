@@ -137,6 +137,7 @@ import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ORIENTATIO
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_STARTING_WINDOW;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_STATES;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_SWITCH;
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN;
 import static com.android.internal.util.FrameworkStatsLog.APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_ASPECT_RATIO;
 import static com.android.internal.util.FrameworkStatsLog.APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_FIXED_ORIENTATION;
@@ -249,7 +250,6 @@ import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE_SURFACES;
 import static com.android.server.wm.WindowManagerService.sEnableShellTransitions;
 import static com.android.server.wm.WindowState.LEGACY_POLICY_VISIBILITY;
-import static com.android.server.wm.WindowStateAnimator.HAS_DRAWN;
 
 import static org.xmlpull.v1.XmlPullParser.END_DOCUMENT;
 import static org.xmlpull.v1.XmlPullParser.END_TAG;
@@ -2157,6 +2157,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             mHandoverLaunchDisplayId = options.getLaunchDisplayId();
             mLaunchCookie = options.getLaunchCookie();
             mLaunchRootTask = options.getLaunchRootTask();
+            if (mLaunchCookie != null) {
+                ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
+                        "Activity created with launch cookie=%s act=%s(%d)",
+                        mLaunchCookie, packageName, System.identityHashCode(this));
+            }
         } else {
             mHasSceneTransition = false;
         }
@@ -2429,9 +2434,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return false;
         }
 
-        final TaskSnapshot snapshot =
-                mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId, task.mUserId,
-                        false /* restoreFromDisk */, false /* isLowResolution */);
+        final TaskSnapshot snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
+                false /* isLowResolution */);
         final int type = getStartingWindowType(newTask, taskSwitch, processRunning,
                 allowTaskSnapshot, activityCreated, activityAllDrawn, snapshot);
 
@@ -2673,7 +2677,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // Skip copy splash screen to client if it was resized, or the starting data already
                 // requested to be removed after transaction commit.
                 || (mStartingData != null && (mStartingData.mResizedFromTransfer
-                        || mStartingData.mRemoveAfterTransaction != AFTER_TRANSACTION_IDLE))
+                        || mStartingData.mRemoveAfterTransaction
+                        == AFTER_TRANSACTION_REMOVE_DIRECTLY))
                 || isRelaunching()) {
             return false;
         }
@@ -3235,8 +3240,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      * will be ignored.
      */
     boolean isUniversalResizeable() {
-        final boolean isLargeScreen = mDisplayContent != null && mDisplayContent.getConfiguration()
-                .smallestScreenWidthDp >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
+        final boolean isLargeScreen = mDisplayContent != null && mDisplayContent.isLargeScreen()
                 && mDisplayContent.getIgnoreOrientationRequest();
         if (!canBeUniversalResizeable(info.applicationInfo, mWmService, isLargeScreen,
                 true /* forActivity */)) {
@@ -4174,6 +4178,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     r -> r.mLaunchCookie == null && !r.finishing && r.isUid(getUid()),
                     this, false /* includeBoundary */, false /* traverseTopToBottom */);
             if (nextCookieTarget != null) {
+                ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
+                        "Transferring launch cookie=%s on finish from=%s(%d) to=%s(%d)",
+                        mLaunchCookie, packageName, System.identityHashCode(this),
+                        nextCookieTarget.packageName, System.identityHashCode(nextCookieTarget));
                 nextCookieTarget.mLaunchCookie = mLaunchCookie;
                 mLaunchCookie = null;
             }
@@ -4617,6 +4625,19 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
     }
 
+    /**
+     * Returns {@code true} if the requested orientation of this activity is the same as the
+     * resolved orientation of the from activity.
+     */
+    private boolean isStartingOrientationCompatible(@NonNull ActivityRecord fromActivity) {
+        final int fromOrientation = fromActivity.getConfiguration().orientation;
+        final int requestedOrientation = getRequestedConfigurationOrientation();
+        if (requestedOrientation == ORIENTATION_UNDEFINED) {
+            return fromOrientation == getConfiguration().orientation;
+        }
+        return fromOrientation == requestedOrientation;
+    }
+
     private boolean transferStartingWindow(@NonNull ActivityRecord fromActivity) {
         final WindowState tStartingWindow = fromActivity.mStartingWindow;
         if (tStartingWindow != null && fromActivity.mStartingSurface != null) {
@@ -4636,13 +4657,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             }
             // Do not transfer if the orientation doesn't match, redraw starting window while it is
             // on top will cause flicker.
-            final int fromOrientation = fromActivity.getConfiguration().orientation;
-            final int requestedOrientation = getRequestedConfigurationOrientation();
-            if (requestedOrientation == ORIENTATION_UNDEFINED) {
-                if (fromOrientation != getConfiguration().orientation) {
-                    return false;
-                }
-            } else if (fromOrientation != requestedOrientation) {
+            if (!isStartingOrientationCompatible(fromActivity)) {
                 return false;
             }
 
@@ -4740,6 +4755,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             }
             return true;
         } else if (fromActivity.mStartingData != null) {
+            if (fromActivity.mStartingData instanceof SnapshotStartingData
+                    && !isStartingOrientationCompatible(fromActivity)) {
+                // Do not transfer because the snapshot will be distorted in different orientation.
+                return false;
+            }
             // The previous app was getting ready to show a
             // starting window, but hasn't yet done so.  Steal it!
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW,
@@ -5440,10 +5460,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     }
 
     void setDeferHidingClient() {
+        if (Flags.removeDeferHidingClient()) {
+            return;
+        }
         mDeferHidingClient = true;
     }
 
     void clearDeferHidingClient() {
+        if (Flags.removeDeferHidingClient()) {
+            return;
+        }
         if (!mDeferHidingClient) return;
         mDeferHidingClient = false;
         if (!mVisibleRequested) {
@@ -5622,18 +5648,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             // stopped, then we need to set up to wait for its windows to be ready.
             if (!isVisible() || mAppStopped) {
                 clearAllDrawn();
-                // Reset the draw state in order to prevent the starting window to be immediately
-                // dismissed when the app still has the surface.
-                if (!Flags.resetDrawStateOnClientInvisible()
-                        && !isVisible() && !isClientVisible()) {
-                    forAllWindows(w -> {
-                        if (w.mWinAnimator.mDrawState == HAS_DRAWN) {
-                            w.mWinAnimator.resetDrawState();
-                            // Force add to mResizingWindows, so the window will report drawn.
-                            w.forceReportingResized();
-                        }
-                    }, true /* traverseTopToBottom */);
-                }
             }
 
             // In the case where we are making an app visible but holding off for a transition,
@@ -7309,9 +7323,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     @Override
     void setClientVisible(boolean clientVisible) {
-        // TODO(shell-transitions): Remove mDeferHidingClient once everything is shell-transitions.
-        //                          pip activities should just remain in clientVisible.
-        if (!clientVisible && mDeferHidingClient) return;
+        if (!Flags.removeDeferHidingClient()) {
+            // TODO(shell-transitions): Remove mDeferHidingClient once everything is
+            //  shell-transitions. pip activities should just remain in clientVisible.
+            if (!clientVisible && mDeferHidingClient) return;
+        }
         super.setClientVisible(clientVisible);
     }
 
@@ -8668,7 +8684,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final boolean isFixedOrientationLetterboxAllowed = !getLaunchedFromBubble()
                 && (parentWindowingMode == WINDOWING_MODE_MULTI_WINDOW
                         || parentWindowingMode == WINDOWING_MODE_FULLSCREEN
-                        || AppCompatCameraPolicy.shouldCameraCompatControlOrientation(this)
+                        || AppCompatCameraPolicy.isFreeformLetterboxingForCameraAllowed(this)
                         // When starting to switch between PiP and fullscreen, the task is pinned
                         // and the activity is fullscreen. But only allow to apply letterbox if the
                         // activity is exiting PiP because an entered PiP should fill the task.

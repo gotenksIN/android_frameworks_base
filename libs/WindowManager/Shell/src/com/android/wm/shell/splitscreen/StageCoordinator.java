@@ -20,6 +20,7 @@ import static android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_A
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT;
@@ -142,10 +143,12 @@ import com.android.wm.shell.common.split.SplitLayout;
 import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.common.split.SplitState;
 import com.android.wm.shell.common.split.SplitWindowManager;
+import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.recents.RecentTasksController;
 import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.TransitionUtil;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.split.SplitBounds;
 import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
 import com.android.wm.shell.shared.split.SplitScreenConstants.SplitIndex;
@@ -214,12 +217,14 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     private final SplitscreenEventLogger mLogger;
     private final ShellExecutor mMainExecutor;
     private final Handler mMainHandler;
+    private final ShellExecutor mBgExecutor;
     // Cache live tile tasks while entering recents, evict them from stages in finish transaction
     // if user is opening another task(s).
     private final ArrayList<Integer> mPausingTasks = new ArrayList<>();
     private final Optional<RecentTasksController> mRecentTasks;
     private final LaunchAdjacentController mLaunchAdjacentController;
     private final Optional<WindowDecorViewModel> mWindowDecorViewModel;
+    private final Optional<DesktopTasksController> mDesktopTasksController;
     /** Singleton source of truth for the current state of split screen on this device. */
     private final SplitState mSplitState;
 
@@ -341,14 +346,23 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 }
             };
 
-    protected StageCoordinator(Context context, int displayId, SyncTransactionQueue syncQueue,
-            ShellTaskOrganizer taskOrganizer, DisplayController displayController,
+    protected StageCoordinator(Context context,
+            int displayId,
+            SyncTransactionQueue syncQueue,
+            ShellTaskOrganizer taskOrganizer,
+            DisplayController displayController,
             DisplayImeController displayImeController,
-            DisplayInsetsController displayInsetsController, Transitions transitions,
-            TransactionPool transactionPool, IconProvider iconProvider, ShellExecutor mainExecutor,
-            Handler mainHandler, Optional<RecentTasksController> recentTasks,
+            DisplayInsetsController displayInsetsController,
+            Transitions transitions,
+            TransactionPool transactionPool,
+            IconProvider iconProvider,
+            ShellExecutor mainExecutor,
+            Handler mainHandler,
+            ShellExecutor bgExecutor,
+            Optional<RecentTasksController> recentTasks,
             LaunchAdjacentController launchAdjacentController,
-            Optional<WindowDecorViewModel> windowDecorViewModel, SplitState splitState) {
+            Optional<WindowDecorViewModel> windowDecorViewModel, SplitState splitState,
+            Optional<DesktopTasksController> desktopTasksController) {
         mContext = context;
         mDisplayId = displayId;
         mSyncQueue = syncQueue;
@@ -356,10 +370,12 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mLogger = new SplitscreenEventLogger();
         mMainExecutor = mainExecutor;
         mMainHandler = mainHandler;
+        mBgExecutor = bgExecutor;
         mRecentTasks = recentTasks;
         mLaunchAdjacentController = launchAdjacentController;
         mWindowDecorViewModel = windowDecorViewModel;
         mSplitState = splitState;
+        mDesktopTasksController = desktopTasksController;
 
         taskOrganizer.createRootTask(displayId, WINDOWING_MODE_FULLSCREEN, this /* listener */);
 
@@ -371,6 +387,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     this /*stageListenerCallbacks*/,
                     mSyncQueue,
                     iconProvider,
+                    mMainExecutor,
+                    mBgExecutor,
                     mWindowDecorViewModel);
         } else {
             mMainStage = new StageTaskListener(
@@ -380,6 +398,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     this /*stageListenerCallbacks*/,
                     mSyncQueue,
                     iconProvider,
+                    mMainExecutor,
+                    mBgExecutor,
                     mWindowDecorViewModel, STAGE_TYPE_MAIN);
             mSideStage = new StageTaskListener(
                     mContext,
@@ -388,6 +408,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     this /*stageListenerCallbacks*/,
                     mSyncQueue,
                     iconProvider,
+                    mMainExecutor,
+                    mBgExecutor,
                     mWindowDecorViewModel, STAGE_TYPE_SIDE);
         }
         mDisplayController = displayController;
@@ -409,15 +431,25 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     }
 
     @VisibleForTesting
-    StageCoordinator(Context context, int displayId, SyncTransactionQueue syncQueue,
-            ShellTaskOrganizer taskOrganizer, StageTaskListener mainStage,
-            StageTaskListener sideStage, DisplayController displayController,
+    StageCoordinator(Context context,
+            int displayId,
+            SyncTransactionQueue syncQueue,
+            ShellTaskOrganizer taskOrganizer,
+            StageTaskListener mainStage,
+            StageTaskListener sideStage,
+            DisplayController displayController,
             DisplayImeController displayImeController,
-            DisplayInsetsController displayInsetsController, SplitLayout splitLayout,
-            Transitions transitions, TransactionPool transactionPool, ShellExecutor mainExecutor,
-            Handler mainHandler, Optional<RecentTasksController> recentTasks,
+            DisplayInsetsController displayInsetsController,
+            SplitLayout splitLayout,
+            Transitions transitions,
+            TransactionPool transactionPool,
+            ShellExecutor mainExecutor,
+            Handler mainHandler,
+            ShellExecutor bgExecutor,
+            Optional<RecentTasksController> recentTasks,
             LaunchAdjacentController launchAdjacentController,
-            Optional<WindowDecorViewModel> windowDecorViewModel, SplitState splitState) {
+            Optional<WindowDecorViewModel> windowDecorViewModel, SplitState splitState,
+            Optional<DesktopTasksController> desktopTasksController) {
         mContext = context;
         mDisplayId = displayId;
         mSyncQueue = syncQueue;
@@ -434,10 +466,12 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mLogger = new SplitscreenEventLogger();
         mMainExecutor = mainExecutor;
         mMainHandler = mainHandler;
+        mBgExecutor = bgExecutor;
         mRecentTasks = recentTasks;
         mLaunchAdjacentController = launchAdjacentController;
         mWindowDecorViewModel = windowDecorViewModel;
         mSplitState = splitState;
+        mDesktopTasksController = desktopTasksController;
 
         mDisplayController.addDisplayWindowListener(this);
         transitions.addHandler(this);
@@ -1970,32 +2004,32 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 }
             }
 
-            int currentSnapPosition = mSplitLayout.calculateCurrentSnapPosition();
-
-            if (Flags.enableFlexibleTwoAppSplit()) {
-                // Split screen can be laid out in such a way that some of the apps are offscreen.
-                // For the purposes of passing SplitBounds up to launcher (for use in thumbnails
-                // etc.), we crop the bounds down to the screen size.
-                topLeftBounds.left =
-                        Math.max(topLeftBounds.left, 0);
-                topLeftBounds.top =
-                        Math.max(topLeftBounds.top, 0);
-                bottomRightBounds.right =
-                        Math.min(bottomRightBounds.right, mSplitLayout.getDisplayWidth());
-                bottomRightBounds.top =
-                        Math.min(bottomRightBounds.top, mSplitLayout.getDisplayHeight());
-
-                // TODO (b/349828130): Can change to getState() fully after brief soak time.
-                if (mSplitState.get() != currentSnapPosition) {
-                    Log.wtf(TAG, "SplitState is " + mSplitState.get()
-                            + ", expected " + currentSnapPosition);
-                    currentSnapPosition = mSplitState.get();
-                }
-            }
-
-            SplitBounds splitBounds = new SplitBounds(topLeftBounds, bottomRightBounds,
-                    leftTopTaskId, rightBottomTaskId, currentSnapPosition);
+            // If all stages are filled, create new SplitBounds and update Recents.
             if (mainStageTopTaskId != INVALID_TASK_ID && sideStageTopTaskId != INVALID_TASK_ID) {
+                int currentSnapPosition = mSplitLayout.calculateCurrentSnapPosition();
+                if (Flags.enableFlexibleTwoAppSplit()) {
+                    // Split screen can be laid out in such a way that some of the apps are
+                    // offscreen. For the purposes of passing SplitBounds up to launcher (for use in
+                    // thumbnails etc.), we crop the bounds down to the screen size.
+                    topLeftBounds.left =
+                            Math.max(topLeftBounds.left, 0);
+                    topLeftBounds.top =
+                            Math.max(topLeftBounds.top, 0);
+                    bottomRightBounds.right =
+                            Math.min(bottomRightBounds.right, mSplitLayout.getDisplayWidth());
+                    bottomRightBounds.top =
+                            Math.min(bottomRightBounds.top, mSplitLayout.getDisplayHeight());
+
+                    // TODO (b/349828130): Can change to getState() fully after brief soak time.
+                    if (mSplitState.get() != currentSnapPosition) {
+                        Log.wtf(TAG, "SplitState is " + mSplitState.get()
+                                + ", expected " + currentSnapPosition);
+                        currentSnapPosition = mSplitState.get();
+                    }
+                }
+                SplitBounds splitBounds = new SplitBounds(topLeftBounds, bottomRightBounds,
+                        leftTopTaskId, rightBottomTaskId, currentSnapPosition);
+
                 // Update the pair for the top tasks
                 boolean added = recentTasks.addSplitPair(mainStageTopTaskId, sideStageTopTaskId,
                         splitBounds);
@@ -2741,9 +2775,17 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         final @WindowManager.TransitionType int type = request.getType();
         final boolean isOpening = isOpeningType(type);
         final boolean inFullscreen = triggerTask.getWindowingMode() == WINDOWING_MODE_FULLSCREEN;
+        final boolean inDesktopMode = mDesktopTasksController.isPresent()
+                && mDesktopTasksController.get().isDesktopModeShowing(mDisplayId);
+        final boolean isLaunchingDesktopTask = isOpening && DesktopModeStatus.canEnterDesktopMode(
+                mContext) && triggerTask.getWindowingMode() == WINDOWING_MODE_FREEFORM;
         final StageTaskListener stage = getStageOfTask(triggerTask);
 
-        if (isOpening && inFullscreen) {
+        if (inDesktopMode || isLaunchingDesktopTask) {
+            // Don't handle request when desktop mode is showing (since they don't coexist), or
+            // when launching a desktop task (defer to DesktopTasksController)
+            return null;
+        } else if (isOpening && inFullscreen) {
             // One task is opening into fullscreen mode, remove the corresponding split record.
             mRecentTasks.ifPresent(recentTasks -> recentTasks.removeSplitPair(triggerTask.taskId));
             logExit(EXIT_REASON_FULLSCREEN_REQUEST);
@@ -2964,7 +3006,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     mSplitLayout.update(startTransaction, false /* resetImePosition */);
                 }
 
-                if (mMixedHandler.isEnteringPip(change, transitType)) {
+                if (mMixedHandler.isEnteringPip(change, transitType)
+                        && getSplitItemStage(change.getLastParent()) != STAGE_TYPE_UNDEFINED) {
                     pipChange = change;
                 }
 

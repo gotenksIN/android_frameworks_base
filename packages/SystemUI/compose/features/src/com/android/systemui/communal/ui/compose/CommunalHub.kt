@@ -43,6 +43,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.snapping.SnapPosition
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -151,6 +153,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -293,9 +296,19 @@ fun CommunalHub(
                                     offset.y,
                                 ) - contentOffset
                             val index = firstIndexAtOffset(gridState, adjustedOffset)
-                            val key =
+                            val tappedKey =
                                 index?.let { keyAtIndexIfEditable(contentListState.list, index) }
-                            viewModel.setSelectedKey(key)
+
+                            viewModel.setSelectedKey(
+                                if (
+                                    Flags.hubEditModeTouchAdjustments() &&
+                                        selectedKey.value == tappedKey
+                                ) {
+                                    null
+                                } else {
+                                    tappedKey
+                                }
+                            )
                         }
                     }
                 }
@@ -749,10 +762,13 @@ private fun HorizontalGridWrapper(
     content: LazyGridScope.(sizeInfo: SizeInfo?) -> Unit,
 ) {
     if (communalResponsiveGrid()) {
+        val flingBehavior =
+            rememberSnapFlingBehavior(lazyGridState = gridState, snapPosition = SnapPosition.Start)
         ResponsiveLazyHorizontalGrid(
             cellAspectRatio = 1.5f,
             modifier = modifier,
             state = gridState,
+            flingBehavior = flingBehavior,
             minContentPadding = minContentPadding,
             minHorizontalArrangement = Dimensions.ItemSpacing,
             minVerticalArrangement = Dimensions.ItemSpacing,
@@ -909,7 +925,7 @@ private fun BoxScope.CommunalHubLazyGrid(
                         Arrangement.spacedBy(
                             sizeInfo?.verticalArrangement ?: Dimensions.ItemSpacing
                         ),
-                    enabled = selected,
+                    enabled = selected && !isItemDragging,
                     alpha = { outlineAlpha },
                     modifier =
                         Modifier.requiredSize(dpSize)
@@ -947,12 +963,28 @@ private fun BoxScope.CommunalHubLazyGrid(
                     }
                 }
             } else {
+                val itemAlpha =
+                    if (communalResponsiveGrid()) {
+                        val percentVisible by
+                            remember(gridState, index) {
+                                derivedStateOf { calculatePercentVisible(gridState, index) }
+                            }
+                        animateFloatAsState(percentVisible)
+                    } else {
+                        null
+                    }
+
                 CommunalContent(
                     model = item,
                     viewModel = viewModel,
                     size = size,
                     selected = false,
-                    modifier = Modifier.requiredSize(dpSize).animateItem(),
+                    modifier =
+                        Modifier.requiredSize(dpSize).animateItem().thenIf(
+                            communalResponsiveGrid()
+                        ) {
+                            Modifier.graphicsLayer { alpha = itemAlpha?.value ?: 1f }
+                        },
                     index = index,
                     contentListState = contentListState,
                     interactionHandler = interactionHandler,
@@ -988,7 +1020,7 @@ private fun EmptyStateCta(contentPadding: PaddingValues, viewModel: BaseCommunal
                 text = titleForEmptyStateCTA,
                 style = MaterialTheme.typography.displaySmall,
                 textAlign = TextAlign.Center,
-                color = colors.primary,
+                color = colors.onPrimary,
                 modifier =
                     Modifier.focusable().semantics(mergeDescendants = true) {
                         contentDescription = titleForEmptyStateCTA
@@ -1058,17 +1090,27 @@ private fun Toolbar(
                 .onSizeChanged { setToolbarSize(it) }
     ) {
         val addWidgetText = stringResource(R.string.hub_mode_add_widget_button_text)
-        ToolbarButton(
-            isPrimary = !removeEnabled,
-            modifier = Modifier.align(Alignment.CenterStart),
-            onClick = onOpenWidgetPicker,
-        ) {
-            Icon(Icons.Default.Add, null)
-            Text(text = addWidgetText)
+
+        if (!(Flags.hubEditModeTouchAdjustments() && removeEnabled)) {
+            ToolbarButton(
+                isPrimary = !removeEnabled,
+                modifier = Modifier.align(Alignment.CenterStart),
+                onClick = onOpenWidgetPicker,
+            ) {
+                Icon(Icons.Default.Add, null)
+                Text(text = addWidgetText)
+            }
         }
 
         AnimatedVisibility(
-            modifier = Modifier.align(Alignment.Center),
+            modifier =
+                Modifier.align(
+                    if (Flags.hubEditModeTouchAdjustments()) {
+                        Alignment.CenterStart
+                    } else {
+                        Alignment.Center
+                    }
+                ),
             visible = removeEnabled,
             enter = fadeIn(),
             exit = fadeOut(),
@@ -1091,7 +1133,11 @@ private fun Toolbar(
                     horizontalArrangement =
                         Arrangement.spacedBy(
                             ButtonDefaults.IconSpacing,
-                            Alignment.CenterHorizontally,
+                            if (Flags.hubEditModeTouchAdjustments()) {
+                                Alignment.Start
+                            } else {
+                                Alignment.CenterHorizontally
+                            },
                         ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -1352,6 +1398,7 @@ private fun WidgetContent(
     val shrinkWidgetLabel = stringResource(R.string.accessibility_action_label_shrink_widget)
     val expandWidgetLabel = stringResource(R.string.accessibility_action_label_expand_widget)
 
+    val isFocusable by viewModel.isFocusable.collectAsStateWithLifecycle(initialValue = false)
     val selectedKey by viewModel.selectedKey.collectAsStateWithLifecycle()
     val selectedIndex =
         selectedKey?.let { key -> contentListState.list.indexOfFirst { it.key == key } }
@@ -1465,7 +1512,8 @@ private fun WidgetContent(
     ) {
         with(widgetSection) {
             Widget(
-                viewModel = viewModel,
+                isFocusable = isFocusable,
+                openWidgetEditor = { viewModel.onOpenWidgetEditor() },
                 model = model,
                 size = size,
                 modifier = Modifier.fillMaxSize().allowGestures(allowed = !viewModel.isEditMode),
@@ -1855,6 +1903,44 @@ private fun CommunalContentModel.getSpanOrMax(maxSpan: Int?) =
     } else {
         size.span
     }
+
+private fun IntRect.percentOverlap(other: IntRect): Float {
+    val intersection = intersect(other)
+    if (intersection.width < 0 || intersection.height < 0) {
+        return 0f
+    }
+    val overlapArea = intersection.width * intersection.height
+    val area = width * height
+    return overlapArea.toFloat() / area.toFloat()
+}
+
+private fun calculatePercentVisible(state: LazyGridState, index: Int): Float {
+    val viewportSize = state.layoutInfo.viewportSize
+    val visibleRect =
+        IntRect(
+            offset =
+                IntOffset(
+                    state.layoutInfo.viewportStartOffset + state.layoutInfo.beforeContentPadding,
+                    0,
+                ),
+            size =
+                IntSize(
+                    width =
+                        viewportSize.width -
+                            state.layoutInfo.beforeContentPadding -
+                            state.layoutInfo.afterContentPadding,
+                    height = viewportSize.height,
+                ),
+        )
+
+    val itemInfo = state.layoutInfo.visibleItemsInfo.find { it.index == index }
+    return if (itemInfo != null) {
+        val boundingBox = IntRect(itemInfo.offset, itemInfo.size)
+        boundingBox.percentOverlap(visibleRect)
+    } else {
+        0f
+    }
+}
 
 private object Colors {
     val DisabledColorFilter by lazy { disabledColorMatrix() }

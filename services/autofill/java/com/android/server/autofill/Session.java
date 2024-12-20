@@ -34,12 +34,14 @@ import static android.service.autofill.FillRequest.FLAG_MANUAL_REQUEST;
 import static android.service.autofill.FillRequest.FLAG_PASSWORD_INPUT_TYPE;
 import static android.service.autofill.FillRequest.FLAG_PCC_DETECTION;
 import static android.service.autofill.FillRequest.FLAG_RESET_FILL_DIALOG_STATE;
+import static android.service.autofill.FillRequest.FLAG_SCREEN_HAS_CREDMAN_FIELD;
 import static android.service.autofill.FillRequest.FLAG_SUPPORTS_FILL_DIALOG;
 import static android.service.autofill.FillRequest.FLAG_VIEW_NOT_FOCUSED;
 import static android.service.autofill.FillRequest.FLAG_VIEW_REQUESTS_CREDMAN_SERVICE;
 import static android.service.autofill.FillRequest.INVALID_REQUEST_ID;
 import static android.service.autofill.Flags.highlightAutofillSingleField;
 import static android.service.autofill.Flags.improveFillDialogAconfig;
+import static android.service.autofill.Flags.metricsFixes;
 import static android.view.autofill.AutofillManager.ACTION_RESPONSE_EXPIRED;
 import static android.view.autofill.AutofillManager.ACTION_START_SESSION;
 import static android.view.autofill.AutofillManager.ACTION_VALUE_CHANGED;
@@ -721,6 +723,9 @@ final class Session
 
         /** Whether the current {@link FillResponse} is expired. */
         private boolean mExpiredResponse;
+
+        /** Whether current screen has credman field. */
+        private boolean mScreenHasCredmanField;
 
         /** Whether the fill dialog UI is disabled. */
         private boolean mFillDialogDisabled;
@@ -3737,8 +3742,13 @@ final class Session
         final FillResponse lastResponse = getLastResponseLocked("logContextCommited(%s)");
         if (lastResponse == null) return;
 
-        mPresentationStatsEventLogger.maybeSetNoPresentationEventReason(
-                PresentationStatsEventLogger.getNoPresentationEventReason(commitReason));
+        if (metricsFixes()) {
+            mPresentationStatsEventLogger.maybeSetNoPresentationEventReasonIfNoReasonExists(
+                    PresentationStatsEventLogger.getNoPresentationEventReason(commitReason));
+        } else {
+            mPresentationStatsEventLogger.maybeSetNoPresentationEventReason(
+                    PresentationStatsEventLogger.getNoPresentationEventReason(commitReason));
+        }
         mPresentationStatsEventLogger.logAndEndEvent("Context committed");
 
         final int flags = lastResponse.getFlags();
@@ -4142,6 +4152,18 @@ final class Session
         mSessionState = STATE_FINISHED;
         final FillResponse response = getLastResponseLocked("showSaveLocked(%s)");
         final SaveInfo saveInfo = response == null ? null : response.getSaveInfo();
+
+        /*
+         * Don't show save if the session has credman field
+         */
+        if (mSessionFlags.mScreenHasCredmanField) {
+            if (sVerbose) {
+                Slog.v(TAG, "Call to Session#showSaveLocked() rejected - "
+                        + "there is credman field in screen");
+            }
+            return new SaveResult(/* logSaveShown= */ false, /* removeSession= */ true,
+                    Event.NO_SAVE_UI_REASON_NONE);
+        }
 
         /*
          * The Save dialog is only shown if all conditions below are met:
@@ -5086,6 +5108,10 @@ final class Session
             return;
         }
 
+        if ((flags & FLAG_SCREEN_HAS_CREDMAN_FIELD) != 0) {
+            mSessionFlags.mScreenHasCredmanField = true;
+        }
+
         switch(action) {
             case ACTION_START_SESSION:
                 // View is triggering autofill.
@@ -5099,6 +5125,13 @@ final class Session
                     mPreviouslyFillDialogPotentiallyStarted = false;
                 } else {
                     mPreviouslyFillDialogPotentiallyStarted = true;
+                    if (metricsFixes()) {
+                        // Set the default reason for now if the user doesn't trigger any focus
+                        // event on the autofillable view. This can be changed downstream when
+                        // more information is available or session is committed.
+                        mPresentationStatsEventLogger.maybeSetNoPresentationEventReason(
+                                NOT_SHOWN_REASON_NO_FOCUS);
+                    }
                 }
                 Optional<Integer> maybeRequestId =
                         requestNewFillResponseLocked(
@@ -5265,6 +5298,10 @@ final class Session
                     if (maybeNewRequestId.isPresent()) {
                         mPresentationStatsEventLogger.maybeSetRequestId(maybeNewRequestId.get());
                     }
+                    if (metricsFixes()) {
+                        mPresentationStatsEventLogger
+                                .maybeSetNoPresentationEventReasonSuggestionsFiltered(value);
+                    }
                 }
 
                 logPresentationStatsOnViewEnteredLocked(
@@ -5299,8 +5336,14 @@ final class Session
 
                     // It's not necessary that there's no more presentation for this view. It could
                     // be that the user chose some suggestion, in which case, view exits.
-                    mPresentationStatsEventLogger.maybeSetNoPresentationEventReason(
-                            NOT_SHOWN_REASON_VIEW_FOCUS_CHANGED);
+                    if (metricsFixes()) {
+                        mPresentationStatsEventLogger
+                                .maybeSetNoPresentationEventReasonIfNoReasonExists(
+                                        NOT_SHOWN_REASON_VIEW_FOCUS_CHANGED);
+                    } else {
+                        mPresentationStatsEventLogger.maybeSetNoPresentationEventReason(
+                                NOT_SHOWN_REASON_VIEW_FOCUS_CHANGED);
+                    }
                 }
                 break;
             default:
@@ -5640,7 +5683,7 @@ final class Session
 
     private boolean isFillDialogUiEnabled() {
         synchronized (mLock) {
-            return !mSessionFlags.mFillDialogDisabled;
+            return !mSessionFlags.mFillDialogDisabled && !mSessionFlags.mScreenHasCredmanField;
         }
     }
 
@@ -6909,11 +6952,15 @@ final class Session
     private void startNewEventForPresentationStatsEventLogger() {
         synchronized (mLock) {
             mPresentationStatsEventLogger.startNewEvent();
-            // Set the default reason for now if the user doesn't trigger any focus event
-            // on the autofillable view. This can be changed downstream when more
-            // information is available or session is committed.
-            mPresentationStatsEventLogger.maybeSetNoPresentationEventReason(
-                    NOT_SHOWN_REASON_NO_FOCUS);
+            // This is a fill dialog only state, moved to when we set
+            // mPreviouslyFillDialogPotentiallyStarted = true
+            if (!metricsFixes()) {
+                // Set the default reason for now if the user doesn't trigger any focus event
+                // on the autofillable view. This can be changed downstream when more
+                // information is available or session is committed.
+                mPresentationStatsEventLogger.maybeSetNoPresentationEventReason(
+                        NOT_SHOWN_REASON_NO_FOCUS);
+            }
             mPresentationStatsEventLogger.maybeSetDetectionPreference(
                     getDetectionPreferenceForLogging());
             mPresentationStatsEventLogger.maybeSetAutofillServiceUid(getAutofillServiceUid());
@@ -7670,7 +7717,11 @@ final class Session
         if (sVerbose) {
             Slog.v(TAG, "logAllEvents(" + id + "): commitReason: " + val);
         }
-        mSessionCommittedEventLogger.maybeSetCommitReason(val);
+        if (metricsFixes()) {
+            mSessionCommittedEventLogger.maybeSetCommitReasonIfUnset(val);
+        } else {
+            mSessionCommittedEventLogger.maybeSetCommitReason(val);
+        }
         mSessionCommittedEventLogger.maybeSetRequestCount(mRequestCount);
         mSessionCommittedEventLogger.maybeSetSessionDurationMillis(
                 SystemClock.elapsedRealtime() - mStartTime);

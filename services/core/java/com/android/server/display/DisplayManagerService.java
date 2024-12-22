@@ -2406,9 +2406,13 @@ public final class DisplayManagerService extends SystemService {
         // We don't bother invalidating the display info caches here because any changes to the
         // display info will trigger a cache invalidation inside of LogicalDisplay before we hit
         // this point.
-        sendDisplayEventIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_CHANGED);
+        sendDisplayEventIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED);
 
         applyDisplayChangedLocked(display);
+
+        if (mDisplayTopologyCoordinator != null) {
+            mDisplayTopologyCoordinator.onDisplayChanged(display.getDisplayInfoLocked());
+        }
     }
 
     private void applyDisplayChangedLocked(@NonNull LogicalDisplay display) {
@@ -2652,7 +2656,8 @@ public final class DisplayManagerService extends SystemService {
 
     private void updateCanHostTasksIfNeededLocked(LogicalDisplay display) {
         if (display.setCanHostTasksLocked(!mMirrorBuiltInDisplay)) {
-            sendDisplayEventIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_CHANGED);
+            sendDisplayEventIfEnabledLocked(display,
+                    DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED);
         }
     }
 
@@ -3483,7 +3488,7 @@ public final class DisplayManagerService extends SystemService {
 
     private void sendDisplayEventFrameRateOverrideLocked(int displayId) {
         Message msg = mHandler.obtainMessage(MSG_DELIVER_DISPLAY_EVENT_FRAME_RATE_OVERRIDE,
-                displayId, DisplayManagerGlobal.EVENT_DISPLAY_CHANGED);
+                displayId, DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED);
         mHandler.sendMessage(msg);
     }
 
@@ -4081,7 +4086,7 @@ public final class DisplayManagerService extends SystemService {
                     handleLogicalDisplayAddedLocked(display);
                     break;
 
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_CHANGED:
+                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_BASIC_CHANGED:
                     handleLogicalDisplayChangedLocked(display);
                     break;
 
@@ -4306,8 +4311,9 @@ public final class DisplayManagerService extends SystemService {
             switch (event) {
                 case DisplayManagerGlobal.EVENT_DISPLAY_ADDED:
                     return (mask & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_ADDED) != 0;
-                case DisplayManagerGlobal.EVENT_DISPLAY_CHANGED:
-                    return (mask & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CHANGED) != 0;
+                case DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED:
+                    return (mask & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_BASIC_CHANGED)
+                            != 0;
                 case DisplayManagerGlobal.EVENT_DISPLAY_BRIGHTNESS_CHANGED:
                     return (mask
                             & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED)
@@ -4562,7 +4568,8 @@ public final class DisplayManagerService extends SystemService {
         public void registerCallback(IDisplayManagerCallback callback) {
             registerCallbackWithEventMask(callback,
                     DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_ADDED
-                    | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CHANGED
+                    | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_BASIC_CHANGED
+                    | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REFRESH_RATE
                     | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED);
         }
 

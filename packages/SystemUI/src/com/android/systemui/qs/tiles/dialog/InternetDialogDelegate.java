@@ -92,6 +92,7 @@ import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.res.R;
 import com.android.systemui.shade.ShadeDisplayAware;
+import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.wifitrackerlib.WifiEntry;
@@ -130,9 +131,9 @@ public class InternetDialogDelegate implements
     private final Handler mHandler;
     private final Executor mBackgroundExecutor;
     private final DialogTransitionAnimator mDialogTransitionAnimator;
-    private final Context mContext;
     private final boolean mAboveStatusBar;
     private final SystemUIDialog.Factory mSystemUIDialogFactory;
+    private final ShadeDialogContextInteractor mShadeDialogContextInteractor;
 
     @VisibleForTesting
     protected InternetAdapter mAdapter;
@@ -286,10 +287,11 @@ public class InternetDialogDelegate implements
             @Main Handler handler,
             @Background Executor executor,
             KeyguardStateController keyguardStateController,
-            SystemUIDialog.Factory systemUIDialogFactory) {
-        mContext = context;
+            SystemUIDialog.Factory systemUIDialogFactory,
+            ShadeDialogContextInteractor shadeDialogContextInteractor) {
         mAboveStatusBar = aboveStatusBar;
         mSystemUIDialogFactory = systemUIDialogFactory;
+        mShadeDialogContextInteractor = shadeDialogContextInteractor;
         if (DEBUG) {
             Log.d(TAG, "Init InternetDialog");
         }
@@ -317,7 +319,8 @@ public class InternetDialogDelegate implements
 
     @Override
     public SystemUIDialog createDialog() {
-        SystemUIDialog dialog = mSystemUIDialogFactory.create(this, mContext);
+        SystemUIDialog dialog = mSystemUIDialogFactory.create(this,
+                mShadeDialogContextInteractor.getContext());
         if (!mAboveStatusBar) {
             dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
         }

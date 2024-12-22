@@ -752,6 +752,70 @@ public class PackageWatchdog {
         return mPackagesExemptFromImpactLevelThreshold;
     }
 
+    /**
+     * Indicates that the result of a mitigation executed during
+     * {@link PackageHealthObserver#onExecuteHealthCheckMitigation} or
+     * {@link PackageHealthObserver#onExecuteBootLoopMitigation} is unknown.
+     */
+    public static final int MITIGATION_RESULT_UNKNOWN =
+            ObserverMitigationResult.MITIGATION_RESULT_UNKNOWN;
+
+    /**
+     * Indicates that a mitigation was successfully triggered or executed during
+     * {@link PackageHealthObserver#onExecuteHealthCheckMitigation} or
+     * {@link PackageHealthObserver#onExecuteBootLoopMitigation}.
+     */
+    public static final int MITIGATION_RESULT_SUCCESS =
+            ObserverMitigationResult.MITIGATION_RESULT_SUCCESS;
+
+    /**
+     * Indicates that a mitigation executed during
+     * {@link PackageHealthObserver#onExecuteHealthCheckMitigation} or
+     * {@link PackageHealthObserver#onExecuteBootLoopMitigation} was skipped.
+     */
+    public static final int MITIGATION_RESULT_SKIPPED =
+            ObserverMitigationResult.MITIGATION_RESULT_SKIPPED;
+
+    /**
+     * Indicates that a mitigation executed during
+     * {@link PackageHealthObserver#onExecuteHealthCheckMitigation} or
+     * {@link PackageHealthObserver#onExecuteBootLoopMitigation} failed,
+     * but the failure is potentially retryable.
+     */
+    public static final int MITIGATION_RESULT_FAILURE_RETRYABLE =
+            ObserverMitigationResult.MITIGATION_RESULT_FAILURE_RETRYABLE;
+
+    /**
+     * Indicates that a mitigation executed during
+     * {@link PackageHealthObserver#onExecuteHealthCheckMitigation} or
+     * {@link PackageHealthObserver#onExecuteBootLoopMitigation} failed,
+     * and the failure is not retryable.
+     */
+    public static final int MITIGATION_RESULT_FAILURE_NON_RETRYABLE =
+            ObserverMitigationResult.MITIGATION_RESULT_FAILURE_NON_RETRYABLE;
+
+    /**
+     * Possible return values of the for mitigations executed during
+     * {@link PackageHealthObserver#onExecuteHealthCheckMitigation} and
+     * {@link PackageHealthObserver#onExecuteBootLoopMitigation}.
+     * @hide
+     */
+    @Retention(SOURCE)
+    @IntDef(prefix = "MITIGATION_RESULT_", value = {
+            ObserverMitigationResult.MITIGATION_RESULT_UNKNOWN,
+            ObserverMitigationResult.MITIGATION_RESULT_SUCCESS,
+            ObserverMitigationResult.MITIGATION_RESULT_SKIPPED,
+            ObserverMitigationResult.MITIGATION_RESULT_FAILURE_RETRYABLE,
+            ObserverMitigationResult.MITIGATION_RESULT_FAILURE_NON_RETRYABLE,
+    })
+    public @interface ObserverMitigationResult {
+        int MITIGATION_RESULT_UNKNOWN = 0;
+        int MITIGATION_RESULT_SUCCESS = 1;
+        int MITIGATION_RESULT_SKIPPED = 2;
+        int MITIGATION_RESULT_FAILURE_RETRYABLE = 3;
+        int MITIGATION_RESULT_FAILURE_NON_RETRYABLE = 4;
+    }
+
     /** Possible severity values of the user impact of a
      * {@link PackageHealthObserver#onExecuteHealthCheckMitigation}.
      * @hide
@@ -809,16 +873,25 @@ public class PackageWatchdog {
                 int mitigationCount);
 
         /**
-         * Executes mitigation for {@link #onHealthCheckFailed}.
+         * This would be called after {@link #onHealthCheckFailed}.
+         * This is called only if current observer returned least impact mitigation for failed
+         * health check.
          *
          * @param versionedPackage the package that is failing. This may be null if a native
-         *                          service is crashing.
-         * @param failureReason   the type of failure that is occurring.
+         *                         service is crashing.
+         * @param failureReason    the type of failure that is occurring.
          * @param mitigationCount the number of times mitigation has been called for this package
-         *                        (including this time).
-         * @return {@code true} if action was executed successfully, {@code false} otherwise
+         *                         (including this time).
+         * @return {@link #MITIGATION_RESULT_SUCCESS} if the mitigation was successful,
+         *         {@link #MITIGATION_RESULT_FAILURE_RETRYABLE} if the mitigation failed but can be
+         *         retried,
+         *         {@link #MITIGATION_RESULT_FAILURE_NON_RETRYABLE} if the mitigation failed and
+         *         cannot be retried,
+         *         {@link #MITIGATION_RESULT_UNKNOWN} if the result of the mitigation is unknown,
+         *         or {@link #MITIGATION_RESULT_SKIPPED} if the mitigation was skipped.
          */
-        boolean onExecuteHealthCheckMitigation(@Nullable VersionedPackage versionedPackage,
+        @ObserverMitigationResult int onExecuteHealthCheckMitigation(
+                @Nullable VersionedPackage versionedPackage,
                 @FailureReasons int failureReason, int mitigationCount);
 
 
@@ -834,12 +907,23 @@ public class PackageWatchdog {
         }
 
         /**
-         * Executes mitigation for {@link #onBootLoop}
+         * This would be called after {@link #onBootLoop}.
+         * This is called only if current observer returned least impact mitigation for fixing
+         * boot loop.
+         *
          * @param mitigationCount the number of times mitigation has been attempted for this
          *                        boot loop (including this time).
+         *
+         * @return {@link #MITIGATION_RESULT_SUCCESS} if the mitigation was successful,
+         *         {@link #MITIGATION_RESULT_FAILURE_RETRYABLE} if the mitigation failed but can be
+         *         retried,
+         *         {@link #MITIGATION_RESULT_FAILURE_NON_RETRYABLE} if the mitigation failed and
+         *         cannot be retried,
+         *         {@link #MITIGATION_RESULT_UNKNOWN} if the result of the mitigation is unknown,
+         *         or {@link #MITIGATION_RESULT_SKIPPED} if the mitigation was skipped.
          */
-        default boolean onExecuteBootLoopMitigation(int mitigationCount) {
-            return false;
+        default @ObserverMitigationResult int onExecuteBootLoopMitigation(int mitigationCount) {
+            return ObserverMitigationResult.MITIGATION_RESULT_SKIPPED;
         }
 
         // TODO(b/120598832): Ensure uniqueness?
@@ -1937,15 +2021,19 @@ public class PackageWatchdog {
             bootMitigationCounts.put(observer.name, observer.getBootMitigationCount());
         }
 
+        FileOutputStream fileStream = null;
+        ObjectOutputStream objectStream = null;
         try {
-            FileOutputStream fileStream = new FileOutputStream(new File(filePath));
-            ObjectOutputStream objectStream = new ObjectOutputStream(fileStream);
+            fileStream = new FileOutputStream(new File(filePath));
+            objectStream = new ObjectOutputStream(fileStream);
             objectStream.writeObject(bootMitigationCounts);
             objectStream.flush();
-            objectStream.close();
-            fileStream.close();
         } catch (Exception e) {
             Slog.i(TAG, "Could not save observers metadata to file: " + e);
+            return;
+        } finally {
+            IoUtils.closeQuietly(objectStream);
+            IoUtils.closeQuietly(fileStream);
         }
     }
 
@@ -2096,23 +2184,32 @@ public class PackageWatchdog {
         void readAllObserversBootMitigationCountIfNecessary(String filePath) {
             File metadataFile = new File(filePath);
             if (metadataFile.exists()) {
+                FileInputStream fileStream = null;
+                ObjectInputStream objectStream = null;
+                HashMap<String, Integer> bootMitigationCounts = null;
                 try {
-                    FileInputStream fileStream = new FileInputStream(metadataFile);
-                    ObjectInputStream objectStream = new ObjectInputStream(fileStream);
-                    HashMap<String, Integer> bootMitigationCounts =
+                    fileStream = new FileInputStream(metadataFile);
+                    objectStream = new ObjectInputStream(fileStream);
+                    bootMitigationCounts =
                             (HashMap<String, Integer>) objectStream.readObject();
-                    objectStream.close();
-                    fileStream.close();
-
-                    for (int i = 0; i < mAllObservers.size(); i++) {
-                        final ObserverInternal observer = mAllObservers.valueAt(i);
-                        if (bootMitigationCounts.containsKey(observer.name)) {
-                            observer.setBootMitigationCount(
-                                    bootMitigationCounts.get(observer.name));
-                        }
-                    }
                 } catch (Exception e) {
                     Slog.i(TAG, "Could not read observer metadata file: " + e);
+                    return;
+                } finally {
+                    IoUtils.closeQuietly(objectStream);
+                    IoUtils.closeQuietly(fileStream);
+                }
+
+                if (bootMitigationCounts == null || bootMitigationCounts.isEmpty()) {
+                    Slog.i(TAG, "No observer in metadata file");
+                    return;
+                }
+                for (int i = 0; i < mAllObservers.size(); i++) {
+                    final ObserverInternal observer = mAllObservers.valueAt(i);
+                    if (bootMitigationCounts.containsKey(observer.name)) {
+                        observer.setBootMitigationCount(
+                                bootMitigationCounts.get(observer.name));
+                    }
                 }
             }
         }

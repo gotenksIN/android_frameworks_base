@@ -30,9 +30,6 @@ import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
-
-import com.android.internal.R;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -702,11 +699,12 @@ class AsyncRotationController extends FadeAnimationController implements Consume
 
     @Override
     public Animation getFadeInAnimation() {
+        final Animation anim = super.getFadeInAnimation();
         if (mHasScreenRotationAnimation) {
             // Use a shorter animation so it is easier to align with screen rotation animation.
-            return AnimationUtils.loadAnimation(mContext, R.anim.screen_rotate_0_enter);
+            anim.setDuration(getScaledDuration(SHORT_DURATION_MS));
         }
-        return super.getFadeInAnimation();
+        return anim;
     }
 
     @Override

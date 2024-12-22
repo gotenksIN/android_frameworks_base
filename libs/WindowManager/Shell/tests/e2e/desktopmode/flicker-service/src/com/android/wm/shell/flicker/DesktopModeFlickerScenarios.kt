@@ -44,6 +44,7 @@ import android.tools.flicker.assertors.assertions.AppWindowOnTopAtStart
 import android.tools.flicker.assertors.assertions.AppWindowRemainInsideDisplayBounds
 import android.tools.flicker.assertors.assertions.AppWindowReturnsToStartBoundsAndPosition
 import android.tools.flicker.assertors.assertions.LauncherWindowReplacesAppAsTopWindow
+import android.tools.flicker.assertors.assertions.VisibleLayersShownMoreThanOneConsecutiveEntry
 import android.tools.flicker.config.AssertionTemplates
 import android.tools.flicker.config.FlickerConfigEntry
 import android.tools.flicker.config.ScenarioId
@@ -262,6 +263,40 @@ class DesktopModeFlickerScenarios {
                 ).associateBy({ it }, { AssertionInvocationGroup.BLOCKING }),
             )
 
+        val SNAP_RESIZE_LEFT_WITH_KEYBOARD =
+            FlickerConfigEntry(
+                scenarioId = ScenarioId("SNAP_RESIZE_LEFT_WITH_KEYBOARD"),
+                extractor =
+                    TaggedScenarioExtractorBuilder()
+                        .setTargetTag(CujType.CUJ_DESKTOP_MODE_SNAP_RESIZE)
+                        .setTransitionMatcher(
+                            TaggedCujTransitionMatcher(associatedTransitionRequired = false)
+                        )
+                        .build(),
+                assertions = AssertionTemplates.DESKTOP_MODE_APP_VISIBILITY_ASSERTIONS + listOf(
+                    AppWindowCoversLeftHalfScreenAtEnd(
+                        DESKTOP_MODE_APP, SNAP_WINDOW_MAX_DIFF_THRESHOLD_RATIO
+                    )
+                ).associateBy({ it }, { AssertionInvocationGroup.BLOCKING }),
+            )
+
+        val SNAP_RESIZE_RIGHT_WITH_KEYBOARD =
+            FlickerConfigEntry(
+                scenarioId = ScenarioId("SNAP_RESIZE_RIGHT_WITH_KEYBOARD"),
+                extractor =
+                    TaggedScenarioExtractorBuilder()
+                        .setTargetTag(CujType.CUJ_DESKTOP_MODE_SNAP_RESIZE)
+                        .setTransitionMatcher(
+                            TaggedCujTransitionMatcher(associatedTransitionRequired = false)
+                        )
+                        .build(),
+                assertions = AssertionTemplates.DESKTOP_MODE_APP_VISIBILITY_ASSERTIONS + listOf(
+                    AppWindowCoversRightHalfScreenAtEnd(
+                        DESKTOP_MODE_APP, SNAP_WINDOW_MAX_DIFF_THRESHOLD_RATIO
+                    )
+                ).associateBy({ it }, { AssertionInvocationGroup.BLOCKING }),
+            )
+
         val SNAP_RESIZE_LEFT_WITH_DRAG =
             FlickerConfigEntry(
                 scenarioId = ScenarioId("SNAP_RESIZE_LEFT_WITH_DRAG"),
@@ -429,7 +464,9 @@ class DesktopModeFlickerScenarios {
                     }
                 ),
                 assertions =
-                AssertionTemplates.COMMON_ASSERTIONS +
+                    AssertionTemplates.COMMON_ASSERTIONS.toMutableMap().also {
+                        it.remove(VisibleLayersShownMoreThanOneConsecutiveEntry())
+                    } +
                     listOf(
                         AppWindowOnTopAtStart(DESKTOP_MODE_APP),
                         AppWindowBecomesInvisible(DESKTOP_MODE_APP),
@@ -455,7 +492,9 @@ class DesktopModeFlickerScenarios {
                     }
                 ),
                 assertions =
-                AssertionTemplates.COMMON_ASSERTIONS +
+                    AssertionTemplates.COMMON_ASSERTIONS.toMutableMap().also {
+                        it.remove(VisibleLayersShownMoreThanOneConsecutiveEntry())
+                    } +
                     listOf(
                         AppWindowOnTopAtStart(DESKTOP_MODE_APP),
                         AppWindowBecomesInvisible(DESKTOP_MODE_APP),

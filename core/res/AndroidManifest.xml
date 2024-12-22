@@ -9215,15 +9215,6 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name="com.android.server.updates.CertificateTransparencyLogInstallReceiver"
-                android:exported="true"
-                android:permission="android.permission.UPDATE_CONFIG">
-            <intent-filter>
-                <action android:name="android.intent.action.UPDATE_CT_LOGS" />
-                <data android:scheme="content" android:host="*" android:mimeType="*/*" />
-            </intent-filter>
-        </receiver>
-
         <receiver android:name="com.android.server.updates.LangIdInstallReceiver"
                 android:exported="true"
                 android:permission="android.permission.UPDATE_CONFIG">
@@ -9389,7 +9380,11 @@
                  android:permission="android.permission.BIND_JOB_SERVICE" >
         </service>
 
-        <service android:name="com.android.server.profcollect.ProfcollectForwardingService$ProfcollectBGJobService"
+        <service android:name="com.android.server.profcollect.ProfcollectForwardingService$PeriodicTraceJobService"
+                 android:permission="android.permission.BIND_JOB_SERVICE" >
+        </service>
+
+        <service android:name="com.android.server.profcollect.ProfcollectForwardingService$ReportProcessJobService"
                  android:permission="android.permission.BIND_JOB_SERVICE" >
         </service>
 

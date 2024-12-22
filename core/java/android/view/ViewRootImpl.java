@@ -38,7 +38,7 @@ import static android.view.Surface.FRAME_RATE_CATEGORY_LOW;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NORMAL;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NO_PREFERENCE;
 import static android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
-import static android.view.Surface.FRAME_RATE_COMPATIBILITY_GTE;
+import static android.view.Surface.FRAME_RATE_COMPATIBILITY_AT_LEAST;
 import static android.view.View.FRAME_RATE_CATEGORY_REASON_BOOST;
 import static android.view.View.FRAME_RATE_CATEGORY_REASON_CONFLICTED;
 import static android.view.View.FRAME_RATE_CATEGORY_REASON_INTERMITTENT;
@@ -1831,7 +1831,8 @@ public final class ViewRootImpl implements ViewParent,
                         | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_STATE
                         | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED
                 : DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_ADDED
-                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CHANGED
+                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_BASIC_CHANGED
+                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REFRESH_RATE
                         | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED;
         DisplayManagerGlobal
                 .getInstance()
@@ -13284,7 +13285,7 @@ public final class ViewRootImpl implements ViewParent,
      * We set category to HIGH if the maximum frame rate is greater than 60.
      * Otherwise, we set category to NORMAL.
      *
-     * Use FRAME_RATE_COMPATIBILITY_GTE for velocity and FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
+     * Use FRAME_RATE_COMPATIBILITY_AT_LEAST for velocity and FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
      * for TextureView video play and user requested frame rate.
      *
      * @param frameRate the preferred frame rate of a View
@@ -13295,7 +13296,7 @@ public final class ViewRootImpl implements ViewParent,
         if (frameRate <= 0) {
             return;
         }
-        if (frameRateCompatibility == FRAME_RATE_COMPATIBILITY_GTE && !mIsPressedGesture) {
+        if (frameRateCompatibility == FRAME_RATE_COMPATIBILITY_AT_LEAST && !mIsPressedGesture) {
             mIsTouchBoosting = false;
             mIsFrameRateBoosting = false;
             if (!sToolkitFrameRateVelocityMappingReadOnlyFlagValue) {

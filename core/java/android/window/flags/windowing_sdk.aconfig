@@ -127,3 +127,34 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    namespace: "windowing_sdk"
+    name: "track_system_ui_context_before_wms"
+    description: "Keep track of SystemUiContext before WMS is initialized"
+    bug: "384428048"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "normalize_home_intent"
+    description: "To ensure home is started in correct intent"
+    bug: "378505461"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "condense_configuration_change_for_simple_mode"
+    description: "Condense configuration change for simple mode"
+    bug: "356738240"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}

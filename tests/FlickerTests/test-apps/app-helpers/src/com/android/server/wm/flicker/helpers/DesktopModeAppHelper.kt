@@ -28,6 +28,10 @@ import android.tools.device.apphelpers.IStandardAppHelper
 import android.tools.helpers.SYSTEMUI_PACKAGE
 import android.tools.traces.parsers.WindowManagerStateHelper
 import android.tools.traces.wm.WindowingMode
+import android.view.KeyEvent.KEYCODE_LEFT_BRACKET
+import android.view.KeyEvent.KEYCODE_MINUS
+import android.view.KeyEvent.KEYCODE_RIGHT_BRACKET
+import android.view.KeyEvent.META_META_ON
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.window.DesktopModeFlags
@@ -157,10 +161,21 @@ open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
             ?: error("Unable to find resource $MINIMIZE_BUTTON_VIEW\n")
     }
 
-    fun minimizeDesktopApp(wmHelper: WindowManagerStateHelper, device: UiDevice, isPip: Boolean = false) {
-        val caption = getCaptionForTheApp(wmHelper, device)
-        val minimizeButton = getMinimizeButtonForTheApp(caption)
-        minimizeButton.click()
+    fun minimizeDesktopApp(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice,
+        isPip: Boolean = false,
+        usingKeyboard: Boolean = false,
+    ) {
+        if (usingKeyboard) {
+            val keyEventHelper = KeyEventHelper(getInstrumentation())
+            keyEventHelper.press(KEYCODE_MINUS, META_META_ON)
+        } else {
+            val caption = getCaptionForTheApp(wmHelper, device)
+            val minimizeButton = getMinimizeButtonForTheApp(caption)
+            minimizeButton.click()
+        }
+
         wmHelper
             .StateSyncBuilder()
             .withAppTransitionIdle()
@@ -213,6 +228,25 @@ open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
                 ?: error("Unable to find object with resource id $buttonResId")
         snapResizeButton.click()
 
+        waitAndVerifySnapResize(wmHelper, context, toLeft)
+    }
+
+    fun snapResizeWithKeyboard(
+        wmHelper: WindowManagerStateHelper,
+        context: Context,
+        keyEventHelper: KeyEventHelper,
+        toLeft: Boolean,
+    ) {
+        val bracketKey = if (toLeft) KEYCODE_LEFT_BRACKET else KEYCODE_RIGHT_BRACKET
+        keyEventHelper.press(bracketKey, META_META_ON)
+        waitAndVerifySnapResize(wmHelper, context, toLeft)
+    }
+
+    private fun waitAndVerifySnapResize(
+        wmHelper: WindowManagerStateHelper,
+        context: Context,
+        toLeft: Boolean
+    ) {
         val displayRect = getDisplayRect(wmHelper)
         val insets = getWindowInsets(
             context, WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()

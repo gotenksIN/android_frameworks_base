@@ -846,33 +846,29 @@ class MediaRouter2ServiceImpl {
         try {
             synchronized (mLock) {
                 UserRecord userRecord = getOrCreateUserRecordLocked(userId);
-                List<RoutingSessionInfo> sessionInfos;
+                SystemMediaRoute2Provider systemProvider = userRecord.mHandler.getSystemProvider();
                 if (hasSystemRoutingPermissions) {
-                    if (setDeviceRouteSelected && !Flags.enableMirroringInMediaRouter2()) {
+                    if (!Flags.enableMirroringInMediaRouter2() && setDeviceRouteSelected) {
                         // Return a fake system session that shows the device route as selected and
                         // available bluetooth routes as transferable.
-                        return userRecord.mHandler.getSystemProvider()
-                                .generateDeviceRouteSelectedSessionInfo(targetPackageName);
+                        return systemProvider.generateDeviceRouteSelectedSessionInfo(
+                                targetPackageName);
                     } else {
-                        sessionInfos = userRecord.mHandler.getSystemProvider().getSessionInfos();
-                        if (!sessionInfos.isEmpty()) {
-                            // Return a copy of the current system session with no modification,
-                            // except setting the client package name.
-                            return new RoutingSessionInfo.Builder(sessionInfos.get(0))
-                                    .setClientPackageName(targetPackageName)
-                                    .build();
+                        RoutingSessionInfo session =
+                                systemProvider.getSessionForPackage(targetPackageName);
+                        if (session != null) {
+                            return session;
                         } else {
                             Slog.w(TAG, "System provider does not have any session info.");
+                            return null;
                         }
                     }
                 } else {
-                    return new RoutingSessionInfo.Builder(
-                                    userRecord.mHandler.getSystemProvider().getDefaultSessionInfo())
+                    return new RoutingSessionInfo.Builder(systemProvider.getDefaultSessionInfo())
                             .setClientPackageName(targetPackageName)
                             .build();
                 }
             }
-            return null;
         } finally {
             Binder.restoreCallingIdentity(token);
         }
@@ -2638,10 +2634,17 @@ class MediaRouter2ServiceImpl {
         }
 
         @Override
-        public void onSessionUpdated(@NonNull MediaRoute2Provider provider,
-                @NonNull RoutingSessionInfo sessionInfo) {
-            sendMessage(PooledLambda.obtainMessage(UserHandler::onSessionInfoChangedOnHandler,
-                    this, provider, sessionInfo));
+        public void onSessionUpdated(
+                @NonNull MediaRoute2Provider provider,
+                @NonNull RoutingSessionInfo sessionInfo,
+                Set<String> packageNamesWithRoutingSessionOverrides) {
+            sendMessage(
+                    PooledLambda.obtainMessage(
+                            UserHandler::onSessionInfoChangedOnHandler,
+                            this,
+                            provider,
+                            sessionInfo,
+                            packageNamesWithRoutingSessionOverrides));
         }
 
         @Override
@@ -3152,10 +3155,31 @@ class MediaRouter2ServiceImpl {
                     toOriginalRequestId(uniqueRequestId), sessionInfo);
         }
 
-        private void onSessionInfoChangedOnHandler(@NonNull MediaRoute2Provider provider,
-                @NonNull RoutingSessionInfo sessionInfo) {
+        /**
+         * Implementation of {@link MediaRoute2Provider.Callback#onSessionUpdated}.
+         *
+         * <p>Must run on the thread that corresponds to this {@link UserHandler}.
+         */
+        private void onSessionInfoChangedOnHandler(
+                @NonNull MediaRoute2Provider provider,
+                @NonNull RoutingSessionInfo sessionInfo,
+                Set<String> packageNamesWithRoutingSessionOverrides) {
             List<ManagerRecord> managers = getManagerRecords();
             for (ManagerRecord manager : managers) {
+                if (Flags.enableMirroringInMediaRouter2()) {
+                    String targetPackageName = manager.mTargetPackageName;
+                    boolean skipDueToOverride =
+                            targetPackageName != null
+                                    && packageNamesWithRoutingSessionOverrides.contains(
+                                            targetPackageName);
+                    boolean sessionIsForTargetPackage =
+                            TextUtils.isEmpty(sessionInfo.getClientPackageName()) // is global.
+                                    || TextUtils.equals(
+                                            targetPackageName, sessionInfo.getClientPackageName());
+                    if (skipDueToOverride || !sessionIsForTargetPackage) {
+                        continue;
+                    }
+                }
                 manager.notifySessionUpdated(sessionInfo);
             }
 

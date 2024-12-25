@@ -1286,6 +1286,17 @@ public final class SystemServer implements Dumpable {
         if (SystemProperties.getBoolean("config.enable_display_offload", false)) {
             mSystemServiceManager.startService(WEAR_DISPLAYOFFLOAD_SERVICE_CLASS);
         }
+        // start the OffloadManagerService
+        if (SystemProperties.getBoolean("config.enable_qti_display_offload", false)) {
+            mSystemServiceManager.startService("com.qualcomm.qti.server.offloadservice.OffloadManagerService");
+        }
+        t.traceEnd();
+
+        // Start the suspend manager
+        t.traceBegin("StartSuspendManagerService");
+        if (SystemProperties.getBoolean("config.enable_qti_suspend_manager", false)) {
+            mSystemServiceManager.startService("com.qualcomm.qti.server.suspendservice.SuspendManagerService");
+        }
         t.traceEnd();
 
         // Display manager is needed to provide display metrics before package manager
@@ -2452,7 +2463,11 @@ public final class SystemServer implements Dumpable {
 
             if (isWatch) {
                 t.traceBegin("StartThermalObserver");
-                mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
+                try {
+                    mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
+                } catch (Throwable e) {
+                    reportWtf("starting StartThermalObserver", e);
+                }
                 t.traceEnd();
             }
 
@@ -2829,41 +2844,77 @@ public final class SystemServer implements Dumpable {
         if (isWatch) {
             // Must be started before services that depend it, e.g. WearConnectivityService
             t.traceBegin("StartWearPowerService");
-            mSystemServiceManager.startService(WEAR_POWER_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(WEAR_POWER_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartWearPowerService", e);
+            }
             t.traceEnd();
 
             t.traceBegin("StartHealthService");
-            mSystemServiceManager.startService(HEALTH_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(HEALTH_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartHealthService", e);
+            }
             t.traceEnd();
 
             t.traceBegin("StartSystemStateDisplayService");
-            mSystemServiceManager.startService(SYSTEM_STATE_DISPLAY_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(SYSTEM_STATE_DISPLAY_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartSystemStateDisplayService", e);
+            }
             t.traceEnd();
 
             t.traceBegin("StartWearConnectivityService");
-            mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartWearConnectivityService", e);
+            }
             t.traceEnd();
 
             t.traceBegin("StartWearDisplayService");
-            mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartWearDisplayService", e);
+            }
             t.traceEnd();
 
             if (Build.IS_DEBUGGABLE) {
                 t.traceBegin("StartWearDebugService");
-                mSystemServiceManager.startService(WEAR_DEBUG_SERVICE_CLASS);
+                try {
+                    mSystemServiceManager.startService(WEAR_DEBUG_SERVICE_CLASS);
+                } catch (Throwable e) {
+                    reportWtf("starting StartWearDebugService", e);
+                }
                 t.traceEnd();
             }
 
             t.traceBegin("StartWearTimeService");
-            mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartWearTimeService", e);
+            }
             t.traceEnd();
 
             t.traceBegin("StartWearSettingsService");
-            mSystemServiceManager.startService(WEAR_SETTINGS_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(WEAR_SETTINGS_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartWearSettingsService", e);
+            }
             t.traceEnd();
 
             t.traceBegin("StartWearModeService");
-            mSystemServiceManager.startService(WEAR_MODE_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(WEAR_MODE_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting StartWearModeService", e);
+            }
             t.traceEnd();
 
             boolean enableWristOrientationService =

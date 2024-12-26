@@ -76,6 +76,8 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.AutoSize
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -110,6 +112,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -757,10 +760,12 @@ fun calculateWidgetSize(
 private fun HorizontalGridWrapper(
     minContentPadding: PaddingValues,
     gridState: LazyGridState,
+    dragDropState: GridDragDropState?,
     setContentOffset: (offset: Offset) -> Unit,
     modifier: Modifier = Modifier,
     content: LazyGridScope.(sizeInfo: SizeInfo?) -> Unit,
 ) {
+    val isDragging = dragDropState?.draggingItemKey != null
     if (communalResponsiveGrid()) {
         val flingBehavior =
             rememberSnapFlingBehavior(lazyGridState = gridState, snapPosition = SnapPosition.Start)
@@ -773,6 +778,10 @@ private fun HorizontalGridWrapper(
             minHorizontalArrangement = Dimensions.ItemSpacing,
             minVerticalArrangement = Dimensions.ItemSpacing,
             setContentOffset = setContentOffset,
+            // Temporarily disable user gesture scrolling while dragging a widget to prevent
+            // conflicts between the drag and scroll gestures. Programmatic scrolling remains
+            // enabled to allow dragging a widget beyond the visible boundaries.
+            userScrollEnabled = !isDragging,
             content = content,
         )
     } else {
@@ -791,6 +800,10 @@ private fun HorizontalGridWrapper(
             contentPadding = minContentPadding,
             horizontalArrangement = Arrangement.spacedBy(Dimensions.ItemSpacing),
             verticalArrangement = Arrangement.spacedBy(Dimensions.ItemSpacing),
+            // Temporarily disable user gesture scrolling while dragging a widget to prevent
+            // conflicts between the drag and scroll gestures. Programmatic scrolling remains
+            // enabled to allow dragging a widget beyond the visible boundaries.
+            userScrollEnabled = !isDragging,
         ) {
             content(null)
         }
@@ -860,6 +873,7 @@ private fun BoxScope.CommunalHubLazyGrid(
     HorizontalGridWrapper(
         modifier = gridModifier,
         gridState = gridState,
+        dragDropState = dragDropState,
         minContentPadding = minContentPadding,
         setContentOffset = setContentOffset,
     ) { sizeInfo ->
@@ -1010,8 +1024,11 @@ private fun EmptyStateCta(contentPadding: PaddingValues, viewModel: BaseCommunal
     val colors = MaterialTheme.colorScheme
     Card(
         modifier = Modifier.height(hubDimensions.GridHeight).padding(contentPadding),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        border = BorderStroke(3.adjustedDp, colors.secondary),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = colors.primary,
+                contentColor = colors.onPrimary,
+            ),
         shape = RoundedCornerShape(size = 80.adjustedDp),
     ) {
         Column(
@@ -1021,24 +1038,28 @@ private fun EmptyStateCta(contentPadding: PaddingValues, viewModel: BaseCommunal
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val titleForEmptyStateCTA = stringResource(R.string.title_for_empty_state_cta)
-            Text(
+            BasicText(
                 text = titleForEmptyStateCTA,
-                style = MaterialTheme.typography.displaySmall,
-                textAlign = TextAlign.Center,
-                color = colors.onPrimary,
+                style =
+                    MaterialTheme.typography.displaySmall.merge(
+                        color = colors.onPrimary,
+                        textAlign = TextAlign.Center,
+                    ),
+                autoSize = AutoSize.StepBased(maxFontSize = 36.sp, stepSize = 0.1.sp),
                 modifier =
                     Modifier.focusable().semantics(mergeDescendants = true) {
                         contentDescription = titleForEmptyStateCTA
                         heading()
                     },
             )
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Button(
                     modifier = Modifier.height(56.dp),
                     colors =
                         ButtonDefaults.buttonColors(
-                            containerColor = colors.primary,
-                            contentColor = colors.onPrimary,
+                            containerColor = colors.primaryContainer,
+                            contentColor = colors.onPrimaryContainer,
                         ),
                     onClick = { viewModel.onOpenWidgetEditor(shouldOpenWidgetPickerOnStart = true) },
                 ) {
@@ -1699,23 +1720,29 @@ private fun Umo(
 private fun UmoLegacy(viewModel: BaseCommunalViewModel, modifier: Modifier = Modifier) {
     AndroidView(
         modifier =
-            modifier.pointerInput(Unit) {
-                detectHorizontalDragGestures { change, _ ->
-                    change.consume()
-                    val upTime = SystemClock.uptimeMillis()
-                    val event =
-                        MotionEvent.obtain(
-                            upTime,
-                            upTime,
-                            MotionEvent.ACTION_MOVE,
-                            change.position.x,
-                            change.position.y,
-                            0,
-                        )
-                    viewModel.mediaHost.hostView.dispatchTouchEvent(event)
-                    event.recycle()
-                }
-            },
+            modifier
+                .clip(
+                    shape =
+                        RoundedCornerShape(dimensionResource(system_app_widget_background_radius))
+                )
+                .background(MaterialTheme.colorScheme.primary)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { change, _ ->
+                        change.consume()
+                        val upTime = SystemClock.uptimeMillis()
+                        val event =
+                            MotionEvent.obtain(
+                                upTime,
+                                upTime,
+                                MotionEvent.ACTION_MOVE,
+                                change.position.x,
+                                change.position.y,
+                                0,
+                            )
+                        viewModel.mediaHost.hostView.dispatchTouchEvent(event)
+                        event.recycle()
+                    }
+                },
         factory = { _ ->
             viewModel.mediaHost.hostView.apply {
                 layoutParams =

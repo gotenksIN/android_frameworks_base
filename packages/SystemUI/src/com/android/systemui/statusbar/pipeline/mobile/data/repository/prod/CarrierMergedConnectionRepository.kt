@@ -28,7 +28,6 @@ import android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID
 import android.telephony.TelephonyManager
 import android.util.Log
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState
@@ -67,7 +66,7 @@ class CarrierMergedConnectionRepository(
     override val tableLogBuffer: TableLogBuffer,
     private val telephonyManager: TelephonyManager,
     private val bgContext: CoroutineContext,
-    @Application private val scope: CoroutineScope,
+    @Background private val scope: CoroutineScope,
     val wifiRepository: WifiRepository,
 ) : MobileConnectionRepository {
     init {
@@ -227,7 +226,7 @@ class CarrierMergedConnectionRepository(
     constructor(
         private val telephonyManager: TelephonyManager,
         @Background private val bgContext: CoroutineContext,
-        @Application private val scope: CoroutineScope,
+        @Background private val scope: CoroutineScope,
         private val wifiRepository: WifiRepository,
     ) {
         fun build(subId: Int, mobileLogger: TableLogBuffer): MobileConnectionRepository {

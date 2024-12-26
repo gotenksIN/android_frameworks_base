@@ -121,6 +121,7 @@ import static com.android.server.LockGuard.INDEX_WINDOW;
 import static com.android.server.LockGuard.installLock;
 import static com.android.server.policy.PhoneWindowManager.TRACE_WAIT_FOR_ALL_WINDOWS_DRAWN_METHOD;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
+import static com.android.server.wm.ActivityTaskManagerService.DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
 import static com.android.server.wm.ActivityTaskManagerService.POWER_MODE_REASON_CHANGE_DISPLAY;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND_FLOATING;
@@ -7883,6 +7884,37 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
+    public void onNotificationShadeExpanded(IBinder token, boolean expanded) {
+        synchronized (mGlobalLock) {
+            final WindowState w = mWindowMap.get(token);
+            if (w == null || w != w.mDisplayContent.getDisplayPolicy().getNotificationShade()) {
+                return;
+            }
+            final WindowProcessController topApp = mAtmService.mTopApp;
+            // Demotes the priority of top app if notification shade is expanded to occlude the app.
+            // So the notification shade may have more capacity to draw and animate.
+            final int demoteTopAppReasons = mAtmService.mDemoteTopAppReasons;
+            if (expanded && mAtmService.mTopProcessState == ActivityManager.PROCESS_STATE_TOP
+                    && (demoteTopAppReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) == 0) {
+                mAtmService.mDemoteTopAppReasons =
+                        demoteTopAppReasons | DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
+                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "demote-top-for-ns");
+                if (topApp != null) {
+                    topApp.scheduleUpdateOomAdj();
+                }
+            } else if (!expanded
+                    && (demoteTopAppReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) != 0) {
+                mAtmService.mDemoteTopAppReasons =
+                        demoteTopAppReasons & ~DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
+                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancel-demote-top-for-ns");
+                if (topApp != null) {
+                    topApp.scheduleUpdateOomAdj();
+                }
+            }
+        }
+    }
+
+    @Override
     public void registerShortcutKey(long shortcutCode, IShortcutService shortcutKeyReceiver)
             throws RemoteException {
         if (!checkCallingPermission(REGISTER_WINDOW_MANAGER_LISTENERS, "registerShortcutKey")) {
@@ -10122,14 +10154,16 @@ public class WindowManagerService extends IWindowManager.Stub
         TaskSnapshot taskSnapshot;
         final long token = Binder.clearCallingIdentity();
         try {
+            final Supplier<TaskSnapshot> supplier;
             synchronized (mGlobalLock) {
                 Task task = mRoot.anyTaskForId(taskId, MATCH_ATTACHED_TASK_OR_RECENT_TASKS);
                 if (task == null) {
                     throw new IllegalArgumentException(
                             "Failed to find matching task for taskId=" + taskId);
                 }
-                taskSnapshot = mTaskSnapshotController.captureSnapshot(task);
+                supplier = mTaskSnapshotController.captureSnapshot(task, true /* allowAppTheme */);
             }
+            taskSnapshot = supplier != null ? supplier.get() : null;
         } finally {
             Binder.restoreCallingIdentity(token);
         }

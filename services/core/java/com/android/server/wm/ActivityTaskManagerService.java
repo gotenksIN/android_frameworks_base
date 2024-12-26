@@ -314,6 +314,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * System service for managing activities and their containers (task, displays,... ).
@@ -437,10 +438,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     /** It is set from keyguard-going-away to set-keyguard-shown. */
     static final int DEMOTE_TOP_REASON_DURING_UNLOCKING = 1;
+    /** It is set when notification shade occludes the foreground app. */
+    static final int DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE = 1 << 1;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({
             DEMOTE_TOP_REASON_DURING_UNLOCKING,
+            DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE,
     })
     @interface DemoteTopReason {}
 
@@ -4040,6 +4044,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mAmInternal.enforceCallingPermission(READ_FRAME_BUFFER, "takeTaskSnapshot()");
         final long ident = Binder.clearCallingIdentity();
         try {
+            final Supplier<TaskSnapshot> supplier;
             synchronized (mGlobalLock) {
                 final Task task = mRootWindowContainer.anyTaskForId(taskId,
                         MATCH_ATTACHED_TASK_OR_RECENT_TASKS);
@@ -4052,11 +4057,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 // be retrieved by recents. While if updateCache is false, the real snapshot will
                 // always be taken and the snapshot won't be put into SnapshotPersister.
                 if (updateCache) {
-                    return mWindowManager.mTaskSnapshotController.recordSnapshot(task);
+                    supplier = mWindowManager.mTaskSnapshotController
+                            .getRecordSnapshotSupplier(task);
                 } else {
                     return mWindowManager.mTaskSnapshotController.snapshot(task);
                 }
             }
+            return supplier != null ? supplier.get() : null;
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
@@ -5245,6 +5252,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 : mRootWindowContainer.getTopResumedActivity();
         mTopApp = top != null ? top.app : null;
         if (mTopApp == mPreviousProcess) mPreviousProcess = null;
+
+        final int demoteReasons = mDemoteTopAppReasons;
+        if ((demoteReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) != 0) {
+            Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancel-demote-top-for-ns-switch");
+            mDemoteTopAppReasons = demoteReasons & ~DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
+        }
     }
 
     /**
@@ -6417,6 +6430,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public boolean shuttingDown(boolean booted, int timeout) {
             mShuttingDown = true;
+            mWindowManager.mSnapshotController.mTaskSnapshotController.prepareShutdown();
             synchronized (mGlobalLock) {
                 mRootWindowContainer.prepareForShutdown();
                 updateEventDispatchingLocked(booted);

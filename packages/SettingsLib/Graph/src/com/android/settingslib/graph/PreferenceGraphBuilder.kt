@@ -22,7 +22,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -42,6 +41,7 @@ import com.android.settingslib.graph.proto.PreferenceProto.ActionTarget
 import com.android.settingslib.graph.proto.PreferenceScreenProto
 import com.android.settingslib.graph.proto.TextProto
 import com.android.settingslib.metadata.BooleanValue
+import com.android.settingslib.metadata.FloatPersistentPreference
 import com.android.settingslib.metadata.PersistentPreference
 import com.android.settingslib.metadata.PreferenceAvailabilityProvider
 import com.android.settingslib.metadata.PreferenceHierarchy
@@ -390,7 +390,15 @@ fun PreferenceMetadata.toProto(
     }
     persistent = metadata.isPersistent(context)
     if (persistent) {
-        if (metadata is PersistentPreference<*>) sensitivityLevel = metadata.sensitivityLevel
+        if (metadata is PersistentPreference<*>) {
+            sensitivityLevel = metadata.sensitivityLevel
+            metadata.getReadPermissions(context)?.let {
+                if (it.size > 0) readPermissions = it.toProto()
+            }
+            metadata.getWritePermissions(context)?.let {
+                if (it.size > 0) writePermissions = it.toProto()
+            }
+        }
         if (
             flags.includeValue() &&
                 enabled &&
@@ -399,15 +407,13 @@ fun PreferenceMetadata.toProto(
                 metadata is PersistentPreference<*> &&
                 metadata.evalReadPermit(context, callingPid, callingUid) == ReadWritePermit.ALLOW
         ) {
+            val storage = metadata.storage(context)
             value = preferenceValueProto {
                 when (metadata) {
-                    is BooleanValue ->
-                        metadata.storage(context).getBoolean(metadata.key)?.let {
-                            booleanValue = it
-                        }
-                    is RangeValue -> {
-                        metadata.storage(context).getInt(metadata.key)?.let { intValue = it }
-                    }
+                    is BooleanValue -> storage.getBoolean(metadata.key)?.let { booleanValue = it }
+                    is RangeValue -> storage.getInt(metadata.key)?.let { intValue = it }
+                    is FloatPersistentPreference ->
+                        storage.getFloat(metadata.key)?.let { floatValue = it }
                     else -> {}
                 }
             }
@@ -421,6 +427,7 @@ fun PreferenceMetadata.toProto(
                             max = metadata.getMaxValue(context)
                             step = metadata.getIncrementStep(context)
                         }
+                    is FloatPersistentPreference -> floatType = true
                     else -> {}
                 }
             }
@@ -433,14 +440,12 @@ fun <T> PersistentPreference<T>.evalReadPermit(
     context: Context,
     callingPid: Int,
     callingUid: Int,
-): Int {
-    for (permission in getReadPermissions(context)) {
-        if (context.checkPermission(permission, callingPid, callingUid) != PERMISSION_GRANTED) {
-            return ReadWritePermit.REQUIRE_APP_PERMISSION
-        }
+): Int =
+    when {
+        getReadPermissions(context)?.check(context, callingPid, callingUid) == false ->
+            ReadWritePermit.REQUIRE_APP_PERMISSION
+        else -> getReadPermit(context, callingPid, callingUid)
     }
-    return getReadPermit(context, callingPid, callingUid)
-}
 
 private fun PreferenceMetadata.getTitleTextProto(context: Context, isRoot: Boolean): TextProto? {
     if (isRoot && this is PreferenceScreenMetadata) {

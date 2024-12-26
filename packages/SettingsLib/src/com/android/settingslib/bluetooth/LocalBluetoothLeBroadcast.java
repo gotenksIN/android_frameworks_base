@@ -56,6 +56,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.android.settingslib.R;
+import com.android.settingslib.flags.Flags;
 
 import com.google.common.collect.ImmutableList;
 
@@ -101,6 +102,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     public @interface BroadcastState {}
 
     private static final String SETTINGS_PKG = "com.android.settings";
+    private static final String SYSUI_PKG = "com.android.systemui";
     private static final String TAG = "LocalBluetoothLeBroadcast";
     private static final boolean DEBUG = BluetoothUtils.D;
 
@@ -216,6 +218,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                     }
                     setLatestBroadcastId(broadcastId);
                     setAppSourceName(mNewAppSourceName, /* updateContentResolver= */ true);
+                    notifyBroadcastStateChange(BROADCAST_STATE_ON);
                 }
 
                 @Override
@@ -232,7 +235,6 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                         Log.d(TAG, "onBroadcastMetadataChanged(), broadcastId = " + broadcastId);
                     }
                     setLatestBluetoothLeBroadcastMetadata(metadata);
-                    notifyBroadcastStateChange(BROADCAST_STATE_ON);
                 }
 
                 @Override
@@ -1125,6 +1127,10 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
 
     /** Update fallback active device if needed. */
     public void updateFallbackActiveDeviceIfNeeded() {
+        if (Flags.disableAudioSharingAutoPickFallbackInUi()) {
+            Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded, disable flag is on");
+            return;
+        }
         if (isWorkProfile(mContext)) {
             Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded for work profile.");
             return;
@@ -1247,8 +1253,9 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     }
 
     private void notifyBroadcastStateChange(@BroadcastState int state) {
-        if (!mContext.getPackageName().equals(SETTINGS_PKG)) {
-            Log.d(TAG, "Skip notifyBroadcastStateChange, not triggered by Settings.");
+        String packageName = mContext.getPackageName();
+        if (!packageName.equals(SETTINGS_PKG) && !packageName.equals(SYSUI_PKG)) {
+            Log.d(TAG, "Skip notifyBroadcastStateChange, not triggered by Settings or SystemUI.");
             return;
         }
         if (isWorkProfile(mContext)) {
@@ -1257,8 +1264,8 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
         Intent intent = new Intent(ACTION_LE_AUDIO_SHARING_STATE_CHANGE);
         intent.putExtra(EXTRA_LE_AUDIO_SHARING_STATE, state);
-        intent.setPackage(mContext.getPackageName());
-        Log.d(TAG, "notifyBroadcastStateChange for state = " + state);
+        intent.setPackage(SETTINGS_PKG);
+        Log.d(TAG, "notifyBroadcastStateChange for state = " + state + " by pkg = " + packageName);
         mContext.sendBroadcast(intent);
     }
 

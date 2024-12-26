@@ -70,8 +70,6 @@ import android.telephony.satellite.NtnSignalStrength
 import android.util.Log
 import com.android.settingslib.Utils
 import com.android.systemui.broadcast.BroadcastDispatcher
-import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
-import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.flags.FeatureFlagsClassic
 import com.android.systemui.flags.Flags.ROAMING_INDICATOR_VIA_DISPLAY_INFO
@@ -97,6 +95,7 @@ import com.android.systemui.statusbar.policy.FiveGServiceClient
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState
 import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener
 import com.qti.extphone.NrIconType
+import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -849,7 +848,7 @@ class MobileConnectionRepositoryImpl(
         private val mobileMappingsProxy: MobileMappingsProxy,
         private val flags: FeatureFlagsClassic,
         @Background private val bgDispatcher: CoroutineDispatcher,
-        @Application private val scope: CoroutineScope,
+        @Background private val scope: CoroutineScope,
         private val fiveGServiceClient: FiveGServiceClient,
     ) {
         fun build(

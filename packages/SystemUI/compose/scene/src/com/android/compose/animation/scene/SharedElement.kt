@@ -30,7 +30,8 @@ internal fun Element.shouldBeRenderedBy(content: ContentKey): Boolean {
     // the transition is running. If the [renderAuthority.size] is 1 it means that that this element
     // is currently composed only in one nesting level, which means that the render authority
     // is determined by "classic" shared element code.
-    return renderAuthority.size == 1 || renderAuthority.first() == content
+    return renderAuthority.size > 0 &&
+        (renderAuthority.size == 1 || renderAuthority.first() == content)
 }
 
 /**
@@ -53,24 +54,6 @@ internal fun shouldPlaceSharedElement(
         // If the element is present in multiple STLs we require the highest STL to render it and
         // we don't want contentPicker to potentially return false for the highest STL.
         return element.shouldBeRenderedBy(content)
-    }
-
-    val overscrollContent = transition.currentOverscrollSpec?.content
-    if (overscrollContent != null) {
-        return when (transition) {
-            // If we are overscrolling between scenes, only place/compose the element in the
-            // overscrolling scene.
-            is TransitionState.Transition.ChangeScene -> content == overscrollContent
-
-            // If we are overscrolling an overlay, place/compose the element if [content] is the
-            // overscrolling content or if [content] is the current scene and the overscrolling
-            // overlay does not contain the element.
-            is TransitionState.Transition.ReplaceOverlay,
-            is TransitionState.Transition.ShowOrHideOverlay ->
-                content == overscrollContent ||
-                    (content == transition.currentScene &&
-                        overscrollContent !in element.stateByContent)
-        }
     }
 
     val scenePicker = elementKey.contentPicker

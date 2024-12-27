@@ -1640,7 +1640,11 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             if (DEBUG) {
                 Log.d(TAG, "DDS: no change");
             }
+            int lastNddsSubId = mNddsSubId;
             updateNddsSubId(defaultDataSubId);
+            if (lastNddsSubId != mNddsSubId && mCallback != null) {
+                mCallback.onSubscriptionsChanged(defaultDataSubId);
+            }
             return;
         }
         if (DEBUG) {

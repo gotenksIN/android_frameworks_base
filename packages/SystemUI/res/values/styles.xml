@@ -81,6 +81,15 @@
     <style name="StatusBar" />
     <style name="StatusBar.Chip" />
 
+    <style name="StatusBar.Chip.RootView">
+        <item name="android:layout_width">wrap_content</item>
+        <!-- Have the root chip view match the parent height so that we get a larger touch area for
+             the chip. -->
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_gravity">center_vertical|start</item>
+        <item name="android:layout_marginStart">5dp</item>
+    </style>
+
     <style name="StatusBar.Chip.Text">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
@@ -569,6 +578,8 @@
         <item name="trackCornerSize">12dp</item>
         <item name="trackInsideCornerSize">2dp</item>
         <item name="trackStopIndicatorSize">6dp</item>
+        <item name="trackIconSize">20dp</item>
+        <item name="labelBehavior">gone</item>
     </style>
 
     <style name="SystemUI.Material3.Slider" parent="@style/Widget.Material3.Slider">
@@ -578,6 +589,7 @@
         <item name="tickColorInactive">@androidprv:color/materialColorPrimary</item>
         <item name="trackColorActive">@androidprv:color/materialColorPrimary</item>
         <item name="trackColorInactive">@androidprv:color/materialColorSurfaceContainerHighest</item>
+        <item name="trackIconActiveColor">@androidprv:color/materialColorSurfaceContainerHighest</item>
     </style>
 
     <style name="Theme.SystemUI.DayNightDialog" parent="@android:style/Theme.DeviceDefault.Light.Dialog"/>

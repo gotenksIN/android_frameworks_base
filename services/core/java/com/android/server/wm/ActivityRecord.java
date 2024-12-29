@@ -226,6 +226,7 @@ import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_F
 import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_NONE;
 import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_WINDOWING_MODE_RESIZE;
 import static com.android.server.wm.ActivityTaskManagerService.getInputDispatchingTimeoutMillisLocked;
+import static com.android.server.wm.ActivityTaskManagerService.isPip2ExperimentEnabled;
 import static com.android.server.wm.IdentifierProto.HASH_CODE;
 import static com.android.server.wm.IdentifierProto.TITLE;
 import static com.android.server.wm.IdentifierProto.USER_ID;
@@ -1511,7 +1512,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             // precede the configuration change from the resize.)
             mLastReportedPictureInPictureMode = inPictureInPictureMode;
             mLastReportedMultiWindowMode = inPictureInPictureMode;
-            ensureActivityConfiguration(true /* ignoreVisibility */);
+            if (!isPip2ExperimentEnabled()) {
+                // PiP2 should handle sending out the configuration as a part of Shell Transitions.
+                ensureActivityConfiguration(true /* ignoreVisibility */);
+            }
             if (inPictureInPictureMode && findMainWindow() == null
                     && task.topRunningActivity() == this) {
                 // Prevent malicious app entering PiP without valid WindowState, which can in turn

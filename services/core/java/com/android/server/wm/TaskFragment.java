@@ -524,11 +524,14 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         }
     }
 
-    // TODO(b/373709676): update usages.
     /** @deprecated b/373709676 replace with {@link #getAdjacentTaskFragments()}. */
     @Deprecated
     @Nullable
     TaskFragment getAdjacentTaskFragment() {
+        if (Flags.allowMultipleAdjacentTaskFragments()) {
+            throw new IllegalStateException("allowMultipleAdjacentTaskFragments is enabled. "
+                    + "Use #getAdjacentTaskFragments instead");
+        }
         return mAdjacentTaskFragment;
     }
 

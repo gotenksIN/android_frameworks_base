@@ -50,6 +50,7 @@ import static com.android.window.flags.Flags.balImprovedMetrics;
 import static com.android.window.flags.Flags.balRequireOptInByPendingIntentCreator;
 import static com.android.window.flags.Flags.balShowToastsBlocked;
 import static com.android.window.flags.Flags.balStrictModeRo;
+import static com.android.window.flags.Flags.balStrictModeGracePeriod;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static java.util.Objects.requireNonNull;
@@ -516,7 +517,9 @@ public class BackgroundActivityStartController {
                 return !callerExplicitOptOut();
             }
             return mCheckedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
-                    == MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
+                    != MODE_BACKGROUND_ACTIVITY_START_DENIED
+                    && mCheckedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
+                    != MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED;
         }
 
         public boolean realCallerExplicitOptInOrAutoOptIn() {
@@ -524,7 +527,9 @@ public class BackgroundActivityStartController {
                 return !realCallerExplicitOptOut();
             }
             return mCheckedOptions.getPendingIntentBackgroundActivityStartMode()
-                    == MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
+                    != MODE_BACKGROUND_ACTIVITY_START_DENIED
+                    && mCheckedOptions.getPendingIntentBackgroundActivityStartMode()
+                    != MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED;
         }
 
         public boolean callerExplicitOptOut() {
@@ -1909,7 +1914,14 @@ public class BackgroundActivityStartController {
                             (state.mOriginatingPendingIntent != null));
         }
 
-        logIfOnlyAllowedBy(finalVerdict, state, BAL_ALLOW_GRACE_PERIOD);
+        if (logIfOnlyAllowedBy(finalVerdict, state, BAL_ALLOW_GRACE_PERIOD)) {
+            if (balStrictModeRo() && balStrictModeGracePeriod()) {
+                String abortDebugMessage = "Activity start is only allowed by grace period. "
+                        + "This may stop working in the future. "
+                        + "intent: " + state.mIntent;
+                strictModeLaunchAborted(state.mRealCallingUid, abortDebugMessage);
+            }
+        }
         logIfOnlyAllowedBy(finalVerdict, state, BAL_ALLOW_NON_APP_VISIBLE_WINDOW);
 
         if (balImprovedMetrics()) {
@@ -1953,24 +1965,29 @@ public class BackgroundActivityStartController {
      * Logs details about the activity starts if the only reason it is allowed is the provided
      * {@code balCode}.
      */
-    private static void logIfOnlyAllowedBy(BalVerdict finalVerdict, BalState state, int balCode) {
+    private static boolean logIfOnlyAllowedBy(BalVerdict finalVerdict, BalState state,
+            int balCode) {
         if (finalVerdict.getRawCode() == balCode) {
             if (state.realCallerExplicitOptInOrAutoOptIn()
                     && state.mResultForRealCaller != null
                     && state.mResultForRealCaller.allows()
                     && state.mResultForRealCaller.getRawCode() != balCode) {
                 // real caller could allow with a different exemption
+                return false;
             } else if (state.callerExplicitOptInOrAutoOptIn()
                     && state.mResultForCaller != null
                     && state.mResultForCaller.allows()
                     && state.mResultForCaller.getRawCode() != balCode) {
                 // caller could allow with a different exemption
+                return false;
             } else {
                 // log to determine grace period length distribution
                 Slog.wtf(TAG, "Activity start ONLY allowed by " + balCodeToString(balCode) + " "
                         + finalVerdict.mMessage + ": " + state);
+                return true;
             }
         }
+        return false;
     }
 
     @VisibleForTesting

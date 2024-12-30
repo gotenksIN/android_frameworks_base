@@ -3534,7 +3534,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      * if the resetEnabledSettingsOnAppDataCleared is {@code true}.
      */
     @GuardedBy("mLock")
-    private void resetComponentEnabledSettingsIfNeededLPw(String packageName, int userId) {
+    private void resetComponentEnabledSettingsIfNeededLPw(String packageName, int userId,
+            int callingUid) {
         final AndroidPackage pkg = packageName != null ? mPackages.get(packageName) : null;
         if (pkg == null || !pkg.isResetEnabledSettingsOnAppDataCleared()) {
             return;
@@ -3573,9 +3574,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mPendingBroadcasts.addComponents(userId, packageName, updatedComponents);
         if (!mHandler.hasMessages(SEND_PENDING_BROADCAST)) {
             mHandler.sendMessageDelayed(
-                    mHandler.obtainMessage(SEND_PENDING_BROADCAST,
-                            "reset_component_state_changed" /* obj */),
-                    BROADCAST_DELAY);
+                    mHandler.obtainMessage(SEND_PENDING_BROADCAST, callingUid, 0 /* arg2 */,
+                            "reset_component_state_changed" /* obj */), BROADCAST_DELAY);
         }
     }
 
@@ -3872,8 +3872,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mPendingBroadcasts.addComponent(userId, componentPkgName, componentName.getClassName());
 
         if (!mHandler.hasMessages(SEND_PENDING_BROADCAST)) {
-            mHandler.sendMessageDelayed(mHandler.obtainMessage(SEND_PENDING_BROADCAST,
-                    "component_label_icon_changed" /* obj */), BROADCAST_DELAY);
+            mHandler.sendMessageDelayed(
+                    mHandler.obtainMessage(SEND_PENDING_BROADCAST, callingUid, 0 /* arg2 */,
+                            "component_label_icon_changed" /* obj */), BROADCAST_DELAY);
         }
     }
 
@@ -4132,8 +4133,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     final long broadcastDelay = SystemClock.uptimeMillis() > mServiceStartWithDelay
                             ? BROADCAST_DELAY
                             : BROADCAST_DELAY_DURING_STARTUP;
-                    mHandler.sendMessageDelayed(mHandler.obtainMessage(SEND_PENDING_BROADCAST,
-                            "component_state_changed" /* obj */), broadcastDelay);
+                    mHandler.sendMessageDelayed(
+                            mHandler.obtainMessage(SEND_PENDING_BROADCAST, callingUid,
+                                    0 /* arg2 */, "component_state_changed" /* obj */),
+                            broadcastDelay);
                 }
             }
         }
@@ -4152,7 +4155,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         userId, pkgSettings.get(packageName).getAppId());
                 mBroadcastHelper.sendPackageChangedBroadcast(newSnapshot, packageName,
                         false /* dontKillApp */, components, packageUid, null /* reason */,
-                        "component_state_changed" /* reasonForTrace */);
+                        "component_state_changed" /* reasonForTrace */, callingUid);
             }
         } finally {
             Binder.restoreCallingIdentity(callingId);
@@ -4380,7 +4383,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         true /* dontKillApp */,
                         new ArrayList<>(Collections.singletonList(pkg.getPackageName())),
                         pkg.getUid(),
-                        Intent.ACTION_OVERLAY_CHANGED, "overlay_changed" /* reasonForTrace */);
+                        Intent.ACTION_OVERLAY_CHANGED, "overlay_changed" /* reasonForTrace */,
+                        Process.SYSTEM_UID);
             }
         }, overlayFilter);
 
@@ -4879,7 +4883,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         mInstantAppRegistry.deleteInstantApplicationMetadata(packageName, userId);
                         synchronized (mLock) {
                             if (succeeded) {
-                                resetComponentEnabledSettingsIfNeededLPw(packageName, userId);
+                                resetComponentEnabledSettingsIfNeededLPw(packageName, userId,
+                                        callingUid);
                             }
                         }
                     }
@@ -6389,7 +6394,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         @Override
         public void setMimeGroup(String packageName, String mimeGroup, List<String> mimeTypes) {
             final Computer snapshot = snapshotComputer();
-            enforceOwnerRights(snapshot, packageName, Binder.getCallingUid());
+            final int callingUid = Binder.getCallingUid();
+            enforceOwnerRights(snapshot, packageName, callingUid);
             mimeTypes = CollectionUtils.emptyIfNull(mimeTypes);
             for (int i = 0; i < mimeTypes.size(); i++) {
                 if (mimeTypes.get(i).length() > 255) {
@@ -6433,7 +6439,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                             final int packageUid = UserHandle.getUid(userIds[i], appId);
                             mBroadcastHelper.sendPackageChangedBroadcast(snapShot, packageName,
                                     true /* dontKillApp */, components, packageUid, reason,
-                                    "mime_group_changed" /* reasonForTrace */);
+                                    "mime_group_changed" /* reasonForTrace */, callingUid);
                         }
                     }
                 });
@@ -8228,8 +8234,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mRemovePackageHelper.cleanUpForMoveInstall(volumeUuid, packageName, fromCodePath);
     }
 
-    void sendPendingBroadcasts(String reasonForTrace) {
-        mInstallPackageHelper.sendPendingBroadcasts(reasonForTrace);
+    void sendPendingBroadcasts(String reasonForTrace, int callingUidForTrace) {
+        mInstallPackageHelper.sendPendingBroadcasts(reasonForTrace, callingUidForTrace);
     }
 
     void handlePackagePostInstall(@NonNull InstallRequest request, boolean launchedForRestore) {

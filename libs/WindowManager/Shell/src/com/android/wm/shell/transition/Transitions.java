@@ -30,7 +30,6 @@ import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.fixScale;
 import static android.window.TransitionInfo.FLAGS_IS_NON_APP_WINDOW;
-import static android.window.TransitionInfo.FLAG_BACK_GESTURE_ANIMATED;
 import static android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY;
 import static android.window.TransitionInfo.FLAG_IS_BEHIND_STARTING_WINDOW;
 import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
@@ -41,7 +40,6 @@ import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 
 import static com.android.systemui.shared.Flags.returnAnimationFrameworkLongLived;
 import static com.android.window.flags.Flags.ensureWallpaperInTransitions;
-import static com.android.window.flags.Flags.migratePredictiveBackTransition;
 import static com.android.wm.shell.shared.TransitionUtil.isClosingType;
 import static com.android.wm.shell.shared.TransitionUtil.isOpeningType;
 
@@ -855,12 +853,6 @@ public class Transitions implements RemoteCallable<Transitions>,
                 // Remove the change because it should be invisible in the animation.
                 info.getChanges().remove(i);
                 continue;
-            }
-            // The change has already animated by back gesture, don't need to play transition
-            // animation on it.
-            if (!migratePredictiveBackTransition()
-                    && change.hasFlags(FLAG_BACK_GESTURE_ANIMATED)) {
-                info.getChanges().remove(i);
             }
         }
         // There does not need animation when:

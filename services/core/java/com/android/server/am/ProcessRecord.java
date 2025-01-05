@@ -1036,6 +1036,11 @@ class ProcessRecord implements WindowProcessListener {
     }
 
     @GuardedBy(anyOf = {"mService", "mProcLock"})
+    boolean hasActiveInstrumentation() {
+        return mInstr != null;
+    }
+
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     boolean isKilledByAm() {
         return mKilledByAm;
     }

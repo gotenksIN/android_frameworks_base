@@ -47,6 +47,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
+import com.android.settingslib.flags.Flags;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -55,6 +56,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import android.os.SystemProperties;
 import java.lang.reflect.Constructor;
@@ -358,11 +360,17 @@ public class LocalBluetoothProfileManager {
                     oldState == BluetoothProfile.STATE_CONNECTING) {
                 Log.i(TAG, "Failed to connect " + mProfile + " device");
             }
+            final boolean isAshaProfile = getHearingAidProfile() != null
+                    && mProfile instanceof HearingAidProfile;
+            final boolean isHapClientProfile = getHapClientProfile() != null
+                    && mProfile instanceof HapClientProfile;
+            final boolean isLeAudioProfile = getLeAudioProfile() != null
+                    && mProfile instanceof LeAudioProfile;
+            final boolean isHapClientOrLeAudioProfile = isHapClientProfile || isLeAudioProfile;
+            final boolean isCsipProfile = getCsipSetCoordinatorProfile() != null
+                    && mProfile instanceof CsipSetCoordinatorProfile;
 
-            if (getHearingAidProfile() != null
-                    && mProfile instanceof HearingAidProfile
-                    && (newState == BluetoothProfile.STATE_CONNECTED)) {
-
+            if (isAshaProfile && (newState == BluetoothProfile.STATE_CONNECTED)) {
                 // Check if the HiSyncID has being initialized
                 if (cachedDevice.getHiSyncId() == BluetoothHearingAid.HI_SYNC_ID_INVALID) {
                     long newHiSyncId = getHearingAidProfile().getHiSyncId(cachedDevice.getDevice());
@@ -379,11 +387,6 @@ public class LocalBluetoothProfileManager {
                 HearingAidStatsLogUtils.logHearingAidInfo(cachedDevice);
             }
 
-            final boolean isHapClientProfile = getHapClientProfile() != null
-                    && mProfile instanceof HapClientProfile;
-            final boolean isLeAudioProfile = getLeAudioProfile() != null
-                    && mProfile instanceof LeAudioProfile;
-            final boolean isHapClientOrLeAudioProfile = isHapClientProfile || isLeAudioProfile;
             if (isHapClientOrLeAudioProfile && newState == BluetoothProfile.STATE_CONNECTED) {
 
                 // Checks if both profiles are connected to the device. Hearing aid info need
@@ -398,9 +401,7 @@ public class LocalBluetoothProfileManager {
                 }
             }
 
-            if (getCsipSetCoordinatorProfile() != null
-                    && mProfile instanceof CsipSetCoordinatorProfile
-                    && newState == BluetoothProfile.STATE_CONNECTED) {
+            if (isCsipProfile && (newState == BluetoothProfile.STATE_CONNECTED)) {
                 // Check if the GroupID has being initialized
                 if (cachedDevice.getGroupId() == BluetoothCsipSetCoordinator.GROUP_ID_INVALID) {
                     final Map<Integer, ParcelUuid> groupIdMap = getCsipSetCoordinatorProfile()
@@ -414,6 +415,21 @@ public class LocalBluetoothProfileManager {
                             //}
                         }
                     }
+                }
+            }
+
+            // LE_AUDIO, CSIP_SET_COORDINATOR profiles will also impact the connection status
+            // change, e.g. device need to active on LE_AUDIO to become active connection status.
+            final Set<Integer> hearingDeviceConnectionStatusProfileId = Set.of(
+                    BluetoothProfile.HEARING_AID,
+                    BluetoothProfile.HAP_CLIENT,
+                    BluetoothProfile.LE_AUDIO,
+                    BluetoothProfile.CSIP_SET_COORDINATOR
+            );
+            if (Flags.hearingDeviceSetConnectionStatusReport()) {
+                if (hearingDeviceConnectionStatusProfileId.contains(mProfile.getProfileId())) {
+                    mDeviceManager.notifyHearingDevicesConnectionStatusChangedIfNeeded(
+                            cachedDevice);
                 }
             }
 

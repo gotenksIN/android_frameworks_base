@@ -10940,8 +10940,12 @@ public class ActivityManagerService extends IActivityManager.Stub
                     opti++;
                 }
                 synchronized (this) {
+                    // TODO: b/361161826 - Always pass in the dumpAll and let
+                    // BroadcastController decide how to treat it.
+                    final boolean requestDumpAll = "filter".equals(dumpPackage)
+                            ? dumpAll : true;
                     mBroadcastController.dumpBroadcastsLocked(fd, pw, args, opti,
-                            /* dumpAll= */ true, dumpPackage);
+                            requestDumpAll, dumpPackage);
                 }
             } else if ("broadcast-stats".equals(cmd)) {
                 if (opti < args.length) {
@@ -14493,10 +14497,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public final void unbroadcastIntent(IApplicationThread caller, Intent intent, int userId) {
         mBroadcastController.unbroadcastIntent(caller, intent, userId);
-    }
-
-    void backgroundServicesFinishedLocked(int userId) {
-        mBroadcastQueue.backgroundServicesFinishedLocked(userId);
     }
 
     public void finishReceiver(IBinder caller, int resultCode, String resultData,
@@ -19062,7 +19062,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     Settings.Global.BROADCAST_BG_CONSTANTS);
             backConstants.TIMEOUT = BROADCAST_BG_TIMEOUT;
 
-            return new BroadcastQueueModernImpl(service, service.mHandler,
+            return new BroadcastQueueImpl(service, service.mHandler,
                         foreConstants, backConstants);
         }
 

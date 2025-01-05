@@ -137,17 +137,17 @@ import java.util.function.Predicate;
  * {@link #finishReceiverLocked}
  * </ol>
  */
-class BroadcastQueueModernImpl extends BroadcastQueue {
-    BroadcastQueueModernImpl(ActivityManagerService service, Handler handler,
+class BroadcastQueueImpl extends BroadcastQueue {
+    BroadcastQueueImpl(ActivityManagerService service, Handler handler,
             BroadcastConstants fgConstants, BroadcastConstants bgConstants) {
         this(service, handler, fgConstants, bgConstants, new BroadcastSkipPolicy(service),
                 new BroadcastHistory(fgConstants));
     }
 
-    BroadcastQueueModernImpl(ActivityManagerService service, Handler handler,
+    BroadcastQueueImpl(ActivityManagerService service, Handler handler,
             BroadcastConstants fgConstants, BroadcastConstants bgConstants,
             BroadcastSkipPolicy skipPolicy, BroadcastHistory history) {
-        super(service, handler, "modern", skipPolicy, history);
+        super(service, handler, skipPolicy, history);
 
         // For the moment, read agnostic constants from foreground
         mConstants = Objects.requireNonNull(fgConstants);
@@ -545,8 +545,9 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
                 }
             }
 
-            if (DEBUG_BROADCAST) logv("Promoting " + queue
-                    + " from runnable to running; process is " + queue.app);
+            if (DEBUG_BROADCAST) {
+                logv("Promoting " + queue + " from runnable to running; process is " + queue.app);
+            }
             promoteToRunningLocked(queue);
             boolean completed;
             if (processWarm) {
@@ -798,7 +799,9 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
             mService.mOomAdjuster.mCachedAppOptimizer.freezeAppAsyncImmediateLSP(r.callerApp);
             return;
         }
-        if (DEBUG_BROADCAST) logv("Enqueuing " + r + " for " + r.receivers.size() + " receivers");
+        if (DEBUG_BROADCAST || r.debugLog()) {
+            logv("Enqueuing " + r + " for " + r.receivers.size() + " receivers");
+        }
 
         final int cookie = traceBegin("enqueueBroadcast");
         r.applySingletonPolicy(mService);
@@ -1019,7 +1022,9 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
                 & Intent.FLAG_RECEIVER_BOOT_UPGRADE) != 0;
 
         long startTimeNs = SystemClock.uptimeNanos();
-        if (DEBUG_BROADCAST) logv("Scheduling " + r + " to cold " + queue);
+        if (DEBUG_BROADCAST || r.debugLog()) {
+            logv("Scheduling " + r + " to cold " + queue);
+        }
         queue.app = mService.startProcessLocked(queue.processName, info, true, intentFlags,
                 hostingRecord, zygotePolicyFlags, allowWhileBooting, false);
         if (queue.app == null) {
@@ -1176,7 +1181,9 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
             }
         }
 
-        if (DEBUG_BROADCAST) logv("Scheduling " + r + " to warm " + app);
+        if (DEBUG_BROADCAST || r.debugLog()) {
+            logv("Scheduling " + r + " to warm " + app);
+        }
         setDeliveryState(queue, app, r, index, receiver, BroadcastRecord.DELIVERY_SCHEDULED,
                 "scheduleReceiverWarmLocked");
 
@@ -1192,12 +1199,12 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
                 if (receiver instanceof BroadcastFilter) {
                     notifyScheduleRegisteredReceiver(app, r, (BroadcastFilter) receiver);
                     thread.scheduleRegisteredReceiver(
-                        ((BroadcastFilter) receiver).receiverList.receiver,
-                        receiverIntent, r.resultCode, r.resultData, r.resultExtras,
-                        r.ordered, r.initialSticky, assumeDelivered, r.userId,
-                        app.mState.getReportedProcState(),
-                        r.shareIdentity ? r.callingUid : Process.INVALID_UID,
-                        r.shareIdentity ? r.callerPackage : null);
+                            ((BroadcastFilter) receiver).receiverList.receiver,
+                            receiverIntent, r.resultCode, r.resultData, r.resultExtras,
+                            r.ordered, r.initialSticky, assumeDelivered, r.userId,
+                            app.mState.getReportedProcState(),
+                            r.shareIdentity ? r.callingUid : Process.INVALID_UID,
+                            r.shareIdentity ? r.callerPackage : null);
                     // TODO: consider making registered receivers of unordered
                     // broadcasts report results to detect ANRs
                     if (assumeDelivered) {
@@ -1562,12 +1569,17 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
         // bookkeeping to update for ordered broadcasts
         if (!isDeliveryStateTerminal(oldDeliveryState)
                 && isDeliveryStateTerminal(newDeliveryState)) {
-            if (DEBUG_BROADCAST
-                    && newDeliveryState != BroadcastRecord.DELIVERY_DELIVERED) {
-                logw("Delivery state of " + r + " to " + receiver
+            if ((DEBUG_BROADCAST && newDeliveryState != BroadcastRecord.DELIVERY_DELIVERED)
+                    || r.debugLog()) {
+                final String msg = "Delivery state of " + r + " to " + receiver
                         + " via " + app + " changed from "
                         + deliveryStateToString(oldDeliveryState) + " to "
-                        + deliveryStateToString(newDeliveryState) + " because " + reason);
+                        + deliveryStateToString(newDeliveryState) + " because " + reason;
+                if (newDeliveryState == BroadcastRecord.DELIVERY_DELIVERED) {
+                    logv(msg);
+                } else {
+                    logw(msg);
+                }
             }
 
             notifyFinishReceiver(queue, app, r, index, receiver);
@@ -1909,13 +1921,6 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
     @Override
     public String describeStateLocked() {
         return getRunningSize() + " running";
-    }
-
-    @GuardedBy("mService")
-    @Override
-    public void backgroundServicesFinishedLocked(int userId) {
-        // Modern queue does not alter the broadcasts delivery behavior based on background
-        // services, so ignore.
     }
 
     private void checkHealth() {
@@ -2407,7 +2412,6 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
     @GuardedBy("mService")
     public void dumpDebug(@NonNull ProtoOutputStream proto, long fieldId) {
         long token = proto.start(fieldId);
-        proto.write(BroadcastQueueProto.QUEUE_NAME, mQueueName);
         mHistory.dumpDebug(proto);
         proto.end(token);
     }
@@ -2417,12 +2421,33 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
     @GuardedBy("mService")
     public boolean dumpLocked(@NonNull FileDescriptor fd, @NonNull PrintWriter pw,
             @NonNull String[] args, int opti, boolean dumpConstants, boolean dumpHistory,
-            boolean dumpAll, @Nullable String dumpPackage, boolean needSep) {
+            boolean dumpAll, @Nullable String dumpPackage, @Nullable String dumpIntentAction,
+            boolean needSep) {
         final long now = SystemClock.uptimeMillis();
         final IndentingPrintWriter ipw = new IndentingPrintWriter(pw);
         ipw.increaseIndent();
         ipw.println();
 
+        if (dumpIntentAction == null) {
+            dumpProcessQueues(ipw, now);
+            dumpBroadcastsWithIgnoredPolicies(ipw);
+            dumpForegroundUids(ipw);
+
+            if (dumpConstants) {
+                mFgConstants.dump(ipw);
+                mBgConstants.dump(ipw);
+            }
+        }
+
+        if (dumpHistory) {
+            final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+            needSep = mHistory.dumpLocked(ipw, dumpPackage, dumpIntentAction,
+                    sdf, dumpAll);
+        }
+        return needSep;
+    }
+
+    private void dumpProcessQueues(@NonNull IndentingPrintWriter ipw, @UptimeMillisLong long now) {
         ipw.println("📋 Per-process queues:");
         ipw.increaseIndent();
         for (int i = 0; i < mProcessQueues.size(); i++) {
@@ -2470,28 +2495,21 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
         }
         ipw.decreaseIndent();
         ipw.println();
+    }
 
+    private void dumpBroadcastsWithIgnoredPolicies(@NonNull IndentingPrintWriter ipw) {
         ipw.println("Broadcasts with ignored delivery group policies:");
         ipw.increaseIndent();
         mService.dumpDeliveryGroupPolicyIgnoredActions(ipw);
         ipw.decreaseIndent();
         ipw.println();
+    }
 
+    private void dumpForegroundUids(@NonNull IndentingPrintWriter ipw) {
         ipw.println("Foreground UIDs:");
         ipw.increaseIndent();
         ipw.println(mUidForeground);
         ipw.decreaseIndent();
         ipw.println();
-
-        if (dumpConstants) {
-            mFgConstants.dump(ipw);
-            mBgConstants.dump(ipw);
-        }
-
-        if (dumpHistory) {
-            final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-            needSep = mHistory.dumpLocked(ipw, dumpPackage, mQueueName, sdf, dumpAll, needSep);
-        }
-        return needSep;
     }
 }

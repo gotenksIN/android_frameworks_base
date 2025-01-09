@@ -3663,7 +3663,7 @@ public class OomAdjuster {
             state.setSetRawAdj(state.getCurRawAdj());
         }
 
-        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance(mService);
+        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
         if (freezer != null && freezer.useFreezerManager()) {
             // unfreeze process if user press home key before the first frame appeared
             if ((state.getSetAdj() >= ProcessList.FOREGROUND_APP_ADJ &&

@@ -985,7 +985,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance(this);
+            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.addPidLocked(app);
             }
@@ -1014,7 +1014,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance(this);
+            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.removePidLocked(pid, app);
                 freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);

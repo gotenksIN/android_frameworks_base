@@ -70,7 +70,7 @@ public class ProcessFreezerManager {
     private static volatile boolean mUseFreezerManager = false;
     private static volatile boolean mUseCpuLoadMonitor = false;
 
-    private final ActivityManagerService mAm;
+    private final Freezer mFreezer;
 
     public class CpuLoadMonitor {
         private CpuMonitorInternal mCpuMonitorService = null;
@@ -160,7 +160,7 @@ public class ProcessFreezerManager {
         }
     }
 
-    public static ProcessFreezerManager getInstance(ActivityManagerService am) {
+    public static ProcessFreezerManager getInstance() {
         if (!ALREADY_READ_PROPERTIES) {
             ALREADY_READ_PROPERTIES = true;
             mUseFreezerManager = Boolean.valueOf(mPerf.perfGetProp(
@@ -201,7 +201,7 @@ public class ProcessFreezerManager {
         if (mInstance == null) {
             synchronized (ProcessFreezerManager.class) {
                 if (mInstance == null) {
-                    mInstance = new ProcessFreezerManager(am);
+                    mInstance = new ProcessFreezerManager();
                 }
             }
         }
@@ -247,13 +247,13 @@ public class ProcessFreezerManager {
         return freezerManagerThread;
     }
 
-    private ProcessFreezerManager(ActivityManagerService am) {
+    private ProcessFreezerManager() {
         if (mUseCpuLoadMonitor) {
             mCpuLoadMonitor.setCpuUsageThreshold(mCpuUsageThreshold);
             mCpuLoadMonitor.setCpuSet(mCpuLoadMonitorBG);
         }
 
-        mAm = am;
+        mFreezer = new Freezer();
 
         mFreezerManagerHandler = new Handler(createAndStartFreezeThread().getLooper(), msg -> {
             switch (msg.what) {
@@ -695,7 +695,7 @@ public class ProcessFreezerManager {
         }
 
         try {
-            int rc = mAm.getFreezer().freezeBinder(pid, false, 2 /* timeout_ms */);
+            int rc = mFreezer.freezeBinder(pid, false, 2 /* timeout_ms */);
             if (rc != 0) {
                 Slog.w(TAG, " *unable to unfreeze binder: " +  logInfo + " " + rc );
             } else {
@@ -716,7 +716,7 @@ public class ProcessFreezerManager {
         }
 
         try{
-            Process.setProcessFrozen(pid, uid, false);
+            mFreezer.setProcessFrozen(pid, uid, false);
             if (mUseDebug) {
                 Slog.d(TAG, "  unfreeze process: " +  logInfo);
             }
@@ -793,7 +793,7 @@ public class ProcessFreezerManager {
         }
 
         try {
-            int rc = mAm.getFreezer().freezeBinder(pid, true, 2 /* timeout_ms */);
+            int rc = mFreezer.freezeBinder(pid, true, 2 /* timeout_ms */);
             if (rc != 0){
                 Slog.w(TAG, " *unable to freeze binder for " + pid + ": " + rc);
             } else {
@@ -816,7 +816,7 @@ public class ProcessFreezerManager {
 
         try {
             if (freezeBinderSuccess) {
-                Process.setProcessFrozen(pid, uid, true);
+                mFreezer.setProcessFrozen(pid, uid, true);
                 if (mUseDebug) {
                     Slog.d(TAG, "  freeze process: " + logInfo);
                 }

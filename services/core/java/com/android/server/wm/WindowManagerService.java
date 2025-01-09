@@ -2811,10 +2811,10 @@ public class WindowManagerService extends IWindowManager.Stub
     void finishDrawingWindow(Session session, IWindow client,
             @Nullable SurfaceControl.Transaction postDrawTransaction, int seqId) {
         //unfreeze process if the first frame appeared
-        // ProcessFreezerManager freezer = ProcessFreezerManager.getInstance(mAtmService);
-        // if (freezer != null && freezer.useFreezerManager()) {
-        //     freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
-        // }
+        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+        if (freezer != null && freezer.useFreezerManager()) {
+            freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
+        }
 
         if (postDrawTransaction != null) {
             postDrawTransaction.sanitize(Binder.getCallingPid(), Binder.getCallingUid());

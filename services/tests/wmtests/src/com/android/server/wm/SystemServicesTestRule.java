@@ -43,6 +43,7 @@ import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
+import android.annotation.Nullable;
 import android.app.ActivityManagerInternal;
 import android.app.ActivityThread;
 import android.app.AppOpsManager;
@@ -67,7 +68,6 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.PowerManagerInternal;
 import android.os.PowerSaveState;
-import android.os.StrictMode;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.DeviceConfig;
@@ -95,7 +95,6 @@ import com.android.server.input.InputManagerService;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.pm.UserManagerService;
 import com.android.server.policy.PermissionPolicyInternal;
-import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.testutils.StubTransaction;
 import com.android.server.uri.UriGrantsManagerInternal;
@@ -142,13 +141,15 @@ public class SystemServicesTestRule implements TestRule {
     private ActivityTaskManagerService mAtmService;
     private WindowManagerService mWmService;
     private InputManagerService mImService;
-    private Runnable mOnBeforeServicesCreated;
+    @Nullable
+    private final Runnable mOnBeforeServicesCreated;
+
     /**
      * Spied {@link SurfaceControl.Transaction} class than can be used to verify calls.
      */
     SurfaceControl.Transaction mTransaction;
 
-    public SystemServicesTestRule(Runnable onBeforeServicesCreated) {
+    public SystemServicesTestRule(@Nullable Runnable onBeforeServicesCreated) {
         mOnBeforeServicesCreated = onBeforeServicesCreated;
     }
 
@@ -396,15 +397,13 @@ public class SystemServicesTestRule implements TestRule {
     }
 
     private void setUpWindowManagerService() {
-        TestWindowManagerPolicy wmPolicy = new TestWindowManagerPolicy();
-        TestDisplayWindowSettingsProvider testDisplayWindowSettingsProvider =
-                new TestDisplayWindowSettingsProvider();
-        // Suppress StrictMode violation (DisplayWindowSettings) to avoid log flood.
-        DisplayThread.getHandler().post(StrictMode::allowThreadDiskWritesMask);
-        mWmService = WindowManagerService.main(
-                mContext, mImService, false, wmPolicy, mAtmService,
-                testDisplayWindowSettingsProvider, StubTransaction::new,
-                MockSurfaceControlBuilder::new, mAppCompat);
+        // Use a spied Transaction class to prevent native code calls and verify interactions.
+        mTransaction = spy(StubTransaction.class);
+
+        mWmService = WindowManagerServiceTestSupport.setUpService(mContext, mImService,
+                new TestWindowManagerPolicy(), mAtmService, new TestDisplayWindowSettingsProvider(),
+                mTransaction, new MockSurfaceControlBuilder(), mAppCompat);
+
         spyOn(mWmService);
         spyOn(mWmService.mRoot);
         // Invoked during {@link ActivityStack} creation.
@@ -416,10 +415,6 @@ public class SystemServicesTestRule implements TestRule {
         spyOn(mWmService.mDisplayWindowSettings);
         spyOn(mWmService.mDisplayWindowSettingsProvider);
 
-        // Setup factory classes to prevent calls to native code.
-        mTransaction = spy(StubTransaction.class);
-        // Return a spied Transaction class than can be used to verify calls.
-        mWmService.mTransactionFactory = () -> mTransaction;
         mWmService.mSurfaceAnimationRunner = new SurfaceAnimationRunner(
                 null, null, mTransaction, mWmService.mPowerManagerInternal);
 
@@ -486,12 +481,12 @@ public class SystemServicesTestRule implements TestRule {
     }
 
     private static void tearDownLocalServices() {
+        WindowManagerServiceTestSupport.tearDownService();
+
         LocalServices.removeServiceForTest(DisplayManagerInternal.class);
         LocalServices.removeServiceForTest(PowerManagerInternal.class);
         LocalServices.removeServiceForTest(ActivityManagerInternal.class);
         LocalServices.removeServiceForTest(ActivityTaskManagerInternal.class);
-        LocalServices.removeServiceForTest(WindowManagerInternal.class);
-        LocalServices.removeServiceForTest(WindowManagerPolicy.class);
         LocalServices.removeServiceForTest(PackageManagerInternal.class);
         LocalServices.removeServiceForTest(UriGrantsManagerInternal.class);
         LocalServices.removeServiceForTest(PermissionPolicyInternal.class);
@@ -499,7 +494,6 @@ public class SystemServicesTestRule implements TestRule {
         LocalServices.removeServiceForTest(UsageStatsManagerInternal.class);
         LocalServices.removeServiceForTest(StatusBarManagerInternal.class);
         LocalServices.removeServiceForTest(UserManagerInternal.class);
-        LocalServices.removeServiceForTest(ImeTargetVisibilityPolicy.class);
         LocalServices.removeServiceForTest(GrammaticalInflectionManagerInternal.class);
     }
 

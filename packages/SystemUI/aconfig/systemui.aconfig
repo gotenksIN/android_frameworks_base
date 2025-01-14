@@ -84,6 +84,16 @@ flag {
 }
 
 flag {
+   name: "notification_ambient_suppression_after_inflation"
+   namespace: "systemui"
+   description: "Move the DND visual effects filter to the finalize stage of the pipeline when it is doze-dependent, but keep it in the pre-group stage when it is doze-independent."
+   bug: "373411431"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
    name: "notification_over_expansion_clipping_fix"
    namespace: "systemui"
    description: "Fix NSSL clipping when over-expanding; fixes split shade bug."
@@ -130,14 +140,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "notifications_footer_view_refactor"
-    namespace: "systemui"
-    description: "Enables the refactored version of the footer view in the notification shade "
-        "(containing the \"Clear all\" button). Should not bring any behavior changes"
-    bug: "293167744"
 }
 
 flag {
@@ -380,6 +382,13 @@ flag {
 }
 
 flag {
+    name: "status_bar_mobile_icon_kairos"
+    namespace: "systemui"
+    description: "Refactors the mobile connection icon in the status bar to use the Kairos library"
+    bug: "383172066"
+}
+
+flag {
     name: "status_bar_monochrome_icons_fix"
     namespace: "systemui"
     description: "Fixes the status bar icon size when drawing InsetDrawables (ie. monochrome icons)"
@@ -387,14 +396,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "status_bar_screen_sharing_chips"
-    namespace: "systemui"
-    description: "Show chips on the left side of the status bar when a user is screen sharing, "
-        "recording, or casting"
-    bug: "332662551"
 }
 
 flag {
@@ -432,28 +433,17 @@ flag {
 }
 
 flag {
-    name: "status_bar_use_repos_for_call_chip"
-    namespace: "systemui"
-    description: "Use repositories as the source of truth for call notifications shown as a chip in"
-        "the status bar"
-    bug: "328584859"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "status_bar_call_chip_notification_icon"
-    namespace: "systemui"
-    description: "Use the small icon set on the notification for the status bar call chip"
-    bug: "354930838"
-}
-
-flag {
    name: "status_bar_signal_policy_refactor"
    namespace: "systemui"
    description: "Use a settings observer for airplane mode and make StatusBarSignalPolicy startable"
    bug: "264539100"
+}
+
+flag {
+   name: "status_bar_signal_policy_refactor_ethernet"
+   namespace: "systemui"
+   description: "Use recommended architecture for ethernet icon in status bar"
+   bug: "291321279"
 }
 
 flag {
@@ -672,6 +662,16 @@ flag {
     namespace: "systemui"
     description: "Enables Volume visuals update"
     bug: "368308908"
+}
+
+flag {
+    name: "clipboard_overlay_multiuser"
+    namespace: "systemui"
+    description: "Fix clipboard overlay for secondary users"
+    bug: "217922018"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1335,6 +1335,13 @@ flag {
 }
 
 flag {
+  name: "output_switcher_redesign"
+  namespace: "systemui"
+  description: "Enables visual update for Media Output Switcher"
+  bug: "388296370"
+}
+
+flag {
   namespace: "systemui"
   name: "enable_view_capture_tracing"
   description: "Enables view capture tracing in System UI."
@@ -1797,16 +1804,6 @@ flag {
 }
 
 flag {
-  name: "disable_shade_expands_on_trackpad_two_finger_swipe"
-  namespace: "systemui"
-  description: "Disables expansion of the shade via two finger swipe on a trackpad"
-  bug: "356804470"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
     name: "keyboard_shortcut_helper_shortcut_customizer"
     namespace: "systemui"
     description: "An implementation of shortcut customizations through shortcut helper."
@@ -1907,8 +1904,28 @@ flag {
 }
 
 flag {
+  name: "disable_shade_trackpad_two_finger_swipe"
+  namespace: "systemui"
+  description: "Disables expansion of the shade via two finger swipe on a trackpad"
+  bug: "356804470"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
    name: "notification_magic_actions_treatment"
    namespace: "systemui"
    description: "Special UI treatment for magic actions"
    bug: "383567383"
+}
+
+flag {
+    name: "show_audio_sharing_slider_in_volume_panel"
+    namespace: "cross_device_experiences"
+    description: "Show two sliders in volume panel when audio sharing."
+    bug: "336183611"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

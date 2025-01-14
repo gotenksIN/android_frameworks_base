@@ -411,10 +411,12 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             mInstanceId = System.identityHashCode(this);
             mListener = listener;
             mDeathHandler = () -> {
-                ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
-                        "[%d] RecentsController.DeathRecipient: binder died", mInstanceId);
-                finishInner(mWillFinishToHome, false /* leaveHint */, null /* finishCb */,
-                        "deathRecipient");
+                mExecutor.execute(() -> {
+                    ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
+                            "[%d] RecentsController.DeathRecipient: binder died", mInstanceId);
+                    finishInner(mWillFinishToHome, false /* leaveHint */, null /* finishCb */,
+                            "deathRecipient");
+                });
             };
             try {
                 mListener.asBinder().linkToDeath(mDeathHandler, 0 /* flags */);
@@ -1227,19 +1229,6 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
         }
 
         @Override
-        public TaskSnapshot screenshotTask(int taskId) {
-            try {
-                ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
-                        "[%d] RecentsController.screenshotTask: taskId=%d", mInstanceId, taskId);
-                return ActivityTaskManager.getService().takeTaskSnapshot(taskId,
-                        true /* updateCache */);
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Failed to screenshot task", e);
-            }
-            return null;
-        }
-
-        @Override
         public void setInputConsumerEnabled(boolean enabled) {
             mExecutor.execute(() -> {
                 if (mFinishCB == null || !enabled) {
@@ -1286,6 +1275,11 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                     "requested"));
         }
 
+        /**
+         * @param runnerFinishCb The remote finish callback to run after finish is complete, this is
+         *                       not the same as mFinishCb which reports the transition is finished
+         *                       to WM.
+         */
         private void finishInner(boolean toHome, boolean sendUserLeaveHint,
                 IResultReceiver runnerFinishCb, String reason) {
             if (finishSyntheticTransition(runnerFinishCb, reason)) {

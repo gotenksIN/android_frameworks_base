@@ -1027,9 +1027,6 @@ public class Activity extends ContextThemeWrapper
     /** The autofill client controller. Always access via {@link #getAutofillClientController()}. */
     private AutofillClientController mAutofillClientController;
 
-    /** @hide */
-    boolean mEnterAnimationComplete;
-
     private boolean mIsInMultiWindowMode;
     /** @hide */
     boolean mIsInPictureInPictureMode;
@@ -1273,8 +1270,8 @@ public class Activity extends ContextThemeWrapper
      * Requests to show the “Open in browser” education. “Open in browser” is a feature
      * within the app header that allows users to switch from an app to the web. The feature
      * is made available when an application is opened by a user clicking a link or when a
-     * link is provided by an application. Links can be provided by utilizing
-     * {@link AssistContent#EXTRA_AUTHENTICATING_USER_WEB_URI} or
+     * link is provided by an application. Links can be provided by calling
+     * {@link AssistContent#setSessionTransferUri} or
      * {@link AssistContent#setWebUri}.
      *
      * <p>This method should be utilized when an activity wants to nudge the user to switch
@@ -1287,7 +1284,7 @@ public class Activity extends ContextThemeWrapper
      * disruptive to the user to show the education and when it is optimal to switch the user to a
      * browser session. Before requesting to show the education, developers should assert that they
      * have set a link that can be used by the "Open in browser" feature through either
-     * {@link AssistContent#EXTRA_AUTHENTICATING_USER_WEB_URI} or
+     * {@link AssistContent#setSessionTransferUri} or
      * {@link AssistContent#setWebUri} so that users are navigated to a relevant page if they choose
      * to switch to the browser. If a URI is not set using either method, "Open in browser" will
      * utilize a generic link if available which will direct users to the homepage of the site
@@ -1296,7 +1293,7 @@ public class Activity extends ContextThemeWrapper
      * the user will not be provided with the option to switch to the browser and the education will
      * not be shown if requested.
      *
-     * @see android.app.assist.AssistContent#EXTRA_SESSION_TRANSFER_WEB_URI
+     * @see android.app.assist.AssistContent#setSessionTransferUri
      */
     @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION)
     public final void requestOpenInBrowserEducation() {
@@ -2898,7 +2895,6 @@ public class Activity extends ContextThemeWrapper
         mCalled = true;
 
         getAutofillClientController().onActivityStopped(mIntent, mChangingConfigurations);
-        mEnterAnimationComplete = false;
 
         notifyVoiceInteractionManagerServiceActivityEvent(
                 VoiceInteractionSession.VOICE_INTERACTION_ACTIVITY_EVENT_STOP);
@@ -5770,6 +5766,11 @@ public class Activity extends ContextThemeWrapper
     @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
     public final void requestPermissions(@NonNull String[] permissions, int requestCode,
             int deviceId) {
+        // Pre M apps shouldn't request permissions, as permissions are granted at install time.
+        if (getApplicationInfo().targetSdkVersion < Build.VERSION_CODES.M) {
+            onRequestPermissionsResult(requestCode, new String[0], new int[0], deviceId);
+        }
+
         if (requestCode < 0) {
             throw new IllegalArgumentException("requestCode should be >= 0");
         }
@@ -8589,8 +8590,6 @@ public class Activity extends ContextThemeWrapper
      * @hide
      */
     public void dispatchEnterAnimationComplete() {
-        mEnterAnimationComplete = true;
-        mInstrumentation.onEnterAnimationComplete();
         onEnterAnimationComplete();
         if (getWindow() != null && getWindow().getDecorView() != null) {
             View decorView = getWindow().getDecorView();

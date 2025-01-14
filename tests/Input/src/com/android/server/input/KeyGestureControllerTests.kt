@@ -59,6 +59,7 @@ import junitparams.Parameters
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -830,6 +831,18 @@ class KeyGestureControllerTests {
                 KeyEvent.META_META_ON or KeyEvent.META_ALT_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
             ),
+            TestData(
+                "META + ALT + 'V' -> Toggle Voice Access",
+                intArrayOf(
+                    KeyEvent.KEYCODE_META_LEFT,
+                    KeyEvent.KEYCODE_ALT_LEFT,
+                    KeyEvent.KEYCODE_V
+                ),
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS,
+                intArrayOf(KeyEvent.KEYCODE_V),
+                KeyEvent.META_META_ON or KeyEvent.META_ALT_ON,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
+            ),
         )
     }
 
@@ -843,6 +856,7 @@ class KeyGestureControllerTests {
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_STICKY_KEYS_FLAG,
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_MOUSE_KEYS,
         com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_AND_MAGNIFIER_KEY_GESTURES,
+        com.android.hardware.input.Flags.FLAG_ENABLE_VOICE_ACCESS_KEY_GESTURES,
         com.android.window.flags.Flags.FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT,
         com.android.window.flags.Flags.FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS
     )
@@ -861,6 +875,7 @@ class KeyGestureControllerTests {
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_STICKY_KEYS_FLAG,
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_MOUSE_KEYS,
         com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_AND_MAGNIFIER_KEY_GESTURES,
+        com.android.hardware.input.Flags.FLAG_ENABLE_VOICE_ACCESS_KEY_GESTURES,
         com.android.window.flags.Flags.FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT,
         com.android.window.flags.Flags.FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS
     )
@@ -1452,20 +1467,32 @@ class KeyGestureControllerTests {
     @Parameters(method = "customInputGesturesTestArguments")
     fun testCustomKeyGestures(test: TestData) {
         setupKeyGestureController()
+        val trigger = InputGestureData.createKeyTrigger(
+            test.expectedKeys[0],
+            test.expectedModifierState
+        )
         val builder = InputGestureData.Builder()
             .setKeyGestureType(test.expectedKeyGestureType)
-            .setTrigger(
-                InputGestureData.createKeyTrigger(
-                    test.expectedKeys[0],
-                    test.expectedModifierState
-                )
-            )
+            .setTrigger(trigger)
         if (test.expectedAppLaunchData != null) {
             builder.setAppLaunchData(test.expectedAppLaunchData)
         }
         val inputGestureData = builder.build()
 
-        keyGestureController.addCustomInputGesture(0, inputGestureData.aidlData)
+        assertNull(
+            test.toString(),
+            keyGestureController.getInputGesture(0, trigger.aidlTrigger)
+        )
+        assertEquals(
+            test.toString(),
+            InputManager.CUSTOM_INPUT_GESTURE_RESULT_SUCCESS,
+            keyGestureController.addCustomInputGesture(0, builder.build().aidlData)
+        )
+        assertEquals(
+            test.toString(),
+            inputGestureData.aidlData,
+            keyGestureController.getInputGesture(0, trigger.aidlTrigger)
+        )
         testKeyGestureInternal(test)
     }
 

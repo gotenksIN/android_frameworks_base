@@ -20,11 +20,12 @@ import android.media.quality.AmbientBacklightSettings;
 import android.media.quality.IAmbientBacklightCallback;
 import android.media.quality.IPictureProfileCallback;
 import android.media.quality.ISoundProfileCallback;
-import android.media.quality.ParamCapability;
+import android.media.quality.ParameterCapability;
 import android.media.quality.PictureProfileHandle;
 import android.media.quality.PictureProfile;
 import android.media.quality.SoundProfileHandle;
 import android.media.quality.SoundProfile;
+import android.os.Bundle;
 import android.os.UserHandle;
 
 /**
@@ -37,10 +38,10 @@ interface IMediaQualityManager {
     void removePictureProfile(in String id, in UserHandle user);
     boolean setDefaultPictureProfile(in String id, in UserHandle user);
     PictureProfile getPictureProfile(
-            in int type, in String name, in boolean includeParams, in UserHandle user);
+            in int type, in String name, in Bundle options, in UserHandle user);
     List<PictureProfile> getPictureProfilesByPackage(
-            in String packageName, in boolean includeParams, in UserHandle user);
-    List<PictureProfile> getAvailablePictureProfiles(in boolean includeParams, in UserHandle user);
+            in String packageName, in Bundle options, in UserHandle user);
+    List<PictureProfile> getAvailablePictureProfiles(in Bundle options, in UserHandle user);
     List<String> getPictureProfilePackageNames(in UserHandle user);
     List<String> getPictureProfileAllowList(in UserHandle user);
     void setPictureProfileAllowList(in List<String> packages, in UserHandle user);
@@ -51,10 +52,10 @@ interface IMediaQualityManager {
     void removeSoundProfile(in String id, in UserHandle user);
     boolean setDefaultSoundProfile(in String id, in UserHandle user);
     SoundProfile getSoundProfile(
-            in int type, in String name, in boolean includeParams, in UserHandle user);
+            in int type, in String name, in Bundle options, in UserHandle user);
     List<SoundProfile> getSoundProfilesByPackage(
-            in String packageName, in boolean includeParams, in UserHandle user);
-    List<SoundProfile> getAvailableSoundProfiles(in boolean includeParams, in UserHandle user);
+            in String packageName, in Bundle options, in UserHandle user);
+    List<SoundProfile> getAvailableSoundProfiles(in Bundle options, in UserHandle user);
     List<String> getSoundProfilePackageNames(in UserHandle user);
     List<String> getSoundProfileAllowList(in UserHandle user);
     void setSoundProfileAllowList(in List<String> packages, in UserHandle user);
@@ -64,7 +65,7 @@ interface IMediaQualityManager {
     void registerSoundProfileCallback(in ISoundProfileCallback cb);
     void registerAmbientBacklightCallback(in IAmbientBacklightCallback cb);
 
-    List<ParamCapability> getParamCapabilities(in List<String> names, in UserHandle user);
+    List<ParameterCapability> getParameterCapabilities(in List<String> names, in UserHandle user);
 
     boolean isSupported(in UserHandle user);
     void setAutoPictureQualityEnabled(in boolean enabled, in UserHandle user);

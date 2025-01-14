@@ -18,9 +18,8 @@ package com.android.systemui.statusbar.policy.domain.interactor
 
 import android.app.AutomaticZenRule
 import android.app.Flags
-import android.app.NotificationManager.INTERRUPTION_FILTER_NONE
-import android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY
 import android.app.NotificationManager.Policy
+import android.media.AudioManager
 import android.platform.test.annotations.EnableFlags
 import android.provider.Settings
 import android.provider.Settings.Secure.ZEN_DURATION
@@ -34,6 +33,8 @@ import androidx.test.filters.SmallTest
 import com.android.internal.R
 import com.android.settingslib.notification.data.repository.updateNotificationPolicy
 import com.android.settingslib.notification.modes.TestModeBuilder
+import com.android.settingslib.notification.modes.TestModeBuilder.MANUAL_DND
+import com.android.settingslib.volume.shared.model.AudioStream
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.testScope
@@ -204,7 +205,7 @@ class ZenModeInteractorTest : SysuiTestCase() {
     @Test
     fun shouldAskForZenDuration_changesWithSetting() =
         testScope.runTest {
-            val manualDnd = TestModeBuilder.MANUAL_DND_ACTIVE
+            val manualDnd = TestModeBuilder().makeManualDnd().setActive(true).build()
 
             settingsRepository.setInt(ZEN_DURATION, ZEN_DURATION_FOREVER)
             runCurrent()
@@ -233,29 +234,27 @@ class ZenModeInteractorTest : SysuiTestCase() {
     @Test
     fun activateMode_usesCorrectDuration() =
         testScope.runTest {
-            val manualDnd = TestModeBuilder.MANUAL_DND_ACTIVE
-            zenModeRepository.addModes(listOf(manualDnd))
             settingsRepository.setInt(ZEN_DURATION, ZEN_DURATION_FOREVER)
             runCurrent()
 
-            underTest.activateMode(manualDnd)
-            assertThat(zenModeRepository.getModeActiveDuration(manualDnd.id)).isNull()
+            underTest.activateMode(MANUAL_DND)
+            assertThat(zenModeRepository.getModeActiveDuration(MANUAL_DND.id)).isNull()
 
-            zenModeRepository.deactivateMode(manualDnd.id)
+            zenModeRepository.deactivateMode(MANUAL_DND)
             settingsRepository.setInt(ZEN_DURATION, 60)
             runCurrent()
 
-            underTest.activateMode(manualDnd)
-            assertThat(zenModeRepository.getModeActiveDuration(manualDnd.id))
+            underTest.activateMode(MANUAL_DND)
+            assertThat(zenModeRepository.getModeActiveDuration(MANUAL_DND.id))
                 .isEqualTo(Duration.ofMinutes(60))
         }
 
     @Test
     fun deactivateAllModes_updatesCorrectModes() =
         testScope.runTest {
+            zenModeRepository.activateMode(MANUAL_DND)
             zenModeRepository.addModes(
                 listOf(
-                    TestModeBuilder.MANUAL_DND_ACTIVE,
                     TestModeBuilder().setName("Inactive").setActive(false).build(),
                     TestModeBuilder().setName("Active").setActive(true).build(),
                 )
@@ -389,12 +388,9 @@ class ZenModeInteractorTest : SysuiTestCase() {
         testScope.runTest {
             val dndMode by collectLastValue(underTest.dndMode)
 
-            zenModeRepository.addMode(TestModeBuilder.MANUAL_DND_INACTIVE)
-            runCurrent()
-
             assertThat(dndMode!!.isActive).isFalse()
 
-            zenModeRepository.activateMode(TestModeBuilder.MANUAL_DND_INACTIVE.id)
+            zenModeRepository.activateMode(MANUAL_DND)
             runCurrent()
 
             assertThat(dndMode!!.isActive).isTrue()
@@ -402,47 +398,12 @@ class ZenModeInteractorTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(Flags.FLAG_MODES_UI)
-    fun activeModesBlockingEverything_hasModesWithFilterNone() =
-        testScope.runTest {
-            val blockingEverything by collectLastValue(underTest.activeModesBlockingEverything)
-
-            zenModeRepository.addModes(
-                listOf(
-                    TestModeBuilder()
-                        .setName("Filter=None, Not active")
-                        .setInterruptionFilter(INTERRUPTION_FILTER_NONE)
-                        .setActive(false)
-                        .build(),
-                    TestModeBuilder()
-                        .setName("Filter=Priority, Active")
-                        .setInterruptionFilter(INTERRUPTION_FILTER_PRIORITY)
-                        .setActive(true)
-                        .build(),
-                    TestModeBuilder()
-                        .setName("Filter=None, Active")
-                        .setInterruptionFilter(INTERRUPTION_FILTER_NONE)
-                        .setActive(true)
-                        .build(),
-                    TestModeBuilder()
-                        .setName("Filter=None, Active Too")
-                        .setInterruptionFilter(INTERRUPTION_FILTER_NONE)
-                        .setActive(true)
-                        .build(),
-                )
-            )
-            runCurrent()
-
-            assertThat(blockingEverything!!.mainMode!!.name).isEqualTo("Filter=None, Active")
-            assertThat(blockingEverything!!.modeNames)
-                .containsExactly("Filter=None, Active", "Filter=None, Active Too")
-                .inOrder()
-        }
-
-    @Test
-    @EnableFlags(Flags.FLAG_MODES_UI)
     fun activeModesBlockingMedia_hasModesWithPolicyBlockingMedia() =
         testScope.runTest {
-            val blockingMedia by collectLastValue(underTest.activeModesBlockingMedia)
+            val blockingMedia by
+                collectLastValue(
+                    underTest.activeModesBlockingStream(AudioStream(AudioManager.STREAM_MUSIC))
+                )
 
             zenModeRepository.addModes(
                 listOf(
@@ -480,7 +441,10 @@ class ZenModeInteractorTest : SysuiTestCase() {
     @EnableFlags(Flags.FLAG_MODES_UI)
     fun activeModesBlockingAlarms_hasModesWithPolicyBlockingAlarms() =
         testScope.runTest {
-            val blockingAlarms by collectLastValue(underTest.activeModesBlockingAlarms)
+            val blockingAlarms by
+                collectLastValue(
+                    underTest.activeModesBlockingStream(AudioStream(AudioManager.STREAM_ALARM))
+                )
 
             zenModeRepository.addModes(
                 listOf(
@@ -511,6 +475,47 @@ class ZenModeInteractorTest : SysuiTestCase() {
             assertThat(blockingAlarms!!.mainMode!!.name).isEqualTo("Blocks alarms, Active")
             assertThat(blockingAlarms!!.modeNames)
                 .containsExactly("Blocks alarms, Active", "Blocks alarms, Active Too")
+                .inOrder()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MODES_UI)
+    fun activeModesBlockingAlarms_hasModesWithPolicyBlockingSystem() =
+        testScope.runTest {
+            val blockingSystem by
+                collectLastValue(
+                    underTest.activeModesBlockingStream(AudioStream(AudioManager.STREAM_SYSTEM))
+                )
+
+            zenModeRepository.addModes(
+                listOf(
+                    TestModeBuilder()
+                        .setName("Blocks system, Not active")
+                        .setZenPolicy(ZenPolicy.Builder().allowSystem(false).build())
+                        .setActive(false)
+                        .build(),
+                    TestModeBuilder()
+                        .setName("Allows system, Active")
+                        .setZenPolicy(ZenPolicy.Builder().allowSystem(true).build())
+                        .setActive(true)
+                        .build(),
+                    TestModeBuilder()
+                        .setName("Blocks system, Active")
+                        .setZenPolicy(ZenPolicy.Builder().allowSystem(false).build())
+                        .setActive(true)
+                        .build(),
+                    TestModeBuilder()
+                        .setName("Blocks system, Active Too")
+                        .setZenPolicy(ZenPolicy.Builder().allowSystem(false).build())
+                        .setActive(true)
+                        .build(),
+                )
+            )
+            runCurrent()
+
+            assertThat(blockingSystem!!.mainMode!!.name).isEqualTo("Blocks system, Active")
+            assertThat(blockingSystem!!.modeNames)
+                .containsExactly("Blocks system, Active", "Blocks system, Active Too")
                 .inOrder()
         }
 

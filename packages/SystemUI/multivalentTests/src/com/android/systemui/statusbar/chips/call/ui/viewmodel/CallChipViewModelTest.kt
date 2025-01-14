@@ -22,7 +22,6 @@ import android.platform.test.annotations.EnableFlags
 import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.systemui.Flags.FLAG_STATUS_BAR_CALL_CHIP_NOTIFICATION_ICON
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.coroutines.collectLastValue
@@ -126,46 +125,8 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(FLAG_STATUS_BAR_CALL_CHIP_NOTIFICATION_ICON)
-    fun chip_positiveStartTime_notifIconFlagOff_iconIsPhone() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            repo.setOngoingCallState(
-                inCallModel(startTimeMs = 1000, notificationIcon = mock<StatusBarIconView>())
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Shown).icon)
-                .isInstanceOf(OngoingActivityChipModel.ChipIcon.SingleColorIcon::class.java)
-            val icon =
-                (((latest as OngoingActivityChipModel.Shown).icon)
-                        as OngoingActivityChipModel.ChipIcon.SingleColorIcon)
-                    .impl as Icon.Resource
-            assertThat(icon.res).isEqualTo(com.android.internal.R.drawable.ic_phone)
-            assertThat(icon.contentDescription).isNotNull()
-        }
-
-    @Test
-    @EnableFlags(FLAG_STATUS_BAR_CALL_CHIP_NOTIFICATION_ICON)
-    fun chip_positiveStartTime_notifIconFlagOn_iconIsNotifIcon() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val notifIcon = mock<StatusBarIconView>()
-            repo.setOngoingCallState(inCallModel(startTimeMs = 1000, notificationIcon = notifIcon))
-
-            assertThat((latest as OngoingActivityChipModel.Shown).icon)
-                .isInstanceOf(OngoingActivityChipModel.ChipIcon.StatusBarView::class.java)
-            val actualIcon =
-                (((latest as OngoingActivityChipModel.Shown).icon)
-                        as OngoingActivityChipModel.ChipIcon.StatusBarView)
-                    .impl
-            assertThat(actualIcon).isEqualTo(notifIcon)
-        }
-
-    @Test
-    @EnableFlags(FLAG_STATUS_BAR_CALL_CHIP_NOTIFICATION_ICON, StatusBarConnectedDisplays.FLAG_NAME)
-    fun chip_positiveStartTime_notifIconAndConnectedDisplaysFlagOn_iconIsNotifIcon() =
+    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
+    fun chip_positiveStartTime_connectedDisplaysFlagOn_iconIsNotifIcon() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -186,32 +147,12 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(FLAG_STATUS_BAR_CALL_CHIP_NOTIFICATION_ICON)
-    fun chip_zeroStartTime_notifIconFlagOff_iconIsPhone() =
+    @DisableFlags(StatusBarConnectedDisplays.FLAG_NAME)
+    fun chip_zeroStartTime_cdFlagOff_iconIsNotifIcon() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
-            repo.setOngoingCallState(
-                inCallModel(startTimeMs = 0, notificationIcon = mock<StatusBarIconView>())
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Shown).icon)
-                .isInstanceOf(OngoingActivityChipModel.ChipIcon.SingleColorIcon::class.java)
-            val icon =
-                (((latest as OngoingActivityChipModel.Shown).icon)
-                        as OngoingActivityChipModel.ChipIcon.SingleColorIcon)
-                    .impl as Icon.Resource
-            assertThat(icon.res).isEqualTo(com.android.internal.R.drawable.ic_phone)
-            assertThat(icon.contentDescription).isNotNull()
-        }
-
-    @Test
-    @EnableFlags(FLAG_STATUS_BAR_CALL_CHIP_NOTIFICATION_ICON)
-    fun chip_zeroStartTime_notifIconFlagOn_iconIsNotifIcon() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val notifIcon = mock<StatusBarIconView>()
+            val notifIcon = createStatusBarIconViewOrNull()
             repo.setOngoingCallState(inCallModel(startTimeMs = 0, notificationIcon = notifIcon))
 
             assertThat((latest as OngoingActivityChipModel.Shown).icon)
@@ -224,8 +165,26 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(FLAG_STATUS_BAR_CALL_CHIP_NOTIFICATION_ICON)
-    fun chip_notifIconFlagOn_butNullNotifIcon_iconIsPhone() =
+    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
+    fun chip_zeroStartTime_cdFlagOn_iconIsNotifKeyIcon() =
+        testScope.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            repo.setOngoingCallState(
+                inCallModel(
+                    startTimeMs = 0,
+                    notificationIcon = createStatusBarIconViewOrNull(),
+                    notificationKey = "notifKey",
+                )
+            )
+
+            assertThat((latest as OngoingActivityChipModel.Shown).icon)
+                .isEqualTo(OngoingActivityChipModel.ChipIcon.StatusBarNotificationIcon("notifKey"))
+        }
+
+    @Test
+    @DisableFlags(StatusBarConnectedDisplays.FLAG_NAME)
+    fun chip_notifIconFlagOn_butNullNotifIcon_cdFlagOff_iconIsPhone() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -239,6 +198,24 @@ class CallChipViewModelTest : SysuiTestCase() {
                     .impl as Icon.Resource
             assertThat(icon.res).isEqualTo(com.android.internal.R.drawable.ic_phone)
             assertThat(icon.contentDescription).isNotNull()
+        }
+
+    @Test
+    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
+    fun chip_notifIconFlagOn_butNullNotifIcon_iconNotifKey() =
+        testScope.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            repo.setOngoingCallState(
+                inCallModel(
+                    startTimeMs = 1000,
+                    notificationIcon = null,
+                    notificationKey = "notifKey",
+                )
+            )
+
+            assertThat((latest as OngoingActivityChipModel.Shown).icon)
+                .isEqualTo(OngoingActivityChipModel.ChipIcon.StatusBarNotificationIcon("notifKey"))
         }
 
     @Test
@@ -306,14 +283,16 @@ class CallChipViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
-            val intent = mock<PendingIntent>()
-            repo.setOngoingCallState(inCallModel(startTimeMs = 1000, intent = intent))
+            val pendingIntent = mock<PendingIntent>()
+            repo.setOngoingCallState(inCallModel(startTimeMs = 1000, intent = pendingIntent))
             val clickListener = (latest as OngoingActivityChipModel.Shown).onClickListener
             assertThat(clickListener).isNotNull()
 
             clickListener!!.onClick(chipView)
 
-            verify(kosmos.activityStarter).postStartActivityDismissingKeyguard(intent, null)
+            // Ensure that the SysUI didn't modify the notification's intent by verifying it
+            // directly matches the `PendingIntent` set -- see b/212467440.
+            verify(kosmos.activityStarter).postStartActivityDismissingKeyguard(pendingIntent, null)
         }
 
     @Test
@@ -321,13 +300,24 @@ class CallChipViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
-            val intent = mock<PendingIntent>()
-            repo.setOngoingCallState(inCallModel(startTimeMs = 0, intent = intent))
+            val pendingIntent = mock<PendingIntent>()
+            repo.setOngoingCallState(inCallModel(startTimeMs = 0, intent = pendingIntent))
             val clickListener = (latest as OngoingActivityChipModel.Shown).onClickListener
             assertThat(clickListener).isNotNull()
 
             clickListener!!.onClick(chipView)
 
-            verify(kosmos.activityStarter).postStartActivityDismissingKeyguard(intent, null)
+            // Ensure that the SysUI didn't modify the notification's intent by verifying it
+            // directly matches the `PendingIntent` set -- see b/212467440.
+            verify(kosmos.activityStarter).postStartActivityDismissingKeyguard(pendingIntent, null)
         }
+
+    companion object {
+        fun createStatusBarIconViewOrNull(): StatusBarIconView? =
+            if (StatusBarConnectedDisplays.isEnabled) {
+                null
+            } else {
+                mock<StatusBarIconView>()
+            }
+    }
 }

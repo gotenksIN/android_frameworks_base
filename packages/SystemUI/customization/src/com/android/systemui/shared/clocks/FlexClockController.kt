@@ -32,21 +32,16 @@ import java.util.Locale
 import java.util.TimeZone
 
 /** Controller for the default flex clock */
-class FlexClockController(
-    private val clockCtx: ClockContext,
-    val design: ClockDesign, // TODO(b/364680879): Remove when done inlining
-) : ClockController {
+class FlexClockController(private val clockCtx: ClockContext) : ClockController {
     override val smallClock =
         FlexClockFaceController(
             clockCtx.copy(messageBuffer = clockCtx.messageBuffers.smallClockMessageBuffer),
-            design.small ?: design.large!!,
             isLargeClock = false,
         )
 
     override val largeClock =
         FlexClockFaceController(
             clockCtx.copy(messageBuffer = clockCtx.messageBuffers.largeClockMessageBuffer),
-            design.large ?: design.small!!,
             isLargeClock = true,
         )
 
@@ -55,7 +50,6 @@ class FlexClockController(
             DEFAULT_CLOCK_ID,
             clockCtx.resources.getString(R.string.clock_default_name),
             clockCtx.resources.getString(R.string.clock_default_description),
-            isReactiveToTone = true,
         )
     }
 

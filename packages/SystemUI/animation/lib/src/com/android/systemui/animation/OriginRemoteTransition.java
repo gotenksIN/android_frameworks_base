@@ -43,6 +43,7 @@ import com.android.wm.shell.shared.TransitionUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * An implementation of {@link IRemoteTransition} that accepts a {@link UIComponent} as the origin
@@ -52,6 +53,7 @@ import java.util.List;
  */
 public class OriginRemoteTransition extends IRemoteTransition.Stub {
     private static final String TAG = "OriginRemoteTransition";
+    private static final long FINISH_ANIMATION_TIMEOUT_MS = 100;
 
     private final Context mContext;
     private final boolean mIsEntry;
@@ -105,7 +107,7 @@ public class OriginRemoteTransition extends IRemoteTransition.Stub {
             IBinder mergeTarget,
             IRemoteTransitionFinishedCallback finishCallback) {
         logD("mergeAnimation - " + info);
-        mHandler.post(this::cancel);
+        cancel();
     }
 
     @Override
@@ -127,7 +129,7 @@ public class OriginRemoteTransition extends IRemoteTransition.Stub {
     @Override
     public void onTransitionConsumed(IBinder transition, boolean aborted) {
         logD("onTransitionConsumed - aborted: " + aborted);
-        mHandler.post(this::cancel);
+        cancel();
     }
 
     private void startAnimationInternal(
@@ -248,23 +250,20 @@ public class OriginRemoteTransition extends IRemoteTransition.Stub {
 
         if (mIsEntry) {
             if (!closingSurfaces.isEmpty()) {
-                tmpTransaction
-                        .setRelativeLayer(mOriginLeash, closingSurfaces.get(0), 1);
+                tmpTransaction.setRelativeLayer(mOriginLeash, closingSurfaces.get(0), 1);
             } else {
                 logW("Missing closing surface is entry transition");
             }
             if (!openingSurfaces.isEmpty()) {
-                tmpTransaction
-                        .setRelativeLayer(
-                                openingSurfaces.get(openingSurfaces.size() - 1), mOriginLeash, 1);
+                tmpTransaction.setRelativeLayer(
+                        openingSurfaces.get(openingSurfaces.size() - 1), mOriginLeash, 1);
             } else {
                 logW("Missing opening surface is entry transition");
             }
 
         } else {
             if (!openingSurfaces.isEmpty()) {
-                tmpTransaction
-                        .setRelativeLayer(mOriginLeash, openingSurfaces.get(0), 1);
+                tmpTransaction.setRelativeLayer(mOriginLeash, openingSurfaces.get(0), 1);
             } else {
                 logW("Missing opening surface is exit transition");
             }
@@ -293,12 +292,26 @@ public class OriginRemoteTransition extends IRemoteTransition.Stub {
 
     private void finishAnimation(boolean finished) {
         logD("finishAnimation: finished=" + finished);
+        OneShotRunnable finishInternalRunnable = new OneShotRunnable(this::finishInternal);
+        Runnable timeoutRunnable =
+                () -> {
+                    Log.w(TAG, "Timeout waiting for surface transaction!");
+                    finishInternalRunnable.run();
+                };
+        Runnable committedRunnable =
+                () -> {
+                    // Remove the timeout runnable.
+                    mHandler.removeCallbacks(timeoutRunnable);
+                    finishInternalRunnable.run();
+                };
         if (mAnimator == null) {
             // The transition didn't start. Ensure we apply the start transaction and report
             // finish afterwards.
             mStartTransaction
-                    .addTransactionCommittedListener(mHandler::post, this::finishInternal)
+                    .addTransactionCommittedListener(mHandler::post, committedRunnable::run)
                     .apply();
+            // Call finishInternal() anyway after the timeout.
+            mHandler.postDelayed(timeoutRunnable, FINISH_ANIMATION_TIMEOUT_MS);
             return;
         }
         mAnimator = null;
@@ -306,8 +319,10 @@ public class OriginRemoteTransition extends IRemoteTransition.Stub {
         mPlayer.onEnd(finished);
         // Detach the origin from the transition leash and report finish after it's done.
         mOriginTransaction
-                .detachFromTransitionLeash(mOrigin, mHandler::post, this::finishInternal)
+                .detachFromTransitionLeash(mOrigin, mHandler::post, committedRunnable)
                 .commit();
+        // Call finishInternal() anyway after the timeout.
+        mHandler.postDelayed(timeoutRunnable, FINISH_ANIMATION_TIMEOUT_MS);
     }
 
     private void finishInternal() {
@@ -327,11 +342,14 @@ public class OriginRemoteTransition extends IRemoteTransition.Stub {
         mFinishCallback = null;
     }
 
-    private void cancel() {
+    public void cancel() {
         logD("cancel()");
-        if (mAnimator != null) {
-            mAnimator.cancel();
-        }
+        mHandler.post(
+                () -> {
+                    if (mAnimator != null) {
+                        mAnimator.cancel();
+                    }
+                });
     }
 
     private static void logD(String msg) {
@@ -421,6 +439,23 @@ public class OriginRemoteTransition extends IRemoteTransition.Stub {
         Rect out = new Rect();
         state.bounds.roundOut(out);
         return out;
+    }
+
+    /** A {@link Runnable} that will only run once. */
+    private static class OneShotRunnable implements Runnable {
+        private final AtomicBoolean mDone = new AtomicBoolean();
+        private final Runnable mRunnable;
+
+        OneShotRunnable(Runnable runnable) {
+            this.mRunnable = runnable;
+        }
+
+        @Override
+        public void run() {
+            if (!mDone.getAndSet(true)) {
+                mRunnable.run();
+            }
+        }
     }
 
     /**

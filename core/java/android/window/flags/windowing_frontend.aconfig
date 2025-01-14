@@ -113,13 +113,6 @@ flag {
 }
 
 flag {
-    name: "predictive_back_system_anims"
-    namespace: "systemui"
-    description: "Predictive back for system animations"
-    bug: "320510464"
-}
-
-flag {
     name: "remove_activity_starter_dream_callback"
     namespace: "windowing_frontend"
     description: "Avoid a race with DreamManagerService callbacks for isDreaming by checking Activity state directly"
@@ -303,17 +296,6 @@ flag {
 }
 
 flag {
-  name: "remove_starting_window_wait_for_multi_transitions"
-  namespace: "windowing_frontend"
-  description: "Avoid remove starting window too early when playing multiple transitions"
-  bug: "362347290"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "ensure_keyguard_does_transition_starting"
   namespace: "windowing_frontend"
   description: "Ensure that keyguard is the one starting transitions, instead of delegating to Core"
@@ -433,8 +415,19 @@ flag {
 }
 
 flag {
+    name: "keep_app_window_hide_while_locked"
+    namespace: "windowing_frontend"
+    description: "Do not let app window visible while device is locked"
+    is_fixed_read_only: true
+    bug: "378088391"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "port_window_size_animation"
-    namespace: "systemui"
+    namespace: "windowing_frontend"
     description: "Port window-resize animation from legacy to shell"
     bug: "384976265"
 }

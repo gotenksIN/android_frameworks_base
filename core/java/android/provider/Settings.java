@@ -1256,12 +1256,12 @@ public final class Settings {
     /**
      * Activity Action: Show numbering system configuration settings.
      * <p>
-     * In some cases, a matching Activity may not exist, so ensure you
-     * safeguard against this.
-     * <p>
      * Input: Nothing.
      * <p>
-     * Output: Nothing.
+     * Output: After calling {@link android.app.Activity#startActivityForResult}, the callback
+     * {@code onActivityResult} will have resultCode {@link android.app.Activity#RESULT_OK} if
+     * the numbering system settings page is suitable to show on the UI. Otherwise, the result is
+     * set to {@link android.app.Activity#RESULT_CANCELED}.
      */
     @FlaggedApi(Flags.FLAG_SYSTEM_REGIONAL_PREFERENCES_API_ENABLED)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
@@ -6381,6 +6381,19 @@ public final class Settings {
                 "mouse_pointer_acceleration_enabled";
 
         /**
+         * Mouse scrolling speed setting.
+         *
+         * This is an integer value in a range between -7 and +7, so there are 15 possible values.
+         * The setting only applies when mouse scrolling acceleration is not enabled.
+         *   -7 = slowest
+         *    0 = default speed
+         *   +7 = fastest
+         *
+         * @hide
+         */
+        public static final String MOUSE_SCROLLING_SPEED = "mouse_scrolling_speed";
+
+        /**
          * Pointer fill style, specified by
          * {@link android.view.PointerIcon.PointerIconVectorStyleFill} constants.
          *
@@ -6633,6 +6646,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(PREFERRED_REGION);
             PRIVATE_SETTINGS.add(MOUSE_SCROLLING_ACCELERATION);
             PRIVATE_SETTINGS.add(CALL_CONNECTED_TONE_ENABLED);
+            PRIVATE_SETTINGS.add(MOUSE_SCROLLING_SPEED);
         }
 
         /**
@@ -9316,6 +9330,16 @@ public final class Settings {
                 "accessibility_autoclick_delay";
 
         /**
+         * Integer setting specifying the autoclick cursor area size (the radius of the autoclick
+         * ring indicator) when {@link #ACCESSIBILITY_AUTOCLICK_ENABLED} is set.
+         *
+         * @see #ACCESSIBILITY_AUTOCLICK_ENABLED
+         * @hide
+         */
+        public static final String ACCESSIBILITY_AUTOCLICK_CURSOR_AREA_SIZE =
+                "accessibility_autoclick_cursor_area_size";
+
+        /**
          * Whether or not larger size icons are used for the pointer of mouse/trackpad for
          * accessibility.
          * (0 = false, 1 = true)
@@ -10510,6 +10534,15 @@ public final class Settings {
          */
         @Readable
         public static final String SCREENSAVER_ACTIVATE_ON_SLEEP = "screensaver_activate_on_sleep";
+
+        /**
+         * If screensavers are enabled, whether the screensaver should be
+         * automatically launched when the device is stationary and upright.
+         * @hide
+         */
+        @Readable
+        public static final String SCREENSAVER_ACTIVATE_ON_POSTURED =
+                "screensaver_activate_on_postured";
 
         /**
          * If screensavers are enabled, the default screensaver component.
@@ -12234,49 +12267,6 @@ public final class Settings {
                 "back_gesture_inset_scale_right";
 
         /**
-         * Indicates whether the trackpad back gesture is enabled.
-         * <p>Type: int (0 for false, 1 for true)
-         *
-         * @hide
-         */
-        public static final String TRACKPAD_GESTURE_BACK_ENABLED = "trackpad_gesture_back_enabled";
-
-        /**
-         * Indicates whether the trackpad home gesture is enabled.
-         * <p>Type: int (0 for false, 1 for true)
-         *
-         * @hide
-         */
-        public static final String TRACKPAD_GESTURE_HOME_ENABLED = "trackpad_gesture_home_enabled";
-
-        /**
-         * Indicates whether the trackpad overview gesture is enabled.
-         * <p>Type: int (0 for false, 1 for true)
-         *
-         * @hide
-         */
-        public static final String TRACKPAD_GESTURE_OVERVIEW_ENABLED =
-                "trackpad_gesture_overview_enabled";
-
-        /**
-         * Indicates whether the trackpad notification gesture is enabled.
-         * <p>Type: int (0 for false, 1 for true)
-         *
-         * @hide
-         */
-        public static final String TRACKPAD_GESTURE_NOTIFICATION_ENABLED =
-                "trackpad_gesture_notification_enabled";
-
-        /**
-         * Indicates whether the trackpad quick switch gesture is enabled.
-         * <p>Type: int (0 for false, 1 for true)
-         *
-         * @hide
-         */
-        public static final String TRACKPAD_GESTURE_QUICK_SWITCH_ENABLED =
-                "trackpad_gesture_quick_switch_enabled";
-
-        /**
          * Current provider of proximity-based sharing services.
          * Default value in @string/config_defaultNearbySharingComponent.
          * No VALIDATOR as this setting will not be backed up.
@@ -13356,6 +13346,16 @@ public final class Settings {
          * @hide
          */
         public static final String AUTO_TIME_ZONE_EXPLICIT = "auto_time_zone_explicit";
+
+        /**
+         * Value to specify if the device should send notifications when {@link #AUTO_TIME_ZONE} is
+         * on and the device's time zone changes.
+         *
+         * <p>1=yes, 0=no.
+         *
+         * @hide
+         */
+        public static final String TIME_ZONE_NOTIFICATIONS = "time_zone_notifications";
 
         /**
          * URI for the car dock "in" event sound.
@@ -17459,13 +17459,6 @@ public final class Settings {
          */
         public static final String DEVICE_CONFIG_SYNC_DISABLED = "device_config_sync_disabled";
 
-
-        /**
-         * Whether back preview animations are played when user does a back gesture or presses
-         * the back button.
-         * @hide
-         */
-        public static final String ENABLE_BACK_ANIMATION = "enable_back_animation";
 
         /**
          * An allow list of packages for which the user has granted the permission to communicate

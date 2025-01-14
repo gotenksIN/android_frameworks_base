@@ -8909,11 +8909,15 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
         if (parent) {
             Preconditions.checkCallAuthorization(
-                    isProfileOwnerOfOrganizationOwnedDevice(getCallerIdentity().getUserId()));
+                    isProfileOwnerOfOrganizationOwnedDevice(caller.getUserId()));
+            // If a DPC is querying on the parent instance, make sure it's only querying the parent
+            // user of itself. Querying any other user is not allowed.
+            Preconditions.checkArgument(caller.getUserId() == userHandle);
         }
+        int affectedUserId = parent ? getProfileParentId(userHandle) : userHandle;
         Boolean disallowed = mDevicePolicyEngine.getResolvedPolicy(
                 PolicyDefinition.SCREEN_CAPTURE_DISABLED,
-                userHandle);
+                affectedUserId);
         return disallowed != null && disallowed;
     }
 
@@ -10466,6 +10470,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         // Reset some of the user-specific policies.
         final DevicePolicyData policy = getUserData(userId);
         policy.mPermissionPolicy = DevicePolicyManager.PERMISSION_POLICY_PROMPT;
+        mPolicyCache.setPermissionPolicy(userId, policy.mPermissionPolicy);
         // Clear delegations.
         policy.mDelegationMap.clear();
         policy.mStatusBarDisabled = false;
@@ -14669,7 +14674,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     @Override
     public void setSecondaryLockscreenEnabled(ComponentName who, boolean enabled,
             PersistableBundle options) {
-        if (Flags.secondaryLockscreenApiEnabled()) {
+        if (Flags.secondaryLockscreenApiEnabled() && mSupervisionManagerInternal != null) {
             final CallerIdentity caller = getCallerIdentity();
             final boolean isRoleHolder = isCallerSystemSupervisionRoleHolder(caller);
             synchronized (getLockObject()) {
@@ -14680,16 +14685,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         caller.getUserId());
             }
 
-            if (mSupervisionManagerInternal != null) {
-                mSupervisionManagerInternal.setSupervisionLockscreenEnabledForUser(
-                        caller.getUserId(), enabled, options);
-            } else {
-                synchronized (getLockObject()) {
-                    DevicePolicyData policy = getUserData(caller.getUserId());
-                    policy.mSecondaryLockscreenEnabled = enabled;
-                    saveSettingsLocked(caller.getUserId());
-                }
-            }
+            mSupervisionManagerInternal.setSupervisionLockscreenEnabledForUser(
+                    caller.getUserId(), enabled, options);
         } else {
             Objects.requireNonNull(who, "ComponentName is null");
 
@@ -21907,7 +21904,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                     accountToMigrate,
                     sourceUser,
                     targetUser,
-                    /* callback= */ null, /* handler= */ null)
+                    /* handler= */ null, /* callback= */ null)
                     .getResult(60 * 3, TimeUnit.SECONDS);
             if (copySucceeded) {
                 logCopyAccountStatus(COPY_ACCOUNT_SUCCEEDED, callerPackage);

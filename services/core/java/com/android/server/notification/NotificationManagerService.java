@@ -1888,6 +1888,36 @@ public class NotificationManagerService extends SystemService {
                 }
             }
         }
+
+        @Override
+        public void rebundleNotification(String key) {
+            if (!(notificationClassification() && notificationRegroupOnClassification())) {
+                return;
+            }
+            synchronized (mNotificationLock) {
+                NotificationRecord r = mNotificationsByKey.get(key);
+                if (r == null) {
+                    return;
+                }
+
+                if (DBG) {
+                    Slog.v(TAG, "rebundleNotification: " + r);
+                }
+
+                if (r.getBundleType() != Adjustment.TYPE_OTHER) {
+                    final Bundle classifBundle = new Bundle();
+                    classifBundle.putInt(KEY_TYPE, r.getBundleType());
+                    Adjustment adj = new Adjustment(r.getSbn().getPackageName(), r.getKey(),
+                            classifBundle, "rebundle", r.getUserId());
+                    applyAdjustmentLocked(r, adj, /* isPosted= */ true);
+                    mRankingHandler.requestSort();
+                } else {
+                    if (DBG) {
+                        Slog.w(TAG, "Can't rebundle. No valid bundle type for: " + r);
+                    }
+                }
+            }
+        }
     };
 
     NotificationManagerPrivate mNotificationManagerPrivate = new NotificationManagerPrivate() {
@@ -3162,6 +3192,7 @@ public class NotificationManagerService extends SystemService {
             mAssistants.onBootPhaseAppsCanStart();
             mConditionProviders.onBootPhaseAppsCanStart();
             mHistoryManager.onBootPhaseAppsCanStart();
+            mPreferencesHelper.onBootPhaseAppsCanStart();
             migrateDefaultNAS();
             maybeShowInitialReviewPermissionsNotification();
 
@@ -5903,8 +5934,9 @@ public class NotificationManagerService extends SystemService {
         // TODO: b/310620812 - Remove getZenRules() when MODES_API is inlined.
         @Override
         public List<ZenModeConfig.ZenRule> getZenRules() throws RemoteException {
-            enforcePolicyAccess(Binder.getCallingUid(), "getZenRules");
-            return mZenModeHelper.getZenRules(getCallingZenUser());
+            int callingUid = Binder.getCallingUid();
+            enforcePolicyAccess(callingUid, "getZenRules");
+            return mZenModeHelper.getZenRules(getCallingZenUser(), callingUid);
         }
 
         @Override
@@ -5912,15 +5944,17 @@ public class NotificationManagerService extends SystemService {
             if (!android.app.Flags.modesApi()) {
                 throw new IllegalStateException("getAutomaticZenRules called with flag off!");
             }
-            enforcePolicyAccess(Binder.getCallingUid(), "getAutomaticZenRules");
-            return mZenModeHelper.getAutomaticZenRules(getCallingZenUser());
+            int callingUid = Binder.getCallingUid();
+            enforcePolicyAccess(callingUid, "getAutomaticZenRules");
+            return mZenModeHelper.getAutomaticZenRules(getCallingZenUser(), callingUid);
         }
 
         @Override
         public AutomaticZenRule getAutomaticZenRule(String id) throws RemoteException {
             Objects.requireNonNull(id, "Id is null");
-            enforcePolicyAccess(Binder.getCallingUid(), "getAutomaticZenRule");
-            return mZenModeHelper.getAutomaticZenRule(getCallingZenUser(), id);
+            int callingUid = Binder.getCallingUid();
+            enforcePolicyAccess(callingUid, "getAutomaticZenRule");
+            return mZenModeHelper.getAutomaticZenRule(getCallingZenUser(), id, callingUid);
         }
 
         @Override
@@ -6065,8 +6099,9 @@ public class NotificationManagerService extends SystemService {
         @Condition.State
         public int getAutomaticZenRuleState(@NonNull String id) {
             Objects.requireNonNull(id, "id is null");
-            enforcePolicyAccess(Binder.getCallingUid(), "getAutomaticZenRuleState");
-            return mZenModeHelper.getAutomaticZenRuleState(getCallingZenUser(), id);
+            int callingUid = Binder.getCallingUid();
+            enforcePolicyAccess(callingUid, "getAutomaticZenRuleState");
+            return mZenModeHelper.getAutomaticZenRuleState(getCallingZenUser(), id, callingUid);
         }
 
         @Override
@@ -7129,6 +7164,7 @@ public class NotificationManagerService extends SystemService {
                     adjustments.putParcelable(KEY_TYPE, newChannel);
 
                     logClassificationChannelAdjustmentReceived(r, isPosted, classification);
+                    r.setBundleType(classification);
                 }
             }
             r.addAdjustment(adjustment);
@@ -9532,7 +9568,8 @@ public class NotificationManagerService extends SystemService {
                                     || !Objects.equals(oldSbn.getNotification().getGroup(),
                                         n.getNotification().getGroup())
                                     || oldSbn.getNotification().flags
-                                    != n.getNotification().flags) {
+                                    != n.getNotification().flags
+                                    || !old.getChannel().getId().equals(r.getChannel().getId())) {
                                 synchronized (mNotificationLock) {
                                     final String autogroupName =
                                             notificationForceGrouping() ?

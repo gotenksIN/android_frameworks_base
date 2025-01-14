@@ -102,13 +102,6 @@ public class FeatureFlagUtils {
     public static final String SETTINGS_NEW_KEYBOARD_TRACKPAD = "settings_new_keyboard_trackpad";
 
     /**
-     * Enable trackpad gesture settings UI
-     * @hide
-     */
-    public static final String SETTINGS_NEW_KEYBOARD_TRACKPAD_GESTURE =
-            "settings_new_keyboard_trackpad_gesture";
-
-    /**
      * Enable the new pages which is implemented with SPA.
      * @hide
      */
@@ -214,7 +207,6 @@ public class FeatureFlagUtils {
         DEFAULT_FLAGS.put(SETTINGS_NEED_CONNECTED_BLE_DEVICE_FOR_BROADCAST, "true");
         DEFAULT_FLAGS.put(SETTINGS_NEW_KEYBOARD_MODIFIER_KEY, "true");
         DEFAULT_FLAGS.put(SETTINGS_NEW_KEYBOARD_TRACKPAD, "true");
-        DEFAULT_FLAGS.put(SETTINGS_NEW_KEYBOARD_TRACKPAD_GESTURE, "false");
         DEFAULT_FLAGS.put(SETTINGS_ENABLE_SPA, "true");
         DEFAULT_FLAGS.put(SETTINGS_ENABLE_SPA_PHASE2, "false");
         DEFAULT_FLAGS.put(SETTINGS_ENABLE_SPA_METRICS, "true");
@@ -241,7 +233,6 @@ public class FeatureFlagUtils {
         PERSISTENT_FLAGS.add(SETTINGS_PROVIDER_MODEL);
         PERSISTENT_FLAGS.add(SETTINGS_NEW_KEYBOARD_MODIFIER_KEY);
         PERSISTENT_FLAGS.add(SETTINGS_NEW_KEYBOARD_TRACKPAD);
-        PERSISTENT_FLAGS.add(SETTINGS_NEW_KEYBOARD_TRACKPAD_GESTURE);
         PERSISTENT_FLAGS.add(SETTINGS_ENABLE_SPA);
         PERSISTENT_FLAGS.add(SETTINGS_ENABLE_SPA_PHASE2);
         PERSISTENT_FLAGS.add(SETTINGS_PREFER_ACCESSIBILITY_MENU_IN_SYSTEM);

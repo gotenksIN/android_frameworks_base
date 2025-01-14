@@ -76,6 +76,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.app.ActivityManager;
 import android.app.ActivityThread;
 import android.app.IApplicationThread;
 import android.content.pm.ActivityInfo;
@@ -84,6 +85,8 @@ import android.graphics.Rect;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.InputConfig;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -92,6 +95,7 @@ import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.provider.Settings;
 import android.util.ArraySet;
 import android.util.MergedConfiguration;
 import android.view.ContentRecordingSession;
@@ -109,6 +113,7 @@ import android.view.WindowManagerGlobal;
 import android.view.WindowRelayoutResult;
 import android.window.ActivityWindowInfo;
 import android.window.ClientWindowFrames;
+import android.window.ConfigurationChangeSetting;
 import android.window.InputTransferToken;
 import android.window.ScreenCapture;
 import android.window.WindowContainerToken;
@@ -126,12 +131,15 @@ import com.android.window.flags.Flags;
 import com.google.common.truth.Expect;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Build/Install/Run:
@@ -153,9 +161,15 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     @Rule
     public Expect mExpect = Expect.create();
 
+    @Before
+    public void setUp() {
+        Settings.System.clearProviderForTest();
+    }
+
     @After
     public void tearDown() {
         mWm.mSensitiveContentPackages.clearBlockedApps();
+        Settings.System.clearProviderForTest();
     }
 
     @Test
@@ -1487,14 +1501,83 @@ public class WindowManagerServiceTests extends WindowTestsBase {
         verify(mWm.mWindowPlacerLocked).requestTraversal();
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_CONDENSE_CONFIGURATION_CHANGE_FOR_SIMPLE_MODE)
+    public void createImplFromParcel_invalidSettingType_throwsException() {
+        final Parcelable.Creator<ConfigurationChangeSetting> creator =
+                new ConfigurationChangeSetting.CreatorImpl(true /* isSystem */);
+        final Parcel parcel = Parcel.obtain();
+        try {
+            parcel.writeInt(ConfigurationChangeSetting.SETTING_TYPE_UNKNOWN);
+            parcel.setDataPosition(0);
 
-    class TestResultReceiver implements IResultReceiver {
+            assertThrows(IllegalArgumentException.class, () -> {
+                creator.createFromParcel(parcel);
+            });
+        } finally {
+            parcel.recycle();
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_CONDENSE_CONFIGURATION_CHANGE_FOR_SIMPLE_MODE)
+    public void setConfigurationChangeSettingsForUser_createsFromParcel_callsSettingImpl()
+            throws Settings.SettingNotFoundException {
+        final int currentUserId = ActivityManager.getCurrentUser();
+        final int forcedDensity = 400;
+        final float forcedFontScaleFactor = 1.15f;
+        final Parcelable.Creator<ConfigurationChangeSetting> creator =
+                new ConfigurationChangeSetting.CreatorImpl(true /* isSystem */);
+        final List<ConfigurationChangeSetting> settings = Stream.of(
+                // Display Size
+                new ConfigurationChangeSetting.DensitySetting(DEFAULT_DISPLAY, forcedDensity),
+                // Font Size
+                new ConfigurationChangeSetting.FontScaleSetting(forcedFontScaleFactor)
+        ).map(setting -> simulateIpcTransfer(setting, creator)).toList();
+
+        mWm.setConfigurationChangeSettingsForUser(settings, UserHandle.USER_CURRENT);
+
+        verify(mDisplayContent).setForcedDensity(forcedDensity, currentUserId);
+        assertEquals(forcedFontScaleFactor, Settings.System.getFloat(
+                mContext.getContentResolver(), Settings.System.FONT_SCALE), 0.1f /* delta */);
+        verify(mAtm).updateFontScaleIfNeeded(currentUserId);
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_CONDENSE_CONFIGURATION_CHANGE_FOR_SIMPLE_MODE)
+    public void setConfigurationChangeSettingsForUser_flagDisabled_throwsException() {
+        final List<ConfigurationChangeSetting> settings = List.of();
+
+        assertThrows(IllegalStateException.class, () -> {
+            mWm.setConfigurationChangeSettingsForUser(settings, UserHandle.USER_CURRENT);
+        });
+    }
+
+    /**
+     * Simulates IPC transfer by writing the setting to a parcel and reading it back.
+     *
+     * @param setting the setting to transfer.
+     * @param creator the creator to use for reconstructing the setting from the parcel.
+     * @return a new instance of the setting created from the parcel.
+     */
+    private static <T extends ConfigurationChangeSetting> T simulateIpcTransfer(
+            T setting, Parcelable.Creator<T> creator) {
+        final Parcel parcel = Parcel.obtain();
+        try {
+            setting.writeToParcel(parcel, 0);
+            parcel.setDataPosition(0);
+            return creator.createFromParcel(parcel);
+        } finally {
+            parcel.recycle();
+        }
+    }
+
+    private static class TestResultReceiver implements IResultReceiver {
         public android.os.Bundle resultData;
         private final IBinder mBinder = mock(IBinder.class);
 
         @Override
-        public void send(int resultCode, android.os.Bundle resultData)
-                throws android.os.RemoteException {
+        public void send(int resultCode, android.os.Bundle resultData) {
             this.resultData = resultData;
         }
 

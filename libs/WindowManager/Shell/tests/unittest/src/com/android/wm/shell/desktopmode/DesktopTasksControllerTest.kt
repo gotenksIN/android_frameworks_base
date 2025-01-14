@@ -82,6 +82,7 @@ import com.android.dx.mockito.inline.extended.StaticMockitoSession
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.window.flags.Flags
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE
+import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP
 import com.android.window.flags.Flags.FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS
 import com.android.window.flags.Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP
 import com.android.window.flags.Flags.FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT
@@ -352,8 +353,8 @@ class DesktopTasksControllerTest : ShellTestCase() {
         taskRepository = userRepositories.current
     }
 
-    private fun createController(): DesktopTasksController {
-        return DesktopTasksController(
+    private fun createController() =
+        DesktopTasksController(
             context,
             shellInit,
             shellCommandHandler,
@@ -387,7 +388,6 @@ class DesktopTasksControllerTest : ShellTestCase() {
             desktopWallpaperActivityTokenProvider,
             Optional.of(bubbleController),
         )
-    }
 
     @After
     fun tearDown() {
@@ -566,6 +566,38 @@ class DesktopTasksControllerTest : ShellTestCase() {
         taskRepository.setTopTransparentFullscreenTaskId(DEFAULT_DISPLAY, topTransparentTask.taskId)
 
         assertThat(controller.isDesktopModeShowing(displayId = DEFAULT_DISPLAY)).isTrue()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun isDesktopModeShowing_minimizedPipTask_wallpaperVisible_returnsTrue() {
+        val pipTask = setUpPipTask(autoEnterEnabled = true)
+        whenever(desktopWallpaperActivityTokenProvider.isWallpaperActivityVisible())
+            .thenReturn(true)
+
+        taskRepository.setTaskInPip(DEFAULT_DISPLAY, pipTask.taskId, enterPip = true)
+
+        assertThat(controller.isDesktopModeShowing(displayId = DEFAULT_DISPLAY)).isTrue()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun isDesktopModeShowing_minimizedPipTask_wallpaperNotVisible_returnsFalse() {
+        val pipTask = setUpPipTask(autoEnterEnabled = true)
+        whenever(desktopWallpaperActivityTokenProvider.isWallpaperActivityVisible())
+            .thenReturn(false)
+
+        taskRepository.setTaskInPip(DEFAULT_DISPLAY, pipTask.taskId, enterPip = true)
+
+        assertThat(controller.isDesktopModeShowing(displayId = DEFAULT_DISPLAY)).isFalse()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun isDesktopModeShowing_pipTaskNotMinimizedNorVisible_returnsFalse() {
+        setUpPipTask(autoEnterEnabled = true)
+
+        assertThat(controller.isDesktopModeShowing(displayId = DEFAULT_DISPLAY)).isFalse()
     }
 
     @Test
@@ -1267,7 +1299,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         // Set task as systemUI package
         val systemUIPackageName =
             context.resources.getString(com.android.internal.R.string.config_systemUi)
-        val baseComponent = ComponentName(systemUIPackageName, /* class */ "")
+        val baseComponent = ComponentName(systemUIPackageName, /* cls= */ "")
         val task =
             setUpFullscreenTask().apply {
                 baseActivity = baseComponent
@@ -1284,7 +1316,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         // Set task as systemUI package
         val systemUIPackageName =
             context.resources.getString(com.android.internal.R.string.config_systemUi)
-        val baseComponent = ComponentName(systemUIPackageName, /* class */ "")
+        val baseComponent = ComponentName(systemUIPackageName, /* cls= */ "")
         val task =
             setUpFullscreenTask().apply {
                 baseActivity = baseComponent
@@ -1497,7 +1529,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun moveToFullscreen_tdaFullscreen_windowingModeUndefined_removesWallpaperActivity() {
         val task = setUpFreeformTask()
         assertNotNull(rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY))
@@ -1530,7 +1562,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun moveToFullscreen_tdaFreeform_windowingModeFullscreen_removesWallpaperActivity() {
         val task = setUpFreeformTask()
 
@@ -1757,12 +1789,12 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         controller.moveToNextDisplay(task.taskId)
 
-        with(getLatestWct(type = TRANSIT_CHANGE)) {
-            val wallpaperChange =
-                hierarchyOps.find { op -> op.container == wallpaperToken.asBinder() }
-            assertThat(wallpaperChange).isNotNull()
-            assertThat(wallpaperChange!!.type).isEqualTo(HIERARCHY_OP_TYPE_REMOVE_TASK)
-        }
+        val wallpaperChange =
+            getLatestWct(type = TRANSIT_CHANGE).hierarchyOps.find { op ->
+                op.container == wallpaperToken.asBinder()
+            }
+        assertNotNull(wallpaperChange)
+        assertThat(wallpaperChange.type).isEqualTo(HIERARCHY_OP_TYPE_REMOVE_TASK)
     }
 
     @Test
@@ -1792,15 +1824,13 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         controller.moveToNextDisplay(task.taskId)
 
-        with(getLatestWct(type = TRANSIT_CHANGE)) {
-            val taskChange = changes[task.token.asBinder()]
-            assertThat(taskChange).isNotNull()
-            // To preserve DP size, pixel size is changed to 320x240. The ratio of the left margin
-            // to the right margin and the ratio of the top margin to bottom margin are also
-            // preserved.
-            assertThat(taskChange!!.configuration.windowConfiguration.bounds)
-                .isEqualTo(Rect(240, 160, 560, 400))
-        }
+        val taskChange = getLatestWct(type = TRANSIT_CHANGE).changes[task.token.asBinder()]
+        assertNotNull(taskChange)
+        // To preserve DP size, pixel size is changed to 320x240. The ratio of the left margin
+        // to the right margin and the ratio of the top margin to bottom margin are also
+        // preserved.
+        assertThat(taskChange.configuration.windowConfiguration.bounds)
+            .isEqualTo(Rect(240, 160, 560, 400))
     }
 
     @Test
@@ -1831,12 +1861,10 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         controller.moveToNextDisplay(task.taskId)
 
-        with(getLatestWct(type = TRANSIT_CHANGE)) {
-            val taskChange = changes[task.token.asBinder()]
-            assertThat(taskChange).isNotNull()
-            assertThat(taskChange!!.configuration.windowConfiguration.bounds)
-                .isEqualTo(Rect(960, 480, 1280, 720))
-        }
+        val taskChange = getLatestWct(type = TRANSIT_CHANGE).changes[task.token.asBinder()]
+        assertNotNull(taskChange)
+        assertThat(taskChange.configuration.windowConfiguration.bounds)
+            .isEqualTo(Rect(960, 480, 1280, 720))
     }
 
     @Test
@@ -1864,13 +1892,11 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         controller.moveToNextDisplay(task.taskId)
 
-        with(getLatestWct(type = TRANSIT_CHANGE)) {
-            val taskChange = changes[task.token.asBinder()]
-            assertThat(taskChange).isNotNull()
-            // DP size is preserved. The window is centered in the destination display.
-            assertThat(taskChange!!.configuration.windowConfiguration.bounds)
-                .isEqualTo(Rect(320, 120, 960, 600))
-        }
+        val taskChange = getLatestWct(type = TRANSIT_CHANGE).changes[task.token.asBinder()]
+        assertNotNull(taskChange)
+        // DP size is preserved. The window is centered in the destination display.
+        assertThat(taskChange.configuration.windowConfiguration.bounds)
+            .isEqualTo(Rect(320, 120, 960, 600))
     }
 
     @Test
@@ -1903,14 +1929,12 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         controller.moveToNextDisplay(task.taskId)
 
-        with(getLatestWct(type = TRANSIT_CHANGE)) {
-            val taskChange = changes[task.token.asBinder()]
-            assertThat(taskChange).isNotNull()
-            assertThat(taskChange!!.configuration.windowConfiguration.bounds.left).isAtLeast(0)
-            assertThat(taskChange.configuration.windowConfiguration.bounds.top).isAtLeast(0)
-            assertThat(taskChange.configuration.windowConfiguration.bounds.right).isAtMost(640)
-            assertThat(taskChange.configuration.windowConfiguration.bounds.bottom).isAtMost(480)
-        }
+        val taskChange = getLatestWct(type = TRANSIT_CHANGE).changes[task.token.asBinder()]
+        assertNotNull(taskChange)
+        assertThat(taskChange.configuration.windowConfiguration.bounds.left).isAtLeast(0)
+        assertThat(taskChange.configuration.windowConfiguration.bounds.top).isAtLeast(0)
+        assertThat(taskChange.configuration.windowConfiguration.bounds.right).isAtMost(640)
+        assertThat(taskChange.configuration.windowConfiguration.bounds.bottom).isAtMost(480)
     }
 
     @Test
@@ -1973,7 +1997,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun onDesktopWindowClose_singleActiveTask_hasWallpaperActivityToken() {
         val task = setUpFreeformTask()
 
@@ -2019,7 +2043,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun onDesktopWindowClose_multipleActiveTasks_isOnlyNonClosingTask() {
         val task1 = setUpFreeformTask()
         val task2 = setUpFreeformTask()
@@ -2033,7 +2057,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun onDesktopWindowClose_multipleActiveTasks_hasMinimized() {
         val task1 = setUpFreeformTask()
         val task2 = setUpFreeformTask()
@@ -2044,6 +2068,41 @@ class DesktopTasksControllerTest : ShellTestCase() {
         controller.onDesktopWindowClose(wct, displayId = DEFAULT_DISPLAY, task1)
         // Adds remove wallpaper operation
         wct.assertReorderAt(index = 0, wallpaperToken, toTop = false)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun onDesktopWindowClose_minimizedPipPresent_doesNotExitDesktop() {
+        val freeformTask = setUpFreeformTask().apply { isFocused = true }
+        val pipTask = setUpPipTask(autoEnterEnabled = true)
+
+        taskRepository.setTaskInPip(DEFAULT_DISPLAY, pipTask.taskId, enterPip = true)
+        val wct = WindowContainerTransaction()
+        controller.onDesktopWindowClose(wct, displayId = DEFAULT_DISPLAY, freeformTask)
+
+        verifyExitDesktopWCTNotExecuted()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun onDesktopWindowClose_minimizedPipNotPresent_exitDesktop() {
+        val freeformTask = setUpFreeformTask()
+        val pipTask = setUpPipTask(autoEnterEnabled = true)
+        val handler = mock(TransitionHandler::class.java)
+        whenever(transitions.dispatchRequest(any(), any(), anyOrNull()))
+            .thenReturn(android.util.Pair(handler, WindowContainerTransaction()))
+
+        controller.minimizeTask(pipTask)
+        verifyExitDesktopWCTNotExecuted()
+
+        taskRepository.setTaskInPip(DEFAULT_DISPLAY, pipTask.taskId, enterPip = false)
+        val wct = WindowContainerTransaction()
+        controller.onDesktopWindowClose(wct, displayId = DEFAULT_DISPLAY, freeformTask)
+
+        // Remove wallpaper operation
+        wct.hierarchyOps.any { hop ->
+            hop.type == HIERARCHY_OP_TYPE_REMOVE_TASK && hop.container == wallpaperToken.asBinder()
+        }
     }
 
     @Test
@@ -2063,10 +2122,9 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    fun onDesktopWindowMinimize_pipTask_autoEnterEnabled_startPipTransition() {
+    fun onPipTaskMinimize_autoEnterEnabled_startPipTransition() {
         val task = setUpPipTask(autoEnterEnabled = true)
         val handler = mock(TransitionHandler::class.java)
-        whenever(freeformTaskTransitionStarter.startPipTransition(any())).thenReturn(Binder())
         whenever(transitions.dispatchRequest(any(), any(), anyOrNull()))
             .thenReturn(android.util.Pair(handler, WindowContainerTransaction()))
 
@@ -2077,7 +2135,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    fun onDesktopWindowMinimize_pipTask_autoEnterDisabled_startMinimizeTransition() {
+    fun onPipTaskMinimize_autoEnterDisabled_startMinimizeTransition() {
         val task = setUpPipTask(autoEnterEnabled = false)
         whenever(freeformTaskTransitionStarter.startMinimizedModeTransition(any()))
             .thenReturn(Binder())
@@ -2086,6 +2144,22 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         verify(freeformTaskTransitionStarter).startMinimizedModeTransition(any())
         verify(freeformTaskTransitionStarter, never()).startPipTransition(any())
+    }
+
+    @Test
+    fun onPipTaskMinimize_doesntRemoveWallpaper() {
+        val task = setUpPipTask(autoEnterEnabled = true)
+        val handler = mock(TransitionHandler::class.java)
+        whenever(transitions.dispatchRequest(any(), any(), anyOrNull()))
+            .thenReturn(android.util.Pair(handler, WindowContainerTransaction()))
+
+        controller.minimizeTask(task)
+
+        val captor = ArgumentCaptor.forClass(WindowContainerTransaction::class.java)
+        verify(freeformTaskTransitionStarter).startPipTransition(captor.capture())
+        captor.value.hierarchyOps.none { hop ->
+            hop.type == HIERARCHY_OP_TYPE_REMOVE_TASK && hop.container == wallpaperToken.asBinder()
+        }
     }
 
     @Test
@@ -2103,7 +2177,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun onTaskMinimize_singleActiveTask_hasWallpaperActivityToken_removesWallpaper() {
         val task = setUpFreeformTask()
         val transition = Binder()
@@ -2155,7 +2229,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun onDesktopWindowMinimize_multipleActiveTasks_minimizesTheOnlyVisibleTask_removesWallpaper() {
         val task1 = setUpFreeformTask(active = true)
         val task2 = setUpFreeformTask(active = true)
@@ -2722,7 +2796,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         // Set task as systemUI package
         val systemUIPackageName =
             context.resources.getString(com.android.internal.R.string.config_systemUi)
-        val baseComponent = ComponentName(systemUIPackageName, /* class */ "")
+        val baseComponent = ComponentName(systemUIPackageName, /* cls= */ "")
         val task =
             setUpFreeformTask().apply {
                 baseActivity = baseComponent
@@ -2743,7 +2817,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         // Set task as systemUI package
         val systemUIPackageName =
             context.resources.getString(com.android.internal.R.string.config_systemUi)
-        val baseComponent = ComponentName(systemUIPackageName, /* class */ "")
+        val baseComponent = ComponentName(systemUIPackageName, /* cls= */ "")
         val task =
             setUpFullscreenTask().apply {
                 baseActivity = baseComponent
@@ -2816,7 +2890,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY,
-        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER,
+        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER,
     )
     fun handleRequest_backTransition_singleTaskWithToken_removesWallpaper() {
         val task = setUpFreeformTask()
@@ -2857,7 +2931,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY,
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION,
-        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER,
+        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER,
     )
     fun handleRequest_backTransition_multipleTasksSingleNonClosing_removesWallpaperAndTask() {
         val task1 = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
@@ -2875,7 +2949,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY,
-        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER,
+        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER,
     )
     fun handleRequest_backTransition_multipleTasksSingleNonMinimized_removesWallpaperAndTask() {
         val task1 = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
@@ -2942,7 +3016,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY,
-        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER,
+        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER,
     )
     fun handleRequest_closeTransition_singleTaskWithToken_withWallpaper_removesWallpaper() {
         val task = setUpFreeformTask()
@@ -2982,7 +3056,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY,
-        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER,
+        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER,
     )
     fun handleRequest_closeTransition_multipleTasksSingleNonClosing_removesWallpaper() {
         val task1 = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
@@ -3000,7 +3074,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY,
-        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER,
+        Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER,
     )
     fun handleRequest_closeTransition_multipleTasksSingleNonMinimized_removesWallpaper() {
         val task1 = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
@@ -3092,7 +3166,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun moveFocusedTaskToFullscreen_onlyVisibleNonMinimizedTask_removesWallpaperActivity() {
         val task1 = setUpFreeformTask()
         val task2 = setUpFreeformTask()
@@ -3130,6 +3204,31 @@ class DesktopTasksControllerTest : ShellTestCase() {
             .isEqualTo(WINDOWING_MODE_UNDEFINED) // inherited FULLSCREEN
         // Does not remove wallpaper activity, as desktop still has visible desktop tasks
         assertThat(wct.hierarchyOps).isEmpty()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun moveFocusedTaskToFullscreen_minimizedPipPresent_removeWallpaperActivity() {
+        val freeformTask = setUpFreeformTask()
+        val pipTask = setUpPipTask(autoEnterEnabled = true)
+        val handler = mock(TransitionHandler::class.java)
+        whenever(transitions.dispatchRequest(any(), any(), anyOrNull()))
+            .thenReturn(android.util.Pair(handler, WindowContainerTransaction()))
+
+        controller.minimizeTask(pipTask)
+        verifyExitDesktopWCTNotExecuted()
+
+        freeformTask.isFocused = true
+        controller.enterFullscreen(DEFAULT_DISPLAY, transitionSource = UNKNOWN)
+
+        val wct = getLatestExitDesktopWct()
+        val taskChange = assertNotNull(wct.changes[freeformTask.token.asBinder()])
+        assertThat(taskChange.windowingMode)
+            .isEqualTo(WINDOWING_MODE_UNDEFINED) // inherited FULLSCREEN
+        // Remove wallpaper operation
+        wct.hierarchyOps.any { hop ->
+            hop.type == HIERARCHY_OP_TYPE_REMOVE_TASK && hop.container == wallpaperToken.asBinder()
+        }
     }
 
     @Test
@@ -3376,11 +3475,11 @@ class DesktopTasksControllerTest : ShellTestCase() {
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            Point(100, -100), /* position */
-            PointF(200f, -200f), /* inputCoordinate */
-            Rect(100, -100, 500, 1000), /* currentDragBounds */
-            Rect(0, 50, 2000, 2000), /* validDragArea */
-            Rect() /* dragStartBounds */,
+            position = Point(100, -100),
+            inputCoordinate = PointF(200f, -200f),
+            currentDragBounds = Rect(100, -100, 500, 1000),
+            validDragArea = Rect(0, 50, 2000, 2000),
+            dragStartBounds = Rect(),
             motionEvent,
             desktopWindowDecoration,
         )
@@ -3415,11 +3514,11 @@ class DesktopTasksControllerTest : ShellTestCase() {
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            Point(100, 200), /* position */
-            PointF(200f, 300f), /* inputCoordinate */
-            currentDragBounds, /* currentDragBounds */
-            Rect(0, 50, 2000, 2000) /* validDragArea */,
-            Rect() /* dragStartBounds */,
+            position = Point(100, 200),
+            inputCoordinate = PointF(200f, 300f),
+            currentDragBounds = currentDragBounds,
+            validDragArea = Rect(0, 50, 2000, 2000),
+            dragStartBounds = Rect(),
             motionEvent,
             desktopWindowDecoration,
         )
@@ -3459,11 +3558,11 @@ class DesktopTasksControllerTest : ShellTestCase() {
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            Point(100, 50), /* position */
-            PointF(200f, 300f), /* inputCoordinate */
-            Rect(100, 50, 500, 1000), /* currentDragBounds */
-            Rect(0, 50, 2000, 2000) /* validDragArea */,
-            Rect() /* dragStartBounds */,
+            position = Point(100, 50),
+            inputCoordinate = PointF(200f, 300f),
+            currentDragBounds = Rect(100, 50, 500, 1000),
+            validDragArea = Rect(0, 50, 2000, 2000),
+            dragStartBounds = Rect(),
             motionEvent,
             desktopWindowDecoration,
         )
@@ -3498,11 +3597,11 @@ class DesktopTasksControllerTest : ShellTestCase() {
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            Point(100, 50), /* position */
-            PointF(200f, 300f), /* inputCoordinate */
+            position = Point(100, 50),
+            inputCoordinate = PointF(200f, 300f),
             currentDragBounds,
-            Rect(0, 50, 2000, 2000) /* validDragArea */,
-            Rect() /* dragStartBounds */,
+            validDragArea = Rect(0, 50, 2000, 2000),
+            dragStartBounds = Rect(),
             motionEvent,
             desktopWindowDecoration,
         )
@@ -3555,11 +3654,11 @@ class DesktopTasksControllerTest : ShellTestCase() {
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            Point(100, 50), /* position */
-            PointF(200f, 300f), /* inputCoordinate */
-            currentDragBounds, /* currentDragBounds */
-            Rect(0, 50, 2000, 2000) /* validDragArea */,
-            Rect() /* dragStartBounds */,
+            position = Point(100, 50),
+            inputCoordinate = PointF(200f, 300f),
+            currentDragBounds = currentDragBounds,
+            validDragArea = Rect(0, 50, 2000, 2000),
+            dragStartBounds = Rect(),
             motionEvent,
             desktopWindowDecoration,
         )
@@ -3604,7 +3703,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_ON_SYSTEM_USER)
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
     fun enterSplit_onlyVisibleNonMinimizedTask_removesWallpaperActivity() {
         val task1 = setUpFreeformTask()
         val task2 = setUpFreeformTask()
@@ -4858,12 +4957,12 @@ class DesktopTasksControllerTest : ShellTestCase() {
         return task
     }
 
-    private fun setUpPipTask(autoEnterEnabled: Boolean): RunningTaskInfo {
-        return setUpFreeformTask().apply {
+    private fun setUpPipTask(autoEnterEnabled: Boolean): RunningTaskInfo =
+        // active = false marks the task as non-visible; PiP window doesn't count as visible tasks
+        setUpFreeformTask(active = false).apply {
             pictureInPictureParams =
                 PictureInPictureParams.Builder().setAutoEnterEnabled(autoEnterEnabled).build()
         }
-    }
 
     private fun setUpHomeTask(displayId: Int = DEFAULT_DISPLAY): RunningTaskInfo {
         val task = createHomeTask(displayId)
@@ -5053,7 +5152,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         task: RunningTaskInfo?,
         @WindowManager.TransitionType type: Int = TRANSIT_OPEN,
     ): TransitionRequestInfo {
-        return TransitionRequestInfo(type, task, null /* remoteTransition */)
+        return TransitionRequestInfo(type, task, /* remoteTransition= */ null)
     }
 
     private companion object {

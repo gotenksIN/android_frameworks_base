@@ -117,6 +117,7 @@ import com.android.server.wm.SurfaceAnimator.Animatable;
 import com.android.server.wm.SurfaceAnimator.AnimationType;
 import com.android.server.wm.SurfaceAnimator.OnAnimationFinishedCallback;
 import com.android.server.wm.utils.AlwaysTruePredicate;
+import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
@@ -1659,6 +1660,12 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         return ORIENTATION_UNDEFINED;
     }
 
+    @Nullable
+    ActivityRecord getActivityBelowForDefiningOrientation(ActivityRecord from) {
+        return getActivity(ActivityRecord::canDefineOrientationForActivitiesAbove,
+                from /* boundary */, false /* includeBoundary */, true /* traverseTopToBottom */);
+    }
+
     /**
      * Calls {@link #setOrientation(int, WindowContainer)} with {@code null} to the last 2
      * parameters.
@@ -2730,6 +2737,13 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         if (!mTransitionController.canAssignLayers(this)) return;
         final boolean changed = layer != mLastLayer || mLastRelativeToLayer != null;
         if (mSurfaceControl != null && changed) {
+            if (Flags.useSelfSyncTransactionForLayer() && mSyncState != SYNC_STATE_NONE) {
+                // When this container needs to be synced, assign layer with its own sync
+                // transaction to avoid out of ordering when merge.
+                // Still use the passed-in transaction for non-sync case, such as building finish
+                // transaction.
+                t = getSyncTransaction();
+            }
             setLayer(t, layer);
             mLastLayer = layer;
             mLastRelativeToLayer = null;
@@ -2740,6 +2754,13 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             boolean forceUpdate) {
         final boolean changed = layer != mLastLayer || mLastRelativeToLayer != relativeTo;
         if (mSurfaceControl != null && (changed || forceUpdate)) {
+            if (Flags.useSelfSyncTransactionForLayer() && mSyncState != SYNC_STATE_NONE) {
+                // When this container needs to be synced, assign layer with its own sync
+                // transaction to avoid out of ordering when merge.
+                // Still use the passed-in transaction for non-sync case, such as building finish
+                // transaction.
+                t = getSyncTransaction();
+            }
             setRelativeLayer(t, relativeTo, layer);
             mLastLayer = layer;
             mLastRelativeToLayer = relativeTo;

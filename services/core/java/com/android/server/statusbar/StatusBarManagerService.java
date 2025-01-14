@@ -420,6 +420,17 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
             }
         }
 
+        @Override
+        public void onWalletLaunchGestureDetected() {
+            IStatusBar bar = mBar;
+            if (bar != null) {
+                try {
+                    bar.onWalletLaunchGestureDetected();
+                } catch (RemoteException e) {
+                }
+            }
+        }
+
         /**
          * Notifies the status bar that a Emergency Action launch gesture has been detected.
          *
@@ -2186,6 +2197,19 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         enforceValidCallingUser();
         Binder.withCleanCallingIdentity(() -> {
             mNotificationDelegate.unbundleNotification(key);
+        });
+    }
+
+    /**
+     *  Called when the notification should be rebundled.
+     * @param key the notification key
+     */
+    @Override
+    public void rebundleNotification(String key) {
+        enforceStatusBarService();
+        enforceValidCallingUser();
+        Binder.withCleanCallingIdentity(() -> {
+            mNotificationDelegate.rebundleNotification(key);
         });
     }
 

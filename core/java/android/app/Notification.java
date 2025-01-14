@@ -774,8 +774,9 @@ public class Notification implements Parcelable
 
     /**
      * Bit to be bitwise-ored into the {@link #flags} field that should be
-     * set by the system if this notification is a promoted ongoing notification, either via a
-     * user setting or allowlist.
+     * set by the system if this notification is a promoted ongoing notification, both because it
+     * {@link #hasPromotableCharacteristics()} and the user has not disabled the feature for this
+     * app.
      *
      * Applications cannot set this flag directly, but the posting app and
      * {@link android.service.notification.NotificationListenerService} can read it.
@@ -1966,6 +1967,13 @@ public class Notification implements Parcelable
          */
         @SystemApi
         public static final int SEMANTIC_ACTION_CONVERSATION_IS_PHISHING = 12;
+
+        /**
+         * {@link #extras} key to a boolean defining if this action requires special visual
+         * treatment.
+         * @hide
+         */
+        public static final String EXTRA_IS_MAGIC = "android.extra.IS_MAGIC";
 
         private final Bundle mExtras;
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
@@ -5855,7 +5863,9 @@ public class Notification implements Parcelable
                 return null;
             }
             final int size = mContext.getResources().getDimensionPixelSize(
-                    R.dimen.notification_badge_size);
+                    Flags.notificationsRedesignTemplates()
+                            ? R.dimen.notification_2025_badge_size
+                            : R.dimen.notification_badge_size);
             Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             badge.setBounds(0, 0, size, size);
@@ -5980,6 +5990,15 @@ public class Notification implements Parcelable
                 contentView.setTextViewText(p.mTextViewId, null);
             }
             setHeaderlessVerticalMargins(contentView, p, hasSecondLine);
+
+            // Update margins to leave space for the top line (but not for headerless views like
+            // HUNS, which use a different layout that already accounts for that).
+            if (Flags.notificationsRedesignTemplates() && !p.mHeaderless) {
+                int margin = getContentMarginTop(mContext,
+                        R.dimen.notification_2025_content_margin_top);
+                contentView.setViewLayoutMargin(R.id.notification_main_column,
+                        RemoteViews.MARGIN_TOP, margin, TypedValue.COMPLEX_UNIT_PX);
+            }
 
             return contentView;
         }
@@ -6204,7 +6223,7 @@ public class Notification implements Parcelable
             int textColor = Colors.flattenAlpha(getPrimaryTextColor(p), pillColor);
             contentView.setInt(R.id.expand_button, "setDefaultTextColor", textColor);
             contentView.setInt(R.id.expand_button, "setDefaultPillColor", pillColor);
-            // Use different highlighted colors for e.g. unopened groups
+            // Use different highlighted colors for conversations' unread count
             if (p.mHighlightExpander) {
                 pillColor = Colors.flattenAlpha(
                         getColors(p).getTertiaryFixedDimAccentColor(), bgColor);
@@ -6452,16 +6471,6 @@ public class Notification implements Parcelable
             ColorStateList actionColor = ColorStateList.valueOf(getStandardActionColor(p));
             big.setColorStateList(R.id.snooze_button, "setImageTintList", actionColor);
             big.setColorStateList(R.id.bubble_button, "setImageTintList", actionColor);
-
-            // Update margins to leave space for the top line (but not for HUNs, which use a
-            // different layout that already accounts for that).
-            if (Flags.notificationsRedesignTemplates()
-                    && p.mViewType != StandardTemplateParams.VIEW_TYPE_HEADS_UP) {
-                int margin = getContentMarginTop(mContext,
-                        R.dimen.notification_2025_content_margin_top);
-                big.setViewLayoutMargin(R.id.notification_main_column, RemoteViews.MARGIN_TOP,
-                        margin, TypedValue.COMPLEX_UNIT_PX);
-            }
 
             boolean validRemoteInput = false;
 
@@ -6804,8 +6813,6 @@ public class Notification implements Parcelable
         public RemoteViews makeNotificationGroupHeader() {
             return makeNotificationHeader(mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_GROUP_HEADER)
-                    // Highlight group expander until the group is first opened
-                    .highlightExpander(Flags.notificationsRedesignTemplates())
                     .fillTextsFrom(this));
         }
 
@@ -6935,6 +6942,12 @@ public class Notification implements Parcelable
         public RemoteViews makePublicContentView(boolean isLowPriority) {
             if (mN.publicVersion != null) {
                 final Builder builder = recoverBuilder(mContext, mN.publicVersion);
+                // copy non-sensitive style fields to the public style
+                if (mStyle instanceof Notification.MessagingStyle privateStyle) {
+                    if (builder.mStyle instanceof Notification.MessagingStyle publicStyle) {
+                        publicStyle.mConversationType = privateStyle.mConversationType;
+                    }
+                }
                 return builder.createContentView();
             }
             Bundle savedBundle = mN.extras;
@@ -6981,14 +6994,12 @@ public class Notification implements Parcelable
          * @param useRegularSubtext uses the normal subtext set if there is one available. Otherwise
          *                          a new subtext is created consisting of the content of the
          *                          notification.
-         * @param highlightExpander whether the expander should use the highlighted colors
          * @hide
          */
-        public RemoteViews makeLowPriorityContentView(boolean useRegularSubtext,
-                boolean highlightExpander) {
+        public RemoteViews makeLowPriorityContentView(boolean useRegularSubtext) {
             StandardTemplateParams p = mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_MINIMIZED)
-                    .highlightExpander(highlightExpander)
+                    .highlightExpander(false)
                     .fillTextsFrom(this);
             if (!useRegularSubtext || TextUtils.isEmpty(p.mSubText)) {
                 p.summaryText(createSummaryText());

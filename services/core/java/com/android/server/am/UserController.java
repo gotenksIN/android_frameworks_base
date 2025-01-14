@@ -125,7 +125,6 @@ import android.view.Display;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.policy.IKeyguardDismissCallback;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.ObjectUtils;
@@ -160,7 +159,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 /**
  * Helper class for {@link ActivityManagerService} responsible for multi-user functionality.
@@ -224,14 +223,6 @@ class UserController implements Handler.Callback {
      * observer when it never calls back.
      */
     private static final int USER_SWITCH_CALLBACKS_TIMEOUT_MS = 5 * 1000;
-
-    /**
-     * Amount of time waited for {@link WindowManagerService#dismissKeyguard} callbacks to be
-     * called after dismissing the keyguard.
-     * Otherwise, we should move on to dismiss the dialog {@link #dismissUserSwitchDialog()}
-     * and report user switch is complete {@link #REPORT_USER_SWITCH_COMPLETE_MSG}.
-     */
-    private static final int DISMISS_KEYGUARD_TIMEOUT_MS = 2 * 1000;
 
     /**
      * Time after last scheduleOnUserCompletedEvent() call at which USER_COMPLETED_EVENT_MSG will be
@@ -453,11 +444,6 @@ class UserController implements Handler.Callback {
         @Override
         public void onUserCreated(UserInfo user, Object token) {
             onUserAdded(user);
-        }
-
-        @Override
-        public void onUserRemoved(UserInfo user) {
-            UserController.this.onUserRemoved(user.id);
         }
     };
 
@@ -1920,8 +1906,14 @@ class UserController implements Handler.Callback {
                 return false;
             }
 
-            mHandler.post(() -> startUserInternalOnHandler(userId, oldUserId, userStartMode,
-                    unlockListener, callingUid, callingPid));
+            final Runnable continueStartUserInternal = () -> continueStartUserInternal(userInfo,
+                    oldUserId, userStartMode, unlockListener, callingUid, callingPid);
+            if (foreground) {
+                mHandler.post(() -> dispatchOnBeforeUserSwitching(userId, () ->
+                        mHandler.post(continueStartUserInternal)));
+            } else {
+                continueStartUserInternal.run();
+            }
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
@@ -1929,11 +1921,11 @@ class UserController implements Handler.Callback {
         return true;
     }
 
-    private void startUserInternalOnHandler(int userId, int oldUserId, int userStartMode,
+    private void continueStartUserInternal(UserInfo userInfo, int oldUserId, int userStartMode,
             IProgressListener unlockListener, int callingUid, int callingPid) {
         final TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         final boolean foreground = userStartMode == USER_START_MODE_FOREGROUND;
-        final UserInfo userInfo = getUserInfo(userId);
+        final int userId = userInfo.id;
 
         boolean needStart = false;
         boolean updateUmState = false;
@@ -1995,7 +1987,6 @@ class UserController implements Handler.Callback {
             // it should be moved outside, but for now it's not as there are many calls to
             // external components here afterwards
             updateProfileRelatedCaches();
-            dispatchOnBeforeUserSwitching(userId);
             mInjector.getWindowManager().setCurrentUser(userId);
             mInjector.reportCurWakefulnessUsageEvent();
             // Once the internal notion of the active user has switched, we lock the device
@@ -2004,7 +1995,7 @@ class UserController implements Handler.Callback {
                 mInjector.getWindowManager().setSwitchingUser(true);
                 // Only lock if the user has a secure keyguard PIN/Pattern/Pwd
                 if (mInjector.getKeyguardManager().isDeviceSecure(userId)) {
-                    // Make sure the device is locked before moving on with the user switch
+                    Slogf.d(TAG, "Locking the device before moving on with the user switch");
                     mInjector.lockDeviceNowAndWaitForKeyguardShown();
                 }
             }
@@ -2296,24 +2287,41 @@ class UserController implements Handler.Callback {
         mUserSwitchObservers.finishBroadcast();
     }
 
-    private void dispatchOnBeforeUserSwitching(@UserIdInt int newUserId) {
+    private void dispatchOnBeforeUserSwitching(@UserIdInt int newUserId, Runnable onComplete) {
         final TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         t.traceBegin("dispatchOnBeforeUserSwitching-" + newUserId);
-        final int observerCount = mUserSwitchObservers.beginBroadcast();
-        for (int i = 0; i < observerCount; i++) {
-            final String name = "#" + i + " " + mUserSwitchObservers.getBroadcastCookie(i);
-            t.traceBegin("onBeforeUserSwitching-" + name);
+        final AtomicBoolean isFirst = new AtomicBoolean(true);
+        startTimeoutForOnBeforeUserSwitching(isFirst, onComplete);
+        informUserSwitchObservers((observer, callback) -> {
             try {
-                mUserSwitchObservers.getBroadcastItem(i).onBeforeUserSwitching(newUserId);
+                observer.onBeforeUserSwitching(newUserId, callback);
             } catch (RemoteException e) {
-                // Ignore
-            } finally {
-                t.traceEnd();
+                // ignore
             }
-        }
-        mUserSwitchObservers.finishBroadcast();
+        }, () -> {
+            if (isFirst.getAndSet(false)) {
+                onComplete.run();
+            }
+        }, "onBeforeUserSwitching");
         t.traceEnd();
     }
+
+    private void startTimeoutForOnBeforeUserSwitching(AtomicBoolean isFirst,
+            Runnable onComplete) {
+        final long timeout = getUserSwitchTimeoutMs();
+        mHandler.postDelayed(() -> {
+            if (isFirst.getAndSet(false)) {
+                String unresponsiveObservers;
+                synchronized (mLock) {
+                    unresponsiveObservers = String.join(", ", mCurWaitingUserSwitchCallbacks);
+                }
+                Slogf.e(TAG, "Timeout on dispatchOnBeforeUserSwitching. These UserSwitchObservers "
+                        + "did not respond in " + timeout + "ms: " + unresponsiveObservers + ".");
+                onComplete.run();
+            }
+        }, timeout);
+    }
+
 
     /** Called on handler thread */
     @VisibleForTesting
@@ -2527,70 +2535,76 @@ class UserController implements Handler.Callback {
         t.traceBegin("dispatchUserSwitch-" + oldUserId + "-to-" + newUserId);
 
         EventLog.writeEvent(EventLogTags.UC_DISPATCH_USER_SWITCH, oldUserId, newUserId);
-
-        final int observerCount = mUserSwitchObservers.beginBroadcast();
-        if (observerCount > 0) {
-            final ArraySet<String> curWaitingUserSwitchCallbacks = new ArraySet<>();
-            synchronized (mLock) {
-                uss.switching = true;
-                mCurWaitingUserSwitchCallbacks = curWaitingUserSwitchCallbacks;
+        uss.switching = true;
+        informUserSwitchObservers((observer, callback) -> {
+            try {
+                observer.onUserSwitching(newUserId, callback);
+            } catch (RemoteException e) {
+                // ignore
             }
-            final AtomicInteger waitingCallbacksCount = new AtomicInteger(observerCount);
-            final long userSwitchTimeoutMs = getUserSwitchTimeoutMs();
-            final long dispatchStartedTime = SystemClock.elapsedRealtime();
-            for (int i = 0; i < observerCount; i++) {
-                final long dispatchStartedTimeForObserver = SystemClock.elapsedRealtime();
-                try {
-                    // Prepend with unique prefix to guarantee that keys are unique
-                    final String name = "#" + i + " " + mUserSwitchObservers.getBroadcastCookie(i);
-                    synchronized (mLock) {
-                        curWaitingUserSwitchCallbacks.add(name);
-                    }
-                    final IRemoteCallback callback = new IRemoteCallback.Stub() {
-                        @Override
-                        public void sendResult(Bundle data) throws RemoteException {
-                            asyncTraceEnd("onUserSwitching-" + name, newUserId);
-                            synchronized (mLock) {
-                                long delayForObserver = SystemClock.elapsedRealtime()
-                                        - dispatchStartedTimeForObserver;
-                                if (delayForObserver > LONG_USER_SWITCH_OBSERVER_WARNING_TIME_MS) {
-                                    Slogf.w(TAG, "User switch slowed down by observer " + name
-                                            + ": result took " + delayForObserver
-                                            + " ms to process.");
-                                }
-
-                                long totalDelay = SystemClock.elapsedRealtime()
-                                        - dispatchStartedTime;
-                                if (totalDelay > userSwitchTimeoutMs) {
-                                    Slogf.e(TAG, "User switch timeout: observer " + name
-                                            + "'s result was received " + totalDelay
-                                            + " ms after dispatchUserSwitch.");
-                                }
-
-                                curWaitingUserSwitchCallbacks.remove(name);
-                                // Continue switching if all callbacks have been notified and
-                                // user switching session is still valid
-                                if (waitingCallbacksCount.decrementAndGet() == 0
-                                        && (curWaitingUserSwitchCallbacks
-                                        == mCurWaitingUserSwitchCallbacks)) {
-                                    sendContinueUserSwitchLU(uss, oldUserId, newUserId);
-                                }
-                            }
-                        }
-                    };
-                    asyncTraceBegin("onUserSwitching-" + name, newUserId);
-                    mUserSwitchObservers.getBroadcastItem(i).onUserSwitching(newUserId, callback);
-                } catch (RemoteException e) {
-                    // Ignore
-                }
-            }
-        } else {
+        }, () -> {
             synchronized (mLock) {
                 sendContinueUserSwitchLU(uss, oldUserId, newUserId);
             }
+        }, "onUserSwitching");
+        t.traceEnd();
+    }
+
+    void informUserSwitchObservers(BiConsumer<IUserSwitchObserver, IRemoteCallback> consumer,
+            final Runnable onComplete, String trace) {
+        final int observerCount = mUserSwitchObservers.beginBroadcast();
+        if (observerCount == 0) {
+            onComplete.run();
+            mUserSwitchObservers.finishBroadcast();
+            return;
+        }
+        final ArraySet<String> curWaitingUserSwitchCallbacks = new ArraySet<>();
+        synchronized (mLock) {
+            mCurWaitingUserSwitchCallbacks = curWaitingUserSwitchCallbacks;
+        }
+        final AtomicInteger waitingCallbacksCount = new AtomicInteger(observerCount);
+        final long userSwitchTimeoutMs = getUserSwitchTimeoutMs();
+        final long dispatchStartedTime = SystemClock.elapsedRealtime();
+        for (int i = 0; i < observerCount; i++) {
+            final long dispatchStartedTimeForObserver = SystemClock.elapsedRealtime();
+            // Prepend with unique prefix to guarantee that keys are unique
+            final String name = "#" + i + " " + mUserSwitchObservers.getBroadcastCookie(i);
+            synchronized (mLock) {
+                curWaitingUserSwitchCallbacks.add(name);
+            }
+            final IRemoteCallback callback = new IRemoteCallback.Stub() {
+                @Override
+                public void sendResult(Bundle data) throws RemoteException {
+                    asyncTraceEnd(trace + "-" + name, 0);
+                    synchronized (mLock) {
+                        long delayForObserver = SystemClock.elapsedRealtime()
+                                - dispatchStartedTimeForObserver;
+                        if (delayForObserver > LONG_USER_SWITCH_OBSERVER_WARNING_TIME_MS) {
+                            Slogf.w(TAG, "User switch slowed down by observer " + name
+                                    + ": result took " + delayForObserver
+                                    + " ms to process. " + trace);
+                        }
+                        long totalDelay = SystemClock.elapsedRealtime() - dispatchStartedTime;
+                        if (totalDelay > userSwitchTimeoutMs) {
+                            Slogf.e(TAG, "User switch timeout: observer " + name
+                                    + "'s result was received " + totalDelay
+                                    + " ms after dispatchUserSwitch. " + trace);
+                        }
+                        curWaitingUserSwitchCallbacks.remove(name);
+                        // Continue switching if all callbacks have been notified and
+                        // user switching session is still valid
+                        if (waitingCallbacksCount.decrementAndGet() == 0
+                                && (curWaitingUserSwitchCallbacks
+                                == mCurWaitingUserSwitchCallbacks)) {
+                            onComplete.run();
+                        }
+                    }
+                }
+            };
+            asyncTraceBegin(trace + "-" + name, 0);
+            consumer.accept(mUserSwitchObservers.getBroadcastItem(i), callback);
         }
         mUserSwitchObservers.finishBroadcast();
-        t.traceEnd(); // end dispatchUserSwitch-
     }
 
     @GuardedBy("mLock")
@@ -2611,7 +2625,7 @@ class UserController implements Handler.Callback {
 
         EventLog.writeEvent(EventLogTags.UC_CONTINUE_USER_SWITCH, oldUserId, newUserId);
 
-        // Do the keyguard dismiss and dismiss the user switching dialog later
+        // Dismiss the user switching dialog and complete the user switch
         mHandler.removeMessages(COMPLETE_USER_SWITCH_MSG);
         mHandler.sendMessage(mHandler.obtainMessage(
                 COMPLETE_USER_SWITCH_MSG, oldUserId, newUserId));
@@ -2626,31 +2640,17 @@ class UserController implements Handler.Callback {
 
     @VisibleForTesting
     void completeUserSwitch(int oldUserId, int newUserId) {
-        final boolean isUserSwitchUiEnabled = isUserSwitchUiEnabled();
-        // serialize each conditional step
-        await(
-                // STEP 1 - If there is no challenge set, dismiss the keyguard right away
-                isUserSwitchUiEnabled && !mInjector.getKeyguardManager().isDeviceSecure(newUserId),
-                mInjector::dismissKeyguard,
-                () -> await(
-                        // STEP 2 - If user switch ui was enabled, dismiss user switch dialog
-                        isUserSwitchUiEnabled,
-                        this::dismissUserSwitchDialog,
-                        () -> {
-                            // STEP 3 - Send REPORT_USER_SWITCH_COMPLETE_MSG to broadcast
-                            // ACTION_USER_SWITCHED & call UserSwitchObservers.onUserSwitchComplete
-                            mHandler.removeMessages(REPORT_USER_SWITCH_COMPLETE_MSG);
-                            mHandler.sendMessage(mHandler.obtainMessage(
-                                    REPORT_USER_SWITCH_COMPLETE_MSG, oldUserId, newUserId));
-                        }
-                ));
-    }
-
-    private void await(boolean condition, Consumer<Runnable> conditionalStep, Runnable nextStep) {
-        if (condition) {
-            conditionalStep.accept(nextStep);
+        final Runnable runnable = () -> {
+            // Send REPORT_USER_SWITCH_COMPLETE_MSG to broadcast ACTION_USER_SWITCHED and call
+            // onUserSwitchComplete on UserSwitchObservers.
+            mHandler.removeMessages(REPORT_USER_SWITCH_COMPLETE_MSG);
+            mHandler.sendMessage(mHandler.obtainMessage(
+                    REPORT_USER_SWITCH_COMPLETE_MSG, oldUserId, newUserId));
+        };
+        if (isUserSwitchUiEnabled()) {
+            dismissUserSwitchDialog(runnable);
         } else {
-            nextStep.run();
+            runnable.run();
         }
     }
 
@@ -3352,10 +3352,12 @@ class UserController implements Handler.Callback {
                 if (mUserProfileGroupIds.keyAt(i) == userId
                         || mUserProfileGroupIds.valueAt(i) == userId) {
                     mUserProfileGroupIds.removeAt(i);
-
                 }
             }
             mCurrentProfileIds = ArrayUtils.removeInt(mCurrentProfileIds, userId);
+            mUserLru.remove((Integer) userId);
+            mStartedUsers.remove(userId);
+            updateStartedUserArrayLU();
         }
     }
 
@@ -4098,33 +4100,6 @@ class UserController implements Handler.Callback {
             return IStorageManager.Stub.asInterface(ServiceManager.getService("mount"));
         }
 
-        protected void dismissKeyguard(Runnable runnable) {
-            final AtomicBoolean isFirst = new AtomicBoolean(true);
-            final Runnable runOnce = () -> {
-                if (isFirst.getAndSet(false)) {
-                    runnable.run();
-                }
-            };
-
-            mHandler.postDelayed(runOnce, DISMISS_KEYGUARD_TIMEOUT_MS);
-            getWindowManager().dismissKeyguard(new IKeyguardDismissCallback.Stub() {
-                @Override
-                public void onDismissError() throws RemoteException {
-                    mHandler.post(runOnce);
-                }
-
-                @Override
-                public void onDismissSucceeded() throws RemoteException {
-                    mHandler.post(runOnce);
-                }
-
-                @Override
-                public void onDismissCancelled() throws RemoteException {
-                    mHandler.post(runOnce);
-                }
-            }, /* message= */ null);
-        }
-
         boolean isHeadlessSystemUserMode() {
             return UserManager.isHeadlessSystemUserMode();
         }
@@ -4149,6 +4124,7 @@ class UserController implements Handler.Callback {
 
         void lockDeviceNowAndWaitForKeyguardShown() {
             if (getWindowManager().isKeyguardLocked()) {
+                Slogf.w(TAG, "Not locking the device since the keyguard is already locked");
                 return;
             }
 

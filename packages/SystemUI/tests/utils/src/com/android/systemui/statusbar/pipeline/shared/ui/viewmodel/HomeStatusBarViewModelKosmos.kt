@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.pipeline.shared.ui.viewmodel
 
+import android.content.testableContext
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
 import com.android.systemui.kosmos.Kosmos
@@ -26,6 +27,7 @@ import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.statusbar.chips.ui.viewmodel.ongoingActivityChipsViewModel
 import com.android.systemui.statusbar.events.domain.interactor.systemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.featurepods.popups.ui.viewmodel.statusBarPopupChipsViewModel
+import com.android.systemui.statusbar.layout.ui.viewmodel.multiDisplayStatusBarContentInsetsViewModelStore
 import com.android.systemui.statusbar.notification.domain.interactor.activeNotificationsInteractor
 import com.android.systemui.statusbar.notification.stack.domain.interactor.headsUpNotificationInteractor
 import com.android.systemui.statusbar.phone.domain.interactor.darkIconInteractor
@@ -36,6 +38,7 @@ import com.android.systemui.statusbar.pipeline.shared.domain.interactor.homeStat
 var Kosmos.homeStatusBarViewModel: HomeStatusBarViewModel by
     Kosmos.Fixture {
         HomeStatusBarViewModelImpl(
+            testableContext.displayId,
             homeStatusBarInteractor,
             homeStatusBarIconBlockListInteractor,
             lightsOutInteractor,
@@ -51,6 +54,7 @@ var Kosmos.homeStatusBarViewModel: HomeStatusBarViewModel by
             ongoingActivityChipsViewModel,
             statusBarPopupChipsViewModel,
             systemStatusEventAnimationInteractor,
+            multiDisplayStatusBarContentInsetsViewModelStore,
             applicationCoroutineScope,
         )
     }

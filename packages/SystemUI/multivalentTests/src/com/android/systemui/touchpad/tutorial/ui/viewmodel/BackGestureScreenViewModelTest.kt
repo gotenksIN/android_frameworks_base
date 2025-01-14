@@ -16,36 +16,46 @@
 
 package com.android.systemui.touchpad.tutorial.ui.viewmodel
 
+import android.content.res.mockResources
 import android.view.MotionEvent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
-import com.android.systemui.common.ui.domain.interactor.configurationInteractor
+import com.android.systemui.inputdevice.tutorial.inputDeviceTutorialLogger
+import com.android.systemui.inputdevice.tutorial.ui.composable.TutorialActionState
+import com.android.systemui.inputdevice.tutorial.ui.composable.TutorialActionState.Error
+import com.android.systemui.inputdevice.tutorial.ui.composable.TutorialActionState.Finished
+import com.android.systemui.inputdevice.tutorial.ui.composable.TutorialActionState.InProgress
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.testKosmos
-import com.android.systemui.touchpad.tutorial.ui.composable.GestureUiState
-import com.android.systemui.touchpad.tutorial.ui.composable.GestureUiState.Error
-import com.android.systemui.touchpad.tutorial.ui.composable.GestureUiState.Finished
-import com.android.systemui.touchpad.tutorial.ui.composable.GestureUiState.InProgress
 import com.android.systemui.touchpad.tutorial.ui.gesture.MultiFingerGesture.Companion.SWIPE_DISTANCE
 import com.android.systemui.touchpad.tutorial.ui.gesture.ThreeFingerGesture
+import com.android.systemui.touchpad.ui.gesture.touchpadGestureResources
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.whenever
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class BackGestureScreenViewModelTest : SysuiTestCase() {
 
     private val kosmos = testKosmos()
+    private val resources = kosmos.mockResources
     private val fakeConfigRepository = kosmos.fakeConfigurationRepository
-    private val viewModel = BackGestureScreenViewModel(kosmos.configurationInteractor)
+    private val viewModel =
+        BackGestureScreenViewModel(
+            GestureRecognizerAdapter(
+                BackGestureRecognizerProvider(kosmos.touchpadGestureResources),
+                kosmos.inputDeviceTutorialLogger,
+            )
+        )
 
     @Before
     fun before() {
@@ -61,8 +71,8 @@ class BackGestureScreenViewModelTest : SysuiTestCase() {
                 expected =
                     InProgress(
                         progress = 1f,
-                        progressStartMarker = "gesture to L",
-                        progressEndMarker = "end progress L",
+                        startMarker = "gesture to L",
+                        endMarker = "end progress L",
                     ),
             )
         }
@@ -75,8 +85,8 @@ class BackGestureScreenViewModelTest : SysuiTestCase() {
                 expected =
                     InProgress(
                         progress = 1f,
-                        progressStartMarker = "gesture to R",
-                        progressEndMarker = "end progress R",
+                        startMarker = "gesture to R",
+                        endMarker = "end progress R",
                     ),
             )
         }
@@ -104,7 +114,7 @@ class BackGestureScreenViewModelTest : SysuiTestCase() {
         kosmos.runTest {
             fun performBackGesture() =
                 ThreeFingerGesture.swipeLeft().forEach { viewModel.handleEvent(it) }
-            val state by collectLastValue(viewModel.gestureUiState)
+            val state by collectLastValue(viewModel.tutorialState)
             performBackGesture()
             assertThat(state).isInstanceOf(Finished::class.java)
 
@@ -115,22 +125,30 @@ class BackGestureScreenViewModelTest : SysuiTestCase() {
         }
 
     private fun setThresholdResource(threshold: Float) {
-        fakeConfigRepository.setDimensionPixelSize(
-            R.dimen.touchpad_tutorial_gestures_distance_threshold,
-            (threshold).toInt(),
-        )
+        whenever(
+                resources.getDimensionPixelSize(
+                    R.dimen.touchpad_tutorial_gestures_distance_threshold
+                )
+            )
+            .thenReturn(threshold.toInt())
         fakeConfigRepository.onAnyConfigurationChange()
     }
 
-    private fun Kosmos.assertProgressWhileMovingFingers(deltaX: Float, expected: GestureUiState) {
+    private fun Kosmos.assertProgressWhileMovingFingers(
+        deltaX: Float,
+        expected: TutorialActionState,
+    ) {
         assertStateAfterEvents(
             events = ThreeFingerGesture.eventsForGestureInProgress { move(deltaX = deltaX) },
             expected = expected,
         )
     }
 
-    private fun Kosmos.assertStateAfterEvents(events: List<MotionEvent>, expected: GestureUiState) {
-        val state by collectLastValue(viewModel.gestureUiState)
+    private fun Kosmos.assertStateAfterEvents(
+        events: List<MotionEvent>,
+        expected: TutorialActionState,
+    ) {
+        val state by collectLastValue(viewModel.tutorialState)
         events.forEach { viewModel.handleEvent(it) }
         assertThat(state).isEqualTo(expected)
     }

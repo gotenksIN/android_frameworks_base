@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.animation.scene.transformation.Transformation
+import com.android.internal.jank.Cuj.CujType
 
 /** Define the [transitions][SceneTransitions] to be used with a [SceneTransitionLayout]. */
 fun transitions(builder: SceneTransitionsBuilder.() -> Unit): SceneTransitions {
@@ -39,7 +40,7 @@ interface SceneTransitionsBuilder {
      * The default [AnimationSpec] used when after the user lifts their finger after starting a
      * swipe to transition, to animate back into one of the 2 scenes we are transitioning to.
      */
-    var defaultSwipeSpec: SpringSpec<Float>
+    var defaultMotionSpatialSpec: SpringSpec<Float>
 
     /**
      * The [InterruptionHandler] used when transitions are interrupted. Defaults to
@@ -64,6 +65,7 @@ interface SceneTransitionsBuilder {
     fun to(
         to: ContentKey,
         key: TransitionKey? = null,
+        @CujType cuj: Int? = null,
         preview: (TransitionBuilder.() -> Unit)? = null,
         reversePreview: (TransitionBuilder.() -> Unit)? = null,
         builder: TransitionBuilder.() -> Unit = {},
@@ -90,6 +92,7 @@ interface SceneTransitionsBuilder {
         from: ContentKey,
         to: ContentKey? = null,
         key: TransitionKey? = null,
+        @CujType cuj: Int? = null,
         preview: (TransitionBuilder.() -> Unit)? = null,
         reversePreview: (TransitionBuilder.() -> Unit)? = null,
         builder: TransitionBuilder.() -> Unit = {},
@@ -142,9 +145,12 @@ interface TransitionBuilder : BaseTransitionBuilder {
      * The [SpringSpec] used to animate the associated transition progress when the transition was
      * started by a swipe and is now animating back to a scene because the user lifted their finger.
      *
-     * If `null`, then the [SceneTransitionsBuilder.defaultSwipeSpec] will be used.
+     * If `null`, then the [SceneTransitionsBuilder.defaultMotionSpatialSpec] will be used.
      */
-    var swipeSpec: SpringSpec<Float>?
+    var motionSpatialSpec: SpringSpec<Float>?
+
+    /** The CUJ associated to this transitions. */
+    @CujType var cuj: Int?
 
     /**
      * Define a timestamp-based range for the transformations inside [builder].

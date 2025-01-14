@@ -1968,7 +1968,7 @@
     <!-- Text displayed indicating that the user is connected to a satellite signal. -->
     <string name="satellite_connected_carrier_text">Satellite SOS</string>
     <!-- Text displayed indicating that the user might be able to use satellite SOS. -->
-    <string name="satellite_emergency_only_carrier_text">Emergency calls or SOS</string>
+    <string name="satellite_emergency_only_carrier_text">Emergency calls or SOS only</string>
 
     <!-- Content description skeleton. Input strings should be carrier name and signal bar description [CHAR LIMIT=NONE]-->
     <string name="accessibility_phone_string_format"><xliff:g id="carrier_name" example="Carrier Name">%1$s</xliff:g>, <xliff:g id="signal_strength_description" example="two bars">%2$s</xliff:g>.</string>
@@ -2314,6 +2314,9 @@
     <string name="group_system_lock_screen">Lock screen</string>
     <!-- User visible title for the keyboard shortcut that pulls up Notes app for quick memo. [CHAR LIMIT=70] -->
     <string name="group_system_quick_memo">Take a note</string>
+    <!-- TODO(b/383734125): make it translatable once string is finalized by UXW.-->
+    <!-- User visible title for the keyboard shortcut that toggles Voice Access. [CHAR LIMIT=70] -->
+    <string name="group_system_toggle_voice_access" translatable="false">Toggle Voice Access</string>
 
     <!-- User visible title for the multitasking keyboard shortcuts list. [CHAR LIMIT=70] -->
     <string name="keyboard_shortcut_group_system_multitasking">Multitasking</string>
@@ -3814,7 +3817,7 @@
     <!-- Title at the top of the keyboard shortcut helper UI when in customize mode. The helper
          is a component that shows the user which keyboard shortcuts they can use.
          [CHAR LIMIT=NONE] -->
-    <string name="shortcut_helper_customize_mode_title">Customize keyboard shortcuts</string>
+    <string name="shortcut_helper_customize_mode_title">Customize shortcuts</string>
     <!-- Title at the top of the keyboard shortcut helper remove shortcut dialog.
          The helper is a component that shows the user which keyboard shortcuts they can use. Also
          allows the user to add/remove custom shortcuts.[CHAR LIMIT=NONE] -->
@@ -3935,6 +3938,16 @@
          The helper is a component that shows the user which keyboard shortcuts they can use.
          [CHAR LIMIT=NONE] -->
     <string name="shortcut_helper_plus_symbol">+</string>
+    <!-- Accessibility label for the plus icon on a shortcut in shortcut helper that allows the user
+         to add a new custom shortcut.
+         The helper is a component that shows the user which keyboard shortcuts they can use.
+         [CHAR LIMIT=NONE] -->
+    <string name="shortcut_helper_add_shortcut_button_label">Add shortcut</string>
+    <!-- Accessibility label for the bin(trash) icon on a shortcut in shortcut helper that allows the
+         user to delete an existing custom shortcut.
+         The helper is a component that shows the user which keyboard shortcuts they can use.
+         [CHAR LIMIT=NONE] -->
+    <string name="shortcut_helper_delete_shortcut_button_label">Delete shortcut</string>
 
     <!-- Keyboard touchpad tutorial scheduler-->
     <!-- Notification title for launching keyboard tutorial [CHAR_LIMIT=100] -->

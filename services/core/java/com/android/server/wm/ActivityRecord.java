@@ -233,6 +233,7 @@ import static com.android.server.wm.IdentifierProto.USER_ID;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_COPY_TO_CLIENT;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
+import static com.android.server.wm.StartingData.AFTER_TRANSITION_FINISH;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_APP_TRANSITION;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_PREDICT_BACK;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
@@ -2691,11 +2692,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         // Only do transfer after transaction has done when starting window exist.
         if (mStartingData != null) {
-            final boolean isWaitingForSyncTransactionCommit =
-                    Flags.removeStartingWindowWaitForMultiTransitions()
-                            ? getSyncTransactionCommitCallbackDepth() > 0
-                            : mStartingData.mWaitForSyncTransactionCommit;
-            if (isWaitingForSyncTransactionCommit) {
+            if (getSyncTransactionCommitCallbackDepth() > 0) {
                 mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_COPY_TO_CLIENT;
                 return true;
             }
@@ -2841,8 +2838,26 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         attachStartingSurfaceToAssociatedTask();
     }
 
+    /**
+     * If the device is locked and the app does not request showWhenLocked,
+     * defer removing the starting window until the transition is complete.
+     * This prevents briefly appearing the app context and causing secure concern.
+     */
+    void deferStartingWindowRemovalForKeyguardUnoccluding() {
+        if (mStartingData.mRemoveAfterTransaction != AFTER_TRANSITION_FINISH
+                && isKeyguardLocked() && !canShowWhenLockedInner(this) && !isVisibleRequested()
+                && mTransitionController.inTransition(this)) {
+            mStartingData.mRemoveAfterTransaction = AFTER_TRANSITION_FINISH;
+        }
+    }
+
     void removeStartingWindow() {
         boolean prevEligibleForLetterboxEducation = isEligibleForLetterboxEducation();
+
+        if (mStartingData != null
+                && mStartingData.mRemoveAfterTransaction == AFTER_TRANSITION_FINISH) {
+            return;
+        }
 
         if (transferSplashScreenIfNeeded()) {
             return;
@@ -2858,21 +2873,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     }
 
     @Override
-    void waitForSyncTransactionCommit(ArraySet<WindowContainer> wcAwaitingCommit) {
-        super.waitForSyncTransactionCommit(wcAwaitingCommit);
-        if (mStartingData != null) {
-            mStartingData.mWaitForSyncTransactionCommit = true;
-        }
-    }
-
-    @Override
     void onSyncTransactionCommitted(SurfaceControl.Transaction t) {
         super.onSyncTransactionCommitted(t);
         if (mStartingData == null) {
             return;
         }
         final StartingData lastData = mStartingData;
-        lastData.mWaitForSyncTransactionCommit = false;
         if (lastData.mRemoveAfterTransaction == AFTER_TRANSACTION_REMOVE_DIRECTLY) {
             removeStartingWindowAnimation(lastData.mPrepareRemoveAnimation);
         } else if (lastData.mRemoveAfterTransaction == AFTER_TRANSACTION_COPY_TO_CLIENT) {
@@ -2902,12 +2908,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final boolean animate;
         final boolean hasImeSurface;
         if (mStartingData != null) {
-            final boolean isWaitingForSyncTransactionCommit =
-                    Flags.removeStartingWindowWaitForMultiTransitions()
-                            ? getSyncTransactionCommitCallbackDepth() > 0
-                            : mStartingData.mWaitForSyncTransactionCommit;
-            if (isWaitingForSyncTransactionCommit
-                    || mSyncState != SYNC_STATE_NONE) {
+            if (getSyncTransactionCommitCallbackDepth() > 0 || mSyncState != SYNC_STATE_NONE) {
                 mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
                 mStartingData.mPrepareRemoveAnimation = prepareAnimation;
                 return;
@@ -3250,7 +3251,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 true /* forActivity */)) {
             return false;
         }
-        if (mAppCompatController.mAllowRestrictedResizability.getAsBoolean()) {
+        if (mAppCompatController.getResizeOverrides().allowRestrictedResizability()) {
             return false;
         }
         // If the user preference respects aspect ratio, then it becomes non-resizable.
@@ -3281,8 +3282,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             // The caller will check both application and activity level property.
             return true;
         }
-        return !AppCompatController.allowRestrictedResizability(wms.mContext.getPackageManager(),
-                appInfo.packageName);
+        return !AppCompatResizeOverrides.allowRestrictedResizability(
+                wms.mContext.getPackageManager(), appInfo.packageName);
     }
 
     boolean isResizeable() {
@@ -4311,7 +4312,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     }
 
     void finishRelaunching() {
-        mAppCompatController.getAppCompatOrientationOverrides()
+        mAppCompatController.getOrientationOverrides()
                 .setRelaunchingAfterRequestedOrientationChanged(false);
         mTaskSupervisor.getActivityMetricsLogger().notifyActivityRelaunched(this);
 
@@ -4705,6 +4706,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 tStartingWindow.mToken = this;
                 tStartingWindow.mActivityRecord = this;
 
+                if (mStartingData.mRemoveAfterTransaction == AFTER_TRANSITION_FINISH) {
+                    mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_IDLE;
+                }
                 if (mStartingData.mRemoveAfterTransaction == AFTER_TRANSACTION_REMOVE_DIRECTLY) {
                     // The removal of starting window should wait for window drawn of current
                     // activity.
@@ -8320,10 +8324,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (task != null && requestedOrientation == SCREEN_ORIENTATION_BEHIND) {
             // We use Task here because we want to be consistent with what happens in
             // multi-window mode where other tasks orientations are ignored.
-            final ActivityRecord belowCandidate = task.getActivity(
-                    a -> a.canDefineOrientationForActivitiesAbove() /* callback */,
-                    this /* boundary */, false /* includeBoundary */,
-                    true /* traverseTopToBottom */);
+            final ActivityRecord belowCandidate = task.getActivityBelowForDefiningOrientation(this);
             if (belowCandidate != null) {
                 return belowCandidate.getRequestedConfigurationOrientation(forDisplay);
             }
@@ -8417,7 +8418,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 mLastReportedConfiguration.getMergedConfiguration())) {
             ensureActivityConfiguration(false /* ignoreVisibility */);
             if (mPendingRelaunchCount > originalRelaunchingCount) {
-                mAppCompatController.getAppCompatOrientationOverrides()
+                mAppCompatController.getOrientationOverrides()
                         .setRelaunchingAfterRequestedOrientationChanged(true);
             }
             if (mTransitionController.inPlayingTransition(this)) {
@@ -8630,8 +8631,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      */
     @ActivityInfo.SizeChangesSupportMode
     private int supportsSizeChanges() {
-        if (mAppCompatController.getAppCompatResizeOverrides()
-                .shouldOverrideForceNonResizeApp()) {
+        final AppCompatResizeOverrides resizeOverrides = mAppCompatController.getResizeOverrides();
+        if (resizeOverrides.shouldOverrideForceNonResizeApp()) {
             return SIZE_CHANGES_UNSUPPORTED_OVERRIDE;
         }
 
@@ -8639,8 +8640,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return SIZE_CHANGES_SUPPORTED_METADATA;
         }
 
-        if (mAppCompatController.getAppCompatResizeOverrides()
-                .shouldOverrideForceResizeApp()) {
+        if (resizeOverrides.shouldOverrideForceResizeApp()) {
             return SIZE_CHANGES_SUPPORTED_OVERRIDE;
         }
 
@@ -8940,7 +8940,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             navBarInsets = Insets.NONE;
         }
         final AppCompatReachabilityOverrides reachabilityOverrides =
-                mAppCompatController.getAppCompatReachabilityOverrides();
+                mAppCompatController.getReachabilityOverrides();
         // Horizontal position
         int offsetX = 0;
         if (parentBounds.width() != screenResolvedBoundsWidth) {
@@ -9172,13 +9172,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 || orientationRespectedWithInsets)) {
             return;
         }
-        final AppCompatDisplayInsets mAppCompatDisplayInsets = getAppCompatDisplayInsets();
+        final AppCompatDisplayInsets appCompatDisplayInsets = getAppCompatDisplayInsets();
         final AppCompatSizeCompatModePolicy scmPolicy =
                 mAppCompatController.getAppCompatSizeCompatModePolicy();
 
-        if (scmPolicy.hasAppCompatDisplayInsetsWithoutInheritance()
-                && mAppCompatDisplayInsets != null
-                && !mAppCompatDisplayInsets.mIsInFixedOrientationOrAspectRatioLetterbox) {
+        if (appCompatDisplayInsets != null
+                && !appCompatDisplayInsets.mIsInFixedOrientationOrAspectRatioLetterbox) {
             // App prefers to keep its original size.
             // If the size compat is from previous fixed orientation letterboxing, we may want to
             // have fixed orientation letterbox again, otherwise it will show the size compat
@@ -9230,8 +9229,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 .applyDesiredAspectRatio(newParentConfig, parentBounds, resolvedBounds,
                         containingBoundsWithInsets, containingBounds);
 
-        if (scmPolicy.hasAppCompatDisplayInsetsWithoutInheritance()) {
-            mAppCompatDisplayInsets.getBoundsByRotation(mTmpBounds,
+        if (appCompatDisplayInsets != null) {
+            appCompatDisplayInsets.getBoundsByRotation(mTmpBounds,
                     newParentConfig.windowConfiguration.getRotation());
             if (resolvedBounds.width() != mTmpBounds.width()
                     || resolvedBounds.height() != mTmpBounds.height()) {
@@ -9254,7 +9253,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         // Calculate app bounds using fixed orientation bounds because they will be needed later
         // for comparison with size compat app bounds in {@link resolveSizeCompatModeConfiguration}.
-        mResolveConfigHint.mTmpCompatInsets = mAppCompatDisplayInsets;
+        mResolveConfigHint.mTmpCompatInsets = appCompatDisplayInsets;
         computeConfigByResolveHint(getResolvedOverrideConfiguration(), newParentConfig);
         mAppCompatController.getAppCompatAspectRatioPolicy()
                 .setLetterboxBoundsForFixedOrientationAndAspectRatio(new Rect(resolvedBounds));
@@ -10415,10 +10414,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 mAppCompatController.getAppCompatAspectRatioOverrides()
                         .shouldOverrideMinAspectRatio());
         proto.write(SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP,
-                mAppCompatController.getAppCompatOrientationOverrides()
+                mAppCompatController.getOrientationOverrides()
                         .shouldIgnoreOrientationRequestLoop());
         proto.write(SHOULD_OVERRIDE_FORCE_RESIZE_APP,
-                mAppCompatController.getAppCompatResizeOverrides().shouldOverrideForceResizeApp());
+                mAppCompatController.getResizeOverrides().shouldOverrideForceResizeApp());
         proto.write(SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS,
                 mAppCompatController.getAppCompatAspectRatioOverrides()
                         .shouldEnableUserAspectRatioSettings());

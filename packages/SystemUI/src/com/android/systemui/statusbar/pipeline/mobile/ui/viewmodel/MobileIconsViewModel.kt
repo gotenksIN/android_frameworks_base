@@ -31,6 +31,7 @@ import com.android.systemui.statusbar.pipeline.mobile.ui.VerboseMobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernStatusBarMobileView
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
@@ -65,7 +66,7 @@ constructor(
     @Background private val scope: CoroutineScope,
 ) {
     @VisibleForTesting
-    val reuseCache = mutableMapOf<Int, Pair<MobileIconViewModel, CoroutineScope>>()
+    val reuseCache = ConcurrentHashMap<Int, Pair<MobileIconViewModel, CoroutineScope>>()
 
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions

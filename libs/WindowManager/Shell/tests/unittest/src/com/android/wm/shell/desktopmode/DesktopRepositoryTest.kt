@@ -25,6 +25,7 @@ import android.view.Display.DEFAULT_DISPLAY
 import android.view.Display.INVALID_DISPLAY
 import androidx.test.filters.SmallTest
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE
+import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.common.ShellExecutor
@@ -668,10 +669,10 @@ class DesktopRepositoryTest : ShellTestCase() {
     }
 
     @Test
-    fun removeFreeformTask_invalidDisplay_removesTaskFromFreeformTasks() {
+    fun removeTask_invalidDisplay_removesTaskFromFreeformTasks() {
         repo.addTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
 
-        repo.removeFreeformTask(INVALID_DISPLAY, taskId = 1)
+        repo.removeTask(INVALID_DISPLAY, taskId = 1)
 
         val invalidDisplayTasks = repo.getFreeformTasksInZOrder(INVALID_DISPLAY)
         assertThat(invalidDisplayTasks).isEmpty()
@@ -681,11 +682,11 @@ class DesktopRepositoryTest : ShellTestCase() {
 
     @Test
     @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE)
-    fun removeFreeformTask_invalidDisplay_persistenceEnabled_removesTaskFromFreeformTasks() {
+    fun removeTask_invalidDisplay_persistenceEnabled_removesTaskFromFreeformTasks() {
         runTest(StandardTestDispatcher()) {
             repo.addTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
 
-            repo.removeFreeformTask(INVALID_DISPLAY, taskId = 1)
+            repo.removeTask(INVALID_DISPLAY, taskId = 1)
 
             verify(persistentRepository)
                 .addOrUpdateDesktop(
@@ -707,10 +708,10 @@ class DesktopRepositoryTest : ShellTestCase() {
     }
 
     @Test
-    fun removeFreeformTask_validDisplay_removesTaskFromFreeformTasks() {
+    fun removeTask_validDisplay_removesTaskFromFreeformTasks() {
         repo.addTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
 
-        repo.removeFreeformTask(DEFAULT_DISPLAY, taskId = 1)
+        repo.removeTask(DEFAULT_DISPLAY, taskId = 1)
 
         val tasks = repo.getFreeformTasksInZOrder(DEFAULT_DISPLAY)
         assertThat(tasks).isEmpty()
@@ -718,11 +719,11 @@ class DesktopRepositoryTest : ShellTestCase() {
 
     @Test
     @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE)
-    fun removeFreeformTask_validDisplay_persistenceEnabled_removesTaskFromFreeformTasks() {
+    fun removeTask_validDisplay_persistenceEnabled_removesTaskFromFreeformTasks() {
         runTest(StandardTestDispatcher()) {
             repo.addTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
 
-            repo.removeFreeformTask(DEFAULT_DISPLAY, taskId = 1)
+            repo.removeTask(DEFAULT_DISPLAY, taskId = 1)
 
             verify(persistentRepository)
                 .addOrUpdateDesktop(
@@ -744,10 +745,10 @@ class DesktopRepositoryTest : ShellTestCase() {
     }
 
     @Test
-    fun removeFreeformTask_validDisplay_differentDisplay_doesNotRemovesTask() {
+    fun removeTask_validDisplay_differentDisplay_doesNotRemovesTask() {
         repo.addTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
 
-        repo.removeFreeformTask(SECOND_DISPLAY, taskId = 1)
+        repo.removeTask(SECOND_DISPLAY, taskId = 1)
 
         val tasks = repo.getFreeformTasksInZOrder(DEFAULT_DISPLAY)
         assertThat(tasks).containsExactly(1)
@@ -755,11 +756,11 @@ class DesktopRepositoryTest : ShellTestCase() {
 
     @Test
     @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE)
-    fun removeFreeformTask_validDisplayButDifferentDisplay_persistenceEnabled_doesNotRemoveTask() {
+    fun removeTask_validDisplayButDifferentDisplay_persistenceEnabled_doesNotRemoveTask() {
         runTest(StandardTestDispatcher()) {
             repo.addTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
 
-            repo.removeFreeformTask(SECOND_DISPLAY, taskId = 1)
+            repo.removeTask(SECOND_DISPLAY, taskId = 1)
 
             verify(persistentRepository)
                 .addOrUpdateDesktop(
@@ -781,57 +782,57 @@ class DesktopRepositoryTest : ShellTestCase() {
     }
 
     @Test
-    fun removeFreeformTask_removesTaskBoundsBeforeMaximize() {
+    fun removeTask_removesTaskBoundsBeforeMaximize() {
         val taskId = 1
         repo.addTask(THIRD_DISPLAY, taskId, isVisible = true)
         repo.saveBoundsBeforeMaximize(taskId, Rect(0, 0, 200, 200))
 
-        repo.removeFreeformTask(THIRD_DISPLAY, taskId)
+        repo.removeTask(THIRD_DISPLAY, taskId)
 
         assertThat(repo.removeBoundsBeforeMaximize(taskId)).isNull()
     }
 
     @Test
-    fun removeFreeformTask_removesTaskBoundsBeforeImmersive() {
+    fun removeTask_removesTaskBoundsBeforeImmersive() {
         val taskId = 1
         repo.addTask(THIRD_DISPLAY, taskId, isVisible = true)
         repo.saveBoundsBeforeFullImmersive(taskId, Rect(0, 0, 200, 200))
 
-        repo.removeFreeformTask(THIRD_DISPLAY, taskId)
+        repo.removeTask(THIRD_DISPLAY, taskId)
 
         assertThat(repo.removeBoundsBeforeFullImmersive(taskId)).isNull()
     }
 
     @Test
-    fun removeFreeformTask_removesActiveTask() {
+    fun removeTask_removesActiveTask() {
         val taskId = 1
         val listener = TestListener()
         repo.addActiveTaskListener(listener)
         repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true)
 
-        repo.removeFreeformTask(THIRD_DISPLAY, taskId)
+        repo.removeTask(THIRD_DISPLAY, taskId)
 
         assertThat(repo.isActiveTask(taskId)).isFalse()
         assertThat(listener.activeChangesOnDefaultDisplay).isEqualTo(2)
     }
 
     @Test
-    fun removeFreeformTask_unminimizesTask() {
+    fun removeTask_unminimizesTask() {
         val taskId = 1
         repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true)
         repo.minimizeTask(DEFAULT_DISPLAY, taskId)
 
-        repo.removeFreeformTask(DEFAULT_DISPLAY, taskId)
+        repo.removeTask(DEFAULT_DISPLAY, taskId)
 
         assertThat(repo.isMinimizedTask(taskId)).isFalse()
     }
 
     @Test
-    fun removeFreeformTask_updatesTaskVisibility() {
+    fun removeTask_updatesTaskVisibility() {
         val taskId = 1
         repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true)
 
-        repo.removeFreeformTask(THIRD_DISPLAY, taskId)
+        repo.removeTask(THIRD_DISPLAY, taskId)
 
         assertThat(repo.isVisibleTask(taskId)).isFalse()
     }
@@ -1065,6 +1066,67 @@ class DesktopRepositoryTest : ShellTestCase() {
 
         assertThat(repo.getTaskInFullImmersiveState(DEFAULT_DESKTOP_ID)).isEqualTo(1)
         assertThat(repo.getTaskInFullImmersiveState(DEFAULT_DESKTOP_ID + 1)).isEqualTo(2)
+    }
+
+    @Test
+    fun setTaskInPip_savedAsMinimizedPipInDisplay() {
+        assertThat(repo.isTaskMinimizedPipInDisplay(DEFAULT_DESKTOP_ID, taskId = 1)).isFalse()
+
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = true)
+
+        assertThat(repo.isTaskMinimizedPipInDisplay(DEFAULT_DESKTOP_ID, taskId = 1)).isTrue()
+    }
+
+    @Test
+    fun removeTaskInPip_removedAsMinimizedPipInDisplay() {
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = true)
+        assertThat(repo.isTaskMinimizedPipInDisplay(DEFAULT_DESKTOP_ID, taskId = 1)).isTrue()
+
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = false)
+
+        assertThat(repo.isTaskMinimizedPipInDisplay(DEFAULT_DESKTOP_ID, taskId = 1)).isFalse()
+    }
+
+    @Test
+    fun setTaskInPip_multipleDisplays_bothAreInPip() {
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = true)
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID + 1, taskId = 2, enterPip = true)
+
+        assertThat(repo.isTaskMinimizedPipInDisplay(DEFAULT_DESKTOP_ID, taskId = 1)).isTrue()
+        assertThat(repo.isTaskMinimizedPipInDisplay(DEFAULT_DESKTOP_ID + 1, taskId = 2)).isTrue()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun setPipShouldKeepDesktopActive_shouldKeepDesktopActive() {
+        assertThat(repo.shouldDesktopBeActiveForPip(DEFAULT_DESKTOP_ID)).isFalse()
+
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = true)
+        repo.setPipShouldKeepDesktopActive(DEFAULT_DESKTOP_ID, keepActive = true)
+
+        assertThat(repo.shouldDesktopBeActiveForPip(DEFAULT_DESKTOP_ID)).isTrue()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun setPipShouldNotKeepDesktopActive_shouldNotKeepDesktopActive() {
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = true)
+        assertThat(repo.shouldDesktopBeActiveForPip(DEFAULT_DESKTOP_ID)).isTrue()
+
+        repo.setPipShouldKeepDesktopActive(DEFAULT_DESKTOP_ID, keepActive = false)
+
+        assertThat(repo.shouldDesktopBeActiveForPip(DEFAULT_DESKTOP_ID)).isFalse()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
+    fun removeTaskInPip_shouldNotKeepDesktopActive() {
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = true)
+        assertThat(repo.shouldDesktopBeActiveForPip(DEFAULT_DESKTOP_ID)).isTrue()
+
+        repo.setTaskInPip(DEFAULT_DESKTOP_ID, taskId = 1, enterPip = false)
+
+        assertThat(repo.shouldDesktopBeActiveForPip(DEFAULT_DESKTOP_ID)).isFalse()
     }
 
     class TestListener : DesktopRepository.ActiveTasksListener {

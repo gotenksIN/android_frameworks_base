@@ -66,12 +66,14 @@ constructor(
     private val model: Flow<VolumeDialogStreamModel> =
         interactor.slider
             .filter {
-                val lastVolumeUpdateTime = userVolumeUpdates.value?.timestampMillis ?: 0
+                val currentVolumeUpdate = userVolumeUpdates.value ?: return@filter true
+                val lastVolumeUpdateTime = currentVolumeUpdate.timestampMillis
                 getTimestampMillis() - lastVolumeUpdateTime > VOLUME_UPDATE_GRACE_PERIOD
             }
             .stateIn(coroutineScope, SharingStarted.Eagerly, null)
             .filterNotNull()
 
+    val isDisabledByZenMode: Flow<Boolean> = interactor.isDisabledByZenMode
     val state: Flow<VolumeDialogSliderStateModel> =
         model
             .flatMapLatest { streamModel ->
@@ -81,7 +83,7 @@ constructor(
                             level = level,
                             levelMin = levelMin,
                             levelMax = levelMax,
-                            isMuted = muted,
+                            isMuted = muteSupported && muted,
                             isRoutedToBluetooth = routedToBluetooth,
                         )
                     }

@@ -258,7 +258,6 @@ public class MockingOomAdjusterTests {
         mService.mOomAdjuster = mService.mProcessStateController.getOomAdjuster();
         mService.mOomAdjuster.mAdjSeq = 10000;
         mService.mWakefulness = new AtomicInteger(PowerManagerInternal.WAKEFULNESS_AWAKE);
-        mSetFlagsRule.enableFlags(Flags.FLAG_NEW_FGS_RESTRICTION_LOGIC);
 
         mUiTierSize = mService.mConstants.TIERED_CACHED_ADJ_UI_TIER_SIZE;
         mFirstNonUiCachedAdj = sFirstUiCachedAdj + mUiTierSize;
@@ -740,6 +739,43 @@ public class MockingOomAdjusterTests {
 
         assertNoCpuTime(app);
         assertNoCpuTime(app2);
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    @EnableFlags(Flags.FLAG_USE_CPU_TIME_CAPABILITY)
+    public void testUpdateOomAdjFreezeState_receivers() {
+        final ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID,
+                MOCKAPP_PROCESSNAME, MOCKAPP_PACKAGENAME, true);
+
+        updateOomAdj(app);
+        assertNoCpuTime(app);
+
+        app.mReceivers.incrementCurReceivers();
+        updateOomAdj(app);
+        assertCpuTime(app);
+
+        app.mReceivers.decrementCurReceivers();
+        updateOomAdj(app);
+        assertNoCpuTime(app);
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    @EnableFlags(Flags.FLAG_USE_CPU_TIME_CAPABILITY)
+    public void testUpdateOomAdjFreezeState_activeInstrumentation() {
+        ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
+                MOCKAPP_PACKAGENAME, true);
+        updateOomAdj(app);
+        assertNoCpuTime(app);
+
+        mProcessStateController.setActiveInstrumentation(app, mock(ActiveInstrumentation.class));
+        updateOomAdj(app);
+        assertCpuTime(app);
+
+        mProcessStateController.setActiveInstrumentation(app, null);
+        updateOomAdj(app);
+        assertNoCpuTime(app);
     }
 
     @SuppressWarnings("GuardedBy")

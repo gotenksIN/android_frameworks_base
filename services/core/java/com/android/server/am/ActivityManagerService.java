@@ -256,7 +256,7 @@ import android.app.ServiceStartNotAllowedException;
 import android.app.WaitResult;
 import android.app.assist.ActivityId;
 import android.app.backup.BackupAnnotations.BackupDestination;
-import android.app.backup.IBackupManager;
+import android.app.backup.BackupManagerInternal;
 import android.app.compat.CompatChanges;
 import android.app.job.JobParameters;
 import android.app.usage.UsageEvents;
@@ -4574,11 +4574,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 final int userId = app.userId;
                 final String packageName = app.info.packageName;
                 mHandler.post(() -> {
-                    try {
-                        getBackupManager().agentDisconnectedForUser(userId, packageName);
-                    } catch (RemoteException e) {
-                        // Can't happen; the backup manager is local
-                    }
+                    LocalServices.getService(BackupManagerInternal.class).agentDisconnectedForUser(
+                            packageName, userId);
                 });
             }
         } else {
@@ -12967,6 +12964,28 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             }
 
+            final long kernelCmaUsage = Debug.getKernelCmaUsageKb();
+            if (kernelCmaUsage >= 0) {
+                pw.print("      Kernel CMA: ");
+                pw.println(stringifyKBSize(kernelCmaUsage));
+                // CMA memory can be in one of the following four states:
+                //
+                // 1. Free, in which case it is accounted for as part of MemFree, which
+                //    is already considered in the lostRAM calculation below.
+                //
+                // 2. Allocated as part of a userspace allocated, in which case it is
+                //    already accounted for in the total PSS value that was computed.
+                //
+                // 3. Allocated for storing compressed memory (ZRAM) on Android kernels.
+                //    This is accounted for by calculating the amount of memory ZRAM
+                //    consumes and including it in the lostRAM calculuation.
+                //
+                // 4. Allocated by a kernel driver, in which case, it is currently not
+                //    attributed to any term that has been derived thus far. Since the
+                //    allocations come from a kernel driver, add it to kernelUsed.
+                kernelUsed += kernelCmaUsage;
+            }
+
              // Note: ION/DMA-BUF heap pools are reclaimable and hence, they are included as part of
              // memInfo.getCachedSizeKb().
             final long lostRAM = memInfo.getTotalSizeKb()
@@ -13484,12 +13503,32 @@ public class ActivityManagerService extends IActivityManager.Stub
                 proto.write(MemInfoDumpProto.CACHED_KERNEL_KB, memInfo.getCachedSizeKb());
                 proto.write(MemInfoDumpProto.FREE_KB, memInfo.getFreeSizeKb());
             }
+            // CMA memory can be in one of the following four states:
+            //
+            // 1. Free, in which case it is accounted for as part of MemFree, which
+            //    is already considered in the lostRAM calculation below.
+            //
+            // 2. Allocated as part of a userspace allocated, in which case it is
+            //    already accounted for in the total PSS value that was computed.
+            //
+            // 3. Allocated for storing compressed memory (ZRAM) on Android Kernels.
+            //    This is accounted for by calculating hte amount of memory ZRAM
+            //    consumes and including it in the lostRAM calculation.
+            //
+            // 4. Allocated by a kernel driver, in which case, it is currently not
+            //    attributed to any term that has been derived thus far, so subtract
+            //    it from lostRAM.
+            long kernelCmaUsage = Debug.getKernelCmaUsageKb();
+            if (kernelCmaUsage < 0) {
+                kernelCmaUsage = 0;
+            }
             long lostRAM = memInfo.getTotalSizeKb()
                     - (ss[INDEX_TOTAL_PSS] - ss[INDEX_TOTAL_SWAP_PSS])
                     - memInfo.getFreeSizeKb() - memInfo.getCachedSizeKb()
                     // NR_SHMEM is subtracted twice (getCachedSizeKb() and getKernelUsedSizeKb())
                     + memInfo.getShmemSizeKb()
-                    - memInfo.getKernelUsedSizeKb() - memInfo.getZramTotalSizeKb();
+                    - memInfo.getKernelUsedSizeKb() - memInfo.getZramTotalSizeKb()
+                    - kernelCmaUsage;
             proto.write(MemInfoDumpProto.USED_PSS_KB, ss[INDEX_TOTAL_PSS] - cachedPss);
             proto.write(MemInfoDumpProto.USED_KERNEL_KB, memInfo.getKernelUsedSizeKb());
             proto.write(MemInfoDumpProto.LOST_RAM_KB, lostRAM);
@@ -13608,11 +13647,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (DEBUG_BACKUP || DEBUG_CLEANUP) Slog.d(TAG_CLEANUP, "App "
                     + backupTarget.appInfo + " died during backup");
             mHandler.post(() -> {
-                try {
-                    getBackupManager().agentDisconnectedForUser(app.userId, app.info.packageName);
-                } catch (RemoteException e) {
-                    // can't happen; backup manager is local
-                }
+                LocalServices.getService(BackupManagerInternal.class).agentDisconnectedForUser(
+                        app.info.packageName, app.userId);
             });
         }
 
@@ -14348,9 +14384,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         final long oldIdent = Binder.clearCallingIdentity();
         try {
-            getBackupManager().agentConnectedForUser(userId, agentPackageName, agent);
-        } catch (RemoteException e) {
-            // can't happen; the backup manager service is local
+            LocalServices.getService(BackupManagerInternal.class).agentConnectedForUser(
+                    agentPackageName, userId, agent);
         } catch (Exception e) {
             Slog.w(TAG, "Exception trying to deliver BackupAgent binding: ");
             e.printStackTrace();
@@ -14690,7 +14725,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     app.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_INSTRUMENTATION);
                 }
 
-                app.setActiveInstrumentation(activeInstr);
+                mProcessStateController.setActiveInstrumentation(app, activeInstr);
                 activeInstr.mFinished = false;
                 activeInstr.mSourceUid = callingUid;
                 activeInstr.mRunningProcesses.add(app);
@@ -14836,7 +14871,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         abiOverride,
                         ZYGOTE_POLICY_FLAG_EMPTY);
 
-                app.setActiveInstrumentation(activeInstr);
+                mProcessStateController.setActiveInstrumentation(app, activeInstr);
                 activeInstr.mFinished = false;
                 activeInstr.mSourceUid = callingUid;
                 activeInstr.mRunningProcesses.add(app);
@@ -14973,7 +15008,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
 
                 instr.removeProcess(app);
-                app.setActiveInstrumentation(null);
+                mProcessStateController.setActiveInstrumentation(app, null);
             }
             app.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_INSTRUMENTATION);
 
@@ -16742,7 +16777,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public void onUserRemoved(@UserIdInt int userId) {
+        public void onUserRemoving(@UserIdInt int userId) {
             // Clean up any ActivityTaskManager state (by telling it the user is stopped)
             mAtmInternal.onUserStopped(userId);
             // Clean up various services by removing the user
@@ -16758,6 +16793,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public int startActivityAsUserEmpty(Bundle options) {
             return ActivityManagerService.this.startActivityAsUserEmpty(options);
+        }
+
+        @Override
+        public void onUserRemoved(int userId) {
+            // Clean up UserController state
+            mUserController.onUserRemoved(userId);
         }
 
         @Override
@@ -19504,7 +19545,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             if (preventIntentRedirectCollectNestedKeysOnServerIfNotCollected()) {
                 // this flag will be ramped to public.
-                intent.collectExtraIntentKeys();
+                intent.collectExtraIntentKeys(true);
             }
         }
 
@@ -19569,9 +19610,5 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
         return token;
-    }
-
-    private IBackupManager getBackupManager() {
-        return IBackupManager.Stub.asInterface(ServiceManager.getService(Context.BACKUP_SERVICE));
     }
 }

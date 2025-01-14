@@ -159,7 +159,6 @@ import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
-import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.BoostFramework;
@@ -3510,13 +3509,10 @@ public class OomAdjuster {
     }
 
     private static int getCpuCapability(ProcessRecord app, long nowUptime) {
+        // Note: persistent processes get all capabilities, including CPU_TIME.
         final UidRecord uidRec = app.getUidRecord();
         if (uidRec != null && uidRec.isCurAllowListed()) {
-            // Process has user visible activities.
-            return PROCESS_CAPABILITY_CPU_TIME;
-        }
-        if (UserHandle.isCore(app.uid)) {
-            // Make sure all system components are not frozen.
+            // Process is in the power allowlist.
             return PROCESS_CAPABILITY_CPU_TIME;
         }
         if (app.mState.getCachedHasVisibleActivities()) {
@@ -3525,6 +3521,12 @@ public class OomAdjuster {
         }
         if (app.mServices.hasUndemotedShortForegroundService(nowUptime)) {
             // It running a short fgs, just give it cpu time.
+            return PROCESS_CAPABILITY_CPU_TIME;
+        }
+        if (app.mReceivers.numberOfCurReceivers() > 0) {
+            return PROCESS_CAPABILITY_CPU_TIME;
+        }
+        if (app.hasActiveInstrumentation()) {
             return PROCESS_CAPABILITY_CPU_TIME;
         }
         // TODO(b/370817323): Populate this method with all of the reasons to keep a process

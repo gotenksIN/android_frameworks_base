@@ -17,7 +17,6 @@
 package com.android.systemui.statusbar.chips.ui.model
 
 import android.view.View
-import com.android.systemui.Flags
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
@@ -130,10 +129,6 @@ sealed class OngoingActivityChipModel {
          */
         data class StatusBarView(val impl: StatusBarIconView) : ChipIcon {
             init {
-                check(Flags.statusBarCallChipNotificationIcon()) {
-                    "OngoingActivityChipModel.ChipIcon.StatusBarView created even though " +
-                        "Flags.statusBarCallChipNotificationIcon is not enabled"
-                }
                 StatusBarConnectedDisplays.assertInLegacyMode()
             }
         }
@@ -153,8 +148,5 @@ sealed class OngoingActivityChipModel {
          * UI created internally.
          */
         data class SingleColorIcon(val impl: Icon) : ChipIcon
-
-        /** This icon is an app icon in full color (so it should not get tinted in any way). */
-        data class FullColorAppIcon(val impl: Icon) : ChipIcon
     }
 }

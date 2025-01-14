@@ -125,7 +125,6 @@ import android.content.pm.SharedLibraryInfo;
 import android.content.pm.Signature;
 import android.content.pm.SigningDetails;
 import android.content.pm.VerifierInfo;
-import android.content.pm.dex.DexMetadataHelper;
 import android.content.pm.parsing.result.ParseResult;
 import android.content.pm.parsing.result.ParseTypeImpl;
 import android.net.Uri;
@@ -173,7 +172,6 @@ import com.android.internal.pm.pkg.component.ParsedIntentInfo;
 import com.android.internal.pm.pkg.component.ParsedPermission;
 import com.android.internal.pm.pkg.component.ParsedPermissionGroup;
 import com.android.internal.pm.pkg.parsing.ParsingPackageUtils;
-import com.android.internal.security.VerityUtils;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.server.EventLogTags;
@@ -188,7 +186,6 @@ import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
 import com.android.server.pm.pkg.SharedLibraryWrapper;
 import com.android.server.rollback.RollbackManagerInternal;
-import com.android.server.security.FileIntegrityService;
 import com.android.server.utils.TimingsTraceAndSlog;
 import com.android.server.utils.WatchedArrayMap;
 import com.android.server.utils.WatchedLongSparseArray;
@@ -200,7 +197,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.security.DigestException;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -868,7 +864,9 @@ final class InstallPackageHelper {
         int token;
         if (mPm.mNextInstallToken < 0) mPm.mNextInstallToken = 1;
         token = mPm.mNextInstallToken++;
-        mPm.mRunningInstalls.put(token, request);
+        synchronized (mPm.mRunningInstalls) {
+            mPm.mRunningInstalls.put(token, request);
+        }
 
         if (DEBUG_INSTALL) Log.v(TAG, "+ starting restore round-trip " + token);
 
@@ -1180,11 +1178,8 @@ final class InstallPackageHelper {
                 }
                 try {
                     doRenameLI(request, parsedPackage);
-                    setUpFsVerity(parsedPackage);
-                } catch (Installer.InstallerException | IOException | DigestException
-                         | NoSuchAlgorithmException | PrepareFailure e) {
-                    request.setError(PackageManagerException.INTERNAL_ERROR_VERITY_SETUP,
-                            "Failed to set up verity: " + e);
+                } catch (PrepareFailure e) {
+                    request.setError(e);
                     return false;
                 }
 
@@ -1548,7 +1543,7 @@ final class InstallPackageHelper {
         boolean systemApp = false;
         boolean replace = false;
         synchronized (mPm.mLock) {
-            final PackageSetting ps = mPm.mSettings.getPackageLPr(pkgName);
+            PackageSetting ps = mPm.mSettings.getPackageLPr(pkgName);
             // Check if installing already existing package
             if ((installFlags & PackageManager.INSTALL_REPLACE_EXISTING) != 0) {
                 String oldName = mPm.mSettings.getRenamedPackageLPr(pkgName);
@@ -1559,14 +1554,15 @@ final class InstallPackageHelper {
                     // name.  We must continue using the original name, so
                     // rename the new package here.
                     parsedPackage.setPackageName(oldName);
-                    pkgName = parsedPackage.getPackageName();
-                    replace = true;
+                    pkgName = oldName;
+                    ps = mPm.mSettings.getPackageLPr(oldName);
                     if (DEBUG_INSTALL) {
                         Slog.d(TAG, "Replacing existing renamed package: oldName="
                                 + oldName + " pkgName=" + pkgName);
                     }
-                } else if (ps != null) {
-                    // This package, under its official name, already exists
+                }
+                if (ps != null) {
+                    // This package, under its official name or its old name, already exists
                     // on the device; we should replace it.
                     replace = true;
                     if (DEBUG_INSTALL) Slog.d(TAG, "Replace existing package: " + pkgName);
@@ -2346,68 +2342,6 @@ final class InstallPackageHelper {
         }
     }
 
-    /**
-     * Set up fs-verity for the given package. For older devices that do not support fs-verity,
-     * this is a no-op.
-     */
-    private void setUpFsVerity(AndroidPackage pkg) throws Installer.InstallerException,
-            PrepareFailure, IOException, DigestException, NoSuchAlgorithmException {
-        if (!PackageManagerServiceUtils.isApkVerityEnabled()) {
-            return;
-        }
-
-        if (isIncrementalPath(pkg.getPath()) && IncrementalManager.getVersion()
-                < IncrementalManager.MIN_VERSION_TO_SUPPORT_FSVERITY) {
-            return;
-        }
-
-        // Collect files we care for fs-verity setup.
-        ArrayMap<String, String> fsverityCandidates = new ArrayMap<>();
-        fsverityCandidates.put(pkg.getBaseApkPath(),
-                VerityUtils.getFsveritySignatureFilePath(pkg.getBaseApkPath()));
-
-        final String dmPath = DexMetadataHelper.buildDexMetadataPathForApk(
-                pkg.getBaseApkPath());
-        if (new File(dmPath).exists()) {
-            fsverityCandidates.put(dmPath, VerityUtils.getFsveritySignatureFilePath(dmPath));
-        }
-
-        for (String path : pkg.getSplitCodePaths()) {
-            fsverityCandidates.put(path, VerityUtils.getFsveritySignatureFilePath(path));
-
-            final String splitDmPath = DexMetadataHelper.buildDexMetadataPathForApk(path);
-            if (new File(splitDmPath).exists()) {
-                fsverityCandidates.put(splitDmPath,
-                        VerityUtils.getFsveritySignatureFilePath(splitDmPath));
-            }
-        }
-
-        var fis = FileIntegrityService.getService();
-        for (Map.Entry<String, String> entry : fsverityCandidates.entrySet()) {
-            try {
-                final String filePath = entry.getKey();
-                if (VerityUtils.hasFsverity(filePath)) {
-                    continue;
-                }
-
-                final String signaturePath = entry.getValue();
-                if (new File(signaturePath).exists()) {
-                    // If signature is provided, enable fs-verity first so that the file can be
-                    // measured for signature check below.
-                    VerityUtils.setUpFsverity(filePath);
-
-                    if (!fis.verifyPkcs7DetachedSignature(signaturePath, filePath)) {
-                        throw new PrepareFailure(PackageManager.INSTALL_FAILED_BAD_SIGNATURE,
-                                "fs-verity signature does not verify against a known key");
-                    }
-                }
-            } catch (IOException e) {
-                throw new PrepareFailure(PackageManager.INSTALL_FAILED_BAD_SIGNATURE,
-                        "Failed to enable fs-verity: " + e);
-            }
-        }
-    }
-
     private PackageFreezer freezePackageForInstall(String packageName, int userId, int installFlags,
             String killReason, int exitInfoReason, InstallRequest request) {
         if ((installFlags & PackageManager.INSTALL_DONT_KILL_APP) != 0) {
@@ -3095,6 +3029,8 @@ final class InstallPackageHelper {
         }
 
         if (succeeded) {
+            Slog.i(TAG, "installation completed:" + packageName);
+
             if (Flags.aslInApkAppMetadataSource()
                     && pkgSetting.getAppMetadataSource() == APP_METADATA_SOURCE_APK) {
                 if (!extractAppMetadataFromApk(request.getPkg(),
@@ -3139,13 +3075,14 @@ final class InstallPackageHelper {
             if (android.permission.flags.Flags.enhancedConfirmationModeApisEnabled()
                     && android.security.Flags.extendEcmToAllSettings()) {
                 final int appId = request.getAppId();
-                mPm.mHandler.post(() -> {
+                // TODO: b/388960315 - Implement a long-term solution to race condition
+                mPm.mHandler.postDelayed(() -> {
                     for (int userId : firstUserIds) {
                         // MODE_DEFAULT means that the app's guardedness will be decided lazily
                         setAccessRestrictedSettingsMode(packageName, appId, userId,
                                 AppOpsManager.MODE_DEFAULT);
                     }
-                });
+                }, 1000L);
             } else {
                 // Apply restricted settings on potentially dangerous packages. Needs to happen
                 // after appOpsManager is notified of the new package

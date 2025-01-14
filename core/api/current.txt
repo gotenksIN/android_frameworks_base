@@ -8905,7 +8905,7 @@ package android.app.appfunctions {
   @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public abstract class AppFunctionService extends android.app.Service {
     ctor public AppFunctionService();
     method @NonNull public final android.os.IBinder onBind(@Nullable android.content.Intent);
-    method @MainThread public abstract void onExecuteFunction(@NonNull android.app.appfunctions.ExecuteAppFunctionRequest, @NonNull String, @NonNull android.os.CancellationSignal, @NonNull android.os.OutcomeReceiver<android.app.appfunctions.ExecuteAppFunctionResponse,android.app.appfunctions.AppFunctionException>);
+    method @MainThread public abstract void onExecuteFunction(@NonNull android.app.appfunctions.ExecuteAppFunctionRequest, @NonNull String, @NonNull android.content.pm.SigningInfo, @NonNull android.os.CancellationSignal, @NonNull android.os.OutcomeReceiver<android.app.appfunctions.ExecuteAppFunctionResponse,android.app.appfunctions.AppFunctionException>);
     field @NonNull public static final String SERVICE_INTERFACE = "android.app.appfunctions.AppFunctionService";
   }
 
@@ -8947,18 +8947,19 @@ package android.app.assist {
     method public android.content.ClipData getClipData();
     method public android.os.Bundle getExtras();
     method public android.content.Intent getIntent();
+    method @FlaggedApi("com.android.window.flags.enable_desktop_windowing_app_to_web_education") @Nullable public android.net.Uri getSessionTransferUri();
     method public String getStructuredData();
     method public android.net.Uri getWebUri();
     method public boolean isAppProvidedIntent();
     method public boolean isAppProvidedWebUri();
     method public void setClipData(android.content.ClipData);
     method public void setIntent(android.content.Intent);
+    method @FlaggedApi("com.android.window.flags.enable_desktop_windowing_app_to_web_education") public void setSessionTransferUri(@Nullable android.net.Uri);
     method public void setStructuredData(String);
     method public void setWebUri(android.net.Uri);
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.app.assist.AssistContent> CREATOR;
     field @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public static final String EXTRA_APP_FUNCTION_DATA = "android.app.assist.extra.APP_FUNCTION_DATA";
-    field @FlaggedApi("com.android.window.flags.enable_desktop_windowing_app_to_web_education") public static final String EXTRA_SESSION_TRANSFER_WEB_URI = "android.app.assist.extra.SESSION_TRANSFER_WEB_URI";
   }
 
   public class AssistStructure implements android.os.Parcelable {
@@ -9190,8 +9191,9 @@ package android.app.blob {
 package android.app.jank {
 
   @FlaggedApi("android.app.jank.detailed_app_jank_metrics_api") public final class AppJankStats {
-    ctor public AppJankStats(int, @NonNull String, @Nullable String, @Nullable String, long, long, @NonNull android.app.jank.RelativeFrameTimeHistogram);
+    ctor public AppJankStats(int, @NonNull String, @Nullable String, @Nullable String, @Nullable String, long, long, @NonNull android.app.jank.RelativeFrameTimeHistogram);
     method public long getJankyFrameCount();
+    method @Nullable public String getNavigationComponent();
     method @NonNull public android.app.jank.RelativeFrameTimeHistogram getRelativeFrameTimeHistogram();
     method public long getTotalFrameCount();
     method public int getUid();
@@ -16894,6 +16896,7 @@ package android.graphics {
     method public android.graphics.Paint.FontMetricsInt getFontMetricsInt();
     method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public void getFontMetricsIntForLocale(@NonNull android.graphics.Paint.FontMetricsInt);
     method public float getFontSpacing();
+    method @FlaggedApi("com.android.text.flags.typeface_redesign_readonly") @Nullable public String getFontVariationOverride();
     method public String getFontVariationSettings();
     method public int getHinting();
     method public float getLetterSpacing();
@@ -16972,6 +16975,7 @@ package android.graphics {
     method public void setFilterBitmap(boolean);
     method public void setFlags(int);
     method public void setFontFeatureSettings(String);
+    method @FlaggedApi("com.android.text.flags.typeface_redesign_readonly") public boolean setFontVariationOverride(@Nullable String);
     method public boolean setFontVariationSettings(String);
     method public void setHinting(int);
     method public void setLetterSpacing(float);
@@ -27204,7 +27208,7 @@ package android.media.quality {
     field public static final int AMBIENT_BACKLIGHT_EVENT_DISABLED = 2; // 0x2
     field public static final int AMBIENT_BACKLIGHT_EVENT_ENABLED = 1; // 0x1
     field public static final int AMBIENT_BACKLIGHT_EVENT_INTERRUPTED = 4; // 0x4
-    field public static final int AMBIENT_BACKLIGHT_EVENT_METADATA = 3; // 0x3
+    field public static final int AMBIENT_BACKLIGHT_EVENT_METADATA_AVAILABLE = 3; // 0x3
     field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.AmbientBacklightEvent> CREATOR;
   }
 
@@ -27212,13 +27216,15 @@ package android.media.quality {
     ctor public AmbientBacklightMetadata(@NonNull String, int, int, int, int, int, @NonNull int[]);
     method public int describeContents();
     method public int getColorFormat();
-    method public int getCompressAlgorithm();
-    method @IntRange(from=0, to=128) public int getHorizontalZonesNumber();
+    method public int getCompressionAlgorithm();
+    method @IntRange(from=0, to=128) public int getHorizontalZonesCount();
     method @NonNull public String getPackageName();
     method public int getSource();
-    method @IntRange(from=0, to=80) public int getVerticalZonesNumber();
-    method @NonNull public int[] getZonesColors();
+    method @IntRange(from=0, to=80) public int getVerticalZonesCount();
+    method @NonNull public int[] getZoneColors();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field public static final int ALGORITHM_NONE = 0; // 0x0
+    field public static final int ALGORITHM_RLE = 1; // 0x1
     field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.AmbientBacklightMetadata> CREATOR;
   }
 
@@ -27226,15 +27232,13 @@ package android.media.quality {
     ctor public AmbientBacklightSettings(int, int, int, int, int, boolean, int);
     method public int describeContents();
     method public int getColorFormat();
-    method @IntRange(from=0) public int getHorizontalZonesNumber();
+    method @IntRange(from=0) public int getHorizontalZonesCount();
     method @IntRange(from=1) public int getMaxFps();
     method public int getSource();
     method public int getThreshold();
-    method @IntRange(from=0) public int getVerticalZonesNumber();
+    method @IntRange(from=0) public int getVerticalZonesCount();
     method public boolean isLetterboxOmitted();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final int ALGORITHM_NONE = 0; // 0x0
-    field public static final int ALGORITHM_RLE = 1; // 0x1
     field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.AmbientBacklightSettings> CREATOR;
     field public static final int SOURCE_AUDIO = 1; // 0x1
     field public static final int SOURCE_AUDIO_VIDEO = 3; // 0x3
@@ -27243,6 +27247,10 @@ package android.media.quality {
   }
 
   @FlaggedApi("android.media.tv.flags.media_quality_fw") public class MediaQualityContract {
+    field public static final String LEVEL_HIGH = "level_high";
+    field public static final String LEVEL_LOW = "level_low";
+    field public static final String LEVEL_MEDIUM = "level_medium";
+    field public static final String LEVEL_OFF = "level_off";
   }
 
   public static final class MediaQualityContract.PictureQuality {
@@ -27275,20 +27283,41 @@ package android.media.quality {
   }
 
   public static final class MediaQualityContract.SoundQuality {
+    field public static final String PARAMETER_AUTO_VOLUME_CONTROL = "auto_volume_control";
     field public static final String PARAMETER_BALANCE = "balance";
     field public static final String PARAMETER_BASS = "bass";
+    field public static final String PARAMETER_DIALOGUE_ENHANCER = "dialogue_enhancer";
+    field public static final String PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS = "digital_output_delay_millis";
+    field public static final String PARAMETER_DIGITAL_OUTPUT_MODE = "digital_output_mode";
+    field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_DOLBY_ATMOS = "dolby_audio_processing_dolby_atmos";
+    field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_SOUND_MODE = "dolby_audio_processing_sound_mode";
+    field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_SURROUND_VIRTUALIZER = "dolby_audio_processing_surround_virtualizer";
+    field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_VOLUME_LEVELER = "dolby_audio_processing_volume_leveler";
+    field public static final String PARAMETER_DOWN_MIX_MODE = "down_mix_mode";
+    field public static final String PARAMETER_DTS_DRC = "dts_drc";
+    field public static final String PARAMETER_DTS_VIRTUAL_X_DEFINITION = "dts_virtual_x_definition";
+    field public static final String PARAMETER_DTS_VIRTUAL_X_DIALOG_CLARITY = "dts_virtual_x_dialog_clarity";
+    field public static final String PARAMETER_DTS_VIRTUAL_X_HEIGHT = "dts_virtual_x_height";
+    field public static final String PARAMETER_DTS_VIRTUAL_X_LIMITER = "dts_virtual_x_limiter";
+    field public static final String PARAMETER_DTS_VIRTUAL_X_TBHDX = "dts_virtual_x_tbhdx";
+    field public static final String PARAMETER_DTS_VIRTUAL_X_TRU_SURROUND_X = "dts_virtual_x_tru_surround_x";
+    field public static final String PARAMETER_DTS_VIRTUAL_X_TRU_VOLUME_HD = "dts_virtual_x_tru_volume_hd";
+    field public static final String PARAMETER_EARC = "earc";
+    field public static final String PARAMETER_SPEAKERS = "speakers";
+    field public static final String PARAMETER_SPEAKERS_DELAY_MILLIS = "speakers_delay_millis";
+    field public static final String PARAMETER_SURROUND_SOUND = "surround_sound";
     field public static final String PARAMETER_TREBLE = "treble";
   }
 
   @FlaggedApi("android.media.tv.flags.media_quality_fw") public final class MediaQualityManager {
-    method public void addActiveProcessingPictureListener(@NonNull java.util.concurrent.Executor, @NonNull android.media.quality.MediaQualityManager.ActiveProcessingPictureListener);
+    method public void addActiveProcessingPictureListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.util.List<android.media.quality.ActiveProcessingPicture>>);
     method public void createPictureProfile(@NonNull android.media.quality.PictureProfile);
     method public void createSoundProfile(@NonNull android.media.quality.SoundProfile);
-    method @NonNull public java.util.List<android.media.quality.PictureProfile> getAvailablePictureProfiles(boolean);
-    method @NonNull public java.util.List<android.media.quality.SoundProfile> getAvailableSoundProfiles(boolean);
-    method @NonNull public java.util.List<android.media.quality.ParamCapability> getParamCapabilities(@NonNull java.util.List<java.lang.String>);
-    method @Nullable public android.media.quality.PictureProfile getPictureProfile(int, @NonNull String, boolean);
-    method @Nullable public android.media.quality.SoundProfile getSoundProfile(int, @NonNull String, boolean);
+    method @NonNull public java.util.List<android.media.quality.PictureProfile> getAvailablePictureProfiles(@Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
+    method @NonNull public java.util.List<android.media.quality.SoundProfile> getAvailableSoundProfiles(@Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
+    method @NonNull public java.util.List<android.media.quality.ParameterCapability> getParameterCapabilities(@NonNull java.util.List<java.lang.String>);
+    method @Nullable public android.media.quality.PictureProfile getPictureProfile(int, @NonNull String, @Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
+    method @Nullable public android.media.quality.SoundProfile getSoundProfile(int, @NonNull String, @Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
     method public boolean isAmbientBacklightEnabled();
     method public boolean isAutoPictureQualityEnabled();
     method public boolean isAutoSoundQualityEnabled();
@@ -27296,7 +27325,7 @@ package android.media.quality {
     method public void registerAmbientBacklightCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.quality.MediaQualityManager.AmbientBacklightCallback);
     method public void registerPictureProfileCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.quality.MediaQualityManager.PictureProfileCallback);
     method public void registerSoundProfileCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.quality.MediaQualityManager.SoundProfileCallback);
-    method public void removeActiveProcessingPictureListener(@NonNull android.media.quality.MediaQualityManager.ActiveProcessingPictureListener);
+    method public void removeActiveProcessingPictureListener(@NonNull java.util.function.Consumer<java.util.List<android.media.quality.ActiveProcessingPicture>>);
     method public void removePictureProfile(@NonNull String);
     method public void removeSoundProfile(@NonNull String);
     method public void setAmbientBacklightEnabled(boolean);
@@ -27308,48 +27337,57 @@ package android.media.quality {
     method public void updateSoundProfile(@NonNull String, @NonNull android.media.quality.SoundProfile);
   }
 
-  public static interface MediaQualityManager.ActiveProcessingPictureListener {
-    method public void onActiveProcessingPicturesChanged(@NonNull java.util.List<android.media.quality.ActiveProcessingPicture>);
-  }
-
-  public abstract static class MediaQualityManager.AmbientBacklightCallback {
-    ctor public MediaQualityManager.AmbientBacklightCallback();
+  public static interface MediaQualityManager.AmbientBacklightCallback {
     method public void onAmbientBacklightEvent(@NonNull android.media.quality.AmbientBacklightEvent);
   }
 
   public abstract static class MediaQualityManager.PictureProfileCallback {
     ctor public MediaQualityManager.PictureProfileCallback();
     method public void onError(@Nullable String, int);
-    method public void onParamCapabilitiesChanged(@Nullable String, @NonNull java.util.List<android.media.quality.ParamCapability>);
+    method public void onParameterCapabilitiesChanged(@Nullable String, @NonNull java.util.List<android.media.quality.ParameterCapability>);
     method public void onPictureProfileAdded(@NonNull String, @NonNull android.media.quality.PictureProfile);
     method public void onPictureProfileRemoved(@NonNull String, @NonNull android.media.quality.PictureProfile);
     method public void onPictureProfileUpdated(@NonNull String, @NonNull android.media.quality.PictureProfile);
   }
 
+  public static final class MediaQualityManager.ProfileQueryParams implements android.os.Parcelable {
+    method public boolean areParametersIncluded();
+    method public int describeContents();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.MediaQualityManager.ProfileQueryParams> CREATOR;
+  }
+
+  public static final class MediaQualityManager.ProfileQueryParams.Builder {
+    ctor public MediaQualityManager.ProfileQueryParams.Builder();
+    method @NonNull public android.media.quality.MediaQualityManager.ProfileQueryParams build();
+    method @NonNull public android.media.quality.MediaQualityManager.ProfileQueryParams.Builder setParametersIncluded(boolean);
+  }
+
   public abstract static class MediaQualityManager.SoundProfileCallback {
     ctor public MediaQualityManager.SoundProfileCallback();
     method public void onError(@Nullable String, int);
-    method public void onParamCapabilitiesChanged(@Nullable String, @NonNull java.util.List<android.media.quality.ParamCapability>);
+    method public void onParameterCapabilitiesChanged(@Nullable String, @NonNull java.util.List<android.media.quality.ParameterCapability>);
     method public void onSoundProfileAdded(@NonNull String, @NonNull android.media.quality.SoundProfile);
     method public void onSoundProfileRemoved(@NonNull String, @NonNull android.media.quality.SoundProfile);
     method public void onSoundProfileUpdated(@NonNull String, @NonNull android.media.quality.SoundProfile);
   }
 
-  @FlaggedApi("android.media.tv.flags.media_quality_fw") public final class ParamCapability implements android.os.Parcelable {
+  @FlaggedApi("android.media.tv.flags.media_quality_fw") public final class ParameterCapability implements android.os.Parcelable {
     method public int describeContents();
     method @NonNull public android.os.Bundle getCapabilities();
-    method @NonNull public String getParamName();
-    method public int getParamType();
+    method @NonNull public String getParameterName();
+    method public int getParameterType();
     method public boolean isSupported();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field public static final String CAPABILITY_DEFAULT = "default";
     field public static final String CAPABILITY_ENUM = "enum";
     field public static final String CAPABILITY_MAX = "max";
     field public static final String CAPABILITY_MIN = "min";
-    field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.ParamCapability> CREATOR;
+    field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.ParameterCapability> CREATOR;
     field public static final int TYPE_DOUBLE = 3; // 0x3
     field public static final int TYPE_INT = 1; // 0x1
     field public static final int TYPE_LONG = 2; // 0x2
+    field public static final int TYPE_NONE = 0; // 0x0
     field public static final int TYPE_STRING = 4; // 0x4
   }
 
@@ -33625,14 +33663,21 @@ package android.os {
   }
 
   @FlaggedApi("android.os.cpu_gpu_headrooms") public final class CpuHeadroomParams {
-    ctor public CpuHeadroomParams();
     method public int getCalculationType();
-    method @IntRange(from=0x32, to=0x2710) public long getCalculationWindowMillis();
-    method public void setCalculationType(int);
-    method public void setCalculationWindowMillis(@IntRange(from=0x32, to=0x2710) int);
-    method public void setTids(@NonNull int...);
+    method public long getCalculationWindowMillis();
+    method @NonNull public int[] getTids();
+    method @NonNull public android.os.CpuHeadroomParams.Builder toBuilder();
     field public static final int CPU_HEADROOM_CALCULATION_TYPE_AVERAGE = 1; // 0x1
     field public static final int CPU_HEADROOM_CALCULATION_TYPE_MIN = 0; // 0x0
+  }
+
+  public static final class CpuHeadroomParams.Builder {
+    ctor public CpuHeadroomParams.Builder();
+    ctor public CpuHeadroomParams.Builder(@NonNull android.os.CpuHeadroomParams);
+    method @NonNull public android.os.CpuHeadroomParams build();
+    method @NonNull public android.os.CpuHeadroomParams.Builder setCalculationType(int);
+    method @NonNull public android.os.CpuHeadroomParams.Builder setCalculationWindowMillis(@IntRange(from=1) int);
+    method @NonNull public android.os.CpuHeadroomParams.Builder setTids(@NonNull int...);
   }
 
   public final class CpuUsageInfo implements android.os.Parcelable {
@@ -33883,13 +33928,20 @@ package android.os {
   }
 
   @FlaggedApi("android.os.cpu_gpu_headrooms") public final class GpuHeadroomParams {
-    ctor public GpuHeadroomParams();
     method public int getCalculationType();
-    method @IntRange(from=0x32, to=0x2710) public int getCalculationWindowMillis();
-    method public void setCalculationType(int);
-    method public void setCalculationWindowMillis(@IntRange(from=0x32, to=0x2710) int);
+    method public int getCalculationWindowMillis();
     field public static final int GPU_HEADROOM_CALCULATION_TYPE_AVERAGE = 1; // 0x1
     field public static final int GPU_HEADROOM_CALCULATION_TYPE_MIN = 0; // 0x0
+    field public static final int GPU_HEADROOM_CALCULATION_WINDOW_MILLIS_MAX = 10000; // 0x2710
+    field public static final int GPU_HEADROOM_CALCULATION_WINDOW_MILLIS_MIN = 50; // 0x32
+  }
+
+  public static final class GpuHeadroomParams.Builder {
+    ctor public GpuHeadroomParams.Builder();
+    ctor public GpuHeadroomParams.Builder(@NonNull android.os.GpuHeadroomParams);
+    method @NonNull public android.os.GpuHeadroomParams build();
+    method @NonNull public android.os.GpuHeadroomParams.Builder setCalculationType(int);
+    method @NonNull public android.os.GpuHeadroomParams.Builder setCalculationWindowMillis(@IntRange(from=1) int);
   }
 
   public class Handler {
@@ -35155,9 +35207,12 @@ package android.os.health {
 
   public class SystemHealthManager {
     method @FlaggedApi("android.os.cpu_gpu_headrooms") @FloatRange(from=0.0f, to=100.0f) public float getCpuHeadroom(@Nullable android.os.CpuHeadroomParams);
+    method @FlaggedApi("android.os.cpu_gpu_headrooms") @NonNull public android.util.Pair<java.lang.Integer,java.lang.Integer> getCpuHeadroomCalculationWindowRange();
     method @FlaggedApi("android.os.cpu_gpu_headrooms") public long getCpuHeadroomMinIntervalMillis();
     method @FlaggedApi("android.os.cpu_gpu_headrooms") @FloatRange(from=0.0f, to=100.0f) public float getGpuHeadroom(@Nullable android.os.GpuHeadroomParams);
+    method @FlaggedApi("android.os.cpu_gpu_headrooms") @NonNull public android.util.Pair<java.lang.Integer,java.lang.Integer> getGpuHeadroomCalculationWindowRange();
     method @FlaggedApi("android.os.cpu_gpu_headrooms") public long getGpuHeadroomMinIntervalMillis();
+    method @FlaggedApi("android.os.cpu_gpu_headrooms") @IntRange(from=1) public int getMaxCpuHeadroomTidsSize();
     method @FlaggedApi("com.android.server.power.optimization.power_monitor_api") public void getPowerMonitorReadings(@NonNull java.util.List<android.os.PowerMonitor>, @Nullable java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.os.PowerMonitorReadings,java.lang.RuntimeException>);
     method @FlaggedApi("com.android.server.power.optimization.power_monitor_api") public void getSupportedPowerMonitors(@Nullable java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.util.List<android.os.PowerMonitor>>);
     method public android.os.health.HealthStats takeMyUidSnapshot();

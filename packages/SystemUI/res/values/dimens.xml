@@ -1278,6 +1278,7 @@
     <dimen name="qs_center_guideline_padding">10dp</dimen>
     <dimen name="qs_media_action_spacing">4dp</dimen>
     <dimen name="qs_media_action_margin">12dp</dimen>
+    <dimen name="qs_media_action_play_pause_width">72dp</dimen>
     <dimen name="qs_seamless_height">24dp</dimen>
     <dimen name="qs_seamless_icon_size">12dp</dimen>
     <dimen name="qs_media_disabled_seekbar_height">1dp</dimen>
@@ -1771,6 +1772,7 @@
 
     <!-- Ongoing activity chip -->
     <dimen name="ongoing_activity_chip_max_text_width">74dp</dimen>
+    <dimen name="ongoing_activity_chip_margin_start">5dp</dimen>
     <!-- The activity chip side padding, used with the default phone icon. -->
     <dimen name="ongoing_activity_chip_side_padding">12dp</dimen>
     <!-- The activity chip side padding, used with an icon that has embedded padding (e.g. if the icon comes from the notification's smallIcon field). If the icon has padding, the chip itself can have less padding. -->
@@ -2104,6 +2106,8 @@
 
     <dimen name="volume_dialog_background_corner_radius">30dp</dimen>
     <dimen name="volume_dialog_background_vertical_margin">-10dp</dimen>
+    <!-- top margin covers half the ringer button + components spacing -->
+    <dimen name="volume_dialog_background_top_margin">-28dp</dimen>
 
     <dimen name="volume_dialog_components_spacing">8dp</dimen>
     <dimen name="volume_dialog_floating_sliders_spacing">8dp</dimen>
@@ -2113,6 +2117,11 @@
     <dimen name="volume_dialog_button_size">40dp</dimen>
     <dimen name="volume_dialog_slider_width">52dp</dimen>
     <dimen name="volume_dialog_slider_height">254dp</dimen>
+    <!--
+        A primary goal of this margin is to vertically constraint slider height in the landscape
+        orientation when the vertical space is limited
+    -->
+    <dimen name="volume_dialog_slider_vertical_margin">124dp</dimen>
 
     <fraction name="volume_dialog_half_opened_bias">0.2</fraction>
 

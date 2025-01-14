@@ -1,6 +1,7 @@
 package com.android.systemui.kosmos
 
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.compose.runTestWithSnapshots
 import com.android.systemui.coroutines.FlowValue
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.coroutines.collectValues
@@ -16,7 +17,6 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import org.mockito.kotlin.verify
 
 var Kosmos.testDispatcher by Fixture { StandardTestDispatcher() }
@@ -52,10 +52,11 @@ var Kosmos.brightnessWarningToast: BrightnessWarningToast by
 
 /**
  * Run this test body with a [Kosmos] as receiver, and using the [testScope] currently installed in
- * that kosmos instance
+ * that Kosmos instance
  */
-fun Kosmos.runTest(testBody: suspend Kosmos.() -> Unit) =
-    testScope.runTest testBody@{ this@runTest.testBody() }
+fun Kosmos.runTest(testBody: suspend Kosmos.() -> Unit) = let { kosmos ->
+    testScope.runTestWithSnapshots { kosmos.testBody() }
+}
 
 fun Kosmos.runCurrent() = testScope.runCurrent()
 

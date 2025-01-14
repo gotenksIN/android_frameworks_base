@@ -70,6 +70,8 @@ import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityTaskManagerInternal.APP_TRANSITION_RECENTS_ANIM;
 import static com.android.server.wm.ActivityTaskManagerInternal.APP_TRANSITION_SPLASH_SCREEN;
 import static com.android.server.wm.ActivityTaskManagerInternal.APP_TRANSITION_WINDOWS_DRAWN;
+import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
+import static com.android.server.wm.StartingData.AFTER_TRANSITION_FINISH;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_PREDICT_BACK;
 import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
 import static com.android.server.wm.WindowState.BLAST_TIMEOUT_DURATION;
@@ -137,9 +139,6 @@ import java.util.function.Predicate;
 class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private static final String TAG = "Transition";
     private static final String TRACE_NAME_PLAY_TRANSITION = "playing";
-
-    /** The default package for resources */
-    private static final String DEFAULT_PACKAGE = "android";
 
     /** The transition has been created but isn't collecting yet. */
     private static final int STATE_PENDING = -1;
@@ -1392,6 +1391,13 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         enterAutoPip = true;
                     }
                 }
+
+                if (ar.mStartingData != null && ar.mStartingData.mRemoveAfterTransaction
+                        == AFTER_TRANSITION_FINISH
+                        && (!ar.isVisible() || !ar.mTransitionController.inTransition(ar))) {
+                    ar.mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_IDLE;
+                    ar.removeStartingWindow();
+                }
                 final ChangeInfo changeInfo = mChanges.get(ar);
                 // Due to transient-hide, there may be some activities here which weren't in the
                 // transition.
@@ -1430,6 +1436,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         if (!tr.isAttached() || !tr.isVisibleRequested()
                                 || !tr.inPinnedWindowingMode()) return;
                         final ActivityRecord currTop = tr.getTopNonFinishingActivity();
+                        if (currTop == null) return;
                         if (currTop.inPinnedWindowingMode()) return;
                         Slog.e(TAG, "Enter-PIP was started but not completed, this is a Shell/SysUI"
                                 + " bug. This state breaks gesture-nav, so attempting clean-up.");
@@ -1999,7 +2006,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         } else {
             // No player registered or it's not enabled, so just finish/apply immediately
             if (!mIsPlayerEnabled) {
-                mLogger.mSendTimeNs = SystemClock.uptimeNanos();
+                mLogger.mSendTimeNs = SystemClock.elapsedRealtimeNanos();
                 ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
                         "Apply and finish immediately because player is disabled "
                                 + "for transition #%d .", mSyncId);
@@ -2100,6 +2107,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             change.setFlags(flags);
             break;
         }
+    }
+
+    // Note that this method is not called in WM lock.
+    @Override
+    public void onTransactionCommitted() {
+        mLogger.mTransactionCommitTimeNs = SystemClock.elapsedRealtimeNanos();
     }
 
     @Override
@@ -3424,6 +3437,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         Trace.asyncTraceForTrackEnd(Trace.TRACE_TAG_WINDOW_MANAGER, TAG, cookie);
     }
 
+    @Override
+    public void onReadyTraceStart(String name, int id) {
+        asyncTraceBegin(name, id);
+    }
+
+    @Override
+    public void onReadyTraceEnd(String name, int id) {
+        asyncTraceEnd(id);
+    }
+
     boolean hasChanged(WindowContainer wc) {
         final ChangeInfo chg = mChanges.get(wc);
         if (chg == null) return false;
@@ -4003,7 +4026,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         /** @return true if all tracked subtrees are ready. */
         boolean allReady() {
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
-                    " allReady query: used=%b " + "override=%b defer=%d states=[%s]", mUsed,
+                    " allReady query: used=%b override=%b defer=%d states=[%s]", mUsed,
                     mReadyOverride, mDeferReadyDepth, groupsToString());
             // If the readiness has never been touched, mUsed will be false. We never want to
             // consider a transition ready if nothing has been reported on it.

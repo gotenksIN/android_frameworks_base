@@ -22,13 +22,17 @@ import android.app.StatusBarManager.DISABLE_CLOCK
 import android.app.StatusBarManager.DISABLE_NONE
 import android.app.StatusBarManager.DISABLE_NOTIFICATION_ICONS
 import android.app.StatusBarManager.DISABLE_SYSTEM_INFO
+import android.content.testableContext
 import android.graphics.Rect
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
+import android.view.Display.DEFAULT_DISPLAY
 import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.display.data.repository.displayRepository
+import com.android.systemui.display.data.repository.fake
 import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
@@ -59,7 +63,6 @@ import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModelTest.Companion.assertIsScreenRecordChip
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModelTest.Companion.assertIsShareToAppChip
 import com.android.systemui.statusbar.data.model.StatusBarMode
-import com.android.systemui.statusbar.data.repository.FakeStatusBarModeRepository.Companion.DISPLAY_ID
 import com.android.systemui.statusbar.data.repository.fakeStatusBarModeRepository
 import com.android.systemui.statusbar.disableflags.data.repository.fakeDisableFlagsRepository
 import com.android.systemui.statusbar.disableflags.shared.model.DisableFlagsModel
@@ -85,6 +88,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Before
 import org.junit.Test
@@ -103,6 +107,9 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
     fun setUp() {
         setUpPackageManagerForMediaProjection(kosmos)
     }
+
+    @Before
+    fun addDisplays() = runBlocking { kosmos.displayRepository.fake.addDisplay(DEFAULT_DISPLAY) }
 
     @Test
     fun isTransitioningFromLockscreenToOccluded_started_isTrue() =
@@ -363,7 +370,7 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(testNotifications)
 
-            val actual by collectLastValue(underTest.areNotificationsLightsOut(DISPLAY_ID))
+            val actual by collectLastValue(underTest.areNotificationsLightsOut)
 
             assertThat(actual).isTrue()
         }
@@ -377,7 +384,7 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(emptyList())
 
-            val actual by collectLastValue(underTest.areNotificationsLightsOut(DISPLAY_ID))
+            val actual by collectLastValue(underTest.areNotificationsLightsOut)
 
             assertThat(actual).isFalse()
         }
@@ -391,7 +398,7 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(emptyList())
 
-            val actual by collectLastValue(underTest.areNotificationsLightsOut(DISPLAY_ID))
+            val actual by collectLastValue(underTest.areNotificationsLightsOut)
 
             assertThat(actual).isFalse()
         }
@@ -405,7 +412,7 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(testNotifications)
 
-            val actual by collectLastValue(underTest.areNotificationsLightsOut(DISPLAY_ID))
+            val actual by collectLastValue(underTest.areNotificationsLightsOut)
 
             assertThat(actual).isFalse()
         }
@@ -415,7 +422,7 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
     fun areNotificationsLightsOut_requiresFlagEnabled() =
         kosmos.runTest {
             assertLogsWtf {
-                val flow = underTest.areNotificationsLightsOut(DISPLAY_ID)
+                val flow = underTest.areNotificationsLightsOut
                 assertThat(flow).isEqualTo(emptyFlow<Boolean>())
             }
         }
@@ -1005,11 +1012,11 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
     @Test
     fun areaTint_viewIsInDarkBounds_getsDarkTint() =
         kosmos.runTest {
-            val displayId = 321
+            val displayId = testableContext.displayId
             fakeDarkIconRepository.darkState(displayId).value =
                 SysuiDarkIconDispatcher.DarkChange(listOf(Rect(0, 0, 5, 5)), 0f, 0xAABBCC)
 
-            val areaTint by collectLastValue(underTest.areaTint(displayId))
+            val areaTint by collectLastValue(underTest.areaTint)
 
             val tint = areaTint?.tint(Rect(1, 1, 3, 3))
 
@@ -1019,11 +1026,11 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
     @Test
     fun areaTint_viewIsNotInDarkBounds_getsDefaultTint() =
         kosmos.runTest {
-            val displayId = 321
+            val displayId = testableContext.displayId
             fakeDarkIconRepository.darkState(displayId).value =
                 SysuiDarkIconDispatcher.DarkChange(listOf(Rect(0, 0, 5, 5)), 0f, 0xAABBCC)
 
-            val areaTint by collectLastValue(underTest.areaTint(displayId))
+            val areaTint by collectLastValue(underTest.areaTint)
 
             val tint = areaTint?.tint(Rect(6, 6, 7, 7))
 
@@ -1033,11 +1040,11 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
     @Test
     fun areaTint_viewIsInDarkBounds_darkBoundsChange_viewUpdates() =
         kosmos.runTest {
-            val displayId = 321
+            val displayId = testableContext.displayId
             fakeDarkIconRepository.darkState(displayId).value =
                 SysuiDarkIconDispatcher.DarkChange(listOf(Rect(0, 0, 5, 5)), 0f, 0xAABBCC)
 
-            val areaTint by collectLastValue(underTest.areaTint(displayId))
+            val areaTint by collectLastValue(underTest.areaTint)
 
             var tint = areaTint?.tint(Rect(1, 1, 3, 3))
 

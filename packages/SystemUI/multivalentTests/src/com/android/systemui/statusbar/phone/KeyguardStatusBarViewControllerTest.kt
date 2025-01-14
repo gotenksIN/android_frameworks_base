@@ -53,6 +53,7 @@ import com.android.systemui.statusbar.CommandQueue
 import com.android.systemui.statusbar.StatusBarState
 import com.android.systemui.statusbar.data.repository.StatusBarContentInsetsProviderStore
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler
+import com.android.systemui.statusbar.layout.mockStatusBarContentInsetsProvider
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.phone.ui.TintedIconManager
 import com.android.systemui.statusbar.policy.BatteryController
@@ -152,7 +153,8 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         shadeViewStateProvider = TestShadeViewStateProvider()
 
         Mockito.`when`(
-                kosmos.statusBarContentInsetsProvider.getStatusBarContentInsetsForCurrentRotation()
+                kosmos.mockStatusBarContentInsetsProvider
+                    .getStatusBarContentInsetsForCurrentRotation()
             )
             .thenReturn(Insets.of(0, 0, 0, 0))
 
@@ -161,7 +163,7 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         Mockito.`when`(iconManagerFactory.create(ArgumentMatchers.any(), ArgumentMatchers.any()))
             .thenReturn(iconManager)
         Mockito.`when`(statusBarContentInsetsProviderStore.defaultDisplay)
-            .thenReturn(kosmos.statusBarContentInsetsProvider)
+            .thenReturn(kosmos.mockStatusBarContentInsetsProvider)
         allowTestableLooperAsMainThread()
         looper.runWithLooper {
             keyguardStatusBarView =
@@ -560,7 +562,6 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         updateStateToKeyguard()
 
         controller.setDozing(true)
-        controller.updateViewState()
 
         Truth.assertThat(keyguardStatusBarView.visibility).isEqualTo(View.INVISIBLE)
     }
@@ -573,7 +574,6 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         updateStateToKeyguard()
 
         controller.setDozing(false)
-        controller.updateViewState()
 
         Truth.assertThat(keyguardStatusBarView.visibility).isEqualTo(View.VISIBLE)
     }
@@ -633,7 +633,6 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         Truth.assertThat(keyguardStatusBarView.visibility).isEqualTo(View.VISIBLE)
 
         controller.setDozing(true)
-        controller.updateViewState()
 
         // setDozing(true) should typically cause the view to hide. But since the flag is on, we
         // should ignore these set dozing calls and stay the same visibility.

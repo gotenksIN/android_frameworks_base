@@ -68,12 +68,12 @@ import androidx.annotation.Nullable;
 import com.android.internal.protolog.ProtoLog;
 import com.android.wm.shell.R;
 import com.android.wm.shell.ShellTaskOrganizer;
+import com.android.wm.shell.common.ComponentUtils;
 import com.android.wm.shell.common.pip.PipBoundsAlgorithm;
 import com.android.wm.shell.common.pip.PipBoundsState;
 import com.android.wm.shell.common.pip.PipDisplayLayoutState;
 import com.android.wm.shell.common.pip.PipMenuController;
 import com.android.wm.shell.common.pip.PipUtils;
-import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.TransitionUtil;
 import com.android.wm.shell.shared.pip.PipContentOverlay;
@@ -844,7 +844,8 @@ public class PipTransition extends PipTransitionController {
             }
             mSurfaceTransactionHelper.rotateAndScaleWithCrop(finishTransaction,
                     pipLeash, endBounds, endBounds, new Rect(), degree, x, y,
-                    true /* isExpanding */, rotationDelta == ROTATION_270 /* clockwise */);
+                    true /* isExpanding */, rotationDelta == ROTATION_270 /* clockwise */,
+                    null /* relativeEndWindowFrame */);
         } else {
             rotationDelta = Surface.ROTATION_0;
         }
@@ -868,7 +869,9 @@ public class PipTransition extends PipTransitionController {
         // Get the start bounds in new orientation.
         final Rect startBounds = new Rect(pipChange.getStartAbsBounds());
         rotateBounds(startBounds, displayRotationChange.getStartAbsBounds(), rotateDelta);
-        final Rect endBounds = new Rect(pipChange.getEndAbsBounds());
+        final Rect windowFrame = taskInfo.topActivityMainWindowFrame;
+        final Rect endBounds = new Rect(windowFrame != null
+                ? windowFrame : pipChange.getEndAbsBounds());
         startBounds.offset(-offset.x, -offset.y);
         endBounds.offset(-offset.x, -offset.y);
 
@@ -888,7 +891,7 @@ public class PipTransition extends PipTransitionController {
         }
         mSurfaceTransactionHelper.rotateAndScaleWithCrop(startTransaction, pipChange.getLeash(),
                 endBounds, startBounds, new Rect(), degree, x, y, true /* isExpanding */,
-                pipRotateDelta == ROTATION_270 /* clockwise */);
+                pipRotateDelta == ROTATION_270 /* clockwise */, null /* relativeEndWindowFrame */);
         startTransaction.apply();
         rotator.cleanUp(finishTransaction);
 
@@ -1356,7 +1359,7 @@ public class PipTransition extends PipTransitionController {
     public boolean isPackageActiveInPip(@Nullable String packageName) {
         final TaskInfo inPipTask = mPipOrganizer.getTaskInfo();
         return packageName != null && inPipTask != null && mPipOrganizer.isInPip()
-                && packageName.equals(SplitScreenUtils.getPackageName(inPipTask.baseIntent));
+                && packageName.equals(ComponentUtils.getPackageName(inPipTask.baseIntent));
     }
 
     private void updatePipForUnhandledTransition(@NonNull TransitionInfo.Change pipChange,

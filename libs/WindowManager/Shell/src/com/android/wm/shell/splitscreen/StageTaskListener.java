@@ -48,7 +48,6 @@ import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.ArrayUtils;
 import com.android.launcher3.icons.IconProvider;
 import com.android.wm.shell.ShellTaskOrganizer;
-import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SurfaceUtils;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.split.SplitDecorManager;
@@ -96,8 +95,6 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
     private final StageListenerCallbacks mCallbacks;
     private final SyncTransactionQueue mSyncQueue;
     private final IconProvider mIconProvider;
-    private final ShellExecutor mMainExecutor;
-    private final ShellExecutor mBgExecutor;
     private final Optional<WindowDecorViewModel> mWindowDecorViewModel;
 
     /** Whether or not the root task has been created. */
@@ -114,21 +111,14 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
     // TODO(b/204308910): Extracts SplitDecorManager related code to common package.
     private SplitDecorManager mSplitDecorManager;
 
-    StageTaskListener(Context context,
-            ShellTaskOrganizer taskOrganizer,
-            int displayId,
-            StageListenerCallbacks callbacks,
-            SyncTransactionQueue syncQueue,
+    StageTaskListener(Context context, ShellTaskOrganizer taskOrganizer, int displayId,
+            StageListenerCallbacks callbacks, SyncTransactionQueue syncQueue,
             IconProvider iconProvider,
-            ShellExecutor mainExecutor,
-            ShellExecutor bgExecutor,
             Optional<WindowDecorViewModel> windowDecorViewModel, int id) {
         mContext = context;
         mCallbacks = callbacks;
         mSyncQueue = syncQueue;
         mIconProvider = iconProvider;
-        mMainExecutor = mainExecutor;
-        mBgExecutor = bgExecutor;
         mWindowDecorViewModel = windowDecorViewModel;
         taskOrganizer.createRootTask(displayId, WINDOWING_MODE_MULTI_WINDOW, this);
         mId = id;
@@ -224,8 +214,9 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
         if (mRootTaskInfo == null) {
             mRootLeash = leash;
             mRootTaskInfo = taskInfo;
-            mSplitDecorManager = new SplitDecorManager(mRootTaskInfo.configuration, mIconProvider,
-                    mMainExecutor, mBgExecutor);
+            mSplitDecorManager = new SplitDecorManager(
+                    mRootTaskInfo.configuration,
+                    mIconProvider);
             mHasRootTask = true;
             mCallbacks.onRootTaskAppeared();
             if (mVisible != mRootTaskInfo.isVisible) {
@@ -249,20 +240,12 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
     @Override
     @CallSuper
     public void onTaskInfoChanged(ActivityManager.RunningTaskInfo taskInfo) {
-        ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
-                "onTaskInfoChanged: taskId=%d vis=%b reqVis=%b baseAct=%s stageId=%s",
-                taskInfo.taskId, taskInfo.isVisible, taskInfo.isVisibleRequested,
-                taskInfo.baseActivity, stageTypeToString(mId));
+        ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "onTaskInfoChanged: taskId=%d taskAct=%s "
+                        + "stageId=%s",
+                taskInfo.taskId, taskInfo.baseActivity, stageTypeToString(mId));
         mWindowDecorViewModel.ifPresent(viewModel -> viewModel.onTaskInfoChanged(taskInfo));
         if (mRootTaskInfo.taskId == taskInfo.taskId) {
             mRootTaskInfo = taskInfo;
-            boolean isVisible = taskInfo.isVisible && taskInfo.isVisibleRequested;
-            if (mVisible != isVisible) {
-                ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "onTaskInfoChanged: currentVis=%b newVis=%b",
-                        mVisible, isVisible);
-                mVisible = isVisible;
-                mCallbacks.onStageVisibilityChanged(this);
-            }
         } else if (taskInfo.parentTaskId == mRootTaskInfo.taskId) {
             if (!taskInfo.supportsMultiWindow
                     || !ArrayUtils.contains(CONTROLLED_ACTIVITY_TYPES, taskInfo.getActivityType())
@@ -339,17 +322,23 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
         return mRootTaskInfo != null && mRootTaskInfo.taskId == taskId;
     }
 
-    void onResizing(Rect newBounds, Rect sideBounds, SurfaceControl.Transaction t, int offsetX,
-            int offsetY, boolean immediately) {
+    void onResizing(Rect newBounds, Rect sideBounds, Rect displayBounds,
+            SurfaceControl.Transaction t, int offsetX, int offsetY, boolean immediately) {
         if (mSplitDecorManager != null && mRootTaskInfo != null) {
-            mSplitDecorManager.onResizing(mRootTaskInfo, newBounds, sideBounds, t, offsetX,
-                    offsetY, immediately);
+            mSplitDecorManager.onResizing(mRootTaskInfo, newBounds, sideBounds, displayBounds, t,
+                    offsetX, offsetY, immediately);
         }
     }
 
     void onResized(SurfaceControl.Transaction t) {
         if (mSplitDecorManager != null) {
             mSplitDecorManager.onResized(t, null);
+        }
+    }
+
+    void screenshotIfNeeded(SurfaceControl.Transaction t) {
+        if (mSplitDecorManager != null) {
+            mSplitDecorManager.screenshotIfNeeded(t);
         }
     }
 

@@ -16,11 +16,17 @@
 
 package com.android.server.accessibility;
 
+import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+
+import static com.android.server.accessibility.AutoclickIndicatorView.SHOW_INDICATOR_DELAY_TIME;
+
 import android.accessibilityservice.AccessibilityTrace;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.database.ContentObserver;
+import android.graphics.PixelFormat;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -30,6 +36,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.MotionEvent.PointerCoords;
 import android.view.MotionEvent.PointerProperties;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 
 /**
@@ -63,7 +70,10 @@ public class AutoclickController extends BaseEventStreamTransformation {
 
     // Lazily created on the first mouse motion event.
     private ClickScheduler mClickScheduler;
-    private ClickDelayObserver mClickDelayObserver;
+    private AutoclickSettingsObserver mAutoclickSettingsObserver;
+    private AutoclickIndicatorScheduler mAutoclickIndicatorScheduler;
+    private AutoclickIndicatorView mAutoclickIndicatorView;
+    private WindowManager mWindowManager;
 
     public AutoclickController(Context context, int userId, AccessibilityTraceManager trace) {
         mTrace = trace;
@@ -80,10 +90,17 @@ public class AutoclickController extends BaseEventStreamTransformation {
         if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
             if (mClickScheduler == null) {
                 Handler handler = new Handler(mContext.getMainLooper());
+                if (Flags.enableAutoclickIndicator()) {
+                    initiateAutoclickIndicator(handler);
+                }
+
                 mClickScheduler =
                         new ClickScheduler(handler, AccessibilityManager.AUTOCLICK_DELAY_DEFAULT);
-                mClickDelayObserver = new ClickDelayObserver(mUserId, handler);
-                mClickDelayObserver.start(mContext.getContentResolver(), mClickScheduler);
+                mAutoclickSettingsObserver = new AutoclickSettingsObserver(mUserId, handler);
+                mAutoclickSettingsObserver.start(
+                        mContext.getContentResolver(),
+                        mClickScheduler,
+                        mAutoclickIndicatorScheduler);
             }
 
             handleMouseMotion(event, policyFlags);
@@ -92,6 +109,27 @@ public class AutoclickController extends BaseEventStreamTransformation {
         }
 
         super.onMotionEvent(event, rawEvent, policyFlags);
+    }
+
+    private void initiateAutoclickIndicator(Handler handler) {
+        mAutoclickIndicatorScheduler = new AutoclickIndicatorScheduler(handler);
+        mAutoclickIndicatorView = new AutoclickIndicatorView(mContext);
+
+        final WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
+        layoutParams.type = WindowManager.LayoutParams.TYPE_SECURE_SYSTEM_OVERLAY;
+        layoutParams.flags =
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+        layoutParams.privateFlags |= WindowManager.LayoutParams.SYSTEM_FLAG_SHOW_FOR_ALL_USERS;
+        layoutParams.setFitInsetsTypes(0);
+        layoutParams.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        layoutParams.format = PixelFormat.TRANSLUCENT;
+        layoutParams.setTitle(AutoclickIndicatorView.class.getSimpleName());
+        layoutParams.inputFeatures |= WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL;
+
+        mWindowManager = mContext.getSystemService(WindowManager.class);
+        mWindowManager.addView(mAutoclickIndicatorView, layoutParams);
     }
 
     @Override
@@ -122,13 +160,19 @@ public class AutoclickController extends BaseEventStreamTransformation {
 
     @Override
     public void onDestroy() {
-        if (mClickDelayObserver != null) {
-            mClickDelayObserver.stop();
-            mClickDelayObserver = null;
+        if (mAutoclickSettingsObserver != null) {
+            mAutoclickSettingsObserver.stop();
+            mAutoclickSettingsObserver = null;
         }
         if (mClickScheduler != null) {
             mClickScheduler.cancel();
             mClickScheduler = null;
+        }
+
+        if (mAutoclickIndicatorScheduler != null) {
+            mAutoclickIndicatorScheduler.cancel();
+            mAutoclickIndicatorScheduler = null;
+            mWindowManager.removeView(mAutoclickIndicatorView);
         }
     }
 
@@ -151,19 +195,24 @@ public class AutoclickController extends BaseEventStreamTransformation {
     }
 
     /**
-     * Observes setting value for autoclick delay, and updates ClickScheduler delay whenever the
-     * setting value changes.
+     * Observes autoclick setting values, and updates ClickScheduler delay and indicator size
+     * whenever the setting value changes.
      */
-    final private static class ClickDelayObserver extends ContentObserver {
+    final private static class AutoclickSettingsObserver extends ContentObserver {
         /** URI used to identify the autoclick delay setting with content resolver. */
         private final Uri mAutoclickDelaySettingUri = Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_AUTOCLICK_DELAY);
 
+        /** URI used to identify the autoclick cursor area size setting with content resolver. */
+        private final Uri mAutoclickCursorAreaSizeSettingUri =
+                Settings.Secure.getUriFor(Settings.Secure.ACCESSIBILITY_AUTOCLICK_CURSOR_AREA_SIZE);
+
         private ContentResolver mContentResolver;
         private ClickScheduler mClickScheduler;
+        private AutoclickIndicatorScheduler mAutoclickIndicatorScheduler;
         private final int mUserId;
 
-        public ClickDelayObserver(int userId, Handler handler) {
+        public AutoclickSettingsObserver(int userId, Handler handler) {
             super(handler);
             mUserId = userId;
         }
@@ -176,11 +225,13 @@ public class AutoclickController extends BaseEventStreamTransformation {
          *     changes.
          * @param clickScheduler ClickScheduler that should be updated when click delay changes.
          * @throws IllegalStateException If internal state is already setup when the method is
-         *         called.
+         *     called.
          * @throws NullPointerException If any of the arguments is a null pointer.
          */
-        public void start(@NonNull ContentResolver contentResolver,
-                @NonNull ClickScheduler clickScheduler) {
+        public void start(
+                @NonNull ContentResolver contentResolver,
+                @NonNull ClickScheduler clickScheduler,
+                @Nullable AutoclickIndicatorScheduler autoclickIndicatorScheduler) {
             if (mContentResolver != null || mClickScheduler != null) {
                 throw new IllegalStateException("Observer already started.");
             }
@@ -193,11 +244,20 @@ public class AutoclickController extends BaseEventStreamTransformation {
 
             mContentResolver = contentResolver;
             mClickScheduler = clickScheduler;
+            mAutoclickIndicatorScheduler = autoclickIndicatorScheduler;
             mContentResolver.registerContentObserver(mAutoclickDelaySettingUri, false, this,
                     mUserId);
 
             // Initialize mClickScheduler's initial delay value.
             onChange(true, mAutoclickDelaySettingUri);
+
+            if (Flags.enableAutoclickIndicator()) {
+                // Register observer to listen to cursor area size setting change.
+                mContentResolver.registerContentObserver(
+                        mAutoclickCursorAreaSizeSettingUri, false, this, mUserId);
+                // Initialize mAutoclickIndicatorView's initial size.
+                onChange(true, mAutoclickCursorAreaSizeSettingUri);
+            }
         }
 
         /**
@@ -208,7 +268,7 @@ public class AutoclickController extends BaseEventStreamTransformation {
          */
         public void stop() {
             if (mContentResolver == null || mClickScheduler == null) {
-                throw new IllegalStateException("ClickDelayObserver not started.");
+                throw new IllegalStateException("AutoclickSettingsObserver not started.");
             }
 
             mContentResolver.unregisterContentObserver(this);
@@ -222,6 +282,76 @@ public class AutoclickController extends BaseEventStreamTransformation {
                         AccessibilityManager.AUTOCLICK_DELAY_DEFAULT, mUserId);
                 mClickScheduler.updateDelay(delay);
             }
+            if (Flags.enableAutoclickIndicator()
+                    && mAutoclickCursorAreaSizeSettingUri.equals(uri)) {
+                int size =
+                        Settings.Secure.getIntForUser(
+                                mContentResolver,
+                                Settings.Secure.ACCESSIBILITY_AUTOCLICK_CURSOR_AREA_SIZE,
+                                AccessibilityManager.AUTOCLICK_CURSOR_AREA_SIZE_DEFAULT,
+                                mUserId);
+                if (mAutoclickIndicatorScheduler != null) {
+                    mAutoclickIndicatorScheduler.updateCursorAreaSize(size);
+                }
+            }
+        }
+    }
+
+    private final class AutoclickIndicatorScheduler implements Runnable {
+        private final Handler mHandler;
+        private long mScheduledShowIndicatorTime;
+        private boolean mIndicatorCallbackActive = false;
+
+        public AutoclickIndicatorScheduler(Handler handler) {
+            mHandler = handler;
+        }
+
+        @Override
+        public void run() {
+            long now = SystemClock.uptimeMillis();
+            // Indicator was rescheduled after task was posted. Post new run task at updated time.
+            if (now < mScheduledShowIndicatorTime) {
+                mHandler.postDelayed(this, mScheduledShowIndicatorTime - now);
+                return;
+            }
+
+            mAutoclickIndicatorView.redrawIndicator();
+            mIndicatorCallbackActive = false;
+        }
+
+        public void update() {
+            long scheduledShowIndicatorTime =
+                    SystemClock.uptimeMillis() + SHOW_INDICATOR_DELAY_TIME;
+            // If there already is a scheduled show indicator at time before the updated time, just
+            // update scheduled time.
+            if (mIndicatorCallbackActive
+                    && scheduledShowIndicatorTime > mScheduledShowIndicatorTime) {
+                mScheduledShowIndicatorTime = scheduledShowIndicatorTime;
+                return;
+            }
+
+            if (mIndicatorCallbackActive) {
+                mHandler.removeCallbacks(this);
+            }
+
+            mIndicatorCallbackActive = true;
+            mScheduledShowIndicatorTime = scheduledShowIndicatorTime;
+
+            mHandler.postDelayed(this, SHOW_INDICATOR_DELAY_TIME);
+        }
+
+        public void cancel() {
+            if (!mIndicatorCallbackActive) {
+                return;
+            }
+
+            mIndicatorCallbackActive = false;
+            mScheduledShowIndicatorTime = -1;
+            mHandler.removeCallbacks(this);
+        }
+
+        public void updateCursorAreaSize(int size) {
+            mAutoclickIndicatorView.setRadius(size);
         }
     }
 
@@ -304,7 +434,14 @@ public class AutoclickController extends BaseEventStreamTransformation {
             cacheLastEvent(event, policyFlags, mLastMotionEvent == null || moved /* useAsAnchor */);
 
             if (moved) {
-              rescheduleClick(mDelay);
+                rescheduleClick(mDelay);
+
+                if (Flags.enableAutoclickIndicator()) {
+                    final int pointerIndex = event.getActionIndex();
+                    mAutoclickIndicatorView.setCoordination(
+                            event.getX(pointerIndex), event.getY(pointerIndex));
+                    mAutoclickIndicatorScheduler.update();
+                }
             }
         }
 
@@ -331,6 +468,10 @@ public class AutoclickController extends BaseEventStreamTransformation {
          */
         public void updateDelay(int delay) {
             mDelay = delay;
+
+            if (Flags.enableAutoclickIndicator() && mAutoclickIndicatorView != null) {
+                mAutoclickIndicatorView.setAnimationDuration(delay - SHOW_INDICATOR_DELAY_TIME);
+            }
         }
 
         /**
@@ -385,6 +526,10 @@ public class AutoclickController extends BaseEventStreamTransformation {
                 mLastMotionEvent = null;
             }
             mScheduledClickTime = -1;
+
+            if (Flags.enableAutoclickIndicator() && mAutoclickIndicatorView != null) {
+                mAutoclickIndicatorView.clearIndicator();
+            }
         }
 
         /**

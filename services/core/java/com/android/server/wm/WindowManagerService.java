@@ -314,6 +314,7 @@ import android.widget.Toast;
 import android.window.ActivityWindowInfo;
 import android.window.AddToSurfaceSyncGroupResult;
 import android.window.ClientWindowFrames;
+import android.window.ConfigurationChangeSetting;
 import android.window.IGlobalDragListener;
 import android.window.IScreenRecordingCallback;
 import android.window.ISurfaceSyncGroupCompletedListener;
@@ -331,6 +332,7 @@ import android.window.WindowContextInfo;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.annotations.VisibleForTesting.Visibility;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.os.TransferPipe;
 import com.android.internal.policy.IKeyguardDismissCallback;
@@ -605,6 +607,7 @@ public class WindowManagerService extends IWindowManager.Stub
     final boolean mLimitedAlphaCompositing;
     final int mMaxUiWidth;
 
+    @NonNull
     @VisibleForTesting
     WindowManagerPolicy mPolicy;
 
@@ -1059,13 +1062,16 @@ public class WindowManagerService extends IWindowManager.Stub
     private boolean mAnimationsDisabled = false;
     boolean mPointerLocationEnabled = false;
 
+    @NonNull
     final AppCompatConfiguration mAppCompatConfiguration;
 
     private boolean mIsIgnoreOrientationRequestDisabled;
 
+    @NonNull
     final InputManagerService mInputManager;
     final DisplayManagerInternal mDisplayManagerInternal;
     final DisplayManager mDisplayManager;
+    @NonNull
     final ActivityTaskManagerService mAtmService;
 
     /** Indicates whether this device supports wide color gamut / HDR rendering */
@@ -1121,7 +1127,9 @@ public class WindowManagerService extends IWindowManager.Stub
     static WindowManagerThreadPriorityBooster sThreadPriorityBooster =
             new WindowManagerThreadPriorityBooster();
 
+    @NonNull
     Supplier<SurfaceControl.Builder> mSurfaceControlFactory;
+    @NonNull
     Supplier<SurfaceControl.Transaction> mTransactionFactory;
 
     private final SurfaceControl.Transaction mTransaction;
@@ -1193,9 +1201,11 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private volatile boolean mDisableSecureWindows = false;
 
-    public static WindowManagerService main(final Context context, final InputManagerService im,
-            final boolean showBootMsgs, WindowManagerPolicy policy,
-            ActivityTaskManagerService atm) {
+    /** Creates an instance of the WindowManagerService for the system server. */
+    public static WindowManagerService main(@NonNull final Context context,
+            @NonNull final InputManagerService im, final boolean showBootMsgs,
+            @NonNull final WindowManagerPolicy policy,
+            @NonNull final ActivityTaskManagerService atm) {
         // Using SysUI context to have access to Material colors extracted from Wallpaper.
         final AppCompatConfiguration appCompat = new AppCompatConfiguration(
                 ActivityThread.currentActivityThread().getSystemUiContext());
@@ -1209,15 +1219,19 @@ public class WindowManagerService extends IWindowManager.Stub
 
     /**
      * Creates and returns an instance of the WindowManagerService. This call allows the caller
-     * to override factories that can be used to stub native calls during test.
+     * to override factories that can be used to stub native calls during test. Tests should use
+     * {@link WindowManagerServiceTestSupport} instead of calling this directly to ensure
+     * proper initialization and cleanup of dependencies.
      */
-    @VisibleForTesting
-    public static WindowManagerService main(final Context context, final InputManagerService im,
-            final boolean showBootMsgs, WindowManagerPolicy policy, ActivityTaskManagerService atm,
-            DisplayWindowSettingsProvider displayWindowSettingsProvider,
-            Supplier<SurfaceControl.Transaction> transactionFactory,
-            Supplier<SurfaceControl.Builder> surfaceControlFactory,
-            AppCompatConfiguration appCompat) {
+    @VisibleForTesting(visibility = Visibility.PRIVATE)
+    static WindowManagerService main(@NonNull final Context context,
+            @NonNull final InputManagerService im, boolean showBootMsgs,
+            @NonNull final WindowManagerPolicy policy,
+            @NonNull final ActivityTaskManagerService atm,
+            @NonNull final DisplayWindowSettingsProvider displayWindowSettingsProvider,
+            @NonNull final Supplier<SurfaceControl.Transaction> transactionFactory,
+            @NonNull final Supplier<SurfaceControl.Builder> surfaceControlFactory,
+            @NonNull final AppCompatConfiguration appCompat) {
 
         final WindowManagerService[] wms = new WindowManagerService[1];
         DisplayThread.getHandler().runWithScissors(() ->
@@ -1243,12 +1257,13 @@ public class WindowManagerService extends IWindowManager.Stub
         new WindowManagerShellCommand(this).exec(this, in, out, err, args, callback, result);
     }
 
-    private WindowManagerService(Context context, InputManagerService inputManager,
-            boolean showBootMsgs, WindowManagerPolicy policy, ActivityTaskManagerService atm,
-            DisplayWindowSettingsProvider displayWindowSettingsProvider,
-            Supplier<SurfaceControl.Transaction> transactionFactory,
-            Supplier<SurfaceControl.Builder> surfaceControlFactory,
-            AppCompatConfiguration appCompat) {
+    private WindowManagerService(@NonNull Context context,
+            @NonNull InputManagerService inputManager, boolean showBootMsgs,
+            @NonNull WindowManagerPolicy policy, @NonNull ActivityTaskManagerService atm,
+            @NonNull DisplayWindowSettingsProvider displayWindowSettingsProvider,
+            @NonNull Supplier<SurfaceControl.Transaction> transactionFactory,
+            @NonNull Supplier<SurfaceControl.Builder> surfaceControlFactory,
+            @NonNull AppCompatConfiguration appCompat) {
         installLock(this, INDEX_WINDOW);
         mGlobalLock = atm.getGlobalLock();
         mAtmService = atm;
@@ -1463,6 +1478,12 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         }, mTransactionFactory);
         mSystemPerformanceHinter.mTraceTag = TRACE_TAG_WINDOW_MANAGER;
+
+        if (Flags.condenseConfigurationChangeForSimpleMode()) {
+            LocalServices.addService(
+                    ConfigurationChangeSetting.ConfigurationChangeSettingInternal.class,
+                    new ConfigurationChangeSettingInternalImpl());
+        }
     }
 
     DisplayAreaPolicy.Provider getDisplayAreaPolicyProvider() {
@@ -6216,19 +6237,30 @@ public class WindowManagerService extends IWindowManager.Stub
         final long ident = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
-                final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
-                if (displayContent != null) {
-                    displayContent.setForcedDensity(density, targetUserId);
-                } else {
-                    DisplayInfo info = mDisplayManagerInternal.getDisplayInfo(displayId);
-                    if (info != null) {
-                        mDisplayWindowSettings.setForcedDensity(info, density, userId);
-                    }
-                }
+                setForcedDensityLockedInternal(displayId, density, targetUserId);
             }
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
+    }
+
+    @GuardedBy("mGlobalLock")
+    private void setForcedDensityLockedInternal(final int displayId, final int density,
+            @UserIdInt final int targetUserId) {
+        final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
+        if (displayContent != null) {
+            displayContent.setForcedDensity(density, targetUserId);
+            return;
+        }
+
+        final DisplayInfo info = mDisplayManagerInternal.getDisplayInfo(displayId);
+        if (info == null) {
+            ProtoLog.e(WM_ERROR, "Failed to get information about logical display %d. "
+                    + "Skip setting forced display density.", displayId);
+            return;
+        }
+
+        mDisplayWindowSettings.setForcedDensity(info, density, targetUserId);
     }
 
     @EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
@@ -6246,12 +6278,51 @@ public class WindowManagerService extends IWindowManager.Stub
                 if (displayContent != null) {
                     displayContent.setForcedDensity(displayContent.getInitialDisplayDensity(),
                             callingUserId);
-                } else {
-                    DisplayInfo info = mDisplayManagerInternal.getDisplayInfo(displayId);
-                    if (info != null) {
-                        mDisplayWindowSettings.setForcedDensity(info, info.logicalDensityDpi,
-                                userId);
+                    return;
+                }
+
+                final DisplayInfo info = mDisplayManagerInternal.getDisplayInfo(displayId);
+                if (info == null) {
+                    ProtoLog.e(WM_ERROR, "Failed to get information about logical display %d. "
+                            + "Skip clearing forced display density.", displayId);
+                    return;
+                }
+
+                mDisplayWindowSettings.setForcedDensity(info, info.logicalDensityDpi,
+                        userId);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
+    @EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+    @Override
+    public void setConfigurationChangeSettingsForUser(
+            @NonNull List<ConfigurationChangeSetting> settings, int userId) {
+        setConfigurationChangeSettingsForUser_enforcePermission();
+        if (!Flags.condenseConfigurationChangeForSimpleMode()) {
+            throw new IllegalStateException(
+                    "setConfigurationChangeSettingsForUser shouldn't be called when "
+                            + "condenseConfigurationChangeForSimpleMode is disabled, "
+                            + "please enable the flag.");
+        }
+
+        final int callingUserId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
+                Binder.getCallingUid(), userId, false, true,
+                "setConfigurationChangeSettingsForUser",
+                null);
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                mAtmService.deferWindowLayout();
+                try {
+                    // Apply the settings.
+                    for (int i = 0; i < settings.size(); i++) {
+                        settings.get(i).apply(callingUserId);
                     }
+                } finally {
+                    mAtmService.continueWindowLayout();
                 }
             }
         } finally {
@@ -7452,6 +7523,23 @@ public class WindowManagerService extends IWindowManager.Stub
     // support non-default display.
     DisplayContent getDefaultDisplayContentLocked() {
         return mRoot.getDisplayContent(DEFAULT_DISPLAY);
+    }
+
+    /**
+     * Returns the main display content for the user passed as parameter.
+     *
+     * <p>Visible background users may have their own designated main display, distinct from the
+     * system default display (DEFAULT_DISPLAY). Visible background users operate independently
+     * with their own main displays. These secondary user main displays host the secondary home
+     * activities.
+     */
+    @Nullable
+    DisplayContent getUserMainDisplayContentLocked(@UserIdInt int userId) {
+        final int userMainDisplayId = mUmInternal.getMainDisplayAssignedToUser(userId);
+        if (userMainDisplayId == -1) {
+            return null;
+        }
+        return mRoot.getDisplayContent(userMainDisplayId);
     }
 
     public void onOverlayChanged() {
@@ -10158,9 +10246,10 @@ public class WindowManagerService extends IWindowManager.Stub
             throw new SecurityException("Access denied to process: " + pid
                     + ", must have permission " + Manifest.permission.ACCESS_FPS_COUNTER);
         }
-
-        if (mRoot.anyTaskForId(taskId) == null) {
-            throw new IllegalArgumentException("no task with taskId: " + taskId);
+        synchronized (mGlobalLock) {
+            if (mRoot.anyTaskForId(taskId) == null) {
+                throw new IllegalArgumentException("no task with taskId: " + taskId);
+            }
         }
 
         mTaskFpsCallbackController.registerListener(taskId, callback);
@@ -10577,5 +10666,49 @@ public class WindowManagerService extends IWindowManager.Stub
                 pw.println("Got a RemoteException while dumping the window");
             }
         });
+    }
+
+    private final class ConfigurationChangeSettingInternalImpl implements
+            ConfigurationChangeSetting.ConfigurationChangeSettingInternal {
+        @NonNull
+        @Override
+        public ConfigurationChangeSetting createImplFromParcel(
+                @ConfigurationChangeSetting.SettingType int settingType, @NonNull Parcel in) {
+            switch (settingType) {
+                case ConfigurationChangeSetting.SETTING_TYPE_DISPLAY_DENSITY:
+                    return new DensitySettingImpl(in);
+                case ConfigurationChangeSetting.SETTING_TYPE_FONT_SCALE:
+                    return new FontScaleSettingImpl(in);
+                default:
+                    throw new IllegalArgumentException("Unknown setting type " + settingType);
+            }
+        }
+
+        private final class DensitySettingImpl extends ConfigurationChangeSetting.DensitySetting {
+            private DensitySettingImpl(Parcel in) {
+                super(in);
+            }
+
+            @Override
+            @GuardedBy("mGlobalLock")
+            public void apply(@UserIdInt int userId) {
+                setForcedDensityLockedInternal(mDisplayId, mDensity, userId);
+            }
+        }
+
+        private final class FontScaleSettingImpl extends
+                ConfigurationChangeSetting.FontScaleSetting {
+            private FontScaleSettingImpl(Parcel in) {
+                super(in);
+            }
+
+            @Override
+            @GuardedBy("mGlobalLock")
+            public void apply(@UserIdInt int userId) {
+                Settings.System.putFloat(mContext.getContentResolver(),
+                        Settings.System.FONT_SCALE, mFontScaleFactor);
+                mAtmService.updateFontScaleIfNeeded(userId);
+            }
+        }
     }
 }

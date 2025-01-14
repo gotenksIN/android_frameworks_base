@@ -17,6 +17,7 @@
 package com.android.server.wm;
 
 import android.annotation.NonNull;
+import android.content.pm.PackageManager;
 
 import com.android.server.wm.utils.OptPropFactory;
 
@@ -26,7 +27,7 @@ import com.android.server.wm.utils.OptPropFactory;
 public class AppCompatOverrides {
 
     @NonNull
-    private final AppCompatOrientationOverrides mAppCompatOrientationOverrides;
+    private final AppCompatOrientationOverrides mOrientationOverrides;
     @NonNull
     private final AppCompatCameraOverrides mAppCompatCameraOverrides;
     @NonNull
@@ -34,35 +35,37 @@ public class AppCompatOverrides {
     @NonNull
     private final AppCompatFocusOverrides mAppCompatFocusOverrides;
     @NonNull
-    private final AppCompatResizeOverrides mAppCompatResizeOverrides;
+    private final AppCompatResizeOverrides mResizeOverrides;
     @NonNull
-    private final AppCompatReachabilityOverrides mAppCompatReachabilityOverrides;
+    private final AppCompatReachabilityOverrides mReachabilityOverrides;
     @NonNull
     private final AppCompatLetterboxOverrides mAppCompatLetterboxOverrides;
 
     AppCompatOverrides(@NonNull ActivityRecord activityRecord,
+            @NonNull PackageManager packageManager,
             @NonNull AppCompatConfiguration appCompatConfiguration,
             @NonNull OptPropFactory optPropBuilder,
             @NonNull AppCompatDeviceStateQuery appCompatDeviceStateQuery) {
         mAppCompatCameraOverrides = new AppCompatCameraOverrides(activityRecord,
                 appCompatConfiguration, optPropBuilder);
-        mAppCompatOrientationOverrides = new AppCompatOrientationOverrides(activityRecord,
+        mOrientationOverrides = new AppCompatOrientationOverrides(activityRecord,
                 appCompatConfiguration, optPropBuilder, mAppCompatCameraOverrides);
-        mAppCompatReachabilityOverrides = new AppCompatReachabilityOverrides(activityRecord,
+        mReachabilityOverrides = new AppCompatReachabilityOverrides(activityRecord,
                 appCompatConfiguration, appCompatDeviceStateQuery);
         mAppCompatAspectRatioOverrides = new AppCompatAspectRatioOverrides(activityRecord,
                 appCompatConfiguration, optPropBuilder, appCompatDeviceStateQuery,
-                mAppCompatReachabilityOverrides);
+                mReachabilityOverrides);
         mAppCompatFocusOverrides = new AppCompatFocusOverrides(activityRecord,
                 appCompatConfiguration, optPropBuilder);
-        mAppCompatResizeOverrides = new AppCompatResizeOverrides(activityRecord, optPropBuilder);
+        mResizeOverrides = new AppCompatResizeOverrides(activityRecord, packageManager,
+                optPropBuilder);
         mAppCompatLetterboxOverrides = new AppCompatLetterboxOverrides(activityRecord,
                 appCompatConfiguration);
     }
 
     @NonNull
-    AppCompatOrientationOverrides getAppCompatOrientationOverrides() {
-        return mAppCompatOrientationOverrides;
+    AppCompatOrientationOverrides getOrientationOverrides() {
+        return mOrientationOverrides;
     }
 
     @NonNull
@@ -81,13 +84,13 @@ public class AppCompatOverrides {
     }
 
     @NonNull
-    AppCompatResizeOverrides getAppCompatResizeOverrides() {
-        return mAppCompatResizeOverrides;
+    AppCompatResizeOverrides getResizeOverrides() {
+        return mResizeOverrides;
     }
 
     @NonNull
-    AppCompatReachabilityOverrides getAppCompatReachabilityOverrides() {
-        return mAppCompatReachabilityOverrides;
+    AppCompatReachabilityOverrides getReachabilityOverrides() {
+        return mReachabilityOverrides;
     }
 
     @NonNull

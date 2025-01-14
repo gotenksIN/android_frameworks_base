@@ -109,6 +109,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.app.animation.Interpolators;
+import com.android.app.tracing.coroutines.TrackTracer;
 import com.android.internal.foldables.FoldGracePeriodProvider;
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.jank.InteractionJankMonitor.Configuration;
@@ -816,7 +817,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             if (targetUserId != mSelectedUserInteractor.getSelectedUserId()) {
                 return;
             }
-            if (DEBUG) Log.d(TAG, "keyguardDone");
+            Log.d(TAG, "keyguardDone");
             tryKeyguardDone();
         }
 
@@ -835,7 +836,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         @Override
         public void keyguardDonePending(int targetUserId) {
             Trace.beginSection("KeyguardViewMediator.mViewMediatorCallback#keyguardDonePending");
-            if (DEBUG) Log.d(TAG, "keyguardDonePending");
+            Log.d(TAG, "keyguardDonePending");
             if (targetUserId != mSelectedUserInteractor.getSelectedUserId()) {
                 Trace.endSection();
                 return;
@@ -2739,10 +2740,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     }
 
     private void tryKeyguardDone() {
-        if (DEBUG) {
-            Log.d(TAG, "tryKeyguardDone: pending - " + mKeyguardDonePending + ", animRan - "
-                    + mHideAnimationRun + " animRunning - " + mHideAnimationRunning);
-        }
+        Log.d(TAG, "tryKeyguardDone: pending - " + mKeyguardDonePending + ", animRan - "
+                + mHideAnimationRun + " animRunning - " + mHideAnimationRunning);
         if (!mKeyguardDonePending && mHideAnimationRun && !mHideAnimationRunning) {
             handleKeyguardDone();
         } else if (mSurfaceBehindRemoteAnimationRunning) {
@@ -3044,7 +3043,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     }
 
     private final Runnable mHideAnimationFinishedRunnable = () -> {
-        Log.e(TAG, "mHideAnimationFinishedRunnable#run");
+        Log.d(TAG, "mHideAnimationFinishedRunnable#run");
         mHideAnimationRunning = false;
         tryKeyguardDone();
     };
@@ -3986,7 +3985,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     public void setPendingLock(boolean hasPendingLock) {
         mPendingLock = hasPendingLock;
-        Trace.traceCounter(Trace.TRACE_TAG_APP, "pendingLock", mPendingLock ? 1 : 0);
+        TrackTracer.instantForGroup("keyguard", "pendingLock", mPendingLock ? 1 : 0);
     }
 
     private boolean isViewRootReady() {

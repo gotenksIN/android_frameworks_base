@@ -5247,9 +5247,15 @@ class Task extends TaskFragment {
             // to ensure any necessary pause logic occurs. In the case where the Activity will be
             // shown regardless of the lock screen, the call to
             // {@link ActivityTaskSupervisor#checkReadyForSleepLocked} is skipped.
-            final ActivityRecord next = topRunningActivity(true /* focusableOnly */);
-            if (next == null || !next.canTurnScreenOn()) {
-                checkReadyForSleep();
+            if (shouldSleepActivities()) {
+                final ActivityRecord next = topRunningActivity(true /* focusableOnly */);
+                if (next != null && next.canTurnScreenOn()
+                        && !mWmService.mPowerManager.isInteractive()) {
+                    mTaskSupervisor.wakeUp(getDisplayId(), "resumeTop-turnScreenOnFlag");
+                    next.setCurrentLaunchCanTurnScreenOn(false);
+                } else {
+                    checkReadyForSleep();
+                }
             }
         } finally {
             mInResumeTopActivity = false;
@@ -5267,10 +5273,11 @@ class Task extends TaskFragment {
     @GuardedBy("mService")
     private boolean resumeTopActivityInnerLocked(ActivityRecord prev, ActivityOptions options,
             boolean deferPause) {
-        if (!mAtmService.isBooting() && !mAtmService.isBooted()) {
+        if (!mAtmService.isBooting() && !mAtmService.isBooted() || !mTaskSupervisor.readyToResume()) {
             // Not ready yet!
             return false;
         }
+
         final ActivityRecord topActivity = topRunningActivity(true /* focusableOnly */);
         if (topActivity == null) {
             // There are no activities left in this task, let's look somewhere else.

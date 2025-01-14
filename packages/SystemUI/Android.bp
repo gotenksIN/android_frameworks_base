@@ -85,11 +85,13 @@ filegroup {
 filegroup {
     name: "SystemUI-tests-broken-robofiles-run",
     srcs: [
+        "tests/src/**/systemui/keyguard/data/repository/KeyguardTransitionRepositoryTest.kt",
+        "tests/src/**/systemui/power/PowerNotificationWarningsTest.java",
+        "tests/src/**/systemui/user/domain/interactor/RefreshUsersSchedulerTest.kt",
         "tests/src/**/systemui/dreams/touch/CommunalTouchHandlerTest.java",
         "tests/src/**/systemui/shade/NotificationShadeWindowViewControllerTest.kt",
         "tests/src/**/systemui/keyguard/domain/interactor/KeyguardQuickAffordanceInteractorSceneContainerTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/ui/model/SignalIconModelParameterizedTest.kt",
-        "tests/src/**/systemui/education/domain/interactor/KeyboardTouchpadEduInteractorTest.kt",
         "tests/src/**/systemui/biometrics/udfps/SinglePointerTouchProcessorTest.kt",
         "tests/src/**/systemui/animation/back/FlingOnBackAnimationCallbackTest.kt",
         "tests/src/**/systemui/education/domain/ui/view/ContextualEduDialogTest.kt",
@@ -285,6 +287,7 @@ filegroup {
         "tests/src/**/systemui/statusbar/phone/KeyguardClockPositionAlgorithmTest.java",
         "tests/src/**/systemui/shared/system/RemoteTransitionTest.java",
         "tests/src/**/systemui/qs/tiles/dialog/InternetDetailsContentControllerTest.java",
+        "tests/src/**/systemui/qs/tiles/dialog/InternetDetailsContentManagerTest.kt",
         "tests/src/**/systemui/qs/external/TileLifecycleManagerTest.java",
         "tests/src/**/systemui/ScreenDecorationsTest.java",
         "tests/src/**/systemui/statusbar/policy/BatteryControllerStartableTest.java",
@@ -516,6 +519,7 @@ android_library {
         "androidx.activity_activity-compose",
         "androidx.compose.animation_animation-graphics",
         "androidx.lifecycle_lifecycle-viewmodel-compose",
+        "kairos",
     ],
     manifest: "AndroidManifest.xml",
     libs: [
@@ -739,6 +743,7 @@ android_library {
         "PlatformMotionTesting",
         "SystemUICustomizationTestUtils",
         "androidx.compose.runtime_runtime",
+        "kairos",
         "kosmos",
         "testables",
         "androidx.test.rules",
@@ -846,7 +851,6 @@ android_robolectric_test {
         "androidx.test.ext.truth",
     ],
 
-    upstream: true,
 
     instrumentation_for: "SystemUIRobo-stub",
     java_resource_dirs: ["tests/robolectric/config"],
@@ -884,7 +888,6 @@ android_robolectric_test {
         "androidx.test.ext.truth",
     ],
 
-    upstream: true,
 
     instrumentation_for: "SystemUIRobo-stub",
     java_resource_dirs: ["tests/robolectric/config"],
@@ -921,6 +924,7 @@ android_ravenwood_test {
         "android.test.mock.impl",
     ],
     auto_gen_config: true,
+    team: "trendy_team_ravenwood",
     plugins: [
         "dagger2-compiler",
     ],

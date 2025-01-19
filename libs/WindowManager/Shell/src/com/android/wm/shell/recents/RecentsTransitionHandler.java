@@ -587,7 +587,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                 mListener.onAnimationStart(this,
                         apps.toArray(new RemoteAnimationTarget[apps.size()]),
                         new RemoteAnimationTarget[0],
-                        new Rect(0, 0, 0, 0), new Rect(), new Bundle());
+                        new Rect(0, 0, 0, 0), new Rect(), new Bundle(),
+                        null);
                 for (int i = 0; i < mStateListeners.size(); i++) {
                     mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_ANIMATING);
                 }
@@ -818,7 +819,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                 mListener.onAnimationStart(this,
                         apps.toArray(new RemoteAnimationTarget[apps.size()]),
                         wallpapers.toArray(new RemoteAnimationTarget[wallpapers.size()]),
-                        new Rect(0, 0, 0, 0), new Rect(), b);
+                        new Rect(0, 0, 0, 0), new Rect(), b, info);
                 for (int i = 0; i < mStateListeners.size(); i++) {
                     mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_ANIMATING);
                 }
@@ -1147,9 +1148,12 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                                 change, layer, info, t, mLeashMap);
                         appearedTargets[nextTargetIdx++] = target;
                         // reparent into the original `mInfo` since that's where we are animating.
-                        final int rootIdx = TransitionUtil.rootIndexFor(change, mInfo);
+                        final TransitionInfo.Root root = TransitionUtil.getRootFor(change, mInfo);
                         final boolean wasClosing = closingIdx >= 0;
-                        t.reparent(target.leash, mInfo.getRoot(rootIdx).getLeash());
+                        t.reparent(target.leash, root.getLeash());
+                        t.setPosition(target.leash,
+                                change.getStartAbsBounds().left - root.getOffset().x,
+                                change.getStartAbsBounds().top - root.getOffset().y);
                         t.setLayer(target.leash, layer);
                         if (wasClosing) {
                             // App was previously visible and is closing

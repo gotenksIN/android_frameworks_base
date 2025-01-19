@@ -423,6 +423,7 @@ android_library {
     ],
     manifest: "AndroidManifest-res.xml",
     flags_packages: [
+        "android.app.flags-aconfig",
         "com_android_systemui_flags",
     ],
 }
@@ -533,6 +534,7 @@ android_library {
         "-Adagger.fastInit=enabled",
         "-Adagger.explicitBindingConflictsWithInject=ERROR",
         "-Adagger.strictMultibindingValidation=enabled",
+        "-Adagger.useBindingGraphFix=ENABLED",
         "-Aroom.schemaLocation=frameworks/base/packages/SystemUI/schemas",
     ],
     kotlincflags: ["-Xjvm-default=all"],
@@ -761,6 +763,10 @@ android_library {
         // TODO(b/352363800): Why do we need this?
         "-J-Xmx8192M",
     ],
+    javacflags: [
+        "-Adagger.useBindingGraphFix=ENABLED",
+    ],
+
     aaptflags: [
         "--extra-packages",
         "com.android.systemui",
@@ -851,7 +857,6 @@ android_robolectric_test {
         "androidx.test.ext.truth",
     ],
 
-
     instrumentation_for: "SystemUIRobo-stub",
     java_resource_dirs: ["tests/robolectric/config"],
     plugins: [
@@ -887,7 +892,6 @@ android_robolectric_test {
         "truth",
         "androidx.test.ext.truth",
     ],
-
 
     instrumentation_for: "SystemUIRobo-stub",
     java_resource_dirs: ["tests/robolectric/config"],

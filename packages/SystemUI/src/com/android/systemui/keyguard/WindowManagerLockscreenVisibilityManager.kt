@@ -17,6 +17,7 @@
 package com.android.systemui.keyguard
 
 import android.app.IActivityTaskManager
+import android.os.RemoteException
 import android.util.Log
 import android.view.IRemoteAnimationFinishedCallback
 import android.view.RemoteAnimationTarget
@@ -174,25 +175,24 @@ constructor(
         if (!isKeyguardGoingAway) {
             // Since WM triggered this, we're likely not transitioning to GONE yet. See if we can
             // start that transition.
-            val startedDismiss =
-                keyguardDismissTransitionInteractor.startDismissKeyguardTransition(
-                    reason = "Going away remote animation started"
-                )
-
-            if (!startedDismiss) {
-                // If the transition wasn't started, we're already GONE. This can happen with timing
-                // issues, where the remote animation took a long time to start, and something else
-                // caused us to unlock in the meantime. Since we're already GONE, simply end the
-                // remote animatiom immediately.
-                Log.d(
-                    TAG,
-                    "onKeyguardGoingAwayRemoteAnimationStart: " +
-                        "Dismiss transition was not started; we're already GONE. " +
-                        "Ending remote animation.",
-                )
-                finishedCallback.onAnimationFinished()
-                return
-            }
+            keyguardDismissTransitionInteractor.startDismissKeyguardTransition(
+                reason = "Going away remote animation started",
+                onAlreadyGone = {
+                    // Called if we're already GONE by the time the dismiss transition would have
+                    // started. This can happen due to timing issues, where the remote animation
+                    // took a long time to start, and something else caused us to unlock in the
+                    // meantime. Since we're already GONE, simply end the remote animation
+                    // immediately.
+                    Log.d(
+                        TAG,
+                        "onKeyguardGoingAwayRemoteAnimationStart: " +
+                            "Dismiss transition was not started; we're already GONE. " +
+                            "Ending remote animation.",
+                    )
+                    finishedCallback.onAnimationFinished()
+                    isKeyguardGoingAway = false
+                },
+            )
 
             isKeyguardGoingAway = true
         }
@@ -266,7 +266,11 @@ constructor(
         if (enableNewKeyguardShellTransitions) {
             startKeyguardTransition(lockscreenShowing, aodVisible)
         } else {
-            activityTaskManagerService.setLockScreenShown(lockscreenShowing, aodVisible)
+            try {
+                activityTaskManagerService.setLockScreenShown(lockscreenShowing, aodVisible)
+            } catch (e: RemoteException) {
+                Log.e(TAG, "Remote exception", e)
+            }
         }
         this.isLockscreenShowing = lockscreenShowing
         this.isAodVisible = aodVisible

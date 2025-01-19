@@ -36,7 +36,6 @@ import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.internal.logging.testing.UiEventLoggerFake
 import com.android.internal.protolog.ProtoLog
-import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.bubbles.Bubble
 import com.android.wm.shell.bubbles.BubbleExpandedViewManager
 import com.android.wm.shell.bubbles.BubbleLogger
@@ -46,6 +45,7 @@ import com.android.wm.shell.bubbles.BubbleTaskView
 import com.android.wm.shell.bubbles.DeviceConfig
 import com.android.wm.shell.bubbles.FakeBubbleExpandedViewManager
 import com.android.wm.shell.bubbles.FakeBubbleFactory
+import com.android.wm.shell.common.TestShellExecutor
 import com.android.wm.shell.taskview.TaskView
 import com.android.wm.shell.taskview.TaskViewTaskController
 import com.google.common.truth.Truth.assertThat
@@ -290,11 +290,10 @@ class BubbleBarAnimationHelperTest {
 
         assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
 
-        val bbevBottom = bbev.contentBottomOnScreen + bubblePositioner.insets.top
         activityScenario.onActivity {
             // notify that the IME top coordinate is greater than the bottom of the expanded view.
             // there's no overlap so it should not be clipped.
-            animationHelper.onImeTopChanged(bbevBottom * 2)
+            animationHelper.onImeTopChanged(bbev.contentBottomOnScreen * 2)
         }
         val outline = Outline()
         bbev.outlineProvider.getOutline(bbev, outline)

@@ -31,9 +31,9 @@ public class AppCompatOverrides {
     @NonNull
     private final AppCompatCameraOverrides mAppCompatCameraOverrides;
     @NonNull
-    private final AppCompatAspectRatioOverrides mAppCompatAspectRatioOverrides;
+    private final AppCompatAspectRatioOverrides mAspectRatioOverrides;
     @NonNull
-    private final AppCompatFocusOverrides mAppCompatFocusOverrides;
+    private final AppCompatFocusOverrides mFocusOverrides;
     @NonNull
     private final AppCompatResizeOverrides mResizeOverrides;
     @NonNull
@@ -52,11 +52,11 @@ public class AppCompatOverrides {
                 appCompatConfiguration, optPropBuilder, mAppCompatCameraOverrides);
         mReachabilityOverrides = new AppCompatReachabilityOverrides(activityRecord,
                 appCompatConfiguration, appCompatDeviceStateQuery);
-        mAppCompatAspectRatioOverrides = new AppCompatAspectRatioOverrides(activityRecord,
+        mAspectRatioOverrides = new AppCompatAspectRatioOverrides(activityRecord,
                 appCompatConfiguration, optPropBuilder, appCompatDeviceStateQuery,
                 mReachabilityOverrides);
-        mAppCompatFocusOverrides = new AppCompatFocusOverrides(activityRecord,
-                appCompatConfiguration, optPropBuilder);
+        mFocusOverrides = new AppCompatFocusOverrides(activityRecord, appCompatConfiguration,
+                optPropBuilder);
         mResizeOverrides = new AppCompatResizeOverrides(activityRecord, packageManager,
                 optPropBuilder);
         mAppCompatLetterboxOverrides = new AppCompatLetterboxOverrides(activityRecord,
@@ -74,13 +74,13 @@ public class AppCompatOverrides {
     }
 
     @NonNull
-    AppCompatAspectRatioOverrides getAppCompatAspectRatioOverrides() {
-        return mAppCompatAspectRatioOverrides;
+    AppCompatAspectRatioOverrides getAspectRatioOverrides() {
+        return mAspectRatioOverrides;
     }
 
     @NonNull
-    AppCompatFocusOverrides getAppCompatFocusOverrides() {
-        return mAppCompatFocusOverrides;
+    AppCompatFocusOverrides getFocusOverrides() {
+        return mFocusOverrides;
     }
 
     @NonNull

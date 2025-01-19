@@ -78,9 +78,9 @@ constructor(
     private val ddsIcon: StateFlow<SignalIconModel?> =
         combine(interactor.defaultDataSubId, subscriptionIdsFlow) {
                 defaultDataSubId, subscriptionIdsFlow ->
-                if (defaultDataSubId > SubscriptionManager.INVALID_SUBSCRIPTION_ID
+                if (defaultDataSubId ?: -1 > SubscriptionManager.INVALID_SUBSCRIPTION_ID
                     && subscriptionIdsFlow.contains(defaultDataSubId)) {
-                    commonViewModelForSub(defaultDataSubId)
+                    commonViewModelForSub(defaultDataSubId ?: -1)
                 } else {
                     null
                 }

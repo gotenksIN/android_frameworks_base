@@ -40,6 +40,7 @@ import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 
 import static com.android.systemui.shared.Flags.returnAnimationFrameworkLongLived;
 import static com.android.window.flags.Flags.ensureWallpaperInTransitions;
+import static com.android.wm.shell.shared.TransitionUtil.FLAG_IS_DESKTOP_WALLPAPER_ACTIVITY;
 import static com.android.wm.shell.shared.TransitionUtil.isClosingType;
 import static com.android.wm.shell.shared.TransitionUtil.isOpeningType;
 
@@ -85,6 +86,7 @@ import com.android.wm.shell.common.ExternalInterfaceBinder;
 import com.android.wm.shell.common.RemoteCallable;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes;
+import com.android.wm.shell.desktopmode.DesktopWallpaperActivity;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.FocusTransitionListener;
@@ -801,6 +803,14 @@ public class Transitions implements RemoteCallable<Transitions>,
             // Actually able to process the sleep now, so re-remove it from the queue and continue
             // the normal flow.
             mReadyDuringSync.remove(active);
+        }
+
+        // If any of the changes are on DesktopWallpaperActivity, add the flag to the change.
+        for (TransitionInfo.Change change : info.getChanges()) {
+            if (change.getTaskInfo() != null
+                    && DesktopWallpaperActivity.isWallpaperTask(change.getTaskInfo())) {
+                change.setFlags(FLAG_IS_DESKTOP_WALLPAPER_ACTIVITY);
+            }
         }
 
         final Track track = getOrCreateTrack(info.getTrack());

@@ -16,7 +16,6 @@
 
 package android.content;
 
-import static android.app.sdksandbox.SdkSandboxManager.ACTION_START_SANDBOXED_ACTIVITY;
 import static android.content.ContentProvider.maybeAddUserId;
 import static android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE;
 import static android.security.Flags.FLAG_FRP_ENFORCEMENT;
@@ -4226,6 +4225,17 @@ public class Intent implements Parcelable, Cloneable {
      */
     public static final String ACTION_USER_INFO_CHANGED =
             "android.intent.action.USER_INFO_CHANGED";
+
+
+    /**
+     * Broadcast sent to the system when a user's information changes. Carries an extra
+     * {@link #EXTRA_USER_HANDLE} to indicate which user's information changed.
+     * This is only sent to permission protected manifest receivers. It is sent to all users.
+     * @hide
+     */
+    @BroadcastBehavior(includeBackground = true)
+    public static final String ACTION_USER_INFO_CHANGED_BACKGROUND =
+            "android.intent.action.USER_INFO_CHANGED_BACKGROUND";
 
     /**
      * Broadcast sent to the primary user when an associated managed profile is added (the profile
@@ -13460,29 +13470,5 @@ public class Intent implements Parcelable, Cloneable {
     /** @hide */
     public boolean isDocument() {
         return (mFlags & FLAG_ACTIVITY_NEW_DOCUMENT) == FLAG_ACTIVITY_NEW_DOCUMENT;
-    }
-
-    /**
-     * @deprecated Use {@link SdkSandboxActivityAuthority#isSdkSandboxActivityIntent} instead.
-     * Once the other API is finalized this method will be removed.
-     *
-     * TODO(b/300059435): remove as part of the cleanup.
-     *
-     * @hide
-     */
-    @Deprecated
-    @android.ravenwood.annotation.RavenwoodThrow
-    public boolean isSandboxActivity(@NonNull Context context) {
-        if (mAction != null && mAction.equals(ACTION_START_SANDBOXED_ACTIVITY)) {
-            return true;
-        }
-        final String sandboxPackageName = context.getPackageManager().getSdkSandboxPackageName();
-        if (mPackage != null && mPackage.equals(sandboxPackageName)) {
-            return true;
-        }
-        if (mComponent != null && mComponent.getPackageName().equals(sandboxPackageName)) {
-            return true;
-        }
-        return false;
     }
 }

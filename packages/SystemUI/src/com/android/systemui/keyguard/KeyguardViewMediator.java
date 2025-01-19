@@ -3496,7 +3496,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     public void showSurfaceBehindKeyguard() {
         mSurfaceBehindRemoteAnimationRequested = true;
 
-        if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS) {
+        if (ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS && !KeyguardWmStateRefactor.isEnabled()) {
             startKeyguardTransition(false /* keyguardShowing */, false /* aodShowing */);
             return;
         }

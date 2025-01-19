@@ -87,10 +87,10 @@ import androidx.compose.ui.unit.times
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.PlatformButton
 import com.android.compose.animation.Easings
+import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.MutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.SceneKey
-import com.android.compose.animation.scene.SceneScope
 import com.android.compose.animation.scene.SceneTransitionLayout
 import com.android.compose.animation.scene.transitions
 import com.android.compose.windowsizeclass.LocalWindowSizeClass
@@ -168,7 +168,7 @@ private fun StandardLayout(viewModel: BouncerSceneContentViewModel, modifier: Mo
         LocalWindowSizeClass.current.heightSizeClass == WindowHeightSizeClass.Expanded
 
     FoldAware(
-        modifier = modifier.padding(start = 32.dp, top = 92.dp, end = 32.dp, bottom = 48.dp),
+        modifier = modifier.padding(top = 92.dp, bottom = 48.dp),
         viewModel = viewModel,
         aboveFold = {
             Column(
@@ -515,7 +515,7 @@ private fun FoldAware(
 }
 
 @Composable
-private fun SceneScope.FoldableScene(
+private fun ContentScope.FoldableScene(
     aboveFold: @Composable BoxScope.() -> Unit,
     belowFold: @Composable BoxScope.() -> Unit,
     isSplit: Boolean,

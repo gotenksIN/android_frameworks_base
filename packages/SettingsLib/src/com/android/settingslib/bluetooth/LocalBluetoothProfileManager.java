@@ -371,6 +371,9 @@ public class LocalBluetoothProfileManager {
                     && mProfile instanceof CsipSetCoordinatorProfile;
 
             if (isAshaProfile && (newState == BluetoothProfile.STATE_CONNECTED)) {
+                if (DEBUG) {
+                    Log.d(TAG, "onReceive, hearing aid profile connected, check hisyncid");
+                }
                 // Check if the HiSyncID has being initialized
                 if (cachedDevice.getHiSyncId() == BluetoothHearingAid.HI_SYNC_ID_INVALID) {
                     long newHiSyncId = getHearingAidProfile().getHiSyncId(cachedDevice.getDevice());
@@ -388,7 +391,9 @@ public class LocalBluetoothProfileManager {
             }
 
             if (isHapClientOrLeAudioProfile && newState == BluetoothProfile.STATE_CONNECTED) {
-
+                if (DEBUG) {
+                    Log.d(TAG, "onReceive, hap/lea profile connected, check hearing aid info");
+                }
                 // Checks if both profiles are connected to the device. Hearing aid info need
                 // to be retrieved from these profiles separately.
                 if (cachedDevice.isConnectedLeAudioHearingAidDevice()) {
@@ -402,10 +407,16 @@ public class LocalBluetoothProfileManager {
             }
 
             if (isCsipProfile && (newState == BluetoothProfile.STATE_CONNECTED)) {
+                if (DEBUG) {
+                    Log.d(TAG, "onReceive, csip profile connected, check group id");
+                }
                 // Check if the GroupID has being initialized
                 if (cachedDevice.getGroupId() == BluetoothCsipSetCoordinator.GROUP_ID_INVALID) {
                     final Map<Integer, ParcelUuid> groupIdMap = getCsipSetCoordinatorProfile()
                             .getGroupUuidMapByDevice(cachedDevice.getDevice());
+                    if (DEBUG) {
+                        Log.d(TAG, "csip group uuid map = " + groupIdMap);
+                    }
                     if (groupIdMap != null) {
                         for (Map.Entry<Integer, ParcelUuid> entry: groupIdMap.entrySet()) {
                             //Based on spec CAP UUID is not mandatory,also we see failures with PTS
@@ -445,6 +456,9 @@ public class LocalBluetoothProfileManager {
                         mProfile.getProfileId());
             }
             if (needDispatchProfileConnectionState) {
+                if (DEBUG) {
+                    Log.d(TAG, "needDispatchProfileConnectionState");
+                }
                 cachedDevice.refresh();
                 mEventManager.dispatchProfileConnectionStateChanged(cachedDevice, newState,
                         mProfile.getProfileId());

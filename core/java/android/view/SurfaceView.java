@@ -1144,7 +1144,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
                     }
                 }
 
-                surfaceUpdateTransaction.setDesintationFrame(mBlastSurfaceControl, mSurfaceWidth,
+                surfaceUpdateTransaction.setDestinationFrame(mBlastSurfaceControl, mSurfaceWidth,
                             mSurfaceHeight);
 
                 if (isHardwareAccelerated()) {

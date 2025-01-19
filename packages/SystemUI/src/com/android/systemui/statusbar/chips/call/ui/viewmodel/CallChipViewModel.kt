@@ -30,7 +30,9 @@ import com.android.systemui.res.R
 import com.android.systemui.statusbar.chips.StatusBarChipLogTags.pad
 import com.android.systemui.statusbar.chips.StatusBarChipsLog
 import com.android.systemui.statusbar.chips.call.domain.interactor.CallChipInteractor
+import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
+import com.android.systemui.statusbar.chips.ui.model.ColorsModel.Companion.toCustomColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.view.ChipBackgroundContainer
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipViewModel
@@ -76,14 +78,24 @@ constructor(
                                 OngoingActivityChipModel.ChipIcon.SingleColorIcon(phoneIcon)
                             }
 
+                        val colors =
+                            if (StatusBarNotifChips.isEnabled && state.promotedContent != null) {
+                                state.promotedContent.toCustomColorsModel()
+                            } else {
+                                ColorsModel.Themed
+                            }
+
                         // This block mimics OngoingCallController#updateChip.
                         if (state.startTimeMs <= 0L) {
                             // If the start time is invalid, don't show a timer and show just an
                             // icon. See b/192379214.
                             OngoingActivityChipModel.Shown.IconOnly(
                                 icon = icon,
-                                colors = ColorsModel.Themed,
-                                getOnClickListener(state),
+                                colors = colors,
+                                onClickListenerLegacy = getOnClickListener(state),
+                                // TODO(b/372657935): Add click support for the call chip when
+                                // StatusBarChipModernization is enabled.
+                                clickBehavior = OngoingActivityChipModel.ClickBehavior.None,
                             )
                         } else {
                             val startTimeInElapsedRealtime =
@@ -91,9 +103,12 @@ constructor(
                                     systemClock.elapsedRealtime()
                             OngoingActivityChipModel.Shown.Timer(
                                 icon = icon,
-                                colors = ColorsModel.Themed,
+                                colors = colors,
                                 startTimeMs = startTimeInElapsedRealtime,
-                                getOnClickListener(state),
+                                onClickListenerLegacy = getOnClickListener(state),
+                                // TODO(b/372657935): Add click support for the call chip when
+                                // StatusBarChipModernization is enabled.
+                                clickBehavior = OngoingActivityChipModel.ClickBehavior.None,
                             )
                         }
                     }

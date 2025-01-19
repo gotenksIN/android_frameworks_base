@@ -493,6 +493,14 @@ flag {
 }
 
 flag {
+    name: "status_bar_no_hun_behavior"
+    namespace: "systemui"
+    description: "When there's a HUN, don't show the HUN text or icon in the status bar. Instead, "
+       "continue showing the usual status bar."
+    bug: "385740230"
+}
+
+flag {
     name: "promote_notifications_automatically"
     namespace: "systemui"
     description: "Flag to automatically turn certain notifications into promoted notifications so "
@@ -614,13 +622,6 @@ flag {
     description: "(Upstream request) Always show the network activity inout indicators and "
         "prefer using alpha to distinguish network activity."
     bug: "310715220"
-}
-
-flag {
-  name: "status_bar_connected_displays"
-  namespace: "lse_desktop_experience"
-  description: "Shows the status bar on connected displays"
-  bug: "379264862"
 }
 
 flag {
@@ -1514,16 +1515,6 @@ flag {
 }
 
 flag {
-   name: "sim_pin_talkback_fix_for_double_submit"
-   namespace: "systemui"
-   description: "The SIM PIN entry screens show the wrong message due"
-   bug: "346932439"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "sim_pin_bouncer_reset"
    namespace: "systemui"
    description: "The SIM PIN bouncer does not close after unlocking"
@@ -1928,4 +1919,24 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "stabilize_heads_up_group"
+    namespace: "systemui"
+    description: "Stabilize heads up groups in VisualStabilityCoordinator"
+    bug: "381864715"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+   name: "magnetic_notification_horizontal_swipe"
+   namespace: "systemui"
+   description: "Add support for magnetic behavior on horizontal notification swipes."
+   bug: "390179908"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
 }

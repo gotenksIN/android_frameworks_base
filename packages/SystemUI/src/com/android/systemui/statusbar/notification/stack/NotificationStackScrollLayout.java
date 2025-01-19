@@ -98,6 +98,7 @@ import com.android.systemui.shade.QSHeaderBoundsProvider;
 import com.android.systemui.shade.TouchLogger;
 import com.android.systemui.statusbar.NotificationShelf;
 import com.android.systemui.statusbar.StatusBarState;
+import com.android.systemui.statusbar.headsup.shared.StatusBarNoHunBehavior;
 import com.android.systemui.statusbar.notification.ColorUpdateLogger;
 import com.android.systemui.statusbar.notification.FakeShadowView;
 import com.android.systemui.statusbar.notification.LaunchAnimationParameters;
@@ -126,7 +127,6 @@ import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrim
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrollState;
 import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView;
 import com.android.systemui.statusbar.phone.HeadsUpAppearanceController;
-import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
 import com.android.systemui.statusbar.policy.ScrollAdapter;
 import com.android.systemui.statusbar.policy.SplitShadeStateController;
 import com.android.systemui.util.Assert;
@@ -281,11 +281,9 @@ public class NotificationStackScrollLayout
     private boolean mExpandedInThisMotion;
     private boolean mShouldShowShelfOnly;
     protected boolean mScrollingEnabled;
-    private boolean mIsCurrentUserSetup;
     protected FooterView mFooterView;
     protected EmptyShadeView mEmptyShadeView;
     private boolean mClearAllInProgress;
-    private FooterClearAllListener mFooterClearAllListener;
     private boolean mFlingAfterUpEvent;
     /**
      * Was the scroller scrolled to the top when the down motion was observed?
@@ -466,7 +464,6 @@ public class NotificationStackScrollLayout
     boolean mHeadsUpAnimatingAway;
     private Consumer<Boolean> mHeadsUpAnimatingAwayListener;
     private int mStatusBarState;
-    private int mUpcomingStatusBarState;
     private boolean mHeadsUpGoingAwayAnimationsAllowed = true;
     private final Runnable mReflingAndAnimateScroll = this::animateScroll;
     private int mCornerRadius;
@@ -497,7 +494,6 @@ public class NotificationStackScrollLayout
     private float mLastSentExpandedHeight;
     private boolean mWillExpand;
     private int mGapHeight;
-    private boolean mIsRemoteInputActive;
 
     /**
      * The extra inset during the full shade transition
@@ -512,23 +508,27 @@ public class NotificationStackScrollLayout
      */
     private final Path mRoundedClipPath = new Path();
 
+    /** The clip path defining where we are NOT allowed to draw. */
+    private final Path mNegativeRoundedClipPath = new Path();
+
     /**
      * The clip Path used to clip the launching notification. This may be different
      * from the normal path, as the views launch animation could start clipped.
      */
     private final Path mLaunchedNotificationClipPath = new Path();
 
-    /**
-     * Should we use rounded rect clipping right now
-     */
+    /** Should we use rounded rect clipping right now */
     private boolean mShouldUseRoundedRectClipping = false;
+
+    /** Should we set an out path for the drawing canvas */
+    private boolean mShouldUseNegativeRoundedRectClipping = false;
 
     private int mRoundedRectClippingLeft;
     private int mRoundedRectClippingTop;
     private int mRoundedRectClippingBottom;
     private int mRoundedRectClippingRight;
     private int mRoundedRectClippingYTranslation;
-    private final float[] mBgCornerRadii = new float[8];
+    private final float[] mRoundedClipCornerRadii = new float[8];
 
     /**
      * Whether stackY should be animated in case the view is getting shorter than the scroll
@@ -567,10 +567,8 @@ public class NotificationStackScrollLayout
     private boolean mDismissUsingRowTranslationX = true;
     private ExpandableNotificationRow mTopHeadsUpRow;
     private NotificationStackScrollLayoutController.TouchHandler mTouchHandler;
-    private final ScreenOffAnimationController mScreenOffAnimationController;
     private boolean mShouldUseSplitNotificationShade;
     private boolean mShouldSkipTopPaddingAnimationAfterFold = false;
-    private boolean mHasFilteredOutSeenNotifications;
     @Nullable private SplitShadeStateController mSplitShadeStateController = null;
     private boolean mIsSmallLandscapeLockscreenEnabled = false;
     private boolean mSuppressHeightUpdates;
@@ -631,9 +629,6 @@ public class NotificationStackScrollLayout
     };
 
     @Nullable
-    private OnClickListener mManageButtonClickListener;
-
-    @Nullable
     private WallpaperInteractor mWallpaperInteractor;
 
     public NotificationStackScrollLayout(Context context, AttributeSet attrs) {
@@ -645,8 +640,6 @@ public class NotificationStackScrollLayout
         mDebugLines = mFeatureFlags.isEnabled(Flags.NSSL_DEBUG_LINES);
         mDebugRemoveAnimation = mFeatureFlags.isEnabled(Flags.NSSL_DEBUG_REMOVE_ANIMATION);
         mSectionsManager = Dependency.get(NotificationSectionsManager.class);
-        mScreenOffAnimationController =
-                Dependency.get(ScreenOffAnimationController.class);
         mSectionsManager.initialize(this);
         mSections = mSectionsManager.createSectionsForBuckets();
 
@@ -3864,7 +3857,7 @@ public class NotificationStackScrollLayout
         if (!SceneContainerFlag.isEnabled()) {
             return !isInsideQsHeader(ev);
         }
-        ShadeScrimShape shape = mScrollViewFields.getScrimClippingShape();
+        ShadeScrimShape shape = mScrollViewFields.getClippingShape();
         if (shape == null) {
             return true; // When there is no scrim, consider this event scrollable.
         }
@@ -5335,7 +5328,7 @@ public class NotificationStackScrollLayout
     void onStatePostChange(boolean fromShadeLocked) {
         boolean onKeyguard = onKeyguard();
 
-        if (mHeadsUpAppearanceController != null) {
+        if (mHeadsUpAppearanceController != null && !StatusBarNoHunBehavior.isEnabled()) {
             mHeadsUpAppearanceController.onStateChanged();
         }
 
@@ -5390,14 +5383,14 @@ public class NotificationStackScrollLayout
             println(pw, "pulsing", mPulsing);
             println(pw, "expanded", mIsExpanded);
             println(pw, "headsUpPinned", mInHeadsUpPinnedMode);
-            println(pw, "qsClipping", mShouldUseRoundedRectClipping);
+            println(pw, "roundedRectClipping", mShouldUseRoundedRectClipping);
+            println(pw, "negativeRoundedRectClipping", mShouldUseNegativeRoundedRectClipping);
             println(pw, "qsClipDismiss", mDismissUsingRowTranslationX);
             println(pw, "visibility", visibilityString(getVisibility()));
             println(pw, "alpha", getAlpha());
             println(pw, "suppressChildrenMeasureLayout", mSuppressChildrenMeasureAndLayout);
             println(pw, "scrollY", mAmbientState.getScrollY());
             println(pw, "showShelfOnly", mShouldShowShelfOnly);
-            println(pw, "isCurrentUserSetup", mIsCurrentUserSetup);
             println(pw, "hideAmount", mAmbientState.getHideAmount());
             println(pw, "ambientStateSwipingUp", mAmbientState.isSwipingUp());
             println(pw, "maxDisplayedNotifications", mMaxDisplayedNotifications);
@@ -5469,8 +5462,8 @@ public class NotificationStackScrollLayout
         pw.append(" r=").print(mRoundedRectClippingRight);
         pw.append(" b=").print(mRoundedRectClippingBottom);
         pw.append(" +y=").print(mRoundedRectClippingYTranslation);
-        pw.append("} topRadius=").print(mBgCornerRadii[0]);
-        pw.append(" bottomRadius=").println(mBgCornerRadii[4]);
+        pw.append("} topRadius=").print(mRoundedClipCornerRadii[0]);
+        pw.append(" bottomRadius=").println(mRoundedClipCornerRadii[4]);
     }
 
     public boolean isFullyHidden() {
@@ -5917,14 +5910,12 @@ public class NotificationStackScrollLayout
         mScrollListener = listener;
     }
 
-    /**
-     * Set rounded rect clipping bounds on this view.
-     */
+    /** Sets rounded rect where the view is allowed to draw. */
     @Override
-    public void setScrimClippingShape(@Nullable ShadeScrimShape shape) {
+    public void setClippingShape(@Nullable ShadeScrimShape shape) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        if (Objects.equals(mScrollViewFields.getScrimClippingShape(), shape)) return;
-        mScrollViewFields.setScrimClippingShape(shape);
+        if (Objects.equals(mScrollViewFields.getClippingShape(), shape)) return;
+        mScrollViewFields.setClippingShape(shape);
         mShouldUseRoundedRectClipping = shape != null;
         mRoundedClipPath.reset();
         if (shape != null) {
@@ -5933,17 +5924,36 @@ public class NotificationStackScrollLayout
             mRoundedRectClippingTop = (int) bounds.getTop();
             mRoundedRectClippingRight = (int) bounds.getRight();
             mRoundedRectClippingBottom = (int) bounds.getBottom();
-            mBgCornerRadii[0] = shape.getTopRadius();
-            mBgCornerRadii[1] = shape.getTopRadius();
-            mBgCornerRadii[2] = shape.getTopRadius();
-            mBgCornerRadii[3] = shape.getTopRadius();
-            mBgCornerRadii[4] = shape.getBottomRadius();
-            mBgCornerRadii[5] = shape.getBottomRadius();
-            mBgCornerRadii[6] = shape.getBottomRadius();
-            mBgCornerRadii[7] = shape.getBottomRadius();
+            mRoundedClipCornerRadii[0] = shape.getTopRadius();
+            mRoundedClipCornerRadii[1] = shape.getTopRadius();
+            mRoundedClipCornerRadii[2] = shape.getTopRadius();
+            mRoundedClipCornerRadii[3] = shape.getTopRadius();
+            mRoundedClipCornerRadii[4] = shape.getBottomRadius();
+            mRoundedClipCornerRadii[5] = shape.getBottomRadius();
+            mRoundedClipCornerRadii[6] = shape.getBottomRadius();
+            mRoundedClipCornerRadii[7] = shape.getBottomRadius();
             mRoundedClipPath.addRoundRect(
                     bounds.getLeft(), bounds.getTop(), bounds.getRight(), bounds.getBottom(),
-                    mBgCornerRadii, Path.Direction.CW);
+                    mRoundedClipCornerRadii, Path.Direction.CW);
+        }
+        invalidate();
+    }
+
+    @Override
+    public void setNegativeClippingShape(@Nullable ShadeScrimShape shape) {
+        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        if (Objects.equals(mScrollViewFields.getNegativeClippingShape(), shape)) return;
+
+        mScrollViewFields.setNegativeClippingShape(shape);
+        mShouldUseNegativeRoundedRectClipping = shape != null;
+        mNegativeRoundedClipPath.reset();
+        if (shape != null) {
+            ShadeScrimBounds bounds = shape.getBounds();
+            float bottomRadius = shape.getBottomRadius();
+            mNegativeRoundedClipPath.addRoundRect(
+                    bounds.getLeft(), bounds.getTop(), bounds.getRight(), bounds.getBottom(),
+                    new float[]{0, 0, 0, 0, bottomRadius, bottomRadius, bottomRadius, bottomRadius},
+                    Path.Direction.CW);
         }
         invalidate();
     }
@@ -5956,21 +5966,22 @@ public class NotificationStackScrollLayout
         SceneContainerFlag.assertInLegacyMode();
         if (mRoundedRectClippingLeft == left && mRoundedRectClippingRight == right
                 && mRoundedRectClippingBottom == bottom && mRoundedRectClippingTop == top
-                && mBgCornerRadii[0] == topRadius && mBgCornerRadii[5] == bottomRadius) {
+                && mRoundedClipCornerRadii[0] == topRadius
+                && mRoundedClipCornerRadii[5] == bottomRadius) {
             return;
         }
         mRoundedRectClippingLeft = left;
         mRoundedRectClippingTop = top;
         mRoundedRectClippingBottom = bottom;
         mRoundedRectClippingRight = right;
-        mBgCornerRadii[0] = topRadius;
-        mBgCornerRadii[1] = topRadius;
-        mBgCornerRadii[2] = topRadius;
-        mBgCornerRadii[3] = topRadius;
-        mBgCornerRadii[4] = bottomRadius;
-        mBgCornerRadii[5] = bottomRadius;
-        mBgCornerRadii[6] = bottomRadius;
-        mBgCornerRadii[7] = bottomRadius;
+        mRoundedClipCornerRadii[0] = topRadius;
+        mRoundedClipCornerRadii[1] = topRadius;
+        mRoundedClipCornerRadii[2] = topRadius;
+        mRoundedClipCornerRadii[3] = topRadius;
+        mRoundedClipCornerRadii[4] = bottomRadius;
+        mRoundedClipCornerRadii[5] = bottomRadius;
+        mRoundedClipCornerRadii[6] = bottomRadius;
+        mRoundedClipCornerRadii[7] = bottomRadius;
         updateRoundedClipPath();
     }
 
@@ -5992,7 +6003,7 @@ public class NotificationStackScrollLayout
                 mRoundedRectClippingTop + mRoundedRectClippingYTranslation,
                 mRoundedRectClippingRight,
                 mRoundedRectClippingBottom + mRoundedRectClippingYTranslation,
-                mBgCornerRadii, Path.Direction.CW);
+                mRoundedClipCornerRadii, Path.Direction.CW);
         if (mShouldUseRoundedRectClipping) {
             invalidate();
         }
@@ -6116,34 +6127,48 @@ public class NotificationStackScrollLayout
     }
 
     @Override
-    protected void dispatchDraw(Canvas canvas) {
-        if (mShouldUseRoundedRectClipping && !mLaunchingNotification) {
+    protected void dispatchDraw(@NonNull Canvas canvas) {
+        if (!mLaunchingNotification) {
             // When launching notifications, we're clipping the children individually instead of in
             // dispatchDraw
-            // Let's clip rounded.
-            canvas.clipPath(mRoundedClipPath);
+            if (mShouldUseRoundedRectClipping) {
+                // Let's clip rounded.
+                canvas.clipPath(mRoundedClipPath);
+            }
+            if (mShouldUseNegativeRoundedRectClipping) {
+                // subtract the negative path if it is defined
+                canvas.clipOutPath(mNegativeRoundedClipPath);
+            }
         }
         super.dispatchDraw(canvas);
     }
 
     @Override
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-        if (mShouldUseRoundedRectClipping && mLaunchingNotification) {
+        boolean shouldUseClipping =
+                mShouldUseRoundedRectClipping || mShouldUseNegativeRoundedRectClipping;
+        if (mLaunchingNotification && shouldUseClipping) {
             // Let's clip children individually during notification launch
             canvas.save();
             ExpandableView expandableView = (ExpandableView) child;
             Path clipPath;
+            Path clipOutPath;
             if (expandableView.isExpandAnimationRunning()
                     || ((ExpandableView) child).hasExpandingChild()) {
                 // When launching the notification, it is not clipped by this layout, but by the
                 // view itself. This is because the view is Translating in Z, where this clipPath
                 // wouldn't apply.
                 clipPath = null;
+                clipOutPath = null;
             } else {
                 clipPath = mRoundedClipPath;
+                clipOutPath = mNegativeRoundedClipPath;
             }
-            if (clipPath != null) {
+            if (mShouldUseRoundedRectClipping && clipPath != null) {
                 canvas.clipPath(clipPath);
+            }
+            if (mShouldUseNegativeRoundedRectClipping && clipOutPath != null) {
+                canvas.clipOutPath(clipOutPath);
             }
             boolean result = super.drawChild(canvas, child, drawingTime);
             canvas.restore();
@@ -6753,10 +6778,6 @@ public class NotificationStackScrollLayout
 
     interface ClearAllListener {
         void onClearAll(@SelectedRows int selectedRows);
-    }
-
-    interface FooterClearAllListener {
-        void onClearAll();
     }
 
     interface ClearAllAnimationListener {

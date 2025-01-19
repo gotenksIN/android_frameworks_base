@@ -409,7 +409,7 @@
         android:killAfterRestore="false"
         android:hardwareAccelerated="true"
         android:label="@string/app_label"
-        android:icon="@drawable/android15_patch_adaptive"
+        android:icon="@drawable/android16_patch_adaptive"
         android:process="com.android.systemui"
         android:supportsRtl="true"
         android:theme="@style/Theme.SystemUI"
@@ -549,6 +549,12 @@
                 android:singleUser="true"
                 android:permission="android.permission.BIND_WALLPAPER"
                 android:exported="true" />
+
+        <service android:name=".wallpapers.GradientColorWallpaper"
+            android:featureFlag="android.app.enable_connected_displays_wallpaper"
+            android:singleUser="true"
+            android:permission="android.permission.BIND_WALLPAPER"
+            android:exported="true" />
 
         <activity android:name=".tuner.TunerActivity"
                   android:enabled="false"

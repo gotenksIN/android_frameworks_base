@@ -1290,9 +1290,7 @@ package android.app {
 
   public class WallpaperManager {
     method @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL) public void clearWallpaper(int, int);
-    method @FlaggedApi("android.app.customization_packs_apis") public static int getOrientation(@NonNull android.graphics.Point);
     method @FloatRange(from=0.0f, to=1.0f) @RequiresPermission(android.Manifest.permission.SET_WALLPAPER_DIM_AMOUNT) public float getWallpaperDimAmount();
-    method @FlaggedApi("android.app.customization_packs_apis") @Nullable public android.os.ParcelFileDescriptor getWallpaperFile(int, boolean);
     method @FlaggedApi("android.app.live_wallpaper_content_handling") @Nullable @RequiresPermission(android.Manifest.permission.READ_WALLPAPER_INTERNAL) public android.app.wallpaper.WallpaperInstance getWallpaperInstance(int);
     method public void setDisplayOffset(android.os.IBinder, int, int);
     method @FlaggedApi("com.android.window.flags.multi_crop") @RequiresPermission(android.Manifest.permission.SET_WALLPAPER) public int setStreamWithCrops(@NonNull java.io.InputStream, @NonNull android.util.SparseArray<android.graphics.Rect>, boolean, int) throws java.io.IOException;
@@ -1301,10 +1299,6 @@ package android.app {
     method @FlaggedApi("android.app.live_wallpaper_content_handling") @RequiresPermission(allOf={android.Manifest.permission.SET_WALLPAPER_COMPONENT, android.Manifest.permission.INTERACT_ACROSS_USERS_FULL}, conditional=true) public boolean setWallpaperComponentWithDescription(@NonNull android.app.wallpaper.WallpaperDescription, int);
     method @RequiresPermission(android.Manifest.permission.SET_WALLPAPER_COMPONENT) public boolean setWallpaperComponentWithFlags(@NonNull android.content.ComponentName, int);
     method @RequiresPermission(android.Manifest.permission.SET_WALLPAPER_DIM_AMOUNT) public void setWallpaperDimAmount(@FloatRange(from=0.0f, to=1.0f) float);
-    field @FlaggedApi("android.app.customization_packs_apis") public static final int ORIENTATION_LANDSCAPE = 1; // 0x1
-    field @FlaggedApi("android.app.customization_packs_apis") public static final int ORIENTATION_PORTRAIT = 0; // 0x0
-    field @FlaggedApi("android.app.customization_packs_apis") public static final int ORIENTATION_SQUARE_LANDSCAPE = 3; // 0x3
-    field @FlaggedApi("android.app.customization_packs_apis") public static final int ORIENTATION_SQUARE_PORTRAIT = 2; // 0x2
   }
 
 }
@@ -3171,6 +3165,11 @@ package android.app.wallpaper {
     method @NonNull public android.util.SparseArray<android.graphics.Rect> getCropHints();
   }
 
+  public static final class WallpaperDescription.Builder {
+    method @NonNull public android.app.wallpaper.WallpaperDescription.Builder setCropHints(@NonNull java.util.Map<android.graphics.Point,android.graphics.Rect>);
+    method @NonNull public android.app.wallpaper.WallpaperDescription.Builder setCropHints(@NonNull android.util.SparseArray<android.graphics.Rect>);
+  }
+
 }
 
 package android.app.wallpapereffectsgeneration {
@@ -3399,18 +3398,18 @@ package android.companion.virtual {
   }
 
   public final class VirtualDevice implements android.os.Parcelable {
-    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") public boolean hasCustomAudioInputSupport();
-    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") public boolean hasCustomCameraSupport();
+    method public boolean hasCustomAudioInputSupport();
+    method public boolean hasCustomCameraSupport();
   }
 
   public final class VirtualDeviceManager {
     method @NonNull @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE) public android.companion.virtual.VirtualDeviceManager.VirtualDevice createVirtualDevice(int, @NonNull android.companion.virtual.VirtualDeviceParams);
-    method @FlaggedApi("android.companion.virtual.flags.persistent_device_id_api") @NonNull public java.util.Set<java.lang.String> getAllPersistentDeviceIds();
-    method @FlaggedApi("android.companion.virtual.flags.persistent_device_id_api") @Nullable public CharSequence getDisplayNameForPersistentDeviceId(@NonNull String);
+    method @NonNull public java.util.Set<java.lang.String> getAllPersistentDeviceIds();
+    method @Nullable public CharSequence getDisplayNameForPersistentDeviceId(@NonNull String);
     field public static final int LAUNCH_FAILURE_NO_ACTIVITY = 2; // 0x2
     field public static final int LAUNCH_FAILURE_PENDING_INTENT_CANCELED = 1; // 0x1
     field public static final int LAUNCH_SUCCESS = 0; // 0x0
-    field @FlaggedApi("android.companion.virtual.flags.persistent_device_id_api") public static final String PERSISTENT_DEVICE_ID_DEFAULT = "default:0";
+    field public static final String PERSISTENT_DEVICE_ID_DEFAULT = "default:0";
   }
 
   public static interface VirtualDeviceManager.ActivityListener {
@@ -3432,7 +3431,7 @@ package android.companion.virtual {
 
   public static class VirtualDeviceManager.VirtualDevice implements java.lang.AutoCloseable {
     method public void addActivityListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.VirtualDeviceManager.ActivityListener);
-    method @FlaggedApi("android.companion.virtual.flags.dynamic_policy") public void addActivityPolicyExemption(@NonNull android.content.ComponentName);
+    method public void addActivityPolicyExemption(@NonNull android.content.ComponentName);
     method @FlaggedApi("android.companion.virtualdevice.flags.activity_control_api") public void addActivityPolicyExemption(@NonNull android.companion.virtual.ActivityPolicyExemption);
     method public void addSoundEffectListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.VirtualDeviceManager.SoundEffectListener);
     method public void close();
@@ -3448,22 +3447,22 @@ package android.companion.virtual {
     method @Deprecated @NonNull public android.hardware.input.VirtualMouse createVirtualMouse(@NonNull android.hardware.display.VirtualDisplay, @NonNull String, int, int);
     method @NonNull public android.hardware.input.VirtualNavigationTouchpad createVirtualNavigationTouchpad(@NonNull android.hardware.input.VirtualNavigationTouchpadConfig);
     method @FlaggedApi("android.companion.virtualdevice.flags.virtual_rotary") @NonNull public android.hardware.input.VirtualRotaryEncoder createVirtualRotaryEncoder(@NonNull android.hardware.input.VirtualRotaryEncoderConfig);
-    method @FlaggedApi("android.companion.virtual.flags.virtual_stylus") @NonNull public android.hardware.input.VirtualStylus createVirtualStylus(@NonNull android.hardware.input.VirtualStylusConfig);
+    method @NonNull public android.hardware.input.VirtualStylus createVirtualStylus(@NonNull android.hardware.input.VirtualStylusConfig);
     method @NonNull public android.hardware.input.VirtualTouchscreen createVirtualTouchscreen(@NonNull android.hardware.input.VirtualTouchscreenConfig);
     method @Deprecated @NonNull public android.hardware.input.VirtualTouchscreen createVirtualTouchscreen(@NonNull android.hardware.display.VirtualDisplay, @NonNull String, int, int);
     method public int getDeviceId();
-    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") @Nullable public String getPersistentDeviceId();
+    method @Nullable public String getPersistentDeviceId();
     method @NonNull public java.util.List<android.companion.virtual.sensor.VirtualSensor> getVirtualSensorList();
     method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") public void goToSleep();
     method public void launchPendingIntent(int, @NonNull android.app.PendingIntent, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
     method public void registerIntentInterceptor(@NonNull android.content.IntentFilter, @NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.VirtualDeviceManager.IntentInterceptorCallback);
     method public void removeActivityListener(@NonNull android.companion.virtual.VirtualDeviceManager.ActivityListener);
-    method @FlaggedApi("android.companion.virtual.flags.dynamic_policy") public void removeActivityPolicyExemption(@NonNull android.content.ComponentName);
+    method public void removeActivityPolicyExemption(@NonNull android.content.ComponentName);
     method @FlaggedApi("android.companion.virtualdevice.flags.activity_control_api") public void removeActivityPolicyExemption(@NonNull android.companion.virtual.ActivityPolicyExemption);
     method public void removeSoundEffectListener(@NonNull android.companion.virtual.VirtualDeviceManager.SoundEffectListener);
-    method @FlaggedApi("android.companion.virtual.flags.dynamic_policy") public void setDevicePolicy(int, int);
+    method public void setDevicePolicy(int, int);
     method @FlaggedApi("android.companion.virtualdevice.flags.activity_control_api") public void setDevicePolicy(int, int, int);
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_ime") public void setDisplayImePolicy(int, int);
+    method public void setDisplayImePolicy(int, int);
     method public void setShowPointerIcon(boolean);
     method public void unregisterIntentInterceptor(@NonNull android.companion.virtual.VirtualDeviceManager.IntentInterceptorCallback);
     method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") public void wakeUp();
@@ -3481,8 +3480,8 @@ package android.companion.virtual {
     method @Deprecated public int getDefaultNavigationPolicy();
     method public int getDevicePolicy(int);
     method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @NonNull public java.time.Duration getDimDuration();
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_home") @Nullable public android.content.ComponentName getHomeComponent();
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_ime") @Nullable public android.content.ComponentName getInputMethodComponent();
+    method @Nullable public android.content.ComponentName getHomeComponent();
+    method @Nullable public android.content.ComponentName getInputMethodComponent();
     method public int getLockState();
     method @Nullable public String getName();
     method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @NonNull public java.time.Duration getScreenOffTimeout();
@@ -3498,11 +3497,11 @@ package android.companion.virtual {
     field public static final int LOCK_STATE_DEFAULT = 0; // 0x0
     field @Deprecated public static final int NAVIGATION_POLICY_DEFAULT_ALLOWED = 0; // 0x0
     field @Deprecated public static final int NAVIGATION_POLICY_DEFAULT_BLOCKED = 1; // 0x1
-    field @FlaggedApi("android.companion.virtual.flags.dynamic_policy") public static final int POLICY_TYPE_ACTIVITY = 3; // 0x3
+    field public static final int POLICY_TYPE_ACTIVITY = 3; // 0x3
     field public static final int POLICY_TYPE_AUDIO = 1; // 0x1
     field @FlaggedApi("android.companion.virtualdevice.flags.activity_control_api") public static final int POLICY_TYPE_BLOCKED_ACTIVITY = 6; // 0x6
     field @FlaggedApi("android.companion.virtual.flags.virtual_camera") public static final int POLICY_TYPE_CAMERA = 5; // 0x5
-    field @FlaggedApi("android.companion.virtual.flags.cross_device_clipboard") public static final int POLICY_TYPE_CLIPBOARD = 4; // 0x4
+    field public static final int POLICY_TYPE_CLIPBOARD = 4; // 0x4
     field @FlaggedApi("android.companion.virtualdevice.flags.default_device_camera_access_policy") public static final int POLICY_TYPE_DEFAULT_DEVICE_CAMERA_ACCESS = 7; // 0x7
     field public static final int POLICY_TYPE_RECENTS = 2; // 0x2
     field public static final int POLICY_TYPE_SENSORS = 0; // 0x0
@@ -3520,8 +3519,8 @@ package android.companion.virtual {
     method @Deprecated @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setBlockedCrossTaskNavigations(@NonNull java.util.Set<android.content.ComponentName>);
     method @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setDevicePolicy(int, int);
     method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setDimDuration(@NonNull java.time.Duration);
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_home") @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setHomeComponent(@Nullable android.content.ComponentName);
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_ime") @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setInputMethodComponent(@Nullable android.content.ComponentName);
+    method @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setHomeComponent(@Nullable android.content.ComponentName);
+    method @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setInputMethodComponent(@Nullable android.content.ComponentName);
     method @NonNull @RequiresPermission(value=android.Manifest.permission.ADD_ALWAYS_UNLOCKED_DISPLAY, conditional=true) public android.companion.virtual.VirtualDeviceParams.Builder setLockState(int);
     method @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setName(@NonNull String);
     method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setScreenOffTimeout(@NonNull java.time.Duration);
@@ -5325,20 +5324,20 @@ package android.hardware.display {
     method @RequiresPermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS) public void setBrightnessConfiguration(android.hardware.display.BrightnessConfiguration);
     method @RequiresPermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS) public void setBrightnessConfigurationForDisplay(@NonNull android.hardware.display.BrightnessConfiguration, @NonNull String);
     method @Deprecated @RequiresPermission(android.Manifest.permission.CONTROL_DISPLAY_SATURATION) public void setSaturationLevel(float);
-    field @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") public static final int VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT = 128; // 0x80
+    field public static final int VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT = 128; // 0x80
     field public static final int VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED = 65536; // 0x10000
     field public static final int VIRTUAL_DISPLAY_FLAG_TRUSTED = 1024; // 0x400
   }
 
   public final class VirtualDisplayConfig implements android.os.Parcelable {
     method @FlaggedApi("android.companion.virtualdevice.flags.virtual_display_insets") @Nullable public android.view.DisplayCutout getDisplayCutout();
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_home") public boolean isHomeSupported();
+    method public boolean isHomeSupported();
     method @FlaggedApi("com.android.window.flags.vdm_force_app_universal_resizable_api") public boolean isIgnoreActivitySizeRestrictions();
   }
 
   public static final class VirtualDisplayConfig.Builder {
     method @FlaggedApi("android.companion.virtualdevice.flags.virtual_display_insets") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDisplayCutout(@Nullable android.view.DisplayCutout);
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_home") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setHomeSupported(boolean);
+    method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setHomeSupported(boolean);
     method @FlaggedApi("com.android.window.flags.vdm_force_app_universal_resizable_api") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setIgnoreActivitySizeRestrictions(boolean);
   }
 
@@ -5970,13 +5969,13 @@ package android.hardware.input {
     method @NonNull public android.hardware.input.VirtualRotaryEncoderScrollEvent.Builder setScrollAmount(@FloatRange(from=-1.0F, to=1.0f) float);
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_stylus") public class VirtualStylus implements java.io.Closeable {
+  public class VirtualStylus implements java.io.Closeable {
     method public void close();
     method public void sendButtonEvent(@NonNull android.hardware.input.VirtualStylusButtonEvent);
     method public void sendMotionEvent(@NonNull android.hardware.input.VirtualStylusMotionEvent);
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_stylus") public final class VirtualStylusButtonEvent implements android.os.Parcelable {
+  public final class VirtualStylusButtonEvent implements android.os.Parcelable {
     method public int describeContents();
     method public int getAction();
     method public int getButtonCode();
@@ -5989,7 +5988,7 @@ package android.hardware.input {
     field @NonNull public static final android.os.Parcelable.Creator<android.hardware.input.VirtualStylusButtonEvent> CREATOR;
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_stylus") public static final class VirtualStylusButtonEvent.Builder {
+  public static final class VirtualStylusButtonEvent.Builder {
     ctor public VirtualStylusButtonEvent.Builder();
     method @NonNull public android.hardware.input.VirtualStylusButtonEvent build();
     method @NonNull public android.hardware.input.VirtualStylusButtonEvent.Builder setAction(int);
@@ -5997,7 +5996,7 @@ package android.hardware.input {
     method @NonNull public android.hardware.input.VirtualStylusButtonEvent.Builder setEventTimeNanos(long);
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_stylus") public final class VirtualStylusConfig extends android.hardware.input.VirtualInputDeviceConfig implements android.os.Parcelable {
+  public final class VirtualStylusConfig extends android.hardware.input.VirtualInputDeviceConfig implements android.os.Parcelable {
     method public int describeContents();
     method public int getHeight();
     method public int getWidth();
@@ -6005,12 +6004,12 @@ package android.hardware.input {
     field @NonNull public static final android.os.Parcelable.Creator<android.hardware.input.VirtualStylusConfig> CREATOR;
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_stylus") public static final class VirtualStylusConfig.Builder extends android.hardware.input.VirtualInputDeviceConfig.Builder<android.hardware.input.VirtualStylusConfig.Builder> {
+  public static final class VirtualStylusConfig.Builder extends android.hardware.input.VirtualInputDeviceConfig.Builder<android.hardware.input.VirtualStylusConfig.Builder> {
     ctor public VirtualStylusConfig.Builder(@IntRange(from=1) int, @IntRange(from=1) int);
     method @NonNull public android.hardware.input.VirtualStylusConfig build();
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_stylus") public final class VirtualStylusMotionEvent implements android.os.Parcelable {
+  public final class VirtualStylusMotionEvent implements android.os.Parcelable {
     method public int describeContents();
     method public int getAction();
     method public long getEventTimeNanos();
@@ -6029,7 +6028,7 @@ package android.hardware.input {
     field public static final int TOOL_TYPE_STYLUS = 2; // 0x2
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_stylus") public static final class VirtualStylusMotionEvent.Builder {
+  public static final class VirtualStylusMotionEvent.Builder {
     ctor public VirtualStylusMotionEvent.Builder();
     method @NonNull public android.hardware.input.VirtualStylusMotionEvent build();
     method @NonNull public android.hardware.input.VirtualStylusMotionEvent.Builder setAction(int);
@@ -19045,7 +19044,7 @@ package android.view.displayhash {
 package android.view.inputmethod {
 
   public final class InputMethodInfo implements android.os.Parcelable {
-    method @FlaggedApi("android.companion.virtual.flags.vdm_custom_ime") public boolean isVirtualDeviceOnly();
+    method public boolean isVirtualDeviceOnly();
   }
 
   public final class InputMethodManager {

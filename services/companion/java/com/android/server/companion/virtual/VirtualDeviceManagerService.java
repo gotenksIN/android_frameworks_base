@@ -216,17 +216,14 @@ public class VirtualDeviceManagerService extends SystemService {
                 VIRTUAL_DEVICE_SERVICE_ORDERED_ID,
                 mActivityInterceptorCallback);
 
-        if (Flags.persistentDeviceIdApi()) {
-            CompanionDeviceManager cdm =
-                    getContext().getSystemService(CompanionDeviceManager.class);
-            if (cdm != null) {
-                onCdmAssociationsChanged(cdm.getAllAssociations(UserHandle.USER_ALL));
-                cdm.addOnAssociationsChangedListener(getContext().getMainExecutor(),
-                        this::onCdmAssociationsChanged, UserHandle.USER_ALL);
-            } else {
-                Slog.e(TAG, "Failed to find CompanionDeviceManager. No CDM association info "
-                        + " will be available.");
-            }
+        CompanionDeviceManager cdm = getContext().getSystemService(CompanionDeviceManager.class);
+        if (cdm != null) {
+            onCdmAssociationsChanged(cdm.getAllAssociations(UserHandle.USER_ALL));
+            cdm.addOnAssociationsChangedListener(getContext().getMainExecutor(),
+                    this::onCdmAssociationsChanged, UserHandle.USER_ALL);
+        } else {
+            Slog.e(TAG, "Failed to find CompanionDeviceManager. No CDM association info "
+                    + " will be available.");
         }
         if (android.companion.virtualdevice.flags.Flags.deviceAwareDisplayPower()) {
             mStrongAuthTracker = new StrongAuthTracker(getContext());
@@ -321,16 +318,14 @@ public class VirtualDeviceManagerService extends SystemService {
             mVirtualDevices.remove(deviceId);
         }
 
-        if (Flags.vdmPublicApis()) {
-            mVirtualDeviceListeners.broadcast(listener -> {
-                try {
-                    listener.onVirtualDeviceClosed(deviceId);
-                } catch (RemoteException e) {
-                    Slog.i(TAG, "Failed to invoke onVirtualDeviceClosed listener: "
-                            + e.getMessage());
-                }
-            });
-        }
+        mVirtualDeviceListeners.broadcast(listener -> {
+            try {
+                listener.onVirtualDeviceClosed(deviceId);
+            } catch (RemoteException e) {
+                Slog.i(TAG, "Failed to invoke onVirtualDeviceClosed listener: "
+                        + e.getMessage());
+            }
+        });
 
         Intent i = new Intent(VirtualDeviceManager.ACTION_VIRTUAL_DEVICE_REMOVED);
         i.putExtra(VirtualDeviceManager.EXTRA_VIRTUAL_DEVICE_ID, deviceId);
@@ -338,14 +333,6 @@ public class VirtualDeviceManagerService extends SystemService {
         final long identity = Binder.clearCallingIdentity();
         try {
             getContext().sendBroadcastAsUser(i, UserHandle.ALL);
-
-            if (!Flags.persistentDeviceIdApi()) {
-                synchronized (mVirtualDeviceManagerLock) {
-                    if (mVirtualDevices.size() == 0) {
-                        unregisterCdmAssociationListener();
-                    }
-                }
-            }
         } finally {
             Binder.restoreCallingIdentity(identity);
         }
@@ -377,21 +364,6 @@ public class VirtualDeviceManagerService extends SystemService {
         for (VirtualDeviceImpl virtualDevice : virtualDevicesToRemove) {
             virtualDevice.close();
         }
-    }
-
-    @RequiresPermission(android.Manifest.permission.MANAGE_COMPANION_DEVICES)
-    private void registerCdmAssociationListener() {
-        final CompanionDeviceManager cdm = getContext().getSystemService(
-                CompanionDeviceManager.class);
-        cdm.addOnAssociationsChangedListener(getContext().getMainExecutor(),
-                mCdmAssociationListener);
-    }
-
-    @RequiresPermission(android.Manifest.permission.MANAGE_COMPANION_DEVICES)
-    private void unregisterCdmAssociationListener() {
-        final CompanionDeviceManager cdm = getContext().getSystemService(
-                CompanionDeviceManager.class);
-        cdm.removeOnAssociationsChangedListener(mCdmAssociationListener);
     }
 
     void onCdmAssociationsChanged(List<AssociationInfo> associations) {
@@ -479,9 +451,8 @@ public class VirtualDeviceManagerService extends SystemService {
             AssociationInfo associationInfo = getAssociationInfo(packageName, associationId);
             if (associationInfo == null) {
                 throw new IllegalArgumentException("No association with ID " + associationId);
-            } else if (!VIRTUAL_DEVICE_COMPANION_DEVICE_PROFILES
-                    .contains(associationInfo.getDeviceProfile())
-                    && Flags.persistentDeviceIdApi()) {
+            } else if (!VIRTUAL_DEVICE_COMPANION_DEVICE_PROFILES.contains(
+                    associationInfo.getDeviceProfile())) {
                 throw new IllegalArgumentException("Unsupported CDM Association device profile "
                         + associationInfo.getDeviceProfile() + " for virtual device creation.");
             }
@@ -522,27 +493,17 @@ public class VirtualDeviceManagerService extends SystemService {
             Counter.logIncrement("virtual_devices.value_virtual_devices_created_count");
 
             synchronized (mVirtualDeviceManagerLock) {
-                if (!Flags.persistentDeviceIdApi() && mVirtualDevices.size() == 0) {
-                    final long callingId = Binder.clearCallingIdentity();
-                    try {
-                        registerCdmAssociationListener();
-                    } finally {
-                        Binder.restoreCallingIdentity(callingId);
-                    }
-                }
                 mVirtualDevices.put(deviceId, virtualDevice);
             }
 
-            if (Flags.vdmPublicApis()) {
-                mVirtualDeviceListeners.broadcast(listener -> {
-                    try {
-                        listener.onVirtualDeviceCreated(deviceId);
-                    } catch (RemoteException e) {
-                        Slog.i(TAG, "Failed to invoke onVirtualDeviceCreated listener: "
-                                + e.getMessage());
-                    }
-                });
-            }
+            mVirtualDeviceListeners.broadcast(listener -> {
+                try {
+                    listener.onVirtualDeviceCreated(deviceId);
+                } catch (RemoteException e) {
+                    Slog.i(TAG, "Failed to invoke onVirtualDeviceCreated listener: "
+                            + e.getMessage());
+                }
+            });
             Counter.logIncrementWithUid(
                     "virtual_devices.value_virtual_devices_created_with_uid_count",
                     attributionSource.getUid());

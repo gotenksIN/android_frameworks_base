@@ -40,8 +40,6 @@ import com.android.settingslib.graph.proto.PreferenceProto
 import com.android.settingslib.graph.proto.PreferenceProto.ActionTarget
 import com.android.settingslib.graph.proto.PreferenceScreenProto
 import com.android.settingslib.graph.proto.TextProto
-import com.android.settingslib.metadata.BooleanValue
-import com.android.settingslib.metadata.FloatPersistentPreference
 import com.android.settingslib.metadata.PersistentPreference
 import com.android.settingslib.metadata.PreferenceAvailabilityProvider
 import com.android.settingslib.metadata.PreferenceHierarchy
@@ -410,25 +408,32 @@ fun PreferenceMetadata.toProto(
             val storage = metadata.storage(context)
             value = preferenceValueProto {
                 when (metadata) {
-                    is BooleanValue -> storage.getBoolean(metadata.key)?.let { booleanValue = it }
                     is RangeValue -> storage.getInt(metadata.key)?.let { intValue = it }
-                    is FloatPersistentPreference ->
-                        storage.getFloat(metadata.key)?.let { floatValue = it }
                     else -> {}
+                }
+                when (metadata.valueType) {
+                    Boolean::class.javaObjectType ->
+                        storage.getBoolean(metadata.key)?.let { booleanValue = it }
+                    Float::class.javaObjectType ->
+                        storage.getFloat(metadata.key)?.let { floatValue = it }
                 }
             }
         }
         if (flags.includeValueDescriptor()) {
             valueDescriptor = preferenceValueDescriptorProto {
                 when (metadata) {
-                    is BooleanValue -> booleanType = true
                     is RangeValue -> rangeValue = rangeValueProto {
                             min = metadata.getMinValue(context)
                             max = metadata.getMaxValue(context)
                             step = metadata.getIncrementStep(context)
                         }
-                    is FloatPersistentPreference -> floatType = true
                     else -> {}
+                }
+                if (metadata is PersistentPreference<*>) {
+                    when (metadata.valueType) {
+                        Boolean::class.javaObjectType -> booleanType = true
+                        Float::class.javaObjectType -> floatType = true
+                    }
                 }
             }
         }

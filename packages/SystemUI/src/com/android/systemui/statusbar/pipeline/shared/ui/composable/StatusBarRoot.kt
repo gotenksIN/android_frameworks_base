@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.isVisible
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.theme.PlatformTheme
@@ -39,6 +40,7 @@ import com.android.keyguard.AlphaOptimizedLinearLayout
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.chips.ui.compose.OngoingActivityChips
+import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.data.repository.DarkIconDispatcherStore
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.featurepods.popups.StatusBarPopupChips
@@ -55,6 +57,7 @@ import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarIconBlockListBinder
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinder
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.StatusBarVisibilityChangeListener
+import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel.HomeStatusBarViewModelFactory
 import javax.inject.Inject
@@ -142,10 +145,14 @@ fun StatusBarRoot(
 
     Box(Modifier.fillMaxSize()) {
         // TODO(b/364360986): remove this before rolling the flag forward
-        Disambiguation(viewModel = statusBarViewModel)
+        if (StatusBarRootModernization.SHOW_DISAMBIGUATION) {
+            Disambiguation(viewModel = statusBarViewModel)
+        }
 
         Row(Modifier.fillMaxSize()) {
             val scope = rememberCoroutineScope()
+            val visible =
+                statusBarViewModel.shouldHomeStatusBarBeVisible.collectAsStateWithLifecycle(false)
             AndroidView(
                 factory = { context ->
                     val inflater = LayoutInflater.from(context)
@@ -280,7 +287,12 @@ fun StatusBarRoot(
                     }
                     onViewCreated(phoneStatusBarView)
                     phoneStatusBarView
-                }
+                },
+                update = { view ->
+                    // Show or hide the entire status bar. This is important so that we aren't
+                    // visible when first inflated
+                    view.isVisible = visible.value
+                },
             )
         }
     }
@@ -293,11 +305,7 @@ fun StatusBarRoot(
 fun Disambiguation(viewModel: HomeStatusBarViewModel) {
     val clockVisibilityModel =
         viewModel.isClockVisible.collectAsStateWithLifecycle(
-            initialValue =
-                HomeStatusBarViewModel.VisibilityModel(
-                    visibility = View.GONE,
-                    shouldAnimateChange = false,
-                )
+            initialValue = VisibilityModel(visibility = View.GONE, shouldAnimateChange = false)
         )
     if (clockVisibilityModel.value.visibility == View.VISIBLE) {
         Box(modifier = Modifier.fillMaxSize().alpha(0.5f), contentAlignment = Alignment.Center) {

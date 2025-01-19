@@ -35,6 +35,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.Region
 import android.os.Binder
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.SystemProperties
@@ -86,6 +87,7 @@ import com.android.wm.shell.common.SyncTransactionQueue
 import com.android.wm.shell.compatui.isTopActivityExemptFromDesktopWindowing
 import com.android.wm.shell.compatui.isTransparentTask
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.InputMethod
+import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.MinimizeReason
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger.DesktopUiEventEnum
 import com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.DragStartState
@@ -465,7 +467,9 @@ class DesktopTasksController(
         desktopModeEnterExitTransitionListener?.onEnterDesktopModeTransitionStarted(
             FREEFORM_ANIMATION_DURATION
         )
-        taskIdToMinimize?.let { addPendingMinimizeTransition(transition, it) }
+        taskIdToMinimize?.let {
+            addPendingMinimizeTransition(transition, it, MinimizeReason.TASK_LIMIT)
+        }
         exitResult.asExit()?.runOnTransitionStart?.invoke(transition)
         return true
     }
@@ -511,7 +515,9 @@ class DesktopTasksController(
         desktopModeEnterExitTransitionListener?.onEnterDesktopModeTransitionStarted(
             FREEFORM_ANIMATION_DURATION
         )
-        taskIdToMinimize?.let { addPendingMinimizeTransition(transition, it) }
+        taskIdToMinimize?.let {
+            addPendingMinimizeTransition(transition, it, MinimizeReason.TASK_LIMIT)
+        }
         exitResult.asExit()?.runOnTransitionStart?.invoke(transition)
     }
 
@@ -552,7 +558,11 @@ class DesktopTasksController(
         )
         val wct = WindowContainerTransaction()
         exitSplitIfApplicable(wct, taskInfo)
-        moveHomeTask(wct, toTop = true)
+        if (Flags.enablePerDisplayDesktopWallpaperActivity()) {
+            moveHomeTask(wct, toTop = true, taskInfo.displayId)
+        } else {
+            moveHomeTask(wct, toTop = true)
+        }
         val taskIdToMinimize =
             bringDesktopAppsToFrontBeforeShowingNewTask(taskInfo.displayId, wct, taskInfo.taskId)
         addMoveToDesktopChanges(wct, taskInfo)
@@ -568,7 +578,9 @@ class DesktopTasksController(
             DRAG_TO_DESKTOP_FINISH_ANIM_DURATION_MS.toInt()
         )
         transition?.let {
-            taskIdToMinimize?.let { taskId -> addPendingMinimizeTransition(it, taskId) }
+            taskIdToMinimize?.let { taskId ->
+                addPendingMinimizeTransition(it, taskId, MinimizeReason.TASK_LIMIT)
+            }
             exitResult.asExit()?.runOnTransitionStart?.invoke(transition)
         }
     }
@@ -617,7 +629,7 @@ class DesktopTasksController(
             ?.runOnTransitionStart
     }
 
-    fun minimizeTask(taskInfo: RunningTaskInfo) {
+    fun minimizeTask(taskInfo: RunningTaskInfo, minimizeReason: MinimizeReason) {
         val wct = WindowContainerTransaction()
 
         val isMinimizingToPip = taskInfo.pictureInPictureParams?.isAutoEnterEnabled() ?: false
@@ -637,16 +649,16 @@ class DesktopTasksController(
             freeformTaskTransitionStarter.startPipTransition(wct)
             taskRepository.setTaskInPip(taskInfo.displayId, taskInfo.taskId, enterPip = true)
             taskRepository.setOnPipAbortedCallback { displayId, taskId ->
-                minimizeTaskInner(shellTaskOrganizer.getRunningTaskInfo(taskId)!!)
+                minimizeTaskInner(shellTaskOrganizer.getRunningTaskInfo(taskId)!!, minimizeReason)
                 taskRepository.setTaskInPip(displayId, taskId, enterPip = false)
             }
             return
         }
 
-        minimizeTaskInner(taskInfo)
+        minimizeTaskInner(taskInfo, minimizeReason)
     }
 
-    private fun minimizeTaskInner(taskInfo: RunningTaskInfo) {
+    private fun minimizeTaskInner(taskInfo: RunningTaskInfo, minimizeReason: MinimizeReason) {
         val taskId = taskInfo.taskId
         val displayId = taskInfo.displayId
         val wct = WindowContainerTransaction()
@@ -666,6 +678,7 @@ class DesktopTasksController(
                 transition = transition,
                 displayId = displayId,
                 taskId = taskId,
+                minimizeReason = minimizeReason,
             )
         }
         exitResult.asExit()?.runOnTransitionStart?.invoke(transition)
@@ -821,7 +834,7 @@ class DesktopTasksController(
                     minimizingTaskId = taskIdToMinimize,
                     exitingImmersiveTask = exitImmersiveResult.asExit()?.exitingTask,
                 )
-            taskIdToMinimize?.let { addPendingMinimizeTransition(t, it) }
+            taskIdToMinimize?.let { addPendingMinimizeTransition(t, it, MinimizeReason.TASK_LIMIT) }
             exitImmersiveResult.asExit()?.runOnTransitionStart?.invoke(t)
             return t
         }
@@ -841,7 +854,7 @@ class DesktopTasksController(
             )
         val t = transitions.startTransition(transitionType, wct, remoteTransitionHandler)
         remoteTransitionHandler.setTransition(t)
-        taskIdToMinimize.let { addPendingMinimizeTransition(t, it) }
+        taskIdToMinimize.let { addPendingMinimizeTransition(t, it, MinimizeReason.TASK_LIMIT) }
         exitImmersiveResult.asExit()?.runOnTransitionStart?.invoke(t)
         return t
     }
@@ -877,6 +890,36 @@ class DesktopTasksController(
             return
         }
         moveToDisplay(task, newDisplayId)
+    }
+
+    /**
+     * Start an intent through a launch transition for starting tasks whose transition does not get
+     * handled by [handleRequest]
+     */
+    fun startLaunchIntentTransition(intent: Intent, options: Bundle, displayId: Int) {
+        val wct = WindowContainerTransaction()
+        val displayLayout = displayController.getDisplayLayout(displayId) ?: return
+        val bounds = calculateDefaultDesktopTaskBounds(displayLayout)
+        if (DesktopModeFlags.ENABLE_CASCADING_WINDOWS.isTrue) {
+            cascadeWindow(bounds, displayLayout, displayId)
+        }
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                /* requestCode= */ 0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE,
+            )
+        val ops =
+            ActivityOptions.fromBundle(options).apply {
+                launchWindowingMode = WINDOWING_MODE_FREEFORM
+                pendingIntentBackgroundActivityStartMode =
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                launchBounds = bounds
+            }
+
+        wct.sendPendingIntent(pendingIntent, intent, ops.toBundle())
+        startLaunchTransition(TRANSIT_OPEN, wct, launchingTaskId = null)
     }
 
     /**
@@ -1309,11 +1352,15 @@ class DesktopTasksController(
     ): Int? {
         logV("bringDesktopAppsToFront, newTaskId=%d", newTaskIdInFront)
         // Move home to front, ensures that we go back home when all desktop windows are closed
-        moveHomeTask(wct, toTop = true)
+        if (Flags.enablePerDisplayDesktopWallpaperActivity()) {
+            moveHomeTask(wct, toTop = true, displayId)
+        } else {
+            moveHomeTask(wct, toTop = true)
+        }
 
         // Currently, we only handle the desktop on the default display really.
         if (
-            (displayId == DEFAULT_DISPLAY || Flags.enableBugFixesForSecondaryDisplay()) &&
+            (displayId == DEFAULT_DISPLAY || Flags.enablePerDisplayDesktopWallpaperActivity()) &&
                 ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
         ) {
             // Add translucent wallpaper activity to show the wallpaper underneath
@@ -1359,9 +1406,13 @@ class DesktopTasksController(
         return taskIdToMinimize
     }
 
-    private fun moveHomeTask(wct: WindowContainerTransaction, toTop: Boolean) {
+    private fun moveHomeTask(
+        wct: WindowContainerTransaction,
+        toTop: Boolean,
+        displayId: Int = DEFAULT_DISPLAY,
+    ) {
         shellTaskOrganizer
-            .getRunningTasks(context.displayId)
+            .getRunningTasks(displayId)
             .firstOrNull { task -> task.activityType == ACTIVITY_TYPE_HOME }
             ?.let { homeTask -> wct.reorder(homeTask.getToken(), /* onTop= */ toTop) }
     }
@@ -1370,12 +1421,19 @@ class DesktopTasksController(
         logV("addWallpaperActivity")
         if (Flags.enableDesktopWallpaperActivityForSystemUser()) {
             val intent = Intent(context, DesktopWallpaperActivity::class.java)
+            if (
+                desktopWallpaperActivityTokenProvider.getToken(displayId) == null &&
+                    Flags.enablePerDisplayDesktopWallpaperActivity()
+            ) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            }
             val options =
                 ActivityOptions.makeBasic().apply {
                     launchWindowingMode = WINDOWING_MODE_FULLSCREEN
                     pendingIntentBackgroundActivityStartMode =
                         ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-                    if (Flags.enableBugFixesForSecondaryDisplay()) {
+                    if (Flags.enablePerDisplayDesktopWallpaperActivity()) {
                         launchDisplayId = displayId
                     }
                 }
@@ -1391,13 +1449,20 @@ class DesktopTasksController(
             val userHandle = UserHandle.of(userId)
             val userContext = context.createContextAsUser(userHandle, /* flags= */ 0)
             val intent = Intent(userContext, DesktopWallpaperActivity::class.java)
+            if (
+                desktopWallpaperActivityTokenProvider.getToken(displayId) == null &&
+                    Flags.enablePerDisplayDesktopWallpaperActivity()
+            ) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            }
             intent.putExtra(Intent.EXTRA_USER_HANDLE, userId)
             val options =
                 ActivityOptions.makeBasic().apply {
                     launchWindowingMode = WINDOWING_MODE_FULLSCREEN
                     pendingIntentBackgroundActivityStartMode =
                         ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-                    if (Flags.enableBugFixesForSecondaryDisplay()) {
+                    if (Flags.enablePerDisplayDesktopWallpaperActivity()) {
                         launchDisplayId = displayId
                     }
                 }
@@ -1414,8 +1479,8 @@ class DesktopTasksController(
         }
     }
 
-    private fun removeWallpaperActivity(wct: WindowContainerTransaction) {
-        desktopWallpaperActivityTokenProvider.getToken()?.let { token ->
+    private fun removeWallpaperActivity(wct: WindowContainerTransaction, displayId: Int) {
+        desktopWallpaperActivityTokenProvider.getToken(displayId)?.let { token ->
             logV("removeWallpaperActivity")
             if (Flags.enableDesktopWallpaperActivityForSystemUser()) {
                 wct.reorder(token, /* onTop= */ false)
@@ -1440,9 +1505,6 @@ class DesktopTasksController(
             if (!taskRepository.isOnlyVisibleNonClosingTask(taskId, displayId)) {
                 return
             }
-            if (displayId != DEFAULT_DISPLAY) {
-                return
-            }
         } else if (
             Flags.enableDesktopWindowingPip() &&
                 taskRepository.isMinimizedPipPresentInDisplay(displayId) &&
@@ -1457,7 +1519,7 @@ class DesktopTasksController(
         desktopModeEnterExitTransitionListener?.onExitDesktopModeTransitionStarted(
             FULLSCREEN_ANIMATION_DURATION
         )
-        removeWallpaperActivity(wct)
+        removeWallpaperActivity(wct, displayId)
     }
 
     fun releaseVisualIndicator() {
@@ -1844,7 +1906,7 @@ class DesktopTasksController(
         val taskIdToMinimize = addAndGetMinimizeChanges(task.displayId, wct, task.taskId)
         addPendingAppLaunchTransition(transition, task.taskId, taskIdToMinimize)
         if (taskIdToMinimize != null) {
-            addPendingMinimizeTransition(transition, taskIdToMinimize)
+            addPendingMinimizeTransition(transition, taskIdToMinimize, MinimizeReason.TASK_LIMIT)
             return wct
         }
         if (!wct.isEmpty) {
@@ -1878,7 +1940,9 @@ class DesktopTasksController(
                 // Desktop Mode is already showing and we're launching a new Task - we might need to
                 // minimize another Task.
                 val taskIdToMinimize = addAndGetMinimizeChanges(task.displayId, wct, task.taskId)
-                taskIdToMinimize?.let { addPendingMinimizeTransition(transition, it) }
+                taskIdToMinimize?.let {
+                    addPendingMinimizeTransition(transition, it, MinimizeReason.TASK_LIMIT)
+                }
                 addPendingAppLaunchTransition(transition, task.taskId, taskIdToMinimize)
                 desktopImmersiveController.exitImmersiveIfApplicable(
                     transition,
@@ -2126,13 +2190,18 @@ class DesktopTasksController(
             .addAndGetMinimizeTaskChanges(displayId, wct, newTaskId, launchingNewIntent)
     }
 
-    private fun addPendingMinimizeTransition(transition: IBinder, taskIdToMinimize: Int) {
+    private fun addPendingMinimizeTransition(
+        transition: IBinder,
+        taskIdToMinimize: Int,
+        minimizeReason: MinimizeReason,
+    ) {
         val taskToMinimize = shellTaskOrganizer.getRunningTaskInfo(taskIdToMinimize)
         desktopTasksLimiter.ifPresent {
             it.addPendingMinimizeChange(
                 transition = transition,
                 displayId = taskToMinimize?.displayId ?: DEFAULT_DISPLAY,
                 taskId = taskIdToMinimize,
+                minimizeReason = minimizeReason,
             )
         }
     }
@@ -2162,7 +2231,7 @@ class DesktopTasksController(
     fun removeDesktop(displayId: Int) {
         if (!DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION.isTrue()) return
 
-        val tasksToRemove = taskRepository.removeDesktop(displayId)
+        val tasksToRemove = taskRepository.removeDesk(displayId)
         val wct = WindowContainerTransaction()
         tasksToRemove.forEach {
             val task = shellTaskOrganizer.getRunningTaskInfo(it)
@@ -2402,6 +2471,25 @@ class DesktopTasksController(
                 // Update task bounds so that the task position will match the position of its leash
                 val wct = WindowContainerTransaction()
                 wct.setBounds(taskInfo.token, destinationBounds)
+
+                // TODO: b/362720497 - reparent to a specific desk within the target display.
+                // Reparent task if it has been moved to a new display.
+                if (Flags.enableConnectedDisplaysWindowDrag()) {
+                    val newDisplayId = motionEvent.getDisplayId()
+                    if (newDisplayId != taskInfo.getDisplayId()) {
+                        val displayAreaInfo =
+                            rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(newDisplayId)
+                        if (displayAreaInfo == null) {
+                            logW(
+                                "Task reparent cannot find DisplayAreaInfo for displayId=%d",
+                                newDisplayId,
+                            )
+                        } else {
+                            wct.reparent(taskInfo.token, displayAreaInfo.token, /* onTop= */ true)
+                        }
+                    }
+                }
+
                 transitions.startTransition(TRANSIT_CHANGE, wct, null)
 
                 releaseVisualIndicator()
@@ -2860,6 +2948,12 @@ class DesktopTasksController(
         override fun moveToExternalDisplay(taskId: Int) {
             executeRemoteCallWithTaskPermission(controller, "moveTaskToExternalDisplay") { c ->
                 c.moveToNextDisplay(taskId)
+            }
+        }
+
+        override fun startLaunchIntentTransition(intent: Intent, options: Bundle, displayId: Int) {
+            executeRemoteCallWithTaskPermission(controller, "startLaunchIntentTransition") { c ->
+                c.startLaunchIntentTransition(intent, options, displayId)
             }
         }
     }

@@ -102,12 +102,13 @@ aconfig_declarations_group {
         "com.android.media.flags.projection-aconfig-java",
         "com.android.net.http.flags-aconfig-exported-java",
         "com.android.net.thread.platform.flags-aconfig-java",
+        "com.android.permission.flags-aconfig-java-export",
         "com.android.ranging.flags.ranging-aconfig-java-export",
         "com.android.server.contextualsearch.flags-java",
         "com.android.server.flags.services-aconfig-java",
         "com.android.text.flags-aconfig-java",
         "com.android.window.flags.window-aconfig-java",
-        "configinfra_framework_flags_java_lib",
+        "configinfra_framework_flags_java_exported_lib",
         "conscrypt_exported_aconfig_flags_lib",
         "device_policy_aconfig_flags_lib",
         "display_flags_lib",
@@ -115,6 +116,7 @@ aconfig_declarations_group {
         "framework-jobscheduler-job.flags-aconfig-java",
         "framework_graphics_flags_java_lib",
         "hwui_flags_java_lib",
+        "icu_exported_aconfig_flags_lib",
         "interaction_jank_monitor_flags_lib",
         "keystore2_flags_java-framework",
         "libcore_exported_aconfig_flags_lib",
@@ -159,6 +161,14 @@ java_defaults {
 java_aconfig_library {
     name: "art_exported_aconfig_flags_lib",
     aconfig_declarations: "art-aconfig-flags",
+    mode: "exported",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// ICU
+java_aconfig_library {
+    name: "icu_exported_aconfig_flags_lib",
+    aconfig_declarations: "icu_aconfig_flags",
     mode: "exported",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
@@ -467,7 +477,7 @@ java_aconfig_library {
         "//apex_available:platform",
         "com.android.art",
         "com.android.art.debug",
-        "com.android.btservices",
+        "com.android.bt",
         "com.android.mediaprovider",
         "com.android.permission",
     ],
@@ -1409,6 +1419,7 @@ java_aconfig_library {
 // Content Capture
 aconfig_declarations {
     name: "android.view.contentcapture.flags-aconfig",
+    exportable: true,
     package: "android.view.contentcapture.flags",
     container: "system",
     srcs: ["core/java/android/view/contentcapture/flags/*.aconfig"],

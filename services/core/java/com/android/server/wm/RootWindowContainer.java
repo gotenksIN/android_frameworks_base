@@ -154,7 +154,6 @@ import com.android.server.LocalServices;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.am.AppTimeTracker;
 import com.android.server.am.UserState;
-import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
@@ -209,7 +208,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     // For seamless rotation cases this always stays true, as the windows complete their orientation
     // changes 1 by 1 without disturbing global state.
     boolean mOrientationChangeComplete = true;
-    boolean mWallpaperActionPending = false;
 
     private final Handler mHandler;
 
@@ -1110,10 +1108,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             }
         }
 
-        if ((bulkUpdateParams & SET_WALLPAPER_ACTION_PENDING) != 0) {
-            mWallpaperActionPending = true;
-        }
-
         return doRequest;
     }
 
@@ -1550,20 +1544,18 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         ActivityInfo aInfo = resolveHomeActivity(userId, homeIntent);
         boolean lookForSecondaryHomeActivityInPrimaryHomePackage = aInfo != null;
 
-        if (android.companion.virtual.flags.Flags.vdmCustomHome()) {
-            // Resolve the externally set home activity for this display, if any. If it is unset or
-            // we fail to resolve it, fallback to the default secondary home activity.
-            final ComponentName customHomeComponent =
-                    taskDisplayArea.getDisplayContent() != null
-                            ? taskDisplayArea.getDisplayContent().getCustomHomeComponent()
-                            : null;
-            if (customHomeComponent != null) {
-                homeIntent.setComponent(customHomeComponent);
-                ActivityInfo customHomeActivityInfo = resolveHomeActivity(userId, homeIntent);
-                if (customHomeActivityInfo != null) {
-                    aInfo = customHomeActivityInfo;
-                    lookForSecondaryHomeActivityInPrimaryHomePackage = false;
-                }
+        // Resolve the externally set home activity for this display, if any. If it is unset or
+        // we fail to resolve it, fallback to the default secondary home activity.
+        final ComponentName customHomeComponent =
+                taskDisplayArea.getDisplayContent() != null
+                        ? taskDisplayArea.getDisplayContent().getCustomHomeComponent()
+                        : null;
+        if (customHomeComponent != null) {
+            homeIntent.setComponent(customHomeComponent);
+            ActivityInfo customHomeActivityInfo = resolveHomeActivity(userId, homeIntent);
+            if (customHomeActivityInfo != null) {
+                aInfo = customHomeActivityInfo;
+                lookForSecondaryHomeActivityInPrimaryHomePackage = false;
             }
         }
 

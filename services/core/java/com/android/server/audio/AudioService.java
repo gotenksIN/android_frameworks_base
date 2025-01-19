@@ -261,6 +261,7 @@ import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.Preconditions;
+import com.android.modules.expresslog.Counter;
 import com.android.server.EventLogTags;
 import com.android.server.LocalManagerRegistry;
 import com.android.server.LocalServices;
@@ -849,9 +850,49 @@ public class AudioService extends IAudioService.Stub
             new AudioServiceUserRestrictionsListener();
 
     private final IAudioManagerNative mNativeShim = new IAudioManagerNative.Stub() {
+        static final String METRIC_COUNTERS_PLAYBACK_PARTIAL =
+                "media_audio.value_audio_playback_hardening_partial_restriction";
+        static final String METRIC_COUNTERS_PLAYBACK_STRICT =
+                "media_audio.value_audio_playback_hardening_strict_would_restrict";
+
+        String getPackNameForUid(int uid) {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                final String[] names = AudioService.this.mContext.
+                                            getPackageManager().getPackagesForUid(uid);
+                if (names == null
+                        || names.length == 0
+                        || TextUtils.isEmpty(names[0])) {
+                    return "[" + uid + "]";
+                }
+                return names[0];
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
         // oneway
         @Override
         public void playbackHardeningEvent(int uid, byte type, boolean bypassed) {
+            if (Binder.getCallingUid() != Process.AUDIOSERVER_UID) {
+                return;
+            }
+            if (type == HardeningType.PARTIAL) {
+                Counter.logIncrementWithUid(METRIC_COUNTERS_PLAYBACK_PARTIAL, uid);
+            } else if (type == HardeningType.FULL) {
+                Counter.logIncrementWithUid(METRIC_COUNTERS_PLAYBACK_STRICT, uid);
+            } else {
+                Slog.wtf(TAG, "Unexpected hardening type" + type);
+                return;
+            }
+            String msg = "AudioHardening background playback "
+                    + (bypassed ? "would be " : "")
+                    + "muted for "
+                    + getPackNameForUid(uid) + " (" + uid + "), "
+                    + "level: " + (type == HardeningType.PARTIAL ? "partial" : "full");
+
+            AudioService.this.mHardeningLogger.enqueueAndSlog(msg,
+                    bypassed ? EventLogger.Event.ALOGI : EventLogger.Event.ALOGW, TAG);
         }
 
         @Override
@@ -1566,7 +1607,8 @@ public class AudioService extends IAudioService.Stub
         mMusicFxHelper = new MusicFxHelper(mContext, mAudioHandler);
 
         mHardeningEnforcer = new HardeningEnforcer(mContext, isPlatformAutomotive(), mAppOps,
-                context.getPackageManager());
+                context.getPackageManager(),
+                mHardeningLogger);
     }
 
     private void initVolumeStreamStates() {
@@ -12776,6 +12818,7 @@ public class AudioService extends IAudioService.Stub
     static final int LOG_NB_EVENTS_DYN_POLICY = 10;
     static final int LOG_NB_EVENTS_SPATIAL = 30;
     static final int LOG_NB_EVENTS_SOUND_DOSE = 50;
+    static final int LOG_NB_EVENTS_HARDENING = 50;
 
     static final int LOG_NB_EVENTS_LOUDNESS_CODEC = 30;
 
@@ -12813,6 +12856,9 @@ public class AudioService extends IAudioService.Stub
     final private EventLogger
             mDynPolicyLogger = new EventLogger(LOG_NB_EVENTS_DYN_POLICY,
             "dynamic policy events (logged when command received by AudioService)");
+
+    private final EventLogger mHardeningLogger = new EventLogger(
+            LOG_NB_EVENTS_HARDENING, "Hardening enforcement");
 
     private static final String[] RINGER_MODE_NAMES = new String[] {
             "SILENT",
@@ -12888,7 +12934,7 @@ public class AudioService extends IAudioService.Stub
             pw.println("\nMessage handler is null");
         }
         dumpFlags(pw);
-        mHardeningEnforcer.dump(pw);
+        mHardeningLogger.dump(pw);
         mMediaFocusControl.dump(pw);
         dumpStreamStates(pw);
         dumpVolumeGroups(pw);

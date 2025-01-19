@@ -16,18 +16,33 @@
 
 package com.android.server.media.quality;
 
+import static android.media.quality.AmbientBacklightEvent.AMBIENT_BACKLIGHT_EVENT_ENABLED;
+import static android.media.quality.AmbientBacklightEvent.AMBIENT_BACKLIGHT_EVENT_DISABLED;
+import static android.media.quality.AmbientBacklightEvent.AMBIENT_BACKLIGHT_EVENT_METADATA_AVAILABLE;
+import static android.media.quality.AmbientBacklightEvent.AMBIENT_BACKLIGHT_EVENT_INTERRUPTED;
+
+import android.annotation.NonNull;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.hardware.tv.mediaquality.AmbientBacklightColorFormat;
 import android.hardware.tv.mediaquality.IMediaQuality;
+import android.hardware.tv.mediaquality.PictureParameter;
+import android.hardware.tv.mediaquality.PictureParameters;
+import android.hardware.tv.mediaquality.SoundParameter;
+import android.hardware.tv.mediaquality.SoundParameters;
+import android.media.quality.AmbientBacklightEvent;
+import android.media.quality.AmbientBacklightMetadata;
 import android.media.quality.AmbientBacklightSettings;
 import android.media.quality.IAmbientBacklightCallback;
 import android.media.quality.IMediaQualityManager;
 import android.media.quality.IPictureProfileCallback;
 import android.media.quality.ISoundProfileCallback;
 import android.media.quality.MediaQualityContract.BaseParameters;
+import android.media.quality.MediaQualityContract.PictureQuality;
+import android.media.quality.MediaQualityContract.SoundQuality;
 import android.media.quality.MediaQualityManager;
 import android.media.quality.ParameterCapability;
 import android.media.quality.PictureProfile;
@@ -42,6 +57,7 @@ import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.UserHandle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
 import android.util.Slog;
@@ -60,6 +76,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -76,13 +93,16 @@ public class MediaQualityService extends SystemService {
     private final MediaQualityDbHelper mMediaQualityDbHelper;
     private final BiMap<Long, String> mPictureProfileTempIdMap;
     private final BiMap<Long, String> mSoundProfileTempIdMap;
+    private IMediaQuality mMediaQuality;
+    private final HalAmbientBacklightCallback mHalAmbientBacklightCallback;
+    private final Map<String, AmbientBacklightCallbackRecord> mCallbackRecords = new HashMap<>();
     private final PackageManager mPackageManager;
     private final SparseArray<UserState> mUserStates = new SparseArray<>();
-    private IMediaQuality mMediaQuality;
 
     public MediaQualityService(Context context) {
         super(context);
         mContext = context;
+        mHalAmbientBacklightCallback = new HalAmbientBacklightCallback();
         mPackageManager = mContext.getPackageManager();
         mPictureProfileTempIdMap = new BiMap<>();
         mSoundProfileTempIdMap = new BiMap<>();
@@ -97,6 +117,13 @@ public class MediaQualityService extends SystemService {
         if (binder != null) {
             Slogf.d(TAG, "binder is not null");
             mMediaQuality = IMediaQuality.Stub.asInterface(binder);
+            if (mMediaQuality != null) {
+                try {
+                    mMediaQuality.setAmbientBacklightCallback(mHalAmbientBacklightCallback);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to set ambient backlight detector callback", e);
+                }
+            }
         }
 
         publishBinderService(Context.MEDIA_QUALITY_SERVICE, new BinderService());
@@ -110,7 +137,7 @@ public class MediaQualityService extends SystemService {
             if ((pp.getPackageName() != null && !pp.getPackageName().isEmpty()
                     && !incomingPackageEqualsCallingUidPackage(pp.getPackageName()))
                     && !hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
@@ -128,7 +155,9 @@ public class MediaQualityService extends SystemService {
             Long id = db.insert(mMediaQualityDbHelper.PICTURE_QUALITY_TABLE_NAME,
                     null, values);
             populateTempIdMap(mPictureProfileTempIdMap, id);
-            pp.setProfileId(mPictureProfileTempIdMap.getValue(id));
+            String value = mPictureProfileTempIdMap.getValue(id);
+            pp.setProfileId(value);
+            notifyOnPictureProfileAdded(value, pp, Binder.getCallingUid(), Binder.getCallingPid());
             return pp;
         }
 
@@ -136,7 +165,7 @@ public class MediaQualityService extends SystemService {
         public void updatePictureProfile(String id, PictureProfile pp, UserHandle user) {
             Long dbId = mPictureProfileTempIdMap.getKey(id);
             if (!hasPermissionToUpdatePictureProfile(dbId, pp)) {
-                notifyPictureProfileError(id, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(id, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
@@ -150,6 +179,8 @@ public class MediaQualityService extends SystemService {
             SQLiteDatabase db = mMediaQualityDbHelper.getWritableDatabase();
             db.replace(mMediaQualityDbHelper.PICTURE_QUALITY_TABLE_NAME,
                     null, values);
+            notifyOnPictureProfileUpdated(mPictureProfileTempIdMap.getValue(dbId),
+                    getPictureProfile(dbId), Binder.getCallingUid(), Binder.getCallingPid());
         }
 
         private boolean hasPermissionToUpdatePictureProfile(Long dbId, PictureProfile toUpdate) {
@@ -164,8 +195,9 @@ public class MediaQualityService extends SystemService {
         public void removePictureProfile(String id, UserHandle user) {
             Long dbId = mPictureProfileTempIdMap.getKey(id);
 
-            if (!hasPermissionToRemovePictureProfile(dbId)) {
-                notifyPictureProfileError(id, PictureProfile.ERROR_NO_PERMISSION,
+            PictureProfile toDelete = getPictureProfile(dbId);
+            if (!hasPermissionToRemovePictureProfile(toDelete)) {
+                notifyOnPictureProfileError(id, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
@@ -176,16 +208,20 @@ public class MediaQualityService extends SystemService {
                 int result = db.delete(mMediaQualityDbHelper.PICTURE_QUALITY_TABLE_NAME, selection,
                         selectionArgs);
                 if (result == 0) {
-                    notifyPictureProfileError(id, PictureProfile.ERROR_INVALID_ARGUMENT,
+                    notifyOnPictureProfileError(id, PictureProfile.ERROR_INVALID_ARGUMENT,
                             Binder.getCallingUid(), Binder.getCallingPid());
                 }
+                notifyOnPictureProfileRemoved(mPictureProfileTempIdMap.getValue(dbId), toDelete,
+                        Binder.getCallingUid(), Binder.getCallingPid());
                 mPictureProfileTempIdMap.remove(dbId);
             }
         }
 
-        private boolean hasPermissionToRemovePictureProfile(Long dbId) {
-            PictureProfile fromDb = getPictureProfile(dbId);
-            return fromDb.getName().equalsIgnoreCase(getPackageOfCallingUid());
+        private boolean hasPermissionToRemovePictureProfile(PictureProfile toDelete) {
+            if (toDelete != null) {
+                return toDelete.getName().equalsIgnoreCase(getPackageOfCallingUid());
+            }
+            return false;
         }
 
         @Override
@@ -246,7 +282,7 @@ public class MediaQualityService extends SystemService {
         public List<PictureProfile> getPictureProfilesByPackage(
                 String packageName, Bundle options, UserHandle user) {
             if (!hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
@@ -270,17 +306,215 @@ public class MediaQualityService extends SystemService {
         @Override
         public boolean setDefaultPictureProfile(String profileId, UserHandle user) {
             if (!hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(profileId, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(profileId, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
-            // TODO: pass the profile ID to MediaQuality HAL when ready.
+
+            PictureProfile pictureProfile = getPictureProfile(
+                    mPictureProfileTempIdMap.getKey(profileId));
+            PersistableBundle params = pictureProfile.getParameters();
+
+            try {
+                if (mMediaQuality != null) {
+                    PictureParameter[] pictureParameters =
+                            convertPersistableBundleToPictureParameterList(params);
+
+                    PictureParameters pp = new PictureParameters();
+                    pp.pictureParameters = pictureParameters;
+
+                    mMediaQuality.sendDefaultPictureParameters(pp);
+                    return true;
+                }
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to set default picture profile", e);
+            }
             return false;
+        }
+
+        private PictureParameter[] convertPersistableBundleToPictureParameterList(
+                PersistableBundle params) {
+            List<PictureParameter> pictureParams = new ArrayList<>();
+            if (params.containsKey(PictureQuality.PARAMETER_BRIGHTNESS)) {
+                pictureParams.add(PictureParameter.brightness(params.getLong(
+                        PictureQuality.PARAMETER_BRIGHTNESS)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_CONTRAST)) {
+                pictureParams.add(PictureParameter.contrast(params.getInt(
+                        PictureQuality.PARAMETER_CONTRAST)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_SHARPNESS)) {
+                pictureParams.add(PictureParameter.sharpness(params.getInt(
+                        PictureQuality.PARAMETER_SHARPNESS)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_SATURATION)) {
+                pictureParams.add(PictureParameter.saturation(params.getInt(
+                        PictureQuality.PARAMETER_SATURATION)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_HUE)) {
+                pictureParams.add(PictureParameter.hue(params.getInt(
+                        PictureQuality.PARAMETER_HUE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_BRIGHTNESS)) {
+                pictureParams.add(PictureParameter.colorTunerBrightness(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_BRIGHTNESS)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION)) {
+                pictureParams.add(PictureParameter.colorTunerSaturation(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE)) {
+                pictureParams.add(PictureParameter.colorTunerHue(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_RED_OFFSET)) {
+                pictureParams.add(PictureParameter.colorTunerRedOffset(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_RED_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_GREEN_OFFSET)) {
+                pictureParams.add(PictureParameter.colorTunerGreenOffset(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_GREEN_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_BLUE_OFFSET)) {
+                pictureParams.add(PictureParameter.colorTunerBlueOffset(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_BLUE_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_RED_GAIN)) {
+                pictureParams.add(PictureParameter.colorTunerRedGain(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_RED_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_GREEN_GAIN)) {
+                pictureParams.add(PictureParameter.colorTunerGreenGain(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_GREEN_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_BLUE_GAIN)) {
+                pictureParams.add(PictureParameter.colorTunerBlueGain(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_BLUE_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_NOISE_REDUCTION)) {
+                pictureParams.add(PictureParameter.noiseReduction(
+                        (byte) params.getInt(PictureQuality.PARAMETER_NOISE_REDUCTION)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_MPEG_NOISE_REDUCTION)) {
+                pictureParams.add(PictureParameter.mpegNoiseReduction(
+                        (byte) params.getInt(PictureQuality.PARAMETER_MPEG_NOISE_REDUCTION)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_FLESH_TONE)) {
+                pictureParams.add(PictureParameter.fleshTone(
+                        (byte) params.getInt(PictureQuality.PARAMETER_FLESH_TONE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_DECONTOUR)) {
+                pictureParams.add(PictureParameter.deContour(
+                        (byte) params.getInt(PictureQuality.PARAMETER_DECONTOUR)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_DYNAMIC_LUMA_CONTROL)) {
+                pictureParams.add(PictureParameter.dynamicLumaControl(
+                        (byte) params.getInt(PictureQuality.PARAMETER_DYNAMIC_LUMA_CONTROL)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_FILM_MODE)) {
+                pictureParams.add(PictureParameter.filmMode(params.getBoolean(
+                        PictureQuality.PARAMETER_FILM_MODE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_BLUE_STRETCH)) {
+                pictureParams.add(PictureParameter.blueStretch(params.getBoolean(
+                        PictureQuality.PARAMETER_BLUE_STRETCH)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNE)) {
+                pictureParams.add(PictureParameter.colorTune(params.getBoolean(
+                        PictureQuality.PARAMETER_COLOR_TUNE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TEMPERATURE)) {
+                pictureParams.add(PictureParameter.colorTemperature(
+                        (byte) params.getInt(
+                                PictureQuality.PARAMETER_COLOR_TEMPERATURE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_GLOBAL_DIMMING)) {
+                pictureParams.add(PictureParameter.globeDimming(params.getBoolean(
+                        PictureQuality.PARAMETER_GLOBAL_DIMMING)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_AUTO_PICTURE_QUALITY_ENABLED)) {
+                pictureParams.add(PictureParameter.autoPictureQualityEnabled(params.getBoolean(
+                        PictureQuality.PARAMETER_AUTO_PICTURE_QUALITY_ENABLED)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_AUTO_SUPER_RESOLUTION_ENABLED)) {
+                pictureParams.add(PictureParameter.autoSuperResolutionEnabled(params.getBoolean(
+                        PictureQuality.PARAMETER_AUTO_SUPER_RESOLUTION_ENABLED)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_RED_GAIN)) {
+                pictureParams.add(PictureParameter.colorTemperatureRedGain(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_RED_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_GREEN_GAIN)) {
+                pictureParams.add(PictureParameter.colorTemperatureGreenGain(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_GREEN_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_BLUE_GAIN)) {
+                pictureParams.add(PictureParameter.colorTemperatureBlueGain(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_BLUE_GAIN)));
+            }
+
+            /**
+             * TODO: add conversion for following after adding to MediaQualityContract
+             *
+             * PictureParameter.levelRange
+             * PictureParameter.gamutMapping
+             * PictureParameter.pcMode
+             * PictureParameter.lowLatency
+             * PictureParameter.vrr
+             * PictureParameter.cvrr
+             * PictureParameter.hdmiRgbRange
+             * PictureParameter.colorSpace
+             * PictureParameter.panelInitMaxLuminceNits
+             * PictureParameter.panelInitMaxLuminceValid
+             * PictureParameter.gamma
+             * PictureParameter.colorTemperatureRedOffset
+             * PictureParameter.colorTemperatureGreenOffset
+             * PictureParameter.colorTemperatureBlueOffset
+             * PictureParameter.elevenPointRed
+             * PictureParameter.elevenPointGreen
+             * PictureParameter.elevenPointBlue
+             * PictureParameter.lowBlueLight
+             * PictureParameter.LdMode
+             * PictureParameter.osdRedGain
+             * PictureParameter.osdGreenGain
+             * PictureParameter.osdBlueGain
+             * PictureParameter.osdRedOffset
+             * PictureParameter.osdGreenOffset
+             * PictureParameter.osdBlueOffset
+             * PictureParameter.osdHue
+             * PictureParameter.osdSaturation
+             * PictureParameter.osdContrast
+             * PictureParameter.colorTunerSwitch
+             * PictureParameter.colorTunerHueRed
+             * PictureParameter.colorTunerHueGreen
+             * PictureParameter.colorTunerHueBlue
+             * PictureParameter.colorTunerHueCyan
+             * PictureParameter.colorTunerHueMagenta
+             * PictureParameter.colorTunerHueYellow
+             * PictureParameter.colorTunerHueFlesh
+             * PictureParameter.colorTunerSaturationRed
+             * PictureParameter.colorTunerSaturationGreen
+             * PictureParameter.colorTunerSaturationBlue
+             * PictureParameter.colorTunerSaturationCyan
+             * PictureParameter.colorTunerSaturationMagenta
+             * PictureParameter.colorTunerSaturationYellow
+             * PictureParameter.colorTunerSaturationFlesh
+             * PictureParameter.colorTunerLuminanceRed
+             * PictureParameter.colorTunerLuminanceGreen
+             * PictureParameter.colorTunerLuminanceBlue
+             * PictureParameter.colorTunerLuminanceCyan
+             * PictureParameter.colorTunerLuminanceMagenta
+             * PictureParameter.colorTunerLuminanceYellow
+             * PictureParameter.colorTunerLuminanceFlesh
+             * PictureParameter.activeProfile
+             * PictureParameter.pictureQualityEventType
+             */
+            return  (PictureParameter[]) pictureParams.toArray();
         }
 
         @Override
         public List<String> getPictureProfilePackageNames(UserHandle user) {
             if (!hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
             String [] column = {BaseParameters.PARAMETER_PACKAGE};
@@ -325,7 +559,7 @@ public class MediaQualityService extends SystemService {
             if ((sp.getPackageName() != null && !sp.getPackageName().isEmpty()
                     && !incomingPackageEqualsCallingUidPackage(sp.getPackageName()))
                     && !hasGlobalPictureQualityServicePermission()) {
-                notifySoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
             SQLiteDatabase db = mMediaQualityDbHelper.getWritableDatabase();
@@ -342,7 +576,9 @@ public class MediaQualityService extends SystemService {
             Long id = db.insert(mMediaQualityDbHelper.SOUND_QUALITY_TABLE_NAME,
                     null, values);
             populateTempIdMap(mSoundProfileTempIdMap, id);
-            sp.setProfileId(mSoundProfileTempIdMap.getValue(id));
+            String value = mSoundProfileTempIdMap.getValue(id);
+            sp.setProfileId(value);
+            notifyOnSoundProfileAdded(value, sp, Binder.getCallingUid(), Binder.getCallingPid());
             return sp;
         }
 
@@ -350,7 +586,7 @@ public class MediaQualityService extends SystemService {
         public void updateSoundProfile(String id, SoundProfile sp, UserHandle user) {
             Long dbId = mSoundProfileTempIdMap.getKey(id);
             if (!hasPermissionToUpdateSoundProfile(dbId, sp)) {
-                notifySoundProfileError(id, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(id, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
@@ -363,6 +599,8 @@ public class MediaQualityService extends SystemService {
 
             SQLiteDatabase db = mMediaQualityDbHelper.getWritableDatabase();
             db.replace(mMediaQualityDbHelper.SOUND_QUALITY_TABLE_NAME, null, values);
+            notifyOnSoundProfileUpdated(mSoundProfileTempIdMap.getValue(dbId),
+                    getSoundProfile(dbId), Binder.getCallingUid(), Binder.getCallingPid());
         }
 
         private boolean hasPermissionToUpdateSoundProfile(Long dbId, SoundProfile sp) {
@@ -376,8 +614,9 @@ public class MediaQualityService extends SystemService {
         @Override
         public void removeSoundProfile(String id, UserHandle user) {
             Long dbId = mSoundProfileTempIdMap.getKey(id);
-            if (!hasPermissionToRemoveSoundProfile(dbId)) {
-                notifySoundProfileError(id, SoundProfile.ERROR_NO_PERMISSION,
+            SoundProfile toDelete = getSoundProfile(dbId);
+            if (!hasPermissionToRemoveSoundProfile(toDelete)) {
+                notifyOnSoundProfileError(id, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
@@ -388,16 +627,20 @@ public class MediaQualityService extends SystemService {
                 int result = db.delete(mMediaQualityDbHelper.SOUND_QUALITY_TABLE_NAME, selection,
                         selectionArgs);
                 if (result == 0) {
-                    notifySoundProfileError(id, SoundProfile.ERROR_INVALID_ARGUMENT,
+                    notifyOnSoundProfileError(id, SoundProfile.ERROR_INVALID_ARGUMENT,
                             Binder.getCallingUid(), Binder.getCallingPid());
                 }
+                notifyOnSoundProfileRemoved(mSoundProfileTempIdMap.getValue(dbId), toDelete,
+                        Binder.getCallingUid(), Binder.getCallingPid());
                 mSoundProfileTempIdMap.remove(dbId);
             }
         }
 
-        private boolean hasPermissionToRemoveSoundProfile(Long dbId) {
-            SoundProfile fromDb = getSoundProfile(dbId);
-            return fromDb.getName().equalsIgnoreCase(getPackageOfCallingUid());
+        private boolean hasPermissionToRemoveSoundProfile(SoundProfile toDelete) {
+            if (toDelete != null) {
+                return toDelete.getName().equalsIgnoreCase(getPackageOfCallingUid());
+            }
+            return false;
         }
 
         @Override
@@ -458,7 +701,7 @@ public class MediaQualityService extends SystemService {
         public List<SoundProfile> getSoundProfilesByPackage(
                 String packageName, Bundle options, UserHandle user) {
             if (!hasGlobalSoundQualityServicePermission()) {
-                notifySoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
@@ -482,17 +725,84 @@ public class MediaQualityService extends SystemService {
         @Override
         public boolean setDefaultSoundProfile(String profileId, UserHandle user) {
             if (!hasGlobalSoundQualityServicePermission()) {
-                notifySoundProfileError(profileId, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(profileId, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
-            // TODO: pass the profile ID to MediaQuality HAL when ready.
+
+            SoundProfile soundProfile = getSoundProfile(mSoundProfileTempIdMap.getKey(profileId));
+            PersistableBundle params = soundProfile.getParameters();
+
+            try {
+                if (mMediaQuality != null) {
+                    SoundParameter[] soundParameters =
+                            convertPersistableBundleToSoundParameterList(params);
+
+                    SoundParameters sp = new SoundParameters();
+                    sp.soundParameters = soundParameters;
+
+                    mMediaQuality.sendDefaultSoundParameters(sp);
+                    return true;
+                }
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to set default sound profile", e);
+            }
             return false;
+        }
+
+        private SoundParameter[] convertPersistableBundleToSoundParameterList(
+                PersistableBundle params) {
+            List<SoundParameter> soundParams = new ArrayList<>();
+            if (params.containsKey(SoundQuality.PARAMETER_BALANCE)) {
+                soundParams.add(SoundParameter.balance(params.getInt(
+                        SoundQuality.PARAMETER_BALANCE)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_BASS)) {
+                soundParams.add(SoundParameter.bass(params.getInt(SoundQuality.PARAMETER_BASS)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_TREBLE)) {
+                soundParams.add(SoundParameter.treble(params.getInt(
+                        SoundQuality.PARAMETER_TREBLE)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_SURROUND_SOUND)) {
+                soundParams.add(SoundParameter.surroundSoundEnabled(params.getBoolean(
+                        SoundQuality.PARAMETER_SURROUND_SOUND)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_SPEAKERS)) {
+                soundParams.add(SoundParameter.speakersEnabled(params.getBoolean(
+                        SoundQuality.PARAMETER_SPEAKERS)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_SPEAKERS_DELAY_MILLIS)) {
+                soundParams.add(SoundParameter.speakersDelayMs(params.getInt(
+                        SoundQuality.PARAMETER_SPEAKERS_DELAY_MILLIS)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_AUTO_VOLUME_CONTROL)) {
+                soundParams.add(SoundParameter.autoVolumeControl(params.getBoolean(
+                        SoundQuality.PARAMETER_AUTO_VOLUME_CONTROL)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_DTS_DRC)) {
+                soundParams.add(SoundParameter.dtsDrc(params.getBoolean(
+                        SoundQuality.PARAMETER_DTS_DRC)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS)) {
+                soundParams.add(SoundParameter.surroundSoundEnabled(params.getBoolean(
+                        SoundQuality.PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS)));
+            }
+            //TODO: equalizerDetail
+            //TODO: downmixMode
+            //TODO: enhancedAudioReturnChannelEnabled
+            //TODO: dolbyAudioProcessing
+            //TODO: dolbyDialogueEnhancer
+            //TODO: dtsVirtualX
+            //TODO: digitalOutput
+            //TODO: activeProfile
+            //TODO: soundStyle
+            return  (SoundParameter[]) soundParams.toArray();
         }
 
         @Override
         public List<String> getSoundProfilePackageNames(UserHandle user) {
             if (!hasGlobalSoundQualityServicePermission()) {
-                notifySoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
             String [] column = {BaseParameters.PARAMETER_NAME};
@@ -735,7 +1045,35 @@ public class MediaQualityService extends SystemService {
             }
         }
 
-        private void notifyPictureProfileError(String profileId, int errorCode, int uid, int pid) {
+        enum Mode {
+            ADD,
+            UPDATE,
+            REMOVE,
+            ERROR
+        }
+
+        private void notifyOnPictureProfileAdded(String profileId, PictureProfile profile,
+                int uid, int pid) {
+            notifyPictureProfileHelper(Mode.ADD, profileId, profile, null, uid, pid);
+        }
+
+        private void notifyOnPictureProfileUpdated(String profileId, PictureProfile profile,
+                int uid, int pid) {
+            notifyPictureProfileHelper(Mode.UPDATE, profileId, profile, null, uid, pid);
+        }
+
+        private void notifyOnPictureProfileRemoved(String profileId, PictureProfile profile,
+                int uid, int pid) {
+            notifyPictureProfileHelper(Mode.REMOVE, profileId, profile, null, uid, pid);
+        }
+
+        private void notifyOnPictureProfileError(String profileId, int errorCode,
+                int uid, int pid) {
+            notifyPictureProfileHelper(Mode.ERROR, profileId, null, errorCode, uid, pid);
+        }
+
+        private void notifyPictureProfileHelper(Mode mode, String profileId, PictureProfile profile,
+                Integer errorCode, int uid, int pid) {
             UserState userState = getOrCreateUserStateLocked(UserHandle.USER_SYSTEM);
             int n = userState.mPictureProfileCallbacks.beginBroadcast();
 
@@ -747,17 +1085,56 @@ public class MediaQualityService extends SystemService {
                             .get(callback);
 
                     if (pidUid.first == pid && pidUid.second == uid) {
-                        userState.mPictureProfileCallbacks.getBroadcastItem(i)
-                                .onError(profileId, errorCode);
+                        if (mode == Mode.ADD) {
+                            userState.mPictureProfileCallbacks.getBroadcastItem(i)
+                                    .onPictureProfileAdded(profileId, profile);
+                        } else if (mode == Mode.UPDATE) {
+                            userState.mPictureProfileCallbacks.getBroadcastItem(i)
+                                    .onPictureProfileUpdated(profileId, profile);
+                        } else if (mode == Mode.REMOVE) {
+                            userState.mPictureProfileCallbacks.getBroadcastItem(i)
+                                    .onPictureProfileRemoved(profileId, profile);
+                        } else if (mode == Mode.ERROR) {
+                            userState.mPictureProfileCallbacks.getBroadcastItem(i)
+                                    .onError(profileId, errorCode);
+                        }
                     }
                 } catch (RemoteException e) {
-                    Slog.e(TAG, "failed to report added input to callback", e);
+                    if (mode == Mode.ADD) {
+                        Slog.e(TAG, "Failed to report added picture profile to callback", e);
+                    } else if (mode == Mode.UPDATE) {
+                        Slog.e(TAG, "Failed to report updated picture profile to callback", e);
+                    } else if (mode == Mode.REMOVE) {
+                        Slog.e(TAG, "Failed to report removed picture profile to callback", e);
+                    } else if (mode == Mode.ERROR) {
+                        Slog.e(TAG, "Failed to report picture profile error to callback", e);
+                    }
                 }
             }
             userState.mPictureProfileCallbacks.finishBroadcast();
         }
 
-        private void notifySoundProfileError(String profileId, int errorCode, int uid, int pid) {
+        private void notifyOnSoundProfileAdded(String profileId, SoundProfile profile,
+                int uid, int pid) {
+            notifySoundProfileHelper(Mode.ADD, profileId, profile, null, uid, pid);
+        }
+
+        private void notifyOnSoundProfileUpdated(String profileId, SoundProfile profile,
+                int uid, int pid) {
+            notifySoundProfileHelper(Mode.UPDATE, profileId, profile, null, uid, pid);
+        }
+
+        private void notifyOnSoundProfileRemoved(String profileId, SoundProfile profile,
+                int uid, int pid) {
+            notifySoundProfileHelper(Mode.REMOVE, profileId, profile, null, uid, pid);
+        }
+
+        private void notifyOnSoundProfileError(String profileId, int errorCode, int uid, int pid) {
+            notifySoundProfileHelper(Mode.ERROR, profileId, null, errorCode, uid, pid);
+        }
+
+        private void notifySoundProfileHelper(Mode mode, String profileId, SoundProfile profile,
+                Integer errorCode, int uid, int pid) {
             UserState userState = getOrCreateUserStateLocked(UserHandle.USER_SYSTEM);
             int n = userState.mSoundProfileCallbacks.beginBroadcast();
 
@@ -769,11 +1146,30 @@ public class MediaQualityService extends SystemService {
                             .get(callback);
 
                     if (pidUid.first == pid && pidUid.second == uid) {
-                        userState.mSoundProfileCallbacks.getBroadcastItem(i)
-                                .onError(profileId, errorCode);
+                        if (mode == Mode.ADD) {
+                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
+                                    .onSoundProfileAdded(profileId, profile);
+                        } else if (mode == Mode.UPDATE) {
+                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
+                                    .onSoundProfileUpdated(profileId, profile);
+                        } else if (mode == Mode.REMOVE) {
+                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
+                                    .onSoundProfileRemoved(profileId, profile);
+                        } else if (mode == Mode.ERROR) {
+                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
+                                    .onError(profileId, errorCode);
+                        }
                     }
                 } catch (RemoteException e) {
-                    Slog.e(TAG, "failed to report added input to callback", e);
+                    if (mode == Mode.ADD) {
+                        Slog.e(TAG, "Failed to report added sound profile to callback", e);
+                    } else if (mode == Mode.UPDATE) {
+                        Slog.e(TAG, "Failed to report updated sound profile to callback", e);
+                    } else if (mode == Mode.REMOVE) {
+                        Slog.e(TAG, "Failed to report removed sound profile to callback", e);
+                    } else if (mode == Mode.ERROR) {
+                        Slog.e(TAG, "Failed to report sound profile error to callback", e);
+                    }
                 }
             }
             userState.mSoundProfileCallbacks.finishBroadcast();
@@ -801,23 +1197,85 @@ public class MediaQualityService extends SystemService {
 
         @Override
         public void registerAmbientBacklightCallback(IAmbientBacklightCallback callback) {
+            if (DEBUG) {
+                Slogf.d(TAG, "registerAmbientBacklightCallback");
+            }
+
             if (!hasReadColorZonesPermission()) {
                 //TODO: error handling
+            }
+
+            String callingPackageName = getPackageOfCallingUid();
+
+            synchronized (mCallbackRecords) {
+                AmbientBacklightCallbackRecord record = mCallbackRecords.get(callingPackageName);
+                if (record != null) {
+                    if (record.mCallback.asBinder().equals(callback.asBinder())) {
+                        Slog.w(TAG, "AmbientBacklight Callback already registered");
+                        return;
+                    }
+                    record.release();
+                    mCallbackRecords.remove(callingPackageName);
+                }
+                mCallbackRecords.put(callingPackageName,
+                        new AmbientBacklightCallbackRecord(callingPackageName, callback));
             }
         }
 
         @Override
         public void setAmbientBacklightSettings(
                 AmbientBacklightSettings settings, UserHandle user) {
+            if (DEBUG) {
+                Slogf.d(TAG, "setAmbientBacklightSettings " + settings);
+            }
+
             if (!hasReadColorZonesPermission()) {
                 //TODO: error handling
+            }
+
+            try {
+                if (mMediaQuality != null) {
+                    android.hardware.tv.mediaquality.AmbientBacklightSettings halSettings =
+                            new android.hardware.tv.mediaquality.AmbientBacklightSettings();
+                    halSettings.uid = Binder.getCallingUid();
+                    halSettings.source = (byte) settings.getSource();
+                    halSettings.maxFramerate = settings.getMaxFps();
+                    halSettings.colorFormat = (byte) settings.getColorFormat();
+                    halSettings.hZonesNumber = settings.getHorizontalZonesCount();
+                    halSettings.vZonesNumber = settings.getVerticalZonesCount();
+                    halSettings.hasLetterbox = settings.isLetterboxOmitted();
+                    halSettings.colorThreshold = settings.getThreshold();
+
+                    mMediaQuality.setAmbientBacklightDetector(halSettings);
+
+                    mHalAmbientBacklightCallback.setAmbientBacklightClientPackageName(
+                            getPackageOfCallingUid());
+
+                    if (DEBUG) {
+                        Slogf.d(TAG, "set ambient settings package: " + halSettings.uid);
+                    }
+                }
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to set ambient backlight settings", e);
             }
         }
 
         @Override
         public void setAmbientBacklightEnabled(boolean enabled, UserHandle user) {
+            if (DEBUG) {
+                Slogf.d(TAG, "setAmbientBacklightEnabled " + enabled);
+            }
             if (!hasReadColorZonesPermission()) {
                 //TODO: error handling
+            }
+            try {
+                if (mMediaQuality != null) {
+                    mMediaQuality.setAmbientBacklightDetectionEnabled(enabled);
+                }
+            } catch (UnsupportedOperationException e) {
+                Slog.e(TAG, "The current device is not supported");
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to set ambient backlight enabled", e);
             }
         }
 
@@ -830,7 +1288,7 @@ public class MediaQualityService extends SystemService {
         @Override
         public List<String> getPictureProfileAllowList(UserHandle user) {
             if (!hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
             return new ArrayList<>();
@@ -839,7 +1297,7 @@ public class MediaQualityService extends SystemService {
         @Override
         public void setPictureProfileAllowList(List<String> packages, UserHandle user) {
             if (!hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
         }
@@ -847,7 +1305,7 @@ public class MediaQualityService extends SystemService {
         @Override
         public List<String> getSoundProfileAllowList(UserHandle user) {
             if (!hasGlobalSoundQualityServicePermission()) {
-                notifySoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
             return new ArrayList<>();
@@ -856,7 +1314,7 @@ public class MediaQualityService extends SystemService {
         @Override
         public void setSoundProfileAllowList(List<String> packages, UserHandle user) {
             if (!hasGlobalSoundQualityServicePermission()) {
-                notifySoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
         }
@@ -869,16 +1327,16 @@ public class MediaQualityService extends SystemService {
         @Override
         public void setAutoPictureQualityEnabled(boolean enabled, UserHandle user) {
             if (!hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
             try {
                 if (mMediaQuality != null) {
-                    mMediaQuality.setAutoPqEnabled(enabled);
+                    if (mMediaQuality.isAutoPqSupported()) {
+                        mMediaQuality.setAutoPqEnabled(enabled);
+                    }
                 }
-            } catch (UnsupportedOperationException e) {
-                Slog.e(TAG, "The current device is not supported");
             } catch (RemoteException e) {
                 Slog.e(TAG, "Failed to set auto picture quality", e);
             }
@@ -888,10 +1346,10 @@ public class MediaQualityService extends SystemService {
         public boolean isAutoPictureQualityEnabled(UserHandle user) {
             try {
                 if (mMediaQuality != null) {
-                    return mMediaQuality.getAutoPqEnabled();
+                    if (mMediaQuality.isAutoPqSupported()) {
+                        mMediaQuality.getAutoPqEnabled();
+                    }
                 }
-            } catch (UnsupportedOperationException e) {
-                Slog.e(TAG, "The current device is not supported");
             } catch (RemoteException e) {
                 Slog.e(TAG, "Failed to get auto picture quality", e);
             }
@@ -901,18 +1359,18 @@ public class MediaQualityService extends SystemService {
         @Override
         public void setSuperResolutionEnabled(boolean enabled, UserHandle user) {
             if (!hasGlobalPictureQualityServicePermission()) {
-                notifyPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
+                notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
             try {
                 if (mMediaQuality != null) {
-                    mMediaQuality.setAutoSrEnabled(enabled);
+                    if (mMediaQuality.isAutoSrSupported()) {
+                        mMediaQuality.setAutoSrEnabled(enabled);
+                    }
                 }
-            } catch (UnsupportedOperationException e) {
-                Slog.e(TAG, "The current device is not supported");
             } catch (RemoteException e) {
-                Slog.e(TAG, "Failed to set auto super resolution", e);
+                Slog.e(TAG, "Failed to set super resolution", e);
             }
         }
 
@@ -920,12 +1378,12 @@ public class MediaQualityService extends SystemService {
         public boolean isSuperResolutionEnabled(UserHandle user) {
             try {
                 if (mMediaQuality != null) {
-                    return mMediaQuality.getAutoSrEnabled();
+                    if (mMediaQuality.isAutoSrSupported()) {
+                        mMediaQuality.getAutoSrEnabled();
+                    }
                 }
-            } catch (UnsupportedOperationException e) {
-                Slog.e(TAG, "The current device is not supported");
             } catch (RemoteException e) {
-                Slog.e(TAG, "Failed to get auto super resolution", e);
+                Slog.e(TAG, "Failed to get super resolution", e);
             }
             return false;
         }
@@ -933,18 +1391,18 @@ public class MediaQualityService extends SystemService {
         @Override
         public void setAutoSoundQualityEnabled(boolean enabled, UserHandle user) {
             if (!hasGlobalSoundQualityServicePermission()) {
-                notifySoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
+                notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
 
             try {
                 if (mMediaQuality != null) {
-                    mMediaQuality.setAutoAqEnabled(enabled);
+                    if (mMediaQuality.isAutoAqSupported()) {
+                        mMediaQuality.setAutoAqEnabled(enabled);
+                    }
                 }
-            } catch (UnsupportedOperationException e) {
-                Slog.e(TAG, "The current device is not supported");
             } catch (RemoteException e) {
-                Slog.e(TAG, "Failed to set auto audio quality", e);
+                Slog.e(TAG, "Failed to set auto sound quality", e);
             }
         }
 
@@ -952,12 +1410,12 @@ public class MediaQualityService extends SystemService {
         public boolean isAutoSoundQualityEnabled(UserHandle user) {
             try {
                 if (mMediaQuality != null) {
-                    return mMediaQuality.getAutoAqEnabled();
+                    if (mMediaQuality.isAutoAqSupported()) {
+                        mMediaQuality.getAutoAqEnabled();
+                    }
                 }
-            } catch (UnsupportedOperationException e) {
-                Slog.e(TAG, "The current device is not supported");
             } catch (RemoteException e) {
-                Slog.e(TAG, "Failed to get auto audio quality", e);
+                Slog.e(TAG, "Failed to get auto sound quality", e);
             }
             return false;
         }
@@ -1014,5 +1472,168 @@ public class MediaQualityService extends SystemService {
 
     private UserState getUserStateLocked(int userId) {
         return mUserStates.get(userId);
+    }
+
+    private final class AmbientBacklightCallbackRecord implements IBinder.DeathRecipient {
+        final String mPackageName;
+        final IAmbientBacklightCallback mCallback;
+
+        AmbientBacklightCallbackRecord(@NonNull String pkgName,
+                @NonNull IAmbientBacklightCallback cb) {
+            mPackageName = pkgName;
+            mCallback = cb;
+            try {
+                mCallback.asBinder().linkToDeath(this, 0);
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to link to death", e);
+            }
+        }
+
+        void release() {
+            try {
+                mCallback.asBinder().unlinkToDeath(this, 0);
+            } catch (NoSuchElementException e) {
+                Slog.e(TAG, "Failed to unlink to death", e);
+            }
+        }
+
+        @Override
+        public void binderDied() {
+            synchronized (mCallbackRecords) {
+                mCallbackRecords.remove(mPackageName);
+            }
+        }
+    }
+
+    private final class HalAmbientBacklightCallback
+            extends android.hardware.tv.mediaquality.IMediaQualityCallback.Stub {
+        private final Object mLock = new Object();
+        private String mAmbientBacklightClientPackageName;
+
+        void setAmbientBacklightClientPackageName(@NonNull String packageName) {
+            synchronized (mLock) {
+                if (TextUtils.equals(mAmbientBacklightClientPackageName, packageName)) {
+                    return;
+                }
+                handleAmbientBacklightInterrupted();
+                mAmbientBacklightClientPackageName = packageName;
+            }
+        }
+
+        void handleAmbientBacklightInterrupted() {
+            synchronized (mCallbackRecords) {
+                if (mAmbientBacklightClientPackageName == null) {
+                    Slog.e(TAG, "Invalid package name in interrupted event");
+                    return;
+                }
+                AmbientBacklightCallbackRecord record = mCallbackRecords.get(
+                        mAmbientBacklightClientPackageName);
+                if (record == null) {
+                    Slog.e(TAG, "Callback record not found for ambient backlight");
+                    return;
+                }
+                AmbientBacklightEvent event =
+                        new AmbientBacklightEvent(
+                                AMBIENT_BACKLIGHT_EVENT_INTERRUPTED, null);
+                try {
+                    record.mCallback.onAmbientBacklightEvent(event);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Deliver ambient backlight interrupted event failed", e);
+                }
+            }
+        }
+
+        void handleAmbientBacklightEnabled(boolean enabled) {
+            AmbientBacklightEvent event =
+                    new AmbientBacklightEvent(
+                            enabled ? AMBIENT_BACKLIGHT_EVENT_ENABLED :
+                                    AMBIENT_BACKLIGHT_EVENT_DISABLED, null);
+            synchronized (mCallbackRecords) {
+                for (AmbientBacklightCallbackRecord record : mCallbackRecords.values()) {
+                    try {
+                        record.mCallback.onAmbientBacklightEvent(event);
+                    } catch (RemoteException e) {
+                        Slog.e(TAG, "Deliver ambient backlight enabled event failed", e);
+                    }
+                }
+            }
+        }
+
+        void handleAmbientBacklightMetadataEvent(
+                @NonNull android.hardware.tv.mediaquality.AmbientBacklightMetadata
+                        halMetadata) {
+            String halPackageName = mContext.getPackageManager()
+                                    .getNameForUid(halMetadata.settings.uid);
+            if (!TextUtils.equals(mAmbientBacklightClientPackageName, halPackageName)) {
+                Slog.e(TAG, "Invalid package name in metadata event");
+                return;
+            }
+
+            AmbientBacklightColorFormat[] zonesColorsUnion = halMetadata.zonesColors;
+            int[] zonesColorsInt = new int[zonesColorsUnion.length];
+
+            for (int i = 0; i < zonesColorsUnion.length; i++) {
+                zonesColorsInt[i] = zonesColorsUnion[i].RGB888;
+            }
+
+            AmbientBacklightMetadata metadata =
+                    new AmbientBacklightMetadata(
+                            halPackageName,
+                            halMetadata.compressAlgorithm,
+                            halMetadata.settings.source,
+                            halMetadata.settings.colorFormat,
+                            halMetadata.settings.hZonesNumber,
+                            halMetadata.settings.vZonesNumber,
+                            zonesColorsInt);
+            AmbientBacklightEvent event =
+                    new AmbientBacklightEvent(
+                            AMBIENT_BACKLIGHT_EVENT_METADATA_AVAILABLE, metadata);
+
+            synchronized (mCallbackRecords) {
+                AmbientBacklightCallbackRecord record = mCallbackRecords
+                                                .get(halPackageName);
+                if (record == null) {
+                    Slog.e(TAG, "Callback record not found for ambient backlight metadata");
+                    return;
+                }
+
+                try {
+                    record.mCallback.onAmbientBacklightEvent(event);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Deliver ambient backlight metadata event failed", e);
+                }
+            }
+        }
+
+        @Override
+        public void notifyAmbientBacklightEvent(
+                android.hardware.tv.mediaquality.AmbientBacklightEvent halEvent) {
+            synchronized (mLock) {
+                if (halEvent.getTag() == android.hardware.tv.mediaquality
+                                .AmbientBacklightEvent.Tag.enabled) {
+                    boolean enabled = halEvent.getEnabled();
+                    if (enabled) {
+                        handleAmbientBacklightEnabled(true);
+                    } else {
+                        handleAmbientBacklightEnabled(false);
+                    }
+                } else if (halEvent.getTag() == android.hardware.tv.mediaquality
+                                    .AmbientBacklightEvent.Tag.metadata) {
+                    handleAmbientBacklightMetadataEvent(halEvent.getMetadata());
+                } else {
+                    Slog.e(TAG, "Invalid event type in ambient backlight event");
+                }
+            }
+        }
+
+        @Override
+        public synchronized String getInterfaceHash() throws android.os.RemoteException {
+            return android.hardware.tv.mediaquality.IMediaQualityCallback.Stub.HASH;
+        }
+
+        @Override
+        public int getInterfaceVersion() throws android.os.RemoteException {
+            return android.hardware.tv.mediaquality.IMediaQualityCallback.Stub.VERSION;
+        }
     }
 }

@@ -1546,6 +1546,8 @@ public final class SystemServer implements Dumpable {
 
         boolean enableWigig = SystemProperties.getBoolean("persist.vendor.wigig.enable", false);
 
+        boolean isDesktop = context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_PC);
+
         boolean isWatch = RoSystemFeatures.hasFeatureWatch(context);
 
         boolean isArc = context.getPackageManager().hasSystemFeature(
@@ -1675,7 +1677,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (!isTv) {
+            if (!isTv && !isDesktop) {
                 t.traceBegin("StartVibratorManagerService");
                 mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
                 t.traceEnd();

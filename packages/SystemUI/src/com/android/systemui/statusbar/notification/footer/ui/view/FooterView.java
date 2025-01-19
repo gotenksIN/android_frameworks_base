@@ -40,6 +40,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 
 import com.android.systemui.res.R;
+import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.statusbar.notification.ColorUpdateLogger;
 import com.android.systemui.statusbar.notification.footer.shared.NotifRedesignFooter;
 import com.android.systemui.statusbar.notification.row.FooterViewButton;
@@ -153,10 +154,12 @@ public class FooterView extends StackScrollerDecorView {
         DumpUtilsKt.withIncreasedIndent(pw, () -> {
             // TODO: b/375010573 - update dumps for redesign
             pw.println("visibility: " + DumpUtilsKt.visibilityString(getVisibility()));
-            pw.println("manageButton visibility: "
-                    + DumpUtilsKt.visibilityString(mClearAllButton.getVisibility()));
-            pw.println("dismissButton visibility: "
-                    + DumpUtilsKt.visibilityString(mClearAllButton.getVisibility()));
+            if (mManageOrHistoryButton != null)
+                pw.println("mManageOrHistoryButton visibility: "
+                        + DumpUtilsKt.visibilityString(mManageOrHistoryButton.getVisibility()));
+            if (mClearAllButton != null)
+                pw.println("mClearAllButton visibility: "
+                        + DumpUtilsKt.visibilityString(mClearAllButton.getVisibility()));
         });
     }
 
@@ -333,11 +336,9 @@ public class FooterView extends StackScrollerDecorView {
 
     /**
      * Whether the touch is outside the Clear all button.
-     *
-     * TODO(b/293167744): This is an artifact from the time when we could press underneath the
-     * shade to dismiss it. Check if it's safe to remove.
      */
     public boolean isOnEmptySpace(float touchX, float touchY) {
+        SceneContainerFlag.assertInLegacyMode();
         return touchX < mContent.getX()
                 || touchX > mContent.getX() + mContent.getWidth()
                 || touchY < mContent.getY()

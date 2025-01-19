@@ -4208,6 +4208,9 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        /**
+         * This method must not be called with mCallback held or deadlock will ensue.
+         */
         @Override
         public void binderDied() {
             synchronized (mCallback) {
@@ -4268,17 +4271,8 @@ public final class DisplayManagerService extends SystemService {
                 }
             }
 
-            return transmitDisplayEvent(displayId, event);
-        }
-
-        /**
-         * Transmit a single display event.  The client is presumed ready.  Return true on success
-         * and false if the client died.
-         */
-        private boolean transmitDisplayEvent(int displayId, @DisplayEvent int event) {
-            // The client is ready to receive the event.
             try {
-                mCallback.onDisplayEvent(displayId, event);
+                transmitDisplayEvent(displayId, event);
                 return true;
             } catch (RemoteException ex) {
                 Slog.w(TAG, "Failed to notify process "
@@ -4286,6 +4280,18 @@ public final class DisplayManagerService extends SystemService {
                 binderDied();
                 return false;
             }
+        }
+
+        /**
+         * Transmit a single display event.  The client is presumed ready.  This throws if the
+         * client has died; callers must catch and handle the exception.  The exception cannot be
+         * handled directly here because {@link #binderDied()} must not be called whilst holding
+         * the mCallback lock.
+         */
+        private void transmitDisplayEvent(int displayId, @DisplayEvent int event)
+                throws RemoteException {
+            // The client is ready to receive the event.
+            mCallback.onDisplayEvent(displayId, event);
         }
 
         /**
@@ -4396,6 +4402,7 @@ public final class DisplayManagerService extends SystemService {
         // would be unusual to do so.  The method returns true on success.
         // This is only used if {@link deferDisplayEventsWhenFrozen()} is true.
         public boolean dispatchPending() {
+            Event[] pending;
             synchronized (mCallback) {
                 if (mPendingEvents == null || mPendingEvents.isEmpty() || !mAlive) {
                     return true;
@@ -4403,20 +4410,27 @@ public final class DisplayManagerService extends SystemService {
                 if (!isReadyLocked()) {
                     return false;
                 }
-                for (int i = 0; i < mPendingEvents.size(); i++) {
-                    Event displayEvent = mPendingEvents.get(i);
+                pending = new Event[mPendingEvents.size()];
+                pending = mPendingEvents.toArray(pending);
+                mPendingEvents.clear();
+            }
+            try {
+                for (int i = 0; i < pending.length; i++) {
+                    Event displayEvent = pending[i];
                     if (DEBUG) {
                         Slog.d(TAG, "Send pending display event #" + i + " "
                                 + displayEvent.displayId + "/"
                                 + displayEvent.event + " to " + mUid + "/" + mPid);
                     }
-                    if (!transmitDisplayEvent(displayEvent.displayId, displayEvent.event)) {
-                        Slog.d(TAG, "Drop pending events for dead process " + mPid);
-                        break;
-                    }
+                    transmitDisplayEvent(displayEvent.displayId, displayEvent.event);
                 }
-                mPendingEvents.clear();
                 return true;
+            } catch (RemoteException ex) {
+                Slog.w(TAG, "Failed to notify process "
+                        + mPid + " that display topology changed, assuming it died.", ex);
+                binderDied();
+                return false;
+
             }
         }
 

@@ -72,9 +72,10 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.compose.animation.Expandable
-import com.android.compose.animation.scene.SceneScope
+import com.android.compose.animation.scene.ContentScope
 import com.android.compose.modifiers.fadingBackground
 import com.android.compose.theme.colorAttr
+import com.android.systemui.Flags.notificationShadeBlur
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.ui.compose.Icon
@@ -90,7 +91,7 @@ import com.android.systemui.res.R
 import kotlinx.coroutines.launch
 
 @Composable
-fun SceneScope.FooterActionsWithAnimatedVisibility(
+fun ContentScope.FooterActionsWithAnimatedVisibility(
     viewModel: FooterActionsViewModel,
     isCustomizing: Boolean,
     customizingAnimationDuration: Int,
@@ -163,14 +164,16 @@ fun FooterActions(
         }
     }
 
-    val backgroundColor = colorAttr(R.attr.underSurface)
+    val backgroundColor =
+        if (!notificationShadeBlur()) colorAttr(R.attr.underSurface) else Color.Transparent
+    val backgroundAlphaValue = if (!notificationShadeBlur()) backgroundAlpha::value else ({ 0f })
     val contentColor = MaterialTheme.colorScheme.onSurface
     val backgroundTopRadius = dimensionResource(R.dimen.qs_corner_radius)
     val backgroundModifier =
-        remember(backgroundColor, backgroundAlpha, backgroundTopRadius) {
+        remember(backgroundColor, backgroundAlphaValue, backgroundTopRadius) {
             Modifier.fadingBackground(
                 backgroundColor,
-                backgroundAlpha::value,
+                backgroundAlphaValue,
                 RoundedCornerShape(topStart = backgroundTopRadius, topEnd = backgroundTopRadius),
             )
         }
@@ -253,6 +256,7 @@ private fun RowScope.ForegroundServicesButton(
     } else {
         NumberButton(
             model.foregroundServicesCount,
+            contentDescription = model.text,
             showNewDot = model.hasNewChanges,
             onClick = model.onClick,
         )
@@ -281,6 +285,7 @@ fun IconButton(model: FooterActionsButtonViewModel, modifier: Modifier = Modifie
 @Composable
 private fun NumberButton(
     number: Int,
+    contentDescription: String,
     showNewDot: Boolean,
     onClick: (Expandable) -> Unit,
     modifier: Modifier = Modifier,
@@ -311,7 +316,10 @@ private fun NumberButton(
             ) {
                 Text(
                     number.toString(),
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier =
+                        Modifier.align(Alignment.Center).semantics {
+                            this.contentDescription = contentDescription
+                        },
                     style = MaterialTheme.typography.bodyLarge,
                     color = colorAttr(R.attr.onShadeInactiveVariant),
                     // TODO(b/242040009): This should only use a standard text style instead and

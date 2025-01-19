@@ -33,6 +33,7 @@ import static android.os.UserManager.SYSTEM_USER_MODE_EMULATION_PROPERTY;
 import static android.os.UserManager.USER_OPERATION_ERROR_UNKNOWN;
 import static android.os.UserManager.USER_OPERATION_ERROR_USER_RESTRICTED;
 import static android.os.UserManager.USER_TYPE_PROFILE_PRIVATE;
+import static android.os.UserManager.supportsMultipleUsers;
 import static android.provider.Settings.Secure.HIDE_PRIVATESPACE_ENTRY_POINT;
 
 import static com.android.internal.app.SetScreenLockDialogActivity.EXTRA_ORIGIN_USER_ID;
@@ -1156,7 +1157,7 @@ public class UserManagerService extends IUserManager.Stub {
 
         showHsumNotificationIfNeeded();
 
-        if (Flags.addUiForSoundsFromBackgroundUsers()) {
+        if (shouldShowNotificationForBackgroundUserSounds()) {
             new BackgroundUserSoundNotifier(mContext);
         }
     }
@@ -3312,13 +3313,18 @@ public class UserManagerService extends IUserManager.Stub {
         }
     }
 
-
-
     private void sendUserInfoChangedBroadcast(@UserIdInt int userId) {
         Intent changedIntent = new Intent(Intent.ACTION_USER_INFO_CHANGED);
         changedIntent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
         changedIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
         mContext.sendBroadcastAsUser(changedIntent, UserHandle.ALL);
+
+        // This intent allow system UI apps to refresh the content even if process was freezed.
+        Intent bgIntent = new Intent(Intent.ACTION_USER_INFO_CHANGED_BACKGROUND);
+        bgIntent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
+        bgIntent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
+        mContext.sendBroadcastAsUser(bgIntent, UserHandle.ALL,
+                Manifest.permission.MANAGE_USERS);
     }
 
     @Override
@@ -8478,6 +8484,17 @@ public class UserManagerService extends IUserManager.Stub {
     public boolean canSwitchToHeadlessSystemUser() {
         return Resources.getSystem()
                 .getBoolean(R.bool.config_canSwitchToHeadlessSystemUser);
+    }
+
+    /**
+     * @hide
+     * Checks whether to show a notification for sounds (e.g., alarms, timers, etc.) from
+     * background users.
+     */
+    public static boolean shouldShowNotificationForBackgroundUserSounds() {
+        return Flags.addUiForSoundsFromBackgroundUsers() && Resources.getSystem().getBoolean(
+                com.android.internal.R.bool.config_showNotificationForBackgroundUserAlarms)
+                && supportsMultipleUsers();
     }
 
     /**

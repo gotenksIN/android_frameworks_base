@@ -114,6 +114,7 @@ interface INotificationManager
     NotificationChannel getNotificationChannelForPackage(String pkg, int uid, String channelId, String conversationId, boolean includeDeleted);
     void deleteNotificationChannel(String pkg, String channelId);
     ParceledListSlice getNotificationChannels(String callingPkg, String targetPkg, int userId);
+    ParceledListSlice getOrCreateNotificationChannels(String callingPkg, String targetPkg, int userId, boolean createPrefsIfNeeded);
     ParceledListSlice getNotificationChannelsForPackage(String pkg, int uid, boolean includeDeleted);
     int getNumNotificationChannelsForPackage(String pkg, int uid, boolean includeDeleted);
     int getDeletedChannelCount(String pkg, int uid);
@@ -270,6 +271,6 @@ interface INotificationManager
 
     int[] getAllowedAdjustmentKeyTypes();
     void setAssistantAdjustmentKeyTypeState(int type, boolean enabled);
-    int[] getAllowedAdjustmentKeyTypesForPackage(String pkg);
-    void setAssistantAdjustmentKeyTypeStateForPackage(String pkg, int type, boolean enabled);
+    String[] getTypeAdjustmentDeniedPackages();
+    void setTypeAdjustmentForPackageState(String pkg, boolean enabled);
 }

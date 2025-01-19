@@ -23,7 +23,7 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.statusbar.chips.notification.domain.interactor.StatusBarNotificationChipsInteractor
 import com.android.systemui.statusbar.chips.notification.domain.model.NotificationChipModel
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
-import com.android.systemui.statusbar.chips.ui.model.ColorsModel
+import com.android.systemui.statusbar.chips.ui.model.ColorsModel.Companion.toCustomColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
@@ -72,11 +72,7 @@ constructor(
                 StatusBarConnectedDisplays.assertInNewMode()
                 OngoingActivityChipModel.ChipIcon.StatusBarNotificationIcon(this.key)
             }
-        val colors =
-            ColorsModel.Custom(
-                backgroundColorInt = this.promotedContent.colors.backgroundColor,
-                primaryTextColorInt = this.promotedContent.colors.primaryTextColor,
-            )
+        val colors = this.promotedContent.toCustomColorsModel()
         val onClickListener =
             View.OnClickListener {
                 // The notification pipeline needs everything to run on the main thread, so keep
@@ -87,6 +83,7 @@ constructor(
                     )
                 }
             }
+        val clickBehavior = OngoingActivityChipModel.ClickBehavior.None
 
         val isShowingHeadsUpFromChipTap =
             headsUpState is TopPinnedState.Pinned &&
@@ -95,7 +92,12 @@ constructor(
         if (isShowingHeadsUpFromChipTap) {
             // If the user tapped this chip to show the HUN, we want to just show the icon because
             // the HUN will show the rest of the information.
-            return OngoingActivityChipModel.Shown.IconOnly(icon, colors, onClickListener)
+            return OngoingActivityChipModel.Shown.IconOnly(
+                icon,
+                colors,
+                onClickListener,
+                clickBehavior,
+            )
         }
 
         if (this.promotedContent.shortCriticalText != null) {
@@ -104,6 +106,7 @@ constructor(
                 colors,
                 this.promotedContent.shortCriticalText,
                 onClickListener,
+                clickBehavior,
             )
         }
 
@@ -115,11 +118,21 @@ constructor(
             // notification will likely just be set to the current time, which would cause the chip
             // to always show "now". We don't want early testers to get that experience since it's
             // not what will happen at launch, so just don't show any time.
-            return OngoingActivityChipModel.Shown.IconOnly(icon, colors, onClickListener)
+            return OngoingActivityChipModel.Shown.IconOnly(
+                icon,
+                colors,
+                onClickListener,
+                clickBehavior,
+            )
         }
 
         if (this.promotedContent.time == null) {
-            return OngoingActivityChipModel.Shown.IconOnly(icon, colors, onClickListener)
+            return OngoingActivityChipModel.Shown.IconOnly(
+                icon,
+                colors,
+                onClickListener,
+                clickBehavior,
+            )
         }
         when (this.promotedContent.time.mode) {
             PromotedNotificationContentModel.When.Mode.BasicTime -> {
@@ -128,6 +141,7 @@ constructor(
                     colors,
                     time = this.promotedContent.time.time,
                     onClickListener,
+                    clickBehavior,
                 )
             }
             PromotedNotificationContentModel.When.Mode.CountUp -> {
@@ -136,6 +150,7 @@ constructor(
                     colors,
                     startTimeMs = this.promotedContent.time.time,
                     onClickListener,
+                    clickBehavior,
                 )
             }
             PromotedNotificationContentModel.When.Mode.CountDown -> {
@@ -145,6 +160,7 @@ constructor(
                     colors,
                     startTimeMs = this.promotedContent.time.time,
                     onClickListener,
+                    clickBehavior,
                 )
             }
         }

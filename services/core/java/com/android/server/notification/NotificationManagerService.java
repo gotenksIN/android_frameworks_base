@@ -27,6 +27,7 @@ import static android.app.AppOpsManager.OP_RECEIVE_SENSITIVE_NOTIFICATIONS;
 import static android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR;
 import static android.app.Flags.lifetimeExtensionRefactor;
 import static android.app.Flags.notificationClassificationUi;
+import static android.app.Flags.redactSensitiveContentNotificationsOnLockscreen;
 import static android.app.Flags.sortSectionByTime;
 import static android.app.Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION;
 import static android.app.Notification.EXTRA_BUILDER_APPLICATION_INFO;
@@ -158,6 +159,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
 import static android.view.contentprotection.flags.Flags.rapidClearNotificationsByListenerAppOpEnabled;
 
 import static com.android.internal.util.FrameworkStatsLog.DND_MODE_RULE;
+import static com.android.internal.util.FrameworkStatsLog.NOTIFICATION_BUNDLE_PREFERENCES;
 import static com.android.internal.util.FrameworkStatsLog.PACKAGE_NOTIFICATION_CHANNEL_GROUP_PREFERENCES;
 import static com.android.internal.util.FrameworkStatsLog.PACKAGE_NOTIFICATION_CHANNEL_PREFERENCES;
 import static com.android.internal.util.FrameworkStatsLog.PACKAGE_NOTIFICATION_PREFERENCES;
@@ -253,6 +255,10 @@ import android.content.pm.VersionedPackage;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.metrics.LogMaker;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -362,6 +368,7 @@ import com.android.server.lights.LightsManager;
 import com.android.server.notification.GroupHelper.NotificationAttributes;
 import com.android.server.notification.ManagedServices.ManagedServiceInfo;
 import com.android.server.notification.ManagedServices.UserProfiles;
+import com.android.server.notification.NotificationRecordLogger.NotificationPullStatsEvent;
 import com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent;
 import com.android.server.notification.toast.CustomToastRecord;
 import com.android.server.notification.toast.TextToastRecord;
@@ -654,6 +661,7 @@ public class NotificationManagerService extends SystemService {
     private UsageStatsManagerInternal mUsageStatsManagerInternal;
     private TelecomManager mTelecomManager;
     private PowerManager mPowerManager;
+    private ConnectivityManager mConnectivityManager;
     private PostNotificationTrackerFactory mPostNotificationTrackerFactory;
 
     private LockPatternUtils mLockUtils;
@@ -754,6 +762,7 @@ public class NotificationManagerService extends SystemService {
 
     private int mWarnRemoteViewsSizeBytes;
     private int mStripRemoteViewsSizeBytes;
+    private String[] mDefaultUnsupportedAdjustments;
 
     @VisibleForTesting
     protected boolean mShowReviewPermissionsNotification;
@@ -774,6 +783,8 @@ public class NotificationManagerService extends SystemService {
     private AppOpsManager.OnOpChangedListener mAppOpsListener;
 
     private ModuleInfo mAdservicesModuleInfo;
+
+    private boolean mConnectedToWifi;
 
     static class Archive {
         final SparseArray<Boolean> mEnabled;
@@ -2571,6 +2582,7 @@ public class NotificationManagerService extends SystemService {
             TelecomManager telecomManager, NotificationChannelLogger channelLogger,
             SystemUiSystemPropertiesFlags.FlagResolver flagResolver,
             PermissionManager permissionManager, PowerManager powerManager,
+            ConnectivityManager connectivityManager,
             PostNotificationTrackerFactory postNotificationTrackerFactory) {
         mHandler = handler;
         Resources resources = getContext().getResources();
@@ -2603,6 +2615,8 @@ public class NotificationManagerService extends SystemService {
         mUm = userManager;
         mTelecomManager = telecomManager;
         mPowerManager = powerManager;
+        mConnectivityManager = connectivityManager;
+        registerNetworkCallback();
         mPostNotificationTrackerFactory = postNotificationTrackerFactory;
         mPlatformCompat = IPlatformCompat.Stub.asInterface(
                 ServiceManager.getService(Context.PLATFORM_COMPAT_SERVICE));
@@ -2818,6 +2832,36 @@ public class NotificationManagerService extends SystemService {
         mAppOps.startWatchingMode(AppOpsManager.OP_POST_NOTIFICATION, null, mAppOpsListener);
     }
 
+    private void registerNetworkCallback() {
+        NetworkRequest request = new NetworkRequest.Builder().addTransportType(
+                NetworkCapabilities.TRANSPORT_WIFI).build();
+        mConnectivityManager.registerNetworkCallback(request,
+                new ConnectivityManager.NetworkCallback() {
+                // Need to post to another thread, as we can't call synchronous ConnectivityManager
+                // methods from the callback itself, due to potential race conditions.
+                @Override
+                public void onAvailable(@NonNull Network network) {
+                    mHandler.post(() -> updateWifiConnectionState());
+                }
+                @Override
+                public void onLost(@NonNull Network network) {
+                    mHandler.post(() -> updateWifiConnectionState());
+                }
+            });
+        updateWifiConnectionState();
+    }
+
+    @VisibleForTesting()
+    void updateWifiConnectionState() {
+        Network current = mConnectivityManager.getActiveNetwork();
+        NetworkCapabilities capabilities = mConnectivityManager.getNetworkCapabilities(current);
+        if (current == null || capabilities == null) {
+            mConnectedToWifi = false;
+            return;
+        }
+        mConnectedToWifi = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+    }
+
     /**
      * Cleanup broadcast receivers change listeners.
      */
@@ -2856,6 +2900,7 @@ public class NotificationManagerService extends SystemService {
             mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_PREFERENCES);
             mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_CHANNEL_PREFERENCES);
             mStatsManager.clearPullAtomCallback(PACKAGE_NOTIFICATION_CHANNEL_GROUP_PREFERENCES);
+            mStatsManager.clearPullAtomCallback(NOTIFICATION_BUNDLE_PREFERENCES);
             mStatsManager.clearPullAtomCallback(DND_MODE_RULE);
         }
         if (mAppOps != null) {
@@ -2894,6 +2939,9 @@ public class NotificationManagerService extends SystemService {
         mShowReviewPermissionsNotification = getContext().getResources().getBoolean(
                 R.bool.config_notificationReviewPermissions);
 
+        mDefaultUnsupportedAdjustments = getContext().getResources().getStringArray(
+                R.array.config_notificationDefaultUnsupportedAdjustments);
+
         init(handler, new RankingHandlerWorker(mRankingThread.getLooper()),
                 AppGlobals.getPackageManager(), getContext().getPackageManager(),
                 getLocalService(LightsManager.class),
@@ -2927,6 +2975,7 @@ public class NotificationManagerService extends SystemService {
                 new NotificationChannelLoggerImpl(), SystemUiSystemPropertiesFlags.getResolver(),
                 getContext().getSystemService(PermissionManager.class),
                 getContext().getSystemService(PowerManager.class),
+                getContext().getSystemService(ConnectivityManager.class),
                 new PostNotificationTrackerFactory() {});
 
         publishBinderService(Context.NOTIFICATION_SERVICE, mService, /* allowIsolated= */ false,
@@ -2960,6 +3009,12 @@ public class NotificationManagerService extends SystemService {
                 ConcurrentUtils.DIRECT_EXECUTOR,
                 mPullAtomCallback
         );
+        mStatsManager.setPullAtomCallback(
+                NOTIFICATION_BUNDLE_PREFERENCES,
+                null, // use default PullAtomMetadata values
+                ConcurrentUtils.DIRECT_EXECUTOR,
+                mPullAtomCallback
+        );
     }
 
     private class StatsPullAtomCallbackImpl implements StatsManager.StatsPullAtomCallback {
@@ -2969,6 +3024,7 @@ public class NotificationManagerService extends SystemService {
                 case PACKAGE_NOTIFICATION_PREFERENCES:
                 case PACKAGE_NOTIFICATION_CHANNEL_PREFERENCES:
                 case PACKAGE_NOTIFICATION_CHANNEL_GROUP_PREFERENCES:
+                case NOTIFICATION_BUNDLE_PREFERENCES:
                 case DND_MODE_RULE:
                     return pullNotificationStates(atomTag, data);
                 default:
@@ -2980,14 +3036,25 @@ public class NotificationManagerService extends SystemService {
     private int pullNotificationStates(int atomTag, List<StatsEvent> data) {
         switch(atomTag) {
             case PACKAGE_NOTIFICATION_PREFERENCES:
-                mPreferencesHelper.pullPackagePreferencesStats(data,
-                        getAllUsersNotificationPermissions());
+                if (notificationClassificationUi()) {
+                    mPreferencesHelper.pullPackagePreferencesStats(data,
+                            getAllUsersNotificationPermissions(),
+                            new ArrayMap<>());
+                } else {
+                    mPreferencesHelper.pullPackagePreferencesStats(data,
+                            getAllUsersNotificationPermissions());
+                }
                 break;
             case PACKAGE_NOTIFICATION_CHANNEL_PREFERENCES:
                 mPreferencesHelper.pullPackageChannelPreferencesStats(data);
                 break;
             case PACKAGE_NOTIFICATION_CHANNEL_GROUP_PREFERENCES:
                 mPreferencesHelper.pullPackageChannelGroupPreferencesStats(data);
+                break;
+            case NOTIFICATION_BUNDLE_PREFERENCES:
+                if (notificationClassification() && notificationClassificationUi()) {
+                    mAssistants.pullBundlePreferencesStats(data);
+                }
                 break;
             case DND_MODE_RULE:
                 mZenModeHelper.pullRules(data);
@@ -4333,16 +4400,16 @@ public class NotificationManagerService extends SystemService {
 
         @Override
         @FlaggedApi(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
-        public @NonNull int[] getAllowedAdjustmentKeyTypesForPackage(String pkg) {
+        public @NonNull String[] getTypeAdjustmentDeniedPackages() {
             checkCallerIsSystemOrSystemUiOrShell();
-            return mAssistants.getAllowedAdjustmentKeyTypesForPackage(pkg);
+            return mAssistants.getTypeAdjustmentDeniedPackages();
         }
 
+        @Override
         @FlaggedApi(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
-        public void setAssistantAdjustmentKeyTypeStateForPackage(String pkg, int type,
-                                                                 boolean enabled) {
+        public void setTypeAdjustmentForPackageState(String pkg, boolean enabled) {
             checkCallerIsSystemOrSystemUiOrShell();
-            mAssistants.setAssistantAdjustmentKeyTypeStateForPackage(pkg, type, enabled);
+            mAssistants.setTypeAdjustmentForPackageState(pkg, enabled);
 
             handleSavePolicyFile();
         }
@@ -4961,6 +5028,12 @@ public class NotificationManagerService extends SystemService {
         @Override
         public ParceledListSlice<NotificationChannel> getNotificationChannels(
                 String callingPkg, String targetPkg, int userId) {
+            return getOrCreateNotificationChannels(callingPkg, targetPkg, userId, false);
+        }
+
+        @Override
+        public ParceledListSlice<NotificationChannel> getOrCreateNotificationChannels(
+                String callingPkg, String targetPkg, int userId, boolean createPrefsIfNeeded) {
             if (canNotifyAsPackage(callingPkg, targetPkg, userId)
                 || isCallingUidSystem()) {
                 int targetUid = -1;
@@ -4970,7 +5043,8 @@ public class NotificationManagerService extends SystemService {
                     /* ignore */
                 }
                 return mPreferencesHelper.getNotificationChannels(
-                        targetPkg, targetUid, false /* includeDeleted */, true);
+                        targetPkg, targetUid, false /* includeDeleted */, true,
+                        createPrefsIfNeeded);
             }
             throw new SecurityException("Pkg " + callingPkg
                     + " cannot read channels for " + targetPkg + " in " + userId);
@@ -7144,7 +7218,7 @@ public class NotificationManagerService extends SystemService {
                         toRemove.add(potentialKey);
                     } else if (notificationClassificationUi()
                             && !mAssistants.isTypeAdjustmentAllowedForPackage(
-                            r.getSbn().getPackageName(), adjustments.getInt(KEY_TYPE))) {
+                            r.getSbn().getPackageName())) {
                         toRemove.add(potentialKey);
                     }
                 }
@@ -10388,16 +10462,12 @@ public class NotificationManagerService extends SystemService {
     }
 
     private void scheduleListenerHintsChanged(int state) {
-        if (!Flags.notificationReduceMessagequeueUsage()) {
-            mHandler.removeMessages(MESSAGE_LISTENER_HINTS_CHANGED);
-        }
+        mHandler.removeMessages(MESSAGE_LISTENER_HINTS_CHANGED);
         mHandler.obtainMessage(MESSAGE_LISTENER_HINTS_CHANGED, state, 0).sendToTarget();
     }
 
     private void scheduleInterruptionFilterChanged(int listenerInterruptionFilter) {
-        if (!Flags.notificationReduceMessagequeueUsage()) {
-            mHandler.removeMessages(MESSAGE_LISTENER_NOTIFICATION_FILTER_CHANGED);
-        }
+        mHandler.removeMessages(MESSAGE_LISTENER_NOTIFICATION_FILTER_CHANGED);
         mHandler.obtainMessage(
                 MESSAGE_LISTENER_NOTIFICATION_FILTER_CHANGED,
                 listenerInterruptionFilter,
@@ -10477,14 +10547,9 @@ public class NotificationManagerService extends SystemService {
         }
 
         protected void scheduleSendRankingUpdate() {
-            if (Flags.notificationReduceMessagequeueUsage()) {
+            if (!hasMessages(MESSAGE_SEND_RANKING_UPDATE)) {
                 Message m = Message.obtain(this, MESSAGE_SEND_RANKING_UPDATE);
                 sendMessage(m);
-            } else {
-                if (!hasMessages(MESSAGE_SEND_RANKING_UPDATE)) {
-                    Message m = Message.obtain(this, MESSAGE_SEND_RANKING_UPDATE);
-                    sendMessage(m);
-                }
             }
         }
 
@@ -10493,12 +10558,8 @@ public class NotificationManagerService extends SystemService {
             if (lifetimeExtensionRefactor()) {
                 sendMessageDelayed(Message.obtain(this, cancelRunnable), delay);
             } else {
-                if (Flags.notificationReduceMessagequeueUsage()) {
+                if (!hasCallbacks(cancelRunnable)) {
                     sendMessage(Message.obtain(this, cancelRunnable));
-                } else {
-                    if (!hasCallbacks(cancelRunnable)) {
-                        sendMessage(Message.obtain(this, cancelRunnable));
-                    }
                 }
             }
         }
@@ -10533,9 +10594,7 @@ public class NotificationManagerService extends SystemService {
         }
 
         public void requestSort() {
-            if (!Flags.notificationReduceMessagequeueUsage()) {
-                removeMessages(MESSAGE_RANKING_SORT);
-            }
+            removeMessages(MESSAGE_RANKING_SORT);
             Message msg = Message.obtain();
             msg.what = MESSAGE_RANKING_SORT;
             sendMessage(msg);
@@ -11613,12 +11672,20 @@ public class NotificationManagerService extends SystemService {
                     new NotificationListenerService.Ranking();
             ArrayList<Notification.Action> smartActions = record.getSystemGeneratedSmartActions();
             ArrayList<CharSequence> smartReplies = record.getSmartReplies();
-            if (redactSensitiveNotificationsFromUntrustedListeners()
-                    && info != null
-                    && !mListeners.isUidTrusted(info.uid)
-                    && mListeners.hasSensitiveContent(record)) {
-                smartActions = null;
-                smartReplies = null;
+            boolean hasSensitiveContent = record.hasSensitiveContent();
+            if (redactSensitiveNotificationsFromUntrustedListeners()) {
+                if (!mListeners.isUidTrusted(info.uid) && mListeners.hasSensitiveContent(record)) {
+                    smartActions = null;
+                    smartReplies = null;
+                }
+                if (redactSensitiveContentNotificationsOnLockscreen()) {
+                    if (mListeners.hasSensitiveContent(record) && mConnectedToWifi
+                            && info.isSystemUi) {
+                        // We don't inform systemUI of sensitive content if
+                        // connected to wifi, though we do still redact from untrusted listeners.
+                        hasSensitiveContent = false;
+                    }
+                }
             }
             ranking.populate(
                     key,
@@ -11648,7 +11715,7 @@ public class NotificationManagerService extends SystemService {
                             : (record.getRankingScore() > 0 ?  RANKING_PROMOTED : RANKING_DEMOTED),
                     record.getNotification().isBubbleNotification(),
                     record.getProposedImportance(),
-                    record.hasSensitiveContent()
+                    hasSensitiveContent
             );
             rankings.add(ranking);
         }
@@ -11803,11 +11870,7 @@ public class NotificationManagerService extends SystemService {
         private static final String ATT_DENIED = "denied_adjustments";
         private static final String ATT_ENABLED_TYPES = "enabled_key_types";
         private static final String ATT_NAS_UNSUPPORTED = "unsupported_adjustments";
-        // Encapsulates a list of packages and the bundle types enabled for each package.
-        private static final String TAG_TYPES_ENABLED_FOR_APPS = "types_enabled_for_apps";
-        // Encapsulates the bundle types enabled for a package.
-        private static final String ATT_APP_ENABLED_TYPES = "app_enabled_types";
-        private static final String ATT_PACKAGE = "package";
+        private static final String ATT_TYPES_DENIED_APPS = "types_denied_apps";
 
         private final Object mLock = new Object();
 
@@ -11823,14 +11886,8 @@ public class NotificationManagerService extends SystemService {
         @GuardedBy("mLock")
         private Map<Integer, HashSet<String>> mNasUnsupported = new ArrayMap<>();
 
-        // Types of classifications (aka bundles) enabled/allowed for this package.
-        // If the set is NULL (or package is not in the list), default classification allow list
-        // (the global one) should be used.
-        // If the set is empty, that indicates the package explicitly has all classifications
-        // disallowed.
         @GuardedBy("mLock")
-        private Map<String, Set<Integer>> mClassificationTypePackagesEnabledTypes =
-                new ArrayMap<>();
+        private Set<String> mClassificationTypeDeniedPackages = new ArraySet<>();
 
         protected ComponentName mDefaultFromConfig = null;
 
@@ -11908,6 +11965,9 @@ public class NotificationManagerService extends SystemService {
                 }
             } else {
                 mAllowedAdjustmentKeyTypes.addAll(List.of(DEFAULT_ALLOWED_ADJUSTMENT_KEY_TYPES));
+                if (mDefaultUnsupportedAdjustments != null) {
+                    mAllowedAdjustments.removeAll(List.of(mDefaultUnsupportedAdjustments));
+                }
             }
         }
 
@@ -12031,88 +12091,41 @@ public class NotificationManagerService extends SystemService {
             }
         }
 
-        /**
-         * Returns whether the type adjustment is allowed for this particular package.
-         * If no package-specific restrictions have been set, defaults to the same value as
-         * isAdjustmentKeyTypeAllowed(type).
-         */
         @FlaggedApi(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
-        protected boolean isTypeAdjustmentAllowedForPackage(String pkg,
-                                                                     @Adjustment.Types int type) {
+        protected @NonNull boolean isTypeAdjustmentAllowedForPackage(String pkg) {
             synchronized (mLock) {
                 if (notificationClassificationUi()) {
-                    if (mClassificationTypePackagesEnabledTypes.containsKey(pkg)) {
-                        Set<Integer> enabled = mClassificationTypePackagesEnabledTypes.get(pkg);
-                        if (enabled != null) {
-                            return enabled.contains(type);
-                        }
-                    }
-                    // If mClassificationTypePackagesEnabledTypes does not contain the pkg, or
-                    // the stored set is null, return the default.
-                    return isAdjustmentKeyTypeAllowed(type);
+                    return !mClassificationTypeDeniedPackages.contains(pkg);
                 }
             }
-            return false;
+            return true;
         }
 
         @FlaggedApi(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
-        protected @NonNull int[] getAllowedAdjustmentKeyTypesForPackage(String pkg) {
+        protected @NonNull String[] getTypeAdjustmentDeniedPackages() {
             synchronized (mLock) {
                 if (notificationClassificationUi()) {
-                    if (mClassificationTypePackagesEnabledTypes.containsKey(pkg)) {
-                        Set<Integer> enabled = mClassificationTypePackagesEnabledTypes.get(pkg);
-                        if (enabled != null) {
-                            // Convert Set to int[] for return.
-                            int[] returnEnabled = new int[enabled.size()];
-                            int i = 0;
-                            for (int val: enabled) {
-                                returnEnabled[i] = val;
-                                i++;
-                            }
-                            return returnEnabled;
-                        }
-                    }
-                    // If package is not in the map, or the value is null, return the default.
-                    return getAllowedAdjustmentKeyTypes();
+                    return mClassificationTypeDeniedPackages.toArray(new String[0]);
                 }
             }
-            return new int[]{};
+            return new String[]{};
         }
 
         /**
          * Set whether a particular package can have its notification channels adjusted to have a
          * different type by NotificationAssistants.
-         * Note: once this method is called to enable or disable a specific type for a package,
-         * the global default is set as the starting point, and the type is enabled/disabled from
-         * there. Future changes to the global default will not apply automatically to this package.
          */
         @FlaggedApi(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
-        public void setAssistantAdjustmentKeyTypeStateForPackage(String pkg,
-                                                       @Adjustment.Types int type,
-                                                       boolean enabled) {
+        public void setTypeAdjustmentForPackageState(String pkg, boolean enabled) {
             if (!notificationClassificationUi()) {
                 return;
             }
             synchronized (mLock) {
-                Set<Integer> enabledTypes = null;
-                if (mClassificationTypePackagesEnabledTypes.containsKey(pkg)) {
-                    enabledTypes = mClassificationTypePackagesEnabledTypes.get(pkg);
-                }
-                if (enabledTypes == null) {
-                    // Use global default to start.
-                    enabledTypes = new ArraySet<Integer>();
-                    // Convert from int[] to Set<Integer>
-                    for (int value : getAllowedAdjustmentKeyTypes()) {
-                        enabledTypes.add(value);
-                    }
-                }
-
                 if (enabled) {
-                    enabledTypes.add(type);
+                    mClassificationTypeDeniedPackages.remove(pkg);
                 } else {
-                    enabledTypes.remove(type);
+                    mClassificationTypeDeniedPackages.add(pkg);
                 }
-                mClassificationTypePackagesEnabledTypes.put(pkg, enabledTypes);
             }
         }
 
@@ -12579,25 +12592,16 @@ public class NotificationManagerService extends SystemService {
                         TextUtils.join(",", mAllowedAdjustmentKeyTypes));
                 out.endTag(null, ATT_ENABLED_TYPES);
                 if (notificationClassificationUi()) {
-                    out.startTag(null, TAG_TYPES_ENABLED_FOR_APPS);
-                    for (String pkg: mClassificationTypePackagesEnabledTypes.keySet()) {
-                        Set<Integer> allowedTypes =
-                                mClassificationTypePackagesEnabledTypes.get(pkg);
-                        if (allowedTypes != null) {
-                            out.startTag(null, ATT_APP_ENABLED_TYPES);
-                            out.attribute(null, ATT_PACKAGE, pkg);
-                            out.attribute(null, ATT_TYPES, TextUtils.join(",", allowedTypes));
-                            out.endTag(null, ATT_APP_ENABLED_TYPES);
-                        }
-                    }
-                    out.endTag(null, TAG_TYPES_ENABLED_FOR_APPS);
+                    out.startTag(null, ATT_TYPES_DENIED_APPS);
+                    out.attribute(null, ATT_TYPES,
+                            TextUtils.join(",", mClassificationTypeDeniedPackages));
+                    out.endTag(null, ATT_TYPES_DENIED_APPS);
                 }
             }
         }
 
         @Override
-        protected void readExtraTag(String tag, TypedXmlPullParser parser) throws IOException,
-                XmlPullParserException {
+        protected void readExtraTag(String tag, TypedXmlPullParser parser) throws IOException {
             if (!notificationClassification()) {
                 return;
             }
@@ -12624,25 +12628,12 @@ public class NotificationManagerService extends SystemService {
                         }
                     }
                 }
-            } else if (TAG_TYPES_ENABLED_FOR_APPS.equals(tag)) {
-                final int appsOuterDepth = parser.getDepth();
+            } else if (notificationClassificationUi() && ATT_TYPES_DENIED_APPS.equals(tag)) {
+                final String apps = XmlUtils.readStringAttribute(parser, ATT_TYPES);
                 synchronized (mLock) {
-                    mClassificationTypePackagesEnabledTypes.clear();
-                    while (XmlUtils.nextElementWithin(parser, appsOuterDepth)) {
-                        if (!ATT_APP_ENABLED_TYPES.equals(parser.getName())) {
-                            continue;
-                        }
-                        final String app = XmlUtils.readStringAttribute(parser, ATT_PACKAGE);
-                        Set<Integer> allowedTypes = new ArraySet<>();
-                        final String typesString = XmlUtils.readStringAttribute(parser, ATT_TYPES);
-                        if (!TextUtils.isEmpty(typesString)) {
-                            allowedTypes = Arrays.stream(typesString.split(","))
-                                    .map(Integer::valueOf)
-                                    .collect(Collectors.toSet());
-                        }
-                        // Empty type list is allowed, because empty type list signifies the user
-                        // has manually cleared the package of allowed types.
-                        mClassificationTypePackagesEnabledTypes.put(app, allowedTypes);
+                    mClassificationTypeDeniedPackages.clear();
+                    if (!TextUtils.isEmpty(apps)) {
+                        mClassificationTypeDeniedPackages.addAll(Arrays.asList(apps.split(",")));
                     }
                 }
             }
@@ -12655,6 +12646,32 @@ public class NotificationManagerService extends SystemService {
             } catch (RemoteException ex) {
                 Slog.e(TAG, "unable to notify assistant (capabilities): " + info, ex);
             }
+        }
+
+        /**
+         * Fills out {@link BundlePreferences} proto and wraps it in a {@link StatsEvent}.
+         */
+        @FlaggedApi(android.service.notification.Flags.FLAG_NOTIFICATION_CLASSIFICATION)
+        protected void pullBundlePreferencesStats(List<StatsEvent> events) {
+            boolean bundlesAllowed = true;
+            synchronized (mLock) {
+                List<String> unsupportedAdjustments = new ArrayList(
+                        mNasUnsupported.getOrDefault(
+                                UserHandle.getUserId(Binder.getCallingUid()),
+                                new HashSet<>())
+                );
+                bundlesAllowed = !unsupportedAdjustments.contains(Adjustment.KEY_TYPE);
+            }
+
+            int[] allowedBundleTypes = getAllowedAdjustmentKeyTypes();
+
+            events.add(FrameworkStatsLog.buildStatsEvent(
+                    NOTIFICATION_BUNDLE_PREFERENCES,
+                    /* optional int32 event_id = 1 */
+                    NotificationPullStatsEvent.NOTIFICATION_BUNDLE_PREFERENCES_PULLED.getId(),
+                    /* optional bool bundles_allowed = 2 */ bundlesAllowed,
+                    /* repeated android.stats.notification.BundleTypes allowed_bundle_types = 3 */
+                    allowedBundleTypes));
         }
     }
 

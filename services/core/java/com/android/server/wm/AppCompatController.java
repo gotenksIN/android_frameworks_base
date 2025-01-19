@@ -31,40 +31,40 @@ class AppCompatController {
     @NonNull
     private final AppCompatOrientationPolicy mOrientationPolicy;
     @NonNull
-    private final AppCompatAspectRatioPolicy mAppCompatAspectRatioPolicy;
+    private final AppCompatAspectRatioPolicy mAspectRatioPolicy;
     @NonNull
     private final AppCompatReachabilityPolicy mReachabilityPolicy;
     @NonNull
-    private final DesktopAppCompatAspectRatioPolicy mDesktopAppCompatAspectRatioPolicy;
+    private final DesktopAppCompatAspectRatioPolicy mDesktopAspectRatioPolicy;
     @NonNull
     private final AppCompatOverrides mAppCompatOverrides;
     @NonNull
-    private final AppCompatDeviceStateQuery mAppCompatDeviceStateQuery;
+    private final AppCompatDeviceStateQuery mDeviceStateQuery;
     @NonNull
     private final AppCompatLetterboxPolicy mAppCompatLetterboxPolicy;
     @NonNull
-    private final AppCompatSizeCompatModePolicy mAppCompatSizeCompatModePolicy;
+    private final AppCompatSizeCompatModePolicy mSizeCompatModePolicy;
 
     AppCompatController(@NonNull WindowManagerService wmService,
                         @NonNull ActivityRecord activityRecord) {
         final PackageManager packageManager = wmService.mContext.getPackageManager();
         final OptPropFactory optPropBuilder = new OptPropFactory(packageManager,
                 activityRecord.packageName);
-        mAppCompatDeviceStateQuery = new AppCompatDeviceStateQuery(activityRecord);
+        mDeviceStateQuery = new AppCompatDeviceStateQuery(activityRecord);
         mTransparentPolicy = new TransparentPolicy(activityRecord,
                 wmService.mAppCompatConfiguration);
         mAppCompatOverrides = new AppCompatOverrides(activityRecord, packageManager,
-                wmService.mAppCompatConfiguration, optPropBuilder, mAppCompatDeviceStateQuery);
+                wmService.mAppCompatConfiguration, optPropBuilder, mDeviceStateQuery);
         mOrientationPolicy = new AppCompatOrientationPolicy(activityRecord, mAppCompatOverrides);
-        mAppCompatAspectRatioPolicy = new AppCompatAspectRatioPolicy(activityRecord,
+        mAspectRatioPolicy = new AppCompatAspectRatioPolicy(activityRecord,
                 mTransparentPolicy, mAppCompatOverrides);
         mReachabilityPolicy = new AppCompatReachabilityPolicy(activityRecord,
                 wmService.mAppCompatConfiguration);
         mAppCompatLetterboxPolicy = new AppCompatLetterboxPolicy(activityRecord,
                 wmService.mAppCompatConfiguration);
-        mDesktopAppCompatAspectRatioPolicy = new DesktopAppCompatAspectRatioPolicy(activityRecord,
+        mDesktopAspectRatioPolicy = new DesktopAppCompatAspectRatioPolicy(activityRecord,
                 mAppCompatOverrides, mTransparentPolicy, wmService.mAppCompatConfiguration);
-        mAppCompatSizeCompatModePolicy = new AppCompatSizeCompatModePolicy(activityRecord,
+        mSizeCompatModePolicy = new AppCompatSizeCompatModePolicy(activityRecord,
                 mAppCompatOverrides);
     }
 
@@ -79,13 +79,13 @@ class AppCompatController {
     }
 
     @NonNull
-    AppCompatAspectRatioPolicy getAppCompatAspectRatioPolicy() {
-        return mAppCompatAspectRatioPolicy;
+    AppCompatAspectRatioPolicy getAspectRatioPolicy() {
+        return mAspectRatioPolicy;
     }
 
     @NonNull
-    DesktopAppCompatAspectRatioPolicy getDesktopAppCompatAspectRatioPolicy() {
-        return mDesktopAppCompatAspectRatioPolicy;
+    DesktopAppCompatAspectRatioPolicy getDesktopAspectRatioPolicy() {
+        return mDesktopAspectRatioPolicy;
     }
 
     @NonNull
@@ -99,8 +99,8 @@ class AppCompatController {
     }
 
     @NonNull
-    AppCompatAspectRatioOverrides getAppCompatAspectRatioOverrides() {
-        return mAppCompatOverrides.getAppCompatAspectRatioOverrides();
+    AppCompatAspectRatioOverrides getAspectRatioOverrides() {
+        return mAppCompatOverrides.getAspectRatioOverrides();
     }
 
     @NonNull
@@ -119,8 +119,8 @@ class AppCompatController {
     }
 
     @NonNull
-    AppCompatFocusOverrides getAppCompatFocusOverrides() {
-        return mAppCompatOverrides.getAppCompatFocusOverrides();
+    AppCompatFocusOverrides getFocusOverrides() {
+        return mAppCompatOverrides.getFocusOverrides();
     }
 
     @NonNull
@@ -129,8 +129,8 @@ class AppCompatController {
     }
 
     @NonNull
-    AppCompatDeviceStateQuery getAppCompatDeviceStateQuery() {
-        return mAppCompatDeviceStateQuery;
+    AppCompatDeviceStateQuery getDeviceStateQuery() {
+        return mDeviceStateQuery;
     }
 
     @NonNull
@@ -139,14 +139,14 @@ class AppCompatController {
     }
 
     @NonNull
-    AppCompatSizeCompatModePolicy getAppCompatSizeCompatModePolicy() {
-        return mAppCompatSizeCompatModePolicy;
+    AppCompatSizeCompatModePolicy getSizeCompatModePolicy() {
+        return mSizeCompatModePolicy;
     }
 
     void dump(@NonNull PrintWriter pw, @NonNull String prefix) {
         getTransparentPolicy().dump(pw, prefix);
         getAppCompatLetterboxPolicy().dump(pw, prefix);
-        getAppCompatSizeCompatModePolicy().dump(pw, prefix);
+        getSizeCompatModePolicy().dump(pw, prefix);
     }
 
 }

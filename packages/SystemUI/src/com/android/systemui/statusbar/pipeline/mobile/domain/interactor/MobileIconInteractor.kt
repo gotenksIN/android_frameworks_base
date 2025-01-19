@@ -197,7 +197,7 @@ class MobileIconInteractorImpl(
     override val showVolteIcon: StateFlow<Boolean>,
     override val showVowifiIcon: StateFlow<Boolean>,
     private val context: Context,
-    private val defaultDataSubId: StateFlow<Int>,
+    private val defaultDataSubId: StateFlow<Int?>,
     ddsIcon: StateFlow<SignalIconModel?>,
     crossSimdisplaySingnalLevel: StateFlow<Boolean>,
     carrierNameCustomization: CarrierNameCustomization,

@@ -154,16 +154,6 @@ class MobileConnectionRepositoryImpl(
                     "Found ${telephonyManager.subscriptionId} instead."
             )
         }
-        slotIndexForSubId?.let { slotIndex ->
-            scope.launch { slotIndex.collect {
-                logger.logSlotIndex(it, subId)
-                if (SubscriptionManager.isValidSlotIndex(it)) {
-                    registerImsCallbackIfNeeded()
-                } else {
-                    unRegisterImsCallbackIfNeeded()
-                }
-            }}
-        }
     }
     private val tag: String = MobileConnectionRepositoryImpl::class.java.simpleName
     private val imsMmTelManager: ImsMmTelManager = ImsMmTelManager.createForSubscriptionId(subId)
@@ -725,10 +715,10 @@ class MobileConnectionRepositoryImpl(
         }
         capabilityCallback = null
         registrationCallback = null
-        imsRegistered.value = false
-        imsRegistrationTech.value = REGISTRATION_TECH_NONE
-        voiceCapable.value = false
-        videoCapable.value = false
+        imsRegistered?.value = false
+        imsRegistrationTech?.value = REGISTRATION_TECH_NONE
+        voiceCapable?.value = false
+        videoCapable?.value = false
     }
 
     override val voiceCapable: MutableStateFlow<Boolean> =
@@ -742,6 +732,19 @@ class MobileConnectionRepositoryImpl(
 
     override val imsRegistrationTech: MutableStateFlow<Int> =
         MutableStateFlow<Int>(REGISTRATION_TECH_NONE)
+
+    init {
+        slotIndexForSubId?.let { slotIndex ->
+            scope.launch { slotIndex.collect {
+                logger.logSlotIndex(it, subId)
+                if (SubscriptionManager.isValidSlotIndex(it)) {
+                    registerImsCallbackIfNeeded()
+                } else {
+                    unRegisterImsCallbackIfNeeded()
+                }
+            }}
+        }
+    }
 
     override val ciwlanAvailable: StateFlow<Boolean> =
         fiveGState

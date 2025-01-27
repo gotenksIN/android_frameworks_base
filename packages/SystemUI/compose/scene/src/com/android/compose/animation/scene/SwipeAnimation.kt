@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android.compose.animation.scene
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.core.calculateTargetValue
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -39,6 +44,7 @@ internal fun createSwipeAnimation(
     orientation: Orientation,
     distance: Float,
     gestureContext: MutableDragOffsetGestureContext,
+    decayAnimationSpec: DecayAnimationSpec<Float>,
 ): SwipeAnimation<*> {
     return createSwipeAnimation(
         layoutState,
@@ -50,6 +56,7 @@ internal fun createSwipeAnimation(
             error("Computing contentForUserActions requires a SceneTransitionLayoutImpl")
         },
         gestureContext = gestureContext,
+        decayAnimationSpec = decayAnimationSpec,
     )
 }
 
@@ -59,6 +66,7 @@ internal fun createSwipeAnimation(
     isUpOrLeft: Boolean,
     orientation: Orientation,
     gestureContext: MutableDragOffsetGestureContext,
+    decayAnimationSpec: DecayAnimationSpec<Float>,
     distance: Float = DistanceUnspecified,
 ): SwipeAnimation<*> {
     var lastDistance = distance
@@ -103,6 +111,7 @@ internal fun createSwipeAnimation(
         distance = ::distance,
         contentForUserActions = { layoutImpl.contentForUserActions().key },
         gestureContext = gestureContext,
+        decayAnimationSpec = decayAnimationSpec,
     )
 }
 
@@ -114,6 +123,7 @@ private fun createSwipeAnimation(
     distance: (SwipeAnimation<*>) -> Float,
     contentForUserActions: () -> ContentKey,
     gestureContext: MutableDragOffsetGestureContext,
+    decayAnimationSpec: DecayAnimationSpec<Float>,
 ): SwipeAnimation<*> {
     fun <T : ContentKey> swipeAnimation(fromContent: T, toContent: T): SwipeAnimation<T> {
         return SwipeAnimation(
@@ -125,6 +135,7 @@ private fun createSwipeAnimation(
             requiresFullDistanceSwipe = result.requiresFullDistanceSwipe,
             distance = distance,
             gestureContext = gestureContext,
+            decayAnimationSpec = decayAnimationSpec,
         )
     }
 
@@ -198,6 +209,7 @@ internal class SwipeAnimation<T : ContentKey>(
     private val distance: (SwipeAnimation<T>) -> Float,
     currentContent: T = fromContent,
     private val gestureContext: MutableDragOffsetGestureContext,
+    private val decayAnimationSpec: DecayAnimationSpec<Float>,
 ) : MutableDragOffsetGestureContext by gestureContext {
     /** The [TransitionState.Transition] whose implementation delegates to this [SwipeAnimation]. */
     lateinit var contentTransition: TransitionState.Transition
@@ -364,23 +376,10 @@ internal class SwipeAnimation<T : ContentKey>(
 
         check(isAnimatingOffset())
 
-        val motionSpatialSpec =
-            spec
-                ?: contentTransition.transformationSpec.motionSpatialSpec
-                ?: layoutState.transitions.defaultMotionSpatialSpec
-
         val velocityConsumed = CompletableDeferred<Float>()
         offsetAnimationRunnable.complete {
-            val result =
-                animatable.animateTo(
-                    targetValue = targetOffset,
-                    animationSpec = motionSpatialSpec,
-                    initialVelocity = initialVelocity,
-                )
-
-            // We are no longer able to consume the velocity, the rest can be consumed by another
-            // component in the hierarchy.
-            velocityConsumed.complete(initialVelocity - result.endState.velocity)
+            val consumed = animateOffset(animatable, targetOffset, initialVelocity, spec)
+            velocityConsumed.complete(consumed)
 
             // Wait for overscroll to finish so that the transition is removed from the STLState
             // only after the overscroll is done, to avoid dropping frame right when the user lifts
@@ -389,6 +388,53 @@ internal class SwipeAnimation<T : ContentKey>(
         }
 
         return velocityConsumed.await()
+    }
+
+    private suspend fun animateOffset(
+        animatable: Animatable<Float, AnimationVector1D>,
+        targetOffset: Float,
+        initialVelocity: Float,
+        spec: AnimationSpec<Float>?,
+    ): Float {
+        val initialOffset = animatable.value
+        val decayOffset =
+            decayAnimationSpec.calculateTargetValue(
+                initialVelocity = initialVelocity,
+                initialValue = initialOffset,
+            )
+
+        val willDecayReachBounds =
+            when {
+                targetOffset > initialOffset -> decayOffset >= targetOffset
+                targetOffset < initialOffset -> decayOffset <= targetOffset
+                else -> true
+            }
+
+        if (willDecayReachBounds) {
+            val result = animatable.animateDecay(initialVelocity, decayAnimationSpec)
+            check(animatable.value == targetOffset) {
+                buildString {
+                    appendLine(
+                        "animatable.value = ${animatable.value} != $targetOffset = targetOffset"
+                    )
+                    appendLine("  initialOffset=$initialOffset")
+                    appendLine("  targetOffset=$targetOffset")
+                    appendLine("  initialVelocity=$initialVelocity")
+                    appendLine("  decayOffset=$decayOffset")
+                }
+            }
+            return initialVelocity - result.endState.velocity
+        }
+
+        val motionSpatialSpec = spec ?: layoutState.motionScheme.defaultSpatialSpec()
+        animatable.animateTo(
+            targetValue = targetOffset,
+            animationSpec = motionSpatialSpec,
+            initialVelocity = initialVelocity,
+        )
+
+        // We consumed the whole velocity.
+        return initialVelocity
     }
 
     private fun canChangeContent(targetContent: ContentKey): Boolean {

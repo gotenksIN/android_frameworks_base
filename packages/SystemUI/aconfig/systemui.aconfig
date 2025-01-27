@@ -176,13 +176,6 @@ flag {
 }
 
 flag {
-    name: "notifications_dismiss_pruned_summaries"
-    namespace: "systemui"
-    description: "NotifCollection.dismissNotifications will now dismiss summaries that are pruned from the shade."
-    bug: "355967751"
-}
-
-flag {
    name: "notification_transparent_header_fix"
    namespace: "systemui"
    description: "fix the transparent group header issue for async header inflation."
@@ -190,6 +183,16 @@ flag {
    metadata {
         purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+    name: "notifications_pinned_hun_in_shade"
+    namespace: "systemui"
+    description: "Fixes displaying pinned HUNs in the Shade, making sure that their y and z positions are correct."
+    bug: "385041854"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -528,6 +531,16 @@ flag {
    namespace: "systemui"
    description: "Change the bouncer message to be a 2-line more descriptive message"
    bug: "236891644"
+}
+
+flag {
+    name: "indication_text_a11y_fix"
+    namespace: "systemui"
+    description: "add double shadow to the indication text at the bottom of the lock screen"
+    bug: "349297241"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1776,7 +1789,14 @@ flag {
 flag {
     name: "bouncer_ui_revamp"
     namespace: "systemui"
-    description: "Updates to background (blur), button animations and font changes."
+    description: "Updates to background (blur) for bouncer"
+    bug: "370555003"
+}
+
+flag {
+    name: "bouncer_ui_revamp_2"
+    namespace: "systemui"
+    description: "Updates to button animations and font changes for bouncer, bouncer_ui_revamp will cover only the blur changes."
     bug: "376491880"
 }
 
@@ -1832,6 +1852,13 @@ flag {
 }
 
 flag {
+    name: "double_tap_to_sleep"
+    namespace: "systemui"
+    description: "Enable Double Tap to Sleep"
+    bug: "385194612"
+}
+
+flag{
     name: "gsf_bouncer"
     namespace: "systemui"
     description: "Applies GSF font styles to Bouncer surfaces."
@@ -1843,13 +1870,6 @@ flag {
     namespace: "systemui"
     description: "Applies GSF font styles to Quick Settings surfaces."
     bug: "379364381"
-}
-
-flag {
-    name: "glanceable_hub_shortcut_button"
-    namespace: "systemui"
-    description: "Adds a shortcut button to lockscreen to show glanceable hub."
-    bug: "378173531"
 }
 
 flag {
@@ -1939,4 +1959,28 @@ flag {
    metadata {
         purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+    name: "ui_rich_ongoing_force_expanded"
+    namespace: "systemui"
+    description: "Force promoted notifications to always be expanded"
+    bug: "380901479"
+}
+
+flag {
+    name: "aod_ui_rich_ongoing"
+    namespace: "systemui"
+    description: "Show a rich ongoing notification on the always-on display (depends on ui_rich_ongoing)"
+    bug: "369151941"
+}
+
+flag {
+    name: "stabilize_heads_up_group_v2"
+    namespace: "systemui"
+    description: "Stabilize heads up groups in VisualStabilityCoordinator"
+    bug: "357753857"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

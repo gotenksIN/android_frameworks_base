@@ -24,6 +24,7 @@ import static android.media.quality.AmbientBacklightEvent.AMBIENT_BACKLIGHT_EVEN
 import android.annotation.NonNull;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -51,6 +52,7 @@ import android.media.quality.SoundProfile;
 import android.media.quality.SoundProfileHandle;
 import android.os.Binder;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.IBinder;
 import android.os.PersistableBundle;
 import android.os.RemoteCallbackList;
@@ -69,6 +71,9 @@ import com.android.server.utils.Slogf;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -88,6 +93,10 @@ public class MediaQualityService extends SystemService {
 
     private static final boolean DEBUG = false;
     private static final String TAG = "MediaQualityService";
+    private static final String ALLOWLIST = "allowlist";
+    private static final String PICTURE_PROFILE_PREFERENCE = "picture_profile_preference";
+    private static final String SOUND_PROFILE_PREFERENCE = "sound_profile_preference";
+    private static final String COMMA_DELIMITER = ",";
     private static final int MAX_UUID_GENERATION_ATTEMPTS = 10;
     private final Context mContext;
     private final MediaQualityDbHelper mMediaQualityDbHelper;
@@ -98,6 +107,8 @@ public class MediaQualityService extends SystemService {
     private final Map<String, AmbientBacklightCallbackRecord> mCallbackRecords = new HashMap<>();
     private final PackageManager mPackageManager;
     private final SparseArray<UserState> mUserStates = new SparseArray<>();
+    private SharedPreferences mPictureProfileSharedPreference;
+    private SharedPreferences mSoundProfileSharedPreference;
 
     public MediaQualityService(Context context) {
         super(context);
@@ -109,6 +120,19 @@ public class MediaQualityService extends SystemService {
         mMediaQualityDbHelper = new MediaQualityDbHelper(mContext);
         mMediaQualityDbHelper.setWriteAheadLoggingEnabled(true);
         mMediaQualityDbHelper.setIdleConnectionTimeout(30);
+
+        // The package info in the context isn't initialized in the way it is for normal apps,
+        // so the standard, name-based context.getSharedPreferences doesn't work. Instead, we
+        // build the path manually below using the same policy that appears in ContextImpl.
+        final Context deviceContext = mContext.createDeviceProtectedStorageContext();
+        final File pictureProfilePrefs = new File(Environment.getDataSystemDirectory(),
+                PICTURE_PROFILE_PREFERENCE);
+        mPictureProfileSharedPreference = deviceContext.getSharedPreferences(
+                pictureProfilePrefs, Context.MODE_PRIVATE);
+        final File soundProfilePrefs = new File(Environment.getDataSystemDirectory(),
+                SOUND_PROFILE_PREFERENCE);
+        mSoundProfileSharedPreference = deviceContext.getSharedPreferences(
+                soundProfilePrefs, Context.MODE_PRIVATE);
     }
 
     @Override
@@ -1045,35 +1069,37 @@ public class MediaQualityService extends SystemService {
             }
         }
 
-        enum Mode {
-            ADD,
-            UPDATE,
-            REMOVE,
-            ERROR
+        /** @hide */
+        @Retention(RetentionPolicy.SOURCE)
+        private @interface ProfileModes {
+            int ADD = 1;
+            int UPDATE = 2;
+            int REMOVE = 3;
+            int ERROR = 4;
         }
 
         private void notifyOnPictureProfileAdded(String profileId, PictureProfile profile,
                 int uid, int pid) {
-            notifyPictureProfileHelper(Mode.ADD, profileId, profile, null, uid, pid);
+            notifyPictureProfileHelper(ProfileModes.ADD, profileId, profile, null, uid, pid);
         }
 
         private void notifyOnPictureProfileUpdated(String profileId, PictureProfile profile,
                 int uid, int pid) {
-            notifyPictureProfileHelper(Mode.UPDATE, profileId, profile, null, uid, pid);
+            notifyPictureProfileHelper(ProfileModes.UPDATE, profileId, profile, null, uid, pid);
         }
 
         private void notifyOnPictureProfileRemoved(String profileId, PictureProfile profile,
                 int uid, int pid) {
-            notifyPictureProfileHelper(Mode.REMOVE, profileId, profile, null, uid, pid);
+            notifyPictureProfileHelper(ProfileModes.REMOVE, profileId, profile, null, uid, pid);
         }
 
         private void notifyOnPictureProfileError(String profileId, int errorCode,
                 int uid, int pid) {
-            notifyPictureProfileHelper(Mode.ERROR, profileId, null, errorCode, uid, pid);
+            notifyPictureProfileHelper(ProfileModes.ERROR, profileId, null, errorCode, uid, pid);
         }
 
-        private void notifyPictureProfileHelper(Mode mode, String profileId, PictureProfile profile,
-                Integer errorCode, int uid, int pid) {
+        private void notifyPictureProfileHelper(int mode, String profileId,
+                PictureProfile profile, Integer errorCode, int uid, int pid) {
             UserState userState = getOrCreateUserStateLocked(UserHandle.USER_SYSTEM);
             int n = userState.mPictureProfileCallbacks.beginBroadcast();
 
@@ -1085,28 +1111,28 @@ public class MediaQualityService extends SystemService {
                             .get(callback);
 
                     if (pidUid.first == pid && pidUid.second == uid) {
-                        if (mode == Mode.ADD) {
+                        if (mode == ProfileModes.ADD) {
                             userState.mPictureProfileCallbacks.getBroadcastItem(i)
                                     .onPictureProfileAdded(profileId, profile);
-                        } else if (mode == Mode.UPDATE) {
+                        } else if (mode == ProfileModes.UPDATE) {
                             userState.mPictureProfileCallbacks.getBroadcastItem(i)
                                     .onPictureProfileUpdated(profileId, profile);
-                        } else if (mode == Mode.REMOVE) {
+                        } else if (mode == ProfileModes.REMOVE) {
                             userState.mPictureProfileCallbacks.getBroadcastItem(i)
                                     .onPictureProfileRemoved(profileId, profile);
-                        } else if (mode == Mode.ERROR) {
+                        } else if (mode == ProfileModes.ERROR) {
                             userState.mPictureProfileCallbacks.getBroadcastItem(i)
                                     .onError(profileId, errorCode);
                         }
                     }
                 } catch (RemoteException e) {
-                    if (mode == Mode.ADD) {
+                    if (mode == ProfileModes.ADD) {
                         Slog.e(TAG, "Failed to report added picture profile to callback", e);
-                    } else if (mode == Mode.UPDATE) {
+                    } else if (mode == ProfileModes.UPDATE) {
                         Slog.e(TAG, "Failed to report updated picture profile to callback", e);
-                    } else if (mode == Mode.REMOVE) {
+                    } else if (mode == ProfileModes.REMOVE) {
                         Slog.e(TAG, "Failed to report removed picture profile to callback", e);
-                    } else if (mode == Mode.ERROR) {
+                    } else if (mode == ProfileModes.ERROR) {
                         Slog.e(TAG, "Failed to report picture profile error to callback", e);
                     }
                 }
@@ -1116,25 +1142,25 @@ public class MediaQualityService extends SystemService {
 
         private void notifyOnSoundProfileAdded(String profileId, SoundProfile profile,
                 int uid, int pid) {
-            notifySoundProfileHelper(Mode.ADD, profileId, profile, null, uid, pid);
+            notifySoundProfileHelper(ProfileModes.ADD, profileId, profile, null, uid, pid);
         }
 
         private void notifyOnSoundProfileUpdated(String profileId, SoundProfile profile,
                 int uid, int pid) {
-            notifySoundProfileHelper(Mode.UPDATE, profileId, profile, null, uid, pid);
+            notifySoundProfileHelper(ProfileModes.UPDATE, profileId, profile, null, uid, pid);
         }
 
         private void notifyOnSoundProfileRemoved(String profileId, SoundProfile profile,
                 int uid, int pid) {
-            notifySoundProfileHelper(Mode.REMOVE, profileId, profile, null, uid, pid);
+            notifySoundProfileHelper(ProfileModes.REMOVE, profileId, profile, null, uid, pid);
         }
 
         private void notifyOnSoundProfileError(String profileId, int errorCode, int uid, int pid) {
-            notifySoundProfileHelper(Mode.ERROR, profileId, null, errorCode, uid, pid);
+            notifySoundProfileHelper(ProfileModes.ERROR, profileId, null, errorCode, uid, pid);
         }
 
-        private void notifySoundProfileHelper(Mode mode, String profileId, SoundProfile profile,
-                Integer errorCode, int uid, int pid) {
+        private void notifySoundProfileHelper(int mode, String profileId,
+                SoundProfile profile, Integer errorCode, int uid, int pid) {
             UserState userState = getOrCreateUserStateLocked(UserHandle.USER_SYSTEM);
             int n = userState.mSoundProfileCallbacks.beginBroadcast();
 
@@ -1146,28 +1172,28 @@ public class MediaQualityService extends SystemService {
                             .get(callback);
 
                     if (pidUid.first == pid && pidUid.second == uid) {
-                        if (mode == Mode.ADD) {
+                        if (mode == ProfileModes.ADD) {
                             userState.mSoundProfileCallbacks.getBroadcastItem(i)
                                     .onSoundProfileAdded(profileId, profile);
-                        } else if (mode == Mode.UPDATE) {
+                        } else if (mode == ProfileModes.UPDATE) {
                             userState.mSoundProfileCallbacks.getBroadcastItem(i)
                                     .onSoundProfileUpdated(profileId, profile);
-                        } else if (mode == Mode.REMOVE) {
+                        } else if (mode == ProfileModes.REMOVE) {
                             userState.mSoundProfileCallbacks.getBroadcastItem(i)
                                     .onSoundProfileRemoved(profileId, profile);
-                        } else if (mode == Mode.ERROR) {
+                        } else if (mode == ProfileModes.ERROR) {
                             userState.mSoundProfileCallbacks.getBroadcastItem(i)
                                     .onError(profileId, errorCode);
                         }
                     }
                 } catch (RemoteException e) {
-                    if (mode == Mode.ADD) {
+                    if (mode == ProfileModes.ADD) {
                         Slog.e(TAG, "Failed to report added sound profile to callback", e);
-                    } else if (mode == Mode.UPDATE) {
+                    } else if (mode == ProfileModes.UPDATE) {
                         Slog.e(TAG, "Failed to report updated sound profile to callback", e);
-                    } else if (mode == Mode.REMOVE) {
+                    } else if (mode == ProfileModes.REMOVE) {
                         Slog.e(TAG, "Failed to report removed sound profile to callback", e);
-                    } else if (mode == Mode.ERROR) {
+                    } else if (mode == ProfileModes.ERROR) {
                         Slog.e(TAG, "Failed to report sound profile error to callback", e);
                     }
                 }
@@ -1291,6 +1317,11 @@ public class MediaQualityService extends SystemService {
                 notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
+            String allowlist = mPictureProfileSharedPreference.getString(ALLOWLIST, null);
+            if (allowlist != null) {
+                String[] stringArray = allowlist.split(COMMA_DELIMITER);
+                return new ArrayList<>(Arrays.asList(stringArray));
+            }
             return new ArrayList<>();
         }
 
@@ -1300,6 +1331,9 @@ public class MediaQualityService extends SystemService {
                 notifyOnPictureProfileError(null, PictureProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
+            SharedPreferences.Editor editor = mPictureProfileSharedPreference.edit();
+            editor.putString(ALLOWLIST, String.join(COMMA_DELIMITER, packages));
+            editor.commit();
         }
 
         @Override
@@ -1307,6 +1341,11 @@ public class MediaQualityService extends SystemService {
             if (!hasGlobalSoundQualityServicePermission()) {
                 notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
+            }
+            String allowlist = mSoundProfileSharedPreference.getString(ALLOWLIST, null);
+            if (allowlist != null) {
+                String[] stringArray = allowlist.split(COMMA_DELIMITER);
+                return new ArrayList<>(Arrays.asList(stringArray));
             }
             return new ArrayList<>();
         }
@@ -1317,6 +1356,9 @@ public class MediaQualityService extends SystemService {
                 notifyOnSoundProfileError(null, SoundProfile.ERROR_NO_PERMISSION,
                         Binder.getCallingUid(), Binder.getCallingPid());
             }
+            SharedPreferences.Editor editor = mSoundProfileSharedPreference.edit();
+            editor.putString(ALLOWLIST, String.join(COMMA_DELIMITER, packages));
+            editor.commit();
         }
 
         @Override
@@ -1347,7 +1389,7 @@ public class MediaQualityService extends SystemService {
             try {
                 if (mMediaQuality != null) {
                     if (mMediaQuality.isAutoPqSupported()) {
-                        mMediaQuality.getAutoPqEnabled();
+                        return mMediaQuality.getAutoPqEnabled();
                     }
                 }
             } catch (RemoteException e) {
@@ -1379,7 +1421,7 @@ public class MediaQualityService extends SystemService {
             try {
                 if (mMediaQuality != null) {
                     if (mMediaQuality.isAutoSrSupported()) {
-                        mMediaQuality.getAutoSrEnabled();
+                        return mMediaQuality.getAutoSrEnabled();
                     }
                 }
             } catch (RemoteException e) {
@@ -1411,7 +1453,7 @@ public class MediaQualityService extends SystemService {
             try {
                 if (mMediaQuality != null) {
                     if (mMediaQuality.isAutoAqSupported()) {
-                        mMediaQuality.getAutoAqEnabled();
+                        return mMediaQuality.getAutoAqEnabled();
                     }
                 }
             } catch (RemoteException e) {

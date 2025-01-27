@@ -17,6 +17,8 @@
 package com.android.compose.animation.scene
 
 import androidx.annotation.VisibleForTesting
+import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.foundation.OverscrollFactory
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -45,9 +47,12 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.util.fastAny
+import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachReversed
 import androidx.compose.ui.zIndex
+import com.android.compose.animation.scene.UserActionResult.ShowOverlay.HideCurrentOverlays
 import com.android.compose.animation.scene.content.Content
 import com.android.compose.animation.scene.content.Overlay
 import com.android.compose.animation.scene.content.Scene
@@ -78,7 +83,8 @@ internal class SceneTransitionLayoutImpl(
     internal var swipeSourceDetector: SwipeSourceDetector,
     internal var swipeDetector: SwipeDetector,
     internal var transitionInterceptionThreshold: Float,
-    builder: SceneTransitionLayoutScope.() -> Unit,
+    internal var decayAnimationSpec: DecayAnimationSpec<Float>,
+    builder: SceneTransitionLayoutScope<InternalContentScope>.() -> Unit,
 
     /**
      * The scope that should be used by *animations started by this layout only*, i.e. animations
@@ -117,6 +123,7 @@ internal class SceneTransitionLayoutImpl(
      */
     internal val ancestors: List<Ancestor> = emptyList(),
     lookaheadScope: LookaheadScope? = null,
+    defaultEffectFactory: OverscrollFactory,
 ) {
 
     /**
@@ -198,7 +205,7 @@ internal class SceneTransitionLayoutImpl(
     private val nestedScrollConnection = object : NestedScrollConnection {}
 
     init {
-        updateContents(builder, layoutDirection)
+        updateContents(builder, layoutDirection, defaultEffectFactory)
 
         // DraggableHandlerImpl must wait for the scenes to be initialized, in order to access the
         // current scene (required for SwipeTransition).
@@ -206,14 +213,14 @@ internal class SceneTransitionLayoutImpl(
             DraggableHandler(
                 layoutImpl = this,
                 orientation = Orientation.Horizontal,
-                gestureEffectProvider = { content(it).scope.horizontalOverscrollGestureEffect },
+                gestureEffectProvider = { content(it).horizontalEffects.gestureEffect },
             )
 
         verticalDraggableHandler =
             DraggableHandler(
                 layoutImpl = this,
                 orientation = Orientation.Vertical,
-                gestureEffectProvider = { content(it).scope.verticalOverscrollGestureEffect },
+                gestureEffectProvider = { content(it).verticalEffects.gestureEffect },
             )
 
         // Make sure that the state is created on the same thread (most probably the main thread)
@@ -221,19 +228,30 @@ internal class SceneTransitionLayoutImpl(
         state.checkThread()
     }
 
-    internal fun scene(key: SceneKey): Scene {
-        return scenes[key] ?: error("Scene $key is not configured")
+    private fun sceneOrNull(key: SceneKey): Scene? {
+        return scenes[key]
+            ?: ancestors
+                .fastFirstOrNull { it.layoutImpl.scenes[key] != null }
+                ?.layoutImpl
+                ?.scenes
+                ?.get(key)
     }
 
-    internal fun contentOrNull(key: ContentKey): Content? {
-        return when (key) {
-            is SceneKey -> scenes[key]
-            is OverlayKey -> overlays[key]
-        }
+    private fun overlayOrNull(key: OverlayKey): Overlay? {
+        return overlays[key]
+            ?: ancestors
+                .fastFirstOrNull { it.layoutImpl.overlays[key] != null }
+                ?.layoutImpl
+                ?.overlays
+                ?.get(key)
+    }
+
+    internal fun scene(key: SceneKey): Scene {
+        return sceneOrNull(key) ?: error("Scene $key is not configured")
     }
 
     internal fun overlay(key: OverlayKey): Overlay {
-        return overlays[key] ?: error("Overlay $key is not configured")
+        return overlayOrNull(key) ?: error("Overlay $key is not configured")
     }
 
     internal fun content(key: ContentKey): Content {
@@ -241,6 +259,10 @@ internal class SceneTransitionLayoutImpl(
             is SceneKey -> scene(key)
             is OverlayKey -> overlay(key)
         }
+    }
+
+    internal fun isAncestorContent(content: ContentKey): Boolean {
+        return ancestors.fastAny { it.inContent == content }
     }
 
     internal fun contentForUserActions(): Content {
@@ -266,8 +288,9 @@ internal class SceneTransitionLayoutImpl(
     }
 
     internal fun updateContents(
-        builder: SceneTransitionLayoutScope.() -> Unit,
+        builder: SceneTransitionLayoutScope<InternalContentScope>.() -> Unit,
         layoutDirection: LayoutDirection,
+        defaultEffectFactory: OverscrollFactory,
     ) {
         // Keep a reference of the current contents. After processing [builder], the contents that
         // were not configured will be removed.
@@ -275,15 +298,18 @@ internal class SceneTransitionLayoutImpl(
         val overlaysToRemove =
             if (_overlays == null) mutableSetOf() else overlays.keys.toMutableSet()
 
+        val parentZIndex =
+            if (ancestors.isEmpty()) 0L else content(ancestors.last().inContent).globalZIndex
         // The incrementing zIndex of each scene.
-        var zIndex = 0f
+        var zIndex = 0
         var overlaysDefined = false
 
-        object : SceneTransitionLayoutScope {
+        object : SceneTransitionLayoutScope<InternalContentScope> {
                 override fun scene(
                     key: SceneKey,
                     userActions: Map<UserAction, UserActionResult>,
-                    content: @Composable ContentScope.() -> Unit,
+                    effectFactory: OverscrollFactory?,
+                    content: @Composable InternalContentScope.() -> Unit,
                 ) {
                     require(!overlaysDefined) { "all scenes must be defined before overlays" }
 
@@ -291,11 +317,16 @@ internal class SceneTransitionLayoutImpl(
 
                     val resolvedUserActions = resolveUserActions(key, userActions, layoutDirection)
                     val scene = scenes[key]
+                    val globalZIndex =
+                        Content.calculateGlobalZIndex(parentZIndex, ++zIndex, ancestors.size)
+                    val factory = effectFactory ?: defaultEffectFactory
                     if (scene != null) {
                         // Update an existing scene.
                         scene.content = content
                         scene.userActions = resolvedUserActions
-                        scene.zIndex = zIndex
+                        scene.zIndex = zIndex.toFloat()
+                        scene.globalZIndex = globalZIndex
+                        scene.maybeUpdateEffects(factory)
                     } else {
                         // New scene.
                         scenes[key] =
@@ -304,11 +335,11 @@ internal class SceneTransitionLayoutImpl(
                                 this@SceneTransitionLayoutImpl,
                                 content,
                                 resolvedUserActions,
-                                zIndex,
+                                zIndex.toFloat(),
+                                globalZIndex,
+                                factory,
                             )
                     }
-
-                    zIndex++
                 }
 
                 override fun overlay(
@@ -316,20 +347,26 @@ internal class SceneTransitionLayoutImpl(
                     userActions: Map<UserAction, UserActionResult>,
                     alignment: Alignment,
                     isModal: Boolean,
-                    content: @Composable (ContentScope.() -> Unit),
+                    effectFactory: OverscrollFactory?,
+                    content: @Composable (InternalContentScope.() -> Unit),
                 ) {
                     overlaysDefined = true
                     overlaysToRemove.remove(key)
 
                     val overlay = overlays[key]
                     val resolvedUserActions = resolveUserActions(key, userActions, layoutDirection)
+                    val globalZIndex =
+                        Content.calculateGlobalZIndex(parentZIndex, ++zIndex, ancestors.size)
+                    val factory = effectFactory ?: defaultEffectFactory
                     if (overlay != null) {
                         // Update an existing overlay.
                         overlay.content = content
-                        overlay.zIndex = zIndex
+                        overlay.zIndex = zIndex.toFloat()
+                        overlay.globalZIndex = globalZIndex
                         overlay.userActions = resolvedUserActions
                         overlay.alignment = alignment
                         overlay.isModal = isModal
+                        overlay.maybeUpdateEffects(factory)
                     } else {
                         // New overlay.
                         overlays[key] =
@@ -338,13 +375,13 @@ internal class SceneTransitionLayoutImpl(
                                 this@SceneTransitionLayoutImpl,
                                 content,
                                 resolvedUserActions,
-                                zIndex,
+                                zIndex.toFloat(),
+                                globalZIndex,
                                 alignment,
                                 isModal,
+                                factory,
                             )
                     }
-
-                    zIndex++
                 }
             }
             .builder()
@@ -537,13 +574,27 @@ internal class SceneTransitionLayoutImpl(
             .sortedBy { it.zIndex }
     }
 
+    internal fun hideOverlays(hide: HideCurrentOverlays) {
+        fun maybeHide(overlay: OverlayKey) {
+            if (state.canHideOverlay(overlay)) {
+                state.hideOverlay(overlay, animationScope = this.animationScope)
+            }
+        }
+
+        when (hide) {
+            HideCurrentOverlays.None -> {}
+            HideCurrentOverlays.All -> HashSet(state.currentOverlays).forEach { maybeHide(it) }
+            is HideCurrentOverlays.Some -> hide.overlays.forEach { maybeHide(it) }
+        }
+    }
+
     @VisibleForTesting
     internal fun setContentsAndLayoutTargetSizeForTest(size: IntSize) {
         lastSize = size
         (scenes.values + overlays.values).forEach { it.targetSize = size }
     }
 
-    internal fun overlaysOrNullForTest(): Map<OverlayKey, Overlay>? = _overlays
+    @VisibleForTesting internal fun overlaysOrNullForTest(): Map<OverlayKey, Overlay>? = _overlays
 }
 
 private data class LayoutElement(private val layoutImpl: SceneTransitionLayoutImpl) :

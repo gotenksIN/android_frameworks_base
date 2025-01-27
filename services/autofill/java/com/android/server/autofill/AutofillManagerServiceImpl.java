@@ -73,6 +73,7 @@ import android.util.LocalLog;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.view.autofill.AutofillFeatureFlags;
 import android.view.autofill.AutofillId;
 import android.view.autofill.AutofillManager;
 import android.view.autofill.AutofillManager.AutofillCommitReason;
@@ -207,6 +208,11 @@ final class AutofillManagerServiceImpl
     private final UserManagerInternal mUserManagerInternal;
 
     private final DisabledInfoCache mDisabledInfoCache;
+
+    // Tracks active session id. There is no guarantee that such a session exists. For eg, if the
+    // session is destroyed, the id may no longer be valid. We don't update the state in all the
+    // cases.
+    private int mActiveSessionId = NO_SESSION;
 
     AutofillManagerServiceImpl(AutofillManagerService master, Object lock,
             LocalLog uiLatencyHistory, LocalLog wtfHistory, int userId, AutoFillUI ui,
@@ -386,6 +392,7 @@ final class AutofillManagerServiceImpl
             @NonNull Rect virtualBounds, @Nullable AutofillValue value, boolean hasCallback,
             @NonNull ComponentName clientActivity, boolean compatMode,
             boolean bindInstantServiceAllowed, int flags) {
+        mActiveSessionId = NO_SESSION;
         // FLAG_AUGMENTED_AUTOFILL_REQUEST is set in the flags when standard autofill is disabled
         // but the package is allowlisted for augmented autofill
         boolean forAugmentedAutofillOnly = (flags
@@ -444,6 +451,7 @@ final class AutofillManagerServiceImpl
         if (newSession == null) {
             return NO_SESSION;
         }
+        mActiveSessionId = newSession.id;
 
         // Service can be null when it's only for augmented autofill
         String servicePackageName = mInfo == null ? null : mInfo.getServiceInfo().packageName;
@@ -672,7 +680,7 @@ final class AutofillManagerServiceImpl
                 flags, mInputMethodManagerInternal, isPrimaryCredential);
         mSessions.put(newSession.id, newSession);
 
-        if (Flags.multipleFillHistory() && !forAugmentedAutofillOnly) {
+        if (AutofillFeatureFlags.isMultipleFillEventHistoryEnabled() && !forAugmentedAutofillOnly) {
             mFillHistories.put(newSession.id, new FillEventHistory(sessionId, null));
         }
 
@@ -747,6 +755,7 @@ final class AutofillManagerServiceImpl
                     Slog.d(TAG, "restarting session " + sessionId + " due to manual request on "
                             + autofillId);
                 }
+                mActiveSessionId = sessionId;
                 return true;
             }
             if (sVerbose) {
@@ -756,6 +765,8 @@ final class AutofillManagerServiceImpl
             return false;
         }
 
+
+        mActiveSessionId = sessionId;
         session.updateLocked(autofillId, virtualBounds, value, action, flags);
         return false;
     }
@@ -772,7 +783,8 @@ final class AutofillManagerServiceImpl
 
             FillEventHistory history = null;
 
-            if (Flags.multipleFillHistory() && mFillHistories != null) {
+            if (AutofillFeatureFlags.isMultipleFillEventHistoryEnabled()
+                        && mFillHistories != null) {
                 history = mFillHistories.get(sessionId);
                 mFillHistories.delete(sessionId);
             }
@@ -874,18 +886,51 @@ final class AutofillManagerServiceImpl
     }
 
     @GuardedBy("mLock")
+    public void notifyImeAnimationStart() {
+        if (!isEnabledLocked()) {
+            Slog.wtf(TAG, "Service not enabled");
+            return;
+        }
+        final Session session = mSessions.get(mActiveSessionId);
+        if (session == null) {
+            Slog.v(TAG, "notifyImeAnimationEnd(): no session for " + mActiveSessionId);
+            return;
+        }
+        session.notifyImeAnimationStart(SystemClock.elapsedRealtime());
+    }
+
+    @GuardedBy("mLock")
     public void notifyImeAnimationEnd(int sessionId, long endTimeMs, int uid) {
         if (!isEnabledLocked()) {
             Slog.wtf(TAG, "Service not enabled");
             return;
         }
         final Session session = mSessions.get(sessionId);
-        if (session == null || uid != session.uid) {
+        if (session == null) {
             Slog.v(TAG, "notifyImeAnimationEnd(): no session for "
                     + sessionId + "(" + uid + ")");
             return;
         }
+        if (uid != session.uid) {
+            Slog.v(TAG, "notifyImeAnimationEnd(): Mismatched session id's "
+                    + sessionId + "(" + uid + ")");
+            return;
+        }
         session.notifyImeAnimationEnd(endTimeMs);
+    }
+
+    @GuardedBy("mLock")
+    public void notifyImeAnimationEnd() {
+        if (!isEnabledLocked()) {
+            Slog.wtf(TAG, "Service not enabled");
+            return;
+        }
+        final Session session = mSessions.get(mActiveSessionId);
+        if (session == null) {
+            Slog.v(TAG, "notifyImeAnimationEnd(): no session for " + mActiveSessionId);
+            return;
+        }
+        session.notifyImeAnimationEnd(SystemClock.elapsedRealtime());
     }
 
     @GuardedBy("mLock")
@@ -922,7 +967,7 @@ final class AutofillManagerServiceImpl
             }
         }
         mSessions.clear();
-        if (Flags.multipleFillHistory()) {
+        if (AutofillFeatureFlags.isMultipleFillEventHistoryEnabled()) {
             mFillHistories.clear();
         }
 
@@ -991,7 +1036,7 @@ final class AutofillManagerServiceImpl
             mEventHistory.addEvent(event);
         }
 
-        if (Flags.multipleFillHistory()) {
+        if (AutofillFeatureFlags.isMultipleFillEventHistoryEnabled()) {
             FillEventHistory history = mFillHistories.get(sessionId);
             if (history != null) {
                 history.addEvent(event);
@@ -1180,7 +1225,7 @@ final class AutofillManagerServiceImpl
                 logViewEnteredForHistory(sessionId, clientState, mEventHistory, focusedId);
             }
 
-            if (Flags.multipleFillHistory()) {
+            if (AutofillFeatureFlags.isMultipleFillEventHistoryEnabled()) {
                 FillEventHistory history = mFillHistories.get(sessionId);
                 if (history != null) {
                     logViewEnteredForHistory(sessionId, clientState, history, focusedId);

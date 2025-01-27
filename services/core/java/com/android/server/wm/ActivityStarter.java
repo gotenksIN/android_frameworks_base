@@ -103,6 +103,7 @@ import android.app.PendingIntent;
 import android.app.ProfilerInfo;
 import android.app.WaitResult;
 import android.app.WindowConfiguration;
+import android.app.WindowConfiguration.WindowingMode;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.Disabled;
@@ -124,6 +125,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.OperationCanceledException;
 import android.os.RemoteException;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -233,6 +235,7 @@ class ActivityStarter {
 
     // The task display area to launch the activity onto, barring any strong reason to do otherwise.
     private TaskDisplayArea mPreferredTaskDisplayArea;
+    @WindowingMode
     private int mPreferredWindowingMode;
 
     private Task mInTask;
@@ -3249,11 +3252,14 @@ class ActivityStarter {
     private void sendCanNotEmbedActivityError(TaskFragment taskFragment,
             @EmbeddingCheckResult int result) {
         final String errMsg;
-        switch(result) {
+        boolean fatalError = true;
+        switch (result) {
             case EMBEDDING_DISALLOWED_NEW_TASK: {
                 errMsg = "Cannot embed " + mStartActivity + " that launched on another task"
                         + ",mLaunchMode=" + launchModeToString(mLaunchMode)
                         + ",mLaunchFlag=" + Integer.toHexString(mLaunchFlags);
+                // This is a known possible scenario, which should not be a fatal error.
+                fatalError = false;
                 break;
             }
             case EMBEDDING_DISALLOWED_MIN_DIMENSION_VIOLATION: {
@@ -3273,7 +3279,8 @@ class ActivityStarter {
             mService.mWindowOrganizerController.sendTaskFragmentOperationFailure(
                     taskFragment.getTaskFragmentOrganizer(), mRequest.errorCallbackToken,
                     taskFragment, OP_TYPE_START_ACTIVITY_IN_TASK_FRAGMENT,
-                    new SecurityException(errMsg));
+                    fatalError ? new SecurityException(errMsg)
+                            : new OperationCanceledException(errMsg));
         } else {
             // If the taskFragment is not organized, just dump error message as warning logs.
             Slog.w(TAG, errMsg);

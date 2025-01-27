@@ -17,6 +17,10 @@
 package com.android.compose.animation.scene
 
 import androidx.annotation.FloatRange
+import androidx.compose.animation.rememberSplineBasedDecay
+import androidx.compose.foundation.LocalOverscrollFactory
+import androidx.compose.foundation.OverscrollEffect
+import androidx.compose.foundation.OverscrollFactory
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -37,7 +41,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import com.android.compose.gesture.NestedScrollableBound
-import com.android.compose.gesture.effect.ContentOverscrollEffect
 
 /**
  * [SceneTransitionLayout] is a container that automatically animates its content whenever its state
@@ -62,7 +65,7 @@ fun SceneTransitionLayout(
     swipeSourceDetector: SwipeSourceDetector = DefaultEdgeDetector,
     swipeDetector: SwipeDetector = DefaultSwipeDetector,
     @FloatRange(from = 0.0, to = 0.5) transitionInterceptionThreshold: Float = 0.05f,
-    builder: SceneTransitionLayoutScope.() -> Unit,
+    builder: SceneTransitionLayoutScope<ContentScope>.() -> Unit,
 ) {
     SceneTransitionLayoutForTesting(
         state,
@@ -75,12 +78,18 @@ fun SceneTransitionLayout(
     )
 }
 
-interface SceneTransitionLayoutScope {
+interface SceneTransitionLayoutScope<out CS : ContentScope> {
     /**
      * Add a scene to this layout, identified by [key].
      *
      * You can configure [userActions] so that swiping on this layout or navigating back will
      * transition to a different scene.
+     *
+     * By default, [verticalOverscrollEffect][ContentScope.verticalOverscrollEffect] and
+     * [horizontalOverscrollEffect][ContentScope.horizontalOverscrollEffect] of this scene will be
+     * created using [LocalOverscrollFactory]. You can specify a non-null [effectFactory] to set up
+     * a custom factory that will be used by this scene and by any calls to
+     * rememberOverscrollEffect() inside the scene.
      *
      * Important: scene order along the z-axis follows call order. Calling scene(A) followed by
      * scene(B) will mean that scene B renders after/above scene A.
@@ -88,7 +97,8 @@ interface SceneTransitionLayoutScope {
     fun scene(
         key: SceneKey,
         userActions: Map<UserAction, UserActionResult> = emptyMap(),
-        content: @Composable ContentScope.() -> Unit,
+        effectFactory: OverscrollFactory? = null,
+        content: @Composable CS.() -> Unit,
     )
 
     /**
@@ -108,6 +118,12 @@ interface SceneTransitionLayoutScope {
      * to prevent swipes from reaching other scenes or overlays behind this one. Clicking this
      * protective layer will close the overlay.
      *
+     * By default, [verticalOverscrollEffect][ContentScope.verticalOverscrollEffect] and
+     * [horizontalOverscrollEffect][ContentScope.horizontalOverscrollEffect] of this overlay will be
+     * created using [LocalOverscrollFactory]. You can specify a non-null [effectFactory] to set up
+     * a custom factory that will be used by this content and by any calls to
+     * rememberOverscrollEffect() inside the content.
+     *
      * Important: overlays must be defined after all scenes. Overlay order along the z-axis follows
      * call order. Calling overlay(A) followed by overlay(B) will mean that overlay B renders
      * after/above overlay A.
@@ -118,7 +134,8 @@ interface SceneTransitionLayoutScope {
             mapOf(Back to UserActionResult.HideOverlay(key)),
         alignment: Alignment = Alignment.Center,
         isModal: Boolean = true,
-        content: @Composable ContentScope.() -> Unit,
+        effectFactory: OverscrollFactory? = null,
+        content: @Composable CS.() -> Unit,
     )
 }
 
@@ -158,6 +175,9 @@ interface BaseContentScope : ElementStateScope {
 
     /** The state of the [SceneTransitionLayout] in which this content is contained. */
     val layoutState: SceneTransitionLayoutState
+
+    /** The [LookaheadScope] used by the [SceneTransitionLayout]. */
+    val lookaheadScope: LookaheadScope
 
     /**
      * Tag an element identified by [key].
@@ -250,18 +270,6 @@ interface BaseContentScope : ElementStateScope {
     fun Modifier.disableSwipesWhenScrolling(
         bounds: NestedScrollableBound = NestedScrollableBound.Any
     ): Modifier
-
-    /**
-     * A [NestedSceneTransitionLayout] will share its elements with its ancestor STLs therefore
-     * enabling sharedElement transitions between them.
-     */
-    // TODO(b/380070506): Add more parameters when default params are supported in Kotlin 2.0.21
-    @Composable
-    fun NestedSceneTransitionLayout(
-        state: SceneTransitionLayoutState,
-        modifier: Modifier,
-        builder: SceneTransitionLayoutScope.() -> Unit,
-    )
 }
 
 @Stable
@@ -271,7 +279,7 @@ interface ContentScope : BaseContentScope {
      * The overscroll effect applied to the content in the vertical direction. This can be used to
      * customize how the content behaves when the scene is over scrolled.
      *
-     * For example, you can use it with the `Modifier.overscroll()` modifier:
+     * You should use this effect exactly once with the `Modifier.overscroll()` modifier:
      * ```kotlin
      * @Composable
      * fun ContentScope.MyScene() {
@@ -285,26 +293,9 @@ interface ContentScope : BaseContentScope {
      * }
      * ```
      *
-     * Or you can read the `overscrollDistance` value directly, if you need some custom overscroll
-     * behavior:
-     * ```kotlin
-     * @Composable
-     * fun ContentScope.MyScene() {
-     *     Box(
-     *         modifier = Modifier
-     *             .graphicsLayer {
-     *                 // Translate half of the overscroll
-     *                 translationY = verticalOverscrollEffect.overscrollDistance * 0.5f
-     *             }
-     *     ) {
-     *         // ... your content ...
-     *     }
-     * }
-     * ```
-     *
      * @see horizontalOverscrollEffect
      */
-    val verticalOverscrollEffect: ContentOverscrollEffect
+    val verticalOverscrollEffect: OverscrollEffect
 
     /**
      * The overscroll effect applied to the content in the horizontal direction. This can be used to
@@ -312,7 +303,7 @@ interface ContentScope : BaseContentScope {
      *
      * @see verticalOverscrollEffect
      */
-    val horizontalOverscrollEffect: ContentOverscrollEffect
+    val horizontalOverscrollEffect: OverscrollEffect
 
     /**
      * Animate some value at the content level.
@@ -334,6 +325,29 @@ interface ContentScope : BaseContentScope {
         type: SharedValueType<T, *>,
         canOverflow: Boolean,
     ): AnimatedState<T>
+
+    /**
+     * A [NestedSceneTransitionLayout] will share its elements with its ancestor STLs therefore
+     * enabling sharedElement transitions between them.
+     */
+    // TODO(b/380070506): Add more parameters when default params are supported in Kotlin 2.0.21
+    @Composable
+    fun NestedSceneTransitionLayout(
+        state: SceneTransitionLayoutState,
+        modifier: Modifier,
+        builder: SceneTransitionLayoutScope<ContentScope>.() -> Unit,
+    )
+}
+
+internal interface InternalContentScope : ContentScope {
+
+    @Composable
+    fun NestedSceneTransitionLayoutForTesting(
+        state: SceneTransitionLayoutState,
+        modifier: Modifier,
+        onLayoutImpl: ((SceneTransitionLayoutImpl) -> Unit)?,
+        builder: SceneTransitionLayoutScope<InternalContentScope>.() -> Unit,
+    )
 }
 
 /**
@@ -604,8 +618,24 @@ sealed class UserActionResult(
         val overlay: OverlayKey,
         override val transitionKey: TransitionKey? = null,
         override val requiresFullDistanceSwipe: Boolean = false,
+
+        /** Specify which overlays (if any) should be hidden when this user action is started. */
+        val hideCurrentOverlays: HideCurrentOverlays = HideCurrentOverlays.None,
     ) : UserActionResult(transitionKey, requiresFullDistanceSwipe) {
         override fun toContent(currentScene: SceneKey): ContentKey = overlay
+
+        sealed class HideCurrentOverlays {
+            /** Hide none of the current overlays. */
+            object None : HideCurrentOverlays()
+
+            /** Hide all current overlays. */
+            object All : HideCurrentOverlays()
+
+            /** Hide [overlays], for those in that set that are currently shown. */
+            class Some(val overlays: Set<OverlayKey>) : HideCurrentOverlays() {
+                constructor(vararg overlays: OverlayKey) : this(overlays.toSet())
+            }
+        }
     }
 
     /** A [UserActionResult] that hides [overlay]. */
@@ -711,12 +741,14 @@ internal fun SceneTransitionLayoutForTesting(
     sharedElementMap: MutableMap<ElementKey, Element> = remember { mutableMapOf() },
     ancestors: List<Ancestor> = remember { emptyList() },
     lookaheadScope: LookaheadScope? = null,
-    builder: SceneTransitionLayoutScope.() -> Unit,
+    builder: SceneTransitionLayoutScope<InternalContentScope>.() -> Unit,
 ) {
     val density = LocalDensity.current
     val directionChangeSlop = LocalViewConfiguration.current.touchSlop
     val layoutDirection = LocalLayoutDirection.current
+    val defaultEffectFactory = checkNotNull(LocalOverscrollFactory.current)
     val animationScope = rememberCoroutineScope()
+    val decayAnimationSpec = rememberSplineBasedDecay<Float>()
     val layoutImpl = remember {
         SceneTransitionLayoutImpl(
                 state = state as MutableSceneTransitionLayoutStateImpl,
@@ -731,13 +763,15 @@ internal fun SceneTransitionLayoutForTesting(
                 ancestors = ancestors,
                 lookaheadScope = lookaheadScope,
                 directionChangeSlop = directionChangeSlop,
+                defaultEffectFactory = defaultEffectFactory,
+                decayAnimationSpec = decayAnimationSpec,
             )
             .also { onLayoutImpl?.invoke(it) }
     }
 
     // TODO(b/317014852): Move this into the SideEffect {} again once STLImpl.scenes is not a
     // SnapshotStateMap anymore.
-    layoutImpl.updateContents(builder, layoutDirection)
+    layoutImpl.updateContents(builder, layoutDirection, defaultEffectFactory)
 
     SideEffect {
         if (state != layoutImpl.state) {
@@ -770,6 +804,7 @@ internal fun SceneTransitionLayoutForTesting(
         layoutImpl.swipeSourceDetector = swipeSourceDetector
         layoutImpl.swipeDetector = swipeDetector
         layoutImpl.transitionInterceptionThreshold = transitionInterceptionThreshold
+        layoutImpl.decayAnimationSpec = decayAnimationSpec
     }
 
     layoutImpl.Content(modifier)

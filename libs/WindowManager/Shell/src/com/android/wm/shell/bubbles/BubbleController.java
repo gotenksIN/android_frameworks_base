@@ -110,6 +110,7 @@ import com.android.wm.shell.onehanded.OneHandedController;
 import com.android.wm.shell.onehanded.OneHandedTransitionCallback;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
+import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.bubbles.BubbleBarUpdate;
 import com.android.wm.shell.sysui.ConfigurationChangeListener;
@@ -117,6 +118,8 @@ import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.taskview.TaskView;
+import com.android.wm.shell.taskview.TaskViewController;
+import com.android.wm.shell.taskview.TaskViewRepository;
 import com.android.wm.shell.taskview.TaskViewTaskController;
 import com.android.wm.shell.taskview.TaskViewTransitions;
 import com.android.wm.shell.transition.Transitions;
@@ -192,7 +195,7 @@ public class BubbleController implements ConfigurationChangeListener,
     private final TaskStackListenerImpl mTaskStackListener;
     private final ShellTaskOrganizer mTaskOrganizer;
     private final DisplayController mDisplayController;
-    private final TaskViewTransitions mTaskViewTransitions;
+    private final TaskViewController mTaskViewController;
     private final Transitions mTransitions;
     private final SyncTransactionQueue mSyncQueue;
     private final ShellController mShellController;
@@ -285,6 +288,8 @@ public class BubbleController implements ConfigurationChangeListener,
     /** Used to send updates to the views from {@link #mBubbleDataListener}. */
     private BubbleViewCallback mBubbleViewCallback;
 
+    private final BubbleTransitions mBubbleTransitions;
+
     public BubbleController(Context context,
             ShellInit shellInit,
             ShellCommandHandler shellCommandHandler,
@@ -309,6 +314,7 @@ public class BubbleController implements ConfigurationChangeListener,
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellMainThread Handler mainHandler,
             @ShellBackgroundThread ShellExecutor bgExecutor,
+            TaskViewRepository taskViewRepository,
             TaskViewTransitions taskViewTransitions,
             Transitions transitions,
             SyncTransactionQueue syncQueue,
@@ -347,7 +353,16 @@ public class BubbleController implements ConfigurationChangeListener,
                 context.getResources().getDimensionPixelSize(
                         com.android.internal.R.dimen.importance_ring_stroke_width));
         mDisplayController = displayController;
-        mTaskViewTransitions = taskViewTransitions;
+        final TaskViewTransitions tvTransitions;
+        if (TaskViewTransitions.useRepo()) {
+            tvTransitions = new TaskViewTransitions(transitions, taskViewRepository, organizer,
+                    syncQueue);
+        } else {
+            tvTransitions = taskViewTransitions;
+        }
+        mTaskViewController = tvTransitions;
+        mBubbleTransitions = new BubbleTransitions(transitions, organizer, taskViewRepository, data,
+                tvTransitions, context);
         mTransitions = transitions;
         mOneHandedOptional = oneHandedOptional;
         mDragAndDropController = dragAndDropController;
@@ -359,8 +374,9 @@ public class BubbleController implements ConfigurationChangeListener,
             @Override
             public BubbleTaskView create() {
                 TaskViewTaskController taskViewTaskController = new TaskViewTaskController(
-                        context, organizer, taskViewTransitions, syncQueue);
-                TaskView taskView = new TaskView(context, taskViewTaskController);
+                        context, organizer, mTaskViewController, syncQueue);
+                TaskView taskView = new TaskView(context, mTaskViewController,
+                        taskViewTaskController);
                 return new BubbleTaskView(taskView, mainExecutor);
             }
         };
@@ -468,24 +484,23 @@ public class BubbleController implements ConfigurationChangeListener,
             @Override
             public void onActivityRestartAttempt(ActivityManager.RunningTaskInfo task,
                     boolean homeTaskVisible, boolean clearedTask, boolean wasVisible) {
-                for (Bubble b : mBubbleData.getBubbles()) {
-                    if (task.taskId == b.getTaskId()) {
-                        ProtoLog.d(WM_SHELL_BUBBLES,
-                                "onActivityRestartAttempt - taskId=%d selecting matching bubble=%s",
-                                task.taskId, b.getKey());
-                        mBubbleData.setSelectedBubbleAndExpandStack(b);
-                        return;
-                    }
+                final int taskId = task.taskId;
+                Bubble bubble = mBubbleData.getBubbleInStackWithTaskId(taskId);
+                if (bubble != null) {
+                    ProtoLog.d(WM_SHELL_BUBBLES,
+                            "onActivityRestartAttempt - taskId=%d selecting matching bubble=%s",
+                            taskId, bubble.getKey());
+                    mBubbleData.setSelectedBubbleAndExpandStack(bubble);
+                    return;
                 }
-                for (Bubble b : mBubbleData.getOverflowBubbles()) {
-                    if (task.taskId == b.getTaskId()) {
-                        ProtoLog.d(WM_SHELL_BUBBLES, "onActivityRestartAttempt - taskId=%d "
-                                        + "selecting matching overflow bubble=%s",
-                                task.taskId, b.getKey());
-                        promoteBubbleFromOverflow(b);
-                        mBubbleData.setExpanded(true);
-                        return;
-                    }
+
+                bubble = mBubbleData.getOverflowBubbleWithTaskId(taskId);
+                if (bubble != null) {
+                    ProtoLog.d(WM_SHELL_BUBBLES, "onActivityRestartAttempt - taskId=%d "
+                                    + "selecting matching overflow bubble=%s",
+                            taskId, bubble.getKey());
+                    promoteBubbleFromOverflow(bubble);
+                    mBubbleData.setExpanded(true);
                 }
             }
         });
@@ -841,14 +856,6 @@ public class BubbleController implements ConfigurationChangeListener,
     /** The task listener for events in bubble tasks. */
     public ShellTaskOrganizer getTaskOrganizer() {
         return mTaskOrganizer;
-    }
-
-    SyncTransactionQueue getSyncTransactionQueue() {
-        return mSyncQueue;
-    }
-
-    TaskViewTransitions getTaskViewTransitions() {
-        return mTaskViewTransitions;
     }
 
     /** Contains information to help position things on the screen. */
@@ -1295,8 +1302,8 @@ public class BubbleController implements ConfigurationChangeListener,
      * @param timestamp the timestamp of the removal
      */
     public void dragBubbleToDismiss(String bubbleKey, long timestamp) {
-        String selectedBubbleKey = mBubbleData.getSelectedBubbleKey();
-        Bubble bubbleToDismiss = mBubbleData.getAnyBubbleWithkey(bubbleKey);
+        final String selectedBubbleKey = mBubbleData.getSelectedBubbleKey();
+        final Bubble bubbleToDismiss = mBubbleData.getAnyBubbleWithKey(bubbleKey);
         if (bubbleToDismiss != null) {
             mBubbleData.dismissBubbleWithKey(
                     bubbleKey, Bubbles.DISMISS_USER_GESTURE_FROM_LAUNCHER, timestamp);
@@ -1329,11 +1336,11 @@ public class BubbleController implements ConfigurationChangeListener,
 
     @VisibleForTesting
     public boolean isBubbleNotificationSuppressedFromShade(String key, String groupKey) {
-        boolean isSuppressedBubble = (mBubbleData.hasAnyBubbleWithKey(key)
-                && !mBubbleData.getAnyBubbleWithkey(key).showInShade());
+        final boolean isSuppressedBubble = (mBubbleData.hasAnyBubbleWithKey(key)
+                && !mBubbleData.getAnyBubbleWithKey(key).showInShade());
 
-        boolean isSuppressedSummary = mBubbleData.isSummarySuppressed(groupKey);
-        boolean isSummary = key.equals(mBubbleData.getSummaryKey(groupKey));
+        final boolean isSuppressedSummary = mBubbleData.isSummarySuppressed(groupKey);
+        final boolean isSummary = key.equals(mBubbleData.getSummaryKey(groupKey));
         return (isSummary && isSuppressedSummary) || isSuppressedBubble;
     }
 
@@ -1361,8 +1368,6 @@ public class BubbleController implements ConfigurationChangeListener,
     public void expandStackAndSelectBubbleFromLauncher(String key, int topOnScreen) {
         mBubblePositioner.setBubbleBarTopOnScreen(topOnScreen);
 
-        boolean wasExpanded = (mLayerView != null && mLayerView.isExpanded());
-
         if (BubbleOverflow.KEY.equals(key)) {
             mBubbleData.setSelectedBubbleFromLauncher(mBubbleData.getOverflow());
             mLayerView.showExpandedView(mBubbleData.getOverflow());
@@ -1370,10 +1375,11 @@ public class BubbleController implements ConfigurationChangeListener,
             return;
         }
 
-        Bubble b = mBubbleData.getAnyBubbleWithkey(key);
+        final Bubble b = mBubbleData.getAnyBubbleWithKey(key);
         if (b == null) {
             return;
         }
+        final boolean wasExpanded = (mLayerView != null && mLayerView.isExpanded());
         if (mBubbleData.hasBubbleInStackWithKey(b.getKey())) {
             // already in the stack
             mBubbleData.setSelectedBubbleFromLauncher(b);
@@ -1439,9 +1445,9 @@ public class BubbleController implements ConfigurationChangeListener,
      *
      * @param intent the intent for the bubble.
      */
-    public void expandStackAndSelectBubble(Intent intent) {
+    public void expandStackAndSelectBubble(Intent intent, UserHandle user) {
         if (!Flags.enableBubbleAnything()) return;
-        Bubble b = mBubbleData.getOrCreateBubble(intent); // Removes from overflow
+        Bubble b = mBubbleData.getOrCreateBubble(intent, user); // Removes from overflow
         ProtoLog.v(WM_SHELL_BUBBLES, "expandStackAndSelectBubble - intent=%s", intent);
         if (b.isInflated()) {
             mBubbleData.setSelectedBubbleAndExpandStack(b);
@@ -1457,7 +1463,19 @@ public class BubbleController implements ConfigurationChangeListener,
      * @param taskInfo the task.
      */
     public void expandStackAndSelectBubble(ActivityManager.RunningTaskInfo taskInfo) {
-        // TODO(384976265): Not implemented yet
+        if (!BubbleAnythingFlagHelper.enableBubbleToFullscreen()) return;
+        Bubble b = mBubbleData.getOrCreateBubble(taskInfo); // Removes from overflow
+        ProtoLog.v(WM_SHELL_BUBBLES, "expandStackAndSelectBubble - intent=%s", taskInfo.taskId);
+        if (b.isInflated()) {
+            mBubbleData.setSelectedBubbleAndExpandStack(b);
+        } else {
+            b.enable(Notification.BubbleMetadata.FLAG_AUTO_EXPAND_BUBBLE);
+            // Lazy init stack view when a bubble is created
+            ensureBubbleViewsAndWindowCreated();
+            mBubbleTransitions.startConvertToBubble(b, taskInfo, mExpandedViewManager,
+                    mBubbleTaskViewFactory, mBubblePositioner, mLogger, mStackView, mLayerView,
+                    mBubbleIconFactory, mInflateSynchronously);
+        }
     }
 
     /**
@@ -1747,31 +1765,32 @@ public class BubbleController implements ConfigurationChangeListener,
     public void updateBubble(BubbleEntry notif, boolean suppressFlyout, boolean showInShade) {
         // If this is an interruptive notif, mark that it's interrupted
         mSysuiProxy.setNotificationInterruption(notif.getKey());
-        boolean isNonInterruptiveNotExpanding = !notif.getRanking().isTextChanged()
+        final boolean isNonInterruptiveNotExpanding = !notif.getRanking().isTextChanged()
                 && (notif.getBubbleMetadata() != null
                 && !notif.getBubbleMetadata().getAutoExpandBubble());
+        final Bubble bubble;
         if (isNonInterruptiveNotExpanding
                 && mBubbleData.hasOverflowBubbleWithKey(notif.getKey())) {
             // Update the bubble but don't promote it out of overflow
-            Bubble b = mBubbleData.getOverflowBubbleWithKey(notif.getKey());
+            bubble = mBubbleData.getOverflowBubbleWithKey(notif.getKey());
             if (notif.isBubble()) {
                 notif.setFlagBubble(false);
             }
-            updateNotNotifyingEntry(b, notif, showInShade);
+            updateNotNotifyingEntry(bubble, notif, showInShade);
         } else if (mBubbleData.hasAnyBubbleWithKey(notif.getKey())
                 && isNonInterruptiveNotExpanding) {
-            Bubble b = mBubbleData.getAnyBubbleWithkey(notif.getKey());
-            if (b != null) {
-                updateNotNotifyingEntry(b, notif, showInShade);
+            bubble = mBubbleData.getAnyBubbleWithKey(notif.getKey());
+            if (bubble != null) {
+                updateNotNotifyingEntry(bubble, notif, showInShade);
             }
         } else if (mBubbleData.isSuppressedWithLocusId(notif.getLocusId())) {
             // Update the bubble but don't promote it out of overflow
-            Bubble b = mBubbleData.getSuppressedBubbleWithKey(notif.getKey());
-            if (b != null) {
-                updateNotNotifyingEntry(b, notif, showInShade);
+            bubble = mBubbleData.getSuppressedBubbleWithKey(notif.getKey());
+            if (bubble != null) {
+                updateNotNotifyingEntry(bubble, notif, showInShade);
             }
         } else {
-            Bubble bubble = mBubbleData.getOrCreateBubble(notif, null /* persistedBubble */);
+            bubble = mBubbleData.getOrCreateBubble(notif, null /* persistedBubble */);
             if (notif.shouldSuppressNotificationList()) {
                 // If we're suppressing notifs for DND, we don't want the bubbles to randomly
                 // expand when DND turns off so flip the flag.
@@ -2261,9 +2280,16 @@ public class BubbleController implements ConfigurationChangeListener,
 
     private void showExpandedViewForBubbleBar() {
         BubbleViewProvider selectedBubble = mBubbleData.getSelectedBubble();
-        if (selectedBubble != null && mLayerView != null) {
-            mLayerView.showExpandedView(selectedBubble);
+        if (selectedBubble == null) return;
+        if (selectedBubble instanceof Bubble) {
+            final Bubble bubble = (Bubble) selectedBubble;
+            if (bubble.getPreparingTransition() != null) {
+                bubble.getPreparingTransition().continueExpand();
+                return;
+            }
         }
+        if (mLayerView == null) return;
+        mLayerView.showExpandedView(selectedBubble);
     }
 
     private void collapseExpandedViewForBubbleBar() {
@@ -2322,12 +2348,12 @@ public class BubbleController implements ConfigurationChangeListener,
             BubbleEntry summary, @Nullable List<BubbleEntry> children, IntConsumer removeCallback) {
         if (children != null) {
             for (int i = 0; i < children.size(); i++) {
-                BubbleEntry child = children.get(i);
+                final BubbleEntry child = children.get(i);
                 if (mBubbleData.hasAnyBubbleWithKey(child.getKey())) {
                     // Suppress the bubbled child
                     // As far as group manager is concerned, once a child is no longer shown
                     // in the shade, it is essentially removed.
-                    Bubble bubbleChild = mBubbleData.getAnyBubbleWithkey(child.getKey());
+                    final Bubble bubbleChild = mBubbleData.getAnyBubbleWithKey(child.getKey());
                     if (bubbleChild != null) {
                         bubbleChild.setSuppressNotification(true);
                         bubbleChild.setShowDot(false /* show */);
@@ -2648,8 +2674,8 @@ public class BubbleController implements ConfigurationChangeListener,
         }
 
         @Override
-        public void showAppBubble(Intent intent) {
-            mMainExecutor.execute(() -> mController.expandStackAndSelectBubble(intent));
+        public void showAppBubble(Intent intent, UserHandle user) {
+            mMainExecutor.execute(() -> mController.expandStackAndSelectBubble(intent, user));
         }
 
         @Override

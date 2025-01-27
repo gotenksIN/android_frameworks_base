@@ -57,7 +57,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -95,6 +94,7 @@ import com.android.compose.animation.scene.MutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SceneTransitionLayout
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
 import com.android.compose.modifiers.height
 import com.android.compose.modifiers.padding
@@ -102,6 +102,7 @@ import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.PlatformTheme
 import com.android.mechanics.GestureContext
 import com.android.systemui.Dumpable
+import com.android.systemui.Flags
 import com.android.systemui.brightness.ui.compose.BrightnessSliderContainer
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dump.DumpManager
@@ -252,12 +253,14 @@ constructor(
                     Box(
                         modifier =
                             Modifier.graphicsLayer { alpha = viewModel.viewAlpha }
-                                // Clipping before translation to match QSContainerImpl.onDraw
-                                .offset {
-                                    IntOffset(
-                                        x = 0,
-                                        y = viewModel.viewTranslationY.fastRoundToInt(),
-                                    )
+                                .thenIf(!Flags.notificationShadeBlur()) {
+                                    // Clipping before translation to match QSContainerImpl.onDraw
+                                    Modifier.offset {
+                                        IntOffset(
+                                            x = 0,
+                                            y = viewModel.viewTranslationY.fastRoundToInt(),
+                                        )
+                                    }
                                 }
                                 .thenIf(notificationScrimClippingParams.isEnabled) {
                                     Modifier.notificationScrimClip {
@@ -313,8 +316,8 @@ constructor(
      */
     @Composable
     private fun CollapsableQuickSettingsSTL() {
-        val sceneState = remember {
-            MutableSceneTransitionLayoutState(
+        val sceneState =
+            rememberMutableSceneTransitionLayoutState(
                 viewModel.expansionState.toIdleSceneKey(),
                 transitions =
                     transitions {
@@ -323,7 +326,6 @@ constructor(
                         }
                     },
             )
-        }
 
         LaunchedEffect(Unit) {
             synchronizeQsState(

@@ -92,6 +92,10 @@ internal class DraggableHandler(
                 else -> null
             } ?: return NoOpDragController
 
+        if (result is UserActionResult.ShowOverlay) {
+            layoutImpl.hideOverlays(result.hideCurrentOverlays)
+        }
+
         val swipeAnimation = createSwipeAnimation(swipes, result)
         return updateDragController(swipes, swipeAnimation)
     }
@@ -123,7 +127,14 @@ internal class DraggableHandler(
                 directionChangeSlop = layoutImpl.directionChangeSlop,
             )
 
-        return createSwipeAnimation(layoutImpl, result, isUpOrLeft, orientation, gestureContext)
+        return createSwipeAnimation(
+            layoutImpl,
+            result,
+            isUpOrLeft,
+            orientation,
+            gestureContext,
+            layoutImpl.decayAnimationSpec,
+        )
     }
 
     private fun resolveSwipeSource(startedPosition: Offset): SwipeSource.Resolved? {

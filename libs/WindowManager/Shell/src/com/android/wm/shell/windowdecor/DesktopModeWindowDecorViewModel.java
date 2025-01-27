@@ -751,7 +751,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         // been added, so they must be added here
         decoration.addCaptionInset(wct);
         mDesktopTasksController.moveTaskToDesktop(taskId, wct, source,
-                /* remoteTransition= */ null);
+                /* remoteTransition= */ null, /* moveToDesktopCallback */ null);
         decoration.closeHandleMenu();
 
         if (source == DesktopModeTransitionSource.APP_HANDLE_MENU_BUTTON) {
@@ -1643,6 +1643,10 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     }
 
     private boolean shouldShowWindowDecor(RunningTaskInfo taskInfo) {
+        if (mDisplayController.getDisplay(taskInfo.displayId) == null) {
+            // If DisplayController doesn't have it tracked, it could be a private/managed display.
+            return false;
+        }
         if (taskInfo.getWindowingMode() == WINDOWING_MODE_FREEFORM) return true;
         if (mSplitScreenController != null
                 && mSplitScreenController.isTaskRootOrStageRoot(taskInfo.taskId)) {

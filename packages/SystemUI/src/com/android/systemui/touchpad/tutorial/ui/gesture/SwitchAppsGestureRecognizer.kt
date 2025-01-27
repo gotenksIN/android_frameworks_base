@@ -16,9 +16,11 @@
 
 package com.android.systemui.touchpad.tutorial.ui.gesture
 
+import android.util.MathUtils
 import android.view.MotionEvent
+import com.android.systemui.touchpad.tutorial.ui.gesture.GestureState.InProgress
 
-// TODO: javadoc
+/** Recognizes Quickswitch gesture i.e. using four fingers on touchpad, swiping to right. */
 class SwitchAppsGestureRecognizer(private val gestureDistanceThresholdPx: Int) : GestureRecognizer {
 
     private val distanceTracker = DistanceTracker()
@@ -32,8 +34,20 @@ class SwitchAppsGestureRecognizer(private val gestureDistanceThresholdPx: Int) :
         gestureStateChangedCallback = {}
     }
 
-    // TODO: recognizer logic
     override fun accept(event: MotionEvent) {
         if (!isMultifingerTouchpadSwipe(event)) return
+        if (!isFourFingerTouchpadSwipe(event)) {
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                gestureStateChangedCallback(GestureState.Error)
+            }
+            return
+        }
+        val gestureState = distanceTracker.processEvent(event)
+        updateGestureState(
+            gestureStateChangedCallback,
+            gestureState,
+            isFinished = { it.deltaX >= gestureDistanceThresholdPx },
+            progress = { InProgress(MathUtils.saturate(it.deltaX / gestureDistanceThresholdPx)) },
+        )
     }
 }

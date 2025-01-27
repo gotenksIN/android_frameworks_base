@@ -2009,6 +2009,10 @@
     <!-- Component name of the built in wallpaper used to display bitmap wallpapers. This must not be null. -->
     <string name="image_wallpaper_component" translatable="false">com.android.systemui/com.android.systemui.wallpapers.ImageWallpaper</string>
 
+    <!-- Component name of the built in wallpaper that is used when the user-selected wallpaper is
+         incompatible with the display's resolution or aspect ratio. -->
+    <string name="fallback_wallpaper_component" translatable="false">com.android.systemui/com.android.systemui.wallpapers.GradientColorWallpaper</string>
+
     <!-- True if WallpaperService is enabled -->
     <bool name="config_enableWallpaperService">true</bool>
 
@@ -2892,7 +2896,7 @@
     <bool name="config_dozeAlwaysOnEnabled">true</bool>
 
     <!-- If AOD can show an ambient version of the wallpaper -->
-    <bool name="config_dozeSupportsAodWallpaper">true</bool>
+    <bool name="config_dozeSupportsAodWallpaper">false</bool>
 
     <!-- Whether the display blanks itself when transitioning from a doze to a non-doze state -->
     <bool name="config_displayBlanksAfterDoze">false</bool>
@@ -7322,6 +7326,10 @@
 
     <!-- Whether to enable fp unlock when screen turns off on udfps devices -->
     <bool name="config_screen_off_udfps_enabled">false</bool>
+
+    <!-- Default value for fp screen off unlock toggle, it only works for the devices that support
+         fp screen off unlock-->
+    <bool name="config_screen_off_udfps_default_on">false</bool>
 
     <!-- The name of the system package that will hold the dependency installer role. -->
     <string name="config_systemDependencyInstaller" translatable="false" />

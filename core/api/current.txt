@@ -33470,7 +33470,7 @@ package android.os {
 
   public static class Build.VERSION_CODES {
     ctor public Build.VERSION_CODES();
-    field @FlaggedApi("android.sdk.major_minor_versioning_scheme") public static final int BAKLAVA = 10000; // 0x2710
+    field @FlaggedApi("android.sdk.major_minor_versioning_scheme") public static final int BAKLAVA = 36; // 0x24
     field public static final int BASE = 1; // 0x1
     field public static final int BASE_1_1 = 2; // 0x2
     field public static final int CUPCAKE = 3; // 0x3
@@ -33510,7 +33510,7 @@ package android.os {
   }
 
   @FlaggedApi("android.sdk.major_minor_versioning_scheme") public static class Build.VERSION_CODES_FULL {
-    field public static final int BAKLAVA = 1000000000; // 0x3b9aca00
+    field public static final int BAKLAVA = 3600000; // 0x36ee80
     field public static final int BASE = 100000; // 0x186a0
     field public static final int BASE_1_1 = 200000; // 0x30d40
     field public static final int CUPCAKE = 300000; // 0x493e0
@@ -45147,7 +45147,7 @@ package android.telephony {
     field public static final String KEY_SHOW_ICCID_IN_SIM_STATUS_BOOL = "show_iccid_in_sim_status_bool";
     field public static final String KEY_SHOW_IMS_REGISTRATION_STATUS_BOOL = "show_ims_registration_status_bool";
     field public static final String KEY_SHOW_ONSCREEN_DIAL_BUTTON_BOOL = "show_onscreen_dial_button_bool";
-    field @FlaggedApi("com.android.internal.telephony.flags.hide_roaming_icon") public static final String KEY_SHOW_ROAMING_INDICATOR_BOOL = "show_roaming_indicator_bool";
+    field public static final String KEY_SHOW_ROAMING_INDICATOR_BOOL = "show_roaming_indicator_bool";
     field public static final String KEY_SHOW_SIGNAL_STRENGTH_IN_SIM_STATUS_BOOL = "show_signal_strength_in_sim_status_bool";
     field public static final String KEY_SHOW_VIDEO_CALL_CHARGES_ALERT_DIALOG_BOOL = "show_video_call_charges_alert_dialog_bool";
     field public static final String KEY_SHOW_WFC_LOCATION_PRIVACY_POLICY_BOOL = "show_wfc_location_privacy_policy_bool";

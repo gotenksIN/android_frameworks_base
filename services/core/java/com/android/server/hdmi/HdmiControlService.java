@@ -710,7 +710,9 @@ public class HdmiControlService extends SystemService {
             // Register ContentObserver to monitor the settings change.
             registerContentObserver();
         }
-        mMhlController.setOption(OPTION_MHL_SERVICE_CONTROL, ENABLED);
+        if (mMhlController != null) {
+            mMhlController.setOption(OPTION_MHL_SERVICE_CONTROL, ENABLED);
+        }
     }
 
     @VisibleForTesting
@@ -1721,6 +1723,8 @@ public class HdmiControlService extends SystemService {
                     if (result != SendMessageResult.SUCCESS) {
                         localDevice.addAndStartAction(new
                                 ResendCecCommandAction(localDevice, command, callback));
+                    } else if (callback != null) {
+                        callback.onSendCompleted(result);
                     }
                 }
             });

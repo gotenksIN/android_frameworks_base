@@ -46,6 +46,7 @@ import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.TestRunningTaskInfoBuilder;
 import com.android.wm.shell.common.LaunchAdjacentController;
+import com.android.wm.shell.desktopmode.DesktopModeLoggerTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopRepository;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
@@ -89,6 +90,8 @@ public final class FreeformTaskListenerTests extends ShellTestCase {
     @Mock
     private DesktopTasksController mDesktopTasksController;
     @Mock
+    private DesktopModeLoggerTransitionObserver mDesktopModeLoggerTransitionObserver;
+    @Mock
     private LaunchAdjacentController mLaunchAdjacentController;
     @Mock
     private TaskChangeListener mTaskChangeListener;
@@ -114,6 +117,7 @@ public final class FreeformTaskListenerTests extends ShellTestCase {
                         mTaskOrganizer,
                         Optional.of(mDesktopUserRepositories),
                         Optional.of(mDesktopTasksController),
+                        mDesktopModeLoggerTransitionObserver,
                         mLaunchAdjacentController,
                         mWindowDecorViewModel,
                         Optional.of(mTaskChangeListener));
@@ -159,7 +163,8 @@ public final class FreeformTaskListenerTests extends ShellTestCase {
     }
 
     @Test
-    public void focusTaskChanged_addsFreeformTaskToRepo() {
+    @DisableFlags(FLAG_ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS)
+    public void focusTaskChanged_noTransitionObserversFlag_addsFreeformTaskToRepo() {
         ActivityManager.RunningTaskInfo task =
                 new TestRunningTaskInfoBuilder().setWindowingMode(WINDOWING_MODE_FREEFORM).build();
         task.isFocused = true;
@@ -167,6 +172,19 @@ public final class FreeformTaskListenerTests extends ShellTestCase {
         mFreeformTaskListener.onFocusTaskChanged(task);
 
         verify(mDesktopUserRepositories.getCurrent())
+                .addTask(task.displayId, task.taskId, task.isVisible);
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS)
+    public void focusTaskChanged_enableTransitionObservers_freeformTaskNotAddedToRepo() {
+        ActivityManager.RunningTaskInfo task =
+                new TestRunningTaskInfoBuilder().setWindowingMode(WINDOWING_MODE_FREEFORM).build();
+        task.isFocused = true;
+
+        mFreeformTaskListener.onFocusTaskChanged(task);
+
+        verify(mDesktopUserRepositories.getCurrent(), never())
                 .addTask(task.displayId, task.taskId, task.isVisible);
     }
 
@@ -267,6 +285,19 @@ public final class FreeformTaskListenerTests extends ShellTestCase {
         verify(mDesktopUserRepositories.getCurrent(), never())
                 .removeTask(task.displayId, task.taskId);
     }
+
+    @Test
+    public void onTaskVanished_withDesktopModeLogger_forwards() {
+        ActivityManager.RunningTaskInfo task =
+                new TestRunningTaskInfoBuilder().setWindowingMode(WINDOWING_MODE_FREEFORM).build();
+        task.isVisible = true;
+        mFreeformTaskListener.onTaskAppeared(task, mMockSurfaceControl);
+
+        mFreeformTaskListener.onTaskVanished(task);
+
+        verify(mDesktopModeLoggerTransitionObserver).onTaskVanished(task);
+    }
+
 
     @Test
     public void onTaskInfoChanged_withDesktopController_forwards() {

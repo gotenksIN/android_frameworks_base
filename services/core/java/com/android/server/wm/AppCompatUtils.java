@@ -150,10 +150,12 @@ final class AppCompatUtils {
             appCompatTaskInfo.setTopActivityInSizeCompat(top.fillsParent());
         }
         // Whether the direct top activity is eligible for letterbox education.
-        appCompatTaskInfo.setEligibleForLetterboxEducation(
-                isTopActivityResumed && top.isEligibleForLetterboxEducation());
-        appCompatTaskInfo.setLetterboxEducationEnabled(top.mAppCompatController
-                .getAppCompatLetterboxOverrides().isLetterboxEducationEnabled());
+        appCompatTaskInfo.setEligibleForLetterboxEducation(isTopActivityResumed
+                && top.mAppCompatController.getLetterboxPolicy()
+                    .isEligibleForLetterboxEducation());
+        appCompatTaskInfo.setLetterboxEducationEnabled(
+                top.mAppCompatController.getLetterboxOverrides()
+                        .isLetterboxEducationEnabled());
 
         final AppCompatAspectRatioOverrides aspectRatioOverrides =
                 top.mAppCompatController.getAspectRatioOverrides();

@@ -521,6 +521,7 @@ android_library {
         "androidx.compose.animation_animation-graphics",
         "androidx.lifecycle_lifecycle-viewmodel-compose",
         "kairos",
+        "aconfig_settings_flags_lib",
     ],
     manifest: "AndroidManifest.xml",
     libs: [
@@ -537,7 +538,10 @@ android_library {
         "-Adagger.useBindingGraphFix=ENABLED",
         "-Aroom.schemaLocation=frameworks/base/packages/SystemUI/schemas",
     ],
-    kotlincflags: ["-Xjvm-default=all"],
+    kotlincflags: [
+        "-Xjvm-default=all",
+        "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+    ],
 
     plugins: [
         "androidx.room_room-compiler-plugin",
@@ -706,6 +710,7 @@ android_library {
         "androidx.lifecycle_lifecycle-viewmodel-compose",
         "TraceurCommon",
         "Traceur-res",
+        "aconfig_settings_flags_lib",
     ],
 }
 
@@ -714,6 +719,9 @@ android_library {
     use_resource_processor: true,
     manifest: "tests/AndroidManifest-base.xml",
     resource_dirs: [],
+
+    kotlin_lang_version: "1.9",
+
     additional_manifests: ["tests/AndroidManifest.xml"],
     srcs: [
         "tests/src/**/*.kt",
@@ -762,6 +770,7 @@ android_library {
         "-Xjvm-default=all",
         // TODO(b/352363800): Why do we need this?
         "-J-Xmx8192M",
+        "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
     ],
     javacflags: [
         "-Adagger.useBindingGraphFix=ENABLED",

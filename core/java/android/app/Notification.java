@@ -4393,6 +4393,9 @@ public class Notification implements Parcelable
      */
     @Nullable
     public Pair<RemoteInput, Action> findRemoteInputActionPair(boolean requiresFreeform) {
+        if (isPromotedOngoing()) {
+            return null;
+        }
         if (actions == null) {
             return null;
         }
@@ -6454,6 +6457,11 @@ public class Notification implements Parcelable
             if (mActions == null) return Collections.emptyList();
             List<Notification.Action> standardActions = new ArrayList<>();
             for (Notification.Action action : mActions) {
+                // Actions with RemoteInput are ignored for RONs.
+                if (mN.isPromotedOngoing()
+                        && hasValidRemoteInput(action)) {
+                    continue;
+                }
                 if (!action.isContextual()) {
                     standardActions.add(action);
                 }
@@ -11854,7 +11862,7 @@ public class Notification implements Parcelable
                     // If segment limit is exceeded. All segments will be replaced
                     // with a single segment
                     boolean allSameColor = true;
-                    int firstSegmentColor = segments.get(0).getColor();
+                    int firstSegmentColor = segments.getFirst().getColor();
 
                     for (int i = 1; i < segments.size(); i++) {
                         if (segments.get(i).getColor() != firstSegmentColor) {
@@ -11887,8 +11895,31 @@ public class Notification implements Parcelable
                     }
                 }
 
+                // If the segments and points can't all fit inside the progress drawable, the
+                // view will replace all segments with a single segment.
+                final int segmentsFallbackColor;
+                if (segments.size() <= 1) {
+                    segmentsFallbackColor = NotificationProgressModel.INVALID_COLOR;
+                } else {
+
+                    boolean allSameColor = true;
+                    int firstSegmentColor = segments.getFirst().getColor();
+                    for (int i = 1; i < segments.size(); i++) {
+                        if (segments.get(i).getColor() != firstSegmentColor) {
+                            allSameColor = false;
+                            break;
+                        }
+                    }
+                    // If the segments are of the same color, the view can just use that color.
+                    // In that case there is no need to send the fallback color.
+                    segmentsFallbackColor = allSameColor ? NotificationProgressModel.INVALID_COLOR
+                            : sanitizeProgressColor(Notification.COLOR_DEFAULT, backgroundColor,
+                                    defaultProgressColor);
+                }
+
                 model = new NotificationProgressModel(segments, points,
-                        Math.clamp(mProgress, 0, totalLength), mIsStyledByProgress);
+                        Math.clamp(mProgress, 0, totalLength), mIsStyledByProgress,
+                        segmentsFallbackColor);
             }
             return model;
         }
@@ -11909,7 +11940,7 @@ public class Notification implements Parcelable
         }
 
         /**
-         * Finds steps and points fill color with sufficient contrast over bg (1.3:1) that
+         * Finds steps and points fill color with sufficient contrast over bg (3:1) that
          * has the same hue as the original color, but is lightened or darkened depending on
          * whether the background is dark or light.
          *
@@ -11922,7 +11953,7 @@ public class Notification implements Parcelable
             return Builder.ensureColorContrast(
                     Color.alpha(color) == 0 ? defaultColor : color,
                     bg,
-                    1.3);
+                    3);
         }
 
         /**

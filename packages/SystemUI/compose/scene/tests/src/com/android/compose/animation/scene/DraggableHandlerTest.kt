@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android.compose.animation.scene
 
+import androidx.compose.animation.SplineBasedFloatDecayAnimationSpec
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.generateDecayAnimationSpec
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.overscroll
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -36,9 +42,11 @@ import com.android.compose.animation.scene.TestScenes.SceneA
 import com.android.compose.animation.scene.TestScenes.SceneB
 import com.android.compose.animation.scene.TestScenes.SceneC
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.animation.scene.content.state.TransitionState.Companion.DistanceUnspecified
 import com.android.compose.animation.scene.content.state.TransitionState.Transition
 import com.android.compose.animation.scene.subjects.assertThat
 import com.android.compose.gesture.NestedDraggable
+import com.android.compose.gesture.effect.OffsetOverscrollEffectFactory
 import com.android.compose.test.MonotonicClockTestScope
 import com.android.compose.test.runMonotonicClockTest
 import com.android.mechanics.spec.InputDirection
@@ -60,31 +68,34 @@ class DraggableHandlerTest {
     private class TestGestureScope(val testScope: MonotonicClockTestScope) {
         var canChangeScene: (SceneKey) -> Boolean = { true }
         val layoutState =
-            MutableSceneTransitionLayoutStateImpl(
+            MutableSceneTransitionLayoutStateForTests(
                 SceneA,
                 EmptyTestTransitions,
                 canChangeScene = { canChangeScene(it) },
             )
 
+        val defaultEffectFactory =
+            OffsetOverscrollEffectFactory(testScope, MotionScheme.standard().defaultSpatialSpec())
+
         var layoutDirection = LayoutDirection.Rtl
             set(value) {
                 field = value
-                layoutImpl.updateContents(scenesBuilder, layoutDirection)
+                layoutImpl.updateContents(scenesBuilder, layoutDirection, defaultEffectFactory)
             }
 
         var mutableUserActionsA = mapOf(Swipe.Up to SceneB, Swipe.Down to SceneC)
             set(value) {
                 field = value
-                layoutImpl.updateContents(scenesBuilder, layoutDirection)
+                layoutImpl.updateContents(scenesBuilder, layoutDirection, defaultEffectFactory)
             }
 
         var mutableUserActionsB = mapOf(Swipe.Up to SceneC, Swipe.Down to SceneA)
             set(value) {
                 field = value
-                layoutImpl.updateContents(scenesBuilder, layoutDirection)
+                layoutImpl.updateContents(scenesBuilder, layoutDirection, defaultEffectFactory)
             }
 
-        private val scenesBuilder: SceneTransitionLayoutScope.() -> Unit = {
+        private val scenesBuilder: SceneTransitionLayoutScope<ContentScope>.() -> Unit = {
             scene(key = SceneA, userActions = mutableUserActionsA) { Text("SceneA") }
             scene(key = SceneB, userActions = mutableUserActionsB) { Text("SceneB") }
             scene(
@@ -110,10 +121,11 @@ class DraggableHandlerTest {
         val transitionInterceptionThreshold = 0.05f
         val directionChangeSlop = 10f
 
+        private val density = Density(1f)
         private val layoutImpl =
             SceneTransitionLayoutImpl(
                     state = layoutState,
-                    density = Density(1f),
+                    density = density,
                     layoutDirection = LayoutDirection.Ltr,
                     swipeSourceDetector = DefaultEdgeDetector,
                     swipeDetector = DefaultSwipeDetector,
@@ -124,6 +136,9 @@ class DraggableHandlerTest {
                     // work well with advanceUntilIdle(), which is used by some tests.
                     animationScope = testScope,
                     directionChangeSlop = directionChangeSlop,
+                    defaultEffectFactory = defaultEffectFactory,
+                    decayAnimationSpec =
+                        SplineBasedFloatDecayAnimationSpec(density).generateDecayAnimationSpec(),
                 )
                 .apply { setContentsAndLayoutTargetSizeForTest(LAYOUT_SIZE) }
 
@@ -640,10 +655,7 @@ class DraggableHandlerTest {
     @Test
     fun overscroll_releaseBetween0And100Percent_up() = runGestureTest {
         // Make scene B overscrollable.
-        layoutState.transitions = transitions {
-            defaultMotionSpatialSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy)
-            from(SceneA, to = SceneB) {}
-        }
+        layoutState.transitions = transitions { from(SceneA, to = SceneB) {} }
 
         val dragController =
             onDragStarted(
@@ -671,10 +683,7 @@ class DraggableHandlerTest {
     @Test
     fun overscroll_releaseBetween0And100Percent_down() = runGestureTest {
         // Make scene C overscrollable.
-        layoutState.transitions = transitions {
-            defaultMotionSpatialSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy)
-            from(SceneA, to = SceneC) {}
-        }
+        layoutState.transitions = transitions { from(SceneA, to = SceneC) {} }
 
         val dragController =
             onDragStarted(
@@ -788,6 +797,29 @@ class DraggableHandlerTest {
             },
         )
         assertIdle(SceneB)
+    }
+
+    @Test
+    fun animateWhenDistanceUnspecified() = runGestureTest {
+        layoutState.transitions = transitions {
+            from(SceneA, to = SceneB) {
+                distance = UserActionDistance { _, _, _ -> DistanceUnspecified }
+            }
+        }
+
+        val controller = onDragStarted(overSlop = up(fractionOfScreen = 0.9f))
+
+        // The distance is not computed yet, so we don't know the "progress" value yet.
+        assertTransition(fromScene = SceneA, toScene = SceneB, progress = 0.0f)
+
+        controller.onDragStoppedAnimateNow(
+            // We are animating from SceneA to SceneA, when the distance is still unspecified.
+            velocity = velocityThreshold,
+            onAnimationStart = {
+                assertTransition(fromScene = SceneA, toScene = SceneB, progress = 0.0f)
+            },
+        )
+        assertIdle(SceneA)
     }
 
     @Test

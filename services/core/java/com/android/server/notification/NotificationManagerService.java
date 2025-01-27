@@ -258,7 +258,6 @@ import android.metrics.LogMaker;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -356,6 +355,7 @@ import com.android.internal.util.Preconditions;
 import com.android.internal.util.XmlUtils;
 import com.android.internal.util.function.TriPredicate;
 import com.android.internal.widget.LockPatternUtils;
+import com.android.modules.expresslog.Counter;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 import com.android.server.DeviceIdleInternal;
@@ -631,6 +631,8 @@ public class NotificationManagerService extends SystemService {
     // Minium number of sparse groups for a package before autogrouping them
     private static final int AUTOGROUP_SPARSE_GROUPS_AT_COUNT = 3;
 
+    private static final Duration ZEN_BROADCAST_DELAY = Duration.ofMillis(250);
+
     private IActivityManager mAm;
     private ActivityTaskManagerInternal mAtm;
     private ActivityManager mActivityManager;
@@ -762,7 +764,7 @@ public class NotificationManagerService extends SystemService {
 
     private int mWarnRemoteViewsSizeBytes;
     private int mStripRemoteViewsSizeBytes;
-    private String[] mDefaultUnsupportedAdjustments;
+    protected String[] mDefaultUnsupportedAdjustments;
 
     @VisibleForTesting
     protected boolean mShowReviewPermissionsNotification;
@@ -2833,33 +2835,25 @@ public class NotificationManagerService extends SystemService {
     }
 
     private void registerNetworkCallback() {
-        NetworkRequest request = new NetworkRequest.Builder().addTransportType(
-                NetworkCapabilities.TRANSPORT_WIFI).build();
-        mConnectivityManager.registerNetworkCallback(request,
+        mConnectivityManager.registerDefaultNetworkCallback(
                 new ConnectivityManager.NetworkCallback() {
-                // Need to post to another thread, as we can't call synchronous ConnectivityManager
-                // methods from the callback itself, due to potential race conditions.
-                @Override
-                public void onAvailable(@NonNull Network network) {
-                    mHandler.post(() -> updateWifiConnectionState());
-                }
-                @Override
-                public void onLost(@NonNull Network network) {
-                    mHandler.post(() -> updateWifiConnectionState());
-                }
-            });
-        updateWifiConnectionState();
+                    @Override
+                    public void onCapabilitiesChanged(@NonNull Network network,
+                            @NonNull NetworkCapabilities capabilities) {
+                        updateWifiConnectionState(capabilities);
+                    }
+                    @Override
+                    public void onLost(@NonNull Network network) {
+                        mConnectedToWifi = false;
+                    }
+                }, mHandler);
     }
 
     @VisibleForTesting()
-    void updateWifiConnectionState() {
-        Network current = mConnectivityManager.getActiveNetwork();
-        NetworkCapabilities capabilities = mConnectivityManager.getNetworkCapabilities(current);
-        if (current == null || capabilities == null) {
-            mConnectedToWifi = false;
-            return;
-        }
-        mConnectedToWifi = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+    void updateWifiConnectionState(NetworkCapabilities capabilities) {
+        mConnectedToWifi = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED);
     }
 
     /**
@@ -3177,6 +3171,24 @@ public class NotificationManagerService extends SystemService {
         sendRegisteredOnlyBroadcast(new Intent(action));
     }
 
+    /**
+     * Schedules a broadcast to be sent to runtime receivers and DND-policy-access packages. The
+     * broadcast will be sent after {@link #ZEN_BROADCAST_DELAY}, unless a new broadcast is
+     * scheduled in the interim, in which case the previous one is dropped and the waiting period
+     * is <em>restarted</em>.
+     *
+     * <p>Note that this uses <em>equality of the {@link Intent#getAction}</em> as the criteria for
+     * deduplicating pending broadcasts, ignoring the extras and anything else. This is intentional
+     * so that e.g. rapidly changing some value A -> B -> C will only produce a broadcast for C
+     * (instead of every time because the extras are different).
+     */
+    private void sendZenBroadcastWithDelay(Intent intent) {
+        String token = "zen_broadcast:" + intent.getAction();
+        mHandler.removeCallbacksAndEqualMessages(token);
+        mHandler.postDelayed(() -> sendRegisteredOnlyBroadcast(intent), token,
+                ZEN_BROADCAST_DELAY.toMillis());
+    }
+
     private void sendRegisteredOnlyBroadcast(Intent baseIntent) {
         int[] userIds = mUmInternal.getProfileIds(mAmi.getCurrentUserId(), true);
         if (Flags.nmBinderPerfReduceZenBroadcasts()) {
@@ -3370,14 +3382,25 @@ public class NotificationManagerService extends SystemService {
 
     @GuardedBy("mNotificationLock")
     private void updateEffectsSuppressorLocked() {
+        final long oldSuppressedEffects = mZenModeHelper.getSuppressedEffects();
         final long updatedSuppressedEffects = calculateSuppressedEffects();
-        if (updatedSuppressedEffects == mZenModeHelper.getSuppressedEffects()) return;
+        if (updatedSuppressedEffects == oldSuppressedEffects) return;
+
         final List<ComponentName> suppressors = getSuppressors();
         ZenLog.traceEffectsSuppressorChanged(
-                mEffectsSuppressors, suppressors, updatedSuppressedEffects);
-        mEffectsSuppressors = suppressors;
+                mEffectsSuppressors, suppressors, oldSuppressedEffects, updatedSuppressedEffects);
         mZenModeHelper.setSuppressedEffects(updatedSuppressedEffects);
-        sendRegisteredOnlyBroadcast(NotificationManager.ACTION_EFFECTS_SUPPRESSOR_CHANGED);
+
+        if (Flags.nmBinderPerfThrottleEffectsSuppressorBroadcast()) {
+            if (!suppressors.equals(mEffectsSuppressors)) {
+                mEffectsSuppressors = suppressors;
+                sendZenBroadcastWithDelay(
+                        new Intent(NotificationManager.ACTION_EFFECTS_SUPPRESSOR_CHANGED));
+            }
+        } else {
+            mEffectsSuppressors = suppressors;
+            sendRegisteredOnlyBroadcast(NotificationManager.ACTION_EFFECTS_SUPPRESSOR_CHANGED);
+        }
     }
 
     private void exitIdle() {
@@ -3499,12 +3522,18 @@ public class NotificationManagerService extends SystemService {
     }
 
     private ArrayList<ComponentName> getSuppressors() {
-        ArrayList<ComponentName> names = new ArrayList<ComponentName>();
+        ArrayList<ComponentName> names = new ArrayList<>();
         for (int i = mListenersDisablingEffects.size() - 1; i >= 0; --i) {
             ArraySet<ComponentName> serviceInfoList = mListenersDisablingEffects.valueAt(i);
 
             for (ComponentName info : serviceInfoList) {
-                names.add(info);
+                if (Flags.nmBinderPerfThrottleEffectsSuppressorBroadcast()) {
+                    if (!names.contains(info)) {
+                        names.add(info);
+                    }
+                } else {
+                    names.add(info);
+                }
             }
         }
 
@@ -4377,8 +4406,8 @@ public class NotificationManagerService extends SystemService {
         public @NonNull List<String> getUnsupportedAdjustmentTypes() {
             checkCallerIsSystemOrSystemUiOrShell();
             synchronized (mNotificationLock) {
-                return new ArrayList(mAssistants.mNasUnsupported.getOrDefault(
-                        UserHandle.getUserId(Binder.getCallingUid()), new HashSet<>()));
+                return new ArrayList(mAssistants.getUnsupportedAdjustments(
+                        UserHandle.getUserId(Binder.getCallingUid())));
             }
         }
 
@@ -7136,6 +7165,13 @@ public class NotificationManagerService extends SystemService {
             Slog.e(TAG, "exiting pullStats: bad request");
             return 0;
         }
+
+        @Override
+        public void incrementCounter(String metricId) {
+            if (android.app.Flags.nmBinderPerfLogNmThrottling() && metricId != null) {
+                Counter.logIncrementWithUid(metricId, Binder.getCallingUid());
+            }
+        }
     };
 
     private void handleNotificationPermissionChange(String pkg, @UserIdInt int userId) {
@@ -7213,7 +7249,8 @@ public class NotificationManagerService extends SystemService {
                 if (!mAssistants.isAdjustmentAllowed(potentialKey)) {
                     toRemove.add(potentialKey);
                 }
-                if (notificationClassification() && adjustments.containsKey(KEY_TYPE)) {
+                if (notificationClassification() && potentialKey.equals(KEY_TYPE)) {
+                    mAssistants.setNasUnsupportedDefaults(r.getSbn().getNormalizedUserId());
                     if (!mAssistants.isAdjustmentKeyTypeAllowed(adjustments.getInt(KEY_TYPE))) {
                         toRemove.add(potentialKey);
                     } else if (notificationClassificationUi()
@@ -11867,9 +11904,9 @@ public class NotificationManagerService extends SystemService {
         static final String TAG_ENABLED_NOTIFICATION_ASSISTANTS = "enabled_assistants";
 
         private static final String ATT_TYPES = "types";
-        private static final String ATT_DENIED = "denied_adjustments";
+        private static final String ATT_DENIED = "user_denied_adjustments";
         private static final String ATT_ENABLED_TYPES = "enabled_key_types";
-        private static final String ATT_NAS_UNSUPPORTED = "unsupported_adjustments";
+        private static final String ATT_NAS_UNSUPPORTED = "nas_unsupported_adjustments";
         private static final String ATT_TYPES_DENIED_APPS = "types_denied_apps";
 
         private final Object mLock = new Object();
@@ -11965,9 +12002,6 @@ public class NotificationManagerService extends SystemService {
                 }
             } else {
                 mAllowedAdjustmentKeyTypes.addAll(List.of(DEFAULT_ALLOWED_ADJUSTMENT_KEY_TYPES));
-                if (mDefaultUnsupportedAdjustments != null) {
-                    mAllowedAdjustments.removeAll(List.of(mDefaultUnsupportedAdjustments));
-                }
             }
         }
 
@@ -12487,7 +12521,7 @@ public class NotificationManagerService extends SystemService {
                 }
             } else {
                 if (android.service.notification.Flags.notificationClassification()) {
-                    mNasUnsupported.put(userId, new HashSet<>());
+                    setNasUnsupportedDefaults(userId);
                 }
             }
             super.setPackageOrComponentEnabled(pkgOrComponent, userId, isPrimary, enabled, userSet);
@@ -12528,8 +12562,8 @@ public class NotificationManagerService extends SystemService {
             if (!android.service.notification.Flags.notificationClassification()) {
                 return;
             }
-            HashSet<String> disabledAdjustments =
-                    mNasUnsupported.getOrDefault(info.userid, new HashSet<>());
+            setNasUnsupportedDefaults(info.userid);
+            HashSet<String> disabledAdjustments = mNasUnsupported.get(info.userid);
             if (supported) {
                 disabledAdjustments.remove(key);
             } else {
@@ -12545,7 +12579,15 @@ public class NotificationManagerService extends SystemService {
             if (!android.service.notification.Flags.notificationClassification()) {
                 return new HashSet<>();
             }
-            return mNasUnsupported.getOrDefault(userId, new HashSet<>());
+            setNasUnsupportedDefaults(userId);
+            return mNasUnsupported.get(userId);
+        }
+
+        private void setNasUnsupportedDefaults(@UserIdInt int userId) {
+            if (mNasUnsupported != null && !mNasUnsupported.containsKey(userId)) {
+                mNasUnsupported.put(userId, new HashSet(List.of(mDefaultUnsupportedAdjustments)));
+                handleSavePolicyFile();
+            }
         }
 
         @Override
@@ -12658,7 +12700,7 @@ public class NotificationManagerService extends SystemService {
                 List<String> unsupportedAdjustments = new ArrayList(
                         mNasUnsupported.getOrDefault(
                                 UserHandle.getUserId(Binder.getCallingUid()),
-                                new HashSet<>())
+                                new HashSet(List.of(mDefaultUnsupportedAdjustments)))
                 );
                 bundlesAllowed = !unsupportedAdjustments.contains(Adjustment.KEY_TYPE);
             }

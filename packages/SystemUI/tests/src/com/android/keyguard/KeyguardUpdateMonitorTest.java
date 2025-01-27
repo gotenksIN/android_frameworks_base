@@ -18,6 +18,8 @@ package com.android.keyguard;
 
 import static android.app.StatusBarManager.SESSION_KEYGUARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
+import static android.hardware.biometrics.BiometricAuthenticator.TYPE_ANY_BIOMETRIC;
+import static android.hardware.biometrics.BiometricAuthenticator.TYPE_FACE;
 import static android.hardware.biometrics.BiometricAuthenticator.TYPE_FINGERPRINT;
 import static android.hardware.biometrics.BiometricFaceConstants.FACE_ERROR_LOCKOUT_PERMANENT;
 import static android.hardware.biometrics.BiometricFingerprintConstants.FINGERPRINT_ERROR_LOCKOUT;
@@ -36,6 +38,7 @@ import static com.android.keyguard.KeyguardUpdateMonitor.BIOMETRIC_STATE_CANCELL
 import static com.android.keyguard.KeyguardUpdateMonitor.BIOMETRIC_STATE_STOPPED;
 import static com.android.keyguard.KeyguardUpdateMonitor.DEFAULT_CANCEL_SIGNAL_TIMEOUT;
 import static com.android.keyguard.KeyguardUpdateMonitor.HAL_POWER_PRESS_TIMEOUT;
+import static com.android.systemui.Flags.FLAG_GLANCEABLE_HUB_V2;
 import static com.android.systemui.statusbar.policy.DevicePostureController.DEVICE_POSTURE_OPENED;
 import static com.android.systemui.statusbar.policy.DevicePostureController.DEVICE_POSTURE_UNKNOWN;
 
@@ -137,6 +140,7 @@ import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.FingerprintInteractiveToAuthProvider;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.broadcast.BroadcastDispatcher;
+import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor;
 import com.android.systemui.deviceentry.data.repository.FaceWakeUpTriggersConfig;
 import com.android.systemui.deviceentry.data.repository.FaceWakeUpTriggersConfigImpl;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor;
@@ -178,6 +182,9 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.MockitoSession;
 import org.mockito.quality.Strictness;
 
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
+import platform.test.runner.parameterized.Parameters;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -186,9 +193,6 @@ import java.util.Random;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
-import platform.test.runner.parameterized.Parameters;
 
 @SmallTest
 @RunWith(ParameterizedAndroidJunit4.class)
@@ -302,6 +306,8 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     private JavaAdapter mJavaAdapter;
     @Mock
     private SceneInteractor mSceneInteractor;
+    @Mock
+    private CommunalSceneInteractor mCommunalSceneInteractor;
     @Captor
     private ArgumentCaptor<FaceAuthenticationListener> mFaceAuthenticationListener;
 
@@ -1082,6 +1088,49 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     }
 
     @Test
+    @EnableFlags(FLAG_GLANCEABLE_HUB_V2)
+    public void udfpsStopsListeningWhenCommunalShowing() {
+        // GIVEN keyguard showing
+        mKeyguardUpdateMonitor.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mKeyguardUpdateMonitor.setKeyguardShowing(true, false);
+
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isTrue();
+
+        // WHEN communal is shown
+        mKeyguardUpdateMonitor.onCommunalShowingChanged(true);
+
+        // THEN shouldn't listen for fingerprint
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isFalse();
+
+        // WHEN alternate bouncer shows on top of communal, we should listen for fingerprint
+        mKeyguardUpdateMonitor.setAlternateBouncerVisibility(true);
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isTrue();
+
+        // WHEN communal is hidden
+        mKeyguardUpdateMonitor.onCommunalShowingChanged(false);
+        mKeyguardUpdateMonitor.setAlternateBouncerVisibility(false);
+
+        // THEN listen for fingerprint
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isTrue();
+    }
+
+    @Test
+    @EnableFlags(FLAG_GLANCEABLE_HUB_V2)
+    public void sfpsNotAffectedByCommunalShowing() {
+        // GIVEN keyguard showing
+        mKeyguardUpdateMonitor.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mKeyguardUpdateMonitor.setKeyguardShowing(true, false);
+
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(false)).isTrue();
+
+        // WHEN communal is shown
+        mKeyguardUpdateMonitor.onCommunalShowingChanged(true);
+
+        // THEN we should still listen for fingerprint if not UDFPS
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(false)).isTrue();
+    }
+
+    @Test
     public void testFingerprintPowerPressed_restartsFingerprintListeningStateWithDelay() {
         mKeyguardUpdateMonitor.mFingerprintAuthenticationCallback
                 .onAuthenticationError(FingerprintManager.BIOMETRIC_ERROR_POWER_PRESSED, "");
@@ -1504,6 +1553,72 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
         // THEN we should listen for udfps (hiding mechanism to actually auth is
         // controlled by UdfpsKeyguardViewController)
         assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isEqualTo(true);
+    }
+
+    @Test
+    @EnableFlags(com.android.settings.flags.Flags.FLAG_BIOMETRICS_ONBOARDING_EDUCATION)
+    public void listenForFingerprint_whenEnabledForUser_typeFingerprint()
+            throws RemoteException {
+        // GIVEN keyguard showing
+        mKeyguardUpdateMonitor.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mKeyguardUpdateMonitor.setKeyguardShowing(true, false);
+
+        biometricsEnabledForCurrentUser(true, TYPE_FINGERPRINT);
+        mTestableLooper.processAllMessages();
+
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isEqualTo(true);
+    }
+
+    @Test
+    @EnableFlags(com.android.settings.flags.Flags.FLAG_BIOMETRICS_ONBOARDING_EDUCATION)
+    public void doNotListenForFingerprint_whenDisabledForUser_typeFingerprint()
+            throws RemoteException {
+        // GIVEN keyguard showing
+        mKeyguardUpdateMonitor.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mKeyguardUpdateMonitor.setKeyguardShowing(true, false);
+
+        biometricsEnabledForCurrentUser(false, TYPE_FINGERPRINT);
+        mTestableLooper.processAllMessages();
+
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isEqualTo(false);
+    }
+
+    @Test
+    @EnableFlags(com.android.settings.flags.Flags.FLAG_BIOMETRICS_ONBOARDING_EDUCATION)
+    public void listenForFingerprint_typeFingerprintEnabled_typeFaceDisabled()
+            throws RemoteException {
+        // GIVEN keyguard showing
+        mKeyguardUpdateMonitor.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mKeyguardUpdateMonitor.setKeyguardShowing(true, false);
+
+        // Enable with fingerprint
+        biometricsEnabledForCurrentUser(true, TYPE_FINGERPRINT);
+        mTestableLooper.processAllMessages();
+
+        // Disable with face
+        biometricsEnabledForCurrentUser(false, TYPE_FACE);
+        mTestableLooper.processAllMessages();
+
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isEqualTo(true);
+    }
+
+    @Test
+    @EnableFlags(com.android.settings.flags.Flags.FLAG_BIOMETRICS_ONBOARDING_EDUCATION)
+    public void doNotListenForFingerprint_typeFingerprintDisabled_typeFaceEnabled()
+            throws RemoteException {
+        // GIVEN keyguard showing
+        mKeyguardUpdateMonitor.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mKeyguardUpdateMonitor.setKeyguardShowing(true, false);
+
+        // Enable with face
+        biometricsEnabledForCurrentUser(true, TYPE_FACE);
+        mTestableLooper.processAllMessages();
+
+        // Disable with fingerprint
+        biometricsEnabledForCurrentUser(false, TYPE_FINGERPRINT);
+        mTestableLooper.processAllMessages();
+
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isEqualTo(false);
     }
 
     @Test
@@ -2464,8 +2579,13 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     }
 
     private void biometricsEnabledForCurrentUser() throws RemoteException {
-        mBiometricEnabledOnKeyguardCallback.onChanged(true,
-                mSelectedUserInteractor.getSelectedUserId());
+        biometricsEnabledForCurrentUser(true /* enabled */, TYPE_FINGERPRINT);
+    }
+
+    private void biometricsEnabledForCurrentUser(boolean enabled, int modality)
+            throws RemoteException {
+        mBiometricEnabledOnKeyguardCallback.onChanged(enabled,
+                mSelectedUserInteractor.getSelectedUserId(), modality);
     }
 
     private void primaryAuthNotRequiredByStrongAuthTracker() {
@@ -2596,7 +2716,8 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
                     mTaskStackChangeListeners, mSelectedUserInteractor, mActivityTaskManager,
                     () -> mAlternateBouncerInteractor,
                     () -> mJavaAdapter,
-                    () -> mSceneInteractor);
+                    () -> mSceneInteractor,
+                    mCommunalSceneInteractor);
             setAlternateBouncerVisibility(false);
             setPrimaryBouncerVisibility(false);
             setStrongAuthTracker(KeyguardUpdateMonitorTest.this.mStrongAuthTracker);

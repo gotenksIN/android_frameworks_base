@@ -75,16 +75,11 @@ annotation class SensitivityLevel {
     }
 }
 
-/** Preference interface that has a value persisted in datastore. */
-interface PersistentPreference<T> {
+/** Preference metadata that has a value persisted in datastore. */
+interface PersistentPreference<T> : PreferenceMetadata {
 
-    /**
-     * The value type the preference is associated with.
-     *
-     * TODO(b/388167302): Remove the default implementation once all subclasses are migrated.
-     */
-    val valueType: Class<T>?
-        get() = null
+    /** The value type the preference is associated with. */
+    val valueType: Class<T>
 
     /**
      * Returns the key-value storage of the preference.
@@ -93,7 +88,7 @@ interface PersistentPreference<T> {
      * [PreferenceScreenRegistry.getKeyValueStore].
      */
     fun storage(context: Context): KeyValueStore =
-        PreferenceScreenRegistry.getKeyValueStore(context, this as PreferenceMetadata)!!
+        PreferenceScreenRegistry.getKeyValueStore(context, this)!!
 
     /** Returns the required permissions to read preference value. */
     fun getReadPermissions(context: Context): Permissions? = null
@@ -111,7 +106,7 @@ interface PersistentPreference<T> {
             context,
             callingPid,
             callingUid,
-            this as PreferenceMetadata,
+            this,
         )
 
     /** Returns the required permissions to write preference value. */
@@ -136,7 +131,7 @@ interface PersistentPreference<T> {
             value,
             callingPid,
             callingUid,
-            this as PreferenceMetadata,
+            this,
         )
 
     /** The sensitivity level of the preference. */
@@ -203,19 +198,4 @@ interface DiscreteIntValue : DiscreteValue<Int> {
 
     override fun getValue(context: Context, index: Int): Int =
         context.resources.getIntArray(values)[index]
-}
-
-/** Value is between a range. */
-interface RangeValue : ValueDescriptor {
-    /** The lower bound (inclusive) of the range. */
-    fun getMinValue(context: Context): Int
-
-    /** The upper bound (inclusive) of the range. */
-    fun getMaxValue(context: Context): Int
-
-    /** The increment step within the range. 0 means unset, which implies step size is 1. */
-    fun getIncrementStep(context: Context) = 0
-
-    override fun isValidValue(context: Context, index: Int) =
-        index in getMinValue(context)..getMaxValue(context)
 }

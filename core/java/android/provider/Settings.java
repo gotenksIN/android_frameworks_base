@@ -353,6 +353,18 @@ public final class Settings {
      */
     public static final String ACTION_ONE_HANDED_SETTINGS =
             "android.settings.action.ONE_HANDED_SETTINGS";
+
+    /**
+     * Activity Action: Show Double tap power gesture Settings page.
+     * <p>
+     * Input: Nothing
+     * <p>
+     * Output: Nothing
+     * @hide
+     */
+    public static final String ACTION_DOUBLE_TAP_POWER_SETTINGS =
+            "android.settings.action.DOUBLE_TAP_POWER_SETTINGS";
+
     /**
      * The return values for {@link Settings.Config#set}
      * @hide
@@ -6327,6 +6339,17 @@ public final class Settings {
         public static final String TOUCHPAD_SYSTEM_GESTURES = "touchpad_system_gestures";
 
         /**
+         * Whether touchpad acceleration is enabled.
+         *
+         * When enabled, the speed of the pointer will increase as the user moves their
+         * finger faster on the touchpad.
+         *
+         * @hide
+         */
+        public static final String TOUCHPAD_ACCELERATION_ENABLED =
+                "touchpad_acceleration_enabled";
+
+        /**
          * Whether to enable reversed vertical scrolling for connected mice.
          *
          * When enabled, scrolling down on the mouse wheel will move the screen up and vice versa.
@@ -6621,6 +6644,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(TOUCHPAD_TAP_DRAGGING);
             PRIVATE_SETTINGS.add(TOUCHPAD_RIGHT_CLICK_ZONE);
             PRIVATE_SETTINGS.add(TOUCHPAD_SYSTEM_GESTURES);
+            PRIVATE_SETTINGS.add(TOUCHPAD_ACCELERATION_ENABLED);
             PRIVATE_SETTINGS.add(CAMERA_FLASH_NOTIFICATION);
             PRIVATE_SETTINGS.add(SCREEN_FLASH_NOTIFICATION);
             PRIVATE_SETTINGS.add(SCREEN_FLASH_NOTIFICATION_COLOR);
@@ -9325,6 +9349,16 @@ public final class Settings {
                 "accessibility_autoclick_cursor_area_size";
 
         /**
+         * Setting that specifies whether minor cursor movement will be ignored when
+         * {@link #ACCESSIBILITY_AUTOCLICK_ENABLED} is set.
+         *
+         * @see #ACCESSIBILITY_AUTOCLICK_ENABLED
+         * @hide
+         */
+        public static final String ACCESSIBILITY_AUTOCLICK_IGNORE_MINOR_CURSOR_MOVEMENT =
+                "accessibility_autoclick_ignore_minor_cursor_movement";
+
+        /**
          * Whether or not larger size icons are used for the pointer of mouse/trackpad for
          * accessibility.
          * (0 = false, 1 = true)
@@ -10985,6 +11019,21 @@ public final class Settings {
         @Readable
         public static final String SHOW_NOTIFICATION_SNOOZE = "show_notification_snooze";
 
+        /**
+         * Controls whether dual shade is enabled. This splits notifications and quick settings to
+         * have their own independently expandable/collapsible panels, appearing on either side of
+         * the large screen (including unfolded device) or sharing a space on a narrow screen
+         * (including a folded device). Both panels will now cover the screen only partially
+         * (wrapping their content), so a running app or the lockscreen will remain visible in the
+         * background.
+         * <p>
+         * Type: int (0 for false, 1 for true)
+         *
+         * @hide
+         */
+        @android.provider.Settings.Readable
+        public static final String DUAL_SHADE = "dual_shade";
+
        /**
          * 1 if it is allowed to remove the primary GAIA account. 0 by default.
          * @hide
@@ -11357,17 +11406,54 @@ public final class Settings {
 
         /**
          * Whether or not biometric is allowed on Keyguard.
+         *
+         * @deprecated Use {@link #FINGERPRINT_KEYGUARD_ENABLED} or {@link #FACE_KEYGUARD_ENABLED}
+         * instead.
+         *
          * @hide
          */
+        @Deprecated
         @Readable
         public static final String BIOMETRIC_KEYGUARD_ENABLED = "biometric_keyguard_enabled";
 
         /**
          * Whether or not biometric is allowed for apps (through BiometricPrompt).
+         *
+         * @deprecated Use {@link #FINGERPRINT_APP_ENABLED} or {@link #FACE_APP_ENABLED} instead.
+         *
+         * @hide
+         */
+        @Deprecated
+        @Readable
+        public static final String BIOMETRIC_APP_ENABLED = "biometric_app_enabled";
+
+        /**
+         * Whether or not fingerprint is allowed on Keyguard.
          * @hide
          */
         @Readable
-        public static final String BIOMETRIC_APP_ENABLED = "biometric_app_enabled";
+        public static final String FINGERPRINT_KEYGUARD_ENABLED = "fingerprint_keyguard_enabled";
+
+        /**
+         * Whether or not fingerprint is allowed for apps (through BiometricPrompt).
+         * @hide
+         */
+        @Readable
+        public static final String FINGERPRINT_APP_ENABLED = "fingerptint_app_enabled";
+
+        /**
+         * Whether or not face is allowed on Keyguard.
+         * @hide
+         */
+        @Readable
+        public static final String FACE_KEYGUARD_ENABLED = "face_keyguard_enabled";
+
+        /**
+         * Whether or not face is allowed for apps (through BiometricPrompt).
+         * @hide
+         */
+        @Readable
+        public static final String FACE_APP_ENABLED = "face_app_enabled";
 
         /**
          * Whether or not mandatory biometrics is enabled.
@@ -12355,12 +12441,6 @@ public final class Settings {
          */
         @Readable
         public static final String CAMERA_EXTENSIONS_FALLBACK = "camera_extensions_fallback";
-
-        /**
-         * Controls whether contextual suggestions can be shown in the media controls.
-         * @hide
-         */
-        public static final String MEDIA_CONTROLS_RECOMMENDATION = "qs_media_recommend";
 
         /**
          * Controls magnification mode when magnification is enabled via a system-wide triple tap
@@ -13732,6 +13812,16 @@ public final class Settings {
         @Readable
         public static final String DEVELOPMENT_ENABLE_FREEFORM_WINDOWS_SUPPORT
                 = "enable_freeform_support";
+
+        /**
+         * Whether to override the availability of the desktop experiences features on the
+         * device. With desktop experiences enabled, secondary displays can be used to run
+         * apps, in desktop mode by default. Otherwise they can only be used for mirroring.
+         * @hide
+         */
+        @Readable
+        public static final String DEVELOPMENT_OVERRIDE_DESKTOP_EXPERIENCE_FEATURES =
+                "override_desktop_experience_features";
 
         /**
          * Whether to override the availability of the desktop mode on the main display of the

@@ -674,6 +674,8 @@ public class TelephonyManager {
         static final int PSEUDO_DSDA = 2;
         /** Concurrent calls on both subscriptions are possible */
         static final int DSDA = 3;
+        /** MultiSimVoiceCapability is unsupported/deprecated */
+        static final int UNSUPPORTED = 4;
     }
 
     /**

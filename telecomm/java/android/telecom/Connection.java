@@ -873,14 +873,6 @@ public abstract class Connection extends Conferenceable {
             "android.telecom.extra.IS_DEVICE_TO_DEVICE_COMMUNICATION_AVAILABLE";
 
     /**
-     * Boolean connection extra key set on a {@link Connection} to indicate that swapping
-     * the call is not allowed.
-     * @hide
-     */
-    public static final String EXTRA_DISABLE_SWAP_CALL =
-            "android.telecom.extra.DISABLE_SWAP_CALL";
-
-    /**
      * Connection event used to inform Telecom that it should play the on hold tone.  This is used
      * to play a tone when the peer puts the current call on hold.  Sent to Telecom via
      * {@link #sendConnectionEvent(String, Bundle)}.
@@ -927,17 +919,6 @@ public abstract class Connection extends Conferenceable {
      * expected to be null when this connection event is used.
      */
     public static final String EVENT_CALL_HOLD_FAILED = "android.telecom.event.CALL_HOLD_FAILED";
-
-    /**
-     * Connection event used to inform Telecom when a resume operation on a call has failed.
-     * This event is only sent when concurrent calls (DSDA) are possible
-     * <p>
-     * Sent via {@link #sendConnectionEvent(String, Bundle)}.  The {@link Bundle} parameter is
-     * expected to be null when this connection event is used.
-     * @hide
-     */
-    public static final String EVENT_CALL_RESUME_FAILED =
-            "android.telecom.event.CALL_RESUME_FAILED";
 
     /**
      * Connection event used to inform Telecom when a switch operation on a call has failed.

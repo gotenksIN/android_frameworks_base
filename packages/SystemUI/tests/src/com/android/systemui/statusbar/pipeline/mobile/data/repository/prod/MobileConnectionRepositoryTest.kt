@@ -19,7 +19,9 @@ package com.android.systemui.statusbar.pipeline.mobile.data.repository.prod
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
 import android.net.ConnectivityManager
+// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
 import android.net.ConnectivityManager.NetworkCallback
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
@@ -94,13 +96,17 @@ import com.android.systemui.statusbar.pipeline.mobile.data.repository.prod.Mobil
 import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.toMobileDataActivityModel
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 import com.android.systemui.statusbar.policy.FiveGServiceClient
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.mockito.withArgCaptor
 import com.google.common.truth.Truth.assertThat
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 import com.qti.extphone.NrIconType
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -112,7 +118,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 import org.mockito.Mockito
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
@@ -140,7 +148,9 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             SUB_1_ID,
             createTestConfig(),
         )
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
     private val fiveGServiceClient = FiveGServiceClient(mContext)
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher)
@@ -176,7 +186,9 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
                 tableLogger,
                 flags,
                 testScope.backgroundScope,
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
                 fiveGServiceClient,
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
             )
     }
 

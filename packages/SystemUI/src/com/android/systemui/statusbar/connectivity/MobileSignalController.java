@@ -15,39 +15,57 @@
  */
 package com.android.systemui.statusbar.connectivity;
 
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
 import static android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN;
 import static android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_NONE;
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
 import static com.android.settingslib.mobile.MobileMappings.toDisplayIconKey;
 import static com.android.settingslib.mobile.MobileMappings.toIconKey;
 import static android.telephony.TelephonyManager.UNKNOWN_CARRIER_ID;
 
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
 import android.content.BroadcastReceiver;
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
 import android.content.Context;
 import android.content.Intent;
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
 import android.content.IntentFilter;
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
 import android.content.res.Resources;
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
 import android.database.ContentObserver;
+// QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
 import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.net.Network;
+// QTI_END: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
 import android.net.NetworkCapabilities;
+// QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
 import android.net.NetworkRequest;
 import android.net.TelephonyNetworkSpecifier;
+// QTI_END: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings.Global;
 import android.telephony.CellSignalStrength;
 import android.telephony.CellSignalStrengthCdma;
+// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
 import android.telephony.CellSignalStrengthNr;
+// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
 import android.telephony.ims.ImsMmTelManager;
 import android.telephony.ims.feature.MmTelFeature;
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
 import android.telephony.SignalStrength;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyDisplayInfo;
 import android.telephony.TelephonyManager;
 import android.telephony.ims.ImsException;
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
 import android.telephony.ims.ImsStateCallback;
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
 import android.telephony.ims.ImsMmTelManager;
 import android.text.Html;
 import android.text.TextUtils;
@@ -66,9 +84,11 @@ import com.android.settingslib.net.SignalStrengthUtil;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor;
 import com.android.systemui.statusbar.pipeline.mobile.util.MobileMappingsProxy;
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener;
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
 import com.android.systemui.util.CarrierConfigTracker;
 
 import java.io.PrintWriter;
@@ -110,20 +130,32 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
     // Where to copy the next state into.
     private int mMobileStatusHistoryIndex;
 
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
     private int mCallState = TelephonyManager.CALL_STATE_IDLE;
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
 
+// QTI_BEGIN: 2019-08-06: Android_UI: SystemUI: Align side-car signal strength level to aosp
     /****************************SideCar****************************/
+// QTI_END: 2019-08-06: Android_UI: SystemUI: Align side-car signal strength level to aosp
+// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
     @VisibleForTesting
     FiveGStateListener mFiveGStateListener;
     @VisibleForTesting
     FiveGServiceState mFiveGState;
+// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
+// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
     private FiveGServiceClient mClient;
+// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     /**********************************************************/
 
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
     private ConnectivityManager mConnectivityManager;
     private ConnectivityManager.NetworkCallback mNetworkCallback;
     private boolean mIsConnectionFailed = false;
 
+// QTI_END: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
     private final MobileStatusTracker.Callback mMobileCallback =
             new MobileStatusTracker.Callback() {
                 private String mLastStatus;
@@ -131,7 +163,9 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                 @Override
                 public void onMobileStatusChanged(boolean updateTelephony,
                         MobileStatus mobileStatus) {
+// QTI_BEGIN: 2022-04-11: Android_UI: SystemUI: Fix issue that log can't be enabled in MobileSignalController
                     if (DEBUG) {
+// QTI_END: 2022-04-11: Android_UI: SystemUI: Fix issue that log can't be enabled in MobileSignalController
                         Log.d(mTag, "onMobileStatusChanged="
                                 + " updateTelephony=" + updateTelephony
                                 + " mobileStatus=" + mobileStatus.toString());
@@ -179,8 +213,12 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         mDefaults = defaults;
         mSubscriptionInfo = info;
         mMobileMappingsProxy = mobileMappingsProxy;
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         mFiveGStateListener = new FiveGStateListener();
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Use same URI format for SSSS and DSDS
         mFiveGState = new FiveGServiceState();
+// QTI_END: 2018-12-18: Android_UI: SystemUI: Use same URI format for SSSS and DSDS
         mNetworkNameSeparator = getTextIfExists(
                 R.string.status_bar_network_name_separator).toString();
         mNetworkNameDefault = getTextIfExists(
@@ -204,6 +242,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         };
         mImsMmTelManager = ImsMmTelManager.createForSubscriptionId(info.getSubscriptionId());
         mMobileStatusTracker = mobileStatusTrackerFactory.createTracker(mMobileCallback);
+// QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
         mNetworkCallback = new NetworkCallback(NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
             @Override
             public void onCapabilitiesChanged(Network network, NetworkCapabilities nc) {
@@ -211,6 +250,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                     !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
             }
         };
+// QTI_END: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
     }
 
     void setConfiguration(Config config) {
@@ -255,21 +295,34 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         mContext.getContentResolver().registerContentObserver(Global.getUriFor(
                 Global.MOBILE_DATA + mSubscriptionInfo.getSubscriptionId()),
                 true, mObserver);
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
         mContext.getContentResolver().registerContentObserver(Global.getUriFor(Global.DATA_ROAMING),
                 true, mObserver);
         mContext.getContentResolver().registerContentObserver(Global.getUriFor(
                 Global.DATA_ROAMING + mSubscriptionInfo.getSubscriptionId()),
                 true, mObserver);
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
         mContext.registerReceiver(mVolteSwitchObserver,
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
+// QTI_BEGIN: 2023-06-26: Android_UI: SystemUI:Mofify register receiver as exported in MobileSignalController
                 new IntentFilter("org.codeaurora.intent.action.ACTION_ENHANCE_4G_SWITCH"), Context.RECEIVER_EXPORTED);
+// QTI_END: 2023-06-26: Android_UI: SystemUI:Mofify register receiver as exported in MobileSignalController
+// QTI_BEGIN: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
         if (mConfig.showVolteIcon || mConfig.showVowifiIcon) {
+// QTI_END: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
             try {
                 mImsMmTelManager.registerImsStateCallback(mContext.getMainExecutor(),
                         mImsStateCallback);
             }catch (ImsException exception) {
                 Log.e(mTag, "failed to call registerImsStateCallback ", exception);
             }
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
+// QTI_BEGIN: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
         }
+// QTI_END: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
+// QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
         mConnectivityManager = (ConnectivityManager)
             mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkRequest.Builder builder = new NetworkRequest.Builder();
@@ -280,6 +333,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         builder.setNetworkSpecifier(specifier);
         final NetworkRequest request = builder.build();
         mConnectivityManager.registerNetworkCallback(request, mNetworkCallback);
+// QTI_END: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
     }
 
     /**
@@ -288,13 +342,23 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
     public void unregisterListener() {
         mMobileStatusTracker.setListening(false);
         mContext.getContentResolver().unregisterContentObserver(mObserver);
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
         mContext.unregisterReceiver(mVolteSwitchObserver);
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
+// QTI_BEGIN: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
         if (mConfig.showVolteIcon || mConfig.showVowifiIcon) {
+// QTI_END: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
             mImsMmTelManager.unregisterImsStateCallback(mImsStateCallback);
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
+// QTI_BEGIN: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
         }
+// QTI_END: 2022-04-11: Android_UI: SystemUI: Monitor IMS state only when VoLTE or VoWIFI icon is enabled
+// QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
         if (mNetworkCallback != null) {
             mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
         }
+// QTI_END: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
     }
 
     private void updateInflateSignalStrength() {
@@ -314,27 +378,43 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         if (mCurrentState.iconGroup == TelephonyIcons.CARRIER_NETWORK_CHANGE) {
             return SignalDrawable.getCarrierChangeState(getNumLevels());
         } else if (mCurrentState.connected) {
+// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Use same URI format for SSSS and DSDS
             int level = mCurrentState.level;
+// QTI_END: 2018-12-18: Android_UI: SystemUI: Use same URI format for SSSS and DSDS
             if (mInflateSignalStrengths) {
                 level++;
             }
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
 
             boolean dataDisabled = mCurrentState.userSetup
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
                     && (mCurrentState.iconGroup == TelephonyIcons.DATA_DISABLED
                     || (mCurrentState.iconGroup == TelephonyIcons.NOT_DEFAULT_DATA
                             && mCurrentState.defaultDataOff));
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
             boolean noInternet = mCurrentState.inetCondition == 0;
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
+// QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
             boolean isDataEnabled = mCurrentState.mobileDataEnabled;
             boolean isDataConnected = mCurrentState.dataState == TelephonyManager.DATA_CONNECTED;
             boolean isInService = isInService();
             boolean cutOut = !isDataEnabled
                 || (isDataConnected && mIsConnectionFailed) || !isInService;
+// QTI_END: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
+// QTI_BEGIN: 2019-02-14: Android_UI: SystemUI: Refactor QTI features
             if (mConfig.hideNoInternetState) {
+// QTI_END: 2019-02-14: Android_UI: SystemUI: Refactor QTI features
+// QTI_BEGIN: 2018-06-20: Android_UI: SystemUI: Config no internet statue
                 cutOut = false;
             }
+// QTI_END: 2018-06-20: Android_UI: SystemUI: Config no internet statue
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
             return SignalDrawable.getState(level, getNumLevels(), cutOut);
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
         } else if (mCurrentState.enabled) {
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
             return SignalDrawable.getEmptyState(getNumLevels());
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
         } else {
             return 0;
         }
@@ -345,34 +425,55 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         return getCurrentIconId();
     }
 
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
     private int getVolteResId() {
         int resId = 0;
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
+// QTI_BEGIN: 2022-03-08: Android_UI: SystemUI: Enable customization VoLTE and VoWIFI icon
         int voiceNetTye = mCurrentState.getVoiceNetworkType();
+// QTI_END: 2022-03-08: Android_UI: SystemUI: Enable customization VoLTE and VoWIFI icon
+// QTI_BEGIN: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
         if ( (mCurrentState.voiceCapable || mCurrentState.videoCapable)
                 &&  mCurrentState.imsRegistered ) {
+// QTI_END: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
             resId = R.drawable.ic_volte;
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
         }else if ( (mCurrentState.telephonyDisplayInfo.getNetworkType() == TelephonyManager.NETWORK_TYPE_LTE
                     || mCurrentState.telephonyDisplayInfo.getNetworkType() ==
                         TelephonyManager.NETWORK_TYPE_LTE_CA)
+// QTI_BEGIN: 2019-12-17: Android_UI: SystemUI: Update the condition to show no voice icon
                     && voiceNetTye  == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
+// QTI_END: 2019-12-17: Android_UI: SystemUI: Update the condition to show no voice icon
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
             resId = R.drawable.ic_volte_no_voice;
         }
         return resId;
     }
 
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
     private void setListeners() {
         try {
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
             Log.d(mTag, "setListeners: register CapabilitiesCallback and RegistrationCallback");
             mImsMmTelManager.registerMmTelCapabilityCallback(mContext.getMainExecutor(),
                     mCapabilityCallback);
         } catch (ImsException e) {
             Log.e(mTag, "unable to register listeners.", e);
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
         }
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Query IMS state after CapabilityCallback is regisered
         queryImsState();
     }
 
     private void queryImsState() {
         TelephonyManager tm = mPhone.createForSubscriptionId(mSubscriptionInfo.getSubscriptionId());
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Query IMS state after CapabilityCallback is regisered
+// QTI_BEGIN: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
         mCurrentState.voiceCapable = tm.isVolteAvailable();
         mCurrentState.videoCapable = tm.isVideoTelephonyAvailable();
         mCurrentState.imsRegistered = mPhone.isImsRegistered(mSubscriptionInfo.getSubscriptionId());
@@ -381,15 +482,26 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                     + " voiceCapable=" + mCurrentState.voiceCapable
                     + " videoCapable=" + mCurrentState.videoCapable
                     + " imsResitered=" + mCurrentState.imsRegistered);
+// QTI_END: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Query IMS state after CapabilityCallback is regisered
         }
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Query IMS state after CapabilityCallback is regisered
+// QTI_BEGIN: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
         notifyListenersIfNecessary();
+// QTI_END: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
     }
 
     private void removeListeners() {
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
         Log.d(mTag, "removeListeners: unregister CapabilitiesCallback and RegistrationCallback");
         mImsMmTelManager.unregisterMmTelCapabilityCallback(mCapabilityCallback);
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
+// QTI_BEGIN: 2018-08-28: Android_UI: SystemUI: Fix volte icon doesn't update in real time
     }
 
+// QTI_END: 2018-08-28: Android_UI: SystemUI: Fix volte icon doesn't update in real time
     @Override
     public void notifyListeners(SignalCallback callback) {
         // If the device is on carrier merged WiFi, we should let WifiSignalController to control
@@ -415,7 +527,9 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         final QsInfo qsInfo = getQsInfo(contentDescription, iconId);
         final SbInfo sbInfo = getSbInfo(contentDescription, iconId);
 
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
         int volteIcon = mConfig.showVolteIcon ? getVolteResId() : 0;
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
         MobileDataIndicators mobileDataIndicators = new MobileDataIndicators(
                 sbInfo.icon,
                 qsInfo.icon,
@@ -471,12 +585,15 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                 (showDataIconInStatusBar || mConfig.alwaysShowDataRatIcon) ? dataTypeIcon : 0;
         boolean showTriangle = mCurrentState.enabled && !mCurrentState.airplaneMode;
 
+// QTI_BEGIN: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
         if ( mConfig.enableRatIconEnhancement ) {
             typeIcon = getEnhancementDataRatIcon();
         }else if ( mConfig.enableDdsRatIconEnhancement ) {
             typeIcon = getEnhancementDdsRatIcon();
         }
 
+// QTI_END: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
+// QTI_BEGIN: 2022-03-08: Android_UI: SystemUI: Enable customization VoLTE and VoWIFI icon
         MobileIconGroup vowifiIconGroup = getVowifiIconGroup();
         if (mConfig.showVowifiIcon && vowifiIconGroup != null) {
             typeIcon = vowifiIconGroup.dataType;
@@ -485,6 +602,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                     statusIcon.contentDescription);
         }
 
+// QTI_END: 2022-03-08: Android_UI: SystemUI: Enable customization VoLTE and VoWIFI icon
         return new SbInfo(showTriangle, typeIcon, statusIcon);
     }
 
@@ -626,7 +744,9 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
      * This will call listeners if necessary.
      */
     private void updateTelephony() {
+// QTI_BEGIN: 2022-04-11: Android_UI: SystemUI: Fix issue that log can't be enabled in MobileSignalController
         if (DEBUG) {
+// QTI_END: 2022-04-11: Android_UI: SystemUI: Fix issue that log can't be enabled in MobileSignalController
             Log.d(mTag, "updateTelephonySignalStrength: hasService="
                     + mCurrentState.isInService()
                     + " ss=" + mCurrentState.signalStrength
@@ -637,6 +757,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         if (mCurrentState.connected) {
             mCurrentState.level = getSignalLevel(mCurrentState.signalStrength);
             if (mConfig.showRsrpSignalLevelforLTE) {
+// QTI_BEGIN: 2022-03-08: Android_UI: SystemUI: Enable customization signal strength level
                  if (DEBUG) {
                      Log.d(mTag, "updateTelephony CS:" + mCurrentState.getVoiceNetworkType()
                              + "/" + TelephonyManager.getNetworkTypeName(
@@ -656,6 +777,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                          mCurrentState.level = getAlternateLteLevel(mCurrentState.signalStrength);
                      }
                  }
+// QTI_END: 2022-03-08: Android_UI: SystemUI: Enable customization signal strength level
             }
         }
 
@@ -667,14 +789,22 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
             mCurrentState.iconGroup = mDefaultIcons;
         }
 
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
         //Modem has centralized logic to display 5G icon based on carrier requirements
         //For 5G icon display, only query NrIconType reported by modem
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
+// QTI_BEGIN: 2020-07-09: Android_UI: SystemUI: Remove deprecated code
         if ( mFiveGState.isNrIconTypeValid() ) {
+// QTI_END: 2020-07-09: Android_UI: SystemUI: Remove deprecated code
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
             mCurrentState.iconGroup = mFiveGState.getIconGroup();
         }else {
             mCurrentState.iconGroup = getNetworkTypeIconGroup();
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
+// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
         }
 
+// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
         mCurrentState.dataConnected = mCurrentState.isDataConnected();
 
         mCurrentState.roaming = isRoaming();
@@ -704,17 +834,31 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         }
 
 
+// QTI_BEGIN: 2019-12-17: Android_UI: SystemUI: Show 5G icon for CMCC/CT mode
         if ( mConfig.alwaysShowNetworkTypeIcon ) {
+// QTI_END: 2019-12-17: Android_UI: SystemUI: Show 5G icon for CMCC/CT mode
+// QTI_BEGIN: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
             if(!mCurrentState.connected) {
                 mCurrentState.iconGroup = TelephonyIcons.UNKNOWN;
             }else if (mFiveGState.isNrIconTypeValid()) {
+// QTI_END: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
                 mCurrentState.iconGroup = mFiveGState.getIconGroup();
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
+// QTI_BEGIN: 2019-12-17: Android_UI: SystemUI: Show 5G icon for CMCC/CT mode
             }else {
+// QTI_END: 2019-12-17: Android_UI: SystemUI: Show 5G icon for CMCC/CT mode
+// QTI_BEGIN: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
                 mCurrentState.iconGroup = getNetworkTypeIconGroup();
+// QTI_END: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
+// QTI_BEGIN: 2019-04-28: Android_UI: SystemUI: Rework qti feature
             }
         }
+// QTI_END: 2019-04-28: Android_UI: SystemUI: Rework qti feature
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
         mCurrentState.mobileDataEnabled = mPhone.isDataEnabled();
         mCurrentState.roamingDataEnabled = mPhone.isDataRoamingEnabled();
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 
         notifyListenersIfNecessary();
     }
@@ -740,9 +884,12 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         return !mPhone.isDataConnectionAllowed();
     }
 
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
     private boolean isDataNetworkTypeAvailable() {
         boolean isAvailable = true;
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
         if (mCurrentState.telephonyDisplayInfo.getNetworkType() == TelephonyManager.NETWORK_TYPE_UNKNOWN ) {
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
             isAvailable = false;
         }else {
             int dataType = getDataNetworkType();
@@ -757,37 +904,57 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                     || voiceType == TelephonyManager.NETWORK_TYPE_CDMA)
                     && ( !isCallIdle() )) {
                 isAvailable = false;
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
             }
         }
 
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
         return isAvailable;
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
     }
 
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
     private boolean isCallIdle() {
         return mCallState == TelephonyManager.CALL_STATE_IDLE;
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Refactort CMCC requirements
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
     }
 
     private int getVoiceNetworkType() {
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
         // TODO(b/214591923)
         //return mServiceState != null ?
         //        mServiceState.getVoiceNetworkType() : TelephonyManager.NETWORK_TYPE_UNKNOWN;
         return TelephonyManager.NETWORK_TYPE_UNKNOWN;
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
     }
 
     private int getDataNetworkType() {
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
         // TODO(b/214591923)
         //return mServiceState != null ?
         //        mServiceState.getDataNetworkType() : TelephonyManager.NETWORK_TYPE_UNKNOWN;
         return TelephonyManager.NETWORK_TYPE_UNKNOWN;
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
     }
 
     private int getAlternateLteLevel(SignalStrength signalStrength) {
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
+// QTI_BEGIN: 2022-03-08: Android_UI: SystemUI: Enable customization signal strength level
         if (signalStrength == null) {
             Log.e(mTag, "getAlternateLteLevel signalStrength is null");
             return 0;
         }
 
+// QTI_END: 2022-03-08: Android_UI: SystemUI: Enable customization signal strength level
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
         int lteRsrp = signalStrength.getLteDbm();
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
+// QTI_BEGIN: 2018-05-07: Android_UI: SystemUI: Show signal strength based on PS/CS's RSRP for LTE
         if ( lteRsrp == SignalStrength.INVALID ) {
             int signalStrengthLevel = signalStrength.getLevel();
             if (DEBUG) {
@@ -797,6 +964,8 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
             return signalStrengthLevel;
         }
 
+// QTI_END: 2018-05-07: Android_UI: SystemUI: Show signal strength based on PS/CS's RSRP for LTE
+// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
         int rsrpLevel = SignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
         if (lteRsrp > -44) rsrpLevel = SignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
         else if (lteRsrp >= -97) rsrpLevel = SignalStrength.SIGNAL_STRENGTH_GREAT;
@@ -810,6 +979,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         return rsrpLevel;
     }
 
+// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
     @VisibleForTesting
     void setActivity(int activity) {
         mCurrentState.activityIn = activity == TelephonyManager.DATA_ACTIVITY_INOUT
@@ -824,29 +994,56 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         mMobileStatusHistoryIndex = (mMobileStatusHistoryIndex + 1) % STATUS_HISTORY_SIZE;
     }
 
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     public void registerFiveGStateListener(FiveGServiceClient client) {
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
         int phoneId = mSubscriptionInfo.getSimSlotIndex();
+// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         client.registerListener(phoneId, mFiveGStateListener);
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
         mClient = client;
+// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     }
 
     public void unregisterFiveGStateListener(FiveGServiceClient client) {
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_BEGIN: 2019-06-18: Android_UI: SystemUI: Fix 5G icon not shown issue.
         int phoneId = mSubscriptionInfo.getSimSlotIndex();
+// QTI_END: 2019-06-18: Android_UI: SystemUI: Fix 5G icon not shown issue.
+// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
         client.unregisterListener(phoneId, mFiveGStateListener);
+// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     }
 
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
     private MobileIconGroup getNetworkTypeIconGroup() {
         MobileIconGroup iconGroup = mDefaultIcons;
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
         int overrideNetworkType = mCurrentState.telephonyDisplayInfo.getOverrideNetworkType();
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
         String iconKey = null;
         if (overrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NONE
                 || overrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE
                 || overrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ){
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
             int networkType = mCurrentState.telephonyDisplayInfo.getNetworkType();
+// QTI_BEGIN: 2020-04-20: Android_UI: SystemUI: Fix data icon not showing issue
             if (networkType == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
+// QTI_END: 2020-04-20: Android_UI: SystemUI: Fix data icon not showing issue
+// QTI_BEGIN: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
                 networkType = mCurrentState.getVoiceNetworkType();
+// QTI_END: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
+// QTI_BEGIN: 2020-04-20: Android_UI: SystemUI: Fix data icon not showing issue
             }
             iconKey = toIconKey(networkType);
+// QTI_END: 2020-04-20: Android_UI: SystemUI: Fix data icon not showing issue
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
         } else{
             iconKey = toDisplayIconKey(overrideNetworkType);
         }
@@ -854,6 +1051,8 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         return mNetworkToIconLookup.getOrDefault(iconKey, mDefaultIcons);
     }
 
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
     private boolean showDataRatIcon() {
         boolean result = false;
         if ( mCurrentState.mobileDataEnabled ) {
@@ -865,11 +1064,19 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
     }
 
     private int getEnhancementDataRatIcon() {
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
+// QTI_BEGIN: 2021-01-25: Android_UI: SystemUI: Don't show network type icon if device is in limited service
         return showDataRatIcon() && mCurrentState.connected ? getRatIconGroup().dataType : 0;
+// QTI_END: 2021-01-25: Android_UI: SystemUI: Don't show network type icon if device is in limited service
+// QTI_BEGIN: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
     }
 
     private int getEnhancementDdsRatIcon() {
+// QTI_END: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
+// QTI_BEGIN: 2021-01-25: Android_UI: SystemUI: Don't show network type icon if device is in limited service
         return mCurrentState.dataSim && mCurrentState.connected ? getRatIconGroup().dataType : 0;
+// QTI_END: 2021-01-25: Android_UI: SystemUI: Don't show network type icon if device is in limited service
+// QTI_BEGIN: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
     }
 
     private MobileIconGroup getRatIconGroup() {
@@ -878,13 +1085,25 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
             iconGroup = mFiveGState.getIconGroup();
         }else {
             iconGroup = getNetworkTypeIconGroup();
+// QTI_END: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
         }
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
+// QTI_BEGIN: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
         return iconGroup;
+// QTI_END: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
     }
 
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
+// QTI_BEGIN: 2020-06-01: Android_UI: SystemUI: support VoWIFI icons
     private boolean isVowifiAvailable() {
+// QTI_END: 2020-06-01: Android_UI: SystemUI: support VoWIFI icons
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         return mCurrentState.voiceCapable
                 && mCurrentState.imsRegistrationTech == REGISTRATION_TECH_IWLAN;
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
+// QTI_BEGIN: 2020-06-01: Android_UI: SystemUI: support VoWIFI icons
     }
 
     private MobileIconGroup getVowifiIconGroup() {
@@ -897,19 +1116,24 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         }
     }
 
+// QTI_END: 2020-06-01: Android_UI: SystemUI: support VoWIFI icons
     @Override
     public void dump(PrintWriter pw) {
         super.dump(pw);
         pw.println("  mSubscription=" + mSubscriptionInfo + ",");
         pw.println("  mInflateSignalStrengths=" + mInflateSignalStrengths + ",");
         pw.println("  isDataDisabled=" + isDataDisabled() + ",");
+// QTI_BEGIN: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
         pw.println("  mConfig.enableRatIconEnhancement=" + mConfig.enableRatIconEnhancement + ",");
         pw.println("  mConfig.enableDdsRatIconEnhancement="
                 + mConfig.enableDdsRatIconEnhancement + ",");
         pw.println("  mConfig.alwaysShowNetworkTypeIcon="
                 + mConfig.alwaysShowNetworkTypeIcon + ",");
+// QTI_END: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
+// QTI_BEGIN: 2022-03-08: Android_UI: SystemUI: Enable customization VoLTE and VoWIFI icon
         pw.println("  mConfig.showVowifiIcon=" +  mConfig.showVowifiIcon + ",");
         pw.println("  mConfig.showVolteIcon=" +  mConfig.showVolteIcon + ",");
+// QTI_END: 2022-03-08: Android_UI: SystemUI: Enable customization VoLTE and VoWIFI icon
         pw.println("  mNetworkToIconLookup=" + mNetworkToIconLookup + ",");
         pw.println("  mMobileStatusTracker.isListening=" + mMobileStatusTracker.isListening());
         pw.println("  MobileStatusHistory");
@@ -926,46 +1150,77 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
                     + (mMobileStatusHistoryIndex + STATUS_HISTORY_SIZE - i) + "): "
                     + mMobileStatusHistory[i & (STATUS_HISTORY_SIZE - 1)]);
         }
+// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Add 5G states into dump logs
         pw.println("  mFiveGState=" + mFiveGState + ",");
+// QTI_END: 2018-12-18: Android_UI: SystemUI: Add 5G states into dump logs
 
         dumpTableData(pw);
     }
 
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     class FiveGStateListener implements IFiveGStateListener{
 
         public void onStateChanged(FiveGServiceState state) {
             if (DEBUG) {
                 Log.d(mTag, "onStateChanged: state=" + state);
             }
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             mFiveGState = state;
+// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
+// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
             updateTelephony();
+// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
             notifyListeners();
         }
     }
 
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
     private ImsMmTelManager.CapabilityCallback mCapabilityCallback
         = new ImsMmTelManager.CapabilityCallback() {
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
         @Override
         public void onCapabilitiesStatusChanged(MmTelFeature.MmTelCapabilities config) {
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
+// QTI_BEGIN: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
             mCurrentState.voiceCapable =
+// QTI_END: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
                     config.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE);
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
+// QTI_BEGIN: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
             mCurrentState.videoCapable =
+// QTI_END: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
                     config.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO);
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
+// QTI_BEGIN: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
             Log.d(mTag, "onCapabilitiesStatusChanged isVoiceCapable=" + mCurrentState.voiceCapable
                     + " isVideoCapable=" + mCurrentState.videoCapable);
+// QTI_END: 2019-04-28: Android_UI: SystemUI: Enhancement for volte icon
+// QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
             notifyListenersIfNecessary();
         }
     };
+// QTI_END: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
 
     private final BroadcastReceiver mVolteSwitchObserver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             Log.d(mTag, "action=" + intent.getAction());
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
+// QTI_BEGIN: 2018-09-19: Android_UI: SystemUI: Refactor the feature of volte icon
             if ( mConfig.showVolteIcon ) {
                 notifyListeners();
             }
+// QTI_END: 2018-09-19: Android_UI: SystemUI: Refactor the feature of volte icon
+// QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
         }
     };
+// QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
 
+// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
     private final ImsStateCallback mImsStateCallback = new ImsStateCallback() {
         @Override
         public void onUnavailable(int reason) {
@@ -986,6 +1241,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         }
     };
 
+// QTI_END: 2022-04-26: Android_UI: SystemUI: Use ImsStateCallback instead of FeatureConnector
     /** Box for QS icon info */
     private static final class QsInfo {
         final int ratTypeIcon;

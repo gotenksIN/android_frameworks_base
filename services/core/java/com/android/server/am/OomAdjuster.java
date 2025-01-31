@@ -81,7 +81,9 @@ import static android.os.Process.THREAD_GROUP_TOP_APP;
 import static android.os.Process.THREAD_PRIORITY_DISPLAY;
 import static android.os.Process.THREAD_PRIORITY_TOP_APP_BOOST;
 import static android.os.Process.setProcessGroup;
+// QTI_BEGIN: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
 import static android.os.Process.setCgroupProcsProcessGroup;
+// QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ALL;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BACKUP;
@@ -157,11 +159,15 @@ import android.os.PowerManagerInternal;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
 import android.os.SystemProperties;
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
 import android.os.Trace;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
 import android.util.BoostFramework;
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 
@@ -390,28 +396,52 @@ public class OomAdjuster {
     final ProcessList mProcessList;
     final ActivityManagerGlobalLock mProcLock;
 
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
     // Min aging threshold in milliseconds to consider a B-service
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
     int mMinBServiceAgingTime = 5000;
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
     // Threshold for B-services when in memory pressure
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
     int mBServiceAppThreshold = 5;
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
     // Enable B-service aging propagation on memory pressure.
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
     boolean mEnableBServicePropagation = false;
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
     // Process in same process Group keep in same cgroup
     boolean mEnableProcessGroupCgroupFollow = false;
     boolean mProcessGroupCgroupFollowDex2oatOnly = false;
+// QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
     // Enable hooks for background apps transition
     boolean mEnableBgt = false;
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
 
     public static BoostFramework mPerf = new BoostFramework();
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
 
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
     //Per Task Boost of top-app renderThread
     public static BoostFramework mPerfBoost = new BoostFramework();
     public static int mPerfHandle = -1;
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+// QTI_BEGIN: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
     public static int mCurAppPid = -1;
     public static int mCurRenderTid = -1;
+// QTI_END: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
     public static int mCurRenderThreadTid = -1;
     public static boolean mIsTopAppRenderThreadBoostEnabled = false;
 
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
     private final int mNumSlots;
     protected final ArrayList<ProcessRecord> mTmpProcessList = new ArrayList<ProcessRecord>();
     protected final ArrayList<ProcessRecord> mTmpProcessList2 = new ArrayList<ProcessRecord>();
@@ -543,16 +573,26 @@ public class OomAdjuster {
         mCacheOomRanker = new CacheOomRanker(service);
 
         mLogger = new OomAdjusterDebugLogger(this, mService.mConstants);
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
         if(mPerf != null) {
             mMinBServiceAgingTime = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_age", "5000"));
             mBServiceAppThreshold = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_limit", "5"));
             mEnableBServicePropagation = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_enable", "false"));
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
             mEnableProcessGroupCgroupFollow = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.enable", "false"));
             mProcessGroupCgroupFollowDex2oatOnly = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.dex2oat_only", "false"));
+// QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
             mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
             mEnableBgt = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.bgt.enable","false"));
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
         }
 
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
         mProcessGroupHandler = new Handler(adjusterThread.getLooper(), msg -> {
             final int group = msg.what;
             final ProcessRecord app = (ProcessRecord) msg.obj;
@@ -1404,9 +1444,11 @@ public class OomAdjuster {
         int numCachedExtraGroup = 0;
         int numEmpty = 0;
         int numTrimming = 0;
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
         ProcessRecord selectedAppRecord = null;
         long serviceLastActivity = 0;
         int numBServices = 0;
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
 
         boolean proactiveKillsEnabled = mConstants.PROACTIVE_KILLS_ENABLED;
         double lowSwapThresholdPercent = mConstants.LOW_SWAP_THRESHOLD_PERCENT;
@@ -1417,11 +1459,16 @@ public class OomAdjuster {
             ProcessRecord app = lruList.get(i);
             if (mEnableBServicePropagation && app.mState.isServiceB()
                     && (app.mState.getCurAdj() == ProcessList.SERVICE_B_ADJ)) {
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                 numBServices++;
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                 for (int s = app.mServices.numberOfRunningServices() - 1; s >= 0; s--) {
                     ServiceRecord sr = app.mServices.getRunningServiceAt(s);
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                     if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + app.processName
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                             + " serviceb = " + app.mState.isServiceB() + " s = " + s + " sr.lastActivity = "
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                             + sr.lastActivity + " packageName = " + sr.packageName
                             + " processName = " + sr.processName);
                     if (SystemClock.uptimeMillis() - sr.lastActivity
@@ -1442,6 +1489,7 @@ public class OomAdjuster {
             }
             if (DEBUG_OOM_ADJ && selectedAppRecord != null) Slog.d(TAG,
                     "Identified app.processName = " + selectedAppRecord.processName
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                     + " app.pid = " + selectedAppRecord.getPid());
             final ProcessStateRecord state = app.mState;
             if (!app.isKilledByAm() && app.getThread() != null) {
@@ -1584,14 +1632,22 @@ public class OomAdjuster {
         mLastFreeSwapPercent = freeSwapPercent;
 
         if ((numBServices > mBServiceAppThreshold) && (true == mService.mAppProfiler.allowLowerMemLevelLocked())
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                 && (selectedAppRecord != null)) {
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
             ProcessList.setOomAdj(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                     ProcessList.CACHED_APP_MAX_ADJ);
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
             selectedAppRecord.mState.setSetAdj(selectedAppRecord.mState.getCurAdj());
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
             if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + selectedAppRecord.processName
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                         + " app.pid = " + selectedAppRecord.getPid() + " is moved to higher adj");
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
         }
 
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
         mService.mAppProfiler.updateLowMemStateLSP(numCached, numEmpty, numTrimming, now);
     }
 
@@ -2097,24 +2153,33 @@ public class OomAdjuster {
             hasVisibleActivities = true;
             procState = PROCESS_STATE_TOP;
 
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
             if(mIsTopAppRenderThreadBoostEnabled) {
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
                 if(mCurRenderThreadTid != app.getRenderThreadTid() && app.getRenderThreadTid() > 0) {
                     mCurRenderThreadTid = app.getRenderThreadTid();
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
                     if (mPerfBoost != null) {
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
                         Slog.d(TAG, "TOP-APP: pid:" + app.getPid() + ", processName: "
                                + app.processName + ", renderThreadTid: " + app.getRenderThreadTid());
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
                         if (mPerfHandle >= 0) {
                             mPerfBoost.perfLockRelease();
                             mPerfHandle = -1;
                         }
                         mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_BOOST_RENDERTHREAD,
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
                                                           app.processName, app.getRenderThreadTid(), 1);
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
                         Slog.d(TAG, "VENDOR_HINT_BOOST_RENDERTHREAD perfHint was called. mPerfHandle: "
                                + mPerfHandle);
                     }
                 }
             }
 
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+// QTI_BEGIN: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
             if (mCurAppPid != app.getPid() && app.getPid() > 0) {
                 mCurAppPid = app.getPid();
                 if (mPerfBoost != null) {
@@ -2130,6 +2195,7 @@ public class OomAdjuster {
                 }
             }
 
+// QTI_END: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
             if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, "Making top: " + app);
             }
@@ -3665,7 +3731,10 @@ public class OomAdjuster {
             state.setSetRawAdj(state.getCurRawAdj());
         }
 
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         if (freezer != null && freezer.useFreezerManager()) {
             // unfreeze process if user press home key before the first frame appeared
             if ((state.getSetAdj() >= ProcessList.FOREGROUND_APP_ADJ &&
@@ -3684,6 +3753,7 @@ public class OomAdjuster {
             }
         }
 
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         int changes = 0;
 
         if (state.getCurAdj() != state.getSetAdj()) {
@@ -3692,31 +3762,45 @@ public class OomAdjuster {
 
         final int oldOomAdj = state.getSetAdj();
         if (state.getCurAdj() != state.getSetAdj()) {
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
             // Hooks for background apps transition
             if (mEnableBgt) {
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
                 if ((state.getSetAdj() >= ProcessList.CACHED_APP_MIN_ADJ &&
                         state.getSetAdj() <= ProcessList.CACHED_APP_MAX_ADJ) &&
                         state.getCurAdj() == ProcessList.FOREGROUND_APP_ADJ &&
                             state.hasForegroundActivities()) {
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
                     Slog.d(TAG,"App adj change from cached state to fg state : "
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
                             + app.getPid() + " " + app.processName);
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
                     if (mPerf != null) {
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
                         int fgAppPerfLockArgs[] = {BoostFramework.MPCTLV3_GPU_IS_APP_FG, app.getPid()};
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
                         mPerf.perfLockAcquire(10, fgAppPerfLockArgs);
                     }
                 }
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
                 if(state.getSetAdj() == ProcessList.PREVIOUS_APP_ADJ &&
                         (state.getCurAdj() >= ProcessList.CACHED_APP_MIN_ADJ &&
                         state.getCurAdj() <= ProcessList.CACHED_APP_MAX_ADJ) &&
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
                             app.hasActivities()) {
                     Slog.d(TAG,"App adj change from previous state to cached state : "
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
                             + app.getPid() + " " + app.processName);
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
                     if (mPerf != null) {
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
                         int bgAppPerfLockArgs[] = {BoostFramework.MPCTLV3_GPU_IS_APP_BG, app.getPid()};
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
                         mPerf.perfLockAcquire(10, bgAppPerfLockArgs);
                     }
                 }
             }
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
             if (isBatchingOomAdj && mConstants.ENABLE_BATCHING_OOM_ADJ) {
                 mProcsToOomAdj.add(app);
             } else {

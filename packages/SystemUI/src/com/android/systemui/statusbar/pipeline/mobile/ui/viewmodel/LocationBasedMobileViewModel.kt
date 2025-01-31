@@ -103,7 +103,9 @@ class ShadeCarrierGroupMobileIconViewModel(
         verboseLogger = null,
     ) {
     private val isSingleCarrier = interactor.isSingleCarrier
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
     val carrierName = interactor.customizedCarrierName
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 
     override val isVisible: StateFlow<Boolean> =
         combine(super.isVisible, isSingleCarrier) { isVisible, isSingleCarrier ->

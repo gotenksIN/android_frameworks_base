@@ -14,16 +14,22 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
 import android.telephony.TelephonyManager
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 import com.android.settingslib.mobile.TelephonyIcons
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 import com.android.systemui.Flags.statusBarStaticInoutIndicators
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
@@ -32,7 +38,9 @@ import com.android.systemui.flags.Flags.NEW_NETWORK_SLICE_UI
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
@@ -68,8 +76,12 @@ interface MobileIconViewModelCommon {
     val activityInVisible: Flow<Boolean>
     val activityOutVisible: Flow<Boolean>
     val activityContainerVisible: Flow<Boolean>
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
     val volteId: Flow<Int>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
     val showSignalStrengthIcon: Flow<Boolean>
+// QTI_END: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
 }
 
 /**
@@ -200,11 +212,15 @@ private class CellularIconViewModel(
                     airplaneModeInteractor.isAirplaneMode,
                     iconInteractor.isAllowedDuringAirplaneMode,
                     iconInteractor.isForceHidden,
+// QTI_BEGIN: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
                     iconInteractor.voWifiAvailable,
+// QTI_END: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
                 ) { isAirplaneMode, isAllowedDuringAirplaneMode, isForceHidden, voWifiAvailable ->
+// QTI_BEGIN: 2024-02-03: Android_UI: SystemUI: Modify logic to show Mobile icons when in VoWifi mode.
                     if (voWifiAvailable) {
                         true
                     } else if (isForceHidden) {
+// QTI_END: 2024-02-03: Android_UI: SystemUI: Modify logic to show Mobile icons when in VoWifi mode.
                         false
                     } else if (isAirplaneMode) {
                         isAllowedDuringAirplaneMode
@@ -284,33 +300,51 @@ private class CellularIconViewModel(
         combine(
                 iconInteractor.networkTypeIconGroup,
                 showNetworkTypeIcon,
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
                 iconInteractor.networkTypeIconCustomization,
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
                 iconInteractor.voWifiAvailable,
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-06-09: Android_UI: SystemUI: Fix show network type icon when oos
                 iconInteractor.isInService,
             ) { networkTypeIconGroup, shouldShow, networkTypeIconCustomization, voWifiAvailable,
                 isInService ->
+// QTI_END: 2023-06-09: Android_UI: SystemUI: Fix show network type icon when oos
                 val desc =
                     if (networkTypeIconGroup.contentDescription != 0)
                         ContentDescription.Resource(networkTypeIconGroup.contentDescription)
                     else null
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
                 val icon =
                     if (voWifiAvailable) {
                         Icon.Resource(TelephonyIcons.VOWIFI.dataType, desc)
                     } else {
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
                         if (networkTypeIconGroup.iconId != 0)
                             Icon.Resource(networkTypeIconGroup.iconId, desc)
                         else null
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
                     }
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
                 return@combine when {
+// QTI_BEGIN: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
                     voWifiAvailable -> icon
+// QTI_END: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
                     networkTypeIconCustomization.isRatCustomization -> {
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-06-09: Android_UI: SystemUI: Fix show network type icon when oos
                         if (shouldShowNetworkTypeIcon(networkTypeIconCustomization)
                             && isInService) {
+// QTI_END: 2023-06-09: Android_UI: SystemUI: Fix show network type icon when oos
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
                             icon
                         } else {
                             null
                         }
                     }
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
                     !shouldShow -> null
                     else -> icon
                 }
@@ -342,13 +376,18 @@ private class CellularIconViewModel(
             )
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
 
     override val volteId =
         combine (
                 iconInteractor.imsInfo,
                 iconInteractor.showVolteIcon,
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2024-07-14: Android_UI: SystemUI: Dismiss "cross symbol HD" icon when OOS
                 iconInteractor.isInService,
         ) { imsInfo, showVolteIcon, isInService ->
+// QTI_END: 2024-07-14: Android_UI: SystemUI: Dismiss "cross symbol HD" icon when OOS
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
              if (!showVolteIcon) {
                 return@combine 0
             }
@@ -358,7 +397,11 @@ private class CellularIconViewModel(
                 return@combine R.drawable.ic_volte
             } else if ((netWorkType == TelephonyManager.NETWORK_TYPE_LTE
                         || netWorkType == TelephonyManager.NETWORK_TYPE_LTE_CA)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2024-07-14: Android_UI: SystemUI: Dismiss "cross symbol HD" icon when OOS
                 && isInService
+// QTI_END: 2024-07-14: Android_UI: SystemUI: Dismiss "cross symbol HD" icon when OOS
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
                 && voiceNetworkType  == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
                 return@combine R.drawable.ic_volte_no_voice
             } else {
@@ -368,6 +411,8 @@ private class CellularIconViewModel(
         .distinctUntilChanged()
         .stateIn(scope, SharingStarted.WhileSubscribed(), 0)
 
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
     override val showSignalStrengthIcon =
         combine(
             airplaneModeInteractor.isAirplaneMode,
@@ -378,6 +423,7 @@ private class CellularIconViewModel(
         .distinctUntilChanged()
         .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
+// QTI_END: 2023-04-23: Android_UI: SystemUI: Fix VoWifi icon dose not display
     private val activity: Flow<DataActivityModel?> =
         if (!constants.shouldShowActivityConfig) {
             flowOf(null)
@@ -402,6 +448,7 @@ private class CellularIconViewModel(
                 activity.map { it != null && (it.hasActivityIn || it.hasActivityOut) }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 
     private fun shouldShowNetworkTypeIcon(mode: MobileIconCustomizationMode): Boolean {
         return (mode.alwaysShowNetworkTypeIcon
@@ -409,4 +456,5 @@ private class CellularIconViewModel(
             || mode.nonDdsRatIconEnhancementEnabled
                 && mode.mobileDataEnabled && (mode.dataRoamingEnabled || !mode.isRoaming))
     }
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 }

@@ -3639,7 +3639,9 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         final int distance = Math.abs(deltaY);
         final boolean overscroll = mScrollY != 0;
 
+// QTI_BEGIN: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
         if ((overscroll || distance > mTouchSlop) &&
+// QTI_END: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
                 (getNestedScrollAxes() & SCROLL_AXIS_VERTICAL) == 0) {
             createScrollingCache();
             if (overscroll) {
@@ -3647,8 +3649,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                 mMotionCorrection = 0;
             } else {
                 mTouchMode = TOUCH_MODE_SCROLL;
+// QTI_BEGIN: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
                 mMotionCorrection = deltaY > 0 ? mTouchSlop : -mTouchSlop;
 
+// QTI_END: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
             }
             removeCallbacks(mPendingCheckForLongPress);
             setPressed(false);
@@ -4253,11 +4257,13 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                                     }
                                     mSelector.setHotspot(x, ev.getY());
                                 }
+// QTI_BEGIN: 2023-05-30: Performance: Optimize AbsListView to reduce click operation latency
                                 /* QTI_OPT: Move performClick from delayed runnable */
                                 if (!mDataChanged && !mIsDetaching
                                         && isAttachedToWindow()) {
                                     performClick.run();
                                 }
+// QTI_END: 2023-05-30: Performance: Optimize AbsListView to reduce click operation latency
                                 if (mTouchModeReset != null) {
                                     removeCallbacks(mTouchModeReset);
                                 }
@@ -4842,7 +4848,9 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                         break;
                 }
                 break;
+// QTI_BEGIN: 2018-03-01: Performance: touch response optimizations.
             }
+// QTI_END: 2018-03-01: Performance: touch response optimizations.
 
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP: {
@@ -4857,7 +4865,9 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
             case MotionEvent.ACTION_POINTER_UP: {
                 onSecondaryPointerUp(ev);
                 break;
+// QTI_BEGIN: 2018-03-01: Performance: touch response optimizations.
             }
+// QTI_END: 2018-03-01: Performance: touch response optimizations.
         }
 
         return false;

@@ -244,7 +244,9 @@ public class KeyguardSimPukViewController
                 else {
                     Log.d(TAG, "onSimCheckResponse " + " empty One result "
                             + result.toString());
+// QTI_BEGIN: 2023-01-18: Telephony: Fix incorrect text shown at PUK lock screen
                     if (result.getAttemptsRemaining() > 0) {
+// QTI_END: 2023-01-18: Telephony: Fix incorrect text shown at PUK lock screen
                         mRemainingAttempts = result.getAttemptsRemaining();
                         mMessageAreaController.setMessage(
                                 mView.getPukPasswordErrorMessage(

@@ -78,7 +78,9 @@
 #include <stats_socket.h>
 #include <utils/String8.h>
 #include <utils/Trace.h>
+// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
 #include <dlfcn.h>
+// QTI_END: 2020-07-29: Performance: Add beluga function
 
 #include <nativehelper/JNIHelp.h>
 #include <nativehelper/ScopedLocalRef.h>
@@ -644,6 +646,7 @@ static void PreApplicationInit() {
 
   // Set the jemalloc decay time to 1.
   mallopt(M_DECAY_TIME, 1);
+// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
 
   void *mBelugaHandle = nullptr;
   void (*mBeluga)() = nullptr;
@@ -657,6 +660,7 @@ static void PreApplicationInit() {
       mBeluga();
     dlclose(mBelugaHandle);
   }
+// QTI_END: 2020-07-29: Performance: Add beluga function
 }
 
 static void SetUpSeccompFilter(uid_t uid, bool is_child_zygote) {
@@ -2236,7 +2240,9 @@ static jlong CalculateCapabilities(JNIEnv* env, jint uid, jint gid, jintArray gi
   /*
    *  Grant the following capabilities to the Bluetooth user:
    *    - CAP_WAKE_ALARM
+// QTI_BEGIN: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
    *    - CAP_NET_ADMIN
+// QTI_END: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
    *    - CAP_NET_RAW
    *    - CAP_NET_BIND_SERVICE (for DHCP client functionality)
    *    - CAP_SYS_NICE (for setting RT priority for audio-related threads)
@@ -2244,11 +2250,15 @@ static jlong CalculateCapabilities(JNIEnv* env, jint uid, jint gid, jintArray gi
 
   if (multiuser_get_app_id(uid) == AID_BLUETOOTH) {
     capabilities |= (1LL << CAP_WAKE_ALARM);
+// QTI_BEGIN: 2019-06-25: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
     capabilities |= (1LL << CAP_NET_ADMIN);
+// QTI_END: 2019-06-25: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
     capabilities |= (1LL << CAP_NET_RAW);
     capabilities |= (1LL << CAP_NET_BIND_SERVICE);
     capabilities |= (1LL << CAP_SYS_NICE);
+// QTI_BEGIN: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
     capabilities |= (1LL << CAP_NET_ADMIN);
+// QTI_END: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
   }
 
   if (multiuser_get_app_id(uid) == AID_NETWORK_STACK) {

@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 package com.android.systemui.statusbar.pipeline.mobile.data.repository
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_NONE
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 import android.telephony.TelephonyManager.UNKNOWN_CARRIER_ID
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState
@@ -30,7 +34,9 @@ import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameMode
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository.Companion.DEFAULT_NUM_LEVELS
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 import com.qti.extphone.NrIconType
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 import kotlinx.coroutines.flow.MutableStateFlow
 
 // TODO(b/261632894): remove this in favor of the real impl or DemoMobileConnectionRepository
@@ -70,20 +76,36 @@ class FakeMobileConnectionRepository(
     override val carrierName: MutableStateFlow<NetworkNameModel> =
         MutableStateFlow(NetworkNameModel.Default(DEFAULT_NETWORK_NAME))
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
     override val lteRsrpLevel = MutableStateFlow(0)
     override val voiceNetworkType = MutableStateFlow(0)
     override val dataNetworkType = MutableStateFlow(0)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
     override val nrIconType = MutableStateFlow(NrIconType.TYPE_NONE)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
     override val dataRoamingEnabled = MutableStateFlow(true)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
     override val originNetworkType = MutableStateFlow(0)
     override val voiceCapable = MutableStateFlow(false)
     override val videoCapable = MutableStateFlow(false)
     override val imsRegistered = MutableStateFlow(false)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
     override val imsRegistrationTech = MutableStateFlow(REGISTRATION_TECH_NONE)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
     override val isConnectionFailed = MutableStateFlow(false)
+// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     override val ciwlanAvailable = MutableStateFlow(false)
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     override val isAllowedDuringAirplaneMode = MutableStateFlow(false)
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     override val is6Rx = MutableStateFlow(false)
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 
     override val hasPrioritizedNetworkCapabilities = MutableStateFlow(false)
 

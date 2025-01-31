@@ -630,6 +630,7 @@ public abstract class InfoMediaManager {
 
         // In practice, mMediaDevices should always have at least one route.
         if (!mMediaDevices.isEmpty()) {
+// QTI_BEGIN: 2024-07-04: Bluetooth: Use first selected route device as current connected device
             for (MediaDevice mediaDevice : mMediaDevices) {
                 // First selected route device on the list
                 if (mediaDevice.getState() == STATE_SELECTED) {
@@ -643,6 +644,7 @@ public abstract class InfoMediaManager {
                 // First device on the list is always the first selected route.
                 mCurrentConnectedDevice = mMediaDevices.get(0);
             }
+// QTI_END: 2024-07-04: Bluetooth: Use first selected route device as current connected device
         }
     }
 

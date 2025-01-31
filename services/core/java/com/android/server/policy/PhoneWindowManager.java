@@ -893,6 +893,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
+// QTI_BEGIN: 2021-04-28: Display: HDMI/DP pluggin notification changes
     private UEventObserver mHDMISwitchObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -900,6 +901,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
+// QTI_END: 2021-04-28: Display: HDMI/DP pluggin notification changes
+// QTI_BEGIN: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
     private UEventObserver mExtEventObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -909,6 +912,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
+// QTI_END: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
     class SettingsObserver extends ContentObserver {
         SettingsObserver(Handler handler) {
             super(handler);
@@ -5258,9 +5262,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     void initializeHdmiStateInternal() {
         boolean plugged = false;
+// QTI_BEGIN: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
         mExtEventObserver.startObserving("mdss_mdp/drm/card");
+// QTI_END: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
         // watch for HDMI plug messages if the hdmi switch exists
+// QTI_BEGIN: 2021-04-28: Display: HDMI/DP pluggin notification changes
         mHDMISwitchObserver.startObserving("change@/devices/virtual/graphics/fb2");
+// QTI_END: 2021-04-28: Display: HDMI/DP pluggin notification changes
         if (new File("/sys/devices/virtual/switch/hdmi/state").exists()) {
             mHDMIObserver.startObserving("DEVPATH=/devices/virtual/switch/hdmi");
 

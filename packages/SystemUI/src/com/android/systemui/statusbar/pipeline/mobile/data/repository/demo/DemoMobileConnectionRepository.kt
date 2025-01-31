@@ -14,16 +14,24 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 package com.android.systemui.statusbar.pipeline.mobile.data.repository.demo
 
 import android.telephony.CellSignalStrength
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_NONE
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 import android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID
 import android.telephony.TelephonyManager
 import com.android.systemui.log.table.TableLogBuffer
@@ -48,7 +56,9 @@ import com.android.systemui.statusbar.pipeline.mobile.data.repository.prod.FullM
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.toMobileDataActivityModel
 import com.android.systemui.statusbar.pipeline.wifi.data.repository.demo.model.FakeWifiEventModel
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 import com.qti.extphone.NrIconType
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -242,19 +252,35 @@ class DemoMobileConnectionRepository(
     override val carrierName =
         MutableStateFlow(NetworkNameModel.SubscriptionDerived(DEMO_CARRIER_NAME))
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
     override val lteRsrpLevel = MutableStateFlow(CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN)
     override val voiceNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
     override val dataNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
     override val nrIconType = MutableStateFlow(NrIconType.TYPE_NONE)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     override val is6Rx = MutableStateFlow(false)
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
     override val dataRoamingEnabled = MutableStateFlow(true)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
     override val originNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
     override val voiceCapable = MutableStateFlow(false)
     override val videoCapable = MutableStateFlow(false)
     override val imsRegistered = MutableStateFlow(false)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
     override val imsRegistrationTech = MutableStateFlow(REGISTRATION_TECH_NONE)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
     override val isConnectionFailed = MutableStateFlow(false)
+// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     override val ciwlanAvailable = MutableStateFlow(false)
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 
     override val isAllowedDuringAirplaneMode = MutableStateFlow(false)
 

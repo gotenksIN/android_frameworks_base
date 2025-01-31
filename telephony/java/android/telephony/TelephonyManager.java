@@ -658,6 +658,7 @@ public class TelephonyManager {
         }
     }
 
+// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     /**
      * The allowed values for multi sim voice capability
      *
@@ -689,6 +690,8 @@ public class TelephonyManager {
         return mSimVoiceConfig == MultiSimVoiceCapability.DSDA;
     }
 
+// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
+// QTI_BEGIN: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
 
     /**
      * Returns true if device is in DSDA mode where concurrent calls on both subscriptions are
@@ -741,6 +744,8 @@ public class TelephonyManager {
         return TelephonyProperties.dsds_transition_supported().orElse(false);
     }
 
+// QTI_END: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
+// QTI_BEGIN: 2023-03-19: Telephony: DSDA: Add API to support DSDS transition use cases
     /**
      * Returns true if Multi SIM voice capability is DSDS.
      * Returns false for other cases.
@@ -752,6 +757,7 @@ public class TelephonyManager {
         return mSimVoiceConfig == MultiSimVoiceCapability.DSDS;
     }
 
+// QTI_END: 2023-03-19: Telephony: DSDA: Add API to support DSDS transition use cases
     /**
      * Returns the number of phones available.
      *
@@ -2413,7 +2419,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public String getDeviceId(int slotIndex) {
         // FIXME this assumes phoneId == slotIndex
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(8, ""+slotIndex);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -2746,7 +2754,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public CellLocation getCellLocation() {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(49);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null) {
@@ -2785,7 +2795,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(50);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null)
@@ -4426,7 +4438,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage
     public String getSimSerialNumber(int subId) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(388, ""+subId);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -4867,7 +4881,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public String getSubscriberId(int subId) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(389, ""+subId);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -5529,7 +5545,9 @@ public class TelephonyManager {
     })
     @UnsupportedAppUsage
     public String getLine1Number(int subId) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(9, ""+subId);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         String number = null;
         try {
             ITelephony telephony = getITelephony();

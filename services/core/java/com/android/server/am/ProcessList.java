@@ -563,10 +563,12 @@ public final class ProcessList {
 
     ActivityManagerGlobalLock mProcLock;
 
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
     /**
      * BoostFramework Object
      */
     public static BoostFramework mPerfServiceStartHint = new BoostFramework();
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
 
     private static final String PROPERTY_APPLY_SDK_SANDBOX_AUDIT_RESTRICTIONS =
             "apply_sdk_sandbox_audit_restrictions";
@@ -2614,16 +2616,24 @@ public final class ProcessList {
                 storageManagerInternal.prepareStorageDirs(userId, pkgDataInfoMap.keySet(),
                         app.processName);
             }
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             if (mPerfServiceStartHint != null) {
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                 if ((hostingRecord.getType() != null)
+// QTI_END: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                        && (hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_ACTIVITY)
                                || hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_TOP_ACTIVITY))) {
+// QTI_BEGIN: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                                    //TODO: not acting on pre-activity
+// QTI_END: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
                     if (startResult != null) {
                         mPerfServiceStartHint.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName, startResult.pid, BoostFramework.Launch.TYPE_START_PROC);
                     }
                 }
             }
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             checkSlow(startTime, "startProcess: returned from zygote!");
             return startResult;
         } finally {

@@ -16,7 +16,9 @@
 
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
 
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import android.telephony.SubscriptionManager
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.coroutines.newTracingContext
@@ -28,7 +30,9 @@ import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.Airpla
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.VerboseMobileViewLogger
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernStatusBarMobileView
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import java.util.concurrent.ConcurrentHashMap
@@ -38,7 +42,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
 import kotlinx.coroutines.flow.combine
+// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -68,6 +74,7 @@ constructor(
     @VisibleForTesting
     val reuseCache = ConcurrentHashMap<Int, Pair<MobileIconViewModel, CoroutineScope>>()
 
+// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions
             .mapLatest { subscriptions ->
@@ -75,12 +82,20 @@ constructor(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), listOf())
 
+// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     private val ddsIcon: StateFlow<SignalIconModel?> =
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
         combine(interactor.defaultDataSubId, subscriptionIdsFlow) {
                 defaultDataSubId, subscriptionIdsFlow ->
+// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
                 if (defaultDataSubId ?: -1 > SubscriptionManager.INVALID_SUBSCRIPTION_ID
+// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
                     && subscriptionIdsFlow.contains(defaultDataSubId)) {
+// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
                     commonViewModelForSub(defaultDataSubId ?: -1)
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
                 } else {
                     null
                 }
@@ -90,6 +105,7 @@ constructor(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
 
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     private val firstMobileSubViewModel: StateFlow<MobileIconViewModelCommon?> =
         subscriptionIdsFlow
             .map {
@@ -115,7 +131,9 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     init {
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
         interactor.setDdsIconFLow(ddsIcon)
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
         scope.launch { subscriptionIdsFlow.collect { invalidateCaches(it) } }
     }
 

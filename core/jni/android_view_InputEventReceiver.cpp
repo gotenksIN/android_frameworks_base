@@ -334,8 +334,10 @@ status_t NativeInputEventReceiver::consumeEvents(JNIEnv* env,
         uint32_t seq;
         InputEvent* inputEvent;
 
+// QTI_BEGIN: 2022-11-02: Display: core: Featurize perf optimizations
         status_t status = mInputConsumer.consume(&mInputEventFactory,
                 consumeBatches, frameTime, &seq, &inputEvent);
+// QTI_END: 2022-11-02: Display: core: Featurize perf optimizations
         if (status != OK && status != WOULD_BLOCK) {
             ALOGE("channel '%s' ~ Failed to consume input event.  status=%s(%d)",
                   getInputChannelName().c_str(), statusToString(status).c_str(), status);

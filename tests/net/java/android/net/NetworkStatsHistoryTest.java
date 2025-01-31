@@ -24,7 +24,9 @@ import static android.net.NetworkStatsHistory.FIELD_OPERATIONS;
 import static android.net.NetworkStatsHistory.FIELD_RX_BYTES;
 import static android.net.NetworkStatsHistory.FIELD_RX_PACKETS;
 import static android.net.NetworkStatsHistory.FIELD_TX_BYTES;
+// QTI_BEGIN: 2020-06-23: Data: Gracefully handle integer overflows.
 import static android.net.NetworkStatsHistory.multiplySafe;
+// QTI_END: 2020-06-23: Data: Gracefully handle integer overflows.
 import static android.net.TrafficStats.GB_IN_BYTES;
 import static android.net.TrafficStats.MB_IN_BYTES;
 import static android.text.format.DateUtils.DAY_IN_MILLIS;
@@ -530,6 +532,7 @@ public class NetworkStatsHistoryTest {
         assertEquals(512L + 4096L, stats.getTotalBytes());
     }
 
+// QTI_BEGIN: 2020-06-23: Data: Gracefully handle integer overflows.
     @Test
     public void testMultiplySafe() {
         assertEquals(25, multiplySafe(50, 1, 2));
@@ -550,6 +553,7 @@ public class NetworkStatsHistoryTest {
                 multiplySafe(4_939_212_288L, 2_121_815_528L, 12_730_893_165L));
     }
 
+// QTI_END: 2020-06-23: Data: Gracefully handle integer overflows.
     private static void assertIndexBeforeAfter(
             NetworkStatsHistory stats, int before, int after, long time) {
         assertEquals("unexpected before", before, stats.getIndexBefore(time));

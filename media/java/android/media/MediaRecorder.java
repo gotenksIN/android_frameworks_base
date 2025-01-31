@@ -632,11 +632,13 @@ public class MediaRecorder implements AudioRouting,
         /** Opus data in a Ogg container */
         public static final int OGG = 11;
 
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
         /** @hide QCP file format */
         public static final int QCP = 20;
 
         /** @hide WAVE media file format*/
         public static final int WAVE = 21;
+// QTI_END: 2018-02-19: Audio: add support for extended formats
     };
 
     /**
@@ -684,16 +686,22 @@ public class MediaRecorder implements AudioRouting,
         public static final int OPUS = 7;
         /** High Efficiency AAC with Parametric Stereo coding (HE-AAC v2, object type PS) */
         public static final int HE_AAC_PS = 8;
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
         /** @hide EVRC audio codec */
         public static final int EVRC = 10;
         /** @hide QCELP audio codec */
         public static final int QCELP = 11;
         /** @hide Linear PCM audio codec */
         public static final int LPCM = 12;
+// QTI_END: 2018-02-19: Audio: add support for extended formats
+// QTI_BEGIN: 2019-05-15: Audio: media: Define MPEG-H Encoder Format
         /** @hide MPEGH audio codec */
         public static final int MPEGH = 13;
+// QTI_END: 2019-05-15: Audio: media: Define MPEG-H Encoder Format
+// QTI_BEGIN: 2023-02-28: Audio: base: add new enum for HE-AAC V2
         /** @hide High Efficiency AAC V2 (HE-AAC V2) audio codec */
         public static final int HE_AAC_V2 = 14;
+// QTI_END: 2023-02-28: Audio: base: add new enum for HE-AAC V2
 
     }
 
@@ -732,7 +740,9 @@ public class MediaRecorder implements AudioRouting,
         public static final int VP9 = 6;
         public static final int DOLBY_VISION = 7;
         public static final int AV1 = 8;
+// QTI_BEGIN: 2024-09-12: Video: base: Media Recorder changes for MVHEVC mime type
         public static final int MVHEVC = 9;
+// QTI_END: 2024-09-12: Video: base: Media Recorder changes for MVHEVC mime type
     }
 
     /**
@@ -748,7 +758,9 @@ public class MediaRecorder implements AudioRouting,
         VideoEncoder.VP9,
         VideoEncoder.DOLBY_VISION,
         VideoEncoder.AV1,
+// QTI_BEGIN: 2024-09-12: Video: base: Media Recorder changes for MVHEVC mime type
         VideoEncoder.MVHEVC,
+// QTI_END: 2024-09-12: Video: base: Media Recorder changes for MVHEVC mime type
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface VideoEncoderValues {}

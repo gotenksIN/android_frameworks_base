@@ -16,7 +16,9 @@
 package com.android.keyguard;
 
 import android.hardware.biometrics.BiometricSourceType;
+// QTI_BEGIN: 2018-01-31: SystemUI: Change for Emergency Button
 import android.telephony.ServiceState;
+// QTI_END: 2018-01-31: SystemUI: Change for Emergency Button
 import android.telephony.TelephonyManager;
 import android.view.WindowManagerPolicyConstants;
 
@@ -134,6 +136,7 @@ public class KeyguardUpdateMonitorCallback {
      */
     public void onSimStateChanged(int subId, int slotId, int simState) { }
 
+// QTI_BEGIN: 2018-01-31: SystemUI: Change for Emergency Button
     /**
      * Called when the sevice state changes.
      * @param subId
@@ -141,6 +144,7 @@ public class KeyguardUpdateMonitorCallback {
      */
     public void onServiceStateChanged(int subId, ServiceState state) { }
 
+// QTI_END: 2018-01-31: SystemUI: Change for Emergency Button
     /**
      * Called when a user got unlocked.
      */

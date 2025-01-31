@@ -1070,7 +1070,9 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestSingleUpdate(
             @NonNull String provider, @NonNull LocationListener listener, @Nullable Looper looper) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(64);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         Preconditions.checkArgument(provider != null, "invalid null provider");
 
         Handler handler = looper == null ? new Handler() : new Handler(looper);
@@ -1110,7 +1112,9 @@ public class LocationManager {
             @NonNull Criteria criteria,
             @NonNull LocationListener listener,
             @Nullable Looper looper) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(64);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         Preconditions.checkArgument(criteria != null, "invalid null criteria");
 
         Handler handler = looper == null ? new Handler() : new Handler(looper);
@@ -1144,7 +1148,9 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestSingleUpdate(@NonNull String provider,
             @NonNull PendingIntent pendingIntent) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(64);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         Preconditions.checkArgument(provider != null, "invalid null provider");
 
         requestLocationUpdates(
@@ -1179,7 +1185,9 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestSingleUpdate(@NonNull Criteria criteria,
             @NonNull PendingIntent pendingIntent) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(64);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         Preconditions.checkArgument(criteria != null, "invalid null criteria");
 
         requestLocationUpdates(
@@ -1280,7 +1288,9 @@ public class LocationManager {
             float minDistanceM,
             @NonNull @CallbackExecutor Executor executor,
             @NonNull LocationListener listener) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(47);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         Preconditions.checkArgument(provider != null, "invalid null provider");
 
         requestLocationUpdates(
@@ -1357,7 +1367,9 @@ public class LocationManager {
             @NonNull Criteria criteria,
             @NonNull @CallbackExecutor Executor executor,
             @NonNull LocationListener listener) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(47);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         Preconditions.checkArgument(criteria != null, "invalid null criteria");
 
         requestLocationUpdates(
@@ -1421,7 +1433,9 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(long minTimeMs, float minDistanceM,
             @NonNull Criteria criteria, @NonNull PendingIntent pendingIntent) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(47);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         Preconditions.checkArgument(criteria != null, "invalid null criteria");
         requestLocationUpdates(
                 FUSED_PROVIDER,

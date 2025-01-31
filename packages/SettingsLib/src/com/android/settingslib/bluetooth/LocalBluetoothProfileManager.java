@@ -49,8 +49,10 @@ import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.settingslib.flags.Flags;
 
+// QTI_BEGIN: 2021-01-29: Bluetooth: Broadcast UI: Changes to existing files
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+// QTI_END: 2021-01-29: Bluetooth: Broadcast UI: Changes to existing files
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -58,10 +60,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+// QTI_BEGIN: 2018-03-21: Bluetooth: DUN: Add framework changes to support DUN
 import android.os.SystemProperties;
+// QTI_END: 2018-03-21: Bluetooth: DUN: Add framework changes to support DUN
+// QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+// QTI_END: 2021-02-01: Bluetooth: Add BC profile entry
+// QTI_BEGIN: 2021-04-22: Bluetooth: Access BC capabiltiy from BC profile
 import java.lang.reflect.Method;
+// QTI_END: 2021-04-22: Bluetooth: Access BC capabiltiy from BC profile
 
 
 /**
@@ -98,7 +106,9 @@ public class LocalBluetoothProfileManager {
 
     private final Context mContext;
     private final CachedBluetoothDeviceManager mDeviceManager;
+// QTI_BEGIN: 2020-11-26: Bluetooth: DeviceGroup: Framework changes for Group Device operations.
     protected final BluetoothEventManager mEventManager;
+// QTI_END: 2020-11-26: Bluetooth: DeviceGroup: Framework changes for Group Device operations.
 
     private A2dpProfile mA2dpProfile;
     private A2dpSinkProfile mA2dpSinkProfile;
@@ -121,8 +131,10 @@ public class LocalBluetoothProfileManager {
     private SapProfile mSapProfile;
     private VolumeControlProfile mVolumeControlProfile;
 
+// QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry
     private static final String BC_CONNECTION_STATE_CHANGED =
             "android.bluetooth.bc.profile.action.CONNECTION_STATE_CHANGED";
+// QTI_END: 2021-02-01: Bluetooth: Add BC profile entry
     /**
      * Mapping from profile name, e.g. "HEADSET" to profile object.
      */
@@ -340,11 +352,13 @@ public class LocalBluetoothProfileManager {
         }
 
         public void onReceive(Context context, Intent intent, BluetoothDevice device) {
+// QTI_BEGIN: 2018-03-22: Bluetooth: Sync Preference in UI for new cached device
             if (device == null) {
                 Log.w(TAG, "StateChangedHandler receives state-change for invalid device");
                 return;
             }
 
+// QTI_END: 2018-03-22: Bluetooth: Sync Preference in UI for new cached device
             CachedBluetoothDevice cachedDevice = mDeviceManager.findDevice(device);
             if (cachedDevice == null) {
                 Log.w(TAG, "StateChangedHandler found new device: " + device);
@@ -419,11 +433,15 @@ public class LocalBluetoothProfileManager {
                     }
                     if (groupIdMap != null) {
                         for (Map.Entry<Integer, ParcelUuid> entry: groupIdMap.entrySet()) {
+// QTI_BEGIN: 2022-04-23: Bluetooth: Csip: Add below enhancements
                             //Based on spec CAP UUID is not mandatory,also we see failures with PTS
                             //if (entry.getValue().equals(BluetoothUuid.CAP)) {
+// QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
                                 cachedDevice.setGroupId(entry.getKey());
                                 break;
+// QTI_BEGIN: 2022-04-23: Bluetooth: Csip: Add below enhancements
                             //}
+// QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
                         }
                     }
                 }
@@ -693,7 +711,10 @@ public class LocalBluetoothProfileManager {
             profiles.add(mA2dpProfile);
             removedProfiles.remove(mA2dpProfile);
         }
+// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
 /*
+// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
+// QTI_BEGIN: 2021-05-05: Bluetooth: Remove usage of adv audio mask property
         if (mHeadsetProfile != null) {
             if (ArrayUtils.contains(uuids, BluetoothUuid.ADVANCE_VOICE_P_UUID)
                    || ArrayUtils.contains(uuids, BluetoothUuid.ADVANCE_VOICE_T_UUID)
@@ -706,10 +727,16 @@ public class LocalBluetoothProfileManager {
                     if (DEBUG) Log.d(TAG, "Advance Audio Voice supported");
                 } else {
                     if (DEBUG) Log.d(TAG, "HeadsetProfile already added");
+// QTI_END: 2021-05-05: Bluetooth: Remove usage of adv audio mask property
+// QTI_BEGIN: 2021-01-17: Bluetooth: GAP Adv Audio: Adding new Advance Audio UUID's
                 }
             }
+// QTI_END: 2021-01-17: Bluetooth: GAP Adv Audio: Adding new Advance Audio UUID's
+// QTI_BEGIN: 2021-05-05: Bluetooth: Remove usage of adv audio mask property
         }
+// QTI_END: 2021-05-05: Bluetooth: Remove usage of adv audio mask property
 
+// QTI_BEGIN: 2021-05-05: Bluetooth: Remove usage of adv audio mask property
         if ((mA2dpProfile != null)
             && (ArrayUtils.contains(uuids, BluetoothUuid.ADVANCE_MEDIA_T_UUID)
                 || ArrayUtils.contains(uuids, BluetoothUuid.ADVANCE_HEARINGAID_UUID)
@@ -724,9 +751,14 @@ public class LocalBluetoothProfileManager {
                 if (DEBUG) Log.d(TAG, "Advance Audio Media supported");
             } else {
                 if (DEBUG) Log.d(TAG, "A2dpProfile already added");
+// QTI_END: 2021-05-05: Bluetooth: Remove usage of adv audio mask property
+// QTI_BEGIN: 2021-01-17: Bluetooth: GAP Adv Audio: Adding new Advance Audio UUID's
             }
         }
+// QTI_END: 2021-01-17: Bluetooth: GAP Adv Audio: Adding new Advance Audio UUID's
+// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
 */
+// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
         if (BluetoothUuid.containsAnyUuid(uuids, A2dpSinkProfile.SRC_UUIDS)
                 && mA2dpSinkProfile != null) {
                 profiles.add(mA2dpSinkProfile);
@@ -765,8 +797,10 @@ public class LocalBluetoothProfileManager {
             mMapProfile.setEnabled(device, true);
         }
 
+// QTI_BEGIN: 2021-07-30: Bluetooth: Avoid removing PBAP in device details when remote supports it
         if ((mPbapProfile != null)
                 && BluetoothUuid.containsAnyUuid(uuids, PbapServerProfile.PBAB_CLIENT_UUIDS) ) {
+// QTI_END: 2021-07-30: Bluetooth: Avoid removing PBAP in device details when remote supports it
             profiles.add(mPbapProfile);
             removedProfiles.remove(mPbapProfile);
             mPbapProfile.setEnabled(device, true);

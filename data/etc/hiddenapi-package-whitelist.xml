@@ -40,6 +40,8 @@ Do NOT include any apps that are updatable via Play Store!
   <hidden-api-whitelisted-app package="com.android.dreams.basic" />
   <hidden-api-whitelisted-app package="com.android.gallery" />
   <hidden-api-whitelisted-app package="com.android.launcher3" />
+<!-- QTI_BEGIN: 2023-01-16: Android_UI: Add DeskClock to hiddenapi whitelist-->
+<!-- QTI_END: 2023-01-16: Android_UI: Add DeskClock to hiddenapi whitelist-->
   <hidden-api-whitelisted-app package="com.android.deskclock" />
   <hidden-api-whitelisted-app package="com.android.mtp" />
   <hidden-api-whitelisted-app package="com.android.musicfx" />

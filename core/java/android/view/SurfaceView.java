@@ -972,6 +972,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         invalidate();
     }
 
+// QTI_BEGIN: 2020-05-06: SecureSystems: SurfaceView: Add API to allow protected content presentation
     /**
      * Control whether the surface view's content should flow through
      * protected hardware path to display disallowing access from non-secure
@@ -992,6 +993,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         }
     }
 
+// QTI_END: 2020-05-06: SecureSystems: SurfaceView: Add API to allow protected content presentation
     private void updateOpaqueFlag() {
         if (!PixelFormat.formatHasAlpha(mRequestedFormat)) {
             mSurfaceFlags |= SurfaceControl.OPAQUE;

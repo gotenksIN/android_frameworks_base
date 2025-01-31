@@ -33,6 +33,7 @@ if [ "x$1" == "xdata" ]; then
     exit 1
 fi
 
+#  QTI_BEGIN: 2022-12-27: Telephony: Add option to toggle C_IWLAN from ADB
 if [ "x$1" == "xciwlan" ]; then
     if [ "x$2" == "xenable" ]; then
         if [ "x$3" == "x-s" ]; then
@@ -56,6 +57,7 @@ if [ "x$1" == "xciwlan" ]; then
     exit 1
 fi
 
+#  QTI_END: 2022-12-27: Telephony: Add option to toggle C_IWLAN from ADB
 # `svc bluetooth` has been migrated to BluetoothShellCommand,
 # simply perform translation to `cmd bluetooth set-bluetooth-enabled` here.
 if [ "x$1" == "xbluetooth" ]; then

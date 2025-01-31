@@ -367,7 +367,9 @@ class ActivityClientController extends IActivityClientController.Stub {
                 final int taskId = ActivityRecord.getTaskForActivityLocked(token, !nonRoot);
                 final Task task = mService.mRootWindowContainer.anyTaskForId(taskId);
                 if (task != null) {
+// QTI_BEGIN: 2024-03-28: Core: Revert PhoneLink in framework/base
                     return ActivityRecord.getRootTask(token).moveTaskToBack(task);
+// QTI_END: 2024-03-28: Core: Revert PhoneLink in framework/base
                 }
             }
         } finally {
@@ -505,7 +507,9 @@ class ActivityClientController extends IActivityClientController.Stub {
             final long origId = Binder.clearCallingIdentity();
             Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "finishActivity");
             try {
+// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
                 r.releaseActivityBoost();
+// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
                 final boolean res;
                 final boolean finishWithRootActivity =
                         finishTask == Activity.FINISH_TASK_WITH_ROOT_ACTIVITY;

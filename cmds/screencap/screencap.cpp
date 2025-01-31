@@ -116,7 +116,9 @@ static status_t notifyMediaScanner(const char* fileName) {
         (char*) "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
         (char*) "-d",
         &filePath[0],
+// QTI_BEGIN: 2023-06-05: Android_UI: screencap: Add async option to media scanner broadcast
         (char*) "--async",
+// QTI_END: 2023-06-05: Android_UI: screencap: Add async option to media scanner broadcast
         nullptr
     };
 

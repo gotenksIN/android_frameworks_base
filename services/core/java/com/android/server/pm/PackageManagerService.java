@@ -172,7 +172,9 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.Xml;
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.util.BoostFramework;
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.view.Display;
 
 import com.android.internal.R;
@@ -374,7 +376,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private static final int SE_UID = Process.SE_UID;
     private static final int NETWORKSTACK_UID = Process.NETWORK_STACK_UID;
     private static final int UWB_UID = Process.UWB_UID;
+// QTI_BEGIN: 2023-10-10: Data: CACert Framework UID changes
     private static final int VENDOR_DATA_UID = Process.VENDOR_DATA_UID;
+// QTI_END: 2023-10-10: Data: CACert Framework UID changes
 
     static final int SCAN_NO_DEX = 1 << 0;
     static final int SCAN_UPDATE_SIGNATURE = 1 << 1;
@@ -967,7 +971,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     int mNextInstallToken = 1;  // nonzero; will be wrapped back to 1 when ++ overflows
 
     final @NonNull String[] mRequiredVerifierPackages;
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
     final @Nullable String mOptionalVerifierPackage;
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
     final @NonNull String mRequiredInstallerPackage;
     final @NonNull String mRequiredUninstallerPackage;
     final @NonNull String mRequiredPermissionControllerPackage;
@@ -2063,8 +2069,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
         mSettings.addSharedUserLPw("android.uid.uwb", UWB_UID,
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
+// QTI_BEGIN: 2023-10-10: Data: CACert Framework UID changes
         mSettings.addSharedUserLPw("android.uid.vendordata", VENDOR_DATA_UID,
                 ApplicationInfo.PRIVATE_FLAG_VENDOR, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
+// QTI_END: 2023-10-10: Data: CACert Framework UID changes
         final ArrayMap<String, Integer> oemDefinedUids = systemConfig.getOemDefinedUids();
         final int numOemDefinedUids = oemDefinedUids.size();
         for (int i = 0; i < numOemDefinedUids; i++) {
@@ -2143,10 +2151,12 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mStorageEventHelper = new StorageEventHelper(this, mDeletePackageHelper,
                 mRemovePackageHelper);
 
+// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         t.traceBegin("readListOfPackagesToBeDisabled");
         mInstallPackageHelper.readListOfPackagesToBeDisabled();
         t.traceEnd();
 
+// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         synchronized (mLock) {
             // Create the computer as soon as the state objects have been installed.  The
             // cached computer is the same as the live computer until the end of the
@@ -4391,7 +4401,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }, overlayFilter);
 
         mModuleInfoProvider.systemReady();
+// QTI_BEGIN: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
         new BoostFramework(mContext, true);
+// QTI_END: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
 
         // Installer service might attempt to install some packages that have been staged for
         // installation on reboot. Make sure this is the last component to be call since the

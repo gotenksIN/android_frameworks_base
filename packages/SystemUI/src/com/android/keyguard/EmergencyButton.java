@@ -31,8 +31,10 @@ import android.widget.Button;
 import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.systemui.res.R;
 
+// QTI_BEGIN: 2020-09-10: Android_UI: SystemUI: show emergency button on lock screen
 import java.util.List;
 
+// QTI_END: 2020-09-10: Android_UI: SystemUI: show emergency button on lock screen
 /**
  * This class implements a smart emergency button that updates itself based
  * on telephony state.  When the phone is idle, it is an emergency call button.
@@ -115,12 +117,18 @@ public class EmergencyButton extends Button {
                     visible = mEnableEmergencyCallWhileSimLocked;
                 } else {
                     // Only show if there is a secure screen (pin/pattern/SIM pin/SIM puk);
+// QTI_BEGIN: 2023-04-23: Android_UI: SystemUI: Fix emergency call button does not shows on lock screen
                     visible = isSecure
+// QTI_END: 2023-04-23: Android_UI: SystemUI: Fix emergency call button does not shows on lock screen
                         || mContext.getResources().getBoolean(com.android.settingslib.R.bool.config_showEmergencyButton);
+// QTI_BEGIN: 2018-01-31: SystemUI: Change for Emergency Button
                 }
 
+// QTI_END: 2018-01-31: SystemUI: Change for Emergency Button
                 if (mContext.getResources().getBoolean(com.android.settingslib.R.bool.kg_hide_emgcy_btn_when_oos)) {
+// QTI_BEGIN: 2021-05-10: Android_UI: SystemUI: Fix emergency call button no response issue
                     visible = visible && isEmergencyCapable;
+// QTI_END: 2021-05-10: Android_UI: SystemUI: Fix emergency call button no response issue
                 }
             }
         }

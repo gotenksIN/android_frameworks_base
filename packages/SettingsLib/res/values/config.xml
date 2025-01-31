@@ -54,5 +54,7 @@
         <!-- network type: "5G+" -->
         <item>@string/data_connection_5g_plus_carrier_2032</item>
     </integer-array>
+<!-- QTI_BEGIN: 2024-06-20: WLAN: SystemUI: adding control to wifiStandard display feature-->
+<!-- QTI_END: 2024-06-20: WLAN: SystemUI: adding control to wifiStandard display feature-->
 </resources>
 

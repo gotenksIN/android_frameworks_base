@@ -73,10 +73,12 @@ public class NetworkCycleDataForUidLoader extends
                     builder.setBackgroundUsage(totalUsage - totalForeground)
                         .setForegroundUsage(totalForeground);
                 }
+// QTI_BEGIN: 2020-01-06: Data: Handle negative background data usage
                 NetworkCycleDataForUid mObject = builder.build();
                 if (mObject.getBackgroudUsage() >= 0) {
                     mData.add(mObject);
                 }
+// QTI_END: 2020-01-06: Data: Handle negative background data usage
             }
         } catch (Exception e) {
             Log.e(TAG, "Exception querying network detail.", e);

@@ -4958,6 +4958,7 @@ public class SettingsProvider extends ContentProvider {
                     }
 
                     // Update the settings for NTP_SERVER_2
+// QTI_BEGIN: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
                     final Setting currentSetting = globalSettings.getSettingLocked(
                             Global.NTP_SERVER_2);
                     if (currentSetting.isNull()) {
@@ -4967,6 +4968,7 @@ public class SettingsProvider extends ContentProvider {
                                         R.string.def_ntp_server_2),
                                 null, true, SettingsState.SYSTEM_PACKAGE_NAME);
                     }
+// QTI_END: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
                     currentVersion = 170;
                 }
 

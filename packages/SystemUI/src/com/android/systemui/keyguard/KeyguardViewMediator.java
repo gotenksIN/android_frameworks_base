@@ -440,8 +440,12 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
      * Index is the slotId - in case of multiple SIM cards.
      */
     private final SparseIntArray mLastSimStates = new SparseIntArray();
+// QTI_BEGIN: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
     private static SparseIntArray mUnlockTrackSimStates = new SparseIntArray();
+// QTI_END: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
     private static final int STATE_INVALID = -1;
+// QTI_END: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
 
     /**
      * Indicates if a SIM card had the SIM PIN enabled during the initialization, before
@@ -665,26 +669,42 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                         || lastState == TelephonyManager.SIM_STATE_PUK_REQUIRED);
                 mLastSimStates.append(slotId, simState);
 
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
                 int trackState = mUnlockTrackSimStates.get(slotId, STATE_INVALID);
                 //update the mUnlockTrackSimStates
+// QTI_END: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
+// QTI_BEGIN: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
                 if(simState == TelephonyManager.SIM_STATE_READY){
+// QTI_END: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
                     if(trackState == TelephonyManager.SIM_STATE_LOADED){
                         return;
                     }else{
                         mUnlockTrackSimStates.put(slotId, simState);
                    }
                 }else{
+// QTI_END: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
+// QTI_BEGIN: 2020-07-17: Android_UI: SystemUI: no PUK lock screen after 3 wrong PIN retries
                     if(simState != TelephonyManager.SIM_STATE_PIN_REQUIRED) {
+// QTI_END: 2020-07-17: Android_UI: SystemUI: no PUK lock screen after 3 wrong PIN retries
+// QTI_BEGIN: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
                         mUnlockTrackSimStates.put(slotId, simState);
+// QTI_END: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
                     }
                 }
 
                 //check the SIM_STATE_PIN_REQUIRED
                 if(trackState == TelephonyManager.SIM_STATE_READY){
                     if(simState == TelephonyManager.SIM_STATE_PIN_REQUIRED) {
+// QTI_END: 2021-06-08: Android_UI: SystemUI: no PIN lock screen when reset SIM.
+// QTI_BEGIN: 2020-08-11: Android_UI: SystemUI: Screen locked after PIN unlocked
                         return;
+// QTI_END: 2020-08-11: Android_UI: SystemUI: Screen locked after PIN unlocked
+// QTI_BEGIN: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
                     }
                 }
+// QTI_END: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
             }
 
             switch (simState) {
@@ -2225,9 +2245,11 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         }
     }
 
+// QTI_BEGIN: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
     public static int getUnlockTrackSimState(int slotId) {
         return mUnlockTrackSimStates.get(slotId);
     }
+// QTI_END: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
 
     public boolean isHiding() {
         return mHiding;

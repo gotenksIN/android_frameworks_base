@@ -64,15 +64,19 @@
 #define ENCODING_IAMF_BASE_ENHANCED_PROFILE_FLAC 43
 #define ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM 44
 
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
 #define ENCODING_AMR_NB     100
 #define ENCODING_AMR_WB     101
 #define ENCODING_EVRC       102
 #define ENCODING_EVRC_B     103
 #define ENCODING_EVRC_WB    104
 #define ENCODING_EVRC_NW    105
+// QTI_END: 2018-02-19: Audio: add support for extended formats
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
 #define ENCODING_AAC_ADTS_LC 106
 #define ENCODING_AAC_ADTS_HE_V1 107
 #define ENCODING_AAC_ADTS_HE_V2 108
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
 
 #define ENCODING_INVALID    0
 #define ENCODING_DEFAULT    1
@@ -120,6 +124,7 @@ static inline audio_format_t audioFormatToNative(int audioFormat)
         return AUDIO_FORMAT_AC4;
     case ENCODING_AC4_L4:
         return AUDIO_FORMAT_AC4_L4;
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
     case ENCODING_AMR_NB:
         return AUDIO_FORMAT_AMR_NB;
     case ENCODING_AMR_WB:
@@ -132,6 +137,7 @@ static inline audio_format_t audioFormatToNative(int audioFormat)
         return AUDIO_FORMAT_EVRCWB;
     case ENCODING_EVRC_NW:
         return AUDIO_FORMAT_EVRCNW;
+// QTI_END: 2018-02-19: Audio: add support for extended formats
     case ENCODING_E_AC3_JOC:
         return AUDIO_FORMAT_E_AC3_JOC;
     case ENCODING_DEFAULT:
@@ -186,12 +192,14 @@ static inline audio_format_t audioFormatToNative(int audioFormat)
         return AUDIO_FORMAT_IAMF_BASE_ENHANCED_FLAC;
     case ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM:
         return AUDIO_FORMAT_IAMF_BASE_ENHANCED_PCM;
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     case ENCODING_AAC_ADTS_LC:
         return AUDIO_FORMAT_AAC_ADTS_LC;
     case ENCODING_AAC_ADTS_HE_V1:
         return AUDIO_FORMAT_AAC_ADTS_HE_V1;
     case ENCODING_AAC_ADTS_HE_V2:
         return AUDIO_FORMAT_AAC_ADTS_HE_V2;
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     default:
         return AUDIO_FORMAT_INVALID;
     }
@@ -246,6 +254,7 @@ static inline int audioFormatFromNative(audio_format_t nativeFormat)
         return ENCODING_AC4;
     case AUDIO_FORMAT_AC4_L4:
         return ENCODING_AC4_L4;
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
     case AUDIO_FORMAT_AMR_NB:
         return ENCODING_AMR_NB;
     case AUDIO_FORMAT_AMR_WB:
@@ -258,6 +267,7 @@ static inline int audioFormatFromNative(audio_format_t nativeFormat)
         return ENCODING_EVRC_WB;
     case AUDIO_FORMAT_EVRCNW:
         return ENCODING_EVRC_NW;
+// QTI_END: 2018-02-19: Audio: add support for extended formats
     case AUDIO_FORMAT_E_AC3_JOC:
         return ENCODING_E_AC3_JOC;
     case AUDIO_FORMAT_MAT:
@@ -311,12 +321,14 @@ static inline int audioFormatFromNative(audio_format_t nativeFormat)
         return ENCODING_IAMF_BASE_ENHANCED_PROFILE_FLAC;
     case AUDIO_FORMAT_IAMF_BASE_ENHANCED_PCM:
         return ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM;
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     case AUDIO_FORMAT_AAC_ADTS_LC:
         return ENCODING_AAC_ADTS_LC;
     case AUDIO_FORMAT_AAC_ADTS_HE_V1:
         return ENCODING_AAC_ADTS_HE_V1;
     case AUDIO_FORMAT_AAC_ADTS_HE_V2:
         return ENCODING_AAC_ADTS_HE_V2;
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     default:
         return ENCODING_INVALID;
     }

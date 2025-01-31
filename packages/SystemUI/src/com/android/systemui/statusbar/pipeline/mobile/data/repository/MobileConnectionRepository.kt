@@ -14,12 +14,18 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 package com.android.systemui.statusbar.pipeline.mobile.data.repository
 
 import android.telephony.CellSignalStrength
@@ -151,19 +157,35 @@ interface MobileConnectionRepository {
     /** The service provider name for this network connection, or the default name. */
     val networkName: StateFlow<NetworkNameModel>
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
     val lteRsrpLevel: StateFlow<Int>
     val voiceNetworkType: StateFlow<Int>
     val dataNetworkType: StateFlow<Int>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
     val nrIconType: StateFlow<Int>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     val is6Rx: StateFlow<Boolean>
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
     val dataRoamingEnabled: StateFlow<Boolean>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
     val originNetworkType: StateFlow<Int>
     val voiceCapable: StateFlow<Boolean>
     val videoCapable: StateFlow<Boolean>
     val imsRegistered: StateFlow<Boolean>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
     val imsRegistrationTech: StateFlow<Int>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
     val isConnectionFailed: StateFlow<Boolean>
+// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     val ciwlanAvailable: StateFlow<Boolean>
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 
     /**
      * The service provider name for this network connection, or the default name.

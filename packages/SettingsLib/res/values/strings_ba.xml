@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry-->
+<!-- QTI_END: 2021-02-01: Bluetooth: Add BC profile entry-->
 <!--
 Copyright (c) 2020, The Linux Foundation. All rights reserved.
 
@@ -28,16 +30,26 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
+<!-- QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry-->
+<!-- QTI_END: 2021-02-01: Bluetooth: Add BC profile entry-->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- Bluetooth settings.  The user-visible string that is used whenever
      referring to BC profile. -->
+<!-- QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry-->
+<!-- QTI_END: 2021-02-01: Bluetooth: Add BC profile entry-->
     <string name="bluetooth_profile_bc">BC Profile</string>
     <!-- Bluetooth settings.  Connection options screen.
     The summary for the profile checkbox preference when BC is connected. -->
+<!-- QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry-->
+<!-- QTI_END: 2021-02-01: Bluetooth: Add BC profile entry-->
     <string name="bluetooth_bc_profile_summary_connected">Connected to BA server
+<!-- QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry-->
+<!-- QTI_END: 2021-02-01: Bluetooth: Add BC profile entry-->
     </string>
     <!-- Bluetooth settings.  Connection options screen.
     The summary for the BC checkbox preference that describes how checking it
     will set the BC profile as preferred. -->
+<!-- QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry-->
+<!-- QTI_END: 2021-02-01: Bluetooth: Add BC profile entry-->
     <string name="bluetooth_bc_profile_summary_use_for">Use for BA</string>
 </resources>

@@ -1,9 +1,11 @@
+// QTI_BEGIN: 2023-03-13: WLAN: Add correct copyright marking in Wifi Icon files
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2023-03-13: WLAN: Add correct copyright marking in Wifi Icon files
 package com.android.settingslib;
 
 import static android.app.admin.DevicePolicyResources.Strings.Settings.WORK_PROFILE_USER_LABEL;
@@ -55,7 +57,9 @@ import android.telephony.NetworkRegistrationInfo;
 import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+// QTI_BEGIN: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
 import android.net.wifi.ScanResult;
+// QTI_END: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
 import android.webkit.IWebViewUpdateService;
 import android.webkit.WebViewFactory;
 import android.webkit.WebViewProviderInfo;
@@ -113,6 +117,7 @@ public class Utils {
         R.drawable.ic_show_x_wifi_signal_4
     };
 
+// QTI_BEGIN: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
     static final int[] WIFI_4_PIE = {
             com.android.internal.R.drawable.ic_wifi_4_signal_0,
             com.android.internal.R.drawable.ic_wifi_4_signal_1,
@@ -137,6 +142,8 @@ public class Utils {
             com.android.internal.R.drawable.ic_wifi_6_signal_4
     };
 
+// QTI_END: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
+// QTI_BEGIN: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
     static final int[] WIFI_7_PIE = {
             com.android.internal.R.drawable.ic_wifi_7_signal_0,
             com.android.internal.R.drawable.ic_wifi_7_signal_1,
@@ -145,6 +152,7 @@ public class Utils {
             com.android.internal.R.drawable.ic_wifi_7_signal_4
     };
 
+// QTI_END: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
     /** Update the location enable state. */
     public static void updateLocationEnabled(
             @NonNull Context context, boolean enabled, int userId, int source) {
@@ -650,18 +658,34 @@ public class Utils {
 
         if (showX) return SHOW_X_WIFI_PIE[level];
 
+// QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
         switch (standard) {
+// QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
+// QTI_BEGIN: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
             case ScanResult.WIFI_STANDARD_11N:
+// QTI_END: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
+// QTI_BEGIN: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
                 return WIFI_4_PIE[level];
+// QTI_END: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
+// QTI_BEGIN: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
             case ScanResult.WIFI_STANDARD_11AC:
+// QTI_END: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
                 return WIFI_5_PIE[level];
+// QTI_BEGIN: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
             case ScanResult.WIFI_STANDARD_11AX:
+// QTI_END: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
+// QTI_BEGIN: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
                 return WIFI_6_PIE[level];
+// QTI_END: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
+// QTI_BEGIN: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
             case ScanResult.WIFI_STANDARD_11BE:
                 return WIFI_7_PIE[level];
+// QTI_END: 2023-02-17: WLAN: wifi: Display Wi-Fi standard in signal icons for Wi-Fi 7 APs
+// QTI_BEGIN: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
             default:
                 return WIFI_PIE[level];
        }
+// QTI_END: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
     }
 
     public static int getDefaultStorageManagerDaysToRetain(Resources resources) {

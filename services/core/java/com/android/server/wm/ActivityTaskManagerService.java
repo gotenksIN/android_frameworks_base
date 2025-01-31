@@ -780,8 +780,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     @Nullable
     private ActivityRecord mTracedResumedActivity;
 
+// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
     boolean toastWindow = false;
 
+// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
     /** If non-null, we are tracking the time the user spends in the currently focused app. */
     AppTimeTracker mCurAppTimeTracker;
 
@@ -5516,6 +5518,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return mCompatModePackages.compatibilityInfoForPackageLocked(ai);
     }
 
+// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
     void setToastWindow() {
         toastWindow = true;
     }
@@ -5528,6 +5531,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return toastWindow;
     }
 
+// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
     /**
      * Returns the PackageManager. Used by classes hosted by {@link ActivityTaskManagerService}. The
      * PackageManager could be unavailable at construction time and therefore needs to be accessed

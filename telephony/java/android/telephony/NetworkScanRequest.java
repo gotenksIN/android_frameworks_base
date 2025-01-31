@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
@@ -21,6 +22,7 @@
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
 package android.telephony;
 
 import android.annotation.IntDef;
@@ -84,6 +86,7 @@ public final class NetworkScanRequest implements Parcelable {
      */
     public static final int SCAN_TYPE_PERIODIC = 1;
 
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
     /** Invalid access mode */
     /** @hide */
     public static final int ACCESS_MODE_INVALID = 0;
@@ -104,6 +107,7 @@ public final class NetworkScanRequest implements Parcelable {
     /** @hide */
     public static final int SEARCH_TYPE_PLMN_ONLY = 1;
 
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
     /** Defines the type of the scan. */
     private int mScanType;
 
@@ -151,6 +155,7 @@ public final class NetworkScanRequest implements Parcelable {
     @NonNull
     private ArrayList<String> mMccMncs;
 
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
     /**
      * Describes the access mode
      */
@@ -161,6 +166,7 @@ public final class NetworkScanRequest implements Parcelable {
      */
     private int mSearchType;
 
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
     /**
      * Creates a new NetworkScanRequest with mScanType and network mSpecifiers
      *
@@ -201,6 +207,7 @@ public final class NetworkScanRequest implements Parcelable {
         }
     }
 
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
     /** @hide */
     public NetworkScanRequest(int scanType, RadioAccessSpecifier[] specifiers,
                     int searchPeriodicity,
@@ -216,6 +223,7 @@ public final class NetworkScanRequest implements Parcelable {
         this.mSearchType = searchType;
     }
 
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
     /** Returns the type of the scan. */
     @ScanType
     public int getScanType() {
@@ -260,6 +268,7 @@ public final class NetworkScanRequest implements Parcelable {
         return (ArrayList<String>) mMccMncs.clone();
     }
 
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
     /** Returns the access mode */
     /** @hide */
     public int getAccessMode() {
@@ -272,6 +281,7 @@ public final class NetworkScanRequest implements Parcelable {
         return mSearchType;
     }
 
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
     @Override
     public int describeContents() {
         return 0;
@@ -286,8 +296,10 @@ public final class NetworkScanRequest implements Parcelable {
         dest.writeBoolean(mIncrementalResults);
         dest.writeInt(mIncrementalResultsPeriodicity);
         dest.writeStringList(mMccMncs);
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
         dest.writeInt(mAccessMode);
         dest.writeInt(mSearchType);
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
     }
 
     private NetworkScanRequest(Parcel in) {
@@ -308,8 +320,10 @@ public final class NetworkScanRequest implements Parcelable {
         mIncrementalResultsPeriodicity = in.readInt();
         mMccMncs = new ArrayList<>();
         in.readStringList(mMccMncs);
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
         mAccessMode = in.readInt();
         mSearchType = in.readInt();
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
     }
 
     @Override
@@ -327,7 +341,9 @@ public final class NetworkScanRequest implements Parcelable {
                 && mIncrementalResults == nsr.mIncrementalResults
                 && mIncrementalResultsPeriodicity == nsr.mIncrementalResultsPeriodicity
                 && Objects.equals(mMccMncs, nsr.mMccMncs)
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
                 && mAccessMode == nsr.mAccessMode
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
                 && mSearchType == nsr.mSearchType;
     }
 
@@ -339,9 +355,11 @@ public final class NetworkScanRequest implements Parcelable {
                 + (mMaxSearchTime * 43)
                 + ((mIncrementalResults == true? 1 : 0) * 47)
                 + (mIncrementalResultsPeriodicity * 53)
+// QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
                 + (mMccMncs.hashCode() * 59)
                 + (mAccessMode * 61)
                 + (mSearchType * 63));
+// QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
     }
 
     public static final @android.annotation.NonNull Creator<NetworkScanRequest> CREATOR =

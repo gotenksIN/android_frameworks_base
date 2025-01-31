@@ -316,7 +316,9 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             Log.d(TAG, "The BluetoothLeBroadcastAssistant is null");
             return;
         }
+// QTI_BEGIN: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
         mService.removeSource(sink, sourceId);
+// QTI_END: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
     }
 
     public void startSearchingForSources(@NonNull List<android.bluetooth.le.ScanFilter> filters) {
@@ -327,7 +329,9 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             Log.d(TAG, "The BluetoothLeBroadcastAssistant is null");
             return;
         }
+// QTI_BEGIN: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
         mService.startSearchingForSources(filters);
+// QTI_END: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
     }
 
     public void stopSearchingForSources() {
@@ -338,7 +342,9 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             Log.d(TAG, "The BluetoothLeBroadcastAssistant is null");
             return;
         }
+// QTI_BEGIN: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
         mService.stopSearchingForSources();
+// QTI_END: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
     }
 
     /**
@@ -415,12 +421,16 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             mCachedCallbackExecutorMap.putIfAbsent(callback, executor);
             return;
         }
+// QTI_BEGIN: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
 
         try {
             mService.registerCallback(executor, callback);
         } catch (IllegalArgumentException e) {
             Log.w(TAG, "registerServiceCallBack failed. " + e.getMessage());
+// QTI_END: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
+// QTI_BEGIN: 2023-06-28: Bluetooth: Bass: Ensure correct registration and de-registration sequence
         }
+// QTI_END: 2023-06-28: Bluetooth: Bass: Ensure correct registration and de-registration sequence
     }
 
     /**
@@ -438,11 +448,15 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
             return;
         }
 
+// QTI_BEGIN: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
         try {
             mService.unregisterCallback(callback);
         } catch (IllegalArgumentException e) {
             Log.w(TAG, "unregisterServiceCallBack failed. " + e.getMessage());
+// QTI_END: 2024-08-12: Bluetooth: Revert "Bass: Ensure correct registration and de-registration sequence"
+// QTI_BEGIN: 2023-06-28: Bluetooth: Bass: Ensure correct registration and de-registration sequence
         }
+// QTI_END: 2023-06-28: Bluetooth: Bass: Ensure correct registration and de-registration sequence
     }
 
     public boolean isProfileReady() {

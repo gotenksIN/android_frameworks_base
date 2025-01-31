@@ -54,7 +54,9 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+// QTI_BEGIN: 2018-03-10: Camera: Force HAL1 for predefined package list.
 import android.os.SystemProperties;
+// QTI_END: 2018-03-10: Camera: Force HAL1 for predefined package list.
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -174,10 +176,10 @@ public class Camera {
     private static final int CAMERA_MSG_RAW_IMAGE_NOTIFY = 0x200;
     private static final int CAMERA_MSG_PREVIEW_METADATA = 0x400;
     private static final int CAMERA_MSG_FOCUS_MOVE       = 0x800;
-    /* ### QC ADD-ONS: START */
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
     private static final int CAMERA_MSG_STATS_DATA       = 0x1000;
     private static final int CAMERA_MSG_META_DATA        = 0x2000;
-    /* ### QC ADD-ONS: END */
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private long mNativeContext; // accessed by native methods
@@ -209,6 +211,7 @@ public class Camera {
     private boolean mShutterSoundEnabledFromApp = true;
 
     private static final int NO_ERROR = 0;
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
     private static final int EACCESS = -13;
     private static final int ENODEV = -19;
     private static final int EBUSY = -16;
@@ -216,10 +219,9 @@ public class Camera {
     private static final int ENOSYS = -38;
     private static final int EUSERS = -87;
     private static final int EOPNOTSUPP = -95;
-    /* ### QC ADD-ONS: START */
     private CameraDataCallback mCameraDataCallback;
     private CameraMetaDataCallback mCameraMetaDataCallback;
-    /* ### QC ADD-ONS: END */
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 
     /**
      * Broadcast Action:  A new picture is taken by the camera, and the entry of
@@ -297,6 +299,7 @@ public class Camera {
      * @return total number of accessible camera devices, or 0 if there are no
      *   cameras or an error was encountered enumerating them.
      */
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
     public static int getNumberOfCameras() {
         boolean exposeAuxCamera = false;
         String packageName = ActivityThread.currentOpPackageName();
@@ -314,16 +317,23 @@ public class Camera {
                 }
             }
         }
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
+// QTI_BEGIN: 2024-09-26: Camera: Remove deprecated JNI method _getNumberOfCameras()
 
         Context context = ActivityThread.currentApplication().getApplicationContext();
         int numberOfCameras = getNumberOfCameras(context);
+// QTI_END: 2024-09-26: Camera: Remove deprecated JNI method _getNumberOfCameras()
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
         if (exposeAuxCamera == false && (numberOfCameras > 2)) {
             numberOfCameras = 2;
         }
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
         return numberOfCameras;
     }
 
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
     /**
      * Returns the number of physical cameras available on this device for the given context.
      * The return value of this method might change dynamically if the device supports external
@@ -352,9 +362,11 @@ public class Camera {
      *    low-level failure).
      */
     public static void getCameraInfo(int cameraId, CameraInfo cameraInfo) {
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
         if(cameraId >= getNumberOfCameras()){
             throw new RuntimeException("Unknown camera ID");
         }
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
         Context context = ActivityThread.currentApplication().getApplicationContext();
         final int rotationOverride = CameraManager.getRotationOverride(context);
         getCameraInfo(cameraId, context, rotationOverride, cameraInfo);
@@ -430,6 +442,7 @@ public class Camera {
          */
         public static final int CAMERA_FACING_FRONT = 1;
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
          /* ### QC ADD-ONS: START TBD*/
         /** @hide
          *  camera is in ZSL mode.
@@ -440,7 +453,7 @@ public class Camera {
          * camera is in non-ZSL mode.
          */
         public static final int CAMERA_SUPPORT_MODE_NONZSL = 3;
-         /* ### QC ADD-ONS: END */
+// QTI_END: 2018-03-05: Camera: Add feature extensions
         /**
          * The direction that the camera faces. It should be
          * CAMERA_FACING_BACK or CAMERA_FACING_FRONT.
@@ -605,10 +618,10 @@ public class Camera {
         mPostviewCallback = null;
         mUsingPreviewAllocation = false;
         mZoomListener = null;
-        /* ### QC ADD-ONS: START */
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         mCameraDataCallback = null;
         mCameraMetaDataCallback = null;
-        /* ### QC ADD-ONS: END */
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 
         Looper looper;
         if ((looper = Looper.myLooper()) != null) {
@@ -648,9 +661,11 @@ public class Camera {
 
     /** used by Camera#open, Camera#open(int) */
     Camera(int cameraId, @NonNull Context context, int rotationOverride) {
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
         if(cameraId >= getNumberOfCameras()){
              throw new RuntimeException("Unknown camera ID");
         }
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
         Objects.requireNonNull(context);
         final int err = cameraInit(cameraId, context, rotationOverride);
         if (checkInitErrors(err)) {
@@ -982,7 +997,9 @@ public class Camera {
      * @see android.media.MediaActionSound
      */
     public final void setPreviewCallback(PreviewCallback cb) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(66);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         mPreviewCallback = cb;
         mOneShot = false;
         mWithBuffer = false;
@@ -1011,7 +1028,9 @@ public class Camera {
      * @see android.media.MediaActionSound
      */
     public final void setOneShotPreviewCallback(PreviewCallback cb) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(68);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         mPreviewCallback = cb;
         mOneShot = true;
         mWithBuffer = false;
@@ -1052,7 +1071,9 @@ public class Camera {
      * @see android.media.MediaActionSound
      */
     public final void setPreviewCallbackWithBuffer(PreviewCallback cb) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(67);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         mPreviewCallback = cb;
         mOneShot = false;
         mWithBuffer = true;
@@ -1258,7 +1279,7 @@ public class Camera {
                     mAutoFocusMoveCallback.onAutoFocusMoving(msg.arg1 == 0 ? false : true, mCamera);
                 }
                 return;
-            /* ### QC ADD-ONS: START */
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
             case CAMERA_MSG_STATS_DATA:
                 int statsdata[] = new int[257];
                 for(int i =0; i<257; i++ ) {
@@ -1268,13 +1289,15 @@ public class Camera {
                      mCameraDataCallback.onCameraData(statsdata, mCamera);
                 }
                 return;
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
             case CAMERA_MSG_META_DATA:
                 if (mCameraMetaDataCallback != null) {
                     mCameraMetaDataCallback.onCameraMetaData((byte[])msg.obj, mCamera);
                 }
                 return;
-            /* ### QC ADD-ONS: END */
+// QTI_END: 2018-03-05: Camera: Add feature extensions
             default:
                 Log.e(TAG, "Unknown message type " + msg.what);
                 return;
@@ -1508,7 +1531,9 @@ public class Camera {
      */
     public final void takePicture(ShutterCallback shutter, PictureCallback raw,
             PictureCallback jpeg) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(65);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         takePicture(shutter, raw, null, jpeg);
     }
     private native final void native_takePicture(int msgType);
@@ -1547,7 +1572,9 @@ public class Camera {
      */
     public final void takePicture(ShutterCallback shutter, PictureCallback raw,
             PictureCallback postview, PictureCallback jpeg) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(65);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         mShutterCallback = shutter;
         mRawImageCallback = raw;
         mPostviewCallback = postview;
@@ -2017,6 +2044,7 @@ public class Camera {
          * as a set. Either they are all valid, or none of them are.
          */
         public Point mouth = null;
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
 
         /**
          * {@hide}
@@ -2034,6 +2062,7 @@ public class Camera {
          * {@hide}
          */
         public int faceRecognised = 0;
+// QTI_END: 2018-03-10: Camera: Extend face detection
     }
 
     /**
@@ -2158,6 +2187,7 @@ public class Camera {
         return p;
     }
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
     /** @hide
      * Returns the current cct value of white balance.
      *
@@ -2179,6 +2209,7 @@ public class Camera {
         return cct;
     }
 
+// QTI_END: 2018-03-05: Camera: Add feature extensions
     /**
      * Returns an empty {@link Parameters} for testing purpose.
      *
@@ -2192,7 +2223,7 @@ public class Camera {
         return camera.new Parameters();
     }
 
-    /* ### QC ADD-ONS: START */
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
     private static int byteToInt(byte[] b, int offset) {
         int value = 0;
         for (int i = 0; i < 4; i++) {
@@ -2342,7 +2373,7 @@ public class Camera {
         return focus_pos;
     }
 
-    /* ### QC ADD-ONS: END */
+// QTI_END: 2018-03-05: Camera: Add feature extensions
     /**
      * Returns a copied {@link Parameters}; for shim use only.
      *
@@ -2607,10 +2638,12 @@ public class Camera {
         public static final String WHITE_BALANCE_CLOUDY_DAYLIGHT = "cloudy-daylight";
         public static final String WHITE_BALANCE_TWILIGHT = "twilight";
         public static final String WHITE_BALANCE_SHADE = "shade";
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         /** @hide
          * wb manual cct mode.
          */
         public static final String WHITE_BALANCE_MANUAL_CCT = "manual-cct";
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 
         // Values for color effect settings.
         public static final String EFFECT_NONE = "none";
@@ -2658,11 +2691,13 @@ public class Camera {
          */
         public static final String FLASH_MODE_TORCH = "torch";
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         /** @hide
          * Scene mode is off.
          */
         public static final String SCENE_MODE_ASD = "asd";
 
+// QTI_END: 2018-03-05: Camera: Add feature extensions
         /**
          * Scene mode is off.
          */
@@ -2739,6 +2774,7 @@ public class Camera {
          * Capture the naturally warm color of scenes lit by candles.
          */
         public static final String SCENE_MODE_CANDLELIGHT = "candlelight";
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         /** @hide
         * SCENE_MODE_BACKLIGHT
         **/
@@ -2747,6 +2783,7 @@ public class Camera {
         * SCENE_MODE_FLOWERS
         **/
         public static final String SCENE_MODE_FLOWERS = "flowers";
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 
         /**
          * Applications are looking for a barcode. Camera driver will be
@@ -2789,6 +2826,7 @@ public class Camera {
          */
         public static final String FOCUS_MODE_FIXED = "fixed";
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         /** @hide
          * Normal focus mode. Applications should call
          * {@link #autoFocus(AutoFocusCallback)} to start the focus in this
@@ -2796,6 +2834,7 @@ public class Camera {
          */
         public static final String FOCUS_MODE_NORMAL = "normal";
 
+// QTI_END: 2018-03-05: Camera: Add feature extensions
         /**
          * Extended depth of field (EDOF). Focusing is done digitally and
          * continuously. Applications should not call {@link
@@ -2848,11 +2887,13 @@ public class Camera {
          */
         public static final String FOCUS_MODE_CONTINUOUS_PICTURE = "continuous-picture";
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         /** @hide
          *  manual focus mode
          */
         public static final String FOCUS_MODE_MANUAL_POSITION = "manual";
 
+// QTI_END: 2018-03-05: Camera: Add feature extensions
         // Indices for focus distance array.
         /**
          * The array index of near focus distance for use with
@@ -2889,15 +2930,19 @@ public class Camera {
         // Formats for setPreviewFormat and setPictureFormat.
         private static final String PIXEL_FORMAT_YUV422SP = "yuv422sp";
         private static final String PIXEL_FORMAT_YUV420SP = "yuv420sp";
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         private static final String PIXEL_FORMAT_YUV420SP_ADRENO = "yuv420sp-adreno";
+// QTI_END: 2018-03-05: Camera: Add feature extensions
         private static final String PIXEL_FORMAT_YUV422I = "yuv422i-yuyv";
         private static final String PIXEL_FORMAT_YUV420P = "yuv420p";
         private static final String PIXEL_FORMAT_RGB565 = "rgb565";
         private static final String PIXEL_FORMAT_JPEG = "jpeg";
         private static final String PIXEL_FORMAT_BAYER_RGGB = "bayer-rggb";
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
         private static final String PIXEL_FORMAT_RAW = "raw";
         private static final String PIXEL_FORMAT_YV12 = "yv12";
         private static final String PIXEL_FORMAT_NV12 = "nv12";
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 
         /**
          * Order matters: Keys that are {@link #set(String, String) set} later
@@ -3717,11 +3762,17 @@ public class Camera {
          * parameters.
          */
         public void removeGpsData() {
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
             remove(KEY_QC_GPS_LATITUDE_REF);
+// QTI_END: 2018-03-05: Camera: Add feature extensions
             remove(KEY_GPS_LATITUDE);
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
             remove(KEY_QC_GPS_LONGITUDE_REF);
+// QTI_END: 2018-03-05: Camera: Add feature extensions
             remove(KEY_GPS_LONGITUDE);
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
             remove(KEY_QC_GPS_ALTITUDE_REF);
+// QTI_END: 2018-03-05: Camera: Add feature extensions
             remove(KEY_GPS_ALTITUDE);
             remove(KEY_GPS_TIMESTAMP);
             remove(KEY_GPS_PROCESSING_METHOD);
@@ -4745,9 +4796,8 @@ public class Camera {
             if (s1 != null && s1.equals(s2)) return true;
             return false;
         }
-        /* ### QC ADD-ONS: START */
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
 
-        /* ### QC ADDED PARAMETER KEYS*/
         private static final String KEY_QC_HFR_SIZE = "hfr-size";
         private static final String KEY_QC_PREVIEW_FRAME_RATE_MODE = "preview-frame-rate-mode";
         private static final String KEY_QC_PREVIEW_FRAME_RATE_AUTO_MODE = "frame-rate-auto";
@@ -4800,7 +4850,6 @@ public class Camera {
         **/
         public static final String KEY_QC_AE_BRACKET_HDR = "ae-bracket-hdr";
 
-        /* ### QC ADDED PARAMETER VALUES*/
 
         // Values for touch af/aec settings.
         /** @hide
@@ -5970,6 +6019,6 @@ public class Camera {
             Log.e(TAG, "Invalid Coordinate parameter string=" + str);
             return null;
          }
-         /* ### QC ADD-ONS: END */
+// QTI_END: 2018-03-05: Camera: Add feature extensions
     };
 }

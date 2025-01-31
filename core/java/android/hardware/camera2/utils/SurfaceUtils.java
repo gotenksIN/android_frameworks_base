@@ -34,11 +34,13 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
+// QTI_BEGIN: 2018-06-12: Camera: Skip HFR checks for privileged apps.
 import android.app.ActivityThread;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 
 
+// QTI_END: 2018-06-12: Camera: Skip HFR checks for privileged apps.
 /**
  * Various Surface utilities.
  */
@@ -246,11 +248,13 @@ public class SurfaceUtils {
                     + " the size must be 1 or 2");
         }
 
+// QTI_BEGIN: 2018-06-12: Camera: Skip HFR checks for privileged apps.
         if (isPrivilegedApp()) {
             //skip checks for privileged apps
             return;
         }
 
+// QTI_END: 2018-06-12: Camera: Skip HFR checks for privileged apps.
         List<Size> highSpeedSizes = null;
 
         if (fpsRange == null) {
@@ -315,6 +319,7 @@ public class SurfaceUtils {
 
     private static native long nativeGetSurfaceId(Surface surface);
 
+// QTI_BEGIN: 2018-06-12: Camera: Skip HFR checks for privileged apps.
     private static boolean isPrivilegedApp() {
         String packageName = ActivityThread.currentOpPackageName();
         String packageList = SystemProperties.get("persist.camera.privapp.list");
@@ -331,4 +336,5 @@ public class SurfaceUtils {
 
         return false;
     }
+// QTI_END: 2018-06-12: Camera: Skip HFR checks for privileged apps.
 }

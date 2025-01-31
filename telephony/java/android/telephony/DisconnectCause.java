@@ -461,18 +461,23 @@ public final class DisconnectCause {
     public static final int HO_NOT_FEASIBLE = 125;
     /** @hide */
     public static final int NON_SELECTED_USER_CLEARING = 126;
+// QTI_BEGIN: 2021-08-12: Telephony: IMS: Add support for additional call information
     /** @hide */
     public static final int CONCURRENT_CALLS_NOT_POSSIBLE = 127;
+// QTI_END: 2021-08-12: Telephony: IMS: Add support for additional call information
 
+// QTI_BEGIN: 2022-05-09: Telephony: Add Secure Mode specific DisconnectCause
     /**
      * Call failed due to device being in Secure Mode
      */
     /** @hide */
     public static final int SECURE_MODE = 128;
 
+// QTI_END: 2022-05-09: Telephony: Add Secure Mode specific DisconnectCause
     /** @hide */
     public static final int INCOMING_CALLS_BARRED_WITHIN_CUG = 129;
 
+// QTI_BEGIN: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     //*********************************************************************************************
     // When adding a disconnect type:
     // 1) Please assign the new type the next id value below.
@@ -481,15 +486,20 @@ public final class DisconnectCause {
     // 4) Update toString() with the newly added disconnect type.
     // 5) Update android.telecom.DisconnectCauseUtil with any mappings to a telecom.DisconnectCause.
     //
+// QTI_END: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     // NextId: 130
+// QTI_BEGIN: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     //*********************************************************************************************
 
+// QTI_END: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     /**
      * Smallest valid value for call disconnect codes.
      * @hide
      */
+// QTI_BEGIN: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     public static final int MINIMUM_VALID_VALUE = NOT_DISCONNECTED;
 
+// QTI_END: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     /**
      * Largest valid value for call disconnect codes.
      * @hide

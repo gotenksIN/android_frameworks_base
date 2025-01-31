@@ -1171,6 +1171,7 @@ base::expected<std::monostate, NullOrIOError> AssetManager2::ResolveReference(
 }
 
 base::expected<const std::vector<uint32_t>*, NullOrIOError> AssetManager2::GetBagResIdStack(
+// QTI_BEGIN: 2024-11-05: Frameworks: Fix for CtsViewTestCases module for test case: testGetAttributeResolutionStack Bug:343386047 am: 2dc4c86386
    uint32_t resid) const {
    auto it = cached_bag_resid_stacks_.find(resid);
    if (it != cached_bag_resid_stacks_.end()) {
@@ -1182,6 +1183,7 @@ base::expected<const std::vector<uint32_t>*, NullOrIOError> AssetManager2::GetBa
    }
 
    it = cached_bag_resid_stacks_.emplace(resid, std::move(stacks)).first;
+// QTI_END: 2024-11-05: Frameworks: Fix for CtsViewTestCases module for test case: testGetAttributeResolutionStack Bug:343386047 am: 2dc4c86386
   return &it->second;
 }
 
@@ -1199,10 +1201,12 @@ base::expected<const ResolvedBag*, NullOrIOError> AssetManager2::ResolveBag(
 }
 
 base::expected<const ResolvedBag*, NullOrIOError> AssetManager2::GetBag(uint32_t resid) const {
+// QTI_BEGIN: 2024-11-05: Frameworks: Fix for CtsViewTestCases module for test case: testGetAttributeResolutionStack Bug:343386047 am: 2dc4c86386
   auto resid_stacks_it = cached_bag_resid_stacks_.find(resid);
   if (resid_stacks_it == cached_bag_resid_stacks_.end()) {
     resid_stacks_it = cached_bag_resid_stacks_.emplace(resid, std::vector<uint32_t>{}).first;
   }
+// QTI_END: 2024-11-05: Frameworks: Fix for CtsViewTestCases module for test case: testGetAttributeResolutionStack Bug:343386047 am: 2dc4c86386
   const auto bag = GetBag(resid, resid_stacks_it->second);
   if (UNLIKELY(IsIOError(bag))) {
     cached_bag_resid_stacks_.erase(resid_stacks_it);

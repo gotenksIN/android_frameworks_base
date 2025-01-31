@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 /*
   Changes from Qualcomm Innovation Center are provided under the following license:
 
@@ -21,6 +22,7 @@
   SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 package com.android.systemui.statusbar.pipeline.mobile.data
 
 import android.content.Intent
@@ -174,19 +176,26 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
         )
     }
 
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     fun logOnNrIconTypeChanged(nrIconType: Int, is6Rx : Boolean, subId: Int) {
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         buffer.log(
             TAG,
             LogLevel.INFO,
             {
                 int1 = subId
                 str1 = nrIconType.toString()
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
                 bool1 = is6Rx
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             },
+// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             { "onNrIconTypeChanged: subId=$int1 nrIconType=$str1 is6Rx=$bool1" },
+// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         )
     }
 
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     fun logOnCiwlanAvailableChanged(available: Boolean, subId: Int) {
         buffer.log(
             TAG,
@@ -199,6 +208,7 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
         )
     }
 
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     fun logActionCarrierConfigChanged() {
         buffer.log(TAG, LogLevel.INFO, {}, { "Intent received: ACTION_CARRIER_CONFIG_CHANGED" })
     }
@@ -274,6 +284,7 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
             { "Lost prioritized network (nedId=$int1)" },
         )
     }
+// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
 
     fun logImsStateCallbackRegistered(registered: Boolean, subId: Int) {
         buffer.log(
@@ -302,6 +313,7 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
     fun logException(ex: Exception, logMsg: String) {
         buffer.log(TAG, LogLevel.ERROR, {}, { logMsg }, exception = ex)
     }
+// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
 }
 
 private const val TAG = "MobileInputLog"

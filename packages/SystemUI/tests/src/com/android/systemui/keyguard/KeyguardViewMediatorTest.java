@@ -71,7 +71,9 @@ import android.platform.test.annotations.EnableFlags;
 import android.telephony.TelephonyManager;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
+// QTI_BEGIN: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 import android.testing.TestableLooper.RunWithLooper;
+// QTI_END: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.RemoteAnimationTarget;
 import android.view.View;
@@ -160,7 +162,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(AndroidTestingRunner.class)
+// QTI_BEGIN: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 @RunWithLooper
+// QTI_END: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 @SmallTest
 public class KeyguardViewMediatorTest extends SysuiTestCase {
 

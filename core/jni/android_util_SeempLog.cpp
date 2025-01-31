@@ -1,3 +1,4 @@
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
 /*
  * Copyright (c) 2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
@@ -26,7 +27,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
 #include <sys/uio.h>
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
 #include <sys/un.h>
 #include <unistd.h>
 #include <assert.h>
@@ -216,3 +219,4 @@ int register_android_util_SeempLog(JNIEnv* env)
 }
 
 }; // namespace android
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features

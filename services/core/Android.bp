@@ -226,9 +226,15 @@ java_library_static {
         "SurfaceFlingerProperties",
         "com.android.sysprop.watchdog",
         "securebox",
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
         "vendor.qti.hardware.servicetracker-V1.0-java",
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
         "vendor.qti.hardware.servicetracker-V1.2-java",
+// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
         "vendor.qti.hardware.servicetrackeraidl-V1-java",
+// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
         "apache-commons-math",
         "battery_saver_flag_lib",
         "notification_flags_lib",

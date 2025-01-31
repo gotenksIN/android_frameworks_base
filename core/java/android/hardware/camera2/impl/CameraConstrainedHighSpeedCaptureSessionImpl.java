@@ -26,13 +26,17 @@ import android.hardware.camera2.CameraOfflineSession.CameraOfflineSessionCallbac
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.OutputConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
+// QTI_BEGIN: 2018-08-31: Camera: Select the proper request list size
 import android.hardware.camera2.params.HighSpeedVideoConfiguration;
+// QTI_END: 2018-08-31: Camera: Select the proper request list size
 import android.hardware.camera2.utils.SurfaceUtils;
 import android.os.Handler;
 import android.os.ConditionVariable;
 import android.util.Range;
 import android.util.Log;
+// QTI_BEGIN: 2018-08-31: Camera: Select the proper request list size
 import android.util.Size;
+// QTI_END: 2018-08-31: Camera: Select the proper request list size
 import android.view.Surface;
 
 import java.util.ArrayList;
@@ -120,7 +124,9 @@ public class CameraConstrainedHighSpeedCaptureSessionImpl
         }
         Log.v(TAG, "previewFps: " + previewFps);
 
+// QTI_BEGIN: 2018-08-31: Camera: Select the proper request list size
         int requestListSize = getHighSpeedRequestListSize(fpsRange, outputSurfaces);
+// QTI_END: 2018-08-31: Camera: Select the proper request list size
         // If it's a preview, keep requestList size fixed = 1.
         if (fpsRange.getUpper() > fpsRange.getLower()) {
             requestListSize = 1;
@@ -205,6 +211,7 @@ public class CameraConstrainedHighSpeedCaptureSessionImpl
         return true;
     }
 
+// QTI_BEGIN: 2018-08-31: Camera: Select the proper request list size
     private int getHighSpeedRequestListSize(Range<Integer> fpsRange, Collection<Surface> surfaces) {
         int requestListSize = 0;
 
@@ -233,6 +240,7 @@ public class CameraConstrainedHighSpeedCaptureSessionImpl
         return requestListSize;
     }
 
+// QTI_END: 2018-08-31: Camera: Select the proper request list size
     @Override
     public CameraDevice getDevice() {
         return mSessionImpl.getDevice();

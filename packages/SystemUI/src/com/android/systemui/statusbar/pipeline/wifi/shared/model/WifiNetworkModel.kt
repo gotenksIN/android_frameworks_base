@@ -246,8 +246,10 @@ sealed class WifiNetworkModel : Diffable<WifiNetworkModel> {
          */
         val hotspotDeviceType: HotspotDeviceType,
 
+// QTI_BEGIN: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
         /** See [android.net.wifi.WifiInfo.getWifiStandard]. */
         val wifiStandard: Int? = 0,
+// QTI_END: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
     ) : WifiNetworkModel() {
         companion object {
             /**

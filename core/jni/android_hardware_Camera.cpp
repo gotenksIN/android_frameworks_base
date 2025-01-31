@@ -67,6 +67,7 @@ struct fields_t {
     jmethodID   rect_constructor;
     jmethodID   face_constructor;
     jmethodID   point_constructor;
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
     jfieldID    face_sm_degree;
     jfieldID    face_sm_score;
     jfieldID    face_blink_detected;
@@ -79,6 +80,7 @@ struct fields_t {
     jfieldID    face_left_right_gaze;
     jfieldID    face_top_bottom_gaze;
     jfieldID    face_recognised;
+// QTI_END: 2018-03-10: Camera: Extend face detection
 };
 
 static fields_t fields;
@@ -117,7 +119,9 @@ private:
     jclass      mFaceClass;  // strong reference to Face class
     jclass      mRectClass;  // strong reference to Rect class
     jclass      mPointClass;  // strong reference to Point class
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
     bool        mIsExtendedFace;
+// QTI_END: 2018-03-10: Camera: Extend face detection
     Mutex       mLock;
 
     /*
@@ -169,6 +173,7 @@ JNICameraContext::JNICameraContext(JNIEnv* env, jobject weak_this, jclass clazz,
     mCameraJClass = (jclass)env->NewGlobalRef(clazz);
     mCamera = camera;
 
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
     jclass extendedfaceClazz = env->FindClass("com/qualcomm/qti/camera/ExtendedFace");
     if (NULL != extendedfaceClazz) {
         mFaceClass = (jclass) env->NewGlobalRef(extendedfaceClazz);
@@ -179,6 +184,7 @@ JNICameraContext::JNICameraContext(JNIEnv* env, jobject weak_this, jclass clazz,
         mFaceClass = (jclass) env->NewGlobalRef(faceClazz);
         mIsExtendedFace = false;
     }
+// QTI_END: 2018-03-10: Camera: Extend face detection
 
     jclass rectClazz = env->FindClass("android/graphics/Rect");
     mRectClass = (jclass) env->NewGlobalRef(rectClazz);
@@ -458,6 +464,7 @@ void JNICameraContext::postMetadata(JNIEnv *env, int32_t msgType, camera_frame_m
             env->SetIntField(mouth, fields.point_y, metadata->faces[i].mouth[1]);
             env->SetObjectField(face, fields.face_mouth, mouth);
             env->DeleteLocalRef(mouth);
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
 
             if (mIsExtendedFace) {
                 env->SetIntField(face, fields.face_sm_degree, metadata->faces[i].smile_degree);
@@ -473,6 +480,7 @@ void JNICameraContext::postMetadata(JNIEnv *env, int32_t msgType, camera_frame_m
                 env->SetIntField(face, fields.face_left_right_gaze, metadata->faces[i].left_right_gaze);
                 env->SetIntField(face, fields.face_top_bottom_gaze, metadata->faces[i].top_bottom_gaze);
             }
+// QTI_END: 2018-03-10: Camera: Extend face detection
         }
 
         env->DeleteLocalRef(face);
@@ -510,6 +518,7 @@ void JNICameraContext::setCallbackMode(JNIEnv *env, bool installed, bool manualM
     }
 }
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
 static void android_hardware_Camera_setLongshot(JNIEnv *env, jobject thiz, jboolean enable)
 {
     ALOGV("setLongshot");
@@ -560,6 +569,7 @@ static void android_hardware_Camera_sendHistogramData(JNIEnv *env, jobject thiz)
       jniThrowException(env, "java/lang/RuntimeException", "set histogram mode failed");
      }
  }
+// QTI_END: 2018-03-05: Camera: Add feature extensions
 void JNICameraContext::addCallbackBuffer(
         JNIEnv *env, jbyteArray cbb, int msgType)
 {
@@ -935,6 +945,7 @@ static void android_hardware_Camera_setHasPreviewCallback(JNIEnv *env, jobject t
     context->setCallbackMode(env, installed, manualBuffer);
 }
 
+// QTI_BEGIN: 2018-03-05: Camera: Add feature extensions
 static void android_hardware_Camera_setMetadataCb(JNIEnv *env, jobject thiz, jboolean mode)
 {
     ALOGV("setMetadataCb: mode:%d", (int)mode);
@@ -954,6 +965,7 @@ static void android_hardware_Camera_setMetadataCb(JNIEnv *env, jobject thiz, jbo
 }
 
 static void android_hardware_Camera_addCallbackBuffer(JNIEnv *env, jobject thiz, jbyteArray bytes, int msgType) {
+// QTI_END: 2018-03-05: Camera: Add feature extensions
     ALOGV("addCallbackBuffer: 0x%x", msgType);
 
     JNICameraContext* context = reinterpret_cast<JNICameraContext*>(env->GetLongField(thiz, fields.context));
@@ -1305,6 +1317,7 @@ int register_android_hardware_Camera(JNIEnv *env)
         { "android/graphics/Point", "y", "I", &fields.point_y},
     };
 
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
     field extendedfacefields_to_find[] = {
         { "com/qualcomm/qti/camera/ExtendedFace", "rect", "Landroid/graphics/Rect;", &fields.face_rect },
         { "com/qualcomm/qti/camera/ExtendedFace", "score", "I", &fields.face_score },
@@ -1326,6 +1339,7 @@ int register_android_hardware_Camera(JNIEnv *env)
         { "com/qualcomm/qti/camera/ExtendedFace", "topbottomGaze", "I", &fields.face_top_bottom_gaze },
     };
 
+// QTI_END: 2018-03-10: Camera: Extend face detection
     find_fields(env, fields_to_find, NELEM(fields_to_find));
 
     jclass clazz = FindClassOrDie(env, "android/hardware/Camera");
@@ -1345,14 +1359,20 @@ int register_android_hardware_Camera(JNIEnv *env)
         return -1;
     }
 
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
     clazz = env->FindClass("com/qualcomm/qti/camera/ExtendedFace");
     if (NULL != clazz) {
         fields.face_constructor = env->GetMethodID(clazz, "<init>", "()V");
         find_fields(env, extendedfacefields_to_find, NELEM(extendedfacefields_to_find));
+// QTI_END: 2018-03-10: Camera: Extend face detection
+// QTI_BEGIN: 2018-05-22: Camera: Clearing exception for Extended Face
     }else {
         env->ExceptionClear();
+// QTI_END: 2018-05-22: Camera: Clearing exception for Extended Face
+// QTI_BEGIN: 2018-03-10: Camera: Extend face detection
     }
 
+// QTI_END: 2018-03-10: Camera: Extend face detection
     // Register native functions
     return RegisterMethodsOrDie(env, "android/hardware/Camera", camMethods, NELEM(camMethods));
 }

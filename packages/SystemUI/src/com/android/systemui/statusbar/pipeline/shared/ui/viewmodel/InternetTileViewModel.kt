@@ -114,7 +114,9 @@ constructor(
                 notConnectedFlow
             } else {
                 combine(
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
                     it.customizedNetworkName,
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
                     it.signalLevelIcon,
                     mobileDataContentName,
                 ) { networkNameModel, signalIcon, dataContentDescription ->

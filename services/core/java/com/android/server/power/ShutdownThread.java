@@ -86,12 +86,14 @@ public final class ShutdownThread extends Thread {
     private static final int PACKAGE_MANAGER_STOP_PERCENT = 6;
     private static final int RADIO_STOP_PERCENT = 18;
     private static final int MOUNT_SERVICE_STOP_PERCENT = 20;
+// QTI_BEGIN: 2018-05-23: Core: ShutdownThread: Add support to wait for oem subsystem shutdown
     // Time we should wait for vendor subsystem shutdown
     // Sleep times(ms) between checks of the vendor subsystem state
     private static final int VENDOR_SUBSYS_STATE_CHECK_INTERVAL_MS = 100;
     // Max time we wait for vendor subsystems to shut down before resuming
     // with full system shutdown
     private static final int VENDOR_SUBSYS_MAX_WAIT_MS = 10000;
+// QTI_END: 2018-05-23: Core: ShutdownThread: Add support to wait for oem subsystem shutdown
 
     // length of vibration before shutting down
     @VisibleForTesting static final int DEFAULT_SHUTDOWN_VIBRATE_MS = 500;
@@ -723,6 +725,7 @@ public final class ShutdownThread extends Thread {
      * @param reason reason for reboot/shutdown
      */
     public static void rebootOrShutdown(final Context context, boolean reboot, String reason) {
+// QTI_BEGIN: 2018-05-23: Core: ShutdownThread: Add support to wait for oem subsystem shutdown
         String subsysProp;
         subsysProp = SystemProperties.get("vendor.peripheral.shutdown_critical_list",
                         "ERROR");
@@ -776,6 +779,7 @@ public final class ShutdownThread extends Thread {
                         Log.i(TAG, "Vendor subsystem(s) shutdown successful");
                 }
         }
+// QTI_END: 2018-05-23: Core: ShutdownThread: Add support to wait for oem subsystem shutdown
         if (reboot) {
             Log.i(TAG, "Rebooting, reason: " + reason);
             PowerManagerService.lowLevelReboot(reason);

@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 
 import android.telephony.TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_ADVANCED_PRO
@@ -29,7 +31,9 @@ import android.telephony.TelephonyManager.NETWORK_TYPE_UMTS
 import com.android.settingslib.SignalIcon.MobileIconGroup
 import com.android.settingslib.mobile.TelephonyIcons
 import com.android.systemui.log.table.TableLogBuffer
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.util.MobileMappingsProxy
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,22 +95,32 @@ class FakeMobileIconsInteractor(
 
     override val isDeviceInEmergencyCallsOnlyMode = MutableStateFlow(false)
 
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
     private val _alwaysUseRsrpLevelForLte = MutableStateFlow(false)
     override val alwaysUseRsrpLevelForLte = _alwaysUseRsrpLevelForLte
 
     private val _hideNoInternetState = MutableStateFlow(false)
     override val hideNoInternetState = _hideNoInternetState
 
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
     private val _networkTypeIconCustomization = MutableStateFlow(MobileIconCustomizationMode())
     override val networkTypeIconCustomization = _networkTypeIconCustomization
 
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
     private val _showVolteIcon = MutableStateFlow(false)
     override val showVolteIcon = _showVolteIcon
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 
     private val _showVowifiIcon = MutableStateFlow(false)
     override val showVowifiIcon = _showVowifiIcon
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 
     private val _defaultDataSubId = MutableStateFlow(0)
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     override val defaultDataSubId: MutableStateFlow<Int?> = MutableStateFlow(DEFAULT_DATA_SUB_ID)
 
     override fun getMobileConnectionInteractorForSubId(subId: Int): FakeMobileIconInteractor {

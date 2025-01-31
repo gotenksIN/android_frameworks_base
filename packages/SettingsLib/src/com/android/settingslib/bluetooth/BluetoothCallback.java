@@ -16,9 +16,13 @@
 
 package com.android.settingslib.bluetooth;
 
+// QTI_BEGIN: 2020-08-19: Bluetooth: Add callback onA2dpCodecConfigChanged
 import android.bluetooth.BluetoothCodecStatus;
+// QTI_END: 2020-08-19: Bluetooth: Add callback onA2dpCodecConfigChanged
 
+// QTI_BEGIN: 2020-11-26: Bluetooth: DeviceGroup: Framework changes for Group Device operations.
 import java.util.UUID;
+// QTI_END: 2020-11-26: Bluetooth: DeviceGroup: Framework changes for Group Device operations.
 import static android.bluetooth.BluetoothAdapter.STATE_CONNECTED;
 import static android.bluetooth.BluetoothAdapter.STATE_CONNECTING;
 import static android.bluetooth.BluetoothAdapter.STATE_DISCONNECTED;
@@ -193,6 +197,7 @@ public interface BluetoothCallback {
     })
     @Retention(RetentionPolicy.SOURCE)
     @interface AdapterState {}
+// QTI_BEGIN: 2020-08-19: Bluetooth: Add callback onA2dpCodecConfigChanged
 
     /**
      * Called when a2dp codec config is changed. It listens to
@@ -204,6 +209,8 @@ public interface BluetoothCallback {
     default void onA2dpCodecConfigChanged(CachedBluetoothDevice cachedDevice,
             BluetoothCodecStatus codecStatus) {
     }
+// QTI_END: 2020-08-19: Bluetooth: Add callback onA2dpCodecConfigChanged
+// QTI_BEGIN: 2020-11-26: Bluetooth: DeviceGroup: Framework changes for Group Device operations.
 
     /**
      * Called when new device group has been identified with the bonded remote device
@@ -227,6 +234,8 @@ public interface BluetoothCallback {
     default void onGroupDiscoveryStatusChanged (int groupId, int status, int reason) {
     }
 
+// QTI_END: 2020-11-26: Bluetooth: DeviceGroup: Framework changes for Group Device operations.
+// QTI_BEGIN: 2021-01-29: Bluetooth: Broadcast UI: Changes to existing files
     /**
      * Called when Broadcast state is changed. It listens to
      * {@link android.bluetooth.BluetoothBroadcast#ACTION_BROADCAST_STATE_CHANGED}
@@ -248,4 +257,5 @@ public interface BluetoothCallback {
      */
     default void onBroadcastKeyGenerated() {
     }
+// QTI_END: 2021-01-29: Bluetooth: Broadcast UI: Changes to existing files
 }

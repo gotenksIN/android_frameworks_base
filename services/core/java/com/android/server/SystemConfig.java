@@ -105,15 +105,19 @@ public class SystemConfig {
     // property for runtime configuration differentiation
     private static final String SKU_PROPERTY = "ro.boot.product.hardware.sku";
 
+// QTI_BEGIN: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
     // property for runtime configuration differentiation in vendor
     private static final String VENDOR_SKU_PROPERTY = "ro.boot.product.vendor.sku";
 
+// QTI_END: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
     // property for runtime configuration differentation in product
     private static final String PRODUCT_SKU_PROPERTY = "ro.boot.hardware.sku";
 
+// QTI_BEGIN: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
     // property for runtime configuration differentiation based on baseband type
     private static final String NO_RIL_PROPERTY = "ro.radio.noril";
 
+// QTI_END: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
     private static final ArrayMap<String, ArraySet<String>> EMPTY_PERMISSIONS =
             new ArrayMap<>();
 
@@ -707,17 +711,24 @@ public class SystemConfig {
         readPermissions(parser, Environment.buildPath(
                 Environment.getVendorDirectory(), "etc", "permissions"), vendorPermissionFlag);
 
+// QTI_BEGIN: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
         String vendorSkuProperty = SystemProperties.get(VENDOR_SKU_PROPERTY, "");
         if (!vendorSkuProperty.isEmpty()) {
             String vendorSkuDir = "sku_" + vendorSkuProperty;
+// QTI_END: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
             readPermissions(parser, Environment.buildPath(
+// QTI_BEGIN: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
                     Environment.getVendorDirectory(), "etc", "sysconfig", vendorSkuDir),
                     vendorPermissionFlag);
+// QTI_END: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
             readPermissions(parser, Environment.buildPath(
+// QTI_BEGIN: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
                     Environment.getVendorDirectory(), "etc", "permissions", vendorSkuDir),
                     vendorPermissionFlag);
         }
 
+// QTI_END: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
+// QTI_BEGIN: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
         boolean noRilSupport = SystemProperties.getBoolean(NO_RIL_PROPERTY, false);
         if (noRilSupport) {
             String noRilDir = "noRil";
@@ -729,6 +740,7 @@ public class SystemConfig {
                     vendorPermissionFlag);
         }
 
+// QTI_END: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
         // Allow ODM to customize system configs as much as Vendor, because /odm is another
         // vendor partition other than /vendor.
         int odmPermissionFlag = vendorPermissionFlag;

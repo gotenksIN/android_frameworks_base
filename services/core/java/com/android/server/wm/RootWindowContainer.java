@@ -128,7 +128,9 @@ import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
 import android.util.BoostFramework;
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
 import android.util.IntArray;
 import android.util.Pair;
 import android.util.Slog;
@@ -156,7 +158,9 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.wm.utils.RegionUtils;
 import com.android.window.flags.Flags;
 
@@ -248,12 +252,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     @NonNull
     private final DisplayRotationCoordinator mDisplayRotationCoordinator;
 
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     public static boolean mPerfSendTapHint = false;
     public static boolean mIsPerfBoostAcquired = false;
     public static int mPerfHandle = -1;
     public BoostFramework mPerfBoost = null;
     public BoostFramework mUxPerf = null;
 
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     /** Reference to default display so we can quickly look it up. */
     private DisplayContent mDefaultDisplay;
     private final SparseArray<IntArray> mDisplayAccessUIDs = new SparseArray<>();
@@ -2446,19 +2452,30 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     }
 
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     void acquireAppLaunchPerfLock(ActivityRecord r) {
         /* Acquire perf lock during new app launch */
         if (mPerfBoost == null) {
             mPerfBoost = new BoostFramework();
         }
         if (mPerfBoost != null) {
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
             int pkgType = mPerfBoost.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                                                      r.packageName);
             int wpcPid = -1;
             if (mService != null && r != null && r.info != null && r.info.applicationInfo !=null) {
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 final WindowProcessController wpc =
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                         mService.getProcessController(r.processName, r.info.applicationInfo.uid);
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 if (wpc != null && wpc.hasThread()) {
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                    //If target process didn't start yet,
                    // this operation will be done when app call attach
                    wpcPid = wpc.getPid();
@@ -2494,12 +2511,20 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                     r.packageName, -1, BoostFramework.Launch.BOOST_V2);
                 if (wpcPid != -1) {
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                     mPerfBoost.perfHint(
                         BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                             r.packageName, wpcPid,
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                             BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
                 }
 
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                 if (pkgType  == BoostFramework.WorkloadType.GAME)
                 {
                     mPerfHandle = mPerfBoost.perfHint(
@@ -2510,22 +2535,29 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                         BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                             r.packageName, -1, BoostFramework.Launch.BOOST_V3);
                 }
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
             }
             if (mPerfHandle > 0)
                 mIsPerfBoostAcquired = true;
             // Start IOP
             if(r.info.applicationInfo != null &&
                 r.info.applicationInfo.sourceDir != null) {
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                   if (mPerfBoost.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mPerfBoost.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                       mPerfBoost.perfIOPrefetchStart(-1,r.packageName,
                       r.info.applicationInfo.sourceDir.substring(
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                         0, r.info.applicationInfo.sourceDir.lastIndexOf('/')));
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                   }
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
             }
         }
     }
 
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     @Nullable
     ActivityRecord findTask(ActivityRecord r, TaskDisplayArea preferredTaskDisplayArea,
             boolean includeLaunchedFromBubble) {
@@ -2547,6 +2579,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (preferredTaskDisplayArea != null) {
             mTmpFindTaskResult.process(preferredTaskDisplayArea);
             if (mTmpFindTaskResult.mIdealRecord != null) {
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 if(mTmpFindTaskResult.mIdealRecord.getState() == DESTROYED) {
                     /*It's a new app launch */
                     acquireAppLaunchPerfLock(r);
@@ -2554,6 +2587,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
                 if(mTmpFindTaskResult.mIdealRecord.getState() == STOPPED) {
                      /*Warm launch */
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                      mUxPerf = new BoostFramework();
                      if (mUxPerf != null) {
                          if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
@@ -2563,31 +2597,47 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                              mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_WARM_LAUNCH, r.packageName, 2, 0, 0);
                          }
                      }
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
                     ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
                     if (freezer != null && freezer.useFreezerManager()) {
                         freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
                     }
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 }
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 return mTmpFindTaskResult.mIdealRecord;
             } else if (mTmpFindTaskResult.mCandidateRecord != null) {
                 candidateActivity = mTmpFindTaskResult.mCandidateRecord;
             }
         }
 
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
         /* Acquire perf lock *only* during new app launch */
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-10-08: Core: Revert "Perf:fix issue that launch boost worked abnormal"
         if ((mTmpFindTaskResult.mIdealRecord == null) ||
             (mTmpFindTaskResult.mIdealRecord.getState() == DESTROYED)) {
+// QTI_END: 2021-10-08: Core: Revert "Perf:fix issue that launch boost worked abnormal"
+// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
             if (r != null && r.isMainIntent(r.intent)) {
                 acquireAppLaunchPerfLock(r);
+// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
                 ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
                 if (freezer != null && freezer.useFreezerManager()) {
                     freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
                 }
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
             } else if (r == null) {
                 Slog.w(TAG, "Should not happen! Didn't apply launch boost");
             }
+// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
         }
 
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
         final ActivityRecord idealMatchActivity = getItemFromTaskDisplayAreas(taskDisplayArea -> {
             if (taskDisplayArea == preferredTaskDisplayArea) {
                 return null;

@@ -159,6 +159,7 @@ open class WifiUtils {
             }
         }
 
+// QTI_BEGIN: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
         val WIFI_4_PIE = intArrayOf(
                     com.android.internal.R.drawable.ic_wifi_4_signal_0,
                     com.android.internal.R.drawable.ic_wifi_4_signal_1,
@@ -191,6 +192,7 @@ open class WifiUtils {
                     com.android.internal.R.drawable.ic_wifi_7_signal_4
         )
 
+// QTI_END: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
         @JvmStatic
         fun buildLoggingSummary(accessPoint: AccessPoint, config: WifiConfiguration?): String {
             val summary = StringBuilder()
@@ -414,11 +416,13 @@ open class WifiUtils {
             } else context.getString(R.string.wifi_unmetered_label)
         }
 
+// QTI_BEGIN: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
         @JvmStatic
         fun getInternetIconResource(level: Int, noInternet: Boolean): Int {
             return getInternetIconResource(level, noInternet, 0 /* standard */)
         }
 
+// QTI_END: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
         /**
          * Returns the Internet icon resource for a given RSSI level.
          *
@@ -426,7 +430,9 @@ open class WifiUtils {
          * @param noInternet True if a connected Wi-Fi network cannot access the Internet
          */
         @JvmStatic
+// QTI_BEGIN: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
         fun getInternetIconResource(level: Int, noInternet: Boolean, standard: Int): Int {
+// QTI_END: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
             var wifiLevel = level
             if (wifiLevel < 0) {
                 Log.e(TAG, "Wi-Fi level is out of range! level:$level")
@@ -435,6 +441,7 @@ open class WifiUtils {
                 Log.e(TAG, "Wi-Fi level is out of range! level:$level")
                 wifiLevel = WIFI_PIE.size - 1
             }
+// QTI_BEGIN: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
 
             if (noInternet) {
                     return NO_INTERNET_WIFI_PIE[wifiLevel]
@@ -448,6 +455,7 @@ open class WifiUtils {
                     else -> WIFI_PIE[wifiLevel]
             }
             return result
+// QTI_END: 2024-04-22: WLAN: SettingsLib: Add WifiGeneration symbols to refactored WifiUtils.kt
         }
 
         /**

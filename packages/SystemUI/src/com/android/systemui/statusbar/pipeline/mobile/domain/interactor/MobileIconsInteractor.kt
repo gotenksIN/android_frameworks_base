@@ -56,7 +56,6 @@ import com.android.systemui.util.CarrierNameCustomization
 import java.lang.ref.WeakReference
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -172,7 +171,6 @@ interface MobileIconsInteractor {
 }
 
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
-@OptIn(ExperimentalCoroutinesApi::class)
 @SysUISingleton
 class MobileIconsInteractorImpl
 @Inject

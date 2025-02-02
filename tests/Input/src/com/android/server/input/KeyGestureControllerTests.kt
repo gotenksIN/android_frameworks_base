@@ -383,15 +383,14 @@ class KeyGestureControllerTests {
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
             ),
             TestData(
-                "META + CTRL + S -> Take Screenshot",
+                "META + S -> Take Screenshot",
                 intArrayOf(
                     KeyEvent.KEYCODE_META_LEFT,
-                    KeyEvent.KEYCODE_CTRL_LEFT,
                     KeyEvent.KEYCODE_S
                 ),
                 KeyGestureEvent.KEY_GESTURE_TYPE_TAKE_SCREENSHOT,
                 intArrayOf(KeyEvent.KEYCODE_S),
-                KeyEvent.META_META_ON or KeyEvent.META_CTRL_ON,
+                KeyEvent.META_META_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
             ),
             TestData(
@@ -464,30 +463,6 @@ class KeyGestureControllerTests {
                 KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT,
                 intArrayOf(KeyEvent.KEYCODE_DPAD_RIGHT),
                 KeyEvent.META_META_ON or KeyEvent.META_CTRL_ON,
-                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
-            ),
-            TestData(
-                "CTRL + ALT + DPAD_LEFT -> Change Splitscreen Focus Left",
-                intArrayOf(
-                    KeyEvent.KEYCODE_CTRL_LEFT,
-                    KeyEvent.KEYCODE_ALT_LEFT,
-                    KeyEvent.KEYCODE_DPAD_LEFT
-                ),
-                KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_LEFT,
-                intArrayOf(KeyEvent.KEYCODE_DPAD_LEFT),
-                KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON,
-                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
-            ),
-            TestData(
-                "CTRL + ALT + DPAD_RIGHT -> Change Splitscreen Focus Right",
-                intArrayOf(
-                    KeyEvent.KEYCODE_CTRL_LEFT,
-                    KeyEvent.KEYCODE_ALT_LEFT,
-                    KeyEvent.KEYCODE_DPAD_RIGHT
-                ),
-                KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_RIGHT,
-                intArrayOf(KeyEvent.KEYCODE_DPAD_RIGHT),
-                KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
             ),
             TestData(

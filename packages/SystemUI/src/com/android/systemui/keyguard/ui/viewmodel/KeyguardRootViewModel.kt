@@ -28,6 +28,7 @@ import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.PulseExpansionInteractor
+import com.android.systemui.keyguard.domain.interactor.WallpaperFocalAreaInteractor
 import com.android.systemui.keyguard.shared.model.Edge
 import com.android.systemui.keyguard.shared.model.KeyguardState.AOD
 import com.android.systemui.keyguard.shared.model.KeyguardState.DREAMING
@@ -56,7 +57,6 @@ import com.android.systemui.util.ui.zip
 import javax.inject.Inject
 import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -69,7 +69,6 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @SysUISingleton
 class KeyguardRootViewModel
 @Inject
@@ -133,6 +132,7 @@ constructor(
     private val screenOffAnimationController: ScreenOffAnimationController,
     private val aodBurnInViewModel: AodBurnInViewModel,
     private val shadeInteractor: ShadeInteractor,
+    wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
 ) {
     val burnInLayerVisibility: Flow<Int> =
         keyguardTransitionInteractor.startedKeyguardTransitionStep
@@ -361,6 +361,8 @@ constructor(
                 started = SharingStarted.WhileSubscribed(),
                 initialValue = AnimatedValue.NotAnimating(false),
             )
+
+    val shouldSendFocalArea = wallpaperFocalAreaInteractor.shouldSendFocalArea
 
     fun onNotificationContainerBoundsChanged(top: Float, bottom: Float, animate: Boolean = false) {
         keyguardInteractor.setNotificationContainerBounds(

@@ -21,6 +21,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
+import com.android.systemui.animation.GSFAxes
 import com.android.systemui.customization.R
 import com.android.systemui.plugins.clocks.AlarmData
 import com.android.systemui.plugins.clocks.ClockAnimations
@@ -125,7 +126,19 @@ class FlexClockFaceController(clockCtx: ClockContext, private val isLargeClock: 
             layerController.faceEvents.onThemeChanged(theme)
         }
 
-        override fun onFontAxesChanged(axes: List<ClockFontAxisSetting>) {
+        override fun onFontAxesChanged(settings: List<ClockFontAxisSetting>) {
+            var axes = settings
+            if (!isLargeClock) {
+                axes =
+                    axes.map { axis ->
+                        if (axis.key == GSFAxes.WIDTH && axis.value > SMALL_CLOCK_MAX_WDTH) {
+                            axis.copy(value = SMALL_CLOCK_MAX_WDTH)
+                        } else {
+                            axis
+                        }
+                    }
+            }
+
             layerController.events.onFontAxesChanged(axes)
         }
 
@@ -236,6 +249,7 @@ class FlexClockFaceController(clockCtx: ClockContext, private val isLargeClock: 
         }
 
     companion object {
+        val SMALL_CLOCK_MAX_WDTH = 120f
         val SMALL_LAYER_CONFIG =
             LayerConfig(
                 timespec = DigitalTimespec.TIME_FULL_FORMAT,

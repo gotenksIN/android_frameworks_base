@@ -34,15 +34,15 @@ import android.view.View.MeasureSpec.EXACTLY
 import android.view.animation.Interpolator
 import android.widget.TextView
 import com.android.internal.annotations.VisibleForTesting
+import com.android.systemui.animation.GSFAxes
 import com.android.systemui.animation.TextAnimator
 import com.android.systemui.customization.R
-import com.android.systemui.log.core.Logger
 import com.android.systemui.plugins.clocks.ClockFontAxisSetting
+import com.android.systemui.plugins.clocks.ClockLogger
 import com.android.systemui.shared.clocks.ClockContext
 import com.android.systemui.shared.clocks.DigitTranslateAnimator
 import com.android.systemui.shared.clocks.DimensionParser
 import com.android.systemui.shared.clocks.FontTextStyle
-import com.android.systemui.shared.clocks.LogUtil
 import java.lang.Thread
 import kotlin.math.max
 import kotlin.math.min
@@ -93,8 +93,8 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
     private val prevTextBounds = Rect()
     // targetTextBounds holds the state we are interpolating to
     private val targetTextBounds = Rect()
-    protected val logger = Logger(clockCtx.messageBuffer, this::class.simpleName!!)
-        get() = field ?: LogUtil.FALLBACK_INIT_LOGGER
+    protected val logger = ClockLogger(this, clockCtx.messageBuffer, this::class.simpleName!!)
+        get() = field ?: ClockLogger.INIT_LOGGER
 
     private var aodDozingInterpolator: Interpolator? = null
 
@@ -145,7 +145,7 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        logger.d("onMeasure()")
+        logger.onMeasure()
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 
         val layout = this.layout
@@ -206,7 +206,8 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
     }
 
     override fun onDraw(canvas: Canvas) {
-        logger.d({ "onDraw(); ls: $str1" }) { str1 = textAnimator.textInterpolator.shapedText }
+        logger.onDraw(textAnimator.textInterpolator.shapedText)
+
         val translation = getLocalTranslation()
         canvas.translate(translation.x.toFloat(), translation.y.toFloat())
         digitTranslateAnimator?.let {
@@ -221,14 +222,24 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
         canvas.translate(-translation.x.toFloat(), -translation.y.toFloat())
     }
 
+    override fun setVisibility(visibility: Int) {
+        logger.setVisibility(visibility)
+        super.setVisibility(visibility)
+    }
+
+    override fun setAlpha(alpha: Float) {
+        logger.setAlpha(alpha)
+        super.setAlpha(alpha)
+    }
+
     override fun invalidate() {
-        logger.d("invalidate()")
+        logger.invalidate()
         super.invalidate()
         (parent as? FlexClockView)?.invalidate()
     }
 
     fun refreshTime() {
-        logger.d("refreshTime()")
+        logger.refreshTime()
         refreshText()
     }
 
@@ -433,7 +444,7 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
         maxSingleDigitWidth = 0
 
         for (i in 0..9) {
-            lockScreenPaint.getTextBounds(i.toString(), 0, 1, rectForCalculate)
+            lockScreenPaint.getTextBounds("$i", 0, 1, rectForCalculate)
             maxSingleDigitHeight = max(maxSingleDigitHeight, rectForCalculate.height())
             maxSingleDigitWidth = max(maxSingleDigitWidth, rectForCalculate.width())
         }
@@ -490,22 +501,22 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
             Paint().also { it.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT) }
 
         val AOD_COLOR = Color.WHITE
-        val OPTICAL_SIZE_AXIS = ClockFontAxisSetting("opsz", 144f)
+        val OPTICAL_SIZE_AXIS = ClockFontAxisSetting(GSFAxes.OPTICAL_SIZE, 144f)
         val DEFAULT_LS_VARIATION =
             listOf(
                 OPTICAL_SIZE_AXIS,
-                ClockFontAxisSetting("wght", 400f),
-                ClockFontAxisSetting("wdth", 100f),
-                ClockFontAxisSetting("ROND", 0f),
-                ClockFontAxisSetting("slnt", 0f),
+                ClockFontAxisSetting(GSFAxes.WEIGHT, 400f),
+                ClockFontAxisSetting(GSFAxes.WIDTH, 100f),
+                ClockFontAxisSetting(GSFAxes.ROUND, 0f),
+                ClockFontAxisSetting(GSFAxes.SLANT, 0f),
             )
         val DEFAULT_AOD_VARIATION =
             listOf(
                 OPTICAL_SIZE_AXIS,
-                ClockFontAxisSetting("wght", 200f),
-                ClockFontAxisSetting("wdth", 100f),
-                ClockFontAxisSetting("ROND", 0f),
-                ClockFontAxisSetting("slnt", 0f),
+                ClockFontAxisSetting(GSFAxes.WEIGHT, 200f),
+                ClockFontAxisSetting(GSFAxes.WIDTH, 100f),
+                ClockFontAxisSetting(GSFAxes.ROUND, 0f),
+                ClockFontAxisSetting(GSFAxes.SLANT, 0f),
             )
     }
 }

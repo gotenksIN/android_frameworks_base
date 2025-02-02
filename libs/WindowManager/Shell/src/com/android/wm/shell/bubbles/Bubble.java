@@ -56,6 +56,7 @@ import com.android.wm.shell.bubbles.bar.BubbleBarExpandedView;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
+import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.bubbles.BubbleInfo;
 import com.android.wm.shell.shared.bubbles.ParcelableFlyoutMessage;
 import com.android.wm.shell.taskview.TaskView;
@@ -542,7 +543,7 @@ public class Bubble implements BubbleViewProvider {
         return (mMetadataShortcutId != null && !mMetadataShortcutId.isEmpty());
     }
 
-    BubbleTransitions.BubbleTransition getPreparingTransition() {
+    public BubbleTransitions.BubbleTransition getPreparingTransition() {
         return mPreparingTransition;
     }
 
@@ -572,7 +573,8 @@ public class Bubble implements BubbleViewProvider {
         mIntentActive = false;
     }
 
-    private void cleanupTaskView() {
+    /** Cleans-up the taskview associated with this bubble (possibly removing the task from wm) */
+    public void cleanupTaskView() {
         if (mBubbleTaskView != null) {
             mBubbleTaskView.cleanup();
             mBubbleTaskView = null;
@@ -593,7 +595,7 @@ public class Bubble implements BubbleViewProvider {
      * <p>If we're switching between bar and floating modes, pass {@code false} on
      * {@code cleanupTaskView} to avoid recreating it in the new mode.
      */
-    void cleanupViews(boolean cleanupTaskView) {
+    public void cleanupViews(boolean cleanupTaskView) {
         cleanupExpandedView(cleanupTaskView);
         mIconView = null;
     }
@@ -1092,7 +1094,7 @@ public class Bubble implements BubbleViewProvider {
      * intent for an app. In this case we don't show a badge on the icon.
      */
     public boolean isAppLaunchIntent() {
-        if (Flags.enableBubbleAnything() && mAppIntent != null) {
+        if (BubbleAnythingFlagHelper.enableCreateAnyBubble() && mAppIntent != null) {
             return mAppIntent.hasCategory("android.intent.category.LAUNCHER");
         }
         return false;

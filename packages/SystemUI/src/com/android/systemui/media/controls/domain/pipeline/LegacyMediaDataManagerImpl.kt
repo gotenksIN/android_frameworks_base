@@ -70,8 +70,6 @@ import com.android.systemui.media.controls.domain.pipeline.MediaDataManager.Comp
 import com.android.systemui.media.controls.domain.resume.MediaResumeListener
 import com.android.systemui.media.controls.domain.resume.ResumeMediaBrowser
 import com.android.systemui.media.controls.shared.MediaLogger
-import com.android.systemui.media.controls.shared.model.EXTRA_KEY_TRIGGER_SOURCE
-import com.android.systemui.media.controls.shared.model.EXTRA_VALUE_TRIGGER_PERIODIC
 import com.android.systemui.media.controls.shared.model.MediaAction
 import com.android.systemui.media.controls.shared.model.MediaButton
 import com.android.systemui.media.controls.shared.model.MediaData
@@ -769,23 +767,6 @@ class LegacyMediaDataManagerImpl(
         )
     }
 
-    /** Called when the recommendation card should no longer be visible in QQS or lockscreen */
-    override fun setRecommendationInactive(key: String) {
-        if (!mediaFlags.isPersistentSsCardEnabled()) {
-            Log.e(TAG, "Only persistent recommendation can be inactive!")
-            return
-        }
-        if (DEBUG) Log.d(TAG, "Setting smartspace recommendation inactive")
-
-        if (smartspaceMediaData.targetId != key || !smartspaceMediaData.isValid()) {
-            // If this doesn't match, or we've already invalidated the data, no action needed
-            return
-        }
-
-        smartspaceMediaData = smartspaceMediaData.copy(isActive = false)
-        notifySmartspaceMediaDataLoaded(smartspaceMediaData.targetId, smartspaceMediaData)
-    }
-
     private suspend fun loadMediaDataForResumption(
         userId: Int,
         desc: MediaDescription,
@@ -1268,13 +1249,21 @@ class LegacyMediaDataManagerImpl(
     }
 
     private fun getResumeMediaAction(action: Runnable): MediaAction {
+        val iconId =
+            if (Flags.mediaControlsUiUpdate()) {
+                R.drawable.ic_media_play_button
+            } else {
+                R.drawable.ic_media_play
+            }
         return MediaAction(
-            Icon.createWithResource(context, R.drawable.ic_media_play)
-                .setTint(themeText)
-                .loadDrawable(context),
+            Icon.createWithResource(context, iconId).setTint(themeText).loadDrawable(context),
             action,
             context.getString(R.string.controls_media_resume),
-            context.getDrawable(R.drawable.ic_media_play_container),
+            if (Flags.mediaControlsUiUpdate()) {
+                context.getDrawable(R.drawable.ic_media_play_button_container)
+            } else {
+                context.getDrawable(R.drawable.ic_media_play_container)
+            },
         )
     }
 
@@ -1490,15 +1479,7 @@ class LegacyMediaDataManagerImpl(
         val dismissIntent =
             baseAction?.extras?.getParcelable(EXTRAS_SMARTSPACE_DISMISS_INTENT_KEY) as Intent?
 
-        val isActive =
-            when {
-                !mediaFlags.isPersistentSsCardEnabled() -> true
-                baseAction == null -> true
-                else -> {
-                    val triggerSource = baseAction.extras?.getString(EXTRA_KEY_TRIGGER_SOURCE)
-                    triggerSource != EXTRA_VALUE_TRIGGER_PERIODIC
-                }
-            }
+        val isActive = true
 
         packageName(target)?.let {
             return SmartspaceMediaData(

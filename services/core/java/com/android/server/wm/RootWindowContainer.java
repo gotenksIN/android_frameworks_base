@@ -142,6 +142,7 @@ import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
+import android.window.DesktopModeFlags;
 import android.window.TaskFragmentAnimationParams;
 import android.window.WindowContainerToken;
 
@@ -1923,7 +1924,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // appropriate.
         removeRootTasksInWindowingModes(WINDOWING_MODE_PINNED);
 
-        if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
+        if (DesktopModeFlags.ENABLE_TOP_VISIBLE_ROOT_TASK_PER_USER_TRACKING.isTrue()) {
             final IntArray visibleRootTasks = new IntArray();
             forAllRootTasks(rootTask -> {
                 if ((mCurrentUser == rootTask.mUserId || rootTask.showForAllUsers())

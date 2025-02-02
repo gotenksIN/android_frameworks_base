@@ -71,6 +71,7 @@ import com.android.wm.shell.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.common.AlphaOptimizedButton;
 import com.android.wm.shell.shared.TriangleShape;
+import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.taskview.TaskView;
 
 import java.io.PrintWriter;
@@ -226,7 +227,8 @@ public class BubbleExpandedView extends LinearLayout {
                             MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
 
                     final boolean isShortcutBubble = (mBubble.hasMetadataShortcutId()
-                            || (mBubble.getShortcutInfo() != null && Flags.enableBubbleAnything()));
+                            || (mBubble.getShortcutInfo() != null
+                            && BubbleAnythingFlagHelper.enableCreateAnyBubble()));
 
                     if (mBubble.isAppBubble()) {
                         Context context =
@@ -687,11 +689,6 @@ public class BubbleExpandedView extends LinearLayout {
         }
     }
 
-    /** Sets the alpha for the pointer. */
-    public void setPointerAlpha(float alpha) {
-        mPointerView.setAlpha(alpha);
-    }
-
     /**
      * Get alpha from underlying {@code TaskView} if this view is for a bubble.
      * Or get alpha for the overflow view if this view is for overflow.
@@ -792,24 +789,6 @@ public class BubbleExpandedView extends LinearLayout {
     public void setBottomClip(int clip) {
         mBottomClip = clip;
         onContainerClipUpdate();
-    }
-
-    /**
-     * Sets the clipping for the view.
-     */
-    public void setTaskViewClip(Rect rect) {
-        mLeftClip = rect.left;
-        mTopClip = rect.top;
-        mRightClip = rect.right;
-        mBottomClip = rect.bottom;
-        onContainerClipUpdate();
-    }
-
-    /**
-     * Returns a rect representing the clipping for the view.
-     */
-    public Rect getTaskViewClip() {
-        return new Rect(mLeftClip, mTopClip, mRightClip, mBottom);
     }
 
     private void onContainerClipUpdate() {
@@ -1119,13 +1098,6 @@ public class BubbleExpandedView extends LinearLayout {
      */
     public boolean isShowingRightPointer() {
         return mCurrentPointer == mRightPointer;
-    }
-
-    /**
-     * Return width of the current pointer
-     */
-    public int getPointerWidth() {
-        return mPointerWidth;
     }
 
     /**

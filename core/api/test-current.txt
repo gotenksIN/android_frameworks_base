@@ -478,8 +478,8 @@ package android.app {
     method public void destroy();
     method @NonNull public java.util.Set<java.lang.String> getAdoptedShellPermissions();
     method @Deprecated public boolean grantRuntimePermission(String, String, android.os.UserHandle);
-    method public boolean injectInputEvent(@NonNull android.view.InputEvent, boolean, boolean);
-    method public void injectInputEventToInputFilter(@NonNull android.view.InputEvent);
+    method @Deprecated @FlaggedApi("com.android.input.flags.deprecate_uiautomation_input_injection") public boolean injectInputEvent(@NonNull android.view.InputEvent, boolean, boolean);
+    method @Deprecated @FlaggedApi("com.android.input.flags.deprecate_uiautomation_input_injection") public void injectInputEventToInputFilter(@NonNull android.view.InputEvent);
     method public boolean isNodeInCache(@NonNull android.view.accessibility.AccessibilityNodeInfo);
     method public void removeOverridePermissionState(int, @NonNull String);
     method @Deprecated public boolean revokeRuntimePermission(String, String, android.os.UserHandle);
@@ -1634,6 +1634,10 @@ package android.hardware.camera2.params {
     method public void setColorSpace(@NonNull android.graphics.ColorSpace.Named);
   }
 
+  @FlaggedApi("com.android.internal.camera.flags.camera_multi_client") public final class SharedSessionConfiguration {
+    ctor public SharedSessionConfiguration(int, @NonNull long[]);
+  }
+
 }
 
 package android.hardware.devicestate {
@@ -2136,6 +2140,7 @@ package android.media.audiofx {
     method public void setParameterListener(android.media.audiofx.AudioEffect.OnParameterChangeListener);
     method public static byte[] shortToByteArray(short);
     field public static final java.util.UUID EFFECT_TYPE_NULL;
+    field @NonNull public static final java.util.UUID EFFECT_TYPE_SPATIALIZER;
   }
 
   public static class AudioEffect.Descriptor {

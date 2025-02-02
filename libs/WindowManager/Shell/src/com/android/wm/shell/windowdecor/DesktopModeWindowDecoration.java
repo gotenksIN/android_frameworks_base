@@ -734,7 +734,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             // [AppHeaderViewHolder].
             ((AppHeaderViewHolder) mWindowDecorViewHolder).runOnAppChipGlobalLayout(
                     () -> {
-                        notifyAppChipStateChanged();
+                        notifyAppHeaderStateChanged();
                         return Unit.INSTANCE;
                     });
         }
@@ -766,7 +766,10 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 mResult.mCaptionHeight);
     }
 
-    private void notifyAppChipStateChanged() {
+    private void notifyAppHeaderStateChanged() {
+        if (isAppHandle(mWindowDecorViewHolder) || mWindowDecorViewHolder == null) {
+            return;
+        }
         final Rect appChipPositionInWindow =
                 ((AppHeaderViewHolder) mWindowDecorViewHolder).getAppChipLocationInWindow();
         final Rect taskBounds = mTaskInfo.configuration.windowConfiguration.getBounds();
@@ -972,7 +975,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             final RelayoutParams.OccludingCaptionElement controlsElement =
                     new RelayoutParams.OccludingCaptionElement();
             controlsElement.mWidthResId = R.dimen.desktop_mode_customizable_caption_margin_end;
-            if (Flags.enableMinimizeButton()) {
+            if (DesktopModeFlags.ENABLE_MINIMIZE_BUTTON.isTrue()) {
                 controlsElement.mWidthResId =
                       R.dimen.desktop_mode_customizable_caption_with_minimize_button_margin_end;
             }
@@ -1358,7 +1361,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         mWebUri = assistContent == null ? null : AppToWebUtils.getSessionWebUri(assistContent);
         updateGenericLink();
         final boolean supportsMultiInstance = mMultiInstanceHelper
-                .supportsMultiInstanceSplit(mTaskInfo.baseActivity)
+                .supportsMultiInstanceSplit(mTaskInfo.baseActivity, mTaskInfo.userId)
                 && Flags.enableDesktopWindowingMultiInstanceFeatures();
         final boolean shouldShowManageWindowsButton = supportsMultiInstance
                 && mMinimumInstancesFound;

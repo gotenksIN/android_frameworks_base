@@ -24,14 +24,12 @@ import com.android.systemui.keyguard.shared.model.KeyguardState.ALTERNATE_BOUNCE
 import com.android.systemui.keyguard.shared.model.KeyguardState.PRIMARY_BOUNCER
 import com.android.systemui.keyguard.ui.KeyguardTransitionAnimationFlow
 import com.android.systemui.keyguard.ui.transitions.BlurConfig
-import com.android.systemui.keyguard.ui.transitions.BlurConfig.Companion.maxBlurRadiusToNotificationPanelBlurRadius
 import com.android.systemui.keyguard.ui.transitions.DeviceEntryIconTransition
 import com.android.systemui.keyguard.ui.transitions.PrimaryBouncerTransition
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.composable.transitions.TO_BOUNCER_FADE_FRACTION
 import javax.inject.Inject
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -39,7 +37,6 @@ import kotlinx.coroutines.flow.emptyFlow
  * Breaks down ALTERNATE BOUNCER->PRIMARY BOUNCER transition into discrete steps for corresponding
  * views to consume.
  */
-@ExperimentalCoroutinesApi
 @SysUISingleton
 class AlternateBouncerToPrimaryBouncerTransitionViewModel
 @Inject
@@ -89,9 +86,7 @@ constructor(
             shadeDependentFlows.transitionFlow(
                 flowWhenShadeIsNotExpanded = emptyFlow(),
                 flowWhenShadeIsExpanded =
-                    transitionAnimation.immediatelyTransitionTo(
-                        blurConfig.maxBlurRadiusPx.maxBlurRadiusToNotificationPanelBlurRadius()
-                    ),
+                    transitionAnimation.immediatelyTransitionTo(blurConfig.maxBlurRadiusPx),
             )
         } else {
             emptyFlow<Float>()
@@ -103,7 +98,11 @@ constructor(
     override val windowBlurRadius: Flow<Float> =
         shadeDependentFlows.transitionFlow(
             flowWhenShadeIsExpanded =
-                transitionAnimation.immediatelyTransitionTo(blurConfig.maxBlurRadiusPx),
+                if (Flags.notificationShadeBlur()) {
+                    transitionAnimation.immediatelyTransitionTo(blurConfig.maxBlurRadiusPx)
+                } else {
+                    emptyFlow()
+                },
             flowWhenShadeIsNotExpanded =
                 transitionAnimation.sharedFlow(
                     duration = FromAlternateBouncerTransitionInteractor.TO_PRIMARY_BOUNCER_DURATION,

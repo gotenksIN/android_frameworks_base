@@ -27,11 +27,10 @@ import android.widget.RelativeLayout
 import androidx.annotation.VisibleForTesting
 import com.android.app.animation.Interpolators
 import com.android.systemui.customization.R
-import com.android.systemui.log.core.Logger
 import com.android.systemui.plugins.clocks.ClockFontAxisSetting
+import com.android.systemui.plugins.clocks.ClockLogger
 import com.android.systemui.shared.clocks.ClockContext
 import com.android.systemui.shared.clocks.DigitTranslateAnimator
-import com.android.systemui.shared.clocks.LogUtil
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
@@ -40,8 +39,8 @@ import kotlin.math.min
 fun clamp(value: Float, minVal: Float, maxVal: Float): Float = max(min(value, maxVal), minVal)
 
 class FlexClockView(clockCtx: ClockContext) : FrameLayout(clockCtx.context) {
-    protected val logger = Logger(clockCtx.messageBuffer, this::class.simpleName!!)
-        get() = field ?: LogUtil.FALLBACK_INIT_LOGGER
+    protected val logger = ClockLogger(this, clockCtx.messageBuffer, this::class.simpleName!!)
+        get() = field ?: ClockLogger.INIT_LOGGER
 
     @VisibleForTesting
     var isAnimationEnabled = true
@@ -121,11 +120,7 @@ class FlexClockView(clockCtx: ClockContext) : FrameLayout(clockCtx.context) {
 
     override fun addView(child: View?) {
         if (child == null) return
-        logger.d({ "addView($str1 @$int1)" }) {
-            str1 = child::class.simpleName!!
-            int1 = child.id
-        }
-
+        logger.addView(child)
         super.addView(child)
         (child as? SimpleDigitalClockTextView)?.let {
             it.digitTranslateAnimator = DigitTranslateAnimator(::invalidate)
@@ -135,22 +130,32 @@ class FlexClockView(clockCtx: ClockContext) : FrameLayout(clockCtx.context) {
     }
 
     fun refreshTime() {
-        logger.d("refreshTime()")
+        logger.refreshTime()
         digitalClockTextViewMap.forEach { (_, textView) -> textView.refreshText() }
     }
 
+    override fun setVisibility(visibility: Int) {
+        logger.setVisibility(visibility)
+        super.setVisibility(visibility)
+    }
+
+    override fun setAlpha(alpha: Float) {
+        logger.setAlpha(alpha)
+        super.setAlpha(alpha)
+    }
+
     override fun invalidate() {
-        logger.d("invalidate()")
+        logger.invalidate()
         super.invalidate()
     }
 
     override fun requestLayout() {
-        logger.d("requestLayout()")
+        logger.requestLayout()
         super.requestLayout()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        logger.d("onMeasure()")
+        logger.onMeasure()
         calculateSize(widthMeasureSpec, heightMeasureSpec)?.let { size ->
             setMeasuredDimension(size.x, size.y)
         } ?: run { super.onMeasure(widthMeasureSpec, heightMeasureSpec) }
@@ -162,12 +167,12 @@ class FlexClockView(clockCtx: ClockContext) : FrameLayout(clockCtx.context) {
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        logger.d("onLayout()")
+        logger.onLayout()
         super.onLayout(changed, left, top, right, bottom)
     }
 
     override fun onDraw(canvas: Canvas) {
-        logger.d("onDraw()")
+        logger.onDraw()
         super.onDraw(canvas)
 
         digitalClockTextViewMap.forEach { (id, textView) ->

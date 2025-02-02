@@ -17,11 +17,13 @@ import android.content.Context
 import android.content.res.Resources
 import android.graphics.Typeface
 import android.view.LayoutInflater
+import com.android.systemui.animation.GSFAxes
 import com.android.systemui.customization.R
 import com.android.systemui.log.core.MessageBuffer
 import com.android.systemui.plugins.clocks.ClockController
 import com.android.systemui.plugins.clocks.ClockFontAxis
 import com.android.systemui.plugins.clocks.ClockFontAxisSetting
+import com.android.systemui.plugins.clocks.ClockLogger
 import com.android.systemui.plugins.clocks.ClockMessageBuffers
 import com.android.systemui.plugins.clocks.ClockMetadata
 import com.android.systemui.plugins.clocks.ClockPickerConfig
@@ -61,7 +63,7 @@ class DefaultClockProvider(
         }
 
         return if (isClockReactiveVariantsEnabled) {
-            val buffers = messageBuffers ?: ClockMessageBuffers(LogUtil.DEFAULT_MESSAGE_BUFFER)
+            val buffers = messageBuffers ?: ClockMessageBuffers(ClockLogger.DEFAULT_MESSAGE_BUFFER)
             val fontAxes = ClockFontAxis.merge(FlexClockController.FONT_AXES, settings.axes)
             val clockSettings = settings.copy(axes = fontAxes.map { it.toSetting() })
             val typefaceCache =
@@ -107,18 +109,18 @@ class DefaultClockProvider(
         // TODO(b/364681643): Variations for retargetted DIGITAL_CLOCK_FLEX
         val LEGACY_FLEX_LS_VARIATION =
             listOf(
-                ClockFontAxisSetting("wght", 600f),
-                ClockFontAxisSetting("wdth", 100f),
-                ClockFontAxisSetting("ROND", 100f),
-                ClockFontAxisSetting("slnt", 0f),
+                ClockFontAxisSetting(GSFAxes.WEIGHT, 600f),
+                ClockFontAxisSetting(GSFAxes.WIDTH, 100f),
+                ClockFontAxisSetting(GSFAxes.ROUND, 100f),
+                ClockFontAxisSetting(GSFAxes.SLANT, 0f),
             )
 
         val LEGACY_FLEX_AOD_VARIATION =
             listOf(
-                ClockFontAxisSetting("wght", 74f),
-                ClockFontAxisSetting("wdth", 43f),
-                ClockFontAxisSetting("ROND", 100f),
-                ClockFontAxisSetting("slnt", 0f),
+                ClockFontAxisSetting(GSFAxes.WEIGHT, 74f),
+                ClockFontAxisSetting(GSFAxes.WIDTH, 43f),
+                ClockFontAxisSetting(GSFAxes.ROUND, 100f),
+                ClockFontAxisSetting(GSFAxes.SLANT, 0f),
             )
 
         val FLEX_TYPEFACE by lazy {

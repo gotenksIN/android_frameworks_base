@@ -21,6 +21,8 @@ import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.content.Context.DEVICE_ID_DEFAULT;
 import static android.media.audio.Flags.autoPublicVolumeApiHardening;
 import static android.media.audio.Flags.automaticBtDeviceType;
+import static android.media.audio.Flags.cacheGetStreamMinMaxVolume;
+import static android.media.audio.Flags.cacheGetStreamVolume;
 import static android.media.audio.Flags.FLAG_DEPRECATE_STREAM_BT_SCO;
 import static android.media.audio.Flags.FLAG_FOCUS_EXCLUSIVE_WITH_RECORDING;
 import static android.media.audio.Flags.FLAG_FOCUS_FREEZE_TEST_API;
@@ -58,7 +60,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes.AttributeSystemUsage;
-import android.media.AudioDeviceInfo;
 import android.media.CallbackUtil.ListenerInfo;
 import android.media.audiopolicy.AudioPolicy;
 import android.media.audiopolicy.AudioPolicy.AudioPolicyFocusListener;
@@ -75,6 +76,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.IpcDataCache;
 import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
@@ -1231,6 +1233,102 @@ public class AudioManager {
     }
 
     /**
+     * API string for caching the min volume for each stream
+     * @hide
+     **/
+    public static final String VOLUME_MIN_CACHING_API = "getStreamMinVolume";
+    /**
+     * API string for caching the max volume for each stream
+     * @hide
+     **/
+    public static final String VOLUME_MAX_CACHING_API = "getStreamMaxVolume";
+    /**
+     * API string for caching the volume for each stream
+     * @hide
+     **/
+    public static final String VOLUME_CACHING_API = "getStreamVolume";
+    private static final int VOLUME_CACHING_SIZE = 16;
+
+    private final IpcDataCache.QueryHandler<VolumeCacheQuery, Integer> mVolQuery =
+            new IpcDataCache.QueryHandler<>() {
+                @Override
+                public Integer apply(VolumeCacheQuery query) {
+                    final IAudioService service = getService();
+                    try {
+                        return switch (query.queryCommand) {
+                            case QUERY_VOL_MIN -> service.getStreamMinVolume(query.stream);
+                            case QUERY_VOL_MAX -> service.getStreamMaxVolume(query.stream);
+                            case QUERY_VOL -> service.getStreamVolume(query.stream);
+                            default -> {
+                                Log.w(TAG, "Not a valid volume cache query: " + query);
+                                yield null;
+                            }
+                        };
+                    } catch (RemoteException e) {
+                        throw e.rethrowFromSystemServer();
+                    }
+                }
+
+            };
+
+    private final IpcDataCache<VolumeCacheQuery, Integer> mVolMinCache =
+            new IpcDataCache<>(VOLUME_CACHING_SIZE, IpcDataCache.MODULE_SYSTEM,
+                    VOLUME_MIN_CACHING_API, VOLUME_MIN_CACHING_API, mVolQuery);
+
+    private final IpcDataCache<VolumeCacheQuery, Integer> mVolMaxCache =
+            new IpcDataCache<>(VOLUME_CACHING_SIZE, IpcDataCache.MODULE_SYSTEM,
+                    VOLUME_MAX_CACHING_API, VOLUME_MAX_CACHING_API, mVolQuery);
+
+    private final IpcDataCache<VolumeCacheQuery, Integer> mVolCache =
+            new IpcDataCache<>(VOLUME_CACHING_SIZE, IpcDataCache.MODULE_SYSTEM,
+                    VOLUME_CACHING_API, VOLUME_CACHING_API, mVolQuery);
+
+    /**
+     * Used to invalidate the cache for the given API
+     * @hide
+     **/
+    public static void clearVolumeCache(String api) {
+        if (cacheGetStreamMinMaxVolume() && (VOLUME_MAX_CACHING_API.equals(api)
+                || VOLUME_MIN_CACHING_API.equals(api))) {
+            IpcDataCache.invalidateCache(IpcDataCache.MODULE_SYSTEM, api);
+        } else if (cacheGetStreamVolume() && VOLUME_CACHING_API.equals(api)) {
+            IpcDataCache.invalidateCache(IpcDataCache.MODULE_SYSTEM, api);
+        } else {
+            Log.w(TAG, "invalid clearVolumeCache for api " + api);
+        }
+    }
+
+    private static final int QUERY_VOL_MIN = 1;
+    private static final int QUERY_VOL_MAX = 2;
+    private static final int QUERY_VOL = 3;
+    /** @hide */
+    @IntDef(prefix = "QUERY_VOL", value = {
+            QUERY_VOL_MIN,
+            QUERY_VOL_MAX,
+            QUERY_VOL}
+    )
+    @Retention(RetentionPolicy.SOURCE)
+    private @interface QueryVolCommand {}
+
+    private record VolumeCacheQuery(int stream, @QueryVolCommand int queryCommand) {
+        private String queryVolCommandToString() {
+            return switch (queryCommand) {
+                case QUERY_VOL_MIN -> "getStreamMinVolume";
+                case QUERY_VOL_MAX -> "getStreamMaxVolume";
+                case QUERY_VOL -> "getStreamVolume";
+                default -> "invalid command";
+            };
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return TextUtils.formatSimple("VolumeCacheQuery(stream=%d, queryCommand=%s)", stream,
+                    queryVolCommandToString());
+        }
+    }
+
+    /**
      * Returns the maximum volume index for a particular stream.
      *
      * @param streamType The stream type whose maximum volume index is returned.
@@ -1238,6 +1336,9 @@ public class AudioManager {
      * @see #getStreamVolume(int)
      */
     public int getStreamMaxVolume(int streamType) {
+        if (cacheGetStreamMinMaxVolume()) {
+            return mVolMaxCache.query(new VolumeCacheQuery(streamType, QUERY_VOL_MAX));
+        }
         final IAudioService service = getService();
         try {
             return service.getStreamMaxVolume(streamType);
@@ -1271,6 +1372,9 @@ public class AudioManager {
      */
     @TestApi
     public int getStreamMinVolumeInt(int streamType) {
+        if (cacheGetStreamMinMaxVolume()) {
+            return mVolMinCache.query(new VolumeCacheQuery(streamType, QUERY_VOL_MIN));
+        }
         final IAudioService service = getService();
         try {
             return service.getStreamMinVolume(streamType);
@@ -1288,6 +1392,9 @@ public class AudioManager {
      * @see #setStreamVolume(int, int, int)
      */
     public int getStreamVolume(int streamType) {
+        if (cacheGetStreamVolume()) {
+            return mVolCache.query(new VolumeCacheQuery(streamType, QUERY_VOL));
+        }
         final IAudioService service = getService();
         try {
             return service.getStreamVolume(streamType);

@@ -16,6 +16,7 @@
 
 package com.android.wm.shell.desktopmode
 
+import android.annotation.UserIdInt
 import android.app.ActivityManager
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
@@ -55,6 +56,7 @@ import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.widget.Toast
 import android.window.DesktopModeFlags
 import android.window.DesktopModeFlags.DISABLE_NON_RESIZABLE_APP_SNAP_RESIZE
+import android.window.DesktopModeFlags.ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER
 import android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY
 import android.window.DesktopModeFlags.ENABLE_WINDOWING_DYNAMIC_INITIAL_BOUNDS
 import android.window.RemoteTransition
@@ -86,8 +88,6 @@ import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.common.SingleInstanceRemoteListener
 import com.android.wm.shell.common.SyncTransactionQueue
 import com.android.wm.shell.common.UserProfileContexts
-import com.android.wm.shell.compatui.isTopActivityExemptFromDesktopWindowing
-import com.android.wm.shell.compatui.isTransparentTask
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.InputMethod
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.MinimizeReason
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger
@@ -116,6 +116,7 @@ import com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_ST
 import com.android.wm.shell.shared.TransitionUtil
 import com.android.wm.shell.shared.annotations.ExternalThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
+import com.android.wm.shell.shared.desktopmode.DesktopModeCompatPolicy
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus.DESKTOP_DENSITY_OVERRIDE
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus.useDesktopOverrideDensity
@@ -185,6 +186,7 @@ class DesktopTasksController(
     private val overviewToDesktopTransitionObserver: OverviewToDesktopTransitionObserver,
     private val desksOrganizer: DesksOrganizer,
     private val userProfileContexts: UserProfileContexts,
+    private val desktopModeCompatPolicy: DesktopModeCompatPolicy,
 ) :
     RemoteCallable<DesktopTasksController>,
     Transitions.TransitionHandler,
@@ -516,10 +518,7 @@ class DesktopTasksController(
         remoteTransition: RemoteTransition? = null,
         callback: IMoveToDesktopCallback? = null,
     ) {
-        if (
-            DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODALS_POLICY.isTrue() &&
-                isTopActivityExemptFromDesktopWindowing(context, task)
-        ) {
+        if (desktopModeCompatPolicy.isTopActivityExemptFromDesktopWindowing(task)) {
             logW("Cannot enter desktop for taskId %d, ineligible top activity found", task.taskId)
             return
         }
@@ -1517,7 +1516,7 @@ class DesktopTasksController(
 
     private fun addWallpaperActivity(displayId: Int, wct: WindowContainerTransaction) {
         logV("addWallpaperActivity")
-        if (Flags.enableDesktopWallpaperActivityForSystemUser()) {
+        if (ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER.isTrue()) {
             val intent = Intent(context, DesktopWallpaperActivity::class.java)
             if (
                 desktopWallpaperActivityTokenProvider.getToken(displayId) == null &&
@@ -1580,7 +1579,7 @@ class DesktopTasksController(
     private fun removeWallpaperActivity(wct: WindowContainerTransaction, displayId: Int) {
         desktopWallpaperActivityTokenProvider.getToken(displayId)?.let { token ->
             logV("removeWallpaperActivity")
-            if (Flags.enableDesktopWallpaperActivityForSystemUser()) {
+            if (ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER.isTrue()) {
                 wct.reorder(token, /* onTop= */ false)
             } else {
                 wct.removeTask(token)
@@ -1821,8 +1820,7 @@ class DesktopTasksController(
             taskRepository.isActiveTask(triggerTask.taskId))
 
     private fun isIncompatibleTask(task: RunningTaskInfo) =
-        DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODALS_POLICY.isTrue() &&
-            isTopActivityExemptFromDesktopWindowing(context, task)
+        desktopModeCompatPolicy.isTopActivityExemptFromDesktopWindowing(task)
 
     private fun shouldHandleTaskClosing(request: TransitionRequestInfo): Boolean =
         ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue() &&
@@ -2093,11 +2091,11 @@ class DesktopTasksController(
      */
     private fun handleIncompatibleTaskLaunch(task: RunningTaskInfo): WindowContainerTransaction? {
         logV("handleIncompatibleTaskLaunch")
-        if (!isDesktopModeShowing(task.displayId)) return null
+        if (!isDesktopModeShowing(task.displayId) && !forceEnterDesktop(task.displayId)) return null
         // Only update task repository for transparent task.
         if (
             DesktopModeFlags.INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC
-                .isTrue() && isTransparentTask(task)
+                .isTrue() && desktopModeCompatPolicy.isTransparentTask(task)
         ) {
             taskRepository.setTopTransparentFullscreenTaskId(task.displayId, task.taskId)
         }
@@ -2348,10 +2346,7 @@ class DesktopTasksController(
         launchTaskId: Int,
         minimizeTaskId: Int?,
     ) {
-        if (
-            !DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS.isTrue &&
-                !DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS_BUGFIX.isTrue
-        ) {
+        if (!DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS_BUGFIX.isTrue) {
             return
         }
         // TODO b/359523924: pass immersive task here?
@@ -2508,7 +2503,6 @@ class DesktopTasksController(
      *
      * @param taskInfo the task being dragged.
      * @param taskSurface the leash of the task being dragged.
-     * @param position position of surface when drag ends.
      * @param inputCoordinate the coordinates of the motion event
      * @param currentDragBounds the current bounds of where the visible task is (might be actual
      *   task bounds or just task leash)
@@ -2518,7 +2512,6 @@ class DesktopTasksController(
     fun onDragPositioningEnd(
         taskInfo: RunningTaskInfo,
         taskSurface: SurfaceControl,
-        position: Point,
         inputCoordinate: PointF,
         currentDragBounds: Rect,
         validDragArea: Rect,
@@ -2546,7 +2539,7 @@ class DesktopTasksController(
                     )
                     moveToFullscreenWithAnimation(
                         taskInfo,
-                        position,
+                        Point(currentDragBounds.left, currentDragBounds.top),
                         DesktopModeTransitionSource.TASK_DRAG,
                     )
                 }
@@ -2745,6 +2738,7 @@ class DesktopTasksController(
     // TODO(b/358114479): Move this implementation into a separate class.
     override fun onUnhandledDrag(
         launchIntent: PendingIntent,
+        @UserIdInt userId: Int,
         dragEvent: DragEvent,
         onFinishCallback: Consumer<Boolean>,
     ): Boolean {
@@ -2753,8 +2747,10 @@ class DesktopTasksController(
             // Not currently in desktop mode, ignore the drop
             return false
         }
+
+        // TODO:
         val launchComponent = getComponent(launchIntent)
-        if (!multiInstanceHelper.supportsMultiInstanceSplit(launchComponent)) {
+        if (!multiInstanceHelper.supportsMultiInstanceSplit(launchComponent, userId)) {
             // TODO(b/320797628): Should only return early if there is an existing running task, and
             //                    notify the user as well. But for now, just ignore the drop.
             logV("Dropped intent does not support multi-instance")

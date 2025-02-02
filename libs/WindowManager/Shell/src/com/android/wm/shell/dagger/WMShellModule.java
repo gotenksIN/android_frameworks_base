@@ -16,7 +16,7 @@
 
 package com.android.wm.shell.dagger;
 
-import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS;
+import static android.window.DesktopModeFlags.ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODALS_POLICY;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASK_LIMIT;
@@ -37,6 +37,7 @@ import android.os.UserManager;
 import android.view.Choreographer;
 import android.view.IWindowManager;
 import android.view.WindowManager;
+import android.window.DesktopModeFlags;
 
 import androidx.annotation.OptIn;
 
@@ -132,6 +133,7 @@ import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.annotations.ShellAnimationThread;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
+import com.android.wm.shell.shared.desktopmode.DesktopModeCompatPolicy;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.splitscreen.SplitScreenController;
 import com.android.wm.shell.sysui.ShellCommandHandler;
@@ -758,7 +760,8 @@ public abstract class WMShellModule {
             Optional<BubbleController> bubbleController,
             OverviewToDesktopTransitionObserver overviewToDesktopTransitionObserver,
             DesksOrganizer desksOrganizer,
-            UserProfileContexts userProfileContexts) {
+            UserProfileContexts userProfileContexts,
+            DesktopModeCompatPolicy desktopModeCompatPolicy) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -794,7 +797,8 @@ public abstract class WMShellModule {
                 bubbleController,
                 overviewToDesktopTransitionObserver,
                 desksOrganizer,
-                userProfileContexts);
+                userProfileContexts,
+                desktopModeCompatPolicy);
     }
 
     @WMSingleton
@@ -811,7 +815,9 @@ public abstract class WMShellModule {
             ReturnToDragStartAnimator returnToDragStartAnimator,
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             DesktopModeEventLogger desktopModeEventLogger,
-            WindowDecorTaskResourceLoader windowDecorTaskResourceLoader) {
+            WindowDecorTaskResourceLoader windowDecorTaskResourceLoader,
+            FocusTransitionObserver focusTransitionObserver,
+            @ShellMainThread ShellExecutor mainExecutor) {
         return new DesktopTilingDecorViewModel(
                 context,
                 mainDispatcher,
@@ -825,7 +831,9 @@ public abstract class WMShellModule {
                 returnToDragStartAnimator,
                 desktopUserRepositories,
                 desktopModeEventLogger,
-                windowDecorTaskResourceLoader
+                windowDecorTaskResourceLoader,
+                focusTransitionObserver,
+                mainExecutor
         );
     }
 
@@ -903,9 +911,7 @@ public abstract class WMShellModule {
             Transitions transitions,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             InteractionJankMonitor interactionJankMonitor) {
-        return (Flags.enableDesktopWindowingTransitions()
-                        || ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS.isTrue()
-                        || ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX.isTrue())
+        return ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX.isTrue()
                 ? new SpringDragToDesktopTransitionHandler(
                         context, transitions, rootTaskDisplayAreaOrganizer, interactionJankMonitor)
                 : new DefaultDragToDesktopTransitionHandler(
@@ -926,7 +932,7 @@ public abstract class WMShellModule {
         if (DesktopModeStatus.canEnterDesktopMode(context) && useKeyGestureEventHandler()
                 && manageKeyGestures()
                 && (Flags.enableMoveToNextDisplayShortcut()
-                || Flags.enableTaskResizingKeyboardShortcuts())) {
+                || DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue())) {
             return Optional.of(new DesktopModeKeyGestureHandler(context,
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     inputManager, shellTaskOrganizer, focusTransitionObserver,
@@ -972,7 +978,8 @@ public abstract class WMShellModule {
             DesktopModeEventLogger desktopModeEventLogger,
             DesktopModeUiEventLogger desktopModeUiEventLogger,
             WindowDecorTaskResourceLoader taskResourceLoader,
-            RecentsTransitionHandler recentsTransitionHandler
+            RecentsTransitionHandler recentsTransitionHandler,
+            DesktopModeCompatPolicy desktopModeCompatPolicy
     ) {
         if (!DesktopModeStatus.canEnterDesktopModeOrShowAppHandle(context)) {
             return Optional.empty();
@@ -988,7 +995,7 @@ public abstract class WMShellModule {
                 desktopTasksLimiter, appHandleEducationController, appToWebEducationController,
                 windowDecorCaptionHandleRepository, activityOrientationChangeHandler,
                 focusTransitionObserver, desktopModeEventLogger, desktopModeUiEventLogger,
-                taskResourceLoader, recentsTransitionHandler));
+                taskResourceLoader, recentsTransitionHandler, desktopModeCompatPolicy));
     }
 
     @WMSingleton
@@ -1010,16 +1017,17 @@ public abstract class WMShellModule {
             @ShellAnimationThread ShellExecutor animExecutor,
             ShellInit shellInit,
             Transitions transitions,
-            @DynamicOverride DesktopUserRepositories desktopUserRepositories) {
+            @DynamicOverride DesktopUserRepositories desktopUserRepositories,
+            DesktopModeCompatPolicy desktopModeCompatPolicy) {
         if (!DesktopModeStatus.canEnterDesktopMode(context)
                 || !ENABLE_DESKTOP_WINDOWING_MODALS_POLICY.isTrue()
-                || !Flags.enableDesktopSystemDialogsTransitions()) {
+                || !ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS.isTrue()) {
             return Optional.empty();
         }
         return Optional.of(
                 new SystemModalsTransitionHandler(
                         context, mainExecutor, animExecutor, shellInit, transitions,
-                        desktopUserRepositories));
+                        desktopUserRepositories, desktopModeCompatPolicy));
     }
 
     @WMSingleton
@@ -1205,7 +1213,8 @@ public abstract class WMShellModule {
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             IWindowManager windowManager,
             Optional<DesktopUserRepositories> desktopUserRepositories,
-            Optional<DesktopTasksController> desktopTasksController
+            Optional<DesktopTasksController> desktopTasksController,
+            ShellTaskOrganizer shellTaskOrganizer
     ) {
         if (!DesktopModeStatus.canEnterDesktopMode(context)) {
             return Optional.empty();
@@ -1219,7 +1228,8 @@ public abstract class WMShellModule {
                         rootTaskDisplayAreaOrganizer,
                         windowManager,
                         desktopUserRepositories.get(),
-                        desktopTasksController.get()));
+                        desktopTasksController.get(),
+                        shellTaskOrganizer));
     }
 
     @WMSingleton

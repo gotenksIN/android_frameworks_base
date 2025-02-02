@@ -67,29 +67,31 @@ public enum DesktopModeFlags {
     ENABLE_WINDOWING_EDGE_DRAG_RESIZE(Flags::enableWindowingEdgeDragResize, true),
     ENABLE_DESKTOP_WINDOWING_TASKBAR_RUNNING_APPS(
             Flags::enableDesktopWindowingTaskbarRunningApps, true),
-    // TODO: b/369763947 - remove this once ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS is ramped up
-    ENABLE_DESKTOP_WINDOWING_TRANSITIONS(Flags::enableDesktopWindowingTransitions, false),
-    ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS(
-            Flags::enableDesktopWindowingEnterTransitions, false),
-    ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS(Flags::enableDesktopWindowingExitTransitions, false),
     ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS(
             Flags::enableWindowingTransitionHandlersObservers, false),
-    ENABLE_DESKTOP_APP_LAUNCH_ALTTAB_TRANSITIONS(
-            Flags::enableDesktopAppLaunchAlttabTransitions, false),
-    ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS(
-            Flags::enableDesktopAppLaunchTransitions, false),
     ENABLE_DESKTOP_WINDOWING_PERSISTENCE(Flags::enableDesktopWindowingPersistence, false),
     ENABLE_HANDLE_INPUT_FIX(Flags::enableHandleInputFix, true),
     ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX(
-            Flags::enableDesktopWindowingEnterTransitionBugfix, false),
+            Flags::enableDesktopWindowingEnterTransitionBugfix, true),
     ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS_BUGFIX(
-            Flags::enableDesktopWindowingExitTransitionsBugfix, false),
+            Flags::enableDesktopWindowingExitTransitionsBugfix, true),
     ENABLE_DESKTOP_APP_LAUNCH_ALTTAB_TRANSITIONS_BUGFIX(
-            Flags::enableDesktopAppLaunchAlttabTransitionsBugfix, false),
+            Flags::enableDesktopAppLaunchAlttabTransitionsBugfix, true),
     ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS_BUGFIX(
-            Flags::enableDesktopAppLaunchTransitionsBugfix, false),
+            Flags::enableDesktopAppLaunchTransitionsBugfix, true),
     INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC(
-            Flags::includeTopTransparentFullscreenTaskInDesktopHeuristic, true);
+            Flags::includeTopTransparentFullscreenTaskInDesktopHeuristic, true),
+    ENABLE_DESKTOP_WINDOWING_HSUM(Flags::enableDesktopWindowingHsum, true),
+    ENABLE_MINIMIZE_BUTTON(Flags::enableMinimizeButton, true),
+    ENABLE_RESIZING_METRICS(Flags::enableResizingMetrics, true),
+    ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS(Flags::enableTaskResizingKeyboardShortcuts, true),
+    ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER(
+        Flags::enableDesktopWallpaperActivityForSystemUser, true),
+    ENABLE_TOP_VISIBLE_ROOT_TASK_PER_USER_TRACKING(
+        Flags::enableTopVisibleRootTaskPerUserTracking, true),
+    ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX(
+            Flags::enableDesktopRecentsTransitionsCornersBugfix, false),
+    ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS(Flags::enableDesktopSystemDialogsTransitions, true);
 
     /**
      * Flag class, to be used in case the enum cannot be used because the flag is not accessible.

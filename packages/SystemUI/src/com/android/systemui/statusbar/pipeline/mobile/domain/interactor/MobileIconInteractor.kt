@@ -77,7 +77,6 @@ import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceStat
 import com.android.systemui.util.CarrierNameCustomization
 // QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -220,7 +219,6 @@ interface MobileIconInteractor {
 
 /** Interactor for a single mobile connection. This connection _should_ have one subscription ID */
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
-@OptIn(ExperimentalCoroutinesApi::class)
 class MobileIconInteractorImpl(
     @Background scope: CoroutineScope,
     defaultSubscriptionHasDataEnabled: StateFlow<Boolean>,

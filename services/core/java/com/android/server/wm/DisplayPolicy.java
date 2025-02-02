@@ -2157,6 +2157,11 @@ public class DisplayPolicy {
                     if (statusBar != null) {
                         statusBar.onDisplayRemoveSystemDecorations(displayId);
                     }
+                    final WallpaperManagerInternal wpMgr =
+                            LocalServices.getService(WallpaperManagerInternal.class);
+                    if (wpMgr != null) {
+                        wpMgr.onDisplayRemoveSystemDecorations(displayId);
+                    }
                 });
     }
 

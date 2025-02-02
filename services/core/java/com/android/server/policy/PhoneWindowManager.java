@@ -239,6 +239,7 @@ import com.android.internal.policy.TransitionAnimation;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.server.AccessibilityManagerInternal;
+import com.android.server.DockObserverInternal;
 import com.android.server.ExtconStateObserver;
 import com.android.server.ExtconUEventObserver;
 import com.android.server.GestureLauncherService;
@@ -473,6 +474,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     DisplayManager mDisplayManager;
     DisplayManagerInternal mDisplayManagerInternal;
     UserManagerInternal mUserManagerInternal;
+    DockObserverInternal mDockObserverInternal;
 
     private WallpaperManagerInternal mWallpaperManagerInternal;
 
@@ -2480,12 +2482,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         filter.addAction(UiModeManager.ACTION_ENTER_DESK_MODE);
         filter.addAction(UiModeManager.ACTION_EXIT_DESK_MODE);
         filter.addAction(Intent.ACTION_DOCK_EVENT);
-        Intent intent = mContext.registerReceiver(mDockReceiver, filter);
-        if (intent != null) {
-            // Retrieve current sticky dock event broadcast.
-            mDefaultDisplayPolicy.setDockMode(intent.getIntExtra(Intent.EXTRA_DOCK_STATE,
-                    Intent.EXTRA_DOCK_STATE_UNDOCKED));
-        }
+        mContext.registerReceiver(mDockReceiver, filter);
 
         // register for multiuser-relevant broadcasts
         filter = new IntentFilter(Intent.ACTION_USER_SWITCHED);
@@ -3695,7 +3692,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
             case KeyEvent.KEYCODE_S:
-                if (firstDown && event.isMetaPressed() && event.isCtrlPressed()) {
+                if (firstDown && event.isMetaPressed()) {
                     interceptScreenshotChord(SCREENSHOT_KEY_OTHER, 0 /*pressDelay*/);
                     notifyKeyGestureCompleted(event,
                             KeyGestureEvent.KEY_GESTURE_TYPE_TAKE_SCREENSHOT);
@@ -3829,10 +3826,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 true /* leftOrTop */);
                         notifyKeyGestureCompleted(event,
                                 KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT);
-                    } else if (event.isAltPressed()) {
-                        setSplitscreenFocus(true /* leftOrTop */);
-                        notifyKeyGestureCompleted(event,
-                                KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_LEFT);
                     } else {
                         notifyKeyGestureCompleted(event,
                                 KeyGestureEvent.KEY_GESTURE_TYPE_BACK);
@@ -3848,11 +3841,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 false /* leftOrTop */);
                         notifyKeyGestureCompleted(event,
                                 KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT);
-                        return true;
-                    } else if (event.isAltPressed()) {
-                        setSplitscreenFocus(false /* leftOrTop */);
-                        notifyKeyGestureCompleted(event,
-                                KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_RIGHT);
                         return true;
                     }
                 }
@@ -4269,9 +4257,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     case KeyGestureEvent.KEY_GESTURE_TYPE_MULTI_WINDOW_NAVIGATION:
                     case KeyGestureEvent.KEY_GESTURE_TYPE_DESKTOP_MODE:
                     case KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT:
-                    case KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_LEFT:
                     case KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT:
-                    case KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_RIGHT:
                     case KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER:
                     case KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_UP:
                     case KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_DOWN:
@@ -4407,20 +4393,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             true /* leftOrTop */);
                 }
                 return true;
-            case KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_LEFT:
-                if (complete) {
-                    setSplitscreenFocus(true /* leftOrTop */);
-                }
-                return true;
             case KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT:
                 if (complete) {
                     moveFocusedTaskToStageSplit(getTargetDisplayIdForKeyGestureEvent(event),
                             false /* leftOrTop */);
-                }
-                return true;
-            case KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_RIGHT:
-                if (complete) {
-                    setSplitscreenFocus(false /* leftOrTop */);
                 }
                 return true;
             case KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER:
@@ -5109,13 +5085,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         StatusBarManagerInternal statusbar = getStatusBarManagerInternal();
         if (statusbar != null) {
             statusbar.moveFocusedTaskToStageSplit(displayId, leftOrTop);
-        }
-    }
-
-    private void setSplitscreenFocus(boolean leftOrTop) {
-        StatusBarManagerInternal statusbar = getStatusBarManagerInternal();
-        if (statusbar != null) {
-            statusbar.setSplitscreenFocus(leftOrTop);
         }
     }
 
@@ -6816,6 +6785,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mVrManagerInternal = LocalServices.getService(VrManagerInternal.class);
         if (mVrManagerInternal != null) {
             mVrManagerInternal.addPersistentVrModeStateListener(mPersistentVrModeListener);
+        }
+
+        mDockObserverInternal = LocalServices.getService(DockObserverInternal.class);
+        if (mDockObserverInternal != null) {
+            // Get initial state from DockObserverInternal, DockObserver starts after WM.
+            int dockMode = mDockObserverInternal.getActualDockState();
+            mDefaultDisplayPolicy.setDockMode(dockMode);
         }
 
         readCameraLensCoverState();

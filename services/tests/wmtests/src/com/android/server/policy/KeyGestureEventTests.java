@@ -176,10 +176,10 @@ public class KeyGestureEventTests extends ShortcutKeyTestBase {
                         KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_NOTIFICATION_PANEL,
                         KeyEvent.KEYCODE_NOTIFICATION,
                         0},
-                {"Meta + Ctrl + S -> Take Screenshot",
-                        new int[]{META_KEY, CTRL_KEY, KeyEvent.KEYCODE_S},
+                {"Meta + S -> Take Screenshot",
+                        new int[]{META_KEY, KeyEvent.KEYCODE_S},
                         KeyGestureEvent.KEY_GESTURE_TYPE_TAKE_SCREENSHOT, KeyEvent.KEYCODE_S,
-                        META_ON | CTRL_ON},
+                        META_ON},
                 {"Meta + / -> Open Shortcut Helper", new int[]{META_KEY, KeyEvent.KEYCODE_SLASH},
                         KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER,
                         KeyEvent.KEYCODE_SLASH, META_ON},
@@ -541,17 +541,6 @@ public class KeyGestureEventTests extends ShortcutKeyTestBase {
         Assert.assertTrue(sendKeyGestureEventComplete(
                 KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT));
         mPhoneWindowManager.assertMoveFocusedTaskToStageSplit(false);
-    }
-
-    @Test
-    public void testKeyGestureSplitscreenFocus() {
-        Assert.assertTrue(sendKeyGestureEventComplete(
-                KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_LEFT));
-        mPhoneWindowManager.assertSetSplitscreenFocus(true);
-
-        Assert.assertTrue(sendKeyGestureEventComplete(
-                KeyGestureEvent.KEY_GESTURE_TYPE_CHANGE_SPLITSCREEN_FOCUS_RIGHT));
-        mPhoneWindowManager.assertSetSplitscreenFocus(false);
     }
 
     @Test

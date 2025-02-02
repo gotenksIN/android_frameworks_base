@@ -129,6 +129,7 @@ import com.android.wm.shell.recents.RecentsTransitionHandler
 import com.android.wm.shell.recents.RecentsTransitionStateListener
 import com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_ANIMATING
 import com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_REQUESTED
+import com.android.wm.shell.shared.desktopmode.DesktopModeCompatPolicy
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource.UNKNOWN
 import com.android.wm.shell.shared.split.SplitScreenConstants
@@ -261,6 +262,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     private lateinit var desktopTasksLimiter: DesktopTasksLimiter
     private lateinit var recentsTransitionStateListener: RecentsTransitionStateListener
     private lateinit var testScope: CoroutineScope
+    private lateinit var desktopModeCompatPolicy: DesktopModeCompatPolicy
 
     private val shellExecutor = TestShellExecutor()
 
@@ -311,6 +313,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 mContext,
                 mockHandler,
             )
+        desktopModeCompatPolicy = DesktopModeCompatPolicy(context)
 
         whenever(shellTaskOrganizer.getRunningTasks(anyInt())).thenAnswer { runningTasks }
         whenever(transitions.startTransition(anyInt(), any(), isNull())).thenAnswer { Binder() }
@@ -406,6 +409,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             overviewToDesktopTransitionObserver,
             desksOrganizer,
             userProfileContexts,
+            desktopModeCompatPolicy,
         )
 
     @After
@@ -3015,6 +3019,27 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    fun handleRequest_systemUIActivityWithDisplay_returnSwitchToFullscreenWCT_enforcedDesktop() {
+        whenever(DesktopModeStatus.enterDesktopByDefaultOnFreeformDisplay(context)).thenReturn(true)
+        val tda = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
+        tda.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
+        // Set task as systemUI package
+        val systemUIPackageName =
+            context.resources.getString(com.android.internal.R.string.config_systemUi)
+        val baseComponent = ComponentName(systemUIPackageName, /* cls= */ "")
+        val task =
+            createFreeformTask().apply {
+                baseActivity = baseComponent
+                isTopActivityNoDisplay = false
+            }
+
+        assertThat(controller.isDesktopModeShowing(DEFAULT_DISPLAY)).isFalse()
+        val result = controller.handleRequest(Binder(), createTransition(task))
+        assertThat(result?.changes?.get(task.token.asBinder())?.windowingMode)
+            .isEqualTo(WINDOWING_MODE_FULLSCREEN)
+    }
+
+    @Test
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY)
     fun handleRequest_backTransition_singleTaskNoToken_noWallpaper_doesNotHandle() {
         val task = setUpFreeformTask()
@@ -3682,7 +3707,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            position = Point(100, -100),
             inputCoordinate = PointF(200f, -200f),
             currentDragBounds = Rect(100, -100, 500, 1000),
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -3721,7 +3745,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            position = Point(100, 200),
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -3762,7 +3785,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            position = Point(100, 200),
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -3804,7 +3826,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            position = Point(100, 50),
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds = Rect(100, 50, 500, 1000),
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -3843,7 +3864,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            position = Point(100, 50),
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -3900,7 +3920,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            position = Point(100, 50),
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -5151,7 +5170,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         whenever(mockDragEvent.dragSurface).thenReturn(dragSurface)
         whenever(mockDragEvent.x).thenReturn(inputCoordinate.x)
         whenever(mockDragEvent.y).thenReturn(inputCoordinate.y)
-        whenever(multiInstanceHelper.supportsMultiInstanceSplit(anyOrNull())).thenReturn(true)
+        whenever(multiInstanceHelper.supportsMultiInstanceSplit(anyOrNull(), anyInt()))
+            .thenReturn(true)
         whenever(spyController.getVisualIndicator()).thenReturn(desktopModeVisualIndicator)
         doReturn(indicatorType)
             .whenever(spyController)
@@ -5165,6 +5185,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         spyController.onUnhandledDrag(
             mockPendingIntent,
+            context.userId,
             mockDragEvent,
             mockCallback as Consumer<Boolean>,
         )

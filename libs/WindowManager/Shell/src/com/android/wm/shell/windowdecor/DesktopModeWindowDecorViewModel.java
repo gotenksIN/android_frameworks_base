@@ -32,7 +32,6 @@ import static android.view.WindowInsets.Type.statusBars;
 
 import static com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_ENTER_MODE_APP_HANDLE_MENU;
 import static com.android.window.flags.Flags.enableDisplayFocusInShellTransitions;
-import static com.android.wm.shell.compatui.AppCompatUtils.isTopActivityExemptFromDesktopWindowing;
 import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.InputMethod;
 import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.MinimizeReason;
 import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger;
@@ -133,6 +132,7 @@ import com.android.wm.shell.recents.RecentsTransitionStateListener;
 import com.android.wm.shell.shared.FocusTransitionListener;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
+import com.android.wm.shell.shared.desktopmode.DesktopModeCompatPolicy;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.shared.split.SplitScreenConstants.SplitPosition;
@@ -254,6 +254,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     private final DesktopModeUiEventLogger mDesktopModeUiEventLogger;
     private final WindowDecorTaskResourceLoader mTaskResourceLoader;
     private final RecentsTransitionHandler mRecentsTransitionHandler;
+    private final DesktopModeCompatPolicy mDesktopModeCompatPolicy;
 
     public DesktopModeWindowDecorViewModel(
             Context context,
@@ -290,7 +291,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             DesktopModeEventLogger desktopModeEventLogger,
             DesktopModeUiEventLogger desktopModeUiEventLogger,
             WindowDecorTaskResourceLoader taskResourceLoader,
-            RecentsTransitionHandler recentsTransitionHandler) {
+            RecentsTransitionHandler recentsTransitionHandler,
+            DesktopModeCompatPolicy desktopModeCompatPolicy) {
         this(
                 context,
                 shellExecutor,
@@ -332,7 +334,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 desktopModeEventLogger,
                 desktopModeUiEventLogger,
                 taskResourceLoader,
-                recentsTransitionHandler);
+                recentsTransitionHandler,
+                desktopModeCompatPolicy);
     }
 
     @VisibleForTesting
@@ -377,7 +380,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             DesktopModeEventLogger desktopModeEventLogger,
             DesktopModeUiEventLogger desktopModeUiEventLogger,
             WindowDecorTaskResourceLoader taskResourceLoader,
-            RecentsTransitionHandler recentsTransitionHandler) {
+            RecentsTransitionHandler recentsTransitionHandler,
+            DesktopModeCompatPolicy desktopModeCompatPolicy) {
         mContext = context;
         mMainExecutor = shellExecutor;
         mMainHandler = mainHandler;
@@ -447,6 +451,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         mDesktopModeUiEventLogger = desktopModeUiEventLogger;
         mTaskResourceLoader = taskResourceLoader;
         mRecentsTransitionHandler = recentsTransitionHandler;
+        mDesktopModeCompatPolicy = desktopModeCompatPolicy;
 
         shellInit.addInitCallback(this::onInit, this);
     }
@@ -461,7 +466,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 new DesktopModeOnTaskResizeAnimationListener());
         mDesktopTasksController.setOnTaskRepositionAnimationListener(
                 new DesktopModeOnTaskRepositionAnimationListener());
-        if (Flags.enableDesktopRecentsTransitionsCornersBugfix()) {
+        if (DesktopModeFlags.ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX.isTrue()) {
             mRecentsTransitionHandler.addTransitionStateListener(
                     new DesktopModeRecentsTransitionStateListener());
         }
@@ -1220,12 +1225,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                         mDragPointerId = e.getPointerId(0);
                     }
                     final int dragPointerIdx = e.findPointerIndex(mDragPointerId);
-                    // Position of the task is calculated by subtracting the raw location of the
-                    // motion event (the location of the motion relative to the display) by the
-                    // location of the motion event relative to the task's bounds
-                    final Point position = new Point(
-                            (int) (e.getRawX(dragPointerIdx) - e.getX(dragPointerIdx)),
-                            (int) (e.getRawY(dragPointerIdx) - e.getY(dragPointerIdx)));
                     final Rect newTaskBounds = mDragPositioningCallback.onDragPositioningEnd(
                             e.getDisplayId(),
                             e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx));
@@ -1233,7 +1232,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     // DesktopTasksController to allow secondary transformations (i.e. snap resizing
                     // or transforming to fullscreen) before setting new task bounds.
                     mDesktopTasksController.onDragPositioningEnd(
-                            taskInfo, decoration.mTaskSurface, position,
+                            taskInfo, decoration.mTaskSurface,
                             new PointF(e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx)),
                             newTaskBounds, decoration.calculateValidDragArea(),
                             new Rect(mOnDragStartInitialBounds), e,
@@ -1652,8 +1651,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 && mSplitScreenController.isTaskRootOrStageRoot(taskInfo.taskId)) {
             return false;
         }
-        if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODALS_POLICY.isTrue()
-                && isTopActivityExemptFromDesktopWindowing(mContext, taskInfo)) {
+        if (mDesktopModeCompatPolicy.isTopActivityExemptFromDesktopWindowing(taskInfo)) {
             return false;
         }
         if (isPartOfDefaultHomePackage(taskInfo)) {

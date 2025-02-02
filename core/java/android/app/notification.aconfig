@@ -62,13 +62,6 @@ flag {
 }
 
 flag {
-  name: "modes_ui_test"
-  namespace: "systemui"
-  description: "Guards new CTS tests for Modes; dependent on flags modes_api and modes_ui"
-  bug: "360862012"
-}
-
-flag {
   name: "modes_hsum"
   namespace: "systemui"
   description: "Fixes for modes (and DND/Zen in general) with HSUM or secondary users"
@@ -309,4 +302,18 @@ flag {
   namespace: "systemui"
   description: "removes sbnholder from NLS"
   bug: "362981561"
+}
+
+flag {
+  name: "nm_summarization"
+  namespace: "systemui"
+  description: "Allows the NAS to summarize notifications"
+  bug: "390417189"
+}
+
+flag {
+  name: "nm_summarization_ui"
+  namespace: "systemui"
+  description: "Shows summarized notifications in the UI"
+  bug: "390217880"
 }

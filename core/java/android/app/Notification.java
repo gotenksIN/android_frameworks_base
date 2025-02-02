@@ -1772,6 +1772,11 @@ public class Notification implements Parcelable
      */
     public static final String EXTRA_FOREGROUND_APPS = "android.foregroundApps";
 
+    /**
+     * @hide
+     */
+    public static final String EXTRA_SUMMARIZED_CONTENT = "android.summarization";
+
     @UnsupportedAppUsage
     private Icon mSmallIcon;
     @UnsupportedAppUsage
@@ -4421,8 +4426,7 @@ public class Notification implements Parcelable
      * notification) out of the actions in this notification.
      */
     public @NonNull List<Notification.Action> getContextualActions() {
-        if (actions == null) return Collections.emptyList();
-
+        if (actions == null || isPromotedOngoing()) return Collections.emptyList();
         List<Notification.Action> contextualActions = new ArrayList<>();
         for (Notification.Action action : actions) {
             if (action.isContextual()) {

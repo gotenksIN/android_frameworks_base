@@ -23,7 +23,6 @@ import android.animation.ValueAnimator;
 import android.app.WallpaperColors;
 import android.content.Context;
 import android.content.res.ColorStateList;
-import android.graphics.Typeface;
 import android.graphics.drawable.ClipDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -37,7 +36,6 @@ import android.view.animation.LinearInterpolator;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -95,10 +93,6 @@ public abstract class MediaOutputBaseAdapter extends
         mController.setCurrentColorScheme(wallpaperColors, isDarkTheme);
     }
 
-    CharSequence getItemTitle(MediaDevice device) {
-        return device.getName();
-    }
-
     boolean isCurrentlyConnected(MediaDevice device) {
         return TextUtils.equals(device.getId(),
                 mController.getCurrentConnectedMediaDevice().getId())
@@ -138,12 +132,10 @@ public abstract class MediaOutputBaseAdapter extends
         final FrameLayout mItemLayout;
         final FrameLayout mIconAreaLayout;
         final TextView mTitleText;
-        final TextView mTwoLineTitleText;
         final TextView mSubTitleText;
         final TextView mVolumeValueText;
         final ImageView mTitleIcon;
         final ProgressBar mProgressBar;
-        final LinearLayout mTwoLineLayout;
         final ImageView mStatusIcon;
         final CheckBox mCheckBox;
         final ViewGroup mEndTouchArea;
@@ -161,8 +153,6 @@ public abstract class MediaOutputBaseAdapter extends
             mItemLayout = view.requireViewById(R.id.item_layout);
             mTitleText = view.requireViewById(R.id.title);
             mSubTitleText = view.requireViewById(R.id.subtitle);
-            mTwoLineLayout = view.requireViewById(R.id.two_line_layout);
-            mTwoLineTitleText = view.requireViewById(R.id.two_line_title);
             mTitleIcon = view.requireViewById(R.id.title_icon);
             mProgressBar = view.requireViewById(R.id.volume_indeterminate_progress);
             mSeekBar = view.requireViewById(R.id.volume_seekbar);
@@ -185,9 +175,8 @@ public abstract class MediaOutputBaseAdapter extends
             mContainerLayout.setContentDescription(null);
             mTitleText.setTextColor(mController.getColorItemContent());
             mSubTitleText.setTextColor(mController.getColorItemContent());
-            mSubTitleText.setSelected(true);
-            mTwoLineTitleText.setTextColor(mController.getColorItemContent());
             mVolumeValueText.setTextColor(mController.getColorItemContent());
+            mIconAreaLayout.setBackground(null);
             mSeekBar.setProgressTintList(
                     ColorStateList.valueOf(mController.getColorSeekbarProgress()));
         }
@@ -198,7 +187,6 @@ public abstract class MediaOutputBaseAdapter extends
 
         void setSingleLineLayout(CharSequence title, boolean showSeekBar,
                 boolean showProgressBar, boolean showCheckBox, boolean showEndTouchArea) {
-            mTwoLineLayout.setVisibility(View.GONE);
             boolean isActive = showSeekBar || showProgressBar;
             if (!mCornerAnimator.isRunning()) {
                 final Drawable backgroundDrawable =
@@ -216,10 +204,6 @@ public abstract class MediaOutputBaseAdapter extends
             mItemLayout.setBackgroundTintList(
                     ColorStateList.valueOf(isActive ? mController.getColorConnectedItemBackground()
                             : mController.getColorItemBackground()));
-            mIconAreaLayout.setBackgroundTintList(
-                    ColorStateList.valueOf(showSeekBar ? mController.getColorSeekbarProgress()
-                            : showProgressBar ? mController.getColorConnectedItemBackground()
-                                    : mController.getColorItemBackground()));
             mProgressBar.setVisibility(showProgressBar ? View.VISIBLE : View.GONE);
             mSeekBar.setAlpha(1);
             mSeekBar.setVisibility(showSeekBar ? View.VISIBLE : View.GONE);
@@ -227,7 +211,6 @@ public abstract class MediaOutputBaseAdapter extends
                 mSeekBar.resetVolume();
             }
             mTitleText.setText(title);
-            mTitleText.setVisibility(View.VISIBLE);
             mCheckBox.setVisibility(showCheckBox ? View.VISIBLE : View.GONE);
             mEndTouchArea.setVisibility(showEndTouchArea ? View.VISIBLE : View.GONE);
             ViewGroup.MarginLayoutParams params =
@@ -236,34 +219,25 @@ public abstract class MediaOutputBaseAdapter extends
                     : mController.getItemMarginEndDefault();
         }
 
-        void setTwoLineLayout(MediaDevice device, boolean bFocused, boolean showSeekBar,
-                boolean showProgressBar, boolean showSubtitle, boolean showStatus,
-                boolean isFakeActive) {
-            setTwoLineLayout(device, null, bFocused, showSeekBar, showProgressBar, showSubtitle,
-                    showStatus, false, isFakeActive);
+        void setTwoLineLayout(CharSequence title, boolean showSeekBar,
+                boolean showProgressBar, boolean showSubtitle, boolean showStatus) {
+            setTwoLineLayout(title, showSeekBar, showProgressBar, showSubtitle, showStatus, false);
         }
 
-        void setTwoLineLayout(MediaDevice device, CharSequence title, boolean bFocused,
+        void setTwoLineLayout(CharSequence title,
                 boolean showSeekBar, boolean showProgressBar, boolean showSubtitle,
-                boolean showStatus , boolean showEndTouchArea, boolean isFakeActive) {
-            mTitleText.setVisibility(View.GONE);
-            mTwoLineLayout.setVisibility(View.VISIBLE);
+                boolean showStatus , boolean showEndTouchArea) {
             mStatusIcon.setVisibility(showStatus ? View.VISIBLE : View.GONE);
             mSeekBar.setAlpha(1);
             mSeekBar.setVisibility(showSeekBar ? View.VISIBLE : View.GONE);
             final Drawable backgroundDrawable;
             backgroundDrawable = mContext.getDrawable(
-                    showSeekBar || isFakeActive ? R.drawable.media_output_item_background_active
+                    showSeekBar ? R.drawable.media_output_item_background_active
                             : R.drawable.media_output_item_background).mutate();
             mItemLayout.setBackgroundTintList(ColorStateList.valueOf(
-                    showSeekBar || isFakeActive ? mController.getColorConnectedItemBackground()
+                    showSeekBar ? mController.getColorConnectedItemBackground()
                             : mController.getColorItemBackground()
             ));
-            mIconAreaLayout.setBackgroundTintList(
-                    ColorStateList.valueOf(showProgressBar || isFakeActive
-                            ? mController.getColorConnectedItemBackground()
-                            : showSeekBar ? mController.getColorSeekbarProgress()
-                                    : mController.getColorItemBackground()));
             if (showSeekBar) {
                 updateSeekbarProgressBackground();
             }
@@ -277,12 +251,7 @@ public abstract class MediaOutputBaseAdapter extends
             mItemLayout.setBackground(backgroundDrawable);
             mProgressBar.setVisibility(showProgressBar ? View.VISIBLE : View.GONE);
             mSubTitleText.setVisibility(showSubtitle ? View.VISIBLE : View.GONE);
-            mTwoLineTitleText.setTranslationY(0);
-            mTwoLineTitleText.setText(device == null ? title : getItemTitle(device));
-            mTwoLineTitleText.setTypeface(Typeface.create(mContext.getString(
-                            bFocused ? com.android.internal.R.string.config_headlineFontFamilyMedium
-                                    : com.android.internal.R.string.config_headlineFontFamily),
-                    Typeface.NORMAL));
+            mTitleText.setText(title);
         }
 
         void updateSeekbarProgressBackground() {
@@ -443,8 +412,7 @@ public abstract class MediaOutputBaseAdapter extends
             mItemLayout.setBackground(backgroundDrawable);
             mItemLayout.setBackgroundTintList(
                     ColorStateList.valueOf(mController.getColorConnectedItemBackground()));
-            mIconAreaLayout.setBackgroundTintList(
-                    ColorStateList.valueOf(mController.getColorConnectedItemBackground()));
+            mIconAreaLayout.setBackground(null);
         }
 
         private void endAnimateCornerAndVolume() {

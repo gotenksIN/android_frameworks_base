@@ -237,6 +237,13 @@ flag {
 }
 
 flag {
+  name: "notification_bundle_ui"
+  namespace: "systemui"
+  description: "Three-level group UI for notification bundles"
+  bug: "367996732"
+}
+
+flag {
     name: "notification_background_tint_optimization"
     namespace: "systemui"
     description: "Re-enable the codepath that removed tinting of notifications when the"
@@ -534,6 +541,16 @@ flag {
 }
 
 flag {
+   name: "face_scanning_animation_npe_fix"
+   namespace: "systemui"
+   description: "Fix for the face scanning animation NPE"
+   bug: "392032258"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "indication_text_a11y_fix"
     namespace: "systemui"
     description: "add double shadow to the indication text at the bottom of the lock screen"
@@ -613,13 +630,6 @@ flag {
   namespace: "systemui"
   description: "Enables detailed traversal slices during measure and layout in perfetto traces"
   bug: "315274804"
-}
-
-flag {
-   name: "quick_settings_visual_haptics_longpress"
-   namespace: "systemui"
-   description: "Enable special visual and haptic effects for quick settings tiles with long-press actions"
-   bug: "229856884"
 }
 
 flag {
@@ -1197,6 +1207,13 @@ flag {
 }
 
 flag {
+  name: "glanceable_hub_blurred_background"
+  namespace: "systemui"
+  description: "Allow blurred background on glanceable hub"
+  bug: "389788272"
+}
+
+flag {
   name: "communal_widget_resizing"
   namespace: "systemui"
   description: "Allow resizing of widgets on glanceable hub"
@@ -1318,10 +1335,13 @@ flag {
 }
 
 flag {
-  name: "media_controls_drawables_reuse"
+  name: "media_controls_drawables_reuse_bugfix"
   namespace: "systemui"
   description: "Re-use created media drawables for media controls"
   bug: "358402034"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -1942,23 +1962,10 @@ flag {
 }
 
 flag {
-    name: "stabilize_heads_up_group"
-    namespace: "systemui"
-    description: "Stabilize heads up groups in VisualStabilityCoordinator"
-    bug: "381864715"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-   name: "magnetic_notification_horizontal_swipe"
+   name: "magnetic_notification_swipes"
    namespace: "systemui"
    description: "Add support for magnetic behavior on horizontal notification swipes."
    bug: "390179908"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1966,6 +1973,13 @@ flag {
     namespace: "systemui"
     description: "Force promoted notifications to always be expanded"
     bug: "380901479"
+}
+
+flag {
+  name: "permission_helper_ui_rich_ongoing"
+  namespace: "systemui"
+  description: "[RONs] Guards inline permission helper for demoting RONs"
+  bug: "379186372"
 }
 
 flag {
@@ -1983,4 +1997,14 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+   name: "shade_launch_accessibility"
+   namespace: "systemui"
+   description: "Intercept accessibility focus events for the Shade during launch animations to avoid stray TalkBack events."
+   bug: "379222226"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
 }

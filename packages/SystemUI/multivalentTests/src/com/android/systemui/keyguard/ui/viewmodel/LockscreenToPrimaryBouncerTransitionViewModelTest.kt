@@ -21,6 +21,7 @@ import android.platform.test.flag.junit.FlagsParameterization
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.Flags.FLAG_BOUNCER_UI_REVAMP
+import com.android.systemui.Flags.FLAG_NOTIFICATION_SHADE_BLUR
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.coroutines.collectValues
@@ -155,6 +156,7 @@ class LockscreenToPrimaryBouncerTransitionViewModelTest(flags: FlagsParameteriza
         }
 
     @Test
+    @EnableFlags(FLAG_NOTIFICATION_SHADE_BLUR)
     @BrokenWithSceneContainer(388068805)
     fun blurRadiusIsMaxWhenShadeIsExpanded() =
         testScope.runTest {
@@ -198,8 +200,8 @@ class LockscreenToPrimaryBouncerTransitionViewModelTest(flags: FlagsParameteriza
 
             kosmos.keyguardWindowBlurTestUtil.assertTransitionToBlurRadius(
                 transitionProgress = listOf(0f, 0f, 0.1f, 0.2f, 0.3f, 1f),
-                startValue = kosmos.blurConfig.maxBlurRadiusPx / 3.0f,
-                endValue = kosmos.blurConfig.maxBlurRadiusPx / 3.0f,
+                startValue = kosmos.blurConfig.maxBlurRadiusPx,
+                endValue = kosmos.blurConfig.maxBlurRadiusPx,
                 transitionFactory = ::step,
                 actualValuesProvider = { values },
                 checkInterpolatedValues = false,

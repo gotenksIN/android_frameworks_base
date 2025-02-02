@@ -1264,8 +1264,7 @@ public class NotificationManager {
                     mNotificationChannelListCache.query(new NotificationChannelQuery(
                             mContext.getOpPackageName(),
                             mContext.getPackageName(),
-                            mContext.getUserId(),
-                            true)));  // create (default channel) if needed
+                            mContext.getUserId())));
         } else {
             INotificationManager service = service();
             try {
@@ -1293,8 +1292,7 @@ public class NotificationManager {
                     mNotificationChannelListCache.query(new NotificationChannelQuery(
                             mContext.getOpPackageName(),
                             mContext.getPackageName(),
-                            mContext.getUserId(),
-                            true)));  // create (default channel) if needed
+                            mContext.getUserId())));
         } else {
             INotificationManager service = service();
             try {
@@ -1320,8 +1318,7 @@ public class NotificationManager {
             return mNotificationChannelListCache.query(new NotificationChannelQuery(
                     mContext.getOpPackageName(),
                     mContext.getPackageName(),
-                    mContext.getUserId(),
-                    false));
+                    mContext.getUserId()));
         } else {
             INotificationManager service = service();
             try {
@@ -1461,8 +1458,8 @@ public class NotificationManager {
                 public List<NotificationChannel> apply(NotificationChannelQuery query) {
                     INotificationManager service = service();
                     try {
-                        return service.getOrCreateNotificationChannels(query.callingPkg,
-                                query.targetPkg, query.userId, query.createIfNeeded).getList();
+                        return service.getNotificationChannels(query.callingPkg,
+                                query.targetPkg, query.userId).getList();
                     } catch (RemoteException e) {
                         throw e.rethrowFromSystemServer();
                     }
@@ -1490,8 +1487,7 @@ public class NotificationManager {
     private record NotificationChannelQuery(
             String callingPkg,
             String targetPkg,
-            int userId,
-            boolean createIfNeeded) {}
+            int userId) {}
 
     /**
      * @hide
@@ -2167,19 +2163,6 @@ public class NotificationManager {
         INotificationManager service = service();
         try {
             service.setAssistantAdjustmentKeyTypeState(type, enabled);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * @hide
-     */
-    @FlaggedApi(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
-    public void setTypeAdjustmentForPackageState(@NonNull String pkg, boolean enabled) {
-        INotificationManager service = service();
-        try {
-            service.setTypeAdjustmentForPackageState(pkg, enabled);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

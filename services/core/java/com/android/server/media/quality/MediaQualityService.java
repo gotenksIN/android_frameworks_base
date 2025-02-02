@@ -29,11 +29,19 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.hardware.tv.mediaquality.AmbientBacklightColorFormat;
+import android.hardware.tv.mediaquality.DolbyAudioProcessing;
+import android.hardware.tv.mediaquality.DtsVirtualX;
 import android.hardware.tv.mediaquality.IMediaQuality;
+import android.hardware.tv.mediaquality.IPictureProfileAdjustmentListener;
+import android.hardware.tv.mediaquality.IPictureProfileChangedListener;
+import android.hardware.tv.mediaquality.ISoundProfileAdjustmentListener;
+import android.hardware.tv.mediaquality.ISoundProfileChangedListener;
+import android.hardware.tv.mediaquality.ParamCapability;
 import android.hardware.tv.mediaquality.PictureParameter;
 import android.hardware.tv.mediaquality.PictureParameters;
 import android.hardware.tv.mediaquality.SoundParameter;
 import android.hardware.tv.mediaquality.SoundParameters;
+import android.hardware.tv.mediaquality.VendorParamCapability;
 import android.media.quality.AmbientBacklightEvent;
 import android.media.quality.AmbientBacklightMetadata;
 import android.media.quality.AmbientBacklightSettings;
@@ -103,6 +111,10 @@ public class MediaQualityService extends SystemService {
     private final BiMap<Long, String> mPictureProfileTempIdMap;
     private final BiMap<Long, String> mSoundProfileTempIdMap;
     private IMediaQuality mMediaQuality;
+    private IPictureProfileAdjustmentListener mPpAdjustmentListener;
+    private ISoundProfileAdjustmentListener mSpAdjustmentListener;
+    private IPictureProfileChangedListener mPpChangedListener;
+    private ISoundProfileChangedListener mSpChangedListener;
     private final HalAmbientBacklightCallback mHalAmbientBacklightCallback;
     private final Map<String, AmbientBacklightCallbackRecord> mCallbackRecords = new HashMap<>();
     private final PackageManager mPackageManager;
@@ -138,17 +150,103 @@ public class MediaQualityService extends SystemService {
     @Override
     public void onStart() {
         IBinder binder = ServiceManager.getService(IMediaQuality.DESCRIPTOR + "/default");
-        if (binder != null) {
-            Slogf.d(TAG, "binder is not null");
-            mMediaQuality = IMediaQuality.Stub.asInterface(binder);
-            if (mMediaQuality != null) {
-                try {
-                    mMediaQuality.setAmbientBacklightCallback(mHalAmbientBacklightCallback);
-                } catch (RemoteException e) {
-                    Slog.e(TAG, "Failed to set ambient backlight detector callback", e);
+        if (binder == null) {
+            Slogf.d(TAG, "Binder is null");
+            return;
+        }
+        Slogf.d(TAG, "Binder is not null");
+
+        mPpAdjustmentListener = new IPictureProfileAdjustmentListener.Stub() {
+                @Override
+                public void onPictureProfileAdjusted(
+                        android.hardware.tv.mediaquality.PictureProfile pictureProfile)
+                        throws RemoteException {
+                    // TODO
                 }
+
+                @Override
+                public void onParamCapabilityChanged(long pictureProfileId, ParamCapability[] caps)
+                        throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public void onVendorParamCapabilityChanged(long pictureProfileId,
+                        VendorParamCapability[] caps) throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public void requestPictureParameters(long pictureProfileId) throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public void onStreamStatusChanged(long pictureProfileId, byte status)
+                        throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public int getInterfaceVersion() throws RemoteException {
+                    return 0;
+                }
+
+                @Override
+                public String getInterfaceHash() throws RemoteException {
+                    return null;
+                }
+            };
+        mSpAdjustmentListener = new ISoundProfileAdjustmentListener.Stub() {
+
+                @Override
+                public void onSoundProfileAdjusted(
+                        android.hardware.tv.mediaquality.SoundProfile soundProfile)
+                        throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public void onParamCapabilityChanged(long soundProfileId, ParamCapability[] caps)
+                        throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public void onVendorParamCapabilityChanged(long soundProfileId,
+                        VendorParamCapability[] caps) throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public void requestSoundParameters(long soundProfileId) throws RemoteException {
+                    // TODO
+                }
+
+                @Override
+                public int getInterfaceVersion() throws RemoteException {
+                    return 0;
+                }
+
+                @Override
+                public String getInterfaceHash() throws RemoteException {
+                    return null;
+                }
+            };
+
+        mMediaQuality = IMediaQuality.Stub.asInterface(binder);
+        if (mMediaQuality != null) {
+            try {
+                mMediaQuality.setAmbientBacklightCallback(mHalAmbientBacklightCallback);
+                mMediaQuality.setPictureProfileAdjustmentListener(mPpAdjustmentListener);
+                mMediaQuality.setSoundProfileAdjustmentListener(mSpAdjustmentListener);
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to set ambient backlight detector callback", e);
             }
         }
+
+        mPpChangedListener = IPictureProfileChangedListener.Stub.asInterface(binder);
+        mSpChangedListener = ISoundProfileChangedListener.Stub.asInterface(binder);
 
         publishBinderService(Context.MEDIA_QUALITY_SERVICE, new BinderService());
     }
@@ -185,6 +283,30 @@ public class MediaQualityService extends SystemService {
             return pp;
         }
 
+        private void notifyHalOnPictureProfileChange(Long dbId, PersistableBundle params) {
+            // TODO: only notify HAL when the profile is active / being used
+            try {
+                mPpChangedListener.onPictureProfileChanged(convertToHalPictureProfile(dbId,
+                        params));
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to notify HAL on picture profile change.", e);
+            }
+        }
+
+        private android.hardware.tv.mediaquality.PictureProfile convertToHalPictureProfile(Long id,
+                PersistableBundle params) {
+            PictureParameters pictureParameters = new PictureParameters();
+            pictureParameters.pictureParameters = convertPersistableBundleToPictureParameterList(
+                    params);
+
+            android.hardware.tv.mediaquality.PictureProfile toReturn =
+                    new android.hardware.tv.mediaquality.PictureProfile();
+            toReturn.pictureProfileId = id;
+            toReturn.parameters = pictureParameters;
+
+            return toReturn;
+        }
+
         @Override
         public void updatePictureProfile(String id, PictureProfile pp, UserHandle user) {
             Long dbId = mPictureProfileTempIdMap.getKey(id);
@@ -205,6 +327,7 @@ public class MediaQualityService extends SystemService {
                     null, values);
             notifyOnPictureProfileUpdated(mPictureProfileTempIdMap.getValue(dbId),
                     getPictureProfile(dbId), Binder.getCallingUid(), Binder.getCallingPid());
+            notifyHalOnPictureProfileChange(dbId, pp.getParameters());
         }
 
         private boolean hasPermissionToUpdatePictureProfile(Long dbId, PictureProfile toUpdate) {
@@ -238,6 +361,7 @@ public class MediaQualityService extends SystemService {
                 notifyOnPictureProfileRemoved(mPictureProfileTempIdMap.getValue(dbId), toDelete,
                         Binder.getCallingUid(), Binder.getCallingPid());
                 mPictureProfileTempIdMap.remove(dbId);
+                notifyHalOnPictureProfileChange(dbId, null);
             }
         }
 
@@ -357,6 +481,10 @@ public class MediaQualityService extends SystemService {
 
         private PictureParameter[] convertPersistableBundleToPictureParameterList(
                 PersistableBundle params) {
+            if (params == null) {
+                return null;
+            }
+
             List<PictureParameter> pictureParams = new ArrayList<>();
             if (params.containsKey(PictureQuality.PARAMETER_BRIGHTNESS)) {
                 pictureParams.add(PictureParameter.brightness(params.getLong(
@@ -461,7 +589,7 @@ public class MediaQualityService extends SystemService {
             }
             if (params.containsKey(PictureQuality.PARAMETER_AUTO_SUPER_RESOLUTION_ENABLED)) {
                 pictureParams.add(PictureParameter.autoSuperResolutionEnabled(params.getBoolean(
-                        PictureQuality.PARAMETER_AUTO_SUPER_RESOLUTION_ENABLED)));
+                                PictureQuality.PARAMETER_AUTO_SUPER_RESOLUTION_ENABLED)));
             }
             if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_RED_GAIN)) {
                 pictureParams.add(PictureParameter.colorTemperatureRedGain(params.getInt(
@@ -475,63 +603,210 @@ public class MediaQualityService extends SystemService {
                 pictureParams.add(PictureParameter.colorTemperatureBlueGain(params.getInt(
                         PictureQuality.PARAMETER_COLOR_TUNER_BLUE_GAIN)));
             }
-
-            /**
-             * TODO: add conversion for following after adding to MediaQualityContract
-             *
-             * PictureParameter.levelRange
-             * PictureParameter.gamutMapping
-             * PictureParameter.pcMode
-             * PictureParameter.lowLatency
-             * PictureParameter.vrr
-             * PictureParameter.cvrr
-             * PictureParameter.hdmiRgbRange
-             * PictureParameter.colorSpace
-             * PictureParameter.panelInitMaxLuminceNits
-             * PictureParameter.panelInitMaxLuminceValid
-             * PictureParameter.gamma
-             * PictureParameter.colorTemperatureRedOffset
-             * PictureParameter.colorTemperatureGreenOffset
-             * PictureParameter.colorTemperatureBlueOffset
-             * PictureParameter.elevenPointRed
-             * PictureParameter.elevenPointGreen
-             * PictureParameter.elevenPointBlue
-             * PictureParameter.lowBlueLight
-             * PictureParameter.LdMode
-             * PictureParameter.osdRedGain
-             * PictureParameter.osdGreenGain
-             * PictureParameter.osdBlueGain
-             * PictureParameter.osdRedOffset
-             * PictureParameter.osdGreenOffset
-             * PictureParameter.osdBlueOffset
-             * PictureParameter.osdHue
-             * PictureParameter.osdSaturation
-             * PictureParameter.osdContrast
-             * PictureParameter.colorTunerSwitch
-             * PictureParameter.colorTunerHueRed
-             * PictureParameter.colorTunerHueGreen
-             * PictureParameter.colorTunerHueBlue
-             * PictureParameter.colorTunerHueCyan
-             * PictureParameter.colorTunerHueMagenta
-             * PictureParameter.colorTunerHueYellow
-             * PictureParameter.colorTunerHueFlesh
-             * PictureParameter.colorTunerSaturationRed
-             * PictureParameter.colorTunerSaturationGreen
-             * PictureParameter.colorTunerSaturationBlue
-             * PictureParameter.colorTunerSaturationCyan
-             * PictureParameter.colorTunerSaturationMagenta
-             * PictureParameter.colorTunerSaturationYellow
-             * PictureParameter.colorTunerSaturationFlesh
-             * PictureParameter.colorTunerLuminanceRed
-             * PictureParameter.colorTunerLuminanceGreen
-             * PictureParameter.colorTunerLuminanceBlue
-             * PictureParameter.colorTunerLuminanceCyan
-             * PictureParameter.colorTunerLuminanceMagenta
-             * PictureParameter.colorTunerLuminanceYellow
-             * PictureParameter.colorTunerLuminanceFlesh
-             * PictureParameter.activeProfile
-             * PictureParameter.pictureQualityEventType
-             */
+            if (params.containsKey(PictureQuality.PARAMETER_LEVEL_RANGE)) {
+                pictureParams.add(PictureParameter.levelRange(
+                        (byte) params.getInt(PictureQuality.PARAMETER_LEVEL_RANGE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_GAMUT_MAPPING)) {
+                pictureParams.add(PictureParameter.gamutMapping(params.getBoolean(
+                        PictureQuality.PARAMETER_GAMUT_MAPPING)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_PC_MODE)) {
+                pictureParams.add(PictureParameter.pcMode(params.getBoolean(
+                        PictureQuality.PARAMETER_PC_MODE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_LOW_LATENCY)) {
+                pictureParams.add(PictureParameter.lowLatency(params.getBoolean(
+                        PictureQuality.PARAMETER_LOW_LATENCY)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_VRR)) {
+                pictureParams.add(PictureParameter.vrr(params.getBoolean(
+                        PictureQuality.PARAMETER_VRR)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_CVRR)) {
+                pictureParams.add(PictureParameter.cvrr(params.getBoolean(
+                        PictureQuality.PARAMETER_CVRR)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_HDMI_RGB_RANGE)) {
+                pictureParams.add(PictureParameter.hdmiRgbRange(
+                        (byte) params.getInt(PictureQuality.PARAMETER_HDMI_RGB_RANGE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_SPACE)) {
+                pictureParams.add(PictureParameter.colorSpace(
+                        (byte) params.getInt(PictureQuality.PARAMETER_COLOR_SPACE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_PANEL_INIT_MAX_LUMINCE_NITS)) {
+                pictureParams.add(PictureParameter.panelInitMaxLuminceNits(
+                        params.getInt(PictureQuality.PARAMETER_PANEL_INIT_MAX_LUMINCE_NITS)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_PANEL_INIT_MAX_LUMINCE_VALID)) {
+                pictureParams.add(PictureParameter.panelInitMaxLuminceValid(
+                        params.getBoolean(PictureQuality.PARAMETER_PANEL_INIT_MAX_LUMINCE_VALID)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_GAMMA)) {
+                pictureParams.add(PictureParameter.gamma(
+                        (byte) params.getInt(PictureQuality.PARAMETER_GAMMA)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TEMPERATURE_RED_OFFSET)) {
+                pictureParams.add(PictureParameter.colorTemperatureRedOffset(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TEMPERATURE_RED_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TEMPERATURE_GREEN_OFFSET)) {
+                pictureParams.add(PictureParameter.colorTemperatureGreenOffset(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TEMPERATURE_GREEN_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TEMPERATURE_BLUE_OFFSET)) {
+                pictureParams.add(PictureParameter.colorTemperatureBlueOffset(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TEMPERATURE_BLUE_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_ELEVEN_POINT_RED)) {
+                pictureParams.add(PictureParameter.elevenPointRed(params.getIntArray(
+                        PictureQuality.PARAMETER_ELEVEN_POINT_RED)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_ELEVEN_POINT_GREEN)) {
+                pictureParams.add(PictureParameter.elevenPointGreen(params.getIntArray(
+                        PictureQuality.PARAMETER_ELEVEN_POINT_GREEN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_ELEVEN_POINT_BLUE)) {
+                pictureParams.add(PictureParameter.elevenPointBlue(params.getIntArray(
+                        PictureQuality.PARAMETER_ELEVEN_POINT_BLUE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_LOW_BLUE_LIGHT)) {
+                pictureParams.add(PictureParameter.lowBlueLight(
+                        (byte) params.getInt(PictureQuality.PARAMETER_LOW_BLUE_LIGHT)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_LD_MODE)) {
+                pictureParams.add(PictureParameter.LdMode(
+                        (byte) params.getInt(PictureQuality.PARAMETER_LD_MODE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_RED_GAIN)) {
+                pictureParams.add(PictureParameter.osdRedGain(params.getInt(
+                        PictureQuality.PARAMETER_OSD_RED_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_GREEN_GAIN)) {
+                pictureParams.add(PictureParameter.osdGreenGain(params.getInt(
+                        PictureQuality.PARAMETER_OSD_GREEN_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_BLUE_GAIN)) {
+                pictureParams.add(PictureParameter.osdBlueGain(params.getInt(
+                        PictureQuality.PARAMETER_OSD_BLUE_GAIN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_RED_OFFSET)) {
+                pictureParams.add(PictureParameter.osdRedOffset(params.getInt(
+                        PictureQuality.PARAMETER_OSD_RED_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_GREEN_OFFSET)) {
+                pictureParams.add(PictureParameter.osdGreenOffset(params.getInt(
+                        PictureQuality.PARAMETER_OSD_GREEN_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_BLUE_OFFSET)) {
+                pictureParams.add(PictureParameter.osdBlueOffset(params.getInt(
+                        PictureQuality.PARAMETER_OSD_BLUE_OFFSET)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_HUE)) {
+                pictureParams.add(PictureParameter.osdHue(params.getInt(
+                        PictureQuality.PARAMETER_OSD_HUE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_SATURATION)) {
+                pictureParams.add(PictureParameter.osdSaturation(params.getInt(
+                        PictureQuality.PARAMETER_OSD_SATURATION)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_OSD_CONTRAST)) {
+                pictureParams.add(PictureParameter.osdContrast(params.getInt(
+                        PictureQuality.PARAMETER_OSD_CONTRAST)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SWITCH)) {
+                pictureParams.add(PictureParameter.colorTunerSwitch(params.getBoolean(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SWITCH)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE_RED)) {
+                pictureParams.add(PictureParameter.colorTunerHueRed(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE_RED)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE_GREEN)) {
+                pictureParams.add(PictureParameter.colorTunerHueGreen(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE_GREEN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE_BLUE)) {
+                pictureParams.add(PictureParameter.colorTunerHueBlue(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE_BLUE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE_CYAN)) {
+                pictureParams.add(PictureParameter.colorTunerHueCyan(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE_CYAN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE_MAGENTA)) {
+                pictureParams.add(PictureParameter.colorTunerHueMagenta(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE_MAGENTA)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE_YELLOW)) {
+                pictureParams.add(PictureParameter.colorTunerHueYellow(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE_YELLOW)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_HUE_FLESH)) {
+                pictureParams.add(PictureParameter.colorTunerHueFlesh(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_HUE_FLESH)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_RED)) {
+                pictureParams.add(PictureParameter.colorTunerSaturationRed(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_RED)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_GREEN)) {
+                pictureParams.add(PictureParameter.colorTunerSaturationGreen(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_GREEN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_BLUE)) {
+                pictureParams.add(PictureParameter.colorTunerSaturationBlue(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_BLUE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_CYAN)) {
+                pictureParams.add(PictureParameter.colorTunerSaturationCyan(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_CYAN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_MAGENTA)) {
+                pictureParams.add(PictureParameter.colorTunerSaturationMagenta(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_MAGENTA)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_YELLOW)) {
+                pictureParams.add(PictureParameter.colorTunerSaturationYellow(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_YELLOW)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_FLESH)) {
+                pictureParams.add(PictureParameter.colorTunerSaturationFlesh(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_SATURATION_FLESH)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_RED)) {
+                pictureParams.add(PictureParameter.colorTunerLuminanceRed(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_RED)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_GREEN)) {
+                pictureParams.add(PictureParameter.colorTunerLuminanceGreen(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_GREEN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_BLUE)) {
+                pictureParams.add(PictureParameter.colorTunerLuminanceBlue(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_BLUE)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_CYAN)) {
+                pictureParams.add(PictureParameter.colorTunerLuminanceCyan(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_CYAN)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_MAGENTA)) {
+                pictureParams.add(PictureParameter.colorTunerLuminanceMagenta(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_MAGENTA)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_YELLOW)) {
+                pictureParams.add(PictureParameter.colorTunerLuminanceYellow(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_YELLOW)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_FLESH)) {
+                pictureParams.add(PictureParameter.colorTunerLuminanceFlesh(params.getInt(
+                        PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_FLESH)));
+            }
+            if (params.containsKey(PictureQuality.PARAMETER_PICTURE_QUALITY_EVENT_TYPE)) {
+                pictureParams.add(PictureParameter.pictureQualityEventType(
+                        (byte) params.getInt(PictureQuality.PARAMETER_PICTURE_QUALITY_EVENT_TYPE)));
+            }
             return  (PictureParameter[]) pictureParams.toArray();
         }
 
@@ -606,6 +881,28 @@ public class MediaQualityService extends SystemService {
             return sp;
         }
 
+        private void notifyHalOnSoundProfileChange(Long dbId, PersistableBundle params) {
+            // TODO: only notify HAL when the profile is active / being used
+            try {
+                mSpChangedListener.onSoundProfileChanged(convertToHalSoundProfile(dbId, params));
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to notify HAL on sound profile change.", e);
+            }
+        }
+
+        private android.hardware.tv.mediaquality.SoundProfile convertToHalSoundProfile(Long id,
+                PersistableBundle params) {
+            SoundParameters soundParameters = new SoundParameters();
+            soundParameters.soundParameters = convertPersistableBundleToSoundParameterList(params);
+
+            android.hardware.tv.mediaquality.SoundProfile toReturn =
+                    new android.hardware.tv.mediaquality.SoundProfile();
+            toReturn.soundProfileId = id;
+            toReturn.parameters = soundParameters;
+
+            return toReturn;
+        }
+
         @Override
         public void updateSoundProfile(String id, SoundProfile sp, UserHandle user) {
             Long dbId = mSoundProfileTempIdMap.getKey(id);
@@ -625,6 +922,7 @@ public class MediaQualityService extends SystemService {
             db.replace(mMediaQualityDbHelper.SOUND_QUALITY_TABLE_NAME, null, values);
             notifyOnSoundProfileUpdated(mSoundProfileTempIdMap.getValue(dbId),
                     getSoundProfile(dbId), Binder.getCallingUid(), Binder.getCallingPid());
+            notifyHalOnSoundProfileChange(dbId, sp.getParameters());
         }
 
         private boolean hasPermissionToUpdateSoundProfile(Long dbId, SoundProfile sp) {
@@ -657,6 +955,7 @@ public class MediaQualityService extends SystemService {
                 notifyOnSoundProfileRemoved(mSoundProfileTempIdMap.getValue(dbId), toDelete,
                         Binder.getCallingUid(), Binder.getCallingPid());
                 mSoundProfileTempIdMap.remove(dbId);
+                notifyHalOnSoundProfileChange(dbId, null);
             }
         }
 
@@ -775,6 +1074,10 @@ public class MediaQualityService extends SystemService {
 
         private SoundParameter[] convertPersistableBundleToSoundParameterList(
                 PersistableBundle params) {
+            //TODO: set EqualizerDetail
+            if (params == null) {
+                return null;
+            }
             List<SoundParameter> soundParams = new ArrayList<>();
             if (params.containsKey(SoundQuality.PARAMETER_BALANCE)) {
                 soundParams.add(SoundParameter.balance(params.getInt(
@@ -811,15 +1114,50 @@ public class MediaQualityService extends SystemService {
                 soundParams.add(SoundParameter.surroundSoundEnabled(params.getBoolean(
                         SoundQuality.PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS)));
             }
-            //TODO: equalizerDetail
-            //TODO: downmixMode
-            //TODO: enhancedAudioReturnChannelEnabled
-            //TODO: dolbyAudioProcessing
-            //TODO: dolbyDialogueEnhancer
-            //TODO: dtsVirtualX
-            //TODO: digitalOutput
-            //TODO: activeProfile
-            //TODO: soundStyle
+            if (params.containsKey(SoundQuality.PARAMETER_EARC)) {
+                soundParams.add(SoundParameter.enhancedAudioReturnChannelEnabled(params.getBoolean(
+                        SoundQuality.PARAMETER_EARC)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_DOWN_MIX_MODE)) {
+                soundParams.add(SoundParameter.downmixMode((byte) params.getInt(
+                        SoundQuality.PARAMETER_DOWN_MIX_MODE)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_SOUND_STYLE)) {
+                soundParams.add(SoundParameter.soundStyle((byte) params.getInt(
+                        SoundQuality.PARAMETER_SOUND_STYLE)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_DIGITAL_OUTPUT_MODE)) {
+                soundParams.add(SoundParameter.digitalOutput((byte) params.getInt(
+                        SoundQuality.PARAMETER_DIGITAL_OUTPUT_MODE)));
+            }
+            if (params.containsKey(SoundQuality.PARAMETER_DIALOGUE_ENHANCER)) {
+                soundParams.add(SoundParameter.dolbyDialogueEnhancer((byte) params.getInt(
+                        SoundQuality.PARAMETER_DIALOGUE_ENHANCER)));
+            }
+
+            DolbyAudioProcessing dab = new DolbyAudioProcessing();
+            dab.soundMode =
+                    (byte) params.getInt(SoundQuality.PARAMETER_DOLBY_AUDIO_PROCESSING_SOUND_MODE);
+            dab.volumeLeveler =
+                    params.getBoolean(SoundQuality.PARAMETER_DOLBY_AUDIO_PROCESSING_VOLUME_LEVELER);
+            dab.surroundVirtualizer = params.getBoolean(
+                    SoundQuality.PARAMETER_DOLBY_AUDIO_PROCESSING_SURROUND_VIRTUALIZER);
+            dab.dolbyAtmos =
+                    params.getBoolean(SoundQuality.PARAMETER_DOLBY_AUDIO_PROCESSING_DOLBY_ATMOS);
+            soundParams.add(SoundParameter.dolbyAudioProcessing(dab));
+
+            DtsVirtualX dts = new DtsVirtualX();
+            dts.tbHdx = params.getBoolean(SoundQuality.PARAMETER_DTS_VIRTUAL_X_TBHDX);
+            dts.limiter = params.getBoolean(SoundQuality.PARAMETER_DTS_VIRTUAL_X_LIMITER);
+            dts.truSurroundX = params.getBoolean(
+                    SoundQuality.PARAMETER_DTS_VIRTUAL_X_TRU_SURROUND_X);
+            dts.truVolumeHd = params.getBoolean(SoundQuality.PARAMETER_DTS_VIRTUAL_X_TRU_VOLUME_HD);
+            dts.dialogClarity = params.getBoolean(
+                    SoundQuality.PARAMETER_DTS_VIRTUAL_X_DIALOG_CLARITY);
+            dts.definition = params.getBoolean(SoundQuality.PARAMETER_DTS_VIRTUAL_X_DEFINITION);
+            dts.height = params.getBoolean(SoundQuality.PARAMETER_DTS_VIRTUAL_X_HEIGHT);
+            soundParams.add(SoundParameter.dtsVirtualX(dts));
+
             return  (SoundParameter[]) soundParams.toArray();
         }
 
@@ -1472,7 +1810,13 @@ public class MediaQualityService extends SystemService {
             RemoteCallbackList<IPictureProfileCallback> {
         @Override
         public void onCallbackDied(IPictureProfileCallback callback) {
-            //todo
+            synchronized ("mPictureProfileLock") {    //TODO: Change to lock
+                for (int i = 0; i < mUserStates.size(); i++) {
+                    int userId = mUserStates.keyAt(i);
+                    UserState userState = getOrCreateUserStateLocked(userId);
+                    userState.mPictureProfileCallbackPidUidMap.remove(callback);
+                }
+            }
         }
     }
 
@@ -1480,7 +1824,13 @@ public class MediaQualityService extends SystemService {
             RemoteCallbackList<ISoundProfileCallback> {
         @Override
         public void onCallbackDied(ISoundProfileCallback callback) {
-            //todo
+            synchronized ("mSoundProfileLock") {    //TODO: Change to lock
+                for (int i = 0; i < mUserStates.size(); i++) {
+                    int userId = mUserStates.keyAt(i);
+                    UserState userState = getOrCreateUserStateLocked(userId);
+                    userState.mSoundProfileCallbackPidUidMap.remove(callback);
+                }
+            }
         }
     }
 

@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 package com.android.systemui.keyguard.data.repository
 
 import android.content.applicationContext
@@ -70,6 +76,7 @@ val Kosmos.defaultKeyguardBlueprint by
             udfpsAccessibilityOverlaySection = mock(),
             accessibilityActionsSection = mock(),
             aodPromotedNotificationSection = mock(),
+            defaultEmergencyButtonSection = mock(),
         )
     }
 

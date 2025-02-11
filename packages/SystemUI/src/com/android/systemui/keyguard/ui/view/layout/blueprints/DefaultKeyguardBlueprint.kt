@@ -15,6 +15,12 @@
  *
  */
 
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 package com.android.systemui.keyguard.ui.view.layout.blueprints
 
 import com.android.systemui.dagger.SysUISingleton
@@ -26,6 +32,7 @@ import com.android.systemui.keyguard.ui.view.layout.sections.AodNotificationIcon
 import com.android.systemui.keyguard.ui.view.layout.sections.AodPromotedNotificationSection
 import com.android.systemui.keyguard.ui.view.layout.sections.ClockSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultDeviceEntrySection
+import com.android.systemui.keyguard.ui.view.layout.sections.DefaultEmergencyButtonSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultIndicationAreaSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultNotificationStackScrollLayoutSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultSettingsPopupMenuSection
@@ -66,6 +73,7 @@ constructor(
     smartspaceSection: SmartspaceSection,
     keyguardSliceViewSection: KeyguardSliceViewSection,
     udfpsAccessibilityOverlaySection: DefaultUdfpsAccessibilityOverlaySection,
+    defaultEmergencyButtonSection: DefaultEmergencyButtonSection,
 ) : KeyguardBlueprint {
     override val id: String = DEFAULT
 
@@ -85,6 +93,7 @@ constructor(
             clockSection,
             keyguardSliceViewSection,
             defaultDeviceEntrySection,
+            defaultEmergencyButtonSection,
             udfpsAccessibilityOverlaySection, // Add LAST: Intentionally has z-order above others
         )
 

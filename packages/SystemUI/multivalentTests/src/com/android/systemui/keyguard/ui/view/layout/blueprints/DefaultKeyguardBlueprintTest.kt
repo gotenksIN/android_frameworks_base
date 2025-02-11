@@ -15,6 +15,12 @@
  *
  */
 
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 package com.android.systemui.keyguard.ui.view.layout.blueprints
 
 import android.testing.TestableLooper.RunWithLooper
@@ -32,6 +38,7 @@ import com.android.systemui.keyguard.ui.view.layout.sections.AodNotificationIcon
 import com.android.systemui.keyguard.ui.view.layout.sections.AodPromotedNotificationSection
 import com.android.systemui.keyguard.ui.view.layout.sections.ClockSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultDeviceEntrySection
+import com.android.systemui.keyguard.ui.view.layout.sections.DefaultEmergencyButtonSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultIndicationAreaSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultNotificationStackScrollLayoutSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultSettingsPopupMenuSection
@@ -77,6 +84,7 @@ class DefaultKeyguardBlueprintTest : SysuiTestCase() {
     @Mock private lateinit var keyguardSliceViewSection: KeyguardSliceViewSection
     @Mock
     private lateinit var udfpsAccessibilityOverlaySection: DefaultUdfpsAccessibilityOverlaySection
+    @Mock private lateinit var defaultEmergencyButtonSection: DefaultEmergencyButtonSection
 
     @Before
     fun setup() {
@@ -99,6 +107,7 @@ class DefaultKeyguardBlueprintTest : SysuiTestCase() {
                 smartspaceSection,
                 keyguardSliceViewSection,
                 udfpsAccessibilityOverlaySection,
+                defaultEmergencyButtonSection,
             )
     }
 

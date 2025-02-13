@@ -16,7 +16,6 @@
 
 package com.android.systemui.deviceentry.domain.interactor
 
-import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.internal.policy.IKeyguardDismissCallback
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
@@ -25,7 +24,10 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.deviceentry.data.repository.DeviceEntryRepository
 import com.android.systemui.keyguard.DismissCallbackRegistry
+import com.android.systemui.log.table.TableLogBuffer
+import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.scene.data.model.asIterable
+import com.android.systemui.scene.domain.SceneFrameworkTableLog
 import com.android.systemui.scene.domain.interactor.SceneBackInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
@@ -43,6 +45,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * Hosts application business logic related to device entry.
@@ -62,6 +65,7 @@ constructor(
     private val alternateBouncerInteractor: AlternateBouncerInteractor,
     private val dismissCallbackRegistry: DismissCallbackRegistry,
     sceneBackInteractor: SceneBackInteractor,
+    @SceneFrameworkTableLog private val tableLogBuffer: TableLogBuffer,
 ) {
     /**
      * Whether the device is unlocked.
@@ -147,6 +151,11 @@ constructor(
             ) { enteredDirectly, enteredOnBackStack ->
                 enteredOnBackStack || enteredDirectly
             }
+            .logDiffsForTable(
+                tableLogBuffer = tableLogBuffer,
+                columnName = "isDeviceEntered",
+                initialValue = false,
+            )
             .stateIn(
                 scope = applicationScope,
                 started = SharingStarted.Eagerly,
@@ -184,6 +193,11 @@ constructor(
                         deviceUnlockStatus.deviceUnlockSource?.dismissesLockscreen == false)) &&
                     !isDeviceEntered
             }
+            .logDiffsForTable(
+                tableLogBuffer = tableLogBuffer,
+                columnName = "canSwipeToEnter",
+                initialValue = false,
+            )
             .stateIn(
                 scope = applicationScope,
                 started = SharingStarted.Eagerly,
@@ -268,7 +282,7 @@ constructor(
     }
 
     /** Locks the device instantly. */
-    fun lockNow() {
-        deviceUnlockedInteractor.lockNow()
+    fun lockNow(debuggingReason: String) {
+        deviceUnlockedInteractor.lockNow(debuggingReason)
     }
 }

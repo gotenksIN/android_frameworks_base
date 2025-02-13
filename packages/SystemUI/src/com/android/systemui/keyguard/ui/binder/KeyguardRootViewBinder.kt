@@ -37,8 +37,6 @@ import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.app.tracing.coroutines.launchTraced as launch
-import com.android.internal.jank.InteractionJankMonitor
-import com.android.internal.jank.InteractionJankMonitor.CUJ_SCREEN_OFF_SHOW_AOD
 import com.android.keyguard.AuthInteractionProperties
 import com.android.systemui.Flags
 import com.android.systemui.Flags.msdlFeedback
@@ -51,11 +49,10 @@ import com.android.systemui.common.ui.view.onLayoutChanged
 import com.android.systemui.common.ui.view.onTouchListener
 import com.android.systemui.customization.R as customR
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryHapticsInteractor
-import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
 import com.android.systemui.keyguard.domain.interactor.WallpaperFocalAreaInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
-import com.android.systemui.keyguard.shared.model.TransitionState
+import com.android.systemui.keyguard.ui.view.layout.sections.AodPromotedNotificationSection
 import com.android.systemui.keyguard.ui.viewmodel.BurnInParameters
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardBlueprintViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardClockViewModel
@@ -109,11 +106,9 @@ object KeyguardRootViewBinder {
         clockInteractor: KeyguardClockInteractor,
         wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
         clockViewModel: KeyguardClockViewModel,
-        interactionJankMonitor: InteractionJankMonitor?,
         deviceEntryHapticsInteractor: DeviceEntryHapticsInteractor?,
         vibratorHelper: VibratorHelper?,
         falsingManager: FalsingManager?,
-        keyguardViewMediator: KeyguardViewMediator?,
         statusBarKeyguardViewManager: StatusBarKeyguardViewManager?,
         mainImmediateDispatcher: CoroutineDispatcher,
         msdlPlayer: MSDLPlayer?,
@@ -184,6 +179,7 @@ object KeyguardRootViewBinder {
                         viewModel.translationY.collect { y ->
                             childViews[burnInLayerId]?.translationY = y
                             childViews[largeClockId]?.translationY = y
+                            childViews[aodPromotedNotificationId]?.translationY = y
                             childViews[aodNotificationIconContainerId]?.translationY = y
                         }
                     }
@@ -195,6 +191,7 @@ object KeyguardRootViewBinder {
                                 state.isToOrFrom(KeyguardState.AOD) -> {
                                     // Large Clock is not translated in the x direction
                                     childViews[burnInLayerId]?.translationX = px
+                                    childViews[aodPromotedNotificationId]?.translationX = px
                                     childViews[aodNotificationIconContainerId]?.translationX = px
                                 }
                                 state.isToOrFrom(KeyguardState.GLANCEABLE_HUB) -> {
@@ -291,40 +288,17 @@ object KeyguardRootViewBinder {
                                 blueprintViewModel.refreshBlueprint()
                             }
                             childViews[aodNotificationIconContainerId]
-                                ?.setAodNotifIconContainerIsVisible(
-                                    isVisible,
-                                    iconsAppearTranslationPx.value,
-                                    screenOffAnimationController,
-                                )
+                                ?.setAodNotifIconContainerIsVisible(isVisible)
                         }
                     }
 
-                    interactionJankMonitor?.let { jankMonitor ->
-                        launch {
-                            viewModel.goneToAodTransition.collect {
-                                when (it.transitionState) {
-                                    TransitionState.STARTED -> {
-                                        val clockId = clockInteractor.renderedClockId
-                                        val builder =
-                                            InteractionJankMonitor.Configuration.Builder.withView(
-                                                    CUJ_SCREEN_OFF_SHOW_AOD,
-                                                    view,
-                                                )
-                                                .setTag(clockId)
-                                        jankMonitor.begin(builder)
-                                    }
-
-                                    TransitionState.CANCELED ->
-                                        jankMonitor.cancel(CUJ_SCREEN_OFF_SHOW_AOD)
-
-                                    TransitionState.FINISHED -> {
-                                        keyguardViewMediator?.maybeHandlePendingLock()
-                                        jankMonitor.end(CUJ_SCREEN_OFF_SHOW_AOD)
-                                    }
-
-                                    TransitionState.RUNNING -> Unit
-                                }
+                    launch {
+                        viewModel.isNotifIconContainerVisible.collect { isVisible ->
+                            if (isVisible.value) {
+                                blueprintViewModel.refreshBlueprint()
                             }
+                            childViews[aodPromotedNotificationId]
+                                ?.setAodNotifIconContainerIsVisible(isVisible)
                         }
                     }
 
@@ -524,11 +498,7 @@ object KeyguardRootViewBinder {
         }
     }
 
-    private fun View.setAodNotifIconContainerIsVisible(
-        isVisible: AnimatedValue<Boolean>,
-        iconsAppearTranslationPx: Int,
-        screenOffAnimationController: ScreenOffAnimationController,
-    ) {
+    private fun View.setAodNotifIconContainerIsVisible(isVisible: AnimatedValue<Boolean>) {
         animate().cancel()
         val animatorListener =
             object : AnimatorListenerAdapter() {
@@ -563,6 +533,7 @@ object KeyguardRootViewBinder {
     }
 
     private val burnInLayerId = R.id.burn_in_layer
+    private val aodPromotedNotificationId = AodPromotedNotificationSection.viewId
     private val aodNotificationIconContainerId = R.id.aod_notification_icon_container
     private val largeClockId = customR.id.lockscreen_clock_view_large
     private val smallClockId = customR.id.lockscreen_clock_view

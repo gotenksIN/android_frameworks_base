@@ -34,6 +34,7 @@ import com.android.systemui.communal.data.model.DisabledReason.DISABLED_REASON_I
 import com.android.systemui.communal.data.model.DisabledReason.DISABLED_REASON_USER_SETTING
 import com.android.systemui.communal.data.repository.CommunalSettingsRepositoryModule.Companion.DEFAULT_BACKGROUND_TYPE
 import com.android.systemui.communal.shared.model.CommunalBackgroundType
+import com.android.systemui.communal.shared.model.WhenToDream
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
@@ -58,6 +59,12 @@ interface CommunalSettingsRepository {
     fun getEnabledState(user: UserInfo): Flow<CommunalEnabledState>
 
     fun getScreensaverEnabledState(user: UserInfo): Flow<Boolean>
+
+    /**
+     * Returns a [WhenToDream] for the specified user, indicating what state the device should be in
+     * to trigger dreams.
+     */
+    fun getWhenToDreamState(user: UserInfo): Flow<WhenToDream>
 
     /**
      * Returns true if any glanceable hub functionality should be enabled via configs and flags.
@@ -103,6 +110,18 @@ constructor(
     private val devicePolicyManager: DevicePolicyManager,
     @Named(DEFAULT_BACKGROUND_TYPE) private val defaultBackgroundType: CommunalBackgroundType,
 ) : CommunalSettingsRepository {
+
+    private val dreamsActivatedOnSleepByDefault by lazy {
+        resources.getBoolean(com.android.internal.R.bool.config_dreamsActivatedOnSleepByDefault)
+    }
+
+    private val dreamsActivatedOnDockByDefault by lazy {
+        resources.getBoolean(com.android.internal.R.bool.config_dreamsActivatedOnDockByDefault)
+    }
+
+    private val dreamsActivatedOnPosturedByDefault by lazy {
+        resources.getBoolean(com.android.internal.R.bool.config_dreamsActivatedOnPosturedByDefault)
+    }
 
     override fun getFlagEnabled(): Boolean {
         return if (getV2FlagEnabled()) {
@@ -154,6 +173,49 @@ constructor(
                     SCREENSAVER_ENABLED_SETTING_DEFAULT,
                     user.id,
                 ) == 1
+            }
+            .flowOn(bgDispatcher)
+
+    override fun getWhenToDreamState(user: UserInfo): Flow<WhenToDream> =
+        secureSettings
+            .observerFlow(
+                userId = user.id,
+                names =
+                    arrayOf(
+                        Settings.Secure.SCREENSAVER_ACTIVATE_ON_SLEEP,
+                        Settings.Secure.SCREENSAVER_ACTIVATE_ON_DOCK,
+                        Settings.Secure.SCREENSAVER_ACTIVATE_ON_POSTURED,
+                    ),
+            )
+            .emitOnStart()
+            .map {
+                if (
+                    secureSettings.getBoolForUser(
+                        Settings.Secure.SCREENSAVER_ACTIVATE_ON_SLEEP,
+                        dreamsActivatedOnSleepByDefault,
+                        user.id,
+                    )
+                ) {
+                    WhenToDream.WHILE_CHARGING
+                } else if (
+                    secureSettings.getBoolForUser(
+                        Settings.Secure.SCREENSAVER_ACTIVATE_ON_DOCK,
+                        dreamsActivatedOnDockByDefault,
+                        user.id,
+                    )
+                ) {
+                    WhenToDream.WHILE_DOCKED
+                } else if (
+                    secureSettings.getBoolForUser(
+                        Settings.Secure.SCREENSAVER_ACTIVATE_ON_POSTURED,
+                        dreamsActivatedOnPosturedByDefault,
+                        user.id,
+                    )
+                ) {
+                    WhenToDream.WHILE_POSTURED
+                } else {
+                    WhenToDream.NEVER
+                }
             }
             .flowOn(bgDispatcher)
 

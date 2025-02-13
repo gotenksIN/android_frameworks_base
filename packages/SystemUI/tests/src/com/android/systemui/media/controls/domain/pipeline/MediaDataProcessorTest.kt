@@ -80,7 +80,6 @@ import com.android.systemui.testKosmos
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -123,7 +122,6 @@ private const val SESSION_EMPTY_TITLE = ""
 private const val USER_ID = 0
 private val DISMISS_INTENT = Intent().apply { action = "dismiss" }
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
 @RunWithLooper(setAsMainLooper = true)
 @RunWith(ParameterizedAndroidJunit4::class)
@@ -251,6 +249,7 @@ class MediaDataProcessorTest(flags: FlagsParameterization) : SysuiTestCase() {
         verify(mediaTimeoutListener).stateCallback = capture(stateCallbackCaptor)
         verify(mediaTimeoutListener).sessionCallback = capture(sessionCallbackCaptor)
         session = MediaSession(context, "MediaDataProcessorTestSession")
+
         mediaNotification =
             SbnBuilder().run {
                 setUser(UserHandle(USER_ID))
@@ -258,6 +257,7 @@ class MediaDataProcessorTest(flags: FlagsParameterization) : SysuiTestCase() {
                 modifyNotification(context).also {
                     it.setSmallIcon(android.R.drawable.ic_media_pause)
                     it.setStyle(MediaStyle().apply { setMediaSession(session.sessionToken) })
+                    it.setContentIntent(getNewPendingIntent())
                 }
                 build()
             }
@@ -2250,6 +2250,33 @@ class MediaDataProcessorTest(flags: FlagsParameterization) : SysuiTestCase() {
         verify(kosmos.mediaLogger, never()).logDuplicateMediaNotification(eq(KEY))
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_MEDIA_CONTROLS_POSTS_OPTIMIZATION)
+    fun postDifferentIntentNotifications_CallsListeners() {
+        whenever(notificationLockscreenUserManager.isCurrentProfile(USER_ID)).thenReturn(true)
+        whenever(notificationLockscreenUserManager.isProfileAvailable(USER_ID)).thenReturn(true)
+
+        mediaDataProcessor.addInternalListener(mediaDataFilter)
+        mediaDataFilter.mediaDataProcessor = mediaDataProcessor
+        addNotificationAndLoad()
+        reset(listener)
+        mediaNotification =
+            mediaNotification.also { it.notification.contentIntent = getNewPendingIntent() }
+        mediaDataProcessor.onNotificationAdded(KEY, mediaNotification)
+
+        testScope.assertRunAllReady(foreground = 1, background = 1)
+        verify(listener)
+            .onMediaDataLoaded(
+                eq(KEY),
+                eq(KEY),
+                capture(mediaDataCaptor),
+                eq(true),
+                eq(0),
+                eq(false),
+            )
+        verify(kosmos.mediaLogger, never()).logDuplicateMediaNotification(eq(KEY))
+    }
+
     private fun TestScope.assertRunAllReady(foreground: Int = 0, background: Int = 0) {
         runCurrent()
         if (Flags.mediaLoadMetadataViaMediaDataLoader()) {
@@ -2328,5 +2355,15 @@ class MediaDataProcessorTest(flags: FlagsParameterization) : SysuiTestCase() {
         stateCallbackCaptor.value.invoke(key, state)
         runCurrent()
         advanceUntilIdle()
+    }
+
+    private fun getNewPendingIntent(): PendingIntent {
+        val intent = Intent().setAction(null)
+        return PendingIntent.getBroadcast(
+            mContext,
+            1,
+            intent,
+            PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 }

@@ -26,6 +26,7 @@ import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
 import com.android.systemui.keyguard.shared.model.KeyguardSection
 import com.android.systemui.res.R
+import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.notification.promoted.AODPromotedNotification
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationLogger
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUiAod
@@ -36,9 +37,14 @@ class AodPromotedNotificationSection
 @Inject
 constructor(
     private val viewModelFactory: AODPromotedNotificationViewModel.Factory,
+    private val shadeInteractor: ShadeInteractor,
     private val logger: PromotedNotificationLogger,
 ) : KeyguardSection() {
     var view: ComposeView? = null
+
+    init {
+        logger.logSectionCreated(this)
+    }
 
     override fun addViews(constraintLayout: ConstraintLayout) {
         if (!PromotedNotificationUiAod.isEnabled) {
@@ -54,7 +60,7 @@ constructor(
                 constraintLayout.addView(this)
             }
 
-        logger.logSectionAddedViews()
+        logger.logSectionAddedViews(this)
     }
 
     override fun bindData(constraintLayout: ConstraintLayout) {
@@ -66,7 +72,7 @@ constructor(
 
         // Do nothing; the binding happens in the AODPromotedNotification Composable.
 
-        logger.logSectionBoundData()
+        logger.logSectionBoundData(this)
     }
 
     override fun applyConstraints(constraintSet: ConstraintSet) {
@@ -74,18 +80,22 @@ constructor(
             return
         }
 
-        checkNotNull(view)
+        // view may have been created by a different instance of the section (!), and we don't
+        // actually *need* it to set constraints, so don't check for it here.
 
         constraintSet.apply {
+            val isShadeLayoutWide = shadeInteractor.isShadeLayoutWide.value
+            val endGuidelineId = if (isShadeLayoutWide) R.id.split_shade_guideline else PARENT_ID
+
             connect(viewId, TOP, R.id.smart_space_barrier_bottom, BOTTOM, 0)
             connect(viewId, START, PARENT_ID, START, 0)
-            connect(viewId, END, PARENT_ID, END, 0)
+            connect(viewId, END, endGuidelineId, END, 0)
 
             constrainWidth(viewId, ConstraintSet.MATCH_CONSTRAINT)
             constrainHeight(viewId, ConstraintSet.WRAP_CONTENT)
         }
 
-        logger.logSectionAppliedConstraints()
+        logger.logSectionAppliedConstraints(this)
     }
 
     override fun removeViews(constraintLayout: ConstraintLayout) {
@@ -97,7 +107,7 @@ constructor(
 
         view = null
 
-        logger.logSectionRemovedViews()
+        logger.logSectionRemovedViews(this)
     }
 
     companion object {

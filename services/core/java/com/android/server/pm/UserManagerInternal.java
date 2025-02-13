@@ -23,7 +23,9 @@ import android.content.Context;
 import android.content.pm.LauncherUserInfo;
 import android.content.pm.UserInfo;
 import android.content.pm.UserProperties;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.multiuser.Flags;
 import android.os.Bundle;
 import android.os.UserManager;
 import android.util.DebugUtils;
@@ -351,8 +353,10 @@ public abstract class UserManagerInternal {
             boolean excludePreCreated);
 
     /**
-     * Returns an array of ids for profiles associated with the specified user including the user
-     * itself.
+     * Returns a list of the users that are associated with the specified user, including the user
+     * itself. This includes the user, its profiles, its parent, and its parent's other profiles,
+     * as applicable.
+     *
      * <p>Note that this includes all profile types (not including Restricted profiles).
      *
      * @param userId      id of the user to return profiles for
@@ -617,4 +621,14 @@ public abstract class UserManagerInternal {
      * if there is no such user.
      */
     public abstract @UserIdInt int getCommunalProfileId();
+
+    /**
+     * Checks whether to show a notification for sounds (e.g., alarms, timers, etc.) from
+     * background users.
+     */
+    public static boolean shouldShowNotificationForBackgroundUserSounds() {
+        return Flags.addUiForSoundsFromBackgroundUsers() && Resources.getSystem().getBoolean(
+                com.android.internal.R.bool.config_showNotificationForBackgroundUserAlarms)
+                && UserManager.supportsMultipleUsers();
+    }
 }

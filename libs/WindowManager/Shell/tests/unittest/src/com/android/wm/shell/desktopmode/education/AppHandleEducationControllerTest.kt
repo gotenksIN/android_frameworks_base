@@ -19,7 +19,6 @@ package com.android.wm.shell.desktopmode.education
 import android.os.SystemProperties
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
-import android.platform.test.flag.junit.SetFlagsRule
 import android.testing.AndroidTestingRunner
 import android.testing.TestableContext
 import androidx.test.filters.SmallTest
@@ -75,7 +74,6 @@ class AppHandleEducationControllerTest : ShellTestCase() {
             .mockStatic(DesktopModeStatus::class.java)
             .mockStatic(SystemProperties::class.java)
             .build()!!
-    @JvmField @Rule val setFlagsRule = SetFlagsRule()
 
     private lateinit var educationController: AppHandleEducationController
     private lateinit var testableContext: TestableContext
@@ -172,6 +170,64 @@ class AppHandleEducationControllerTest : ShellTestCase() {
             verify(mockTooltipController, times(1)).showEducationTooltip(any(), any())
             verify(mockDataStoreRepository, times(1))
                 .updateExitDesktopModeHintViewedTimestampMillis(eq(true))
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
+    fun init_noCaptionStateNotified_shouldHideAllTooltips() =
+        testScope.runTest {
+            setShouldShowDesktopModeEducation(true)
+
+            // Simulate no caption state notification
+            testCaptionStateFlow.value = CaptionState.NoCaption
+            waitForBufferDelay()
+
+            verify(mockTooltipController, times(1)).hideEducationTooltip()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
+    fun init_appHandleHintViewed_shouldNotListenToNoCaptionNotification() =
+        testScope.runTest {
+            testDataStoreFlow.value =
+                createWindowingEducationProto(appHandleHintViewedTimestampMillis = 123L)
+            setShouldShowDesktopModeEducation(true)
+
+            // Simulate no caption state notification
+            testCaptionStateFlow.value = CaptionState.NoCaption
+            waitForBufferDelay()
+
+            verify(mockTooltipController, never()).hideEducationTooltip()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
+    fun init_enterDesktopModeHintViewed_shouldNotListenToNoCaptionNotification() =
+        testScope.runTest {
+            testDataStoreFlow.value =
+                createWindowingEducationProto(enterDesktopModeHintViewedTimestampMillis = 123L)
+            setShouldShowDesktopModeEducation(true)
+
+            // Simulate no caption state notification
+            testCaptionStateFlow.value = CaptionState.NoCaption
+            waitForBufferDelay()
+
+            verify(mockTooltipController, never()).hideEducationTooltip()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
+    fun init_exitDesktopModeHintViewed_shouldNotListenToNoCaptionNotification() =
+        testScope.runTest {
+            testDataStoreFlow.value =
+                createWindowingEducationProto(exitDesktopModeHintViewedTimestampMillis = 123L)
+            setShouldShowDesktopModeEducation(true)
+
+            // Simulate no caption state notification
+            testCaptionStateFlow.value = CaptionState.NoCaption
+            waitForBufferDelay()
+
+            verify(mockTooltipController, never()).hideEducationTooltip()
         }
 
     @Test
@@ -289,8 +345,7 @@ class AppHandleEducationControllerTest : ShellTestCase() {
             // Mark app handle hint viewed.
             testDataStoreFlow.value =
                 createWindowingEducationProto(appHandleHintViewedTimestampMillis = 123L)
-            val systemPropertiesKey = "persist.windowing_force_show_desktop_mode_education"
-            whenever(SystemProperties.getBoolean(eq(systemPropertiesKey), anyBoolean()))
+            whenever(SystemProperties.getBoolean(eq(FORCE_SHOW_EDUCATION_SYSPROP), anyBoolean()))
                 .thenReturn(true)
             setShouldShowDesktopModeEducation(true)
 
@@ -396,5 +451,7 @@ class AppHandleEducationControllerTest : ShellTestCase() {
     private companion object {
         val APP_HANDLE_EDUCATION_DELAY_BUFFER_MILLIS: Long =
             APP_HANDLE_EDUCATION_DELAY_MILLIS + 1000L
+
+        val FORCE_SHOW_EDUCATION_SYSPROP = "persist.windowing_force_show_desktop_mode_education"
     }
 }

@@ -19498,7 +19498,6 @@ public class TelephonyManager {
      *
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_ENABLE_IDENTIFIER_DISCLOSURE_TRANSPARENCY)
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     @SystemApi
     public void setEnableCellularIdentifierDisclosureNotifications(boolean enable) {
@@ -19524,7 +19523,6 @@ public class TelephonyManager {
      *
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_ENABLE_IDENTIFIER_DISCLOSURE_TRANSPARENCY)
     @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @SystemApi
     public boolean isCellularIdentifierDisclosureNotificationsEnabled() {

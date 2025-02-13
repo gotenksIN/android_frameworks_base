@@ -458,7 +458,8 @@ sealed class DragToDesktopTransitionHandler(
     override fun mergeAnimation(
         transition: IBinder,
         info: TransitionInfo,
-        t: SurfaceControl.Transaction,
+        startT: SurfaceControl.Transaction,
+        finishT: SurfaceControl.Transaction,
         mergeTarget: IBinder,
         finishCallback: Transitions.TransitionFinishCallback,
     ) {
@@ -488,18 +489,18 @@ sealed class DragToDesktopTransitionHandler(
         if (isEndTransition) {
             setupEndDragToDesktop(
                 info,
-                startTransaction = t,
+                startTransaction = startT,
                 finishTransaction = startTransactionFinishT,
             )
             // Call finishCallback to merge animation before startTransitionFinishCb is called
             finishCallback.onTransitionFinished(/* wct= */ null)
-            animateEndDragToDesktop(startTransaction = t, startTransitionFinishCb)
+            animateEndDragToDesktop(startTransaction = startT, startTransitionFinishCb)
         } else if (isCancelTransition) {
             info.changes.forEach { change ->
-                t.show(change.leash)
+                startT.show(change.leash)
                 startTransactionFinishT.show(change.leash)
             }
-            t.apply()
+            startT.apply()
             finishCallback.onTransitionFinished(/* wct= */ null)
             startTransitionFinishCb.onTransitionFinished(/* wct= */ null)
             clearState()
@@ -958,9 +959,16 @@ constructor(
         super.setupEndDragToDesktop(info, startTransaction, finishTransaction)
 
         val state = requireTransitionState()
-        val homeLeash = state.homeChange?.leash ?: error("Expects home leash to be non-null")
-        // Hide home on finish to prevent flickering when wallpaper activity flag is enabled
-        finishTransaction.hide(homeLeash)
+        val homeLeash = state.homeChange?.leash
+        if (homeLeash == null) {
+            ProtoLog.e(
+                ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE,
+                "DragToDesktop: home leash is null",
+            )
+        } else {
+            // Hide home on finish to prevent flickering when wallpaper activity flag is enabled
+            finishTransaction.hide(homeLeash)
+        }
         // Setup freeform tasks before animation
         state.freeformTaskChanges.forEach { change ->
             val startScale = FREEFORM_TASKS_INITIAL_SCALE

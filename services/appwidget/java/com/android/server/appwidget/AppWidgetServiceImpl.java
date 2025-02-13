@@ -1095,6 +1095,10 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
             proto.write(WidgetProto.MAX_HEIGHT,
                 widget.options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0));
         }
+        if (widget.views != null) {
+            proto.write(WidgetProto.VIEWS_BITMAP_MEMORY,
+                    widget.views.estimateTotalBitmapMemoryUsage());
+        }
         proto.end(token);
     }
 
@@ -2846,7 +2850,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 // For a full update we replace the RemoteViews completely.
                 widget.views = views;
             }
-            int memoryUsage;
+            long memoryUsage;
             if ((UserHandle.getAppId(Binder.getCallingUid()) != Process.SYSTEM_UID) &&
                     (widget.views != null) &&
                     ((memoryUsage = widget.views.estimateMemoryUsage()) > mMaxWidgetBitmapMemory)) {
@@ -3503,6 +3507,8 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         }
         if (widget.views != null) {
             pw.print("    views="); pw.println(widget.views);
+            pw.print("    views_bitmap_memory=");
+            pw.println(widget.views.estimateTotalBitmapMemoryUsage());
         }
     }
 
@@ -4667,12 +4673,6 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                         keep.add(providerId);
                         // Use the new AppWidgetProviderInfo.
                         provider.setPartialInfoLocked(info);
-                        // Clear old previews
-                        if (remoteViewsProto()) {
-                            clearGeneratedPreviewsAsync(provider);
-                        } else {
-                            provider.clearGeneratedPreviewsLocked();
-                        }
                         // If it's enabled
                         final int M = provider.widgets.size();
                         if (M > 0) {
@@ -5098,6 +5098,10 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         AndroidFuture<RemoteViews> result = new AndroidFuture<>();
         mSavePreviewsHandler.post(() -> {
             SparseArray<RemoteViews> previews = loadGeneratedPreviews(provider);
+            if (previews.size() == 0 && provider.info.generatedPreviewCategories != 0) {
+                // Failed to read previews from file, clear the file and update providers.
+                saveGeneratedPreviews(provider, previews, /* notify= */ true);
+            }
             for (int i = 0; i < previews.size(); i++) {
                 if ((widgetCategory & previews.keyAt(i)) != 0) {
                     result.complete(previews.valueAt(i));
@@ -5216,8 +5220,14 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 continue;
             }
             ProtoInputStream input = new ProtoInputStream(previewsFile.readFully());
-            provider.info.generatedPreviewCategories = readGeneratedPreviewCategoriesFromProto(
-                    input);
+            try {
+                provider.info.generatedPreviewCategories = readGeneratedPreviewCategoriesFromProto(
+                        input);
+            } catch (IOException e) {
+                Slog.e(TAG, "Failed to read generated previews from file for " + provider, e);
+                previewsFile.delete();
+                provider.info.generatedPreviewCategories = 0;
+            }
             if (DEBUG) {
                 Slog.i(TAG, TextUtils.formatSimple(
                         "loadGeneratedPreviewCategoriesLocked %d %s categories %d", profileId,

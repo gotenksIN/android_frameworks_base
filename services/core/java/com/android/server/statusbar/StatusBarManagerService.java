@@ -87,7 +87,6 @@ import android.service.quicksettings.TileService;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.IndentingPrintWriter;
-import android.util.IntArray;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -128,7 +127,6 @@ import com.android.server.power.ShutdownThread;
 import com.android.server.UiThread;
 // QTI_END: 2019-12-22: Frameworks: Avoid system reboot while invalidate LegacyGlobalAction
 import com.android.server.wm.ActivityTaskManagerInternal;
-import com.android.systemui.shared.Flags;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -346,19 +344,15 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
 
     @Override
     public void onDisplayAdded(int displayId) {
-        if (Flags.statusBarConnectedDisplays()) {
-            synchronized (mLock) {
-                mDisplayUiState.put(displayId, new UiState());
-            }
+        synchronized (mLock) {
+            mDisplayUiState.put(displayId, new UiState());
         }
     }
 
     @Override
     public void onDisplayRemoved(int displayId) {
-        if (Flags.statusBarConnectedDisplays()) {
-            synchronized (mLock) {
-                mDisplayUiState.remove(displayId);
-            }
+        synchronized (mLock) {
+            mDisplayUiState.remove(displayId);
         }
     }
 
@@ -779,10 +773,11 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
         @Override
-        public void onDisplayReady(int displayId) {
+        public void onDisplayAddSystemDecorations(int displayId) {
             if (isVisibleBackgroundUserOnDisplay(displayId)) {
                 if (SPEW) {
-                    Slog.d(TAG, "Skipping onDisplayReady for visible background user "
+                    Slog.d(TAG, "Skipping onDisplayAddSystemDecorations for visible background "
+                            + "user "
                             + mUserManagerInternal.getUserAssignedToDisplay(displayId));
                 }
                 return;
@@ -790,7 +785,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
             IStatusBar bar = mBar;
             if (bar != null) {
                 try {
-                    bar.onDisplayReady(displayId);
+                    bar.onDisplayAddSystemDecorations(displayId);
                 } catch (RemoteException ex) {}
             }
         }
@@ -1369,66 +1364,53 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         return mTracingEnabled;
     }
 
+    // TODO(b/117478341): make it aware of multi-display if needed.
     @Override
     public void disable(int what, IBinder token, String pkg) {
         disableForUser(what, token, pkg, mCurrentUserId);
     }
 
-    /**
-     * Disable additional status bar features for user for all displays. Pass the bitwise-or of the
-     * {@code #DISABLE_*} flags. To re-enable everything, pass {@code #DISABLE_NONE}.
-     *
-     * Warning: Only pass {@code #DISABLE_*} flags into this function, do not use
-     * {@code #DISABLE2_*} flags.
-     */
+    // TODO(b/117478341): make it aware of multi-display if needed.
     @Override
     public void disableForUser(int what, IBinder token, String pkg, int userId) {
         enforceStatusBar();
         enforceValidCallingUser();
 
         synchronized (mLock) {
-            IntArray displayIds = new IntArray();
-            for (int i = 0; i < mDisplayUiState.size(); i++) {
-                displayIds.add(mDisplayUiState.keyAt(i));
-            }
-            disableLocked(displayIds, userId, what, token, pkg, 1);
+            disableLocked(DEFAULT_DISPLAY, userId, what, token, pkg, 1);
         }
     }
 
+    // TODO(b/117478341): make it aware of multi-display if needed.
     /**
-     * Disable additional status bar features. Pass the bitwise-or of the {@code #DISABLE2_*} flags.
-     * To re-enable everything, pass {@code #DISABLE2_NONE}.
+     * Disable additional status bar features. Pass the bitwise-or of the DISABLE2_* flags.
+     * To re-enable everything, pass {@link #DISABLE2_NONE}.
      *
-     * Warning: Only pass {@code #DISABLE2_*} flags into this function, do not use
-     * {@code #DISABLE_*} flags.
+     * Warning: Only pass DISABLE2_* flags into this function, do not use DISABLE_* flags.
      */
     @Override
     public void disable2(int what, IBinder token, String pkg) {
         disable2ForUser(what, token, pkg, mCurrentUserId);
     }
 
+    // TODO(b/117478341): make it aware of multi-display if needed.
     /**
-     * Disable additional status bar features for a given user for all displays. Pass the bitwise-or
-     * of the {@code #DISABLE2_*} flags. To re-enable everything, pass {@code #DISABLE2_NONE}.
+     * Disable additional status bar features for a given user. Pass the bitwise-or of the
+     * DISABLE2_* flags. To re-enable everything, pass {@link #DISABLE_NONE}.
      *
-     * Warning: Only pass {@code #DISABLE2_*} flags into this function, do not use
-     * {@code #DISABLE_*}  flags.
+     * Warning: Only pass DISABLE2_* flags into this function, do not use DISABLE_* flags.
      */
     @Override
     public void disable2ForUser(int what, IBinder token, String pkg, int userId) {
         enforceStatusBar();
 
         synchronized (mLock) {
-            IntArray displayIds = new IntArray();
-            for (int i = 0; i < mDisplayUiState.size(); i++) {
-                displayIds.add(mDisplayUiState.keyAt(i));
-            }
-            disableLocked(displayIds, userId, what, token, pkg, 2);
+            disableLocked(DEFAULT_DISPLAY, userId, what, token, pkg, 2);
         }
     }
 
-    private void disableLocked(IntArray displayIds, int userId, int what, IBinder token,
-            String pkg, int whichFlag) {
+    private void disableLocked(int displayId, int userId, int what, IBinder token, String pkg,
+            int whichFlag) {
         // It's important that the the callback and the call to mBar get done
         // in the same order when multiple threads are calling this function
         // so they are paired correctly.  The messages on the handler will be
@@ -1438,26 +1420,17 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         // Ensure state for the current user is applied, even if passed a non-current user.
         final int net1 = gatherDisableActionsLocked(mCurrentUserId, 1);
         final int net2 = gatherDisableActionsLocked(mCurrentUserId, 2);
-        boolean shouldCallNotificationOnSetDisabled = false;
-        IStatusBar bar = mBar;
-        for (int displayId : displayIds.toArray()) {
-            final UiState state = getUiState(displayId);
-            if (!state.disableEquals(net1, net2)) {
-                shouldCallNotificationOnSetDisabled = true;
-                state.setDisabled(net1, net2);
-                if (bar != null) {
-                    try {
-                        // TODO(b/388244660): Create IStatusBar#disableForAllDisplays to avoid
-                        // multiple IPC calls.
-                        bar.disable(displayId, net1, net2);
-                    } catch (RemoteException ex) {
-                        Slog.e(TAG, "Unable to disable Status bar.", ex);
-                    }
+        final UiState state = getUiState(displayId);
+        if (!state.disableEquals(net1, net2)) {
+            state.setDisabled(net1, net2);
+            mHandler.post(() -> mNotificationDelegate.onSetDisabled(net1));
+            IStatusBar bar = mBar;
+            if (bar != null) {
+                try {
+                    bar.disable(displayId, net1, net2);
+                } catch (RemoteException ex) {
                 }
             }
-        }
-        if (shouldCallNotificationOnSetDisabled) {
-            mHandler.post(() -> mNotificationDelegate.onSetDisabled(net1));
         }
     }
 
@@ -1613,8 +1586,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         if (SPEW) Slog.d(TAG, "setDisableFlags(0x" + Integer.toHexString(flags) + ")");
 
         synchronized (mLock) {
-            disableLocked(IntArray.wrap(new int[]{displayId}), mCurrentUserId, flags,
-                    mSysUiVisToken, cause, 1);
+            disableLocked(displayId, mCurrentUserId, flags, mSysUiVisToken, cause, 1);
         }
     }
 

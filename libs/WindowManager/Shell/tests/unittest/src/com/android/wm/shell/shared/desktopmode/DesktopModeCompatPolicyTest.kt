@@ -17,16 +17,20 @@
 package com.android.wm.shell.shared.desktopmode
 
 import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.testing.AndroidTestingRunner
 import androidx.test.filters.SmallTest
 import com.android.internal.R
-import com.android.wm.shell.compatui.CompatUIShellTestCase
+import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 /**
  * Tests for [@link DesktopModeCompatPolicy].
@@ -35,7 +39,7 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidTestingRunner::class)
 @SmallTest
-class DesktopModeCompatPolicyTest : CompatUIShellTestCase() {
+class DesktopModeCompatPolicyTest : ShellTestCase() {
     private lateinit var desktopModeCompatPolicy: DesktopModeCompatPolicy
 
     @Before
@@ -107,6 +111,34 @@ class DesktopModeCompatPolicyTest : CompatUIShellTestCase() {
             createFreeformTask(/* displayId */ 0)
                 .apply {
                     baseActivity = baseComponent
+                    isTopActivityNoDisplay = true
+                }))
+    }
+
+    @Test
+    fun testIsTopActivityExemptFromDesktopWindowing_defaultHomePackage() {
+        val packageManager: PackageManager = mock()
+        val homeActivities = ComponentName("defaultHomePackage", /* class */ "")
+        whenever(packageManager.getHomeActivities(any())).thenReturn(homeActivities)
+        mContext.setMockPackageManager(packageManager)
+        assertTrue(desktopModeCompatPolicy.isTopActivityExemptFromDesktopWindowing(
+            createFreeformTask(/* displayId */ 0)
+                .apply {
+                    baseActivity = homeActivities
+                    isTopActivityNoDisplay = false
+                }))
+    }
+
+    @Test
+    fun testIsTopActivityExemptFromDesktopWindowing_defaultHomePackage_notDisplayed() {
+        val packageManager: PackageManager = mock()
+        val homeActivities = ComponentName("defaultHomePackage", /* class */ "")
+        whenever(packageManager.getHomeActivities(any())).thenReturn(homeActivities)
+        mContext.setMockPackageManager(packageManager)
+        assertFalse(desktopModeCompatPolicy.isTopActivityExemptFromDesktopWindowing(
+            createFreeformTask(/* displayId */ 0)
+                .apply {
+                    baseActivity = homeActivities
                     isTopActivityNoDisplay = true
                 }))
     }

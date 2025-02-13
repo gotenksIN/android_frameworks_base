@@ -190,7 +190,8 @@ import java.util.function.Predicate;
  */
 public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         DisplayController.OnDisplaysChangedListener, Transitions.TransitionHandler,
-        ShellTaskOrganizer.TaskListener, StageTaskListener.StageListenerCallbacks {
+        ShellTaskOrganizer.TaskListener, StageTaskListener.StageListenerCallbacks,
+        SplitMultiDisplayProvider {
 
     private static final String TAG = StageCoordinator.class.getSimpleName();
 
@@ -286,6 +287,16 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mSplitInvocationListener = listener;
         mSplitInvocationListenerExecutor = executor;
         mSplitTransitions.registerSplitAnimListener(listener, executor);
+    }
+
+    @Override
+    public WindowContainerToken getDisplayRootForDisplayId(int displayId) {
+        if (displayId == DEFAULT_DISPLAY) {
+            return mRootTaskInfo != null ? mRootTaskInfo.token : null;
+        }
+
+        // TODO(b/393217881): support different root task on external displays.
+        return null; // Return null for unknown display IDs
     }
 
     class SplitRequest {
@@ -2978,10 +2989,13 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
     @Override
     public void mergeAnimation(IBinder transition, TransitionInfo info,
-            SurfaceControl.Transaction t, IBinder mergeTarget,
+            @NonNull SurfaceControl.Transaction startT,
+            @NonNull SurfaceControl.Transaction finishT,
+            IBinder mergeTarget,
             Transitions.TransitionFinishCallback finishCallback) {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "mergeAnimation: transition=%d", info.getDebugId());
-        mSplitTransitions.mergeAnimation(transition, info, t, mergeTarget, finishCallback);
+        mSplitTransitions.mergeAnimation(transition, info, startT, finishT, mergeTarget,
+                finishCallback);
     }
 
     /** Jump the current transition animation to the end. */

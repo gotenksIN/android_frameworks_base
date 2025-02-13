@@ -50,7 +50,6 @@ import android.app.ActivityManager.RunningTaskInfo;
 import android.app.ActivityTaskManager;
 import android.app.IActivityManager;
 import android.app.IActivityTaskManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Point;
@@ -132,6 +131,7 @@ import com.android.wm.shell.recents.RecentsTransitionStateListener;
 import com.android.wm.shell.shared.FocusTransitionListener;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
+import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.desktopmode.DesktopModeCompatPolicy;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
@@ -755,7 +755,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         // App sometimes draws before the insets from WindowDecoration#relayout have
         // been added, so they must be added here
         decoration.addCaptionInset(wct);
-        mDesktopTasksController.moveTaskToDesktop(taskId, wct, source,
+        mDesktopTasksController.moveTaskToDefaultDeskAndActivate(taskId, wct, source,
                 /* remoteTransition= */ null, /* moveToDesktopCallback */ null);
         decoration.closeHandleMenu();
 
@@ -1440,12 +1440,16 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 mDragToDesktopAnimationStartBounds.set(
                         relevantDecor.mTaskInfo.configuration.windowConfiguration.getBounds());
                 boolean dragFromStatusBarAllowed = false;
+                final int windowingMode = relevantDecor.mTaskInfo.getWindowingMode();
                 if (DesktopModeStatus.canEnterDesktopMode(mContext)) {
                     // In proto2 any full screen or multi-window task can be dragged to
                     // freeform.
-                    final int windowingMode = relevantDecor.mTaskInfo.getWindowingMode();
                     dragFromStatusBarAllowed = windowingMode == WINDOWING_MODE_FULLSCREEN
                             || windowingMode == WINDOWING_MODE_MULTI_WINDOW;
+                }
+                if (BubbleAnythingFlagHelper.enableBubbleToFullscreen()) {
+                    // TODO(b/388851898): add support for split screen (multi-window wm mode)
+                    dragFromStatusBarAllowed = windowingMode == WINDOWING_MODE_FULLSCREEN;
                 }
                 final boolean shouldStartTransitionDrag =
                         relevantDecor.checkTouchEventInFocusedCaptionHandle(ev)
@@ -1654,9 +1658,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         if (mDesktopModeCompatPolicy.isTopActivityExemptFromDesktopWindowing(taskInfo)) {
             return false;
         }
-        if (isPartOfDefaultHomePackage(taskInfo)) {
-            return false;
-        }
         final boolean isOnLargeScreen = taskInfo.getConfiguration().smallestScreenWidthDp
                 >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP;
         if (!DesktopModeStatus.canEnterDesktopMode(mContext)
@@ -1670,14 +1671,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 && taskInfo.getWindowingMode() != WINDOWING_MODE_PINNED
                 && taskInfo.getActivityType() == ACTIVITY_TYPE_STANDARD
                 && !taskInfo.configuration.windowConfiguration.isAlwaysOnTop();
-    }
-
-    private boolean isPartOfDefaultHomePackage(RunningTaskInfo taskInfo) {
-        final ComponentName currentDefaultHome =
-                mContext.getPackageManager().getHomeActivities(new ArrayList<>());
-        return currentDefaultHome != null && taskInfo.baseActivity != null
-                && currentDefaultHome.getPackageName()
-                .equals(taskInfo.baseActivity.getPackageName());
     }
 
     private void createWindowDecoration(

@@ -760,14 +760,26 @@ public class MediaSwitchingController
         if (connectedMediaDevice != null) {
             selectedDevicesIds.add(connectedMediaDevice.getId());
         }
+        boolean groupSelectedDevices =
+                com.android.media.flags.Flags.enableOutputSwitcherSessionGrouping();
+        int nextSelectedItemIndex = 0;
         boolean suggestedDeviceAdded = false;
         boolean displayGroupAdded = false;
+        boolean selectedDeviceAdded = false;
         for (MediaDevice device : devices) {
             if (needToHandleMutingExpectedDevice && device.isMutingExpectedDevice()) {
                 finalMediaItems.add(0, MediaItem.createDeviceMediaItem(device));
+                nextSelectedItemIndex++;
             } else if (!needToHandleMutingExpectedDevice && selectedDevicesIds.contains(
                     device.getId())) {
-                finalMediaItems.add(0, MediaItem.createDeviceMediaItem(device));
+                if (groupSelectedDevices) {
+                    finalMediaItems.add(
+                            nextSelectedItemIndex++,
+                            MediaItem.createDeviceMediaItem(device, !selectedDeviceAdded));
+                    selectedDeviceAdded = true;
+                } else {
+                    finalMediaItems.add(0, MediaItem.createDeviceMediaItem(device));
+                }
             } else {
                 if (device.isSuggestedDevice() && !suggestedDeviceAdded) {
                     addSuggestedDeviceGroupDivider(finalMediaItems);
@@ -927,6 +939,10 @@ public class MediaSwitchingController
 
     List<MediaDevice> getSelectableMediaDevice() {
         return mLocalMediaManager.getSelectableMediaDevice();
+    }
+
+    List<MediaDevice> getTransferableMediaDevices() {
+        return mLocalMediaManager.getTransferableMediaDevices();
     }
 
     public List<MediaDevice> getSelectedMediaDevice() {
@@ -1354,6 +1370,10 @@ public class MediaSwitchingController
 
     boolean isVolumeControlEnabled(@NonNull MediaDevice device) {
         return !device.isVolumeFixed();
+    }
+
+    boolean isVolumeControlEnabledForSession() {
+        return mLocalMediaManager.isMediaSessionAvailableForVolumeControl();
     }
 
     private void startActivity(Intent intent, ActivityTransitionAnimator.Controller controller) {

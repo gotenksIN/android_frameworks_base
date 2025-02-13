@@ -35,7 +35,6 @@ import com.android.internal.statusbar.IStatusBarService
 import com.android.wm.shell.Flags
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.bubbles.Bubbles.SysuiProxy
-import com.android.wm.shell.bubbles.properties.ProdBubbleProperties
 import com.android.wm.shell.bubbles.storage.BubblePersistentRepository
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayImeController
@@ -48,6 +47,7 @@ import com.android.wm.shell.draganddrop.DragAndDropController
 import com.android.wm.shell.shared.TransactionPool
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.bubbles.BubbleBarUpdate
+import com.android.wm.shell.shared.bubbles.DeviceConfig
 import com.android.wm.shell.sysui.ShellCommandHandler
 import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
@@ -288,7 +288,7 @@ class BubbleControllerBubbleBarTest {
             mock<Transitions>(),
             SyncTransactionQueue(TransactionPool(), mainExecutor),
             mock<IWindowManager>(),
-            ProdBubbleProperties,
+            BubbleResizabilityChecker()
         )
     }
 

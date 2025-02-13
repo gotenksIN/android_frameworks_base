@@ -18,6 +18,7 @@ import android.annotation.FlaggedApi;
 import android.annotation.Nullable;
 import android.util.ArraySet;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -38,10 +39,13 @@ public class TestLooperManager {
     private final MessageQueue mQueue;
     private final Looper mLooper;
     private final LinkedBlockingQueue<MessageExecution> mExecuteQueue = new LinkedBlockingQueue<>();
+    private final boolean mLooperIsMyLooper;
+
+    // When this latch is zero, it's guaranteed that the LooperHolder Message
+    // is not in the underlying queue.
+    private final CountDownLatch mLooperHolderLatch = new CountDownLatch(1);
 
     private boolean mReleased;
-    private boolean mLooperBlocked;
-    private final boolean mLooperIsMyLooper;
 
     /**
      * @hide
@@ -59,6 +63,8 @@ public class TestLooperManager {
         if (!mLooperIsMyLooper) {
             // Post a message that will keep the looper blocked as long as we are dispatching.
             new Handler(looper).post(new LooperHolder());
+        } else {
+            mLooperHolderLatch.countDown();
         }
     }
 
@@ -84,17 +90,8 @@ public class TestLooperManager {
      * interactions with it have completed.
      */
     public Message next() {
-        // Wait for the looper block to come up, to make sure we don't accidentally get
-        // the message for the block.
-        while (!mLooperIsMyLooper && !mLooperBlocked) {
-            synchronized (this) {
-                try {
-                    wait();
-                } catch (InterruptedException e) {
-                }
-            }
-        }
         checkReleased();
+        waitForLooperHolder();
         return mQueue.next();
     }
 
@@ -110,6 +107,7 @@ public class TestLooperManager {
     @Nullable
     public Message poll() {
         checkReleased();
+        waitForLooperHolder();
         return mQueue.pollForTest();
     }
 
@@ -124,6 +122,7 @@ public class TestLooperManager {
     @Nullable
     public Long peekWhen() {
         checkReleased();
+        waitForLooperHolder();
         return mQueue.peekWhenForTest();
     }
 
@@ -133,6 +132,7 @@ public class TestLooperManager {
     @FlaggedApi(Flags.FLAG_MESSAGE_QUEUE_TESTABILITY)
     public boolean isBlockedOnSyncBarrier() {
         checkReleased();
+        waitForLooperHolder();
         return mQueue.isBlockedOnSyncBarrier();
     }
 
@@ -174,6 +174,7 @@ public class TestLooperManager {
                 try {
                     execution.wait();
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
                 if (execution.response != null) {
                     throw new RuntimeException(execution.response);
@@ -221,13 +222,24 @@ public class TestLooperManager {
         }
     }
 
+    /**
+     * Waits until the Looper is blocked by the LooperHolder, if one was posted.
+     *
+     * After this method returns, it's guaranteed that the LooperHolder Message
+     * is not in the underlying queue.
+     */
+    private void waitForLooperHolder() {
+        try {
+            mLooperHolderLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private class LooperHolder implements Runnable {
         @Override
         public void run() {
-            synchronized (TestLooperManager.this) {
-                mLooperBlocked = true;
-                TestLooperManager.this.notify();
-            }
+            mLooperHolderLatch.countDown();
             while (!mReleased) {
                 try {
                     final MessageExecution take = mExecuteQueue.take();
@@ -235,10 +247,8 @@ public class TestLooperManager {
                         processMessage(take);
                     }
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
-            }
-            synchronized (TestLooperManager.this) {
-                mLooperBlocked = false;
             }
         }
 

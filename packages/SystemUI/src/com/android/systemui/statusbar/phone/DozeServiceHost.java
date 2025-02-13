@@ -230,9 +230,13 @@ public final class DozeServiceHost implements DozeHost {
             mDozingRequested = true;
             updateDozing();
             mDozeLog.traceDozing(mStatusBarStateController.isDozing());
-            mCentralSurfaces.updateIsKeyguard();
-        }else{
-                mDozingRequested = true;
+            // This is initialized in a CoreStartable, but binder calls from DreamManagerService can
+            // arrive earlier
+            if (mCentralSurfaces != null) {
+                mCentralSurfaces.updateIsKeyguard();
+            }
+        } else {
+            mDozingRequested = true;
         }
     }
 

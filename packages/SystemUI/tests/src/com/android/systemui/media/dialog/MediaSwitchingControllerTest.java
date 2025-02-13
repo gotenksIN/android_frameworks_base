@@ -891,6 +891,13 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
     }
 
     @Test
+    public void getTransferableMediaDevice_triggersFromLocalMediaManager() {
+        mMediaSwitchingController.getTransferableMediaDevices();
+
+        verify(mLocalMediaManager).getTransferableMediaDevices();
+    }
+
+    @Test
     public void getDeselectableMediaDevice_triggersFromLocalMediaManager() {
         mMediaSwitchingController.getDeselectableMediaDevice();
 
@@ -1510,6 +1517,60 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
         mMediaSwitchingController.onDeviceListUpdate(mMediaDevices);
 
         assertThat(getNumberOfConnectDeviceButtons()).isEqualTo(1);
+    }
+
+    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_SESSION_GROUPING)
+    @Test
+    public void selectedDevicesAddedInSameOrder() {
+        when(mLocalMediaManager.isPreferenceRouteListingExist()).thenReturn(true);
+        doReturn(mMediaDevices)
+                .when(mLocalMediaManager)
+                .getSelectedMediaDevice();
+        mMediaSwitchingController.start(mCb);
+        reset(mCb);
+        mMediaSwitchingController.getMediaItemList().clear();
+
+        mMediaSwitchingController.onDeviceListUpdate(mMediaDevices);
+
+        List<MediaItem> items = mMediaSwitchingController.getMediaItemList();
+        assertThat(items.get(0).getMediaDevice().get()).isEqualTo(mMediaDevice1);
+        assertThat(items.get(1).getMediaDevice().get()).isEqualTo(mMediaDevice2);
+    }
+
+    @DisableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_SESSION_GROUPING)
+    @Test
+    public void selectedDevicesAddedInReverseOrder() {
+        when(mLocalMediaManager.isPreferenceRouteListingExist()).thenReturn(true);
+        doReturn(mMediaDevices)
+                .when(mLocalMediaManager)
+                .getSelectedMediaDevice();
+        mMediaSwitchingController.start(mCb);
+        reset(mCb);
+        mMediaSwitchingController.getMediaItemList().clear();
+
+        mMediaSwitchingController.onDeviceListUpdate(mMediaDevices);
+
+        List<MediaItem> items = mMediaSwitchingController.getMediaItemList();
+        assertThat(items.get(0).getMediaDevice().get()).isEqualTo(mMediaDevice2);
+        assertThat(items.get(1).getMediaDevice().get()).isEqualTo(mMediaDevice1);
+    }
+
+    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_SESSION_GROUPING)
+    @Test
+    public void firstSelectedDeviceIsFirstDeviceInGroupIsTrue() {
+        when(mLocalMediaManager.isPreferenceRouteListingExist()).thenReturn(true);
+        doReturn(mMediaDevices)
+                .when(mLocalMediaManager)
+                .getSelectedMediaDevice();
+        mMediaSwitchingController.start(mCb);
+        reset(mCb);
+        mMediaSwitchingController.getMediaItemList().clear();
+
+        mMediaSwitchingController.onDeviceListUpdate(mMediaDevices);
+
+        List<MediaItem> items = mMediaSwitchingController.getMediaItemList();
+        assertThat(items.get(0).isFirstDeviceInGroup()).isTrue();
+        assertThat(items.get(1).isFirstDeviceInGroup()).isFalse();
     }
 
     private int getNumberOfConnectDeviceButtons() {

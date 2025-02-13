@@ -2134,17 +2134,17 @@ public class DisplayPolicy {
         mCanSystemBarsBeShownByUser = canBeShown;
     }
 
-    void notifyDisplayReady() {
+    void notifyDisplayAddSystemDecorations() {
         mHandler.post(() -> {
             final int displayId = getDisplayId();
             StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
             if (statusBar != null) {
-                statusBar.onDisplayReady(displayId);
+                statusBar.onDisplayAddSystemDecorations(displayId);
             }
             final WallpaperManagerInternal wpMgr = LocalServices
                     .getService(WallpaperManagerInternal.class);
             if (wpMgr != null) {
-                wpMgr.onDisplayReady(displayId);
+                wpMgr.onDisplayAddSystemDecorations(displayId);
             }
         });
     }

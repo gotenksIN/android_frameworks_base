@@ -45,7 +45,6 @@ import com.android.systemui.keyguard.ui.composable.section.StatusBarSection
 import com.android.systemui.keyguard.ui.composable.section.TopAreaSection
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel
 import com.android.systemui.res.R
-import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUiAod
 import java.util.Optional
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -110,15 +109,22 @@ constructor(
                             }
                             if (isShadeLayoutWide && !isBypassEnabled) {
                                 with(notificationSection) {
-                                    Notifications(
-                                        areNotificationsVisible = areNotificationsVisible,
-                                        isShadeLayoutWide = true,
-                                        burnInParams = null,
-                                        modifier =
-                                            Modifier.fillMaxWidth(0.5f)
-                                                .fillMaxHeight()
-                                                .align(alignment = Alignment.TopEnd),
-                                    )
+                                    Box(modifier = Modifier.fillMaxHeight()) {
+                                        AodPromotedNotificationArea(
+                                            modifier =
+                                                Modifier.fillMaxWidth(0.5f)
+                                                    .align(alignment = Alignment.TopStart)
+                                        )
+                                        Notifications(
+                                            areNotificationsVisible = areNotificationsVisible,
+                                            isShadeLayoutWide = true,
+                                            burnInParams = null,
+                                            modifier =
+                                                Modifier.fillMaxWidth(0.5f)
+                                                    .fillMaxHeight()
+                                                    .align(alignment = Alignment.TopEnd),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -130,9 +136,7 @@ constructor(
                             if (!isShadeLayoutWide && !isBypassEnabled) {
                                 Box(modifier = Modifier.weight(weight = 1f)) {
                                     Column(Modifier.align(alignment = Alignment.TopStart)) {
-                                        if (PromotedNotificationUiAod.isEnabled) {
-                                            AodPromotedNotification()
-                                        }
+                                        AodPromotedNotificationArea()
                                         AodNotificationIcons(
                                             modifier = Modifier.padding(start = aodIconPadding)
                                         )
@@ -145,11 +149,18 @@ constructor(
                                 }
                             } else {
                                 Column {
-                                    if (PromotedNotificationUiAod.isEnabled) {
-                                        AodPromotedNotification()
+                                    if (!isShadeLayoutWide) {
+                                        AodPromotedNotificationArea()
                                     }
                                     AodNotificationIcons(
-                                        modifier = Modifier.padding(start = aodIconPadding)
+                                        modifier =
+                                            Modifier.padding(
+                                                top =
+                                                    dimensionResource(
+                                                        R.dimen.keyguard_status_view_bottom_margin
+                                                    ),
+                                                start = aodIconPadding,
+                                            )
                                     )
                                 }
                             }

@@ -1149,7 +1149,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
 
     @Test
     @DisableFlags(Flags.FLAG_MSDL_FEEDBACK)
-    fun skipsFaceErrorHaptics_nonSfps_coEx() =
+    fun playsFaceErrorHaptics_nonSfps_coEx() =
         testScope.runTest {
             val currentSceneKey by collectLastValue(sceneInteractor.currentScene)
             val playErrorHaptic by collectLastValue(deviceEntryHapticsInteractor.playErrorHaptic)
@@ -1161,14 +1161,15 @@ class SceneContainerStartableTest : SysuiTestCase() {
             underTest.start()
             updateFaceAuthStatus(isSuccess = false)
 
-            assertThat(playErrorHaptic).isNull()
-            verify(vibratorHelper, never()).vibrateAuthError(anyString())
+            assertThat(playErrorHaptic).isNotNull()
+            assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
+            verify(vibratorHelper).vibrateAuthError(anyString())
             verify(vibratorHelper, never()).vibrateAuthSuccess(anyString())
         }
 
     @Test
     @EnableFlags(Flags.FLAG_MSDL_FEEDBACK)
-    fun skipsMSDLFaceErrorHaptics_nonSfps_coEx() =
+    fun playsMSDLFaceErrorHaptics_nonSfps_coEx() =
         testScope.runTest {
             val currentSceneKey by collectLastValue(sceneInteractor.currentScene)
             val playErrorHaptic by collectLastValue(deviceEntryHapticsInteractor.playErrorHaptic)
@@ -1180,9 +1181,10 @@ class SceneContainerStartableTest : SysuiTestCase() {
             underTest.start()
             updateFaceAuthStatus(isSuccess = false)
 
-            assertThat(playErrorHaptic).isNull()
-            assertThat(msdlPlayer.latestTokenPlayed).isNull()
-            assertThat(msdlPlayer.latestPropertiesPlayed).isNull()
+            assertThat(playErrorHaptic).isNotNull()
+            assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
+            assertThat(msdlPlayer.latestTokenPlayed).isEqualTo(MSDLToken.FAILURE)
+            assertThat(msdlPlayer.latestPropertiesPlayed).isEqualTo(authInteractionProperties)
         }
 
     @Test
@@ -2693,6 +2695,34 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(isVisible).isTrue()
             listeners.forEach { it.onTransitionAnimationEnd() }
             assertThat(isVisible).isFalse()
+        }
+
+    @Test
+    fun deviceLocks_whenNoLongerTrusted_whileDeviceNotEntered() =
+        testScope.runTest {
+            prepareState(isDeviceUnlocked = true, initialSceneKey = Scenes.Gone)
+            underTest.start()
+
+            val isDeviceEntered by collectLastValue(kosmos.deviceEntryInteractor.isDeviceEntered)
+            val deviceUnlockStatus by
+                collectLastValue(kosmos.deviceUnlockedInteractor.deviceUnlockStatus)
+            val currentScene by collectLastValue(kosmos.sceneInteractor.currentScene)
+            assertThat(isDeviceEntered).isTrue()
+            assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
+            assertThat(currentScene).isEqualTo(Scenes.Gone)
+            kosmos.fakeTrustRepository.setCurrentUserTrusted(true)
+            kosmos.sceneInteractor.changeScene(Scenes.Lockscreen, "reason")
+            runCurrent()
+            assertThat(isDeviceEntered).isFalse()
+            assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+
+            kosmos.fakeTrustRepository.setCurrentUserTrusted(false)
+            runCurrent()
+
+            assertThat(isDeviceEntered).isFalse()
+            assertThat(deviceUnlockStatus?.isUnlocked).isFalse()
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
         }
 
     private fun TestScope.emulateSceneTransition(

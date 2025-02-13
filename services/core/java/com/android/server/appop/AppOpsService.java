@@ -237,6 +237,13 @@ public class AppOpsService extends IAppOpsService.Stub {
      */
     private static final int CURRENT_VERSION = 1;
 
+    /**
+     * The upper limit of total number of attributed op entries that can be returned in a binder
+     * transaction to avoid TransactionTooLargeException
+     */
+    private static final int NUM_ATTRIBUTED_OP_ENTRY_THRESHOLD = 2000;
+
+
     private SensorPrivacyManager mSensorPrivacyManager;
 
     // Write at most every 30 minutes.
@@ -543,6 +550,11 @@ public class AppOpsService extends IAppOpsService.Stub {
 
     @VisibleForTesting
     final Constants mConstants;
+
+    /**
+     * Some processes in the user may still be running when trying to drop the user's state
+     */
+    private static final long REMOVE_USER_DELAY = 5000L;
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     final class UidState {
@@ -1702,6 +1714,8 @@ public class AppOpsService extends IAppOpsService.Stub {
                 Manifest.permission.GET_APP_OPS_STATS,
                 Binder.getCallingPid(), Binder.getCallingUid())
                 == PackageManager.PERMISSION_GRANTED;
+        int totalAttributedOpEntryCount = 0;
+
         if (ops == null) {
             resOps = new ArrayList<>();
             for (int j = 0; j < pkgOps.size(); j++) {
@@ -1709,7 +1723,12 @@ public class AppOpsService extends IAppOpsService.Stub {
                 if (opRestrictsRead(curOp.op) && !shouldReturnRestrictedAppOps) {
                     continue;
                 }
-                resOps.add(getOpEntryForResult(curOp, persistentDeviceId));
+                if (totalAttributedOpEntryCount > NUM_ATTRIBUTED_OP_ENTRY_THRESHOLD) {
+                    break;
+                }
+                OpEntry opEntry = getOpEntryForResult(curOp, persistentDeviceId);
+                resOps.add(opEntry);
+                totalAttributedOpEntryCount += opEntry.getAttributedOpEntries().size();
             }
         } else {
             for (int j = 0; j < ops.length; j++) {
@@ -1721,10 +1740,21 @@ public class AppOpsService extends IAppOpsService.Stub {
                     if (opRestrictsRead(curOp.op) && !shouldReturnRestrictedAppOps) {
                         continue;
                     }
-                    resOps.add(getOpEntryForResult(curOp, persistentDeviceId));
+                    if (totalAttributedOpEntryCount > NUM_ATTRIBUTED_OP_ENTRY_THRESHOLD) {
+                        break;
+                    }
+                    OpEntry opEntry = getOpEntryForResult(curOp, persistentDeviceId);
+                    resOps.add(opEntry);
+                    totalAttributedOpEntryCount += opEntry.getAttributedOpEntries().size();
                 }
             }
         }
+
+        if (totalAttributedOpEntryCount > NUM_ATTRIBUTED_OP_ENTRY_THRESHOLD) {
+            Slog.w(TAG, "The number of attributed op entries has exceeded the threshold. This "
+                    + "could be due to DoS attack from malicious apps. The result is throttled.");
+        }
+
         return resOps;
     }
 
@@ -6795,14 +6825,17 @@ public class AppOpsService extends IAppOpsService.Stub {
     @Override
     public void removeUser(int userHandle) throws RemoteException {
         checkSystemUid("removeUser");
-        synchronized (AppOpsService.this) {
-            final int tokenCount = mOpUserRestrictions.size();
-            for (int i = tokenCount - 1; i >= 0; i--) {
-                ClientUserRestrictionState opRestrictions = mOpUserRestrictions.valueAt(i);
-                opRestrictions.removeUser(userHandle);
+        mHandler.postDelayed(() -> {
+            Slog.i(TAG, "Removing user " + userHandle + " from AppOpsService");
+            synchronized (AppOpsService.this) {
+                final int tokenCount = mOpUserRestrictions.size();
+                for (int i = tokenCount - 1; i >= 0; i--) {
+                    ClientUserRestrictionState opRestrictions = mOpUserRestrictions.valueAt(i);
+                    opRestrictions.removeUser(userHandle);
+                }
+                removeUidsForUserLocked(userHandle);
             }
-            removeUidsForUserLocked(userHandle);
-        }
+        }, REMOVE_USER_DELAY);
     }
 
     @Override

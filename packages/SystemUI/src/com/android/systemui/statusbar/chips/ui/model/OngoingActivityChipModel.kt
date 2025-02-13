@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.chips.ui.model
 
 import android.view.View
 import com.android.systemui.animation.Expandable
+import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
@@ -40,7 +41,7 @@ sealed class OngoingActivityChipModel {
     }
 
     /** This chip should be shown with the given information. */
-    abstract class Shown(
+    sealed class Shown(
         /** The icon to show on the chip. If null, no icon will be shown. */
         open val icon: ChipIcon?,
         /** What colors to use for the chip. */
@@ -140,7 +141,10 @@ sealed class OngoingActivityChipModel {
          * The icon is a custom icon, which is set on [impl]. The icon was likely created by an
          * external app.
          */
-        data class StatusBarView(val impl: StatusBarIconView) : ChipIcon {
+        data class StatusBarView(
+            val impl: StatusBarIconView,
+            val contentDescription: ContentDescription,
+        ) : ChipIcon {
             init {
                 StatusBarConnectedDisplays.assertInLegacyMode()
             }
@@ -150,7 +154,10 @@ sealed class OngoingActivityChipModel {
          * The icon is a custom icon, which is set on a notification, and can be looked up using the
          * provided [notificationKey]. The icon was likely created by an external app.
          */
-        data class StatusBarNotificationIcon(val notificationKey: String) : ChipIcon {
+        data class StatusBarNotificationIcon(
+            val notificationKey: String,
+            val contentDescription: ContentDescription,
+        ) : ChipIcon {
             init {
                 StatusBarConnectedDisplays.assertInNewMode()
             }

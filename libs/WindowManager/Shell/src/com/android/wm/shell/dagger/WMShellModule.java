@@ -53,13 +53,14 @@ import com.android.wm.shell.apptoweb.AppToWebGenericLinksParser;
 import com.android.wm.shell.apptoweb.AssistContentRequester;
 import com.android.wm.shell.appzoomout.AppZoomOutController;
 import com.android.wm.shell.back.BackAnimationController;
+import com.android.wm.shell.bubbles.bar.BubbleBarDragListener;
 import com.android.wm.shell.bubbles.BubbleController;
 import com.android.wm.shell.bubbles.BubbleData;
 import com.android.wm.shell.bubbles.BubbleDataRepository;
 import com.android.wm.shell.bubbles.BubbleEducationController;
 import com.android.wm.shell.bubbles.BubbleLogger;
 import com.android.wm.shell.bubbles.BubblePositioner;
-import com.android.wm.shell.bubbles.properties.ProdBubbleProperties;
+import com.android.wm.shell.bubbles.BubbleResizabilityChecker;
 import com.android.wm.shell.bubbles.storage.BubblePersistentRepository;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
@@ -111,6 +112,7 @@ import com.android.wm.shell.desktopmode.education.AppToWebEducationFilter;
 import com.android.wm.shell.desktopmode.education.data.AppHandleEducationDatastoreRepository;
 import com.android.wm.shell.desktopmode.education.data.AppToWebEducationDatastoreRepository;
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
+import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver;
 import com.android.wm.shell.desktopmode.multidesks.RootTaskDesksOrganizer;
 import com.android.wm.shell.desktopmode.persistence.DesktopPersistentRepository;
 import com.android.wm.shell.desktopmode.persistence.DesktopRepositoryInitializer;
@@ -168,18 +170,17 @@ import com.android.wm.shell.windowdecor.education.DesktopWindowingEducationPromo
 import com.android.wm.shell.windowdecor.education.DesktopWindowingEducationTooltipController;
 import com.android.wm.shell.windowdecor.tiling.DesktopTilingDecorViewModel;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 import dagger.Binds;
 import dagger.Lazy;
 import dagger.Module;
 import dagger.Provides;
-
 import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.ExperimentalCoroutinesApi;
 import kotlinx.coroutines.MainCoroutineDispatcher;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * Provides dependencies from {@link com.android.wm.shell}, these dependencies are only accessible
@@ -293,7 +294,7 @@ public abstract class WMShellModule {
                 transitions,
                 syncQueue,
                 wmService,
-                ProdBubbleProperties.INSTANCE);
+                new BubbleResizabilityChecker());
     }
 
     //
@@ -760,6 +761,7 @@ public abstract class WMShellModule {
             Optional<BubbleController> bubbleController,
             OverviewToDesktopTransitionObserver overviewToDesktopTransitionObserver,
             DesksOrganizer desksOrganizer,
+            DesksTransitionObserver desksTransitionObserver,
             UserProfileContexts userProfileContexts,
             DesktopModeCompatPolicy desktopModeCompatPolicy) {
         return new DesktopTasksController(
@@ -797,6 +799,7 @@ public abstract class WMShellModule {
                 bubbleController,
                 overviewToDesktopTransitionObserver,
                 desksOrganizer,
+                desksTransitionObserver,
                 userProfileContexts,
                 desktopModeCompatPolicy);
     }
@@ -1134,6 +1137,7 @@ public abstract class WMShellModule {
             Optional<DesktopMixedTransitionHandler> desktopMixedTransitionHandler,
             Optional<BackAnimationController> backAnimationController,
             DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
+            @NonNull DesksTransitionObserver desksTransitionObserver,
             ShellInit shellInit) {
         return desktopUserRepositories.flatMap(
                 repository ->
@@ -1146,7 +1150,17 @@ public abstract class WMShellModule {
                                         desktopMixedTransitionHandler.get(),
                                         backAnimationController.get(),
                                         desktopWallpaperActivityTokenProvider,
+                                        desksTransitionObserver,
                                         shellInit)));
+    }
+
+    @WMSingleton
+    @Provides
+    static DesksTransitionObserver provideDesksTransitionObserver(
+            @NonNull @DynamicOverride DesktopUserRepositories desktopUserRepositories,
+            @NonNull DesksOrganizer desksOrganizer
+    ) {
+        return new DesksTransitionObserver(desktopUserRepositories, desksOrganizer);
     }
 
     @WMSingleton
@@ -1398,6 +1412,7 @@ public abstract class WMShellModule {
             IconProvider iconProvider,
             GlobalDragListener globalDragListener,
             Transitions transitions,
+            Lazy<BubbleController> bubbleControllerLazy,
             @ShellMainThread ShellExecutor mainExecutor) {
         return new DragAndDropController(
                 context,
@@ -1410,6 +1425,12 @@ public abstract class WMShellModule {
                 iconProvider,
                 globalDragListener,
                 transitions,
+                new Lazy<>() {
+                    @Override
+                    public BubbleBarDragListener get() {
+                        return bubbleControllerLazy.get();
+                    }
+                },
                 mainExecutor);
     }
 

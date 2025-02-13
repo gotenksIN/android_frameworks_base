@@ -152,6 +152,7 @@ import com.android.internal.app.procstats.ProcessStats;
 import android.view.Display;
 import android.webkit.URLUtil;
 import android.window.ActivityWindowInfo;
+import android.window.DesktopModeFlags;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -171,7 +172,6 @@ import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.window.flags.Flags;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -3177,7 +3177,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         @Override
         public void accept(ActivityRecord r) {
-            if (Flags.enableDesktopWindowingAppToWeb() && mInfo.capturedLink == null) {
+            if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB.isTrue()
+                    && mInfo.capturedLink == null) {
                 setCapturedLink(r);
             }
             if (r.mLaunchCookie != null) {

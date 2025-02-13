@@ -28,6 +28,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.ACTION_MAIN
+import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.graphics.Region
 import android.hardware.display.DisplayManager
@@ -96,7 +97,6 @@ import org.mockito.kotlin.whenever
 import org.mockito.quality.Strictness
 import java.util.function.Consumer
 
-
 /**
  * Tests of [DesktopModeWindowDecorViewModel]
  * Usage: atest WMShellUnitTests:DesktopModeWindowDecorViewModelTests
@@ -116,7 +116,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 .spyStatic(DragPositioningCallbackUtility::class.java)
                 .startMocking()
 
-        doReturn(true).`when` { DesktopModeStatus.isDesktopModeSupported(Mockito.any()) }
+        doReturn(true).`when` { DesktopModeStatus.isDeviceEligibleForDesktopMode(Mockito.any()) }
         doReturn(false).`when` { DesktopModeStatus.overridesShowAppHandle(Mockito.any()) }
 
         setUpCommon()
@@ -307,6 +307,23 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODALS_POLICY)
+    fun testDecorationIsNotCreatedForDefaultHomePackage() {
+        val packageManager: PackageManager = org.mockito.kotlin.mock()
+        val homeActivities = ComponentName("defaultHomePackage", /* class */ "")
+        val task = createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
+            baseActivity = homeActivities
+            isTopActivityNoDisplay = false
+        }
+        mContext.setMockPackageManager(packageManager)
+        whenever(packageManager.getHomeActivities(any())).thenReturn(homeActivities)
+
+        onTaskOpening(task)
+
+        assertFalse(windowDecorByTaskIdSpy.contains(task.taskId))
+    }
+
+    @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_IMMERSIVE_HANDLE_HIDING)
     fun testInsetsStateChanged_notifiesAllDecorsInDisplay() {
         val task1 = createTask(windowingMode = WINDOWING_MODE_FREEFORM, displayId = 1)
@@ -362,37 +379,21 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
-    fun testWindowDecor_desktopModeUnsupportedOnDevice_deviceRestrictionsOverridden_decorCreated() {
-        // Simulate enforce device restrictions system property overridden to false
-        whenever(DesktopModeStatus.enforceDeviceRestrictions()).thenReturn(false)
-        // Simulate device that doesn't support desktop mode
-        doReturn(false).`when` { DesktopModeStatus.isDesktopModeSupported(any()) }
-
-        val task = createTask(windowingMode = WINDOWING_MODE_FULLSCREEN)
-        setUpMockDecorationsForTasks(task)
-
-        onTaskOpening(task)
-        assertTrue(windowDecorByTaskIdSpy.contains(task.taskId))
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
-    fun testWindowDecor_deviceSupportsDesktopMode_decorCreated() {
+    fun testWindowDecor_deviceEligibleForDesktopMode_decorCreated() {
         // Simulate default enforce device restrictions system property
         whenever(DesktopModeStatus.enforceDeviceRestrictions()).thenReturn(true)
 
         val task = createTask(windowingMode = WINDOWING_MODE_FULLSCREEN)
-        doReturn(true).`when` { DesktopModeStatus.isDesktopModeSupported(any()) }
+        doReturn(true).`when` { DesktopModeStatus.isDeviceEligibleForDesktopMode(any()) }
         setUpMockDecorationsForTasks(task)
 
         onTaskOpening(task)
-        assertTrue(windowDecorByTaskIdSpy.contains(task.taskId))
+        assertTrue(task.taskId in windowDecorByTaskIdSpy)
     }
 
     @Test
     fun testOnDecorMaximizedOrRestored_togglesTaskSize_maximize() {
-        val maxOrRestoreListenerCaptor = forClass(Function0::class.java)
-                as ArgumentCaptor<Function0<Unit>>
+        val maxOrRestoreListenerCaptor = forClass(Function0::class.java as Class<Function0<Unit>>)
         val decor = createOpenTaskDecoration(
             windowingMode = WINDOWING_MODE_FREEFORM,
             onMaxOrRestoreListenerCaptor = maxOrRestoreListenerCaptor
@@ -638,7 +639,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
 
         toDesktopListenerCaptor.value.accept(DesktopModeTransitionSource.APP_HANDLE_MENU_BUTTON)
 
-        verify(mockDesktopTasksController).moveTaskToDesktop(
+        verify(mockDesktopTasksController).moveTaskToDefaultDeskAndActivate(
             eq(decor.mTaskInfo.taskId),
             any(),
             eq(DesktopModeTransitionSource.APP_HANDLE_MENU_BUTTON),
@@ -876,7 +877,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         )
 
         verify(mockDesktopTasksController, times(1))
-            .moveTaskToDesktop(any(), any(), any(), anyOrNull(), anyOrNull())
+            .moveTaskToDefaultDeskAndActivate(any(), any(), any(), anyOrNull(), anyOrNull())
     }
 
     @Test

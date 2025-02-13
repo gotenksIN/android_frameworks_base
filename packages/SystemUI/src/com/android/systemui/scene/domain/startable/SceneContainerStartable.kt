@@ -44,7 +44,9 @@ import com.android.systemui.deviceentry.shared.model.DeviceUnlockSource
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.TrustInteractor
 import com.android.systemui.keyguard.domain.interactor.WindowManagerLockscreenVisibilityInteractor.Companion.keyguardScenes
+import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.model.SceneContainerPlugin
 import com.android.systemui.model.SysUiState
 import com.android.systemui.model.updateFlags
@@ -54,6 +56,7 @@ import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.power.shared.model.WakeSleepReason
 import com.android.systemui.scene.data.model.asIterable
 import com.android.systemui.scene.data.model.sceneStackOf
+import com.android.systemui.scene.domain.SceneFrameworkTableLog
 import com.android.systemui.scene.domain.interactor.DisabledContentInteractor
 import com.android.systemui.scene.domain.interactor.SceneBackInteractor
 import com.android.systemui.scene.domain.interactor.SceneContainerOcclusionInteractor
@@ -145,6 +148,8 @@ constructor(
     private val disabledContentInteractor: DisabledContentInteractor,
     private val activityTransitionAnimator: ActivityTransitionAnimator,
     private val shadeModeInteractor: ShadeModeInteractor,
+    @SceneFrameworkTableLog private val tableLogBuffer: TableLogBuffer,
+    private val trustInteractor: TrustInteractor,
 ) : CoreStartable {
     private val centralSurfaces: CentralSurfaces?
         get() = centralSurfacesOptLazy.get().getOrNull()
@@ -154,6 +159,7 @@ constructor(
     override fun start() {
         if (SceneContainerFlag.isEnabled) {
             sceneLogger.logFrameworkEnabled(isEnabled = true)
+            applicationScope.launch { hydrateTableLogBuffer() }
             hydrateVisibility()
             automaticallySwitchScenes()
             hydrateSystemUiState()
@@ -169,6 +175,7 @@ constructor(
             notifyKeyguardDismissCancelledCallbacks()
             refreshLockscreenEnabled()
             hydrateActivityTransitionAnimationState()
+            lockWhenDeviceBecomesUntrusted()
         } else {
             sceneLogger.logFrameworkEnabled(
                 isEnabled = false,
@@ -221,6 +228,16 @@ constructor(
                     println("isAodAvailable", keyguardInteractor.isAodAvailable.value)
                 }
             }
+        }
+    }
+
+    private suspend fun hydrateTableLogBuffer() {
+        coroutineScope {
+            launch { sceneInteractor.hydrateTableLogBuffer(tableLogBuffer) }
+            launch { keyguardEnabledInteractor.hydrateTableLogBuffer(tableLogBuffer) }
+            launch { faceUnlockInteractor.hydrateTableLogBuffer(tableLogBuffer) }
+            launch { powerInteractor.hydrateTableLogBuffer(tableLogBuffer) }
+            launch { keyguardInteractor.hydrateTableLogBuffer(tableLogBuffer) }
         }
     }
 
@@ -982,6 +999,18 @@ constructor(
                 }
             }
         )
+    }
+
+    private fun lockWhenDeviceBecomesUntrusted() {
+        applicationScope.launch {
+            trustInteractor.isTrusted.pairwise().collect { (wasTrusted, isTrusted) ->
+                if (wasTrusted && !isTrusted && !deviceEntryInteractor.isDeviceEntered.value) {
+                    deviceEntryInteractor.lockNow(
+                        "Exited trusted environment while not device not entered"
+                    )
+                }
+            }
+        }
     }
 
     companion object {

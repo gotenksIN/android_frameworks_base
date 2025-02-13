@@ -20,7 +20,6 @@ import android.graphics.Rect
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.FlagsParameterization
-import android.platform.test.flag.junit.SetFlagsRule
 import android.util.ArraySet
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.Display.INVALID_DISPLAY
@@ -28,6 +27,7 @@ import androidx.test.filters.SmallTest
 import com.android.window.flags.Flags
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP
+import com.android.window.flags.Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.common.ShellExecutor
@@ -36,6 +36,7 @@ import com.android.wm.shell.desktopmode.persistence.DesktopPersistentRepository
 import com.android.wm.shell.sysui.ShellInit
 import com.google.common.truth.Truth.assertThat
 import junit.framework.Assert.fail
+import kotlin.test.assertEquals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,8 +47,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertThrows
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -70,8 +71,6 @@ import platform.test.runner.parameterized.Parameters
 @RunWith(ParameterizedAndroidJunit4::class)
 @ExperimentalCoroutinesApi
 class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
-
-    @JvmField @Rule val setFlagsRule = SetFlagsRule(flags)
 
     private lateinit var repo: DesktopRepository
     private lateinit var shellInit: ShellInit
@@ -162,6 +161,69 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         repo.addTask(SECOND_DISPLAY, taskId = 1, isVisible = true)
         assertThat(repo.getFreeformTasksInZOrder(DEFAULT_DISPLAY)).isEmpty()
         assertThat(repo.getFreeformTasksInZOrder(SECOND_DISPLAY)).containsExactly(1)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun addTask_deskDoesNotExist_throws() {
+        repo.removeDesk(deskId = 0)
+
+        assertThrows(Exception::class.java) {
+            repo.addTask(displayId = DEFAULT_DISPLAY, taskId = 5, isVisible = true)
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun addTaskToDesk_deskDoesNotExist_throws() {
+        repo.removeDesk(deskId = 2)
+
+        assertThrows(Exception::class.java) {
+            repo.addTaskToDesk(
+                displayId = DEFAULT_DISPLAY,
+                deskId = 2,
+                taskId = 4,
+                isVisible = true,
+            )
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun addTaskToDesk_addsToZOrderList() {
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 2)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 3)
+        repo.addTaskToDesk(displayId = DEFAULT_DISPLAY, deskId = 2, taskId = 5, isVisible = true)
+        repo.addTaskToDesk(displayId = DEFAULT_DISPLAY, deskId = 2, taskId = 6, isVisible = true)
+        repo.addTaskToDesk(displayId = DEFAULT_DISPLAY, deskId = 2, taskId = 7, isVisible = true)
+        repo.addTaskToDesk(displayId = DEFAULT_DISPLAY, deskId = 3, taskId = 8, isVisible = true)
+
+        val orderedTasks = repo.getFreeformTasksIdsInDeskInZOrder(deskId = 2)
+        assertThat(orderedTasks[0]).isEqualTo(7)
+        assertThat(orderedTasks[1]).isEqualTo(6)
+        assertThat(orderedTasks[2]).isEqualTo(5)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun addTaskToDesk_visible_addsToVisible() {
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 2)
+
+        repo.addTaskToDesk(displayId = DEFAULT_DISPLAY, deskId = 2, taskId = 5, isVisible = true)
+
+        assertThat(repo.isVisibleTask(5)).isTrue()
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun addTaskToDesk_removesFromAllOtherDesks() {
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 2)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 3)
+        repo.addTaskToDesk(displayId = DEFAULT_DISPLAY, deskId = 2, taskId = 7, isVisible = true)
+
+        repo.addTaskToDesk(displayId = DEFAULT_DISPLAY, deskId = 3, taskId = 7, isVisible = true)
+
+        assertThat(repo.getActiveTaskIdsInDesk(2)).doesNotContain(7)
     }
 
     @Test
@@ -469,8 +531,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         val listener = TestVisibilityListener()
         val executor = TestShellExecutor()
         repo.addVisibleTasksListener(listener, executor)
-        repo.updateTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
-        repo.updateTask(DEFAULT_DISPLAY, taskId = 2, isVisible = true)
+        repo.addTask(DEFAULT_DISPLAY, taskId = 1, isVisible = true)
+        repo.addTask(DEFAULT_DISPLAY, taskId = 2, isVisible = true)
         executor.flushAll()
 
         assertThat(listener.visibleTasksCountOnDefaultDisplay).isEqualTo(2)
@@ -1080,10 +1142,34 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         repo.addTask(displayId = DEFAULT_DISPLAY, taskId = 1, isVisible = true)
         repo.minimizeTask(displayId = DEFAULT_DISPLAY, taskId = 2)
 
-        val tasksBeforeRemoval = repo.removeDesk(displayId = DEFAULT_DISPLAY)
+        val tasksBeforeRemoval = repo.removeDesk(deskId = DEFAULT_DISPLAY)
 
         assertThat(tasksBeforeRemoval).containsExactly(1, 2, 3).inOrder()
         assertThat(repo.getActiveTasks(displayId = DEFAULT_DISPLAY)).isEmpty()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun removeDesk_multipleDesks_active_removes() {
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+        repo.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+
+        repo.removeDesk(deskId = 3)
+
+        assertThat(repo.getDeskIds(displayId = DEFAULT_DISPLAY)).doesNotContain(3)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun removeDesk_multipleDesks_inactive_removes() {
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+        repo.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+
+        repo.removeDesk(deskId = 2)
+
+        assertThat(repo.getDeskIds(displayId = DEFAULT_DISPLAY)).doesNotContain(2)
     }
 
     @Test
@@ -1166,6 +1252,26 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         repo.addTask(displayId = 999, taskId = 6, isVisible = true)
 
         assertThat(repo.getActiveTaskIdsInDesk(999)).contains(6)
+    }
+
+    @Test
+    @DisableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun getDisplayForDesk() {
+        repo.addDesk(SECOND_DISPLAY, SECOND_DISPLAY)
+
+        assertEquals(SECOND_DISPLAY, repo.getDisplayForDesk(deskId = SECOND_DISPLAY))
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun getDisplayForDesk_multipleDesks() {
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 6)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 7)
+        repo.addDesk(SECOND_DISPLAY, deskId = 8)
+        repo.addDesk(SECOND_DISPLAY, deskId = 9)
+
+        assertEquals(DEFAULT_DISPLAY, repo.getDisplayForDesk(deskId = 7))
+        assertEquals(SECOND_DISPLAY, repo.getDisplayForDesk(deskId = 8))
     }
 
     class TestListener : DesktopRepository.ActiveTasksListener {

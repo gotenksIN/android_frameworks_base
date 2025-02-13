@@ -56,19 +56,16 @@ import android.window.WindowContainerTransaction;
 import androidx.annotation.Nullable;
 
 import com.android.internal.util.Preconditions;
-import com.android.window.flags.Flags;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.common.ComponentUtils;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayLayout;
 import com.android.wm.shell.common.pip.PipBoundsAlgorithm;
 import com.android.wm.shell.common.pip.PipBoundsState;
+import com.android.wm.shell.common.pip.PipDesktopState;
 import com.android.wm.shell.common.pip.PipDisplayLayoutState;
 import com.android.wm.shell.common.pip.PipMenuController;
 import com.android.wm.shell.common.pip.PipUtils;
-import com.android.wm.shell.desktopmode.DesktopRepository;
-import com.android.wm.shell.desktopmode.DesktopUserRepositories;
-import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
 import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.pip2.PipSurfaceTransactionHelper;
 import com.android.wm.shell.pip2.animation.PipAlphaAnimator;
@@ -78,8 +75,6 @@ import com.android.wm.shell.shared.TransitionUtil;
 import com.android.wm.shell.shared.pip.PipContentOverlay;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.Transitions;
-
-import java.util.Optional;
 
 /**
  * Implementation of transitions for PiP on phone.
@@ -117,9 +112,7 @@ public class PipTransition extends PipTransitionController implements
     private final PipDisplayLayoutState mPipDisplayLayoutState;
     private final DisplayController mDisplayController;
     private final PipSurfaceTransactionHelper mPipSurfaceTransactionHelper;
-    private final Optional<DesktopUserRepositories> mDesktopUserRepositoriesOptional;
-    private final Optional<DesktopWallpaperActivityTokenProvider>
-            mDesktopWallpaperActivityTokenProviderOptional;
+    private final PipDesktopState mPipDesktopState;
 
     //
     // Transition caches
@@ -159,9 +152,7 @@ public class PipTransition extends PipTransitionController implements
             PipDisplayLayoutState pipDisplayLayoutState,
             PipUiStateChangeController pipUiStateChangeController,
             DisplayController displayController,
-            Optional<DesktopUserRepositories> desktopUserRepositoriesOptional,
-            Optional<DesktopWallpaperActivityTokenProvider>
-                    desktopWallpaperActivityTokenProviderOptional) {
+            PipDesktopState pipDesktopState) {
         super(shellInit, shellTaskOrganizer, transitions, pipBoundsState, pipMenuController,
                 pipBoundsAlgorithm);
 
@@ -174,9 +165,7 @@ public class PipTransition extends PipTransitionController implements
         mPipDisplayLayoutState = pipDisplayLayoutState;
         mDisplayController = displayController;
         mPipSurfaceTransactionHelper = new PipSurfaceTransactionHelper(mContext);
-        mDesktopUserRepositoriesOptional = desktopUserRepositoriesOptional;
-        mDesktopWallpaperActivityTokenProviderOptional =
-                desktopWallpaperActivityTokenProviderOptional;
+        mPipDesktopState = pipDesktopState;
     }
 
     @Override
@@ -247,7 +236,9 @@ public class PipTransition extends PipTransitionController implements
 
     @Override
     public void mergeAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
-            @NonNull SurfaceControl.Transaction t, @NonNull IBinder mergeTarget,
+            @NonNull SurfaceControl.Transaction startT,
+            @NonNull SurfaceControl.Transaction finishT,
+            @NonNull IBinder mergeTarget,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
         // Just jump-cut the current animation if any, but do not merge.
         if (info.getType() == TRANSIT_EXIT_PIP) {
@@ -725,6 +716,12 @@ public class PipTransition extends PipTransitionController implements
                 mPipTransitionState.getPipTaskToken());
         mFinishCallback = finishCallback;
 
+        if (isPipClosing(info)) {
+            // If PiP is removed via a close (e.g. finishing of the activity), then
+            // clear out the PiP cache related to that activity component (e.g. reentry state).
+            mPipBoundsState.setLastPipComponentName(null /* lastPipComponentName */);
+        }
+
         finishTransaction.setAlpha(pipChange.getLeash(), 0f);
         if (mPendingRemoveWithFadeout) {
             PipAlphaAnimator animator = new PipAlphaAnimator(mContext, pipChange.getLeash(),
@@ -794,7 +791,7 @@ public class PipTransition extends PipTransitionController implements
                     && getFixedRotationDelta(info, pipTaskChange) == ROTATION_90) {
                 adjustedSourceRectHint.offset(cutoutInsets.left, cutoutInsets.top);
             }
-            if (Flags.enableDesktopWindowingPip()) {
+            if (mPipDesktopState.isDesktopWindowingPipEnabled()) {
                 adjustedSourceRectHint.offset(-pipActivityChange.getStartAbsBounds().left,
                         -pipActivityChange.getStartAbsBounds().top);
             }
@@ -854,7 +851,7 @@ public class PipTransition extends PipTransitionController implements
 
         // If PiP is enabled on Connected Displays, update PipDisplayLayoutState to have the correct
         // display info that PiP is entering in.
-        if (Flags.enableConnectedDisplaysPip()) {
+        if (mPipDesktopState.isConnectedDisplaysPipEnabled()) {
             final DisplayLayout displayLayout = mDisplayController.getDisplayLayout(
                     pipTask.displayId);
             if (displayLayout != null) {
@@ -902,12 +899,7 @@ public class PipTransition extends PipTransitionController implements
         // Since opening a new task while in Desktop Mode always first open in Fullscreen
         // until DesktopMode Shell code resolves it to Freeform, PipTransition will get a
         // possibility to handle it also. In this case return false to not have it enter PiP.
-        final boolean isInDesktopSession = !mDesktopUserRepositoriesOptional.isEmpty()
-                && (mDesktopUserRepositoriesOptional.get().getCurrent().getVisibleTaskCount(
-                        pipTask.displayId) > 0
-                    || mDesktopUserRepositoriesOptional.get().getCurrent()
-                        .isMinimizedPipPresentInDisplay(pipTask.displayId));
-        if (isInDesktopSession) {
+        if (mPipDesktopState.isPipEnteringInDesktopMode(pipTask)) {
             return false;
         }
 
@@ -952,13 +944,29 @@ public class PipTransition extends PipTransitionController implements
 
         boolean isPipMovedToBack = info.getType() == TRANSIT_TO_BACK
                 && pipChange.getMode() == TRANSIT_TO_BACK;
-        boolean isPipClosed = info.getType() == TRANSIT_CLOSE
-                && pipChange.getMode() == TRANSIT_CLOSE;
         // If PiP is dismissed by user (i.e. via dismiss button in PiP menu)
         boolean isPipDismissed = info.getType() == TRANSIT_REMOVE_PIP
                 && pipChange.getMode() == TRANSIT_TO_BACK;
         // PiP is being removed if the pinned task is either moved to back, closed, or dismissed.
-        return isPipMovedToBack || isPipClosed || isPipDismissed;
+        return isPipMovedToBack || isPipClosing(info) || isPipDismissed;
+    }
+
+    private boolean isPipClosing(@NonNull TransitionInfo info) {
+        if (mPipTransitionState.getPipTaskToken() == null) {
+            // PiP removal makes sense if enter-PiP has cached a valid pinned task token.
+            return false;
+        }
+        TransitionInfo.Change pipChange = info.getChange(mPipTransitionState.getPipTaskToken());
+        TransitionInfo.Change pipActivityChange = info.getChanges().stream().filter(change ->
+                change.getTaskInfo() == null && change.getParent() != null
+                        && change.getParent() == mPipTransitionState.getPipTaskToken())
+                .findFirst().orElse(null);
+
+        boolean isPipTaskClosed = pipChange != null
+                && pipChange.getMode() == TRANSIT_CLOSE;
+        boolean isPipActivityClosed = pipActivityChange != null
+                && pipActivityChange.getMode() == TRANSIT_CLOSE;
+        return isPipTaskClosed || isPipActivityClosed;
     }
 
     private void prepareConfigAtEndActivity(@NonNull SurfaceControl.Transaction startTx,
@@ -1065,26 +1073,13 @@ public class PipTransition extends PipTransitionController implements
                         "Unexpected bundle for " + mPipTransitionState);
                 break;
             case PipTransitionState.EXITED_PIP:
-                final TaskInfo pipTask = mPipTransitionState.getPipTaskInfo();
-                final boolean desktopPipEnabled = Flags.enableDesktopWindowingPip()
-                        && mDesktopUserRepositoriesOptional.isPresent()
-                        && mDesktopWallpaperActivityTokenProviderOptional.isPresent();
-                if (desktopPipEnabled && pipTask != null) {
-                    final DesktopRepository desktopRepository =
-                            mDesktopUserRepositoriesOptional.get().getCurrent();
-                    final boolean wallpaperIsVisible =
-                            mDesktopWallpaperActivityTokenProviderOptional.get()
-                                    .isWallpaperActivityVisible(pipTask.displayId);
-                    if (desktopRepository.getVisibleTaskCount(pipTask.displayId) == 0
-                            && wallpaperIsVisible) {
-                        mTransitions.startTransition(
-                                TRANSIT_TO_BACK,
-                                new WindowContainerTransaction().reorder(
-                                        mDesktopWallpaperActivityTokenProviderOptional.get()
-                                                .getToken(pipTask.displayId), /* onTop= */ false),
-                                null
-                        );
-                    }
+                if (mPipDesktopState.shouldExitPipExitDesktopMode()) {
+                    mTransitions.startTransition(
+                            TRANSIT_TO_BACK,
+                            mPipDesktopState.getWallpaperActivityTokenWct(
+                                    mPipTransitionState.getPipTaskInfo().getDisplayId()),
+                            null /* firstHandler */
+                    );
                 }
                 mPipTransitionState.setPinnedTaskLeash(null);
                 mPipTransitionState.setPipTaskInfo(null);

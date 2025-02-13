@@ -513,6 +513,13 @@ flag {
 }
 
 flag {
+    name: "enable_taskbar_connected_displays"
+    namespace: "lse_desktop_experience"
+    description: "Enables connected displays in taskbar."
+    bug: "393398093"
+}
+
+flag {
     name: "enable_bug_fixes_for_secondary_display"
     namespace: "lse_desktop_experience"
     description: "Bugfixes / papercuts to bring Desktop Windowing to secondary displays."
@@ -592,4 +599,35 @@ flag {
     metadata {
        purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_non_default_display_split"
+    namespace: "lse_desktop_experience"
+    description: "Enables split screen on non default displays"
+    bug: "384999213"
+}
+
+flag {
+    name: "enable_desktop_mode_through_dev_option"
+    namespace: "lse_desktop_experience"
+    description: "Enables support for desktop mode through developer options for devices eligible for desktop mode."
+    bug: "382238347"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_taskbar_on_freeform_displays"
+    namespace: "lse_desktop_experience"
+    description: "Forces pinned taskbar with desktop tasks on freeform displays"
+    bug: "390665752"
+}
+
+flag {
+    name: "enable_presentation_for_connected_displays"
+    namespace: "lse_desktop_experience"
+    description: "Enables full support of presentation API for connected displays."
+    bug: "378503083"
 }

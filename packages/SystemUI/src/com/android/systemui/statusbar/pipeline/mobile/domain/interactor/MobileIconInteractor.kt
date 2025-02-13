@@ -584,7 +584,6 @@ class MobileIconInteractorImpl(
             .distinctUntilChanged()
             .logDiffsForTable(
                 tableLogBuffer = tableLogBuffer,
-                columnPrefix = "",
                 initialValue = DefaultIcon(defaultMobileIconGroup.value),
             )
             .stateIn(

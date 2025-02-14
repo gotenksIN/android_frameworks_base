@@ -250,6 +250,8 @@ final class InstallPackageHelper {
     private final UpdateOwnershipHelper mUpdateOwnershipHelper;
 // QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     private static final String PROPERTY_NO_RIL = "ro.radio.noril";
+
+    private static final String PROPERTY_QSPA_Enabled = "ro.boot.vendor.qspa";
     /**
      * Tracks packages that need to be disabled.
      * Map of package name to its path on the file system.
@@ -3890,14 +3892,14 @@ final class InstallPackageHelper {
 
 // QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     /**
-     * Read the list of packages that need to be disabled.
+     * Read the list of telephony packages that need to be disabled.
      *
      * For wifi-only devices (modem-less), telephony related applications do not need to run.
      * This method will read the list of packages from a predefined file in the file system,
      * and store it in {@link #mPackagesToBeDisabled}. These applications will be skipped when
      * directories are scanned later.
      */
-    protected void readListOfPackagesToBeDisabled() {
+    protected void readListOfTelephonyPackagesToBeDisabled() {
         boolean wifiOnly = SystemProperties.getBoolean(PROPERTY_NO_RIL, false);
         if (!wifiOnly) {
             // Apps need to be disabled only for modem-less devices
@@ -3959,6 +3961,127 @@ final class InstallPackageHelper {
     }
 
 // QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
+
+    /**
+     * Read the list of packages that need to be disabled.
+     *
+     * For Qspa enabled targets, some defined applications do not need to run if the specific
+     * hardware subsystem is not enabled(disabled) on the target.
+     * This method will read the list of packages from a predefined file in the file system,
+     * and store it in {@link #mPackagesToBeDisabled} if the property value on device matches the
+     * systemPropertyValue i.e., disabled. These applications will be skipped when
+     * directories are scanned later.
+     */
+    protected void readListOfPackagesToBeDisabled() {
+        boolean qspaEnabled = SystemProperties.getBoolean(PROPERTY_QSPA_Enabled, false);
+        if (!qspaEnabled) {
+            // Apps need to be disabled only for Qspa Enabled targets
+            return;
+        }
+
+        final String QSPA_PACKAGES_PATH = "etc/qspa_application_packages.xml";
+        File qspaPackagesFile =
+                new File(Environment.getVendorDirectory(), QSPA_PACKAGES_PATH);
+
+
+        if (!qspaPackagesFile.exists()) {
+            Slog.e(TAG, "File not found: " + qspaPackagesFile);
+            return; // Return early if the file does not exist
+        }
+        FileReader packagesReader = null;
+        Slog.d(TAG, "Disabling packages for qspa enabled targets, source: " + qspaPackagesFile);
+
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            factory.setNamespaceAware(true);
+            XmlPullParser packagesParser = factory.newPullParser();
+            packagesReader = new FileReader(qspaPackagesFile);
+
+            if (packagesParser != null) {
+                packagesParser.setInput(packagesReader);
+                int eventType = packagesParser.getEventType();
+                while (eventType != XmlPullParser.END_DOCUMENT) {
+                    String tagName = packagesParser.getName();
+                    switch (eventType) {
+                        case XmlPullParser.START_TAG:
+                            if (TextUtils.equals(tagName, "propertyCheck")) {
+                                String subsystem =
+                                        packagesParser.getAttributeValue(null, "subsystem");
+                                String systemPropertyName = "ro.boot.vendor.qspa." + subsystem;
+                                String currValue = SystemProperties.get(systemPropertyName);
+                                Slog.d(TAG, "subsystem: " + subsystem + " currValue: " + currValue);
+                                int innerEventType = packagesParser.next();
+                                while (innerEventType != XmlPullParser.END_TAG ||
+                                        !TextUtils.equals(packagesParser.getName(),
+                                        "propertyCheck")) {
+                                    if (innerEventType == XmlPullParser.START_TAG &&
+                                            TextUtils.equals(packagesParser.getName(),
+                                            "propertyValue")) {
+                                        String systemPropertyValue =
+                                                packagesParser.getAttributeValue(null, "value");
+                                        if (TextUtils.equals(currValue, systemPropertyValue)) {
+                                            int packageEventType = packagesParser.next();
+                                            while (packageEventType != XmlPullParser.END_TAG ||
+                                                    !TextUtils.equals(packagesParser.getName(),
+                                                    "propertyValue")) {
+                                                if (packageEventType == XmlPullParser.START_TAG &&
+                                                        TextUtils.equals(packagesParser.getName(),
+                                                        "packageinfo")) {
+                                                    String name = packagesParser.getAttributeValue(
+                                                            null, "name");
+                                                    String path = packagesParser.getAttributeValue(
+                                                            null, "path");
+                                                    mPackagesToBeDisabled.put(name, path);
+                                                }
+                                                packageEventType = packagesParser.next();
+                                            }
+                                        }
+                                        else
+                                        {
+                                            Slog.w(TAG, "Ignoring disabling packages due to " +
+                                                "systemPropertyName: " + systemPropertyName +
+                                                " with value: " + systemPropertyValue);
+                                        }
+                                    }
+                                    innerEventType = packagesParser.next();
+                                }
+                            }
+                            break;
+                    }
+                    eventType = packagesParser.next();
+                }
+            }
+        } catch (XmlPullParserException e) {
+            Slog.e(TAG, "XmlPullParserException parsing '"+ qspaPackagesFile + "'", e);
+        } catch (IOException e) {
+            Slog.e(TAG, "IOException parsing '" + qspaPackagesFile + "'", e);
+        } catch (Exception e) {
+            Slog.e(TAG, "Exception parsing '" + qspaPackagesFile + "'", e);
+        }
+
+        if (packagesReader != null) {
+            try {
+                packagesReader.close();
+            } catch (IOException e) {
+                // do nothing
+            }
+        }
+
+        for (String packageName : mPackagesToBeDisabled.keySet()) {
+                Slog.d(TAG, "readListOfPackagesToBeDisabled"
+                        + ", package: " + packageName
+                        + ", path: " + mPackagesToBeDisabled.get(packageName));
+            }
+
+        if (DEBUG_PACKAGE_SCANNING) {
+            for (String packageName : mPackagesToBeDisabled.keySet()) {
+                Slog.d(TAG, "readListOfPackagesToBeDisabled"
+                        + ", package: " + packageName
+                        + ", path: " + mPackagesToBeDisabled.get(packageName));
+            }
+        }
+    }
+
     /**
      * Make sure all system apps that we expected to appear on
      * the userdata partition actually showed up. If they never

@@ -2151,6 +2151,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mStorageEventHelper = new StorageEventHelper(this, mDeletePackageHelper,
                 mRemovePackageHelper);
 
+        t.traceBegin("readListOfTelephonyPackagesToBeDisabled");
+        mInstallPackageHelper.readListOfTelephonyPackagesToBeDisabled();
+        t.traceEnd();
+
 // QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         t.traceBegin("readListOfPackagesToBeDisabled");
         mInstallPackageHelper.readListOfPackagesToBeDisabled();

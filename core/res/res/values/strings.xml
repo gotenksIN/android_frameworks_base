@@ -5746,6 +5746,16 @@
     <string name="unpin_specific_target">Unpin <xliff:g id="label" example="Tweet">%1$s</xliff:g></string>
     <!-- View application info for a target. -->
     <string name="app_info">App info</string>
+    <!-- Accessibility announcement for the shortcut group (https://developer.android.com/training/sharing/direct-share-targets)
+     in the list of targets. [CHAR LIMIT=NONE]-->
+    <string name="shortcut_group_a11y_title">Direct share targets</string>
+    <!-- Accessibility announcement for the suggested application group in the list of targets.
+    [CHAR LIMIT=NONE] -->
+    <string name="suggested_apps_group_a11y_title">App suggestions</string>
+    <!-- Accessibility announcement for the all-applications group in the list of targets.
+    [CHAR LIMIT=NONE] -->
+    <string name="all_apps_group_a11y_title">App list</string>
+
 
     <!-- The representation of a time duration when negative. An example is -1:14. This can be used with a countdown timer for example.-->
     <string name="negative_duration">\u2212<xliff:g id="time" example="1:14">%1$s</xliff:g></string>
@@ -6156,6 +6166,14 @@
     <string name="accessibility_autoclick_type_settings_panel_title">Autoclick type settings panel</string>
     <!-- Label for autoclick left click button [CHAR LIMIT=NONE] -->
     <string name="accessibility_autoclick_left_click">Left click</string>
+    <!-- Label for autoclick right click button [CHAR LIMIT=NONE] -->
+    <string name="accessibility_autoclick_right_click">Right click</string>
+    <!-- Label for autoclick double click button [CHAR LIMIT=NONE] -->
+    <string name="accessibility_autoclick_double_click">Double click</string>
+    <!-- Label for autoclick drag button [CHAR LIMIT=NONE] -->
+    <string name="accessibility_autoclick_drag">Drag</string>
+    <!-- Label for autoclick scroll button [CHAR LIMIT=NONE] -->
+    <string name="accessibility_autoclick_scroll">Scroll</string>
     <!-- Label for autoclick pause button [CHAR LIMIT=NONE] -->
     <string name="accessibility_autoclick_pause">Pause</string>
     <!-- Label for autoclick position button [CHAR LIMIT=NONE] -->
@@ -6778,4 +6796,10 @@ ul.</string>
 
     <!-- Fingerprint loe notification string -->
     <string name="fingerprint_loe_notification_msg">Your fingerprints can no longer be recognized. Set up Fingerprint Unlock again.</string>
+
+    <!--  AdvancedProtectionService USB notifications -->
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title">USB device plugged in when locked</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_text">USB device is plugged in when Android is locked. To use device, please unlock Android first and then reinsert USB device to use it.</string>
+    <string name="usb_apm_usb_suspicious_activity_notification_title">Suspicious USB activity</string>
+    <string name="usb_apm_usb_suspicious_activity_notification_text">USB data signal has been disabled.</string>
 </resources>

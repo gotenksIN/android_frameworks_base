@@ -942,7 +942,7 @@ public class InfoMediaManagerTest {
         assertThat(mInfoMediaManager.getCurrentConnectedDevice()).isEqualTo(device);
     }
 
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_SESSION_GROUPING)
+    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_DEVICE_GROUPING)
     @Test
     public void composePreferenceRouteListing_useSystemOrderingIsFalse() {
         RouteListingPreference routeListingPreference =
@@ -955,7 +955,7 @@ public class InfoMediaManagerTest {
         assertThat(routeOrder.get(1).getRouteId()).isEqualTo(TEST_ID_4);
     }
 
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_SESSION_GROUPING)
+    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_DEVICE_GROUPING)
     @Test
     public void composePreferenceRouteListing_useSystemOrderingIsTrue() {
         RouteListingPreference routeListingPreference =
@@ -968,7 +968,7 @@ public class InfoMediaManagerTest {
         assertThat(routeOrder.get(1).getRouteId()).isEqualTo(TEST_ID_3);
     }
 
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_SESSION_GROUPING)
+    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_DEVICE_GROUPING)
     @Test
     public void arrangeRouteListByPreference_useSystemOrderingIsFalse() {
         RouteListingPreference routeListingPreference =
@@ -986,7 +986,7 @@ public class InfoMediaManagerTest {
         assertThat(routeOrder.get(3).getId()).isEqualTo(TEST_ID_1);
     }
 
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_SESSION_GROUPING)
+    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_DEVICE_GROUPING)
     @Test
     public void arrangeRouteListByPreference_useSystemOrderingIsTrue() {
         RouteListingPreference routeListingPreference =
@@ -1002,5 +1002,22 @@ public class InfoMediaManagerTest {
         assertThat(routeOrder.get(1).getId()).isEqualTo(TEST_ID_3);
         assertThat(routeOrder.get(2).getId()).isEqualTo(TEST_ID_4);
         assertThat(routeOrder.get(3).getId()).isEqualTo(TEST_ID_1);
+    }
+
+    @Test
+    public void selectedRouteAppearsFirst() {
+        RouteListingPreference routeListingPreference =
+                setUpPreferenceList(TEST_PACKAGE_NAME, true);
+        List<MediaRoute2Info> routes = setAvailableRoutesList(TEST_PACKAGE_NAME);
+        List<MediaRoute2Info> selectedRoutes = List.of(routes.get(2));
+
+        List<MediaRoute2Info> routeOrder =
+                Api34Impl.arrangeRouteListByPreference(
+                        selectedRoutes, routes, routeListingPreference);
+
+        assertThat(routeOrder.stream().map(MediaRoute2Info::getId).toArray())
+                .asList()
+                .containsExactly(TEST_ID_4, TEST_ID_1, TEST_ID_3)
+                .inOrder();
     }
 }

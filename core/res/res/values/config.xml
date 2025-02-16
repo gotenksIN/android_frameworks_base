@@ -1214,6 +1214,9 @@
             3 - Really go to sleep and go home (don't doze)
             4 - Go to home
             5 - Dismiss IME if shown. Otherwise go to home
+            6 - Lock if keyguard enabled or go to sleep (doze)
+            7 - Dream if possible or go to sleep (doze)
+            8 - Go to glanceable hub or dream if possible, or sleep if neither is available (doze)
     -->
     <integer name="config_shortPressOnPowerBehavior">1</integer>
 
@@ -3261,6 +3264,14 @@
          represents physical port address of each display and display in this list will be marked
          as private. {@see android.view.Display#FLAG_PRIVATE} -->
     <integer-array translatable="false" name="config_localPrivateDisplayPorts"></integer-array>
+
+    <!-- Controls if local secondary displays should be able to steal focus and become top display.
+         Value specified in the array represents physical port address of each display and displays
+         in this list due to flag dependencies will be marked with the following flags:
+         {@see android.view.Display#FLAG_STEAL_TOP_FOCUS_DISABLED}
+         {@see android.view.Display#FLAG_OWN_FOCUS} -->
+    <integer-array translatable="false" name="config_localNotStealTopFocusDisplayPorts">
+    </integer-array>
 
     <!-- The default mode for the default display. One of the following values (See Display.java):
              0 - COLOR_MODE_DEFAULT
@@ -7272,6 +7283,9 @@
     <!-- Wear devices: An intent action that is used for remote intent. -->
     <string name="config_wearRemoteIntentAction" translatable="false" />
 
+    <!-- Whether the current device's internal display can host desktop sessions.  -->
+    <bool name="config_canInternalDisplayHostDesktops">false</bool>
+
     <!-- Whether desktop mode is supported on the current device  -->
     <bool name="config_isDesktopModeSupported">false</bool>
 
@@ -7364,4 +7378,23 @@
     <!-- Array containing the notification assistant service adjustments that are not supported by
      default on this device-->
     <string-array translatable="false" name="config_notificationDefaultUnsupportedAdjustments" />
+
+    <!-- Preference name of bugreport-->
+    <string name="prefs_bugreport" translatable="false">bugreports</string>
+
+    <!-- key value of warning state stored in bugreport preference-->
+    <string name="key_warning_state" translatable="false">warning-state</string>
+
+    <!-- Bugreport warning dialog state unknown-->
+    <integer name="bugreport_state_unknown">0</integer>
+
+    <!-- Bugreport warning dialog state shows the warning dialog-->
+    <integer name="bugreport_state_show">1</integer>
+
+    <!-- Bugreport warning dialog state skips the warning dialog-->
+    <integer name="bugreport_state_hide">2</integer>
+
+    <!-- By default ActivityOptions#makeScaleUpAnimation is only used between activities. This
+         config enables OEMs to support its usage across tasks.-->
+    <bool name="config_enableCrossTaskScaleUpAnimation">false</bool>
 </resources>

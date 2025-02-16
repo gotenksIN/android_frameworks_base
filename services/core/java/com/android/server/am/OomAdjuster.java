@@ -1812,8 +1812,11 @@ public class OomAdjuster {
                     }
                     if ((uidChange & UidRecord.CHANGE_PROCSTATE) != 0
                             || (uidChange & UidRecord.CHANGE_CAPABILITY) != 0) {
-                        mService.noteUidProcessState(uidRec.getUid(), uidRec.getCurProcState(),
-                                uidRec.getCurCapability());
+                        mService.noteUidProcessStateAndCapability(uidRec.getUid(),
+                                uidRec.getCurProcState(), uidRec.getCurCapability());
+                    }
+                    if ((uidChange & UidRecord.CHANGE_PROCSTATE) != 0) {
+                        mService.noteUidProcessState(uidRec.getUid(), uidRec.getCurProcState());
                     }
                     if (uidRec.hasForegroundServices()) {
                         mService.mServices.foregroundServiceProcStateChangedLocked(uidRec);
@@ -4291,7 +4294,6 @@ public class OomAdjuster {
                 + " mNewNumServiceProcs=" + mNewNumServiceProcs);
     }
 
-    @GuardedBy("mProcLock")
     void dumpCachedAppOptimizerSettings(PrintWriter pw) {
         mCachedAppOptimizer.dump(pw);
     }
@@ -4341,6 +4343,7 @@ public class OomAdjuster {
             return;
         }
 
+        final boolean freezePolicy = getFreezePolicy(app);
         final ProcessCachedOptimizerRecord opt = app.mOptRecord;
         final ProcessStateRecord state = app.mState;
         if (Flags.traceUpdateAppFreezeStateLsp()) {
@@ -4357,6 +4360,21 @@ public class OomAdjuster {
             if ((oomAdjChanged || shouldNotFreezeChanged || cpuCapabilityChanged)
                     && Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                 Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                        "FreezeLite",
+                        (opt.isFrozen() ? "F" : "-")
+                        + (opt.isPendingFreeze() ? "P" : "-")
+                        + (opt.isFreezeExempt() ? "E" : "-")
+                        + (opt.shouldNotFreeze() ? "N" : "-")
+                        + (hasCpuCapability ? "T" : "-")
+                        + (immediate ? "I" : "-")
+                        + (freezePolicy ? "Z" : "-")
+                        + (Flags.useCpuTimeCapability() ? "t" : "-")
+                        + (Flags.prototypeAggressiveFreezing() ? "a" : "-")
+                        + "/" + app.getPid()
+                        + "/" + state.getCurAdj()
+                        + "/" + oldOomAdj
+                        + "/" + opt.shouldNotFreezeReason());
+                Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                         CachedAppOptimizer.ATRACE_FREEZER_TRACK,
                         "updateAppFreezeStateLSP " + app.processName
                         + " pid: " + app.getPid()
@@ -4371,7 +4389,7 @@ public class OomAdjuster {
             }
         }
 
-        if (getFreezePolicy(app)) {
+        if (freezePolicy) {
             // This process should be frozen.
             if (immediate && !opt.isFrozen()) {
                 // And it will be frozen immediately.

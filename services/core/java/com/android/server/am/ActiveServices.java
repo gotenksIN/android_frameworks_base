@@ -8739,8 +8739,6 @@ public final class ActiveServices {
         if ((allowWiu == REASON_DENIED) || (allowStart == REASON_DENIED)) {
             @ReasonCode final int allowWhileInUse = shouldAllowFgsWhileInUsePermissionLocked(
                     callingPackage, callingPid, callingUid, r.app, backgroundStartPrivileges);
-            // We store them to compare the old and new while-in-use logics to each other.
-            // (They're not used for any other purposes.)
             if (allowWiu == REASON_DENIED) {
                 allowWiu = allowWhileInUse;
             }
@@ -9143,6 +9141,7 @@ public final class ActiveServices {
                                         + ",duration:" + tempAllowListReason.mDuration
                                         + ",callingUid:" + tempAllowListReason.mCallingUid))
                         + ">"
+                        + "; allowWiu:" + allowWhileInUse
                         + "; targetSdkVersion:" + r.appInfo.targetSdkVersion
                         + "; callerTargetSdkVersion:" + callerTargetSdkVersion
                         + "; startForegroundCount:" + r.mStartForegroundCount

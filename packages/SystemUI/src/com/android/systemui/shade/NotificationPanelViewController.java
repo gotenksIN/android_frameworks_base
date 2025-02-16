@@ -49,6 +49,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Insets;
@@ -110,7 +111,8 @@ import com.android.systemui.keyguard.shared.model.ClockSize;
 import com.android.systemui.keyguard.shared.model.Edge;
 import com.android.systemui.keyguard.shared.model.TransitionState;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
-import com.android.systemui.keyguard.ui.binder.KeyguardLongPressViewBinder;
+import com.android.systemui.keyguard.ui.binder.KeyguardTouchViewBinder;
+import com.android.systemui.keyguard.ui.transitions.BlurConfig;
 import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardTouchHandlingViewModel;
 import com.android.systemui.media.controls.domain.pipeline.MediaDataManager;
@@ -189,6 +191,7 @@ import com.android.systemui.unfold.SysUIUnfoldComponent;
 import com.android.systemui.util.Compile;
 import com.android.systemui.util.Utils;
 import com.android.systemui.util.time.SystemClock;
+import com.android.systemui.wallpapers.ui.viewmodel.WallpaperFocalAreaViewModel;
 import com.android.wm.shell.animation.FlingAnimationUtils;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -263,7 +266,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private final ShadeLogger mShadeLog;
     private final DozeParameters mDozeParameters;
     private final NotificationStackScrollLayout.OnEmptySpaceClickListener
-            mOnEmptySpaceClickListener = (x, y) -> onEmptySpaceClick();
+            mOnEmptySpaceClickListener = this::onEmptySpaceClick;
     private final ShadeHeadsUpChangedListener mOnHeadsUpChangedListener =
             new ShadeHeadsUpChangedListener();
     private final ConfigurationListener mConfigurationListener = new ConfigurationListener();
@@ -309,6 +312,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private final AlternateBouncerInteractor mAlternateBouncerInteractor;
     private final QuickSettingsControllerImpl mQsController;
     private final TouchHandler mTouchHandler = new TouchHandler();
+    private final BlurConfig mBlurConfig;
 
     private long mDownTime;
     private long mStatusBarLongPressDowntime = -1L;
@@ -465,6 +469,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private final NotificationListContainer mNotificationListContainer;
     private final NPVCDownEventState.Buffer mLastDownEvents;
     private final KeyguardClockInteractor mKeyguardClockInteractor;
+    private final WallpaperFocalAreaViewModel mWallpaperFocalAreaViewModel;
     private float mMinExpandHeight;
     private boolean mPanelUpdateWhenAnimatorEnds;
     private boolean mHasVibratedOnOpen = false;
@@ -533,6 +538,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private final ActivityStarter mActivityStarter;
     private final BrightnessMirrorShowingInteractor mBrightnessMirrorShowingInteractor;
 
+    @Nullable
+    private RenderEffect mBlurRenderEffect = null;
+
     @Inject
     public NotificationPanelViewController(NotificationPanelView view,
             NotificationWakeUpCoordinator coordinator,
@@ -595,6 +603,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             KeyguardTransitionInteractor keyguardTransitionInteractor,
             DumpManager dumpManager,
             KeyguardTouchHandlingViewModel keyguardTouchHandlingViewModel,
+            WallpaperFocalAreaViewModel wallpaperFocalAreaViewModel,
             KeyguardInteractor keyguardInteractor,
             ActivityStarter activityStarter,
             SharedNotificationContainerInteractor sharedNotificationContainerInteractor,
@@ -606,7 +615,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             PowerInteractor powerInteractor,
             KeyguardClockPositionAlgorithm keyguardClockPositionAlgorithm,
             MSDLPlayer msdlPlayer,
-            BrightnessMirrorShowingInteractor brightnessMirrorShowingInteractor) {
+            BrightnessMirrorShowingInteractor brightnessMirrorShowingInteractor,
+            BlurConfig blurConfig) {
+        mBlurConfig = blurConfig;
         SceneContainerFlag.assertInLegacyMode();
         keyguardStateController.addCallback(new KeyguardStateController.Callback() {
             @Override
@@ -752,11 +763,12 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 SysUIUnfoldComponent::getKeyguardUnfoldTransition);
 
         mKeyguardClockInteractor = keyguardClockInteractor;
-        KeyguardLongPressViewBinder.bind(
+        mWallpaperFocalAreaViewModel = wallpaperFocalAreaViewModel;
+        KeyguardTouchViewBinder.bind(
                 mView.requireViewById(R.id.keyguard_long_press),
                 keyguardTouchHandlingViewModel,
-                () -> {
-                    onEmptySpaceClick();
+                (x, y) -> {
+                    onEmptySpaceClick(x, y);
                     return Unit.INSTANCE;
                 },
                 mFalsingManager);
@@ -920,13 +932,14 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     private void handleBouncerShowingChanged(Boolean isBouncerShowing) {
         if (!com.android.systemui.Flags.bouncerUiRevamp()) return;
-
         if (isBouncerShowing && isExpanded()) {
-            float shadeBlurEffect = mDepthController.getMaxBlurRadiusPx();
-            mView.setRenderEffect(RenderEffect.createBlurEffect(
-                    shadeBlurEffect,
-                    shadeBlurEffect,
-                    Shader.TileMode.CLAMP));
+            if (mBlurRenderEffect == null) {
+                mBlurRenderEffect = RenderEffect.createBlurEffect(
+                        mBlurConfig.getMaxBlurRadiusPx(),
+                        mBlurConfig.getMaxBlurRadiusPx(),
+                        Shader.TileMode.CLAMP);
+            }
+            mView.setRenderEffect(mBlurRenderEffect);
         } else {
             mView.setRenderEffect(null);
         }
@@ -2075,7 +2088,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         }
     }
 
-    private void onMiddleClicked() {
+    private void onMiddleClicked(float x, float y) {
         switch (mBarState) {
             case KEYGUARD:
                 if (!mDozingOnDown) {
@@ -2094,6 +2107,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                         mLockscreenGestureLogger
                                 .log(LockscreenUiEvent.LOCKSCREEN_LOCK_SHOW_HINT);
                         mKeyguardIndicationController.showActionToUnlock();
+                        mKeyguardClockInteractor.handleFidgetTap(x, y);
                     }
                 }
                 break;
@@ -2838,7 +2852,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         } else if (!mCentralSurfaces.isBouncerShowing()
                 && !mAlternateBouncerInteractor.isVisibleState()
                 && !mKeyguardStateController.isKeyguardGoingAway()) {
-            onEmptySpaceClick();
+            onEmptySpaceClick(x, y);
             onTrackingStopped(true);
         }
         mVelocityTracker.clear();
@@ -3146,8 +3160,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     /** Called when the user performs a click anywhere in the empty area of the panel. */
-    private void onEmptySpaceClick() {
-        onMiddleClicked();
+    private void onEmptySpaceClick(float x, float y) {
+        onMiddleClicked(x, y);
     }
 
     @VisibleForTesting
@@ -3374,6 +3388,13 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     private final class ConfigurationListener implements
             ConfigurationController.ConfigurationListener {
+        @Override
+        public void onConfigChanged(Configuration newConfig) {
+            if (ShadeWindowGoesAround.isEnabled()) {
+                updateResources();
+            }
+        }
+
         @Override
         public void onThemeChanged() {
             debugLog("onThemeChanged");

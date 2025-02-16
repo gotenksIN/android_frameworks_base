@@ -22,6 +22,7 @@ import com.android.internal.logging.UiEventLogger
 import com.android.systemui.qs.flags.QsDetailedView
 import com.android.systemui.res.R
 import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor
+import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -30,7 +31,7 @@ import dagger.assisted.AssistedInject
 /** Dialog for showing active, connected and saved bluetooth devices. */
 class BluetoothTileDialogDelegate
 @AssistedInject
-internal constructor(
+constructor(
     @Assisted private val initialUiProperties: BluetoothTileDialogViewModel.UiProperties,
     @Assisted private val cachedContentHeight: Int,
     @Assisted private val bluetoothTileDialogCallback: BluetoothTileDialogCallback,
@@ -39,12 +40,13 @@ internal constructor(
     private val systemuiDialogFactory: SystemUIDialog.Factory,
     private val shadeDialogContextInteractor: ShadeDialogContextInteractor,
     private val bluetoothDetailsContentManagerFactory: BluetoothDetailsContentManager.Factory,
+    private val shadeModeInteractor: ShadeModeInteractor,
 ) : SystemUIDialog.Delegate {
 
     lateinit var contentManager: BluetoothDetailsContentManager
 
     @AssistedFactory
-    internal interface Factory {
+    interface Factory {
         fun create(
             initialUiProperties: BluetoothTileDialogViewModel.UiProperties,
             cachedContentHeight: Int,
@@ -54,8 +56,11 @@ internal constructor(
     }
 
     override fun createDialog(): SystemUIDialog {
-        // If `QsDetailedView` is enabled, it should show the details view.
-        QsDetailedView.assertInLegacyMode()
+        // TODO (b/393628355): remove this after the details view is supported for single shade.
+        if (shadeModeInteractor.isDualShade) {
+            // If `QsDetailedView` is enabled, it should show the details view.
+            QsDetailedView.assertInLegacyMode()
+        }
 
         return systemuiDialogFactory.create(this, shadeDialogContextInteractor.context)
     }

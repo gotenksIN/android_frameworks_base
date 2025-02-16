@@ -30,8 +30,12 @@ import com.android.internal.R
 import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.keyguard.data.repository.KeyguardRepository
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
+import com.android.systemui.keyguard.shared.model.Edge
+import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.res.R as SysUIR
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shared.Flags.ambientAod
 import com.android.systemui.shared.Flags.extendedWallpaperEffects
 import com.android.systemui.user.data.model.SelectedUserModel
@@ -79,9 +83,10 @@ constructor(
     @Background private val bgDispatcher: CoroutineDispatcher,
     broadcastDispatcher: BroadcastDispatcher,
     userRepository: UserRepository,
-    keyguardRepository: KeyguardRepository,
+    wallpaperFocalAreaRepository: WallpaperFocalAreaRepository,
     private val wallpaperManager: WallpaperManager,
     private val context: Context,
+    keyguardTransitionInteractor: KeyguardTransitionInteractor,
 ) : WallpaperRepository {
     private val wallpaperChanged: Flow<Unit> =
         broadcastDispatcher
@@ -101,6 +106,7 @@ constructor(
             .filter { it.selectionStatus == SelectionStatus.SELECTION_COMPLETE }
 
     @VisibleForTesting var sendLockscreenLayoutJob: Job? = null
+    @VisibleForTesting var sendTapInShapeEffectsJob: Job? = null
 
     override val wallpaperInfo: StateFlow<WallpaperInfo?> =
         if (!wallpaperManager.isWallpaperSupported) {
@@ -131,38 +137,68 @@ constructor(
                 if (shouldSendNotificationLayout) {
                     sendLockscreenLayoutJob =
                         scope.launch {
-                            keyguardRepository.wallpaperFocalAreaBounds.collect {
-                                wallpaperFocalAreaBounds ->
+                            combine(
+                                    wallpaperFocalAreaRepository.wallpaperFocalAreaBounds,
+                                    keyguardTransitionInteractor
+                                        .transition(
+                                            edge = Edge.create(to = Scenes.Lockscreen),
+                                            edgeWithoutSceneContainer =
+                                                Edge.create(to = KeyguardState.LOCKSCREEN),
+                                        )
+                                        .filter { transitionStep ->
+                                            transitionStep.transitionState ==
+                                                TransitionState.STARTED
+                                        },
+                                    ::Pair,
+                                )
+                                .map { (bounds, _) -> bounds }
+                                .collect { wallpaperFocalAreaBounds ->
+                                    wallpaperManager.sendWallpaperCommand(
+                                        /* windowToken = */ rootView?.windowToken,
+                                        /* action = */ WallpaperManager
+                                            .COMMAND_LOCKSCREEN_LAYOUT_CHANGED,
+                                        /* x = */ 0,
+                                        /* y = */ 0,
+                                        /* z = */ 0,
+                                        /* extras = */ Bundle().apply {
+                                            putFloat(
+                                                "wallpaperFocalAreaLeft",
+                                                wallpaperFocalAreaBounds.left,
+                                            )
+                                            putFloat(
+                                                "wallpaperFocalAreaRight",
+                                                wallpaperFocalAreaBounds.right,
+                                            )
+                                            putFloat(
+                                                "wallpaperFocalAreaTop",
+                                                wallpaperFocalAreaBounds.top,
+                                            )
+                                            putFloat(
+                                                "wallpaperFocalAreaBottom",
+                                                wallpaperFocalAreaBounds.bottom,
+                                            )
+                                        },
+                                    )
+                                }
+                        }
+
+                    sendTapInShapeEffectsJob =
+                        scope.launch {
+                            wallpaperFocalAreaRepository.wallpaperFocalAreaTapPosition.collect {
+                                wallpaperFocalAreaTapPosition ->
                                 wallpaperManager.sendWallpaperCommand(
                                     /* windowToken = */ rootView?.windowToken,
-                                    /* action = */ WallpaperManager
-                                        .COMMAND_LOCKSCREEN_LAYOUT_CHANGED,
-                                    /* x = */ 0,
-                                    /* y = */ 0,
+                                    /* action = */ WallpaperManager.COMMAND_LOCKSCREEN_TAP,
+                                    /* x = */ wallpaperFocalAreaTapPosition.x.toInt(),
+                                    /* y = */ wallpaperFocalAreaTapPosition.y.toInt(),
                                     /* z = */ 0,
-                                    /* extras = */ Bundle().apply {
-                                        putFloat(
-                                            "wallpaperFocalAreaLeft",
-                                            wallpaperFocalAreaBounds.left,
-                                        )
-                                        putFloat(
-                                            "wallpaperFocalAreaRight",
-                                            wallpaperFocalAreaBounds.right,
-                                        )
-                                        putFloat(
-                                            "wallpaperFocalAreaTop",
-                                            wallpaperFocalAreaBounds.top,
-                                        )
-                                        putFloat(
-                                            "wallpaperFocalAreaBottom",
-                                            wallpaperFocalAreaBounds.bottom,
-                                        )
-                                    },
+                                    /* extras = */ null,
                                 )
                             }
                         }
                 } else {
                     sendLockscreenLayoutJob?.cancel()
+                    sendTapInShapeEffectsJob?.cancel()
                 }
                 shouldSendNotificationLayout
             }

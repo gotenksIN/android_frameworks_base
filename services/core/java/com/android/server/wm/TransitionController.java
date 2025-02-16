@@ -525,6 +525,19 @@ class TransitionController {
         return false;
     }
 
+    boolean isInAodAppearTransition() {
+        if (mCollectingTransition != null && mCollectingTransition.isInAodAppearTransition()) {
+            return true;
+        }
+        for (int i = mWaitingTransitions.size() - 1; i >= 0; --i) {
+            if (mWaitingTransitions.get(i).isInAodAppearTransition()) return true;
+        }
+        for (int i = mPlayingTransitions.size() - 1; i >= 0; --i) {
+            if (mPlayingTransitions.get(i).isInAodAppearTransition()) return true;
+        }
+        return false;
+    }
+
     /**
      * @return A pair of the transition and restore-behind target for the given {@param container}.
      * @param container An ancestor of a transient-launch activity
@@ -537,6 +550,23 @@ class TransitionController {
             final Task restoreBehindTask = transition.getTransientLaunchRestoreTarget(container);
             if (restoreBehindTask != null) {
                 return new Pair<>(transition, restoreBehindTask);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @return The playing transition that is transiently-hiding the given {@param container}, or
+     *         null if there isn't one
+     * @param container A participant of a transient-hide transition
+     */
+    @Nullable
+    Transition getTransientHideTransitionForContainer(
+            @NonNull WindowContainer container) {
+        for (int i = mPlayingTransitions.size() - 1; i >= 0; --i) {
+            final Transition transition = mPlayingTransitions.get(i);
+            if (transition.isInTransientHide(container)) {
+                return transition;
             }
         }
         return null;

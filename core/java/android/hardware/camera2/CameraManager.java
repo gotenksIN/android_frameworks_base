@@ -70,6 +70,7 @@ import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.ServiceSpecificException;
@@ -597,8 +598,7 @@ public final class CameraManager {
 
     /** @hide */
     public int getDevicePolicyFromContext(@NonNull Context context) {
-        if (context.getDeviceId() == DEVICE_ID_DEFAULT
-                || !android.companion.virtual.flags.Flags.virtualCamera()) {
+        if (context.getDeviceId() == DEVICE_ID_DEFAULT) {
             return DEVICE_POLICY_DEFAULT;
         }
 
@@ -1711,7 +1711,9 @@ public final class CameraManager {
             return ICameraService.ROTATION_OVERRIDE_NONE;
         }
 
-        if (context != null) {
+        // Isolated process does not have access to ActivityTaskManager service, which is used
+        // indirectly in `ActivityManager.getAppTasks()`.
+        if (context != null && !Process.isIsolated()) {
             final ActivityManager activityManager = context.getSystemService(ActivityManager.class);
             if (activityManager != null) {
                 for (ActivityManager.AppTask appTask : activityManager.getAppTasks()) {
@@ -2599,11 +2601,6 @@ public final class CameraManager {
 
         private boolean shouldHideCamera(int currentDeviceId, int devicePolicy,
                 DeviceCameraInfo info) {
-            if (!android.companion.virtualdevice.flags.Flags.cameraDeviceAwareness()) {
-                // Don't hide any cameras if the device-awareness feature flag is disabled.
-                return false;
-            }
-
             if (devicePolicy == DEVICE_POLICY_DEFAULT && info.mDeviceId == DEVICE_ID_DEFAULT) {
                 // Don't hide default-device cameras for a default-policy virtual device.
                 return false;

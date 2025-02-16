@@ -107,6 +107,7 @@ import android.hardware.display.DisplayManagerInternal;
 import android.hardware.display.DisplayManagerInternal.DisplayGroupListener;
 import android.hardware.display.DisplayManagerInternal.DisplayTransactionListener;
 import android.hardware.display.DisplayTopology;
+import android.hardware.display.DisplayTopologyGraph;
 import android.hardware.display.DisplayViewport;
 import android.hardware.display.DisplayedContentSample;
 import android.hardware.display.DisplayedContentSamplingAttributes;
@@ -295,6 +296,7 @@ public final class DisplayManagerService extends SystemService {
     private final DisplayModeDirector mDisplayModeDirector;
     private final ExternalDisplayPolicy mExternalDisplayPolicy;
     private WindowManagerInternal mWindowManagerInternal;
+    @Nullable
     private InputManagerInternal mInputManagerInternal;
     private ActivityManagerInternal mActivityManagerInternal;
     private final UidImportanceListener mUidImportanceListener = new UidImportanceListener();
@@ -695,8 +697,15 @@ public final class DisplayManagerService extends SystemService {
         mExternalDisplayPolicy = new ExternalDisplayPolicy(new ExternalDisplayPolicyInjector());
         if (mFlags.isDisplayTopologyEnabled()) {
             final var backupManager = new BackupManager(mContext);
+            Consumer<Pair<DisplayTopology, DisplayTopologyGraph>> topologyChangedCallback =
+                    update -> {
+                        if (mInputManagerInternal != null) {
+                            mInputManagerInternal.setDisplayTopology(update.second);
+                        }
+                        deliverTopologyUpdate(update.first);
+                    };
             mDisplayTopologyCoordinator = new DisplayTopologyCoordinator(
-                    this::isExtendedDisplayEnabled, this::deliverTopologyUpdate,
+                    this::isExtendedDisplayEnabled, topologyChangedCallback,
                     new HandlerExecutor(mHandler), mSyncRoot, backupManager::dataChanged);
         } else {
             mDisplayTopologyCoordinator = null;
@@ -2051,6 +2060,7 @@ public final class DisplayManagerService extends SystemService {
                                 packageName,
                                 displayUniqueId,
                                 virtualDevice,
+                                dwpc,
                                 surface,
                                 flags,
                                 virtualDisplayConfig);
@@ -2145,6 +2155,7 @@ public final class DisplayManagerService extends SystemService {
             String packageName,
             String uniqueId,
             IVirtualDevice virtualDevice,
+            DisplayWindowPolicyController dwpc,
             Surface surface,
             int flags,
             VirtualDisplayConfig virtualDisplayConfig) {
@@ -2198,6 +2209,16 @@ public final class DisplayManagerService extends SystemService {
 
         final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(device);
         if (display != null) {
+            // Notify the virtual device that the display has been created. This needs to be called
+            // in this locked section before the repository had the chance to notify any listeners
+            // to ensure that the device is aware of the new display before others know about it.
+            if (virtualDevice != null) {
+                final VirtualDeviceManagerInternal vdm =
+                        getLocalService(VirtualDeviceManagerInternal.class);
+                vdm.onVirtualDisplayCreated(
+                        virtualDevice, display.getDisplayIdLocked(), callback, dwpc);
+            }
+
             return display.getDisplayIdLocked();
         }
 

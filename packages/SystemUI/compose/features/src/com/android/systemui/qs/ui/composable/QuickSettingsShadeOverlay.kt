@@ -17,6 +17,7 @@
 package com.android.systemui.qs.ui.composable
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -35,7 +36,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onPlaced
@@ -43,13 +44,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.systemui.brightness.ui.compose.BrightnessSliderContainer
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.notifications.ui.composable.NotificationsShade
 import com.android.systemui.notifications.ui.composable.SnoozeableHeadsUpNotificationSpace
 import com.android.systemui.qs.composefragment.ui.GridAnchor
 import com.android.systemui.qs.flags.QsDetailedView
@@ -105,16 +106,19 @@ constructor(
             }
         val quickSettingsContainerViewModel =
             rememberViewModel("QuickSettingsShadeOverlayContainer") {
-                // TODO(b/393054014): Add support for brightness mirroring.
-                quickSettingsContainerViewModelFactory.create(supportsBrightnessMirroring = false)
+                quickSettingsContainerViewModelFactory.create(supportsBrightnessMirroring = true)
             }
         val panelCornerRadius =
             with(LocalDensity.current) { OverlayShade.Dimensions.PanelCornerRadius.toPx().toInt() }
+        val showBrightnessMirror =
+            quickSettingsContainerViewModel.brightnessSliderViewModel.showMirror
+        val contentAlphaFromBrightnessMirror by
+            animateFloatAsState(if (showBrightnessMirror) 0f else 1f)
 
         // Set the bounds to null when the QuickSettings overlay disappears.
         DisposableEffect(Unit) { onDispose { contentViewModel.onPanelShapeChanged(null) } }
 
-        Box(modifier = modifier) {
+        Box(modifier = modifier.graphicsLayer { alpha = contentAlphaFromBrightnessMirror }) {
             SnoozeableHeadsUpNotificationSpace(
                 stackScrollView = notificationStackScrollView.get(),
                 viewModel =
@@ -123,13 +127,14 @@ constructor(
                     },
             )
             OverlayShade(
-                panelAlignment = Alignment.TopEnd,
+                panelElement = QuickSettingsShade.Elements.Panel,
+                alignmentOnWideScreens = Alignment.TopEnd,
                 onScrimClicked = contentViewModel::onScrimClicked,
                 header = {
                     OverlayShadeHeader(
                         viewModel = quickSettingsContainerViewModel.shadeHeaderViewModel,
                         modifier =
-                            Modifier.element(NotificationsShade.Elements.StatusBar)
+                            Modifier.element(QuickSettingsShade.Elements.StatusBar)
                                 .layoutId(SingleShadeMeasurePolicy.LayoutId.ShadeHeader),
                     )
                 },
@@ -159,7 +164,8 @@ constructor(
                             QuickSettingsOverlayHeader(
                                 viewModel = quickSettingsContainerViewModel.shadeHeaderViewModel,
                                 modifier =
-                                    Modifier.padding(top = QuickSettingsShade.Dimensions.Padding),
+                                    Modifier.element(QuickSettingsShade.Elements.Header)
+                                        .padding(top = QuickSettingsShade.Dimensions.Padding),
                             )
                         }
                     },
@@ -250,7 +256,7 @@ fun ContentScope.QuickSettingsLayout(
         ) {
             BrightnessSliderContainer(
                 viewModel = viewModel.brightnessSliderViewModel,
-                containerColor = Color.Transparent,
+                containerColor = OverlayShade.Colors.PanelBackground,
                 modifier =
                     Modifier.fillMaxWidth()
                         .height(QuickSettingsShade.Dimensions.BrightnessSliderHeight),
@@ -267,6 +273,11 @@ fun ContentScope.QuickSettingsLayout(
 }
 
 object QuickSettingsShade {
+    object Elements {
+        val StatusBar = ElementKey("QuickSettingsShadeOverlayStatusBar")
+        val Panel = ElementKey("QuickSettingsShadeOverlayPanel")
+        val Header = ElementKey("QuickSettingsShadeOverlayHeader")
+    }
 
     object Dimensions {
         val Padding = 16.dp

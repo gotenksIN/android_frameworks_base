@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel
 
 import android.content.Context
 import androidx.annotation.DrawableRes
+import androidx.annotation.VisibleForTesting
 import com.android.internal.jank.Cuj
 import com.android.systemui.CoreStartable
 import com.android.systemui.animation.DialogCuj
@@ -128,7 +129,7 @@ constructor(
         mediaProjectionChipInteractor.projection
             .map { projectionModel ->
                 when (projectionModel) {
-                    is ProjectionChipModel.NotProjecting -> OngoingActivityChipModel.Hidden()
+                    is ProjectionChipModel.NotProjecting -> OngoingActivityChipModel.Inactive()
                     is ProjectionChipModel.Projecting -> {
                         when (projectionModel.receiver) {
                             ProjectionChipModel.Receiver.ShareToApp -> {
@@ -140,13 +141,13 @@ constructor(
                                 }
                             }
                             ProjectionChipModel.Receiver.CastToOtherDevice ->
-                                OngoingActivityChipModel.Hidden()
+                                OngoingActivityChipModel.Inactive()
                         }
                     }
                 }
             }
             // See b/347726238 for [SharingStarted.Lazily] reasoning.
-            .stateIn(scope, SharingStarted.Lazily, OngoingActivityChipModel.Hidden())
+            .stateIn(scope, SharingStarted.Lazily, OngoingActivityChipModel.Inactive())
 
     private val chipTransitionHelper = ChipTransitionHelper(scope)
 
@@ -164,12 +165,12 @@ constructor(
                         {},
                         { "Hiding the chip as stop dialog is being shown" },
                     )
-                    OngoingActivityChipModel.Hidden()
+                    OngoingActivityChipModel.Inactive()
                 } else {
                     currentChip
                 }
             }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), OngoingActivityChipModel.Hidden())
+            .stateIn(scope, SharingStarted.WhileSubscribed(), OngoingActivityChipModel.Inactive())
 
     /**
      * Notifies this class that the user just stopped a screen recording from the dialog that's
@@ -218,8 +219,9 @@ constructor(
 
     private fun createShareScreenToAppChip(
         state: ProjectionChipModel.Projecting
-    ): OngoingActivityChipModel.Shown {
-        return OngoingActivityChipModel.Shown.Timer(
+    ): OngoingActivityChipModel.Active {
+        return OngoingActivityChipModel.Active.Timer(
+            key = KEY,
             icon =
                 OngoingActivityChipModel.ChipIcon.SingleColorIcon(
                     Icon.Resource(
@@ -252,8 +254,9 @@ constructor(
         )
     }
 
-    private fun createIconOnlyShareToAppChip(): OngoingActivityChipModel.Shown {
-        return OngoingActivityChipModel.Shown.IconOnly(
+    private fun createIconOnlyShareToAppChip(): OngoingActivityChipModel.Active {
+        return OngoingActivityChipModel.Active.IconOnly(
+            key = KEY,
             icon =
                 OngoingActivityChipModel.ChipIcon.SingleColorIcon(
                     Icon.Resource(
@@ -301,6 +304,7 @@ constructor(
         )
 
     companion object {
+        @VisibleForTesting const val KEY = "ShareToApp"
         @DrawableRes val SHARE_TO_APP_ICON = R.drawable.ic_present_to_all
         private val DIALOG_CUJ =
             DialogCuj(Cuj.CUJ_STATUS_BAR_LAUNCH_DIALOG_FROM_CHIP, tag = "Share to app")

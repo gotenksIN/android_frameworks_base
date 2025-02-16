@@ -24,8 +24,6 @@ import static android.app.ActivityManagerInternal.ServiceNotificationPolicy.NOT_
 import static android.app.ActivityManagerInternal.ServiceNotificationPolicy.SHOW_IMMEDIATELY;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.Flags.FLAG_KEYGUARD_PRIVATE_NOTIFICATIONS;
-import static android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS;
-import static android.app.Flags.FLAG_REDACT_SENSITIVE_CONTENT_NOTIFICATIONS_ON_LOCKSCREEN;
 import static android.app.Flags.FLAG_SORT_SECTION_BY_TIME;
 import static android.app.Notification.EXTRA_ALLOW_DURING_SETUP;
 import static android.app.Notification.EXTRA_PICTURE;
@@ -257,8 +255,6 @@ import android.graphics.drawable.Icon;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.session.MediaSession;
-import android.net.ConnectivityManager;
-import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -483,8 +479,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Mock
     private PowerManager mPowerManager;
     @Mock
-    private ConnectivityManager mConnectivityManager;
-    @Mock
     private LightsManager mLightsManager;
     private final ArrayList<WakeLock> mAcquiredWakeLocks = new ArrayList<>();
     private final TestPostNotificationTrackerFactory mPostNotificationTrackerFactory =
@@ -574,9 +568,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Mock
     NotificationAttentionHelper mAttentionHelper;
-
-    @Mock
-    NetworkCapabilities mWifiNetworkCapabilities;
 
     private NotificationManagerService.WorkerHandler mWorkerHandler;
     private Handler mBroadcastsHandler;
@@ -779,15 +770,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mActivityIntentImmutable = spy(PendingIntent.getActivity(mContext, 0,
                 new Intent().setPackage(mPkg), FLAG_IMMUTABLE));
 
-        when(mWifiNetworkCapabilities.hasTransport(eq(NetworkCapabilities.TRANSPORT_WIFI)))
-                .thenReturn(true);
-        when(mWifiNetworkCapabilities
-                .hasCapability(eq(NetworkCapabilities.NET_CAPABILITY_VALIDATED)))
-                .thenReturn(true);
-        when(mWifiNetworkCapabilities
-                .hasCapability(eq(NetworkCapabilities.NET_CAPABILITY_TRUSTED)))
-                .thenReturn(true);
-
         initNMS();
     }
 
@@ -824,7 +806,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mGroupHelper, mAm, mAtm, mAppUsageStats, mDevicePolicyManager, mUgm, mUgmInternal,
                 mAppOpsManager, mUm, mHistoryManager, mStatsManager, mAmi, mToastRateLimiter,
                 mPermissionHelper, mock(UsageStatsManagerInternal.class), mTelecomManager, mLogger,
-                mTestFlagResolver, mPermissionManager, mPowerManager, mConnectivityManager,
+                mTestFlagResolver, mPermissionManager, mPowerManager,
                 mPostNotificationTrackerFactory);
 
         mService.setAttentionHelper(mAttentionHelper);
@@ -833,6 +815,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // make sure PreferencesHelper doesn't try to interact with any real caches
         PreferencesHelper prefHelper = spy(mService.mPreferencesHelper);
         doNothing().when(prefHelper).invalidateNotificationChannelCache();
+        doNothing().when(prefHelper).invalidateNotificationChannelGroupCache();
         mService.setPreferencesHelper(prefHelper);
 
         // Return first true for RoleObserver main-thread check
@@ -5356,7 +5339,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mBinderService.getNotificationChannelGroupsFromPrivilegedListener(
                 null, mPkg, Process.myUserHandle());
 
-        verify(mPreferencesHelper, times(1)).getNotificationChannelGroups(anyString(), anyInt());
+        verify(mPreferencesHelper, times(1)).getNotificationChannelGroupsWithoutChannels(
+                anyString(), anyInt());
     }
 
     @Test
@@ -5373,7 +5357,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
             // pass
         }
 
-        verify(mPreferencesHelper, never()).getNotificationChannelGroups(anyString(), anyInt());
+        verify(mPreferencesHelper, never()).getNotificationChannelGroupsWithoutChannels(anyString(),
+                anyInt());
     }
 
     @Test
@@ -5393,7 +5378,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
             // pass
         }
 
-        verify(mPreferencesHelper, never()).getNotificationChannelGroups(anyString(), anyInt());
+        verify(mPreferencesHelper, never()).getNotificationChannelGroupsWithoutChannels(anyString(),
+                anyInt());
     }
 
     @Test
@@ -14418,78 +14404,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         record.addAdjustment(adjustment);
         record.applyAdjustments();
         return record;
-    }
-
-    @Test
-    public void testMakeRankingUpdate_clearsHasSensitiveContentIfConnectedToWifi() {
-        mSetFlagsRule.enableFlags(FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS,
-                FLAG_REDACT_SENSITIVE_CONTENT_NOTIFICATIONS_ON_LOCKSCREEN);
-        mService.updateWifiConnectionState(mWifiNetworkCapabilities);
-        when(mListeners.hasSensitiveContent(any())).thenReturn(true);
-        NotificationRecord pkgA = new NotificationRecord(mContext,
-                generateSbn("a", 1000, 9, 0), mTestNotificationChannel);
-        mService.addNotification(pkgA);
-        ManagedServices.ManagedServiceInfo info = mock(ManagedServices.ManagedServiceInfo.class);
-        info.isSystemUi = true;
-        when(info.enabledAndUserMatches(anyInt())).thenReturn(true);
-        when(info.isSameUser(anyInt())).thenReturn(true);
-        NotificationRankingUpdate nru = mService.makeRankingUpdateLocked(info);
-        NotificationListenerService.Ranking ranking =
-                nru.getRankingMap().getRawRankingObject(pkgA.getSbn().getKey());
-        assertFalse(ranking.hasSensitiveContent());
-    }
-
-    @Test
-    public void testMakeRankingUpdate_doesntClearHasSensitiveContentIfNotConnectedToWifi() {
-        mSetFlagsRule.enableFlags(FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS,
-                FLAG_REDACT_SENSITIVE_CONTENT_NOTIFICATIONS_ON_LOCKSCREEN);
-        mService.updateWifiConnectionState(mock(NetworkCapabilities.class));
-        when(mListeners.hasSensitiveContent(any())).thenReturn(true);
-        NotificationRecord record = getSensitiveNotificationRecord();
-        mService.addNotification(record);
-        ManagedServices.ManagedServiceInfo info = mock(ManagedServices.ManagedServiceInfo.class);
-        info.isSystemUi = true;
-        when(info.enabledAndUserMatches(anyInt())).thenReturn(true);
-        when(info.isSameUser(anyInt())).thenReturn(true);
-        NotificationRankingUpdate nru = mService.makeRankingUpdateLocked(info);
-        NotificationListenerService.Ranking ranking =
-                nru.getRankingMap().getRawRankingObject(record.getSbn().getKey());
-        assertTrue(ranking.hasSensitiveContent());
-    }
-
-    @Test
-    public void testMakeRankingUpdate_doesntClearHasSensitiveContentIfNotSysUi() {
-        mSetFlagsRule.enableFlags(FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS);
-        mSetFlagsRule.disableFlags(FLAG_REDACT_SENSITIVE_CONTENT_NOTIFICATIONS_ON_LOCKSCREEN);
-        mService.updateWifiConnectionState(mWifiNetworkCapabilities);
-        when(mListeners.hasSensitiveContent(any())).thenReturn(true);
-        NotificationRecord record = getSensitiveNotificationRecord();
-        mService.addNotification(record);
-        ManagedServices.ManagedServiceInfo info = mock(ManagedServices.ManagedServiceInfo.class);
-        when(info.enabledAndUserMatches(anyInt())).thenReturn(true);
-        when(info.isSameUser(anyInt())).thenReturn(true);
-        NotificationRankingUpdate nru = mService.makeRankingUpdateLocked(info);
-        NotificationListenerService.Ranking ranking =
-                nru.getRankingMap().getRawRankingObject(record.getSbn().getKey());
-        assertTrue(ranking.hasSensitiveContent());
-    }
-
-    @Test
-    public void testMakeRankingUpdate_doesntClearHasSensitiveContentIfFlagDisabled() {
-        mSetFlagsRule.enableFlags(FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS);
-        mSetFlagsRule.disableFlags(FLAG_REDACT_SENSITIVE_CONTENT_NOTIFICATIONS_ON_LOCKSCREEN);
-        mService.updateWifiConnectionState(mWifiNetworkCapabilities);
-        when(mListeners.hasSensitiveContent(any())).thenReturn(true);
-        NotificationRecord record = getSensitiveNotificationRecord();
-        mService.addNotification(record);
-        ManagedServices.ManagedServiceInfo info = mock(ManagedServices.ManagedServiceInfo.class);
-        info.isSystemUi = true;
-        when(info.enabledAndUserMatches(anyInt())).thenReturn(true);
-        when(info.isSameUser(anyInt())).thenReturn(true);
-        NotificationRankingUpdate nru = mService.makeRankingUpdateLocked(info);
-        NotificationListenerService.Ranking ranking =
-                nru.getRankingMap().getRawRankingObject(record.getSbn().getKey());
-        assertTrue(ranking.hasSensitiveContent());
     }
 
     @Test

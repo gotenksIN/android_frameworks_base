@@ -157,6 +157,14 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
     private boolean mRemoved;
 
     /**
+     * Whether the TaskDisplayArea has root tasks.
+     * If {@code true}, the TaskDisplayArea cannot have a new task.
+     *
+     * TODO(b/394466501): Prevent a Task being added to the TaskDisplayArea that shouldKeepNoTask.
+     */
+    private boolean mShouldKeepNoTask;
+
+    /**
      * The id of a leaf task that most recently being moved to front.
      */
     private int mLastLeafTaskToFrontId;
@@ -454,7 +462,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
 
                 // If the previous front-most task is moved to the back, then notify of the new
                 // front-most task.
-                final ActivityRecord topMost = getTopMostActivity();
+                final ActivityRecord topMost = getTopNonFinishingActivity();
                 if (topMost != null) {
                     mAtmService.getTaskChangeNotificationController().notifyTaskMovedToFront(
                             topMost.getTask().getTaskInfo());
@@ -1789,6 +1797,10 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
         return mRemoved;
     }
 
+    boolean shouldKeepNoTask() {
+        return mShouldKeepNoTask;
+    }
+
     @Override
     boolean canCreateRemoteAnimationTarget() {
         // In the legacy transition system, promoting animation target from TaskFragment to
@@ -1814,12 +1826,31 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
         }
     }
 
+    @Nullable
+    Task prepareForRemoval() {
+        mShouldKeepNoTask = true;
+        final Task lastReparentedTask = removeAllTasks();
+        mRemoved = true;
+        return lastReparentedTask;
+    }
+
+    @Nullable
+    Task setShouldKeepNoTask(boolean shouldKeepNoTask) {
+        if (mShouldKeepNoTask == shouldKeepNoTask) {
+            return null;
+        }
+
+        mShouldKeepNoTask = shouldKeepNoTask;
+        return shouldKeepNoTask ? removeAllTasks() : null;
+    }
+
     /**
      * Removes the root tasks in the node applying the content removal node from the display.
      *
      * @return last reparented root task, or {@code null} if the root tasks had to be destroyed.
      */
-    Task remove() {
+    @Nullable
+    private Task removeAllTasks() {
         final TaskDisplayArea toDisplayArea = getReparentToTaskDisplayArea(getFocusedRootTask());
         mPreferredTopFocusableRootTask = null;
         // TODO(b/153090332): Allow setting content removal mode per task display area
@@ -1837,7 +1868,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
         for (int i = 0; i < numRootTasks; i++) {
             final WindowContainer child = mChildren.get(i);
             if (child.asTaskDisplayArea() != null) {
-                lastReparentedRootTask = child.asTaskDisplayArea().remove();
+                lastReparentedRootTask = child.asTaskDisplayArea().removeAllTasks();
                 continue;
             }
             final Task task = mChildren.get(i).asTask();
@@ -1884,14 +1915,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
             lastReparentedRootTask.getRootTask().moveToFront("display-removed");
         }
 
-        mRemoved = true;
-
         return lastReparentedRootTask;
-    }
-
-    // TODO(b/385263090): Remove this method
-    void restart() {
-        mRemoved = false;
     }
 
     /**

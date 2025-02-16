@@ -35,10 +35,8 @@ import android.view.SurfaceControl
 import android.view.View
 import android.view.WindowInsets.Type.systemBars
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.TextView
 import android.window.DesktopModeFlags
 import android.window.SurfaceSyncGroup
 import androidx.annotation.StringRes
@@ -473,7 +471,7 @@ class HandleMenu(
         @VisibleForTesting
         val appIconView = appInfoPill.requireViewById<ImageView>(R.id.application_icon)
         @VisibleForTesting
-        val appNameView = appInfoPill.requireViewById<TextView>(R.id.application_name)
+        val appNameView = appInfoPill.requireViewById<MarqueedTextView>(R.id.application_name)
 
         // Windowing Pill.
         private val windowingPill = rootView.requireViewById<View>(R.id.windowing_pill)
@@ -486,17 +484,17 @@ class HandleMenu(
 
         // More Actions Pill.
         private val moreActionsPill = rootView.requireViewById<View>(R.id.more_actions_pill)
-        private val screenshotBtn = moreActionsPill.requireViewById<Button>(R.id.screenshot_button)
-        private val newWindowBtn = moreActionsPill.requireViewById<Button>(R.id.new_window_button)
+        private val screenshotBtn = moreActionsPill.requireViewById<View>(R.id.screenshot_button)
+        private val newWindowBtn = moreActionsPill.requireViewById<View>(R.id.new_window_button)
         private val manageWindowBtn = moreActionsPill
-            .requireViewById<Button>(R.id.manage_windows_button)
+            .requireViewById<View>(R.id.manage_windows_button)
         private val changeAspectRatioBtn = moreActionsPill
-            .requireViewById<Button>(R.id.change_aspect_ratio_button)
+            .requireViewById<View>(R.id.change_aspect_ratio_button)
 
         // Open in Browser/App Pill.
         private val openInAppOrBrowserPill = rootView.requireViewById<View>(
             R.id.open_in_app_or_browser_pill)
-        private val openInAppOrBrowserBtn = openInAppOrBrowserPill.requireViewById<Button>(
+        private val openInAppOrBrowserBtn = openInAppOrBrowserPill.requireViewById<View>(
             R.id.open_in_app_or_browser_button)
         private val openByDefaultBtn = openInAppOrBrowserPill.requireViewById<ImageButton>(
             R.id.open_by_default_button)
@@ -540,17 +538,35 @@ class HandleMenu(
                 return@setOnTouchListener true
             }
 
-            with(context.resources) {
-                // Update a11y read out to say "double tap to enter desktop windowing mode"
+            with(context) {
+                // Update a11y announcement out to say "double tap to enter Fullscreen"
                 ViewCompat.replaceAccessibilityAction(
-                    desktopBtn, ACTION_CLICK,
-                    getString(R.string.app_handle_menu_talkback_desktop_mode_button_text), null
+                    fullscreenBtn, ACTION_CLICK,
+                    getString(
+                        R.string.app_handle_menu_accessibility_announce,
+                        getString(R.string.fullscreen_text)
+                    ),
+                    null,
                 )
 
-                // Update a11y read out to say "double tap to enter split screen mode"
+                // Update a11y announcement out to say "double tap to enter Desktop View"
+                ViewCompat.replaceAccessibilityAction(
+                    desktopBtn, ACTION_CLICK,
+                    getString(
+                        R.string.app_handle_menu_accessibility_announce,
+                        getString(R.string.desktop_text)
+                    ),
+                    null,
+                )
+
+                // Update a11y announcement to say "double tap to enter Split Screen"
                 ViewCompat.replaceAccessibilityAction(
                     splitscreenBtn, ACTION_CLICK,
-                    getString(R.string.app_handle_menu_talkback_split_screen_mode_button_text), null
+                    getString(
+                        R.string.app_handle_menu_accessibility_announce,
+                        getString(R.string.split_screen_text)
+                    ),
+                    null,
                 )
             }
         }
@@ -658,6 +674,7 @@ class HandleMenu(
                 this.taskInfo = this@HandleMenuView.taskInfo
             }
             appNameView.setTextColor(style.textColor)
+            appNameView.startMarquee()
         }
 
         private fun bindWindowingPill(style: MenuStyle) {
@@ -693,11 +710,15 @@ class HandleMenu(
             ).forEach {
                 val button = it.first
                 val shouldShow = it.second
-                button.apply {
-                    isGone = !shouldShow
+                val label = button.requireViewById<MarqueedTextView>(R.id.label)
+                val image = button.requireViewById<ImageView>(R.id.image)
+
+                button.isGone = !shouldShow
+                label.apply {
                     setTextColor(style.textColor)
-                    compoundDrawableTintList = ColorStateList.valueOf(style.textColor)
+                    startMarquee()
                 }
+                image.imageTintList = ColorStateList.valueOf(style.textColor)
             }
         }
 
@@ -712,12 +733,17 @@ class HandleMenu(
             } else {
                 getString(R.string.open_in_browser_text)
             }
-            openInAppOrBrowserBtn.apply {
+
+            val label = openInAppOrBrowserBtn.requireViewById<MarqueedTextView>(R.id.label)
+            val image = openInAppOrBrowserBtn.requireViewById<ImageView>(R.id.image)
+            openInAppOrBrowserBtn.contentDescription = btnText
+            label.apply {
                 text = btnText
-                contentDescription = btnText
                 setTextColor(style.textColor)
-                compoundDrawableTintList = ColorStateList.valueOf(style.textColor)
+                startMarquee()
             }
+            image.imageTintList = ColorStateList.valueOf(style.textColor)
+
             openByDefaultBtn.isGone = isBrowserApp
             openByDefaultBtn.imageTintList = ColorStateList.valueOf(style.textColor)
         }

@@ -46,7 +46,6 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.app.WindowConfiguration.activityTypeToString;
-import static android.app.WindowConfiguration.isFloating;
 import static android.app.admin.DevicePolicyResources.Drawables.Source.PROFILE_SWITCH_ANIMATION;
 import static android.app.admin.DevicePolicyResources.Drawables.Style.OUTLINE;
 import static android.app.admin.DevicePolicyResources.Drawables.WORK_PROFILE_ICON;
@@ -250,7 +249,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WIND
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE_SURFACES;
-import static com.android.server.wm.WindowManagerService.sEnableShellTransitions;
 import static com.android.server.wm.WindowState.LEGACY_POLICY_VISIBILITY;
 
 import static org.xmlpull.v1.XmlPullParser.END_DOCUMENT;
@@ -798,13 +796,6 @@ public final class ActivityRecord extends WindowToken {
     boolean mLastImeShown;
 
     /**
-     * When set to true, the IME insets will be frozen until the next app becomes IME input target.
-     * @see InsetsPolicy#adjustVisibilityForIme
-     * @see ImeInsetsSourceProvider#updateClientVisibility
-     */
-    boolean mImeInsetsFrozenUntilStartInput;
-
-    /**
      * A flag to determine if this AR is in the process of closing or entering PIP. This is needed
      * to help AR know that the app is in the process of closing but hasn't yet started closing on
      * the WM side.
@@ -1209,8 +1200,6 @@ public final class ActivityRecord extends WindowToken {
                 pw.print(" launchMode="); pw.println(launchMode);
         pw.print(prefix); pw.print("mActivityType=");
                 pw.println(activityTypeToString(getActivityType()));
-        pw.print(prefix); pw.print("mImeInsetsFrozenUntilStartInput=");
-                pw.println(mImeInsetsFrozenUntilStartInput);
         if (requestedVrComponent != null) {
             pw.print(prefix);
             pw.print("requestedVrComponent=");
@@ -5311,7 +5300,8 @@ public final class ActivityRecord extends WindowToken {
                         pendingOptions.getWidth(), pendingOptions.getHeight());
                 options = AnimationOptions.makeScaleUpAnimOptions(
                         pendingOptions.getStartX(), pendingOptions.getStartY(),
-                        pendingOptions.getWidth(), pendingOptions.getHeight());
+                        pendingOptions.getWidth(), pendingOptions.getHeight(),
+                        pendingOptions.getOverrideTaskTransition());
                 if (intent.getSourceBounds() == null) {
                     intent.setSourceBounds(new Rect(pendingOptions.getStartX(),
                             pendingOptions.getStartY(),
@@ -5677,7 +5667,6 @@ public final class ActivityRecord extends WindowToken {
         }
 
         mAtmService.mBackNavigationController.onAppVisibilityChanged(this, visible);
-        onChildVisibilityRequested(visible);
 
         final DisplayContent displayContent = getDisplayContent();
         displayContent.mOpeningApps.remove(this);
@@ -5844,19 +5833,16 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
 
-        final int windowsCount = mChildren.size();
-        // With Shell-Transition, the activity will running a transition when it is visible.
-        // It won't be included when fromTransition is true means the call from finishTransition.
-        final boolean runningAnimation = sEnableShellTransitions ? visible
-                : isAnimating(PARENTS, ANIMATION_TYPE_APP_TRANSITION);
-        for (int i = 0; i < windowsCount; i++) {
-            mChildren.get(i).onAppVisibilityChanged(visible, runningAnimation);
+        if (!visible) {
+            for (int i = mChildren.size() - 1; i >= 0; --i) {
+                mChildren.get(i).onAppCommitInvisible();
+            }
         }
         setVisible(visible);
         setVisibleRequested(visible);
         ProtoLog.v(WM_DEBUG_APP_TRANSITIONS, "commitVisibility: %s: visible=%b"
-                        + " visibleRequested=%b, isInTransition=%b, runningAnimation=%b, caller=%s",
-                this, isVisible(), mVisibleRequested, isInTransition(), runningAnimation,
+                        + " visibleRequested=%b, inTransition=%b, caller=%s",
+                this, visible, mVisibleRequested, inTransition(),
                 Debug.getCallers(5));
         if (visible) {
             // If we are being set visible, and the starting window is not yet displayed,
@@ -5946,10 +5932,6 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final DisplayContent displayContent = getDisplayContent();
-        if (!visible) {
-            mImeInsetsFrozenUntilStartInput = true;
-        }
-
         if (!displayContent.mClosingApps.contains(this)
                 && !displayContent.mOpeningApps.contains(this)
                 && !fromTransition) {
@@ -6377,6 +6359,11 @@ public final class ActivityRecord extends WindowToken {
 
         // Untrusted embedded activity can be visible only if there is no other overlay window.
         if (hasOverlayOverUntrustedModeEmbedded()) {
+            return false;
+        }
+
+        // A presentation stopps all activities behind on the same display.
+        if (mWmService.mPresentationController.shouldOccludeActivities(getDisplayId())) {
             return false;
         }
 
@@ -7182,14 +7169,6 @@ public final class ActivityRecord extends WindowToken {
             // closing activity having to wait until idle timeout to be stopped or destroyed if the
             // next activity won't report idle (e.g. repeated view animation).
             mTaskSupervisor.scheduleProcessStoppingAndFinishingActivitiesIfNeeded();
-
-            // If the activity is visible, but no windows are eligible to start input, unfreeze
-            // to avoid permanently frozen IME insets.
-            if (mImeInsetsFrozenUntilStartInput && getWindow(
-                    win -> WindowManager.LayoutParams.mayUseInputMethod(win.mAttrs.flags))
-                    == null) {
-                mImeInsetsFrozenUntilStartInput = false;
-            }
         }
     }
 
@@ -8631,7 +8610,6 @@ public final class ActivityRecord extends WindowToken {
         mConfigurationSeq = Math.max(++mConfigurationSeq, 1);
         getResolvedOverrideConfiguration().seq = mConfigurationSeq;
 
-        // TODO(b/392069771): Move to AppCompatSandboxingPolicy.
         // Sandbox max bounds by setting it to the activity bounds, if activity is letterboxed, or
         // has or will have mAppCompatDisplayInsets for size compat. Also forces an activity to be
         // sandboxed or not depending upon the configuration settings.
@@ -8658,20 +8636,6 @@ public final class ActivityRecord extends WindowToken {
                         shouldCreateAppCompatDisplayInsets());
             }
             resolvedConfig.windowConfiguration.setMaxBounds(mTmpBounds);
-        }
-
-        // Sandbox activity bounds in freeform to app bounds to force app to display within the
-        // container. This prevents UI cropping when activities can draw below insets which are
-        // normally excluded from appBounds before targetSDK < 35
-        // (see ConfigurationContainer#applySizeOverrideIfNeeded).
-        if (isFloating(parentWindowingMode)) {
-            Rect appBounds = resolvedConfig.windowConfiguration.getAppBounds();
-            if (appBounds == null || appBounds.isEmpty()) {
-                // When there is no override bounds, the activity will inherit the bounds from
-                // parent.
-                appBounds = mResolveConfigHint.mParentAppBoundsOverride;
-            }
-            resolvedConfig.windowConfiguration.setBounds(appBounds);
         }
 
         applySizeOverrideIfNeeded(

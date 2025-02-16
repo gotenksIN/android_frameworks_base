@@ -40,18 +40,33 @@
         <item name="android:activityCloseExitAnimation">@anim/forced_resizable_exit</item>
     </style>
 
-    <style name="DesktopModeHandleMenuActionButton">
+    <style name="DesktopModeHandleMenuActionButtonLayout">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">52dp</item>
+        <item name="android:layout_weight">1</item>
         <item name="android:gravity">start|center_vertical</item>
-        <item name="android:paddingStart">16dp</item>
-        <item name="android:paddingEnd">0dp</item>
-        <item name="android:textSize">14sp</item>
-        <item name="android:textFontWeight">500</item>
-        <item name="android:textColor">@androidprv:color/materialColorOnSurface</item>
-        <item name="android:drawablePadding">16dp</item>
+        <item name="android:paddingHorizontal">16dp</item>
         <item name="android:background">?android:selectableItemBackground</item>
     </style>
+
+    <style name="DesktopModeHandleMenuActionButtonImage">
+       <item name="android:layout_width">20dp</item>
+       <item name="android:layout_height">20dp</item>
+       <item name="android:layout_marginEnd">16dp</item>
+   </style>
+
+    <style name="DesktopModeHandleMenuActionButtonTextView">
+       <item name="android:layout_width">0dp</item>
+       <item name="android:layout_height">wrap_content</item>
+       <item name="android:layout_weight">1</item>
+       <item name="android:textSize">14sp</item>
+       <item name="android:lineHeight">20sp</item>
+       <item name="android:textFontWeight">500</item>
+       <item name="android:textColor">@androidprv:color/materialColorOnSurface</item>
+       <item name="android:ellipsize">marquee</item>
+       <item name="android:scrollHorizontally">true</item>
+       <item name="android:singleLine">true</item>
+   </style>
 
     <style name="DesktopModeHandleMenuWindowingButton">
         <item name="android:layout_width">48dp</item>
@@ -73,15 +88,6 @@
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_gravity">center</item>
         <item name="android:background">@color/split_divider_background</item>
-    </style>
-
-    <style name="TvPipEduText">
-        <item name="android:fontFamily">@*android:string/config_headlineFontFamilyMedium</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:textSize">10sp</item>
-        <item name="android:lineSpacingExtra">4sp</item>
-        <item name="android:lineHeight">16sp</item>
-        <item name="android:textColor">@color/tv_pip_edu_text</item>
     </style>
 
     <style name="LetterboxDialog" parent="@android:style/Theme.DeviceDefault.Dialog.Alert">

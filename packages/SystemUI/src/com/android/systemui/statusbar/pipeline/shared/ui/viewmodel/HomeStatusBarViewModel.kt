@@ -19,7 +19,7 @@ package com.android.systemui.statusbar.pipeline.shared.ui.viewmodel
 import android.annotation.ColorInt
 import android.graphics.Rect
 import android.view.View
-import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.Edge
@@ -34,12 +34,14 @@ import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.scene.domain.interactor.SceneContainerOcclusionInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
+import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.chips.mediaprojection.domain.model.MediaProjectionStopDialogModel
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
 import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.ShareToAppChipViewModel
 import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChipsModel
+import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChipsModelLegacy
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModel
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
@@ -54,6 +56,7 @@ import com.android.systemui.statusbar.notification.headsup.PinnedStatus
 import com.android.systemui.statusbar.notification.shared.NotificationsLiveDataStoreRefactor
 import com.android.systemui.statusbar.phone.domain.interactor.DarkIconInteractor
 import com.android.systemui.statusbar.phone.domain.interactor.LightsOutInteractor
+import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarIconBlockListInteractor
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarInteractor
 import com.android.systemui.statusbar.pipeline.shared.ui.model.SystemInfoCombinedVisibilityModel
@@ -61,6 +64,7 @@ import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -71,6 +75,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -85,9 +90,6 @@ import kotlinx.coroutines.flow.stateIn
  * so that it's all in one place and easily testable outside of the fragment.
  */
 interface HomeStatusBarViewModel {
-    /** Should the entire status bar be hidden? */
-    val shouldHomeStatusBarBeVisible: Flow<Boolean>
-
     /**
      * True if the device is currently transitioning from lockscreen to occluded and false
      * otherwise.
@@ -109,11 +111,15 @@ interface HomeStatusBarViewModel {
      */
     val primaryOngoingActivityChip: StateFlow<OngoingActivityChipModel>
 
+    /** All supported activity chips, whether they are currently active or not. */
+    val ongoingActivityChips: StateFlow<MultipleOngoingActivityChipsModel>
+
     /**
      * The multiple ongoing activity chips that should be shown on the left-hand side of the status
      * bar.
      */
-    val ongoingActivityChips: StateFlow<MultipleOngoingActivityChipsModel>
+    @Deprecated("Since StatusBarChipsModernization, use the new ongoingActivityChips")
+    val ongoingActivityChipsLegacy: StateFlow<MultipleOngoingActivityChipsModelLegacy>
 
     /** View model for the carrier name that may show in the status bar based on carrier config */
     val operatorNameViewModel: StatusBarOperatorNameViewModel
@@ -193,7 +199,8 @@ constructor(
     statusBarPopupChipsViewModel: StatusBarPopupChipsViewModel,
     animations: SystemStatusEventAnimationInteractor,
     statusBarContentInsetsViewModelStore: StatusBarContentInsetsViewModelStore,
-    @Application coroutineScope: CoroutineScope,
+    @Background bgScope: CoroutineScope,
+    @Background bgDispatcher: CoroutineDispatcher,
 ) : HomeStatusBarViewModel {
 
     val tableLogger = tableLoggerFactory.getOrCreate(tableLogBufferName(thisDisplayId), 200)
@@ -207,13 +214,14 @@ constructor(
                 columnName = COL_LOCK_TO_OCCLUDED,
                 initialValue = false,
             )
-            .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), initialValue = false)
+            .stateIn(bgScope, SharingStarted.WhileSubscribed(), initialValue = false)
 
     override val transitionFromLockscreenToDreamStartedEvent: Flow<Unit> =
         keyguardTransitionInteractor
             .transition(Edge.create(from = LOCKSCREEN, to = DREAMING))
             .filter { it.transitionState == TransitionState.STARTED }
             .map {}
+            .flowOn(bgDispatcher)
 
     override val mediaProjectionStopDialogDueToCallEndedState =
         shareToAppChipViewModel.stopDialogToShow
@@ -222,19 +230,26 @@ constructor(
 
     override val ongoingActivityChips = ongoingActivityChipsViewModel.chips
 
+    override val ongoingActivityChipsLegacy = ongoingActivityChipsViewModel.chipsLegacy
+
     override val statusBarPopupChips = statusBarPopupChipsViewModel.shownPopupChips
 
     override val isHomeStatusBarAllowedByScene: StateFlow<Boolean> =
         combine(
                 sceneInteractor.currentScene,
+                sceneInteractor.currentOverlays,
                 sceneContainerOcclusionInteractor.invisibleDueToOcclusion,
-            ) { currentScene, isOccluded ->
+            ) { currentScene, currentOverlays, isOccluded ->
                 // All scenes have their own status bars, so we should only show the home status bar
-                // if we're not in a scene. The one exception: If the scene is occluded, then the
-                // occluding app needs to show the status bar. (Fullscreen apps actually won't show
-                // the status bar but that's handled with the rest of our fullscreen app logic,
-                // which lives elsewhere.)
-                currentScene == Scenes.Gone || isOccluded
+                // if we're not in a scene. There are two exceptions:
+                // 1) The shade (notifications or quick settings) is shown, because it has its own
+                // status-bar-like header.
+                // 2) If the scene is occluded, then the occluding app needs to show the status bar.
+                // (Fullscreen apps actually won't show the status bar but that's handled with the
+                // rest of our fullscreen app logic, which lives elsewhere.)
+                (currentScene == Scenes.Gone &&
+                    Overlays.NotificationsShade !in currentOverlays &&
+                    Overlays.QuickSettingsShade !in currentOverlays) || isOccluded
             }
             .distinctUntilChanged()
             .logDiffsForTable(
@@ -242,7 +257,7 @@ constructor(
                 columnName = COL_ALLOWED_BY_SCENE,
                 initialValue = false,
             )
-            .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), initialValue = false)
+            .stateIn(bgScope, SharingStarted.WhileSubscribed(), initialValue = false)
 
     override val areNotificationsLightsOut: Flow<Boolean> =
         if (NotificationsLiveDataStoreRefactor.isUnexpectedlyInLegacyMode()) {
@@ -261,6 +276,7 @@ constructor(
                 columnName = COL_NOTIF_LIGHTS_OUT,
                 initialValue = false,
             )
+            .flowOn(bgDispatcher)
 
     override val areaTint: Flow<StatusBarTintColor> =
         darkIconInteractor
@@ -276,6 +292,7 @@ constructor(
             }
             .conflate()
             .distinctUntilChanged()
+            .flowOn(bgDispatcher)
 
     /**
      * True if the current SysUI state can show the home status bar (aka this status bar), and false
@@ -297,7 +314,7 @@ constructor(
             isHomeScreenStatusBarAllowedLegacy
         }
 
-    override val shouldHomeStatusBarBeVisible =
+    private val shouldHomeStatusBarBeVisible =
         combine(
                 isHomeStatusBarAllowed,
                 keyguardInteractor.isSecureCameraActive,
@@ -318,12 +335,15 @@ constructor(
                 columnName = COL_VISIBLE,
                 initialValue = false,
             )
+            .flowOn(bgDispatcher)
 
     private val isAnyChipVisible =
-        if (StatusBarNotifChips.isEnabled) {
-            ongoingActivityChips.map { it.primary is OngoingActivityChipModel.Shown }
+        if (StatusBarChipsModernization.isEnabled) {
+            ongoingActivityChips.map { it.active.any { chip -> !chip.isHidden } }
+        } else if (StatusBarNotifChips.isEnabled) {
+            ongoingActivityChipsLegacy.map { it.primary is OngoingActivityChipModel.Active }
         } else {
-            primaryOngoingActivityChip.map { it is OngoingActivityChipModel.Shown }
+            primaryOngoingActivityChip.map { it is OngoingActivityChipModel.Active }
         }
 
     /**
@@ -361,6 +381,7 @@ constructor(
                 columnName = COL_SHOW_OPERATOR_NAME,
                 initialValue = false,
             )
+            .flowOn(bgDispatcher)
 
     override val isClockVisible: Flow<VisibilityModel> =
         combine(
@@ -382,6 +403,7 @@ constructor(
                 columnPrefix = COL_PREFIX_CLOCK,
                 initialValue = VisibilityModel(false.toVisibleOrInvisible(), false),
             )
+            .flowOn(bgDispatcher)
 
     override val isNotificationIconContainerVisible: Flow<VisibilityModel> =
         combine(
@@ -407,6 +429,7 @@ constructor(
                 columnPrefix = COL_PREFIX_NOTIF_CONTAINER,
                 initialValue = VisibilityModel(false.toVisibleOrInvisible(), false),
             )
+            .flowOn(bgDispatcher)
 
     private val isSystemInfoVisible =
         combine(shouldHomeStatusBarBeVisible, homeStatusBarInteractor.visibilityViaDisableFlags) {
@@ -429,17 +452,17 @@ constructor(
                     SystemInfoCombinedVisibilityModel(VisibilityModel(View.VISIBLE, false), Idle),
             )
             .stateIn(
-                coroutineScope,
+                bgScope,
                 SharingStarted.WhileSubscribed(),
                 SystemInfoCombinedVisibilityModel(VisibilityModel(View.VISIBLE, false), Idle),
             )
 
     override val iconBlockList: Flow<List<String>> =
-        homeStatusBarIconBlockListInteractor.iconBlockList
+        homeStatusBarIconBlockListInteractor.iconBlockList.flowOn(bgDispatcher)
 
     override val contentArea: Flow<Rect> =
         statusBarContentInsetsViewModelStore.forDisplay(thisDisplayId)?.contentArea
-            ?: flowOf(Rect(0, 0, 0, 0))
+            ?: flowOf(Rect(0, 0, 0, 0)).flowOn(bgDispatcher)
 
     @View.Visibility
     private fun Boolean.toVisibleOrGone(): Int {

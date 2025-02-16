@@ -29,10 +29,12 @@ import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.animation.ShadeInterpolation
 import com.android.systemui.dump.DumpManager
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeExpansionChangeEvent
+import com.android.systemui.shared.Flags as SharedFlags
 import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.statusbar.phone.DozeParameters
 import com.android.systemui.statusbar.phone.ScrimController
@@ -80,6 +82,7 @@ class NotificationShadeDepthControllerTest : SysuiTestCase() {
     @Mock private lateinit var blurUtils: BlurUtils
     @Mock private lateinit var biometricUnlockController: BiometricUnlockController
     @Mock private lateinit var keyguardStateController: KeyguardStateController
+    @Mock private lateinit var keyguardInteractor: KeyguardInteractor
     @Mock private lateinit var choreographer: Choreographer
     @Mock private lateinit var wallpaperController: WallpaperController
     @Mock private lateinit var notificationShadeWindowController: NotificationShadeWindowController
@@ -123,6 +126,7 @@ class NotificationShadeDepthControllerTest : SysuiTestCase() {
                 blurUtils,
                 biometricUnlockController,
                 keyguardStateController,
+                keyguardInteractor,
                 choreographer,
                 wallpaperController,
                 notificationShadeWindowController,
@@ -308,10 +312,19 @@ class NotificationShadeDepthControllerTest : SysuiTestCase() {
     }
 
     @Test
+    @DisableFlags(SharedFlags.FLAG_AMBIENT_AOD)
     fun onDozeAmountChanged_appliesBlur() {
         statusBarStateListener.onDozeAmountChanged(1f, 1f)
         notificationShadeDepthController.updateBlurCallback.doFrame(0)
         verify(blurUtils).applyBlur(any(), eq(maxBlur), eq(false))
+    }
+
+    @Test
+    @EnableFlags(SharedFlags.FLAG_AMBIENT_AOD)
+    fun onDozeAmountChanged_doesNotApplyBlurWithAmbientAod() {
+        statusBarStateListener.onDozeAmountChanged(1f, 1f)
+        notificationShadeDepthController.updateBlurCallback.doFrame(0)
+        verify(blurUtils).applyBlur(any(), eq(0), eq(false))
     }
 
     @Test

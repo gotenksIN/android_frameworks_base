@@ -71,7 +71,7 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.classifier.FalsingCollectorFake;
 import com.android.systemui.classifier.FalsingManagerFake;
-import com.android.systemui.common.ui.view.LongPressHandlingView;
+import com.android.systemui.common.ui.view.TouchHandlingView;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor;
 import com.android.systemui.doze.DozeLog;
@@ -88,6 +88,7 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.keyguard.domain.interactor.NaturalScrollingSettingObserver;
+import com.android.systemui.keyguard.ui.transitions.BlurConfig;
 import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardTouchHandlingViewModel;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
@@ -168,6 +169,7 @@ import com.android.systemui.user.domain.interactor.UserSwitcherInteractor;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.FakeSystemClock;
 import com.android.systemui.util.time.SystemClock;
+import com.android.systemui.wallpapers.ui.viewmodel.WallpaperFocalAreaViewModel;
 import com.android.wm.shell.animation.FlingAnimationUtils;
 
 import dagger.Lazy;
@@ -272,6 +274,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
             mDreamingToLockscreenTransitionViewModel;
     @Mock protected KeyguardTransitionInteractor mKeyguardTransitionInteractor;
     @Mock protected KeyguardTouchHandlingViewModel mKeyuardTouchHandlingViewModel;
+    @Mock protected WallpaperFocalAreaViewModel mWallpaperFocalAreaViewModel;
     @Mock protected AlternateBouncerInteractor mAlternateBouncerInteractor;
     @Mock protected MotionEvent mDownMotionEvent;
     @Mock protected CoroutineDispatcher mMainDispatcher;
@@ -518,12 +521,12 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
 
         mMainHandler = new Handler(Looper.getMainLooper());
 
-        LongPressHandlingView longPressHandlingView = mock(LongPressHandlingView.class);
+        TouchHandlingView touchHandlingView = mock(TouchHandlingView.class);
         when(mView.requireViewById(R.id.keyguard_long_press))
-                .thenReturn(longPressHandlingView);
+                .thenReturn(touchHandlingView);
 
         Resources longPressHandlingViewRes = mock(Resources.class);
-        when(longPressHandlingView.getResources()).thenReturn(longPressHandlingViewRes);
+        when(touchHandlingView.getResources()).thenReturn(longPressHandlingViewRes);
         when(longPressHandlingViewRes.getString(anyInt())).thenReturn("");
 
         mNotificationPanelViewController = new NotificationPanelViewController(
@@ -576,6 +579,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mKeyguardTransitionInteractor,
                 mDumpManager,
                 mKeyuardTouchHandlingViewModel,
+                mWallpaperFocalAreaViewModel,
                 mKeyguardInteractor,
                 mActivityStarter,
                 mSharedNotificationContainerInteractor,
@@ -587,7 +591,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mPowerInteractor,
                 mKeyguardClockPositionAlgorithm,
                 mMSDLPlayer,
-                mBrightnessMirrorShowingInteractor);
+                mBrightnessMirrorShowingInteractor,
+                new BlurConfig(0f, 0f));
         mNotificationPanelViewController.initDependencies(
                 mCentralSurfaces,
                 null,

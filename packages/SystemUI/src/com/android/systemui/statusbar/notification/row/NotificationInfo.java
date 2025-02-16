@@ -17,9 +17,12 @@
 package com.android.systemui.statusbar.notification.row;
 
 import static android.app.Notification.EXTRA_BUILDER_APPLICATION_INFO;
+import static android.app.NotificationChannel.SYSTEM_RESERVED_IDS;
 import static android.app.NotificationManager.IMPORTANCE_DEFAULT;
 import static android.app.NotificationManager.IMPORTANCE_LOW;
 import static android.app.NotificationManager.IMPORTANCE_UNSPECIFIED;
+import static android.service.notification.Adjustment.KEY_SUMMARIZATION;
+import static android.service.notification.Adjustment.KEY_TYPE;
 
 import static com.android.app.animation.Interpolators.FAST_OUT_SLOW_IN;
 
@@ -27,10 +30,12 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 import android.annotation.IntDef;
 import android.annotation.Nullable;
+import android.app.Flags;
 import android.app.INotificationManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationChannelGroup;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -41,6 +46,7 @@ import android.graphics.drawable.Drawable;
 import android.metrics.LogMaker;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.service.notification.NotificationAssistantService;
 import android.service.notification.StatusBarNotification;
 import android.text.Html;
 import android.text.TextUtils;
@@ -50,6 +56,7 @@ import android.transition.TransitionManager;
 import android.transition.TransitionSet;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Slog;
 import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.ImageView;
@@ -63,6 +70,7 @@ import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.systemui.Dependency;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.notification.AssistantFeedbackController;
+import com.android.systemui.statusbar.notification.NmSummarizationUiFlag;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 
 import java.lang.annotation.Retention;
@@ -74,20 +82,6 @@ import java.util.List;
 public class NotificationInfo extends LinearLayout implements NotificationGuts.GutsContent {
     private static final String TAG = "InfoGuts";
     private int mActualHeight;
-
-    @IntDef(prefix = { "ACTION_" }, value = {
-            ACTION_NONE,
-            ACTION_TOGGLE_ALERT,
-            ACTION_TOGGLE_SILENT,
-    })
-    public @interface NotificationInfoAction {
-    }
-
-    public static final int ACTION_NONE = 0;
-    // standard controls
-    static final int ACTION_TOGGLE_SILENT = 2;
-    // standard controls
-    private static final int ACTION_TOGGLE_ALERT = 5;
 
     private TextView mPriorityDescriptionView;
     private TextView mSilentDescriptionView;
@@ -115,7 +109,8 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
      * The last importance level chosen by the user.  Null if the user has not chosen an importance
      * level; non-null once the user takes an action which indicates an explicit preference.
      */
-    @Nullable private Integer mChosenImportance;
+    @Nullable
+    private Integer mChosenImportance;
     private boolean mIsAutomaticChosen;
     private boolean mIsSingleDefaultChannel;
     private boolean mIsNonblockable;
@@ -126,6 +121,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
 
     private OnSettingsClickListener mOnSettingsClickListener;
     private OnAppSettingsClickListener mAppSettingsClickListener;
+    private OnFeedbackClickListener mFeedbackClickListener;
     private NotificationGuts mGutsContainer;
     private Drawable mPkgIcon;
     private UiEventLogger mUiEventLogger;
@@ -134,27 +130,27 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     boolean mSkipPost = false;
 
     // used by standard ui
-    private OnClickListener mOnAutomatic = v -> {
+    private final OnClickListener mOnAutomatic = v -> {
         mIsAutomaticChosen = true;
         applyAlertingBehavior(BEHAVIOR_AUTOMATIC, true /* userTriggered */);
     };
 
     // used by standard ui
-    private OnClickListener mOnAlert = v -> {
+    private final OnClickListener mOnAlert = v -> {
         mChosenImportance = IMPORTANCE_DEFAULT;
         mIsAutomaticChosen = false;
         applyAlertingBehavior(BEHAVIOR_ALERTING, true /* userTriggered */);
     };
 
     // used by standard ui
-    private OnClickListener mOnSilent = v -> {
+    private final OnClickListener mOnSilent = v -> {
         mChosenImportance = IMPORTANCE_LOW;
         mIsAutomaticChosen = false;
         applyAlertingBehavior(BEHAVIOR_SILENT, true /* userTriggered */);
     };
 
     // used by standard ui
-    private OnClickListener mOnDismissSettings = v -> {
+    private final OnClickListener mOnDismissSettings = v -> {
         mPressedApply = true;
         mGutsContainer.closeControls(v, /* save= */ true);
     };
@@ -172,18 +168,15 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         mAutomaticDescriptionView = findViewById(R.id.automatic_summary);
     }
 
-    // Specify a CheckSaveListener to override when/if the user's changes are committed.
-    public interface CheckSaveListener {
-        // Invoked when importance has changed and the NotificationInfo wants to try to save it.
-        // Listener should run saveImportance unless the change should be canceled.
-        void checkSave(Runnable saveImportance, StatusBarNotification sbn);
-    }
-
     public interface OnSettingsClickListener {
         void onClick(View v, NotificationChannel channel, int appUid);
     }
 
     public interface OnAppSettingsClickListener {
+        void onClick(View v, Intent intent);
+    }
+
+    public interface OnFeedbackClickListener {
         void onClick(View v, Intent intent);
     }
 
@@ -197,12 +190,14 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
             NotificationEntry entry,
             OnSettingsClickListener onSettingsClick,
             OnAppSettingsClickListener onAppSettingsClick,
+            OnFeedbackClickListener onFeedbackClickListener,
             UiEventLogger uiEventLogger,
             boolean isDeviceProvisioned,
             boolean isNonblockable,
             boolean wasShownHighPriority,
             AssistantFeedbackController assistantFeedbackController,
-            MetricsLogger metricsLogger, OnClickListener onCloseClick)
+            MetricsLogger metricsLogger,
+            OnClickListener onCloseClick)
             throws RemoteException {
         mINotificationManager = iNotificationManager;
         mMetricsLogger = metricsLogger;
@@ -214,6 +209,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         mSbn = entry.getSbn();
         mPm = pm;
         mAppSettingsClickListener = onAppSettingsClick;
+        mFeedbackClickListener = onFeedbackClickListener;
         mAppName = mPackageName;
         mOnSettingsClickListener = onSettingsClick;
         mSingleNotificationChannel = notificationChannel;
@@ -318,25 +314,76 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         // Delegate
         bindDelegate();
 
-        // Set up app settings link (i.e. Customize)
-        View settingsLinkView = findViewById(R.id.app_settings);
-        Intent settingsIntent = getAppSettingsIntent(mPm, mPackageName,
-                mSingleNotificationChannel,
-                mSbn.getId(), mSbn.getTag());
-        if (settingsIntent != null
-                && !TextUtils.isEmpty(mSbn.getNotification().getSettingsText())) {
-            settingsLinkView.setVisibility(VISIBLE);
-            settingsLinkView.setOnClickListener((View view) -> {
-                mAppSettingsClickListener.onClick(view, settingsIntent);
-            });
+
+        if (Flags.notificationClassificationUi() &&
+                SYSTEM_RESERVED_IDS.contains(mSingleNotificationChannel.getId())) {
+            bindFeedback();
         } else {
-            settingsLinkView.setVisibility(View.GONE);
+            // Set up app settings link (i.e. Customize)
+            View settingsLinkView = findViewById(R.id.app_settings);
+            Intent settingsIntent = getAppSettingsIntent(mPm, mPackageName,
+                    mSingleNotificationChannel,
+                    mSbn.getId(), mSbn.getTag());
+            if (settingsIntent != null
+                    && !TextUtils.isEmpty(mSbn.getNotification().getSettingsText())) {
+                settingsLinkView.setVisibility(VISIBLE);
+                settingsLinkView.setOnClickListener((View view) -> {
+                    mAppSettingsClickListener.onClick(view, settingsIntent);
+                });
+            } else {
+                settingsLinkView.setVisibility(View.GONE);
+            }
         }
 
         // System Settings button.
         final View settingsButton = findViewById(R.id.info);
         settingsButton.setOnClickListener(getSettingsOnClickListener());
         settingsButton.setVisibility(settingsButton.hasOnClickListeners() ? VISIBLE : GONE);
+    }
+
+    private void bindFeedback() {
+        View feedbackButton = findViewById(R.id.feedback);
+        Intent intent = getAssistantFeedbackIntent(mINotificationManager, mPm, mEntry);
+        if (!android.app.Flags.notificationClassificationUi() || intent == null) {
+            feedbackButton.setVisibility(GONE);
+        } else {
+            feedbackButton.setVisibility(VISIBLE);
+            feedbackButton.setOnClickListener((View v) -> {
+                if (mFeedbackClickListener != null) {
+                    mFeedbackClickListener.onClick(v, intent);
+                }
+            });
+        }
+    }
+
+    public static Intent getAssistantFeedbackIntent(INotificationManager inm, PackageManager pm,
+            NotificationEntry entry) {
+        try {
+            ComponentName assistant = inm.getAllowedNotificationAssistant();
+            if (assistant == null) {
+                return null;
+            }
+            Intent intent = new Intent(
+                    NotificationAssistantService.ACTION_NOTIFICATION_ASSISTANT_FEEDBACK_SETTINGS)
+                    .setPackage(assistant.getPackageName());
+            final List<ResolveInfo> resolveInfos = pm.queryIntentActivities(
+                    intent,
+                    PackageManager.MATCH_DEFAULT_ONLY
+            );
+            if (resolveInfos == null || resolveInfos.size() == 0 || resolveInfos.get(0) == null) {
+                return null;
+            }
+            final ActivityInfo activityInfo = resolveInfos.get(0).activityInfo;
+            intent.setClassName(activityInfo.packageName, activityInfo.name);
+
+            intent.putExtra(NotificationAssistantService.EXTRA_NOTIFICATION_KEY, entry.getKey());
+            intent.putExtra(NotificationAssistantService.EXTRA_NOTIFICATION_ADJUSTMENT,
+                    entry.getRanking().getSummarization() != null ? KEY_SUMMARIZATION : KEY_TYPE);
+            return intent;
+        } catch (Exception e) {
+            Slog.d(TAG, "no assistant?", e);
+            return null;
+        }
     }
 
     private OnClickListener getSettingsOnClickListener() {
@@ -557,7 +604,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
                 intent,
                 PackageManager.MATCH_DEFAULT_ONLY
         );
-        if (resolveInfos == null || resolveInfos.size() == 0 || resolveInfos.get(0) == null) {
+        if (resolveInfos == null || resolveInfos.isEmpty() || resolveInfos.get(0) == null) {
             return null;
         }
         final ActivityInfo activityInfo = resolveInfos.get(0).activityInfo;
@@ -692,6 +739,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     /**
      * Returns a LogMaker with all available notification information.
      * Caller should set category, type, and maybe subtype, before passing it to mMetricsLogger.
+     *
      * @return LogMaker
      */
     private LogMaker getLogMaker() {
@@ -703,10 +751,11 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     /**
      * Returns an initialized LogMaker for logging importance changes.
      * The caller may override the type before passing it to mMetricsLogger.
+     *
      * @return LogMaker
      */
     private LogMaker importanceChangeLogMaker() {
-        Integer chosenImportance =
+        int chosenImportance =
                 mChosenImportance != null ? mChosenImportance : mStartingChannelImportance;
         return getLogMaker().setCategory(MetricsEvent.ACTION_SAVE_IMPORTANCE)
                 .setType(MetricsEvent.TYPE_ACTION)
@@ -716,6 +765,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     /**
      * Returns an initialized LogMaker for logging open/close of the info display.
      * The caller may override the type before passing it to mMetricsLogger.
+     *
      * @return LogMaker
      */
     private LogMaker notificationControlsLogMaker() {
@@ -733,7 +783,9 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
 
     @Retention(SOURCE)
     @IntDef({BEHAVIOR_ALERTING, BEHAVIOR_SILENT, BEHAVIOR_AUTOMATIC})
-    private @interface AlertingBehavior {}
+    private @interface AlertingBehavior {
+    }
+
     private static final int BEHAVIOR_ALERTING = 0;
     private static final int BEHAVIOR_SILENT = 1;
     private static final int BEHAVIOR_AUTOMATIC = 2;

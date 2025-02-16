@@ -3262,7 +3262,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         mWmService.mDisplayWindowSettings.setShouldShowSystemDecorsLocked(this, shouldShow);
 
         if (!shouldShow) {
-            clearAllTasksOnDisplay(null);
+            clearAllTasksOnDisplay(null /* clearTasksCallback */, false /* isRemovingDisplay */);
         }
     }
 
@@ -4656,35 +4656,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mInsetsStateController.getImeSourceProvider().onInputTargetChanged(target);
             }
         }
-    }
-
-    /**
-     * Callback from {@link ImeInsetsSourceProvider#updateClientVisibility} for the system to
-     * judge whether or not to notify the IME insets provider to dispatch this reported IME client
-     * visibility state to the app clients when needed.
-     */
-    boolean onImeInsetsClientVisibilityUpdate() {
-        boolean[] changed = new boolean[1];
-
-        // Unlike the IME layering target or the control target can be updated during the layout
-        // change, the IME input target requires to be changed after gaining the input focus.
-        // In case unfreezing IME insets state may too early during IME focus switching, we unfreeze
-        // when activities going to be visible until the input target changed, or the
-        // activity was the current input target that has to unfreeze after updating the IME
-        // client visibility.
-        final ActivityRecord inputTargetActivity =
-                mImeInputTarget != null ? mImeInputTarget.getActivityRecord() : null;
-        final boolean targetChanged = mImeInputTarget != mLastImeInputTarget;
-        if (targetChanged || inputTargetActivity != null && inputTargetActivity.isVisibleRequested()
-                && inputTargetActivity.mImeInsetsFrozenUntilStartInput) {
-            forAllActivities(r -> {
-                if (r.mImeInsetsFrozenUntilStartInput && r.isVisibleRequested()) {
-                    r.mImeInsetsFrozenUntilStartInput = false;
-                    changed[0] = true;
-                }
-            });
-        }
-        return changed[0];
     }
 
     void updateImeControlTarget() {
@@ -6468,12 +6439,15 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         return mRemoving;
     }
 
-    void clearAllTasksOnDisplay(@Nullable Runnable clearTasksCallback) {
+    private void clearAllTasksOnDisplay(@Nullable Runnable clearTasksCallback,
+            boolean isRemovingDisplay) {
         Task lastReparentedRootTask;
         mRootWindowContainer.mTaskSupervisor.beginDeferResume();
         try {
             lastReparentedRootTask = reduceOnAllTaskDisplayAreas((taskDisplayArea, rootTask) -> {
-                final Task lastReparentedRootTaskFromArea = taskDisplayArea.remove();
+                final Task lastReparentedRootTaskFromArea = isRemovingDisplay
+                        ? taskDisplayArea.prepareForRemoval()
+                        : taskDisplayArea.setShouldKeepNoTask(true);
                 if (lastReparentedRootTaskFromArea != null) {
                     return lastReparentedRootTaskFromArea;
                 }
@@ -6503,7 +6477,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             if (mContentRecorder != null) {
                 mContentRecorder.stopRecording();
             }
-        });
+        }, true /* isRemovingDisplay */);
 
         releaseSelfIfNeeded();
         mDisplayPolicy.release();
@@ -6627,6 +6601,22 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     boolean isKeyguardLocked() {
         return mRootWindowContainer.mTaskSupervisor
                 .getKeyguardController().isKeyguardLocked(mDisplayId);
+    }
+
+    boolean isKeyguardLockedOrAodShowing() {
+        return isKeyguardLocked() || isAodShowing();
+    }
+
+    /**
+     * @return whether aod is showing for this display
+     */
+    boolean isAodShowing() {
+        final boolean isAodShowing = mRootWindowContainer.mTaskSupervisor
+                .getKeyguardController().isAodShowing(mDisplayId);
+        if (mDisplayId == DEFAULT_DISPLAY && isAodShowing) {
+            return !isKeyguardGoingAway();
+        }
+        return isAodShowing;
     }
 
     /**
@@ -7119,14 +7109,19 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
 
         /**
+         * @return an integer as the changed requested visible insets types.
          * @see #getRequestedVisibleTypes()
          */
-        void updateRequestedVisibleTypes(@InsetsType int visibleTypes, @InsetsType int mask) {
-            int newRequestedVisibleTypes =
+        @InsetsType int updateRequestedVisibleTypes(
+                @InsetsType int visibleTypes, @InsetsType int mask) {
+            final int newRequestedVisibleTypes =
                     (mRequestedVisibleTypes & ~mask) | (visibleTypes & mask);
             if (mRequestedVisibleTypes != newRequestedVisibleTypes) {
+                final int changedTypes = mRequestedVisibleTypes ^ newRequestedVisibleTypes;
                 mRequestedVisibleTypes = newRequestedVisibleTypes;
+                return changedTypes;
             }
+            return 0;
         }
     }
 

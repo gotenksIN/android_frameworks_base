@@ -36,7 +36,6 @@ import android.tools.flicker.assertors.assertions.AppWindowHasMaxDisplayHeight
 import android.tools.flicker.assertors.assertions.AppWindowHasMaxDisplayWidth
 import android.tools.flicker.assertors.assertions.AppWindowHasSizeOfAtLeast
 import android.tools.flicker.assertors.assertions.AppWindowInsideDisplayBoundsAtEnd
-import android.tools.flicker.assertors.assertions.AppWindowIsBiggerThanInitialBoundsAtEnd
 import android.tools.flicker.assertors.assertions.AppWindowIsInvisibleAtEnd
 import android.tools.flicker.assertors.assertions.AppWindowIsVisibleAlways
 import android.tools.flicker.assertors.assertions.AppWindowMaintainsAspectRatioAlways
@@ -172,7 +171,6 @@ class DesktopModeFlickerScenarios {
                 assertions = AssertionTemplates.DESKTOP_MODE_APP_VISIBILITY_ASSERTIONS +
                         listOf(
                             ResizeVeilKeepsIncreasingInSize(DESKTOP_MODE_APP),
-                            AppWindowIsBiggerThanInitialBoundsAtEnd(DESKTOP_MODE_APP),
                         ).associateBy({ it }, { AssertionInvocationGroup.BLOCKING })
                 )
 
@@ -189,7 +187,6 @@ class DesktopModeFlickerScenarios {
                 assertions = AssertionTemplates.DESKTOP_MODE_APP_VISIBILITY_ASSERTIONS +
                         listOf(
                             ResizeVeilKeepsIncreasingInSize(DESKTOP_MODE_APP),
-                            AppWindowIsBiggerThanInitialBoundsAtEnd(DESKTOP_MODE_APP),
                         ).associateBy({ it }, { AssertionInvocationGroup.BLOCKING }),
             )
 
@@ -545,6 +542,30 @@ class DesktopModeFlickerScenarios {
                     listOf(
                         AppWindowBecomesPinned(DESKTOP_MODE_APP),
                     ).associateBy({ it }, { AssertionInvocationGroup.BLOCKING })
+            )
+
+        val OPEN_APP_WHEN_EXTERNAL_DISPLAY_CONNECTED =
+            FlickerConfigEntry(
+                scenarioId = ScenarioId("OPEN_APP_WHEN_EXTERNAL_DISPLAY_CONNECTED"),
+                extractor =
+                ShellTransitionScenarioExtractor(
+                    transitionMatcher =
+                    object : ITransitionMatcher {
+                        override fun findAll(
+                            transitions: Collection<Transition>
+                        ): Collection<Transition> {
+                                return listOf(transitions
+                                    .filter { it.type == TransitionType.OPEN }
+                                    .maxByOrNull { it.id }!!)
+                        }
+                    }
+                ),
+                assertions =
+                        listOf(
+                            AppWindowBecomesVisible(DESKTOP_MODE_APP),
+                            AppWindowOnTopAtEnd(DESKTOP_MODE_APP),
+                            AppWindowBecomesVisible(DESKTOP_WALLPAPER),
+                        ).associateBy({ it }, { AssertionInvocationGroup.BLOCKING }),
             )
     }
 }

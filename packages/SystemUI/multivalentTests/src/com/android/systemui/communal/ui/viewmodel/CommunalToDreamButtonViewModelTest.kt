@@ -37,6 +37,7 @@ import com.android.systemui.lifecycle.activateIn
 import com.android.systemui.plugins.activityStarter
 import com.android.systemui.settings.fakeUserTracker
 import com.android.systemui.statusbar.policy.batteryController
+import com.android.systemui.statusbar.policy.fake
 import com.android.systemui.testKosmos
 import com.android.systemui.user.data.repository.fakeUserRepository
 import com.android.systemui.util.settings.fakeSettings
@@ -47,7 +48,6 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.verify
 import org.mockito.kotlin.any
-import org.mockito.kotlin.whenever
 
 @SmallTest
 @EnableFlags(FLAG_GLANCEABLE_HUB_V2)
@@ -69,7 +69,7 @@ class CommunalToDreamButtonViewModelTest : SysuiTestCase() {
     fun shouldShowDreamButtonOnHub_trueWhenPluggedIn() =
         with(kosmos) {
             runTest {
-                whenever(batteryController.isPluggedIn()).thenReturn(true)
+                batteryController.fake._isPluggedIn = true
                 runCurrent()
 
                 assertThat(underTest.shouldShowDreamButtonOnHub).isTrue()
@@ -80,8 +80,7 @@ class CommunalToDreamButtonViewModelTest : SysuiTestCase() {
     fun shouldShowDreamButtonOnHub_falseWhenNotPluggedIn() =
         with(kosmos) {
             runTest {
-                whenever(batteryController.isPluggedIn()).thenReturn(false)
-                runCurrent()
+                batteryController.fake._isPluggedIn = false
 
                 assertThat(underTest.shouldShowDreamButtonOnHub).isFalse()
             }
@@ -126,10 +125,20 @@ class CommunalToDreamButtonViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun shouldShowDreamButtonTooltip_trueWhenNotDismissed() =
+    fun shouldShowDreamButtonTooltip_trueWhenNotDismissedAndHubOnboardingDismissed() =
+        kosmos.runTest {
+            setSelectedUser(MAIN_USER)
+            fakeCommunalPrefsRepository.setHubOnboardingDismissed(MAIN_USER)
+            runCurrent()
+
+            assertThat(underTest.shouldShowTooltip).isTrue()
+        }
+
+    @Test
+    fun shouldShowDreamButtonTooltip_falseWhenNotDismissedAndHubOnboardingNotDismissed() =
         kosmos.runTest {
             runCurrent()
-            assertThat(underTest.shouldShowTooltip).isTrue()
+            assertThat(underTest.shouldShowTooltip).isFalse()
         }
 
     @Test

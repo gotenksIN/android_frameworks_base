@@ -328,7 +328,6 @@ import android.window.WindowContainerToken;
 import android.window.WindowContextInfo;
 
 import com.android.internal.R;
-import com.android.internal.util.ToBooleanFunction;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.annotations.VisibleForTesting.Visibility;
@@ -345,6 +344,7 @@ import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.LatencyTracker;
+import com.android.internal.util.ToBooleanFunction;
 import com.android.internal.view.WindowManagerPolicyThread;
 import com.android.server.AnimationThread;
 import com.android.server.DisplayThread;
@@ -393,7 +393,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -517,6 +516,8 @@ public class WindowManagerService extends IWindowManager.Stub
             Collections.synchronizedMap(new ArrayMap<>());
 
     final StartingSurfaceController mStartingSurfaceController;
+
+    final PresentationController mPresentationController;
 
     private final IVrStateCallbacks mVrStateCallbacks = new IVrStateCallbacks.Stub() {
         @Override
@@ -687,6 +688,14 @@ public class WindowManagerService extends IWindowManager.Stub
     private ArrayList<WindowState> mHidingNonSystemOverlayWindows = new ArrayList<>();
 
     /**
+     * A map that tracks uid/count of windows that cause non-system overlay windows to be hidden.
+     * The key is the window's uid and the value is the number of windows with that uid that are
+     * requesting hiding non-system overlay
+     */
+    private final ArrayMap<Integer, Integer> mHidingNonSystemOverlayWindowsCountPerUid =
+            new ArrayMap<>();
+
+    /**
      * In some cases (e.g. when {@link R.bool.config_reverseDefaultRotation} has value
      * {@value true}) we need to map some orientation to others. This {@link SparseIntArray}
      * contains the relation between the source orientation and the one to use.
@@ -739,8 +748,14 @@ public class WindowManagerService extends IWindowManager.Stub
             new WallpaperVisibilityListeners();
 
     IDisplayChangeWindowController mDisplayChangeController = null;
-    private final DeathRecipient mDisplayChangeControllerDeath =
-            () -> mDisplayChangeController = null;
+    private final DeathRecipient mDisplayChangeControllerDeath = new DeathRecipient() {
+        @Override
+        public void binderDied() {
+            synchronized (mGlobalLock) {
+                mDisplayChangeController = null;
+            }
+        }
+    };
 
     final DisplayWindowListenerController mDisplayNotificationController;
     final TaskSystemBarsListenerController mTaskSystemBarsListenerController;
@@ -1434,6 +1449,7 @@ public class WindowManagerService extends IWindowManager.Stub
         setGlobalShadowSettings();
         mAnrController = new AnrController(this);
         mStartingSurfaceController = new StartingSurfaceController(this);
+        mPresentationController = new PresentationController();
 
         mBlurController = new BlurController(mContext, mPowerManager);
         mTaskFpsCallbackController = new TaskFpsCallbackController(mContext);
@@ -1825,7 +1841,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     UserHandle.getUserId(win.getOwningUid()));
             win.setHiddenWhileSuspended(suspended);
 
-            final boolean hideSystemAlertWindows = !mHidingNonSystemOverlayWindows.isEmpty();
+            final boolean hideSystemAlertWindows = shouldHideNonSystemOverlayWindow(win);
             win.setForceHideNonSystemOverlayWindowIfNeeded(hideSystemAlertWindows);
 
             boolean imMayMove = true;
@@ -1941,10 +1957,8 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             outSizeCompatScale[0] = win.getCompatScaleForClient();
 
-            if (res >= ADD_OKAY
-                    && (type == TYPE_PRESENTATION || type == TYPE_PRIVATE_PRESENTATION)) {
-                mDisplayManagerInternal.onPresentation(displayContent.getDisplay().getDisplayId(),
-                        /*isShown=*/ true);
+            if (res >= ADD_OKAY && win.isPresentation()) {
+                mPresentationController.onPresentationAdded(win);
             }
         }
 
@@ -2041,6 +2055,22 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             return appInfo.targetSdkVersion >= Build.VERSION_CODES.O;
         }
+    }
+
+    private boolean shouldHideNonSystemOverlayWindow(WindowState win) {
+        if (!Flags.fixHideOverlayApi()) {
+            return !mHidingNonSystemOverlayWindows.isEmpty();
+        }
+
+        if (mHidingNonSystemOverlayWindows.isEmpty()) {
+            return false;
+        }
+
+        if (mHidingNonSystemOverlayWindowsCountPerUid.size() == 1
+                && mHidingNonSystemOverlayWindowsCountPerUid.containsKey(win.getOwningUid())) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -4392,6 +4422,23 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    @Nullable
+    Boolean resetIgnoreOrientationRequest(int displayId) {
+        synchronized (mGlobalLock) {
+            final DisplayContent display = mRoot.getDisplayContent(displayId);
+            if (display == null) {
+                return null;
+            }
+            display.mHasSetIgnoreOrientationRequest = false;
+            // Clear existing override settings.
+            mDisplayWindowSettings.setIgnoreOrientationRequest(display,
+                    null /* ignoreOrientationRequest */);
+            // Reload from settings in case there is built-in config.
+            mDisplayWindowSettings.applyRotationSettingsToDisplayLocked(display);
+            return display.getIgnoreOrientationRequest();
+        }
+    }
+
     /**
      * Controls whether ignore orientation request logic in {@link DisplayArea} is disabled
      * at runtime and how to optionally map some requested orientations to others.
@@ -4729,11 +4776,13 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 ImeTracker.forLogging().onProgress(statsToken,
                         ImeTracker.PHASE_WM_UPDATE_DISPLAY_WINDOW_REQUESTED_VISIBLE_TYPES);
-                dc.mRemoteInsetsControlTarget.updateRequestedVisibleTypes(visibleTypes, mask);
+                final @InsetsType int changedTypes =
+                        dc.mRemoteInsetsControlTarget.updateRequestedVisibleTypes(
+                                visibleTypes, mask);
                 // TODO(b/353463205) the statsToken shouldn't be null as it is used later in the
                 //  IME provider. Check if we have to create a new request here, if null.
                 dc.getInsetsStateController().onRequestedVisibleTypesChanged(
-                        dc.mRemoteInsetsControlTarget, statsToken);
+                        dc.mRemoteInsetsControlTarget, changedTypes, statsToken);
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -6974,12 +7023,12 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @Override
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
+        if (!DumpUtils.checkDumpPermission(mContext, TAG, pw)) return;
         PriorityDump.dump(mPriorityDumper, fd, pw, args);
     }
 
     @NeverCompile // Avoid size overhead of debugging code.
     private void doDump(FileDescriptor fd, PrintWriter pw, String[] args, boolean useProto) {
-        if (!DumpUtils.checkDumpPermission(mContext, TAG, pw)) return;
         boolean dumpAll = false;
 
         int opti = 0;
@@ -8759,22 +8808,42 @@ public class WindowManagerService extends IWindowManager.Stub
             return;
         }
         final boolean systemAlertWindowsHidden = !mHidingNonSystemOverlayWindows.isEmpty();
+        final int numUIDsRequestHidingPreUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
         if (surfaceShown && win.hideNonSystemOverlayWindowsWhenVisible()) {
             if (!mHidingNonSystemOverlayWindows.contains(win)) {
                 mHidingNonSystemOverlayWindows.add(win);
+                int uid = win.getOwningUid();
+                int count = mHidingNonSystemOverlayWindowsCountPerUid.getOrDefault(uid, 0);
+                mHidingNonSystemOverlayWindowsCountPerUid.put(uid, count + 1);
             }
         } else {
             mHidingNonSystemOverlayWindows.remove(win);
+            int uid = win.getOwningUid();
+            int count = mHidingNonSystemOverlayWindowsCountPerUid.getOrDefault(uid, 0);
+            if (count <= 1) {
+                mHidingNonSystemOverlayWindowsCountPerUid.remove(win.getOwningUid());
+            } else {
+                mHidingNonSystemOverlayWindowsCountPerUid.put(uid, count - 1);
+            }
         }
-
         final boolean hideSystemAlertWindows = !mHidingNonSystemOverlayWindows.isEmpty();
-
-        if (systemAlertWindowsHidden == hideSystemAlertWindows) {
-            return;
+        final int numUIDSRequestHidingPostUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
+        if (Flags.fixHideOverlayApi()) {
+            if (numUIDSRequestHidingPostUpdate == numUIDsRequestHidingPreUpdate) {
+                return;
+            }
+            // The visibility of SAWs needs to be refreshed only when the number of uids that
+            // request hiding SAWs changes 0->1, 1->0, 1->2 or 2->1.
+            if (numUIDSRequestHidingPostUpdate != 1 && numUIDsRequestHidingPreUpdate != 1) {
+                return;
+            }
+        } else {
+            if (systemAlertWindowsHidden == hideSystemAlertWindows) {
+                return;
+            }
         }
-
         mRoot.forAllWindows((w) -> {
-            w.setForceHideNonSystemOverlayWindowIfNeeded(hideSystemAlertWindows);
+            w.setForceHideNonSystemOverlayWindowIfNeeded(shouldHideNonSystemOverlayWindow(w));
         }, false /* traverseTopToBottom */);
     }
 

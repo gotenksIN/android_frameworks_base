@@ -117,12 +117,12 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
             // Verify the chip is initially shown
-            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
+            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Active::class.java)
 
             fakeMediaProjectionRepository.emitProjectionStartedDuringCallAndActivePostCallEvent()
 
             // Verify the chip is hidden
-            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
         }
 
     @Test
@@ -136,12 +136,12 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
             // Verify the chip is initially shown
-            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
+            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Active::class.java)
 
             fakeMediaProjectionRepository.emitProjectionStartedDuringCallAndActivePostCallEvent()
 
             // Chip is still shown
-            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
+            assertThat(latestChip).isInstanceOf(OngoingActivityChipModel.Active::class.java)
         }
 
     @Test
@@ -297,13 +297,40 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(com.android.media.projection.flags.Flags.FLAG_SHOW_STOP_DIALOG_POST_CALL_END)
+    fun stopDialog_flagEnabled_eventEmitted_dialogCannotBeDismissedByTouchOutside() =
+        kosmos.runTest {
+            val latestDialogModel by collectLastValue(underTest.stopDialogToShow)
+
+            mediaProjectionRepo.mediaProjectionState.value =
+                MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
+
+            fakeMediaProjectionRepository.emitProjectionStartedDuringCallAndActivePostCallEvent()
+
+            // Verify that the dialog is shown
+            assertThat(latestDialogModel)
+                .isInstanceOf(MediaProjectionStopDialogModel.Shown::class.java)
+
+            val dialogModel = latestDialogModel as MediaProjectionStopDialogModel.Shown
+
+            whenever(dialogModel.dialogDelegate.createDialog()).thenReturn(mockDialog)
+
+            dialogModel.createAndShowDialog()
+
+            verify(mockDialog).show()
+
+            // Verify that setCanceledOnTouchOutside(false) is called
+            verify(mockDialog).setCanceledOnTouchOutside(false)
+        }
+
+    @Test
     fun chip_notProjectingState_isHidden() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
             mediaProjectionRepo.mediaProjectionState.value = MediaProjectionState.NotProjecting
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
         }
 
     @Test
@@ -318,7 +345,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                     hostDeviceName = null,
                 )
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
         }
 
     @Test
@@ -333,7 +360,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                     createTask(taskId = 1),
                 )
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
         }
 
     @Test
@@ -344,7 +371,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(CAST_TO_OTHER_DEVICES_PACKAGE)
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
         }
 
     @Test
@@ -356,9 +383,9 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.NoScreen(NORMAL_PACKAGE, hostDeviceName = null)
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown.IconOnly::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
             val icon =
-                (((latest as OngoingActivityChipModel.Shown).icon)
+                (((latest as OngoingActivityChipModel.Active).icon)
                         as OngoingActivityChipModel.ChipIcon.SingleColorIcon)
                     .impl as Icon.Resource
             assertThat(icon.res).isEqualTo(R.drawable.ic_present_to_all)
@@ -379,9 +406,9 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                     createTask(taskId = 1),
                 )
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown.Timer::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
             val icon =
-                (((latest as OngoingActivityChipModel.Shown).icon)
+                (((latest as OngoingActivityChipModel.Active).icon)
                         as OngoingActivityChipModel.ChipIcon.SingleColorIcon)
                     .impl as Icon.Resource
             assertThat(icon.res).isEqualTo(R.drawable.ic_present_to_all)
@@ -396,9 +423,9 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown.Timer::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
             val icon =
-                (((latest as OngoingActivityChipModel.Shown).icon)
+                (((latest as OngoingActivityChipModel.Active).icon)
                         as OngoingActivityChipModel.ChipIcon.SingleColorIcon)
                     .impl as Icon.Resource
             assertThat(icon.res).isEqualTo(R.drawable.ic_present_to_all)
@@ -413,7 +440,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
 
             // WHEN the stop action on the dialog is clicked
             val dialogStopAction =
@@ -427,13 +454,13 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             dialogStopAction.onClick(mock<DialogInterface>(), 0)
 
             // THEN the chip is immediately hidden...
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
             // ...even though the repo still says it's projecting
             assertThat(mediaProjectionRepo.mediaProjectionState.value)
                 .isInstanceOf(MediaProjectionState.Projecting::class.java)
 
             // AND we specify no animation
-            assertThat((latest as OngoingActivityChipModel.Hidden).shouldAnimate).isFalse()
+            assertThat((latest as OngoingActivityChipModel.Inactive).shouldAnimate).isFalse()
         }
 
     @Test
@@ -444,7 +471,8 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
-            assertThat((latest as OngoingActivityChipModel.Shown).colors).isEqualTo(ColorsModel.Red)
+            assertThat((latest as OngoingActivityChipModel.Active).colors)
+                .isEqualTo(ColorsModel.Red)
         }
 
     @Test
@@ -456,11 +484,12 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
-            assertThat((latest as OngoingActivityChipModel.Shown.Timer).startTimeMs).isEqualTo(1234)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active.Timer).startTimeMs)
+                .isEqualTo(1234)
 
             mediaProjectionRepo.mediaProjectionState.value = MediaProjectionState.NotProjecting
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
 
             systemClock.setElapsedRealtime(5678)
             mediaProjectionRepo.mediaProjectionState.value =
@@ -470,8 +499,9 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                     createTask(taskId = 1),
                 )
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Shown::class.java)
-            assertThat((latest as OngoingActivityChipModel.Shown.Timer).startTimeMs).isEqualTo(5678)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active.Timer).startTimeMs)
+                .isEqualTo(5678)
         }
 
     @Test
@@ -483,7 +513,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.NoScreen(NORMAL_PACKAGE)
 
-            val clickListener = ((latest as OngoingActivityChipModel.Shown).onClickListenerLegacy)
+            val clickListener = ((latest as OngoingActivityChipModel.Active).onClickListenerLegacy)
             assertThat(clickListener).isNotNull()
 
             clickListener!!.onClick(chipView)
@@ -504,7 +534,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
-            val clickListener = ((latest as OngoingActivityChipModel.Shown).onClickListenerLegacy)
+            val clickListener = ((latest as OngoingActivityChipModel.Active).onClickListenerLegacy)
             assertThat(clickListener).isNotNull()
 
             clickListener!!.onClick(chipView)
@@ -529,7 +559,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                     createTask(taskId = 1),
                 )
 
-            val clickListener = ((latest as OngoingActivityChipModel.Shown).onClickListenerLegacy)
+            val clickListener = ((latest as OngoingActivityChipModel.Active).onClickListenerLegacy)
             assertThat(clickListener).isNotNull()
 
             clickListener!!.onClick(chipView)
@@ -554,7 +584,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                     createTask(taskId = 1),
                 )
 
-            val clickListener = ((latest as OngoingActivityChipModel.Shown).onClickListenerLegacy)
+            val clickListener = ((latest as OngoingActivityChipModel.Active).onClickListenerLegacy)
             clickListener!!.onClick(chipView)
 
             val cujCaptor = argumentCaptor<DialogCuj>()
@@ -574,7 +604,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.NoScreen(NORMAL_PACKAGE)
 
-            assertThat((latest as OngoingActivityChipModel.Shown).clickBehavior)
+            assertThat((latest as OngoingActivityChipModel.Active).clickBehavior)
                 .isInstanceOf(OngoingActivityChipModel.ClickBehavior.ExpandAction::class.java)
         }
 
@@ -586,7 +616,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
             mediaProjectionRepo.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
-            assertThat((latest as OngoingActivityChipModel.Shown).clickBehavior)
+            assertThat((latest as OngoingActivityChipModel.Active).clickBehavior)
                 .isInstanceOf(OngoingActivityChipModel.ClickBehavior.ExpandAction::class.java)
         }
 
@@ -602,7 +632,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                     createTask(taskId = 1),
                 )
 
-            assertThat((latest as OngoingActivityChipModel.Shown).clickBehavior)
+            assertThat((latest as OngoingActivityChipModel.Active).clickBehavior)
                 .isInstanceOf(OngoingActivityChipModel.ClickBehavior.ExpandAction::class.java)
         }
 
@@ -619,7 +649,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                 MediaProjectionState.Projecting.NoScreen(NORMAL_PACKAGE)
 
             val expandAction =
-                ((latest as OngoingActivityChipModel.Shown).clickBehavior
+                ((latest as OngoingActivityChipModel.Active).clickBehavior
                     as OngoingActivityChipModel.ClickBehavior.ExpandAction)
             expandAction.onClick(mockExpandable)
             verify(kosmos.mockDialogTransitionAnimator)
@@ -635,7 +665,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
 
             val expandAction =
-                ((latest as OngoingActivityChipModel.Shown).clickBehavior
+                ((latest as OngoingActivityChipModel.Active).clickBehavior
                     as OngoingActivityChipModel.ClickBehavior.ExpandAction)
             expandAction.onClick(mockExpandable)
             verify(kosmos.mockDialogTransitionAnimator)
@@ -655,7 +685,7 @@ class ShareToAppChipViewModelTest : SysuiTestCase() {
                 )
 
             val expandAction =
-                ((latest as OngoingActivityChipModel.Shown).clickBehavior
+                ((latest as OngoingActivityChipModel.Active).clickBehavior
                     as OngoingActivityChipModel.ClickBehavior.ExpandAction)
             expandAction.onClick(mockExpandable)
 

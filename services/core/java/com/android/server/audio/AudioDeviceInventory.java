@@ -35,7 +35,6 @@ import static android.media.AudioSystem.isBluetoothDevice;
 import static android.media.AudioSystem.isBluetoothLeOutDevice;
 import static android.media.AudioSystem.isBluetoothOutDevice;
 import static android.media.AudioSystem.isBluetoothScoOutDevice;
-import static android.media.audio.Flags.automaticBtDeviceType;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.media.audio.Flags.asDeviceConnectionFailure;
@@ -215,11 +214,10 @@ public class AudioDeviceInventory {
             AdiDeviceState deviceState, boolean syncInventory) {
         AtomicBoolean updatedCategory = new AtomicBoolean(false);
         synchronized (mDeviceInventoryLock) {
-            if (automaticBtDeviceType()) {
-                if (deviceState.updateAudioDeviceCategory()) {
-                    updatedCategory.set(true);
-                }
+            if (deviceState.updateAudioDeviceCategory()) {
+                updatedCategory.set(true);
             }
+
             deviceState = mDeviceInventory.merge(deviceState.getDeviceId(),
                     deviceState, (oldState, newState) -> {
                         if (oldState.getAudioDeviceCategory()
@@ -314,12 +312,8 @@ public class AudioDeviceInventory {
      */
     @GuardedBy({"mDevicesLock", "mDeviceInventoryLock"})
     void onSynchronizeAdiDeviceInInventory_l(AdiDeviceState updatedDevice) {
-        boolean found = false;
-        found |= synchronizeBleDeviceInInventory(updatedDevice);
-        if (automaticBtDeviceType()) {
-            found |= synchronizeDeviceProfilesInInventory(updatedDevice);
-        }
-        if (found) {
+        if (synchronizeBleDeviceInInventory(updatedDevice)
+                || synchronizeDeviceProfilesInInventory(updatedDevice)) {
             mDeviceBroker.postPersistAudioDeviceSettings();
         }
     }

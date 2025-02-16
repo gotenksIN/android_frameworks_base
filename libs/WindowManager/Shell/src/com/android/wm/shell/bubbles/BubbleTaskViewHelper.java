@@ -100,6 +100,7 @@ public class BubbleTaskViewHelper {
 
             // TODO: I notice inconsistencies in lifecycle
             // Post to keep the lifecycle normal
+            // TODO - currently based on type, really it's what the "launch item" is.
             mParentView.post(() -> {
                 ProtoLog.d(WM_SHELL_BUBBLES, "onInitialized: calling startActivity, bubble=%s",
                         getBubbleKey());
@@ -108,23 +109,32 @@ public class BubbleTaskViewHelper {
                     options.setPendingIntentBackgroundActivityStartMode(
                             MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
                     final boolean isShortcutBubble = (mBubble.hasMetadataShortcutId()
-                            || (mBubble.getShortcutInfo() != null
+                            || (mBubble.isShortcut()
                             && BubbleAnythingFlagHelper.enableCreateAnyBubble()));
                     if (mBubble.getPreparingTransition() != null) {
                         mBubble.getPreparingTransition().surfaceCreated();
-                    } else if (mBubble.isAppBubble()) {
+                    } else if (mBubble.isApp() || mBubble.isNote()) {
                         Context context =
                                 mContext.createContextAsUser(
                                         mBubble.getUser(), Context.CONTEXT_RESTRICTED);
-                        PendingIntent pi = PendingIntent.getActivity(
-                                context,
-                                /* requestCode= */ 0,
-                                mBubble.getAppBubbleIntent()
-                                        .addFlags(FLAG_ACTIVITY_MULTIPLE_TASK),
-                                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT,
-                                /* options= */ null);
-                        mTaskView.startActivity(pi, /* fillInIntent= */ null, options,
-                                launchBounds);
+                        Intent fillInIntent = null;
+                        //first try get pending intent from the bubble
+                        PendingIntent pi = mBubble.getPendingIntent();
+                        if (pi == null) {
+                            // if null - create new one
+                            pi = PendingIntent.getActivity(
+                                    context,
+                                    /* requestCode= */ 0,
+                                    mBubble.getIntent()
+                                            .addFlags(FLAG_ACTIVITY_MULTIPLE_TASK),
+                                    PendingIntent.FLAG_IMMUTABLE
+                                            | PendingIntent.FLAG_UPDATE_CURRENT,
+                                    /* options= */ null);
+                        } else {
+                            fillInIntent = new Intent(pi.getIntent());
+                            fillInIntent.addFlags(FLAG_ACTIVITY_MULTIPLE_TASK);
+                        }
+                        mTaskView.startActivity(pi, fillInIntent, options, launchBounds);
                     } else if (isShortcutBubble) {
                         options.setLaunchedFromBubble(true);
                         options.setApplyActivityFlagsForBubbles(true);
@@ -133,7 +143,7 @@ public class BubbleTaskViewHelper {
                     } else {
                         options.setLaunchedFromBubble(true);
                         if (mBubble != null) {
-                            mBubble.setIntentActive();
+                            mBubble.setPendingIntentActive();
                         }
                         final Intent fillInIntent = new Intent();
                         // Apply flags to make behaviour match documentLaunchMode=always.
@@ -167,7 +177,7 @@ public class BubbleTaskViewHelper {
             // The taskId is saved to use for removeTask, preventing appearance in recent tasks.
             mTaskId = taskId;
 
-            if (mBubble != null && mBubble.isNoteBubble()) {
+            if (mBubble != null && mBubble.isNote()) {
                 // Let the controller know sooner what the taskId is.
                 mExpandedViewManager.setNoteBubbleTaskId(mBubble.getKey(), mTaskId);
             }
@@ -231,7 +241,7 @@ public class BubbleTaskViewHelper {
         boolean isNew = mBubble == null || didBackingContentChange(bubble);
         mBubble = bubble;
         if (isNew) {
-            mPendingIntent = mBubble.getBubbleIntent();
+            mPendingIntent = mBubble.getPendingIntent();
             return true;
         }
         return false;
@@ -276,7 +286,7 @@ public class BubbleTaskViewHelper {
      */
     private boolean didBackingContentChange(Bubble newBubble) {
         boolean prevWasIntentBased = mBubble != null && mPendingIntent != null;
-        boolean newIsIntentBased = newBubble.getBubbleIntent() != null;
+        boolean newIsIntentBased = newBubble.getPendingIntent() != null;
         return prevWasIntentBased != newIsIntentBased;
     }
 }

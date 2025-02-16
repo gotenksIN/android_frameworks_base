@@ -28,7 +28,6 @@ import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.PulseExpansionInteractor
-import com.android.systemui.keyguard.domain.interactor.WallpaperFocalAreaInteractor
 import com.android.systemui.keyguard.shared.model.Edge
 import com.android.systemui.keyguard.shared.model.KeyguardState.AOD
 import com.android.systemui.keyguard.shared.model.KeyguardState.DREAMING
@@ -54,6 +53,7 @@ import com.android.systemui.util.ui.AnimatableEvent
 import com.android.systemui.util.ui.AnimatedValue
 import com.android.systemui.util.ui.toAnimatedValueFlow
 import com.android.systemui.util.ui.zip
+import com.android.systemui.wallpapers.domain.interactor.WallpaperFocalAreaInteractor
 import javax.inject.Inject
 import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +96,7 @@ constructor(
     private val aodToLockscreenTransitionViewModel: AodToLockscreenTransitionViewModel,
     private val aodToOccludedTransitionViewModel: AodToOccludedTransitionViewModel,
     private val aodToPrimaryBouncerTransitionViewModel: AodToPrimaryBouncerTransitionViewModel,
+    private val dozingToDreamingTransitionViewModel: DozingToDreamingTransitionViewModel,
     private val dozingToGoneTransitionViewModel: DozingToGoneTransitionViewModel,
     private val dozingToLockscreenTransitionViewModel: DozingToLockscreenTransitionViewModel,
     private val dozingToOccludedTransitionViewModel: DozingToOccludedTransitionViewModel,
@@ -247,6 +248,7 @@ constructor(
                         aodToLockscreenTransitionViewModel.lockscreenAlpha(viewState),
                         aodToOccludedTransitionViewModel.lockscreenAlpha(viewState),
                         aodToPrimaryBouncerTransitionViewModel.lockscreenAlpha,
+                        dozingToDreamingTransitionViewModel.lockscreenAlpha,
                         dozingToGoneTransitionViewModel.lockscreenAlpha(viewState),
                         dozingToLockscreenTransitionViewModel.lockscreenAlpha,
                         dozingToOccludedTransitionViewModel.lockscreenAlpha(viewState),
@@ -286,6 +288,9 @@ constructor(
             }
             .distinctUntilChanged()
     }
+
+    val scaleFromZoomOut: Flow<Float> =
+        keyguardInteractor.zoomOut.map { 1 - it * PUSHBACK_SCALE_FOR_LOCKSCREEN }
 
     val translationY: Flow<Float> = aodBurnInViewModel.movement.map { it.translationY.toFloat() }
 
@@ -372,8 +377,6 @@ constructor(
                 initialValue = AnimatedValue.NotAnimating(false),
             )
 
-    val shouldSendFocalArea = wallpaperFocalAreaInteractor.shouldSendFocalArea
-
     fun onNotificationContainerBoundsChanged(top: Float, bottom: Float, animate: Boolean = false) {
         keyguardInteractor.setNotificationContainerBounds(
             NotificationContainerBounds(top = top, bottom = bottom, isAnimated = animate)
@@ -418,5 +421,6 @@ constructor(
 
     companion object {
         private const val TAG = "KeyguardRootViewModel"
+        private const val PUSHBACK_SCALE_FOR_LOCKSCREEN = 0.05f
     }
 }

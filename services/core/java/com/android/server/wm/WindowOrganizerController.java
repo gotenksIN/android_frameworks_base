@@ -52,6 +52,7 @@ import static android.window.WindowContainerTransaction.Change.CHANGE_FOCUSABLE;
 import static android.window.WindowContainerTransaction.Change.CHANGE_FORCE_TRANSLUCENT;
 import static android.window.WindowContainerTransaction.Change.CHANGE_HIDDEN;
 import static android.window.WindowContainerTransaction.Change.CHANGE_RELATIVE_BOUNDS;
+import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_APP_COMPAT_REACHABILITY;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REMOVE_ROOT_TASK;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_KEYGUARD_STATE;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_ADD_INSETS_FRAME_PROVIDER;
@@ -77,6 +78,8 @@ import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_LAUNCH_ROOT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_START_SHORTCUT;
+import static android.window.WindowContainerTransaction.HierarchyOp.REACHABILITY_EVENT_X;
+import static android.window.WindowContainerTransaction.HierarchyOp.REACHABILITY_EVENT_Y;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_ORGANIZER;
 import static com.android.server.wm.ActivityRecord.State.PAUSING;
@@ -699,9 +702,23 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
 
                 if ((entry.getValue().getChangeMask()
                         & WindowContainerTransaction.Change.CHANGE_FORCE_NO_PIP) != 0) {
-                    // Disable entering pip (eg. when recents pretends to finish itself)
-                    if (chain.mTransition != null) {
-                        chain.mTransition.setCanPipOnFinish(false /* canPipOnFinish */);
+                    if (com.android.wm.shell.Flags.enableRecentsBookendTransition()) {
+                        // If we are using a bookend transition, then the transition that we need
+                        // to disable pip on finish is the original transient transition, not the
+                        // bookend transition
+                        final Transition transientHideTransition =
+                                mTransitionController.getTransientHideTransitionForContainer(wc);
+                        if (transientHideTransition != null) {
+                            transientHideTransition.setCanPipOnFinish(false);
+                        } else {
+                            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
+                                    "Set do-not-pip: no task");
+                        }
+                    } else {
+                        // Disable entering pip (eg. when recents pretends to finish itself)
+                        if (chain.mTransition != null) {
+                            chain.mTransition.setCanPipOnFinish(false /* canPipOnFinish */);
+                        }
                     }
                 }
                 // A bit hacky, but we need to detect "remove PiP" so that we can "wrap" the
@@ -1194,6 +1211,30 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 effects |= TRANSACT_EFFECTS_LIFECYCLE;
                 waitAsyncStart(() -> mService.mTaskSupervisor.startActivityFromRecents(
                         caller.mPid, caller.mUid, taskId, safeOptions));
+                break;
+            }
+            case HIERARCHY_OP_TYPE_APP_COMPAT_REACHABILITY: {
+                int doubleTapX = hop.getAppCompatOptions().getInt(REACHABILITY_EVENT_X);
+                int doubleTapY = hop.getAppCompatOptions().getInt(REACHABILITY_EVENT_Y);
+                final WindowContainer<?> wc = WindowContainer.fromBinder(hop.getContainer());
+                if (wc == null) {
+                    break;
+                }
+                final Task currentTask = wc.asTask();
+                if (chain.mTransition != null) {
+                    chain.mTransition.collect(wc);
+                }
+                if (currentTask != null) {
+                    final ActivityRecord top = currentTask.topRunningActivity();
+                    if (top != null) {
+                        if (chain.mTransition != null) {
+                            chain.mTransition.collect(top);
+                        }
+                        top.mAppCompatController.getReachabilityPolicy().handleDoubleTap(doubleTapX,
+                                doubleTapY);
+                    }
+                }
+                effects |= TRANSACT_EFFECTS_CLIENT_CONFIG;
                 break;
             }
             case HIERARCHY_OP_TYPE_REORDER:

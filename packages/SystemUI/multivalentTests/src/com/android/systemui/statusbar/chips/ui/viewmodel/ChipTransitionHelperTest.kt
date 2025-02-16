@@ -30,7 +30,6 @@ import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.Test
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -39,7 +38,6 @@ import org.junit.runner.RunWith
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
-@OptIn(ExperimentalCoroutinesApi::class)
 class ChipTransitionHelperTest : SysuiTestCase() {
     private val kosmos = Kosmos()
     private val testScope = kosmos.testScope
@@ -49,11 +47,12 @@ class ChipTransitionHelperTest : SysuiTestCase() {
         testScope.runTest {
             val underTest = ChipTransitionHelper(kosmos.applicationCoroutineScope)
             val inputChipFlow =
-                MutableStateFlow<OngoingActivityChipModel>(OngoingActivityChipModel.Hidden())
+                MutableStateFlow<OngoingActivityChipModel>(OngoingActivityChipModel.Inactive())
             val latest by collectLastValue(underTest.createChipFlow(inputChipFlow))
 
             val newChip =
-                OngoingActivityChipModel.Shown.Timer(
+                OngoingActivityChipModel.Active.Timer(
+                    key = KEY,
                     icon = createIcon(R.drawable.ic_cake),
                     colors = ColorsModel.Themed,
                     startTimeMs = 100L,
@@ -66,7 +65,8 @@ class ChipTransitionHelperTest : SysuiTestCase() {
             assertThat(latest).isEqualTo(newChip)
 
             val newerChip =
-                OngoingActivityChipModel.Shown.IconOnly(
+                OngoingActivityChipModel.Active.IconOnly(
+                    key = KEY,
                     icon = createIcon(R.drawable.ic_hotspot),
                     colors = ColorsModel.Themed,
                     onClickListenerLegacy = null,
@@ -83,11 +83,12 @@ class ChipTransitionHelperTest : SysuiTestCase() {
         testScope.runTest {
             val underTest = ChipTransitionHelper(kosmos.applicationCoroutineScope)
             val inputChipFlow =
-                MutableStateFlow<OngoingActivityChipModel>(OngoingActivityChipModel.Hidden())
+                MutableStateFlow<OngoingActivityChipModel>(OngoingActivityChipModel.Inactive())
             val latest by collectLastValue(underTest.createChipFlow(inputChipFlow))
 
-            val shownChip =
-                OngoingActivityChipModel.Shown.Timer(
+            val activeChip =
+                OngoingActivityChipModel.Active.Timer(
+                    key = KEY,
                     icon = createIcon(R.drawable.ic_cake),
                     colors = ColorsModel.Themed,
                     startTimeMs = 100L,
@@ -95,28 +96,28 @@ class ChipTransitionHelperTest : SysuiTestCase() {
                     clickBehavior = OngoingActivityChipModel.ClickBehavior.None,
                 )
 
-            inputChipFlow.value = shownChip
+            inputChipFlow.value = activeChip
 
-            assertThat(latest).isEqualTo(shownChip)
+            assertThat(latest).isEqualTo(activeChip)
 
             // WHEN #onActivityStopped is invoked
             underTest.onActivityStoppedFromDialog()
             runCurrent()
 
             // THEN the chip is hidden and has no animation
-            assertThat(latest).isEqualTo(OngoingActivityChipModel.Hidden(shouldAnimate = false))
+            assertThat(latest).isEqualTo(OngoingActivityChipModel.Inactive(shouldAnimate = false))
 
             // WHEN only 250ms have elapsed
             advanceTimeBy(250)
 
             // THEN the chip is still hidden
-            assertThat(latest).isEqualTo(OngoingActivityChipModel.Hidden(shouldAnimate = false))
+            assertThat(latest).isEqualTo(OngoingActivityChipModel.Inactive(shouldAnimate = false))
 
             // WHEN over 500ms have elapsed
             advanceTimeBy(251)
 
             // THEN the chip returns to the original input flow value
-            assertThat(latest).isEqualTo(shownChip)
+            assertThat(latest).isEqualTo(activeChip)
         }
 
     @Test
@@ -124,11 +125,12 @@ class ChipTransitionHelperTest : SysuiTestCase() {
         testScope.runTest {
             val underTest = ChipTransitionHelper(kosmos.applicationCoroutineScope)
             val inputChipFlow =
-                MutableStateFlow<OngoingActivityChipModel>(OngoingActivityChipModel.Hidden())
+                MutableStateFlow<OngoingActivityChipModel>(OngoingActivityChipModel.Inactive())
             val latest by collectLastValue(underTest.createChipFlow(inputChipFlow))
 
-            val shownChip =
-                OngoingActivityChipModel.Shown.Timer(
+            val activeChip =
+                OngoingActivityChipModel.Active.Timer(
+                    key = KEY,
                     icon = createIcon(R.drawable.ic_cake),
                     colors = ColorsModel.Themed,
                     startTimeMs = 100L,
@@ -136,16 +138,16 @@ class ChipTransitionHelperTest : SysuiTestCase() {
                     clickBehavior = OngoingActivityChipModel.ClickBehavior.None,
                 )
 
-            inputChipFlow.value = shownChip
+            inputChipFlow.value = activeChip
 
-            assertThat(latest).isEqualTo(shownChip)
+            assertThat(latest).isEqualTo(activeChip)
 
             // WHEN #onActivityStopped is invoked
             underTest.onActivityStoppedFromDialog()
             runCurrent()
 
             // THEN the chip is hidden and has no animation
-            assertThat(latest).isEqualTo(OngoingActivityChipModel.Hidden(shouldAnimate = false))
+            assertThat(latest).isEqualTo(OngoingActivityChipModel.Inactive(shouldAnimate = false))
 
             // WHEN 250ms have elapsed, get another stop event
             advanceTimeBy(250)
@@ -153,15 +155,19 @@ class ChipTransitionHelperTest : SysuiTestCase() {
             runCurrent()
 
             // THEN the chip is still hidden for another 500ms afterwards
-            assertThat(latest).isEqualTo(OngoingActivityChipModel.Hidden(shouldAnimate = false))
+            assertThat(latest).isEqualTo(OngoingActivityChipModel.Inactive(shouldAnimate = false))
             advanceTimeBy(499)
-            assertThat(latest).isEqualTo(OngoingActivityChipModel.Hidden(shouldAnimate = false))
+            assertThat(latest).isEqualTo(OngoingActivityChipModel.Inactive(shouldAnimate = false))
             advanceTimeBy(2)
-            assertThat(latest).isEqualTo(shownChip)
+            assertThat(latest).isEqualTo(activeChip)
         }
 
     private fun createIcon(@DrawableRes drawable: Int) =
         OngoingActivityChipModel.ChipIcon.SingleColorIcon(
             Icon.Resource(drawable, contentDescription = null)
         )
+
+    companion object {
+        private const val KEY = "testKey"
+    }
 }

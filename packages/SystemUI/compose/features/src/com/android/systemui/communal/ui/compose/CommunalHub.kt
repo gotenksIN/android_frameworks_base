@@ -1705,15 +1705,38 @@ private fun Umo(
     contentScope: ContentScope?,
     modifier: Modifier = Modifier,
 ) {
-    if (SceneContainerFlag.isEnabled && contentScope != null) {
-        contentScope.MediaCarousel(
-            modifier = modifier.fillMaxSize(),
-            isVisible = true,
-            mediaHost = viewModel.mediaHost,
-            carouselController = viewModel.mediaCarouselController,
-        )
-    } else {
-        UmoLegacy(viewModel, modifier)
+    val showNextActionLabel = stringResource(R.string.accessibility_action_label_umo_show_next)
+    val showPreviousActionLabel =
+        stringResource(R.string.accessibility_action_label_umo_show_previous)
+
+    Box(
+        modifier =
+            modifier.thenIf(!viewModel.isEditMode) {
+                Modifier.semantics {
+                    customActions =
+                        listOf(
+                            CustomAccessibilityAction(showNextActionLabel) {
+                                viewModel.onShowNextMedia()
+                                true
+                            },
+                            CustomAccessibilityAction(showPreviousActionLabel) {
+                                viewModel.onShowPreviousMedia()
+                                true
+                            },
+                        )
+                }
+            }
+    ) {
+        if (SceneContainerFlag.isEnabled && contentScope != null) {
+            contentScope.MediaCarousel(
+                modifier = modifier.fillMaxSize(),
+                isVisible = true,
+                mediaHost = viewModel.mediaHost,
+                carouselController = viewModel.mediaCarouselController,
+            )
+        } else {
+            UmoLegacy(viewModel, modifier)
+        }
     }
 }
 
@@ -1724,7 +1747,7 @@ private fun UmoLegacy(viewModel: BaseCommunalViewModel, modifier: Modifier = Mod
             modifier
                 .clip(
                     shape =
-                        RoundedCornerShape(dimensionResource(system_app_widget_background_radius))
+                        RoundedCornerShape(dimensionResource(R.dimen.notification_corner_radius))
                 )
                 .background(MaterialTheme.colorScheme.primary)
                 .pointerInput(Unit) {

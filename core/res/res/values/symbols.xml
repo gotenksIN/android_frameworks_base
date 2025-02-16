@@ -434,6 +434,7 @@
   <java-symbol type="bool" name="config_enableProximityService" />
   <java-symbol type="bool" name="config_enableVirtualDeviceManager" />
   <java-symbol type="array" name="config_localPrivateDisplayPorts" />
+  <java-symbol type="array" name="config_localNotStealTopFocusDisplayPorts" />
   <java-symbol type="integer" name="config_defaultDisplayDefaultColorMode" />
   <java-symbol type="bool" name="config_enableAppWidgetService" />
   <java-symbol type="dimen" name="config_pictureInPictureMinAspectRatio" />
@@ -589,6 +590,7 @@
   <java-symbol type="dimen" name="accessibility_magnification_indicator_width" />
   <java-symbol type="dimen" name="circular_display_mask_thickness" />
   <java-symbol type="dimen" name="user_icon_size" />
+  <java-symbol type="dimen" name="round_scrollbar_width" />
 
   <java-symbol type="string" name="add_account_button_label" />
   <java-symbol type="string" name="addToDictionary" />
@@ -4767,6 +4769,8 @@
   <java-symbol type="id" name="resolver_empty_state_container" />
   <java-symbol type="id" name="button_bar_container" />
   <java-symbol type="id" name="title_container" />
+  <java-symbol type="id" name="shortcuts_container" />
+  <java-symbol type="id" name="chooser_row" />
   <java-symbol type="string" name="resolver_cross_profile_blocked" />
   <java-symbol type="string" name="resolver_cant_share_with_work_apps_explanation" />
   <java-symbol type="string" name="resolver_cant_share_with_personal_apps_explanation" />
@@ -4776,6 +4780,9 @@
   <java-symbol type="string" name="resolver_no_work_apps_available" />
   <java-symbol type="string" name="resolver_no_personal_apps_available" />
   <java-symbol type="string" name="resolver_switch_on_work" />
+  <java-symbol type="string" name="shortcut_group_a11y_title" />
+  <java-symbol type="string" name="suggested_apps_group_a11y_title" />
+  <java-symbol type="string" name="all_apps_group_a11y_title" />
   <java-symbol type="drawable" name="ic_screenshot_edit" />
   <java-symbol type="dimen" name="resolver_empty_state_height" />
   <java-symbol type="dimen" name="resolver_empty_state_height_with_tabs" />
@@ -5650,6 +5657,10 @@
   <java-symbol type="layout" name="accessibility_autoclick_type_panel" />
   <java-symbol type="string" name="accessibility_autoclick_type_settings_panel_title" />
   <java-symbol type="string" name="accessibility_autoclick_left_click" />
+  <java-symbol type="string" name="accessibility_autoclick_right_click" />
+  <java-symbol type="string" name="accessibility_autoclick_double_click" />
+  <java-symbol type="string" name="accessibility_autoclick_drag" />
+  <java-symbol type="string" name="accessibility_autoclick_scroll" />
   <java-symbol type="string" name="accessibility_autoclick_pause" />
   <java-symbol type="string" name="accessibility_autoclick_position" />
   <java-symbol type="dimen" name="accessibility_autoclick_type_panel_button_spacing" />
@@ -5657,8 +5668,17 @@
   <java-symbol type="dimen" name="accessibility_autoclick_type_panel_divider_height" />
   <java-symbol type="dimen" name="accessibility_autoclick_type_panel_divider_width" />
   <java-symbol type="id" name="accessibility_autoclick_type_panel" />
+  <java-symbol type="id" name="accessibility_autoclick_button_group_container" />
   <java-symbol type="id" name="accessibility_autoclick_left_click_layout" />
   <java-symbol type="id" name="accessibility_autoclick_left_click_button" />
+  <java-symbol type="id" name="accessibility_autoclick_right_click_layout" />
+  <java-symbol type="id" name="accessibility_autoclick_right_click_button" />
+  <java-symbol type="id" name="accessibility_autoclick_double_click_layout" />
+  <java-symbol type="id" name="accessibility_autoclick_double_click_button" />
+  <java-symbol type="id" name="accessibility_autoclick_drag_layout" />
+  <java-symbol type="id" name="accessibility_autoclick_drag_button" />
+  <java-symbol type="id" name="accessibility_autoclick_scroll_layout" />
+  <java-symbol type="id" name="accessibility_autoclick_scroll_button" />
   <java-symbol type="id" name="accessibility_autoclick_pause_layout" />
   <java-symbol type="id" name="accessibility_autoclick_pause_button" />
   <java-symbol type="id" name="accessibility_autoclick_position_layout" />
@@ -5772,6 +5792,9 @@
   <!-- Whether the developer option for desktop mode is supported on the current device  -->
   <java-symbol type="bool" name="config_isDesktopModeDevOptionSupported" />
 
+  <!-- Whether the current device's internal display can host desktop sessions.  -->
+  <java-symbol type="bool" name="config_canInternalDisplayHostDesktops" />
+
   <!-- Maximum number of active tasks on a given Desktop Windowing session. Set to 0 for unlimited. -->
   <java-symbol type="integer" name="config_maxDesktopWindowingActiveTasks"/>
 
@@ -5860,11 +5883,16 @@
   <!-- Default toggle for fp screen of unlcok-->
   <java-symbol type="bool" name="config_screen_off_udfps_default_on" />
 
-  <!-- Style for Wear Material3 Button. Will only be used for sdk 36 or above. -->
-  <java-symbol type="style" name="Widget.DeviceDefault.Button.WearMaterial3" />
+  <!-- Style for Material3. Will only be used for sdk 36 or above. -->
+  <java-symbol type="style" name="Widget.Material3" />
+  <java-symbol type="style" name="Widget.Material3.Button" />
+  <java-symbol type="style" name="Widget.Material3.Button.Filled" />
+  <java-symbol type="style" name="Widget.Material3.Button.FilledTonal" />
+  <java-symbol type="style" name="Widget.Material3.Button.Outlined" />
+  <java-symbol type="style" name="Widget.Material3.Button.Text" />
 
-  <!-- Style for Wear Material3 AlertDialog. Will only be used for sdk 36 or above. -->
-  <java-symbol type="style" name="AlertDialog.DeviceDefault.WearMaterial3" />
+  <!-- Style for Material3 AlertDialog. Will only be used for sdk 36 or above. -->
+  <java-symbol type="style" name="AlertDialog.Material3" />
 
   <java-symbol type="bool" name="config_allowNormalBrightnessForDozePolicy" />
 
@@ -5908,5 +5936,21 @@
   <java-symbol type="bool" name="config_deviceSupportsWifiUsd" />
 
   <java-symbol type="array" name="config_notificationDefaultUnsupportedAdjustments" />
+  <java-symbol type="drawable" name="ic_notification_summarization" />
+
+  <!-- Advanced Protection Service USB feature -->
+  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_title" />
+  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_text" />
+  <java-symbol type="string" name="usb_apm_usb_suspicious_activity_notification_title" />
+  <java-symbol type="string" name="usb_apm_usb_suspicious_activity_notification_text" />
+
+  <java-symbol type="string" name="prefs_bugreport" />
+  <java-symbol type="string" name="key_warning_state" />
+  <java-symbol type="integer" name="bugreport_state_unknown" />
+  <java-symbol type="integer" name="bugreport_state_show" />
+  <java-symbol type="integer" name="bugreport_state_hide" />
+
+  <!-- Enable OEMs to support scale up anim across tasks.-->
+  <java-symbol type="bool" name="config_enableCrossTaskScaleUpAnimation" />
 
 </resources>

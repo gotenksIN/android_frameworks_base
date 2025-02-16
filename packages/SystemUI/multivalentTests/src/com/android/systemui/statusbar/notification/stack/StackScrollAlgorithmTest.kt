@@ -30,7 +30,6 @@ import com.android.systemui.statusbar.notification.row.ExpandableView
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager
 import com.google.common.truth.Expect
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assume
 import org.junit.Before
 import org.junit.Rule
@@ -58,7 +57,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     private val notificationRow = mock<ExpandableNotificationRow>()
     private val notificationEntry = mock<NotificationEntry>()
     private val dumpManager = mock<DumpManager>()
-    @OptIn(ExperimentalCoroutinesApi::class)
     private val mStatusBarKeyguardViewManager = mock<StatusBarKeyguardViewManager>()
     private val notificationShelf = mock<NotificationShelf>()
     private val emptyShadeView =
@@ -66,7 +64,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
             layout(/* l= */ 0, /* t= */ 0, /* r= */ 100, /* b= */ 100)
         }
     private val footerView = FooterView(context, /* attrs= */ null)
-    @OptIn(ExperimentalCoroutinesApi::class)
     private val ambientState =
         AmbientState(
             context,
@@ -499,7 +496,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         assertThat(notificationRow.viewState.alpha).isEqualTo(1f)
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun resetViewStates_expansionChanging_notificationBecomesTransparent() {
         whenever(mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit).thenReturn(false)
@@ -509,7 +505,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         )
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun resetViewStates_expansionChangingWhileBouncerInTransit_viewBecomesTransparent() {
         whenever(mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit).thenReturn(true)
@@ -519,7 +514,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         )
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun resetViewStates_expansionChanging_notificationAlphaUpdated() {
         whenever(mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit).thenReturn(false)
@@ -529,7 +523,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         )
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun resetViewStates_largeScreen_expansionChanging_alphaUpdated_largeScreenValue() {
         val expansionFraction = 0.6f
@@ -545,7 +538,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         )
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun expansionChanging_largeScreen_bouncerInTransit_alphaUpdated_bouncerValues() {
         ambientState.isSmallScreen = false

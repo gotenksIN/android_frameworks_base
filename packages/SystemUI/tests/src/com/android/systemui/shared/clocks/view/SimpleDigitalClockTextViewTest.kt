@@ -58,7 +58,9 @@ class SimpleDigitalClockTextViewTest : SysuiTestCase() {
                     },
                     ClockMessageBuffers(messageBuffer),
                     messageBuffer,
-                )
+                    vibrator = null,
+                ),
+                isLargeClock = false,
             )
         underTest.textStyle = FontTextStyle()
         underTest.aodStyle = FontTextStyle()

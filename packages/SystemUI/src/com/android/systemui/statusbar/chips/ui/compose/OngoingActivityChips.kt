@@ -21,11 +21,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChipsModel
-import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 
 @Composable
 fun OngoingActivityChips(chips: MultipleOngoingActivityChipsModel, modifier: Modifier = Modifier) {
@@ -35,13 +35,9 @@ fun OngoingActivityChips(chips: MultipleOngoingActivityChipsModel, modifier: Mod
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // TODO(b/372657935): Make sure chips are only shown when there is enough horizontal
-        // space.
-        if (chips.primary is OngoingActivityChipModel.Shown) {
-            OngoingActivityChip(model = chips.primary)
-        }
-        if (chips.secondary is OngoingActivityChipModel.Shown) {
-            OngoingActivityChip(model = chips.secondary)
-        }
+        // TODO(b/372657935): Make sure chips are only shown when there is enough horizontal space.
+        chips.active
+            .filter { !it.isHidden }
+            .forEach { key(it.key) { OngoingActivityChip(model = it) } }
     }
 }

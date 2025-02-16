@@ -25,7 +25,6 @@ import static android.media.AudioManager.AUDIO_DEVICE_CATEGORY_RECEIVER;
 import static android.media.AudioManager.AUDIO_DEVICE_CATEGORY_SPEAKER;
 import static android.media.AudioManager.AUDIO_DEVICE_CATEGORY_UNKNOWN;
 import static android.media.AudioManager.AUDIO_DEVICE_CATEGORY_WATCH;
-import static android.media.audio.Flags.automaticBtDeviceType;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -1603,10 +1602,6 @@ public class BtHelper {
 
     @AudioDeviceCategory
     /*package*/ static int getBtDeviceCategory(String address) {
-        if (!automaticBtDeviceType()) {
-            return AUDIO_DEVICE_CATEGORY_UNKNOWN;
-        }
-
         BluetoothDevice device = BtHelper.getBluetoothDevice(address);
         if (device == null) {
             return AUDIO_DEVICE_CATEGORY_UNKNOWN;

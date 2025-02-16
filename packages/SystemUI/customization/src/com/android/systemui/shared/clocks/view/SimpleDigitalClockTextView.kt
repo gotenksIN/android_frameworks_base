@@ -24,6 +24,7 @@ import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
+import android.os.VibrationEffect
 import android.text.Layout
 import android.text.TextPaint
 import android.util.AttributeSet
@@ -38,10 +39,13 @@ import com.android.systemui.animation.GSFAxes
 import com.android.systemui.animation.TextAnimator
 import com.android.systemui.customization.R
 import com.android.systemui.plugins.clocks.ClockFontAxisSetting
+import com.android.systemui.plugins.clocks.ClockFontAxisSetting.Companion.replace
+import com.android.systemui.plugins.clocks.ClockFontAxisSetting.Companion.toFVar
 import com.android.systemui.plugins.clocks.ClockLogger
 import com.android.systemui.shared.clocks.ClockContext
 import com.android.systemui.shared.clocks.DigitTranslateAnimator
 import com.android.systemui.shared.clocks.DimensionParser
+import com.android.systemui.shared.clocks.FLEX_CLOCK_ID
 import com.android.systemui.shared.clocks.FontTextStyle
 import java.lang.Thread
 import kotlin.math.max
@@ -63,14 +67,35 @@ enum class HorizontalAlignment {
 }
 
 @SuppressLint("AppCompatCustomView")
-open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSet? = null) :
-    TextView(clockCtx.context, attrs) {
+open class SimpleDigitalClockTextView(
+    val clockCtx: ClockContext,
+    isLargeClock: Boolean,
+    attrs: AttributeSet? = null,
+) : TextView(clockCtx.context, attrs) {
     val lockScreenPaint = TextPaint()
     lateinit var textStyle: FontTextStyle
     lateinit var aodStyle: FontTextStyle
 
-    private var lsFontVariation = ClockFontAxisSetting.toFVar(DEFAULT_LS_VARIATION)
-    private var aodFontVariation = ClockFontAxisSetting.toFVar(DEFAULT_AOD_VARIATION)
+    private val isLegacyFlex = clockCtx.settings.clockId == FLEX_CLOCK_ID
+    private val fixedAodAxes =
+        when {
+            !isLegacyFlex -> listOf(AOD_WEIGHT_AXIS, WIDTH_AXIS)
+            isLargeClock -> listOf(FLEX_AOD_LARGE_WEIGHT_AXIS, FLEX_AOD_WIDTH_AXIS)
+            else -> listOf(FLEX_AOD_SMALL_WEIGHT_AXIS, FLEX_AOD_WIDTH_AXIS)
+        }
+
+    private var lsFontVariation =
+        if (!isLegacyFlex) listOf(LS_WEIGHT_AXIS, WIDTH_AXIS, ROUND_AXIS, SLANT_AXIS).toFVar()
+        else listOf(FLEX_LS_WEIGHT_AXIS, FLEX_LS_WIDTH_AXIS, FLEX_ROUND_AXIS, SLANT_AXIS).toFVar()
+
+    private var aodFontVariation = run {
+        val roundAxis = if (!isLegacyFlex) ROUND_AXIS else FLEX_ROUND_AXIS
+        (fixedAodAxes + listOf(roundAxis, SLANT_AXIS)).toFVar()
+    }
+
+    // TODO(b/374306512): Fidget endpoint to spec
+    private var fidgetFontVariation = aodFontVariation
+
     private val parser = DimensionParser(clockCtx.context)
     var maxSingleDigitHeight = -1
     var maxSingleDigitWidth = -1
@@ -129,8 +154,14 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
         invalidate()
     }
 
-    fun updateAxes(axes: List<ClockFontAxisSetting>) {
-        lsFontVariation = ClockFontAxisSetting.toFVar(axes + OPTICAL_SIZE_AXIS)
+    fun updateAxes(lsAxes: List<ClockFontAxisSetting>) {
+        lsFontVariation = lsAxes.toFVar()
+        aodFontVariation = lsAxes.replace(fixedAodAxes).toFVar()
+        logger.i({ "updateAxes(LS = $str1, AOD = $str2)" }) {
+            str1 = lsFontVariation
+            str2 = aodFontVariation
+        }
+
         lockScreenPaint.typeface = typefaceCache.getTypefaceForVariant(lsFontVariation)
         typeface = lockScreenPaint.typeface
 
@@ -262,17 +293,43 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
             return
         }
         logger.d("animateCharge()")
-        val startAnimPhase2 = Runnable {
-            textAnimator.setTextStyle(
-                fvar = if (dozeFraction == 0F) lsFontVariation else aodFontVariation,
-                animate = isAnimationEnabled,
-            )
-            updateTextBoundsForTextAnimator()
-        }
         textAnimator.setTextStyle(
             fvar = if (dozeFraction == 0F) aodFontVariation else lsFontVariation,
             animate = isAnimationEnabled,
-            onAnimationEnd = startAnimPhase2,
+            onAnimationEnd =
+                Runnable {
+                    textAnimator.setTextStyle(
+                        fvar = if (dozeFraction == 0F) lsFontVariation else aodFontVariation,
+                        animate = isAnimationEnabled,
+                    )
+                    updateTextBoundsForTextAnimator()
+                },
+        )
+        updateTextBoundsForTextAnimator()
+    }
+
+    fun animateFidget(x: Float, y: Float) {
+        if (!this::textAnimator.isInitialized || textAnimator.isRunning()) {
+            // Skip fidget animation if other animation is already playing.
+            return
+        }
+
+        logger.animateFidget(x, y)
+        clockCtx.vibrator?.vibrate(FIDGET_HAPTICS)
+
+        // TODO(b/374306512): Duplicated charge animation as placeholder. Implement final version
+        // when we have a complete spec. May require additional code to animate individual digits.
+        textAnimator.setTextStyle(
+            fvar = fidgetFontVariation,
+            animate = isAnimationEnabled,
+            onAnimationEnd =
+                Runnable {
+                    textAnimator.setTextStyle(
+                        fvar = if (dozeFraction == 0F) lsFontVariation else aodFontVariation,
+                        animate = isAnimationEnabled,
+                    )
+                    updateTextBoundsForTextAnimator()
+                },
         )
         updateTextBoundsForTextAnimator()
     }
@@ -287,6 +344,7 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
                 targetTextBounds,
             )
         }
+
         if (layout == null) {
             requestLayout()
         } else {
@@ -500,23 +558,25 @@ open class SimpleDigitalClockTextView(clockCtx: ClockContext, attrs: AttributeSe
         private val PORTER_DUFF_XFER_MODE_PAINT =
             Paint().also { it.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT) }
 
+        val FIDGET_HAPTICS =
+            VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_THUD, 1.0f, 0)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 1.0f, 43)
+                .compose()
+
         val AOD_COLOR = Color.WHITE
-        val OPTICAL_SIZE_AXIS = ClockFontAxisSetting(GSFAxes.OPTICAL_SIZE, 144f)
-        val DEFAULT_LS_VARIATION =
-            listOf(
-                OPTICAL_SIZE_AXIS,
-                ClockFontAxisSetting(GSFAxes.WEIGHT, 400f),
-                ClockFontAxisSetting(GSFAxes.WIDTH, 100f),
-                ClockFontAxisSetting(GSFAxes.ROUND, 0f),
-                ClockFontAxisSetting(GSFAxes.SLANT, 0f),
-            )
-        val DEFAULT_AOD_VARIATION =
-            listOf(
-                OPTICAL_SIZE_AXIS,
-                ClockFontAxisSetting(GSFAxes.WEIGHT, 200f),
-                ClockFontAxisSetting(GSFAxes.WIDTH, 100f),
-                ClockFontAxisSetting(GSFAxes.ROUND, 0f),
-                ClockFontAxisSetting(GSFAxes.SLANT, 0f),
-            )
+        val LS_WEIGHT_AXIS = ClockFontAxisSetting(GSFAxes.WEIGHT, 400f)
+        val AOD_WEIGHT_AXIS = ClockFontAxisSetting(GSFAxes.WEIGHT, 200f)
+        val WIDTH_AXIS = ClockFontAxisSetting(GSFAxes.WIDTH, 85f)
+        val ROUND_AXIS = ClockFontAxisSetting(GSFAxes.ROUND, 0f)
+        val SLANT_AXIS = ClockFontAxisSetting(GSFAxes.SLANT, 0f)
+
+        // Axes for Legacy version of the Flex Clock
+        val FLEX_LS_WEIGHT_AXIS = ClockFontAxisSetting(GSFAxes.WEIGHT, 600f)
+        val FLEX_AOD_LARGE_WEIGHT_AXIS = ClockFontAxisSetting(GSFAxes.WEIGHT, 74f)
+        val FLEX_AOD_SMALL_WEIGHT_AXIS = ClockFontAxisSetting(GSFAxes.WEIGHT, 133f)
+        val FLEX_LS_WIDTH_AXIS = ClockFontAxisSetting(GSFAxes.WIDTH, 100f)
+        val FLEX_AOD_WIDTH_AXIS = ClockFontAxisSetting(GSFAxes.WIDTH, 43f)
+        val FLEX_ROUND_AXIS = ClockFontAxisSetting(GSFAxes.ROUND, 100f)
     }
 }

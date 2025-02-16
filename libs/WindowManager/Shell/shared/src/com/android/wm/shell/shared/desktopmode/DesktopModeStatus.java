@@ -189,7 +189,7 @@ public class DesktopModeStatus {
      * there should be no pooling.
      */
     public static int getWindowDecorScvhPoolSize(@NonNull Context context) {
-        if (!Flags.enableDesktopWindowingScvhCacheBugFix()) return 0;
+        if (!DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_SCVH_CACHE.isTrue()) return 0;
         final int maxTaskLimit = getMaxTaskLimit(context);
         if (maxTaskLimit > 0) {
             return maxTaskLimit;
@@ -208,8 +208,7 @@ public class DesktopModeStatus {
     /**
      * Return {@code true} if the current device supports desktop mode.
      */
-    @VisibleForTesting
-    public static boolean isDesktopModeSupported(@NonNull Context context) {
+    private static boolean isDesktopModeSupported(@NonNull Context context) {
         return context.getResources().getBoolean(R.bool.config_isDesktopModeSupported);
     }
 
@@ -218,6 +217,13 @@ public class DesktopModeStatus {
      */
     private static boolean isDesktopModeDevOptionSupported(@NonNull Context context) {
         return context.getResources().getBoolean(R.bool.config_isDesktopModeDevOptionSupported);
+    }
+
+    /**
+     * Return {@code true} if the current device can host desktop sessions on its internal display.
+     */
+    public static boolean canInternalDisplayHostDesktops(@NonNull Context context) {
+        return context.getResources().getBoolean(R.bool.config_canInternalDisplayHostDesktops);
     }
 
     /**
@@ -232,21 +238,24 @@ public class DesktopModeStatus {
      * Return {@code true} if desktop mode dev option should be shown on current device
      */
     public static boolean canShowDesktopExperienceDevOption(@NonNull Context context) {
-        return Flags.showDesktopExperienceDevOption() && isDeviceEligibleForDesktopMode(context);
+        return Flags.showDesktopExperienceDevOption()
+                && isInternalDisplayEligibleToHostDesktops(context);
     }
 
     /** Returns if desktop mode dev option should be enabled if there is no user override. */
     public static boolean shouldDevOptionBeEnabledByDefault(Context context) {
-        return isDeviceEligibleForDesktopMode(context) && Flags.enableDesktopWindowingMode();
+        return isInternalDisplayEligibleToHostDesktops(context)
+                && Flags.enableDesktopWindowingMode();
     }
 
     /**
      * Return {@code true} if desktop mode is enabled and can be entered on the current device.
      */
     public static boolean canEnterDesktopMode(@NonNull Context context) {
-        return (isDeviceEligibleForDesktopMode(context)
-                && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODE.isTrue())
-                || isDesktopModeEnabledByDevOption(context);
+        return (isInternalDisplayEligibleToHostDesktops(context)
+                && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODE.isTrue()
+                && (isDesktopModeSupported(context) || !enforceDeviceRestrictions())
+                || isDesktopModeEnabledByDevOption(context));
     }
 
     /**
@@ -314,10 +323,11 @@ public class DesktopModeStatus {
     }
 
     /**
-     * Return {@code true} if desktop mode is unrestricted and is supported in the device.
+     * Return {@code true} if desktop sessions is unrestricted and can be host for the device's
+     * internal display.
      */
-    public static boolean isDeviceEligibleForDesktopMode(@NonNull Context context) {
-        return !enforceDeviceRestrictions() || isDesktopModeSupported(context) || (
+    public static boolean isInternalDisplayEligibleToHostDesktops(@NonNull Context context) {
+        return !enforceDeviceRestrictions() || canInternalDisplayHostDesktops(context) || (
                 Flags.enableDesktopModeThroughDevOption() && isDesktopModeDevOptionSupported(
                         context));
     }
@@ -326,7 +336,7 @@ public class DesktopModeStatus {
      * Return {@code true} if the developer option for desktop mode is unrestricted and is supported
      * in the device.
      *
-     * Note that, if {@link #isDeviceEligibleForDesktopMode(Context)} is true, then
+     * Note that, if {@link #isInternalDisplayEligibleToHostDesktops(Context)} is true, then
      * {@link #isDeviceEligibleForDesktopModeDevOption(Context)} is also true.
      */
     private static boolean isDeviceEligibleForDesktopModeDevOption(@NonNull Context context) {

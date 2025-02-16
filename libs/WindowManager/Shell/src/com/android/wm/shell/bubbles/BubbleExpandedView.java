@@ -227,18 +227,18 @@ public class BubbleExpandedView extends LinearLayout {
                             MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
 
                     final boolean isShortcutBubble = (mBubble.hasMetadataShortcutId()
-                            || (mBubble.getShortcutInfo() != null
+                            || (mBubble.isShortcut()
                             && BubbleAnythingFlagHelper.enableCreateAnyBubble()));
 
-                    if (mBubble.isAppBubble()) {
+                    // TODO - currently based on type, really it's what the "launch item" is.
+                    if (mBubble.isApp() || mBubble.isNote()) {
                         Context context =
                                 mContext.createContextAsUser(
                                         mBubble.getUser(), Context.CONTEXT_RESTRICTED);
                         PendingIntent pi = PendingIntent.getActivity(
                                 context,
                                 /* requestCode= */ 0,
-                                mBubble.getAppBubbleIntent()
-                                        .addFlags(FLAG_ACTIVITY_MULTIPLE_TASK),
+                                mBubble.getIntent().addFlags(FLAG_ACTIVITY_MULTIPLE_TASK),
                                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT,
                                 /* options= */ null);
                         mTaskView.startActivity(pi, /* fillInIntent= */ null, options,
@@ -252,7 +252,7 @@ public class BubbleExpandedView extends LinearLayout {
                     } else {
                         options.setLaunchedFromBubble(true);
                         if (mBubble != null) {
-                            mBubble.setIntentActive();
+                            mBubble.setPendingIntentActive();
                         }
                         final Intent fillInIntent = new Intent();
                         // Apply flags to make behaviour match documentLaunchMode=always.
@@ -285,7 +285,7 @@ public class BubbleExpandedView extends LinearLayout {
             // The taskId is saved to use for removeTask, preventing appearance in recent tasks.
             mTaskId = taskId;
 
-            if (mBubble != null && mBubble.isNoteBubble()) {
+            if (mBubble != null && mBubble.isNote()) {
                 // Let the controller know sooner what the taskId is.
                 mManager.setNoteBubbleTaskId(mBubble.getKey(), mTaskId);
             }
@@ -920,7 +920,7 @@ public class BubbleExpandedView extends LinearLayout {
                     });
 
             if (isNew) {
-                mPendingIntent = mBubble.getBubbleIntent();
+                mPendingIntent = mBubble.getPendingIntent();
                 if ((mPendingIntent != null || mBubble.hasMetadataShortcutId())
                         && mTaskView != null) {
                     setContentVisibility(false);
@@ -947,7 +947,7 @@ public class BubbleExpandedView extends LinearLayout {
      */
     private boolean didBackingContentChange(Bubble newBubble) {
         boolean prevWasIntentBased = mBubble != null && mPendingIntent != null;
-        boolean newIsIntentBased = newBubble.getBubbleIntent() != null;
+        boolean newIsIntentBased = newBubble.getPendingIntent() != null;
         return prevWasIntentBased != newIsIntentBased;
     }
 

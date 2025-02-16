@@ -34,18 +34,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ContentKey
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SceneTransitionLayout
-import com.android.compose.animation.scene.SceneTransitions
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.observableTransitionState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffectFactory
+import com.android.systemui.keyguard.ui.composable.blueprint.rememberBurnIn
+import com.android.systemui.keyguard.ui.composable.modifier.burnInAware
 import com.android.systemui.lifecycle.rememberActivated
 import com.android.systemui.qs.ui.adapter.QSSceneAdapter
 import com.android.systemui.qs.ui.composable.QuickSettingsTheme
@@ -85,7 +87,7 @@ fun SceneContainer(
     sceneByKey: Map<SceneKey, Scene>,
     overlayByKey: Map<OverlayKey, Overlay>,
     initialSceneKey: SceneKey,
-    sceneTransitions: SceneTransitions,
+    transitionsBuilder: SceneContainerTransitionsBuilder,
     dataSourceDelegator: SceneDataSourceDelegator,
     qsSceneAdapter: Provider<QSSceneAdapter>,
     sceneJankMonitorFactory: SceneJankMonitor.Factory,
@@ -96,6 +98,12 @@ fun SceneContainer(
     val view = LocalView.current
     val sceneJankMonitor =
         rememberActivated(traceName = "sceneJankMonitor") { sceneJankMonitorFactory.create() }
+
+    val hapticFeedback = LocalHapticFeedback.current
+    val sceneTransitions =
+        remember(hapticFeedback) {
+            transitionsBuilder.build(viewModel.hapticsViewModel.getRevealHaptics(hapticFeedback))
+        }
 
     val state =
         rememberMutableSceneTransitionLayoutState(
@@ -161,7 +169,7 @@ fun SceneContainer(
         if (isFullWidthShade()) stretchOverscrollEffectFactory else offsetOverscrollEffectFactory
 
     // Inflate qsView here so that shade has the correct qqs height in the first measure pass after
-    // rebooting
+    // rebooting.
     if (
         viewModel.allContentKeys.contains(Scenes.QuickSettings) ||
             viewModel.allContentKeys.contains(Scenes.Shade)
@@ -196,7 +204,7 @@ fun SceneContainer(
         SceneTransitionLayout(
             state = state,
             modifier = modifier.fillMaxSize(),
-            swipeSourceDetector = viewModel.edgeDetector,
+            swipeSourceDetector = viewModel.swipeSourceDetector,
         ) {
             sceneByKey.forEach { (sceneKey, scene) ->
                 scene(
@@ -233,7 +241,12 @@ fun SceneContainer(
         BottomRightCornerRibbon(
             content = { Text(text = "flexi\uD83E\uDD43", color = Color.White) },
             colorSaturation = { viewModel.ribbonColorSaturation },
-            modifier = Modifier.align(Alignment.BottomEnd),
+            modifier =
+                Modifier.align(Alignment.BottomEnd)
+                    .burnInAware(
+                        viewModel = viewModel.burnIn,
+                        params = rememberBurnIn(viewModel.clock).parameters,
+                    ),
         )
     }
 }

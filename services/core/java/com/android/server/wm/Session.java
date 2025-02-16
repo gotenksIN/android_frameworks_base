@@ -35,6 +35,7 @@ import static android.content.Intent.EXTRA_TASK_ID;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_DIALOG;
 import static android.view.WindowManager.LayoutParams.isSystemAlertWindowType;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_IME;
@@ -703,9 +704,10 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
                     ImeTracker.forLogging().onProgress(imeStatsToken,
                             ImeTracker.PHASE_WM_UPDATE_REQUESTED_VISIBLE_TYPES);
                 }
-                win.setRequestedVisibleTypes(requestedVisibleTypes);
+                final @InsetsType int changedTypes =
+                        win.setRequestedVisibleTypes(requestedVisibleTypes);
                 win.getDisplayContent().getInsetsPolicy().onRequestedVisibleTypesChanged(win,
-                        imeStatsToken);
+                        changedTypes, imeStatsToken);
                 final Task task = win.getTask();
                 if (task != null) {
                     task.dispatchTaskInfoChangedIfNeeded(/* forced= */ true);
@@ -722,10 +724,11 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
                     // TODO(b/353463205) Use different phase here
                     ImeTracker.forLogging().onProgress(imeStatsToken,
                             ImeTracker.PHASE_WM_UPDATE_REQUESTED_VISIBLE_TYPES);
-                    embeddedWindow.setRequestedVisibleTypes(
+                    final @InsetsType int changedTypes = embeddedWindow.setRequestedVisibleTypes(
                             requestedVisibleTypes & WindowInsets.Type.ime());
                     embeddedWindow.getDisplayContent().getInsetsPolicy()
-                            .onRequestedVisibleTypesChanged(embeddedWindow, imeStatsToken);
+                            .onRequestedVisibleTypesChanged(
+                                    embeddedWindow, changedTypes, imeStatsToken);
                 } else {
                     ImeTracker.forLogging().onFailed(imeStatsToken,
                             ImeTracker.PHASE_WM_UPDATE_REQUESTED_VISIBLE_TYPES);
@@ -765,7 +768,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
 
     void onWindowSurfaceVisibilityChanged(WindowState window, boolean visible) {
         final int type = window.mAttrs.type;
-        if (!isSystemAlertWindowType(type)) {
+        if (!isSystemAlertWindowType(type) && type != TYPE_SYSTEM_DIALOG) {
             return;
         }
 

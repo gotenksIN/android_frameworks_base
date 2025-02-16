@@ -1209,10 +1209,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (!isAttached() || isForceHidden() || isForceTranslucent()) {
             return true;
         }
-        // A TaskFragment isn't translucent if it has at least one visible activity that occludes
-        // this TaskFragment.
-        return mTaskSupervisor.mOpaqueActivityHelper.getVisibleOpaqueActivity(this,
-                starting, true /* ignoringKeyguard */) == null;
+        return !mTaskSupervisor.mOpaqueContainerHelper.isOpaque(
+                this, starting, true /* ignoringKeyguard */, true /* ignoringInvisibleActivity */);
     }
 
     /**
@@ -1225,7 +1223,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return true;
         }
         // Including finishing Activity if the TaskFragment is becoming invisible in the transition.
-        return mTaskSupervisor.mOpaqueActivityHelper.getOpaqueActivity(this) == null;
+        return !mTaskSupervisor.mOpaqueContainerHelper.isOpaque(this);
     }
 
     /**
@@ -1236,10 +1234,11 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (!isAttached() || isForceHidden() || isForceTranslucent()) {
             return true;
         }
-        return mTaskSupervisor.mOpaqueActivityHelper.getVisibleOpaqueActivity(this, null,
-                false /* ignoringKeyguard */) == null;
+        return !mTaskSupervisor.mOpaqueContainerHelper.isOpaque(this, /* starting */ null,
+                false /* ignoringKeyguard */, true /* ignoringInvisibleActivity */);
     }
 
+    @Override
     ActivityRecord getTopNonFinishingActivity() {
         return getTopNonFinishingActivity(
                 true /* includeOverlays */, true /* includeLaunchedFromBubble */);
@@ -1423,14 +1422,22 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
             final TaskFragment otherTaskFrag = other.asTaskFragment();
             if (otherTaskFrag != null && otherTaskFrag.hasAdjacentTaskFragment()) {
+                // For adjacent TaskFragments, we have assumptions that:
+                // 1. A set of adjacent TaskFragments always cover the entire Task window, so that
+                // if this TaskFragment is behind a set of opaque TaskFragments, then this
+                // TaskFragment is invisible.
+                // 2. Adjacent TaskFragments do not overlap, so that if this TaskFragment is behind
+                // any translucent TaskFragment in the adjacent set, then this TaskFragment is
+                // visible behind translucent.
                 if (Flags.allowMultipleAdjacentTaskFragments()) {
                     final boolean hasTraversedAdj = otherTaskFrag.forOtherAdjacentTaskFragments(
                             adjacentTaskFragments::contains);
                     if (hasTraversedAdj) {
-                        final boolean isTranslucent = otherTaskFrag.isTranslucent(starting)
-                                || otherTaskFrag.forOtherAdjacentTaskFragments(adjacentTf -> {
-                                    return adjacentTf.isTranslucent(starting);
-                                });
+                        final boolean isTranslucent =
+                                isBehindTransparentTaskFragment(otherTaskFrag, starting)
+                                || otherTaskFrag.forOtherAdjacentTaskFragments(
+                                        (Predicate<TaskFragment>) tf ->
+                                                isBehindTransparentTaskFragment(tf, starting));
                         if (isTranslucent) {
                             // Can be visible behind a translucent adjacent TaskFragments.
                             gotTranslucentFullscreen = true;
@@ -1442,8 +1449,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                     }
                 } else {
                     if (adjacentTaskFragments.contains(otherTaskFrag.mAdjacentTaskFragment)) {
-                        if (otherTaskFrag.isTranslucent(starting)
-                                || otherTaskFrag.mAdjacentTaskFragment.isTranslucent(starting)) {
+                        if (isBehindTransparentTaskFragment(otherTaskFrag, starting)
+                                || isBehindTransparentTaskFragment(
+                                        otherTaskFrag.mAdjacentTaskFragment, starting)) {
                             // Can be visible behind a translucent adjacent TaskFragments.
                             gotTranslucentFullscreen = true;
                             gotTranslucentAdjacent = true;
@@ -1455,7 +1463,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 }
                 adjacentTaskFragments.add(otherTaskFrag);
             }
-
         }
 
         if (!shouldBeVisible) {
@@ -1466,6 +1473,11 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         return gotTranslucentFullscreen
                 ? TASK_FRAGMENT_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT
                 : TASK_FRAGMENT_VISIBILITY_VISIBLE;
+    }
+
+    private boolean isBehindTransparentTaskFragment(
+            @NonNull TaskFragment otherTf, @Nullable ActivityRecord starting) {
+        return otherTf.isTranslucent(starting) && getBounds().intersect(otherTf.getBounds());
     }
 
     private static boolean hasRunningActivity(WindowContainer wc) {
@@ -2827,7 +2839,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             // We only want to update for organized TaskFragment. Task will handle itself.
             return;
         }
-        if (mSurfaceControl == null || mSurfaceAnimator.hasLeash() || mSurfaceFreezer.hasLeash()) {
+        if (mSurfaceControl == null || mSurfaceAnimator.hasLeash()) {
             return;
         }
 
@@ -2967,20 +2979,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         final Task task = getTask();
         // Skip change transition when the Task is drag resizing.
         return task != null && !task.isDragResizing() && super.canStartChangeTransition();
-    }
-
-    /**
-     * Returns {@code true} if the starting bounds of the closing organized TaskFragment is
-     * recorded. Otherwise, return {@code false}.
-     */
-    boolean setClosingChangingStartBoundsIfNeeded() {
-        if (isOrganizedTaskFragment() && mDisplayContent != null
-                && mDisplayContent.mChangingContainers.remove(this)) {
-            mDisplayContent.mClosingChangingContainers.put(
-                    this, new Rect(mSurfaceFreezer.mFreezeBounds));
-            return true;
-        }
-        return false;
     }
 
     @Override

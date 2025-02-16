@@ -10583,9 +10583,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         synchronized(this) {
             mConstants.dump(pw);
-            synchronized (mProcLock) {
-                mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
-            }
+            mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
             mOomAdjuster.dumpCacheOomRankerSettings(pw);
             pw.println();
             if (dumpAll) {
@@ -10959,7 +10957,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     || DUMP_RECENTS_CMD.equals(cmd) || DUMP_RECENTS_SHORT_CMD.equals(cmd)
                     || DUMP_TOP_RESUMED_ACTIVITY.equals(cmd)
                     || DUMP_VISIBLE_ACTIVITIES.equals(cmd)) {
-                mAtmInternal.dump(cmd, fd, pw, args, opti, /* dumpAll= */ true , dumpClient,
+                mAtmInternal.dump(cmd, fd, pw, args, opti, /* dumpAll= */ true, dumpClient,
                         dumpPackage, dumpDisplayId);
             } else if ("binder-proxies".equals(cmd)) {
                 if (opti >= args.length) {
@@ -11049,7 +11047,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                     name = args[opti];
                     opti++;
                     newArgs = new String[args.length - opti];
-                    if (args.length > 2) System.arraycopy(args, opti, newArgs, 0, args.length - opti);
+                    if (args.length > 2) System.arraycopy(args, opti, newArgs, 0,
+                            args.length - opti);
                 }
                 if (!mCpHelper.dumpProvider(fd, pw, name, newArgs, 0, dumpAll)) {
                     pw.println("No providers match: " + name);
@@ -11072,7 +11071,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     if (args.length > 2) System.arraycopy(args, opti, newArgs, 0,
                             args.length - opti);
                 }
-                int[] users = dumpUserId == UserHandle.USER_ALL ? null : new int[] { dumpUserId };
+                int[] users = dumpUserId == UserHandle.USER_ALL ? null : new int[]{dumpUserId};
                 if (!mServices.dumpService(fd, pw, name, users, newArgs, 0, dumpAll)) {
                     pw.println("No services match: " + name);
                     pw.println("Use -h for help.");
@@ -11101,9 +11100,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     mConstants.dump(pw);
                 }
                 synchronized (mProcLock) {
-                    mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
                     mOomAdjuster.dumpCacheOomRankerSettings(pw);
                 }
+            } else if ("cao".equals(cmd)) {
+                mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
             } else if ("timers".equals(cmd)) {
                 AnrTimer.dump(pw, true);
             } else if ("services".equals(cmd) || "s".equals(cmd)) {
@@ -15294,10 +15294,24 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
-    void noteUidProcessState(final int uid, final int state,
-                final @ProcessCapability int capability) {
-        mBatteryStatsService.noteUidProcessState(uid, state);
+    /**
+     * Called by {@link OomAdjuster} whenever either the ProcessState or Capability of a uid has
+     * changed.
+     * NOTE: Use {@link #noteUidProcessState(int, int)} instead of this method for listeners
+     * interested in only ProcessState changes.
+     */
+    void noteUidProcessStateAndCapability(final int uid, final int state,
+            final @ProcessCapability int capability) {
         mAppOpsService.updateUidProcState(uid, state, capability);
+    }
+
+    /**
+     * Called by {@link OomAdjuster} whenever either the ProcessState of a uid has changed.
+     * NOTE: Use {@link #noteUidProcessStateAndCapability(int, int, int)} instead of this method
+     * for listeners interested in both ProcessState and Capability changes.
+     */
+    void noteUidProcessState(final int uid, final int state) {
+        mBatteryStatsService.noteUidProcessState(uid, state);
         if (StatsPullAtomService.ENABLE_MOBILE_DATA_STATS_AGGREGATED_PULLER) {
             try {
                 if (mStatsPullAtomServiceInternal == null) {

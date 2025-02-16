@@ -16,6 +16,7 @@
 
 package android.content.pm;
 
+import static android.app.PropertyInvalidatedCache.MODULE_SYSTEM;
 import static android.content.pm.SigningInfo.AppSigningSchemeVersion;
 import static android.media.audio.Flags.FLAG_FEATURE_SPATIAL_AUDIO_HEADTRACKING_LOW_LATENCY;
 
@@ -7967,7 +7968,7 @@ public abstract class PackageManager {
      * @param flags Additional option flags to modify the data returned.
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching receiver, ordered from best to worst. If there are
-     *         no matching receivers, an empty list or null is returned.
+     *         no matching receivers, returns an empty list.
      */
     @NonNull
     public abstract List<ResolveInfo> queryBroadcastReceivers(@NonNull Intent intent, int flags);
@@ -7994,7 +7995,7 @@ public abstract class PackageManager {
      * @param userHandle UserHandle of the user being queried.
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching receiver, ordered from best to worst. If there are
-     *         no matching receivers, an empty list or null is returned.
+     *         no matching receivers, returns an empty list.
      * @hide
      */
     @SuppressWarnings("HiddenAbstractMethod")
@@ -8111,8 +8112,8 @@ public abstract class PackageManager {
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching service, ordered from best to worst. In other
      *         words, the first item is what would be returned by
-     *         {@link #resolveService}. If there are no matching services, an
-     *         empty list or null is returned.
+     *         {@link #resolveService}. If there are no matching services,
+     *         returns an empty list.
      */
     @NonNull
     public abstract List<ResolveInfo> queryIntentServices(@NonNull Intent intent,
@@ -8140,8 +8141,8 @@ public abstract class PackageManager {
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching service, ordered from best to worst. In other
      *         words, the first item is what would be returned by
-     *         {@link #resolveService}. If there are no matching services, an
-     *         empty list or null is returned.
+     *         {@link #resolveService}. If there are no matching services,
+     *         returns an empty list.
      * @hide
      */
     @SuppressWarnings("HiddenAbstractMethod")
@@ -8173,8 +8174,8 @@ public abstract class PackageManager {
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching service, ordered from best to worst. In other
      *         words, the first item is what would be returned by
-     *         {@link #resolveService}. If there are no matching services, an
-     *         empty list or null is returned.
+     *         {@link #resolveService}. If there are no matching services,
+     *         returns an empty list.
      * @hide
      */
     @NonNull
@@ -8208,7 +8209,7 @@ public abstract class PackageManager {
      * @param userId The user id.
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching provider, ordered from best to worst. If there are
-     *         no matching services, an empty list or null is returned.
+     *         no matching services, returns an empty list.
      * @hide
      */
     @SuppressWarnings("HiddenAbstractMethod")
@@ -8240,7 +8241,7 @@ public abstract class PackageManager {
      * @param user The user being queried.
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching provider, ordered from best to worst. If there are
-     *         no matching services, an empty list or null is returned.
+     *         no matching services, returns an empty list.
      * @hide
      */
     @NonNull
@@ -8274,7 +8275,7 @@ public abstract class PackageManager {
      * @param flags Additional option flags to modify the data returned.
      * @return Returns a List of ResolveInfo objects containing one entry for
      *         each matching provider, ordered from best to worst. If there are
-     *         no matching services, an empty list or null is returned.
+     *         no matching services, returns an empty list.
      */
     @NonNull
     public abstract List<ResolveInfo> queryIntentContentProviders(@NonNull Intent intent,
@@ -11659,11 +11660,22 @@ public abstract class PackageManager {
         }
     }
 
-    private static final PropertyInvalidatedCache<ApplicationInfoQuery, ApplicationInfo>
-            sApplicationInfoCache =
-            new PropertyInvalidatedCache<ApplicationInfoQuery, ApplicationInfo>(
-                    2048, PermissionManager.CACHE_KEY_PACKAGE_INFO_CACHE,
-                    "getApplicationInfo") {
+    private static String packageInfoApi() {
+        return PropertyInvalidatedCache.apiFromProperty(
+            PermissionManager.CACHE_KEY_PACKAGE_INFO_CACHE);
+    }
+
+    // The maximum number of entries to keep in the packageInfo and applicationInfo caches.
+    private final static int MAX_INFO_CACHE_ENTRIES = 2048;
+
+    /** @hide */
+    @VisibleForTesting
+    public static final PropertyInvalidatedCache<ApplicationInfoQuery, ApplicationInfo>
+            sApplicationInfoCache = new PropertyInvalidatedCache<>(
+                new PropertyInvalidatedCache.Args(MODULE_SYSTEM)
+                .maxEntries(MAX_INFO_CACHE_ENTRIES).api(packageInfoApi()).cacheNulls(true),
+                "getApplicationInfo", null) {
+
                 @Override
                 public ApplicationInfo recompute(ApplicationInfoQuery query) {
                     return getApplicationInfoAsUserUncached(
@@ -11749,10 +11761,11 @@ public abstract class PackageManager {
     }
 
     private static final PropertyInvalidatedCache<PackageInfoQuery, PackageInfo>
-            sPackageInfoCache =
-            new PropertyInvalidatedCache<PackageInfoQuery, PackageInfo>(
-                    2048, PermissionManager.CACHE_KEY_PACKAGE_INFO_CACHE,
-                    "getPackageInfo") {
+            sPackageInfoCache = new PropertyInvalidatedCache<>(
+                new PropertyInvalidatedCache.Args(MODULE_SYSTEM)
+                .maxEntries(MAX_INFO_CACHE_ENTRIES).api(packageInfoApi()).cacheNulls(true),
+                "getPackageInfo", null) {
+
                 @Override
                 public PackageInfo recompute(PackageInfoQuery query) {
                     return getPackageInfoAsUserUncached(

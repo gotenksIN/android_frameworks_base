@@ -52,6 +52,7 @@ import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.data.repository.ShadeRepository
 import com.android.systemui.util.kotlin.Utils.Companion.sample as sampleCombine
 import com.android.systemui.util.kotlin.sample
+import com.android.systemui.wallpapers.data.repository.WallpaperFocalAreaRepository
 import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +86,7 @@ class KeyguardInteractor
 constructor(
     private val repository: KeyguardRepository,
     bouncerRepository: KeyguardBouncerRepository,
+    private val wallpaperFocalAreaRepository: WallpaperFocalAreaRepository,
     @ShadeDisplayAware configurationInteractor: ConfigurationInteractor,
     shadeRepository: ShadeRepository,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
@@ -337,6 +339,9 @@ constructor(
     @Deprecated("SceneContainer uses NotificationStackAppearanceInteractor")
     val panelAlpha: StateFlow<Float> = repository.panelAlpha.asStateFlow()
 
+    /** Sets the zoom out scale of spatial model pushback from e.g. pulling down the shade. */
+    val zoomOut: StateFlow<Float> = repository.zoomOut
+
     /**
      * When the lockscreen can be dismissed, emit an alpha value as the user swipes up. This is
      * useful just before the code commits to moving to GONE.
@@ -475,6 +480,10 @@ constructor(
         repository.setPanelAlpha(alpha)
     }
 
+    fun setZoomOut(zoomOutFromShadeRadius: Float) {
+        repository.setZoomOut(zoomOutFromShadeRadius)
+    }
+
     fun setAnimateDozingTransitions(animate: Boolean) {
         repository.setAnimateDozingTransitions(animate)
     }
@@ -525,7 +534,7 @@ constructor(
     }
 
     fun setShortcutAbsoluteTop(top: Float) {
-        repository.setShortcutAbsoluteTop(top)
+        wallpaperFocalAreaRepository.setShortcutAbsoluteTop(top)
     }
 
     fun setIsKeyguardGoingAway(isGoingAway: Boolean) {
@@ -533,7 +542,7 @@ constructor(
     }
 
     fun setNotificationStackAbsoluteBottom(bottom: Float) {
-        repository.setNotificationStackAbsoluteBottom(bottom)
+        wallpaperFocalAreaRepository.setNotificationStackAbsoluteBottom(bottom)
     }
 
     suspend fun hydrateTableLogBuffer(tableLogBuffer: TableLogBuffer) {

@@ -674,7 +674,8 @@ bool ResourceFileFlattener::Flatten(ResourceTable* table, IArchiveWriter* archiv
             }
 
             FeatureFlagsFilterOptions flags_filter_options;
-            flags_filter_options.flags_must_be_readonly = true;
+            flags_filter_options.fail_on_unrecognized_flags = false;
+            flags_filter_options.flags_must_have_value = false;
             FeatureFlagsFilter flags_filter(options_.feature_flag_values, flags_filter_options);
             if (!flags_filter.Consume(context_, doc.get())) {
               return 1;
@@ -2503,6 +2504,9 @@ int LinkCommand::Action(const std::vector<std::string>& args) {
         ->Error(android::DiagMessage()
                 << "the --merge-only flag can be only used when building a static library");
     return 1;
+  }
+  if (options_.use_sparse_encoding) {
+    options_.table_flattener_options.sparse_entries = SparseEntriesMode::Enabled;
   }
 
   // The default build type.

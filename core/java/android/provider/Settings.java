@@ -11002,7 +11002,10 @@ public final class Settings {
         /**
          * Indicates whether "seen" notifications should be suppressed from the lockscreen.
          * <p>
-         * Type: int (0 for unset, 1 for true, 2 for false)
+         * Type: int (0 for unset_off, 1 for true, 2 for false)
+         * 0 is the default value for phones, which is equivalent to off in effect, before
+         * the notification minimalism feature, this setting is default hidden to phones, we use
+         * 0 instead of 2 to mark that we need to hide this setting toggle in the Settings app.
          *
          * @hide
          */
@@ -13022,6 +13025,24 @@ public final class Settings {
          */
         @Readable
         public static final String STYLUS_POINTER_ICON_ENABLED = "stylus_pointer_icon_enabled";
+
+        /**
+         * Toggle for whether to redact OTP notification while connected to wifi. Defaults to
+         * false/0.
+         * @hide
+         */
+        @Readable
+        public static final String REDACT_OTP_NOTIFICATION_WHILE_CONNECTED_TO_WIFI =
+                "redact_otp_on_wifi";
+
+        /**
+         * Toggle for whether to immediately redact OTP notifications, or require the device to be
+         * locked for 10 minutes. Defaults to false/0
+         * @hide
+         */
+        @Readable
+        public static final String REDACT_OTP_NOTIFICATION_IMMEDIATELY =
+                "remove_otp_redaction_delay";
 
         /**
          * These entries are considered common between the personal and the managed profile,

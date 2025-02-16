@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:OptIn(ExperimentalCoroutinesApi::class)
-
 package com.android.systemui.scene.domain.startable
 
 import android.app.StatusBarManager
@@ -124,7 +122,6 @@ import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.settings.data.repository.userAwareSecureSettingsRepository
 import com.google.android.msdl.data.model.MSDLToken
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -2052,9 +2049,9 @@ class SceneContainerStartableTest : SysuiTestCase() {
             )
 
             clearInvocations(centralSurfaces)
-            emulateSceneTransition(
+            emulateOverlayTransition(
                 transitionStateFlow = transitionStateFlow,
-                toScene = Scenes.Shade,
+                toOverlay = Overlays.NotificationsShade,
                 verifyBeforeTransition = {
                     verify(centralSurfaces, never()).setInteracting(anyInt(), anyBoolean())
                 },
@@ -2082,9 +2079,9 @@ class SceneContainerStartableTest : SysuiTestCase() {
             )
 
             clearInvocations(centralSurfaces)
-            emulateSceneTransition(
+            emulateOverlayTransition(
                 transitionStateFlow = transitionStateFlow,
-                toScene = Scenes.QuickSettings,
+                toOverlay = Overlays.QuickSettingsShade,
                 verifyBeforeTransition = {
                     verify(centralSurfaces, never()).setInteracting(anyInt(), anyBoolean())
                 },
@@ -2657,22 +2654,36 @@ class SceneContainerStartableTest : SysuiTestCase() {
         }
 
     @Test
-    fun handleDisableFlags() =
+    fun handleDisableFlags_singleShade() =
         kosmos.runTest {
             underTest.start()
             val currentScene by collectLastValue(sceneInteractor.currentScene)
-            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+            disableDualShade()
             runCurrent()
             sceneInteractor.changeScene(Scenes.Shade, "reason")
-            sceneInteractor.showOverlay(Overlays.NotificationsShade, "reason")
             assertThat(currentScene).isEqualTo(Scenes.Shade)
-            assertThat(currentOverlays).contains(Overlays.NotificationsShade)
 
             fakeDisableFlagsRepository.disableFlags.value =
                 DisableFlagsModel(disable2 = StatusBarManager.DISABLE2_NOTIFICATION_SHADE)
             runCurrent()
 
             assertThat(currentScene).isNotEqualTo(Scenes.Shade)
+        }
+
+    @Test
+    fun handleDisableFlags_dualShade() =
+        kosmos.runTest {
+            underTest.start()
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+            enableDualShade()
+            runCurrent()
+            sceneInteractor.showOverlay(Overlays.NotificationsShade, "reason")
+            assertThat(currentOverlays).contains(Overlays.NotificationsShade)
+
+            fakeDisableFlagsRepository.disableFlags.value =
+                DisableFlagsModel(disable2 = StatusBarManager.DISABLE2_NOTIFICATION_SHADE)
+            runCurrent()
+
             assertThat(currentOverlays).isEmpty()
         }
 

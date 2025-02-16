@@ -3436,7 +3436,7 @@ package android.companion.virtual {
     method public void close();
     method @NonNull public android.content.Context createContext();
     method @NonNull public android.companion.virtual.audio.VirtualAudioDevice createVirtualAudioDevice(@NonNull android.hardware.display.VirtualDisplay, @Nullable java.util.concurrent.Executor, @Nullable android.companion.virtual.audio.VirtualAudioDevice.AudioConfigurationChangeCallback);
-    method @FlaggedApi("android.companion.virtual.flags.virtual_camera") @NonNull public android.companion.virtual.camera.VirtualCamera createVirtualCamera(@NonNull android.companion.virtual.camera.VirtualCameraConfig);
+    method @NonNull public android.companion.virtual.camera.VirtualCamera createVirtualCamera(@NonNull android.companion.virtual.camera.VirtualCameraConfig);
     method @Deprecated @Nullable public android.hardware.display.VirtualDisplay createVirtualDisplay(@IntRange(from=1) int, @IntRange(from=1) int, @IntRange(from=1) int, @Nullable android.view.Surface, int, @Nullable java.util.concurrent.Executor, @Nullable android.hardware.display.VirtualDisplay.Callback);
     method @Nullable public android.hardware.display.VirtualDisplay createVirtualDisplay(@NonNull android.hardware.display.VirtualDisplayConfig, @Nullable java.util.concurrent.Executor, @Nullable android.hardware.display.VirtualDisplay.Callback);
     method @NonNull public android.hardware.input.VirtualDpad createVirtualDpad(@NonNull android.hardware.input.VirtualDpadConfig);
@@ -3499,7 +3499,7 @@ package android.companion.virtual {
     field public static final int POLICY_TYPE_ACTIVITY = 3; // 0x3
     field public static final int POLICY_TYPE_AUDIO = 1; // 0x1
     field @FlaggedApi("android.companion.virtualdevice.flags.activity_control_api") public static final int POLICY_TYPE_BLOCKED_ACTIVITY = 6; // 0x6
-    field @FlaggedApi("android.companion.virtual.flags.virtual_camera") public static final int POLICY_TYPE_CAMERA = 5; // 0x5
+    field public static final int POLICY_TYPE_CAMERA = 5; // 0x5
     field public static final int POLICY_TYPE_CLIPBOARD = 4; // 0x4
     field @FlaggedApi("android.companion.virtualdevice.flags.default_device_camera_access_policy") public static final int POLICY_TYPE_DEFAULT_DEVICE_CAMERA_ACCESS = 7; // 0x7
     field public static final int POLICY_TYPE_RECENTS = 2; // 0x2
@@ -3577,18 +3577,18 @@ package android.companion.virtual.audio {
 
 package android.companion.virtual.camera {
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_camera") public final class VirtualCamera implements java.io.Closeable {
+  public final class VirtualCamera implements java.io.Closeable {
     method public void close();
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig getConfig();
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_camera") public interface VirtualCameraCallback {
+  public interface VirtualCameraCallback {
     method public default void onProcessCaptureRequest(int, long);
     method public void onStreamClosed(int);
     method public void onStreamConfigured(int, @NonNull android.view.Surface, @IntRange(from=1) int, @IntRange(from=1) int, int);
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_camera") public final class VirtualCameraConfig implements android.os.Parcelable {
+  public final class VirtualCameraConfig implements android.os.Parcelable {
     method public int describeContents();
     method public int getLensFacing();
     method @NonNull public String getName();
@@ -3602,7 +3602,7 @@ package android.companion.virtual.camera {
     field public static final int SENSOR_ORIENTATION_90 = 90; // 0x5a
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_camera") public static final class VirtualCameraConfig.Builder {
+  public static final class VirtualCameraConfig.Builder {
     ctor public VirtualCameraConfig.Builder(@NonNull String);
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder addStreamConfig(@IntRange(from=1) int, @IntRange(from=1) int, int, @IntRange(from=1) int);
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig build();
@@ -3611,7 +3611,7 @@ package android.companion.virtual.camera {
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setVirtualCameraCallback(@NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.camera.VirtualCameraCallback);
   }
 
-  @FlaggedApi("android.companion.virtual.flags.virtual_camera") public final class VirtualCameraStreamConfig implements android.os.Parcelable {
+  public final class VirtualCameraStreamConfig implements android.os.Parcelable {
     method public int describeContents();
     method public int getFormat();
     method @IntRange(from=1) public int getHeight();
@@ -16052,7 +16052,7 @@ package android.telephony {
     method @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE) public boolean isLteCdmaEvdoGsmWcdmaEnabled();
     method @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE) public boolean isMobileDataPolicyEnabled(int);
     method @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE) public boolean isNrDualConnectivityEnabled();
-    method @FlaggedApi("com.android.internal.telephony.flags.enable_modem_cipher_transparency") @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE) public boolean isNullCipherNotificationsEnabled();
+    method @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE) public boolean isNullCipherNotificationsEnabled();
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE, android.Manifest.permission.READ_PHONE_STATE}) public boolean isOffhook();
     method @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE) public boolean isOpportunisticNetworkEnabled();
     method @Deprecated @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE) public boolean isPotentialEmergencyNumber(@NonNull String);
@@ -16097,7 +16097,7 @@ package android.telephony {
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setMobileDataPolicyEnabled(int, boolean);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setMultiSimCarrierRestriction(boolean);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public int setNrDualConnectivityState(int);
-    method @FlaggedApi("com.android.internal.telephony.flags.enable_modem_cipher_transparency") @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setNullCipherNotificationsEnabled(boolean);
+    method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setNullCipherNotificationsEnabled(boolean);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public boolean setOpportunisticNetworkState(boolean);
     method @Deprecated @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public boolean setPreferredNetworkTypeBitmask(long);
     method @Deprecated @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public boolean setRadio(boolean);

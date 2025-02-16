@@ -282,13 +282,6 @@ flag {
 }
 
 flag {
-    name: "dual_shade"
-    namespace: "systemui"
-    description: "Enables Dual Shade (go/dual-shade-design-doc)."
-    bug: "337259436"
-}
-
-flag {
     name: "device_entry_udfps_refactor"
     namespace: "systemui"
     description: "Refactoring device entry UDFPS icon to use modern architecture and "
@@ -1876,20 +1869,6 @@ flag {
     bug: "385194612"
 }
 
-flag{
-    name: "gsf_bouncer"
-    namespace: "systemui"
-    description: "Applies GSF font styles to Bouncer surfaces."
-    bug: "379364381"
-}
-
-flag {
-    name: "gsf_quick_settings"
-    namespace: "systemui"
-    description: "Applies GSF font styles to Quick Settings surfaces."
-    bug: "379364381"
-}
-
 flag {
     name: "spatial_model_launcher_pushback"
     namespace: "systemui"
@@ -1967,6 +1946,16 @@ flag {
 }
 
 flag {
+    name: "unfold_latency_tracking_fix"
+    namespace: "systemui"
+    description: "New implementation to track unfold latency that excludes broken cases"
+    bug: "390649568"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "ui_rich_ongoing_force_expanded"
     namespace: "systemui"
     description: "Force promoted notifications to always be expanded"
@@ -2019,4 +2008,11 @@ flag {
     namespace: "systemui"
     description: "Decouple view and controller in AnimLib."
     bug: "393241010"
+}
+
+flag {
+    name: "clock_fidget_animation"
+    namespace: "systemui"
+    description: "Enables the clock fidget animation"
+    bug: "364664389"
 }

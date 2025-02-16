@@ -21,10 +21,12 @@ import com.android.app.tracing.TrackGroupUtils.trackGroup
 import com.android.app.tracing.coroutines.TrackTracer.Companion.instantForGroup
 import com.android.app.tracing.coroutines.launchTraced
 import com.android.systemui.CoreStartable
+import com.android.systemui.common.ui.data.repository.ConfigurationRepository
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.shade.data.repository.ShadeDisplaysRepository
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
+import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import dagger.Lazy
 import javax.inject.Inject
@@ -36,7 +38,9 @@ class ShadeStateTraceLogger
 @Inject
 constructor(
     private val shadeInteractor: ShadeInteractor,
+    private val shadeModeInteractor: ShadeModeInteractor,
     private val shadeDisplaysRepository: Lazy<ShadeDisplaysRepository>,
+    @ShadeDisplayAware private val configurationRepository: ConfigurationRepository,
     @Application private val scope: CoroutineScope,
 ) : CoreStartable {
     override fun start() {
@@ -47,7 +51,7 @@ constructor(
             }
             launch {
                 val stateLogger = createTraceStateLogger("shadeMode")
-                shadeInteractor.shadeMode.collect { stateLogger.log(it.toString()) }
+                shadeModeInteractor.shadeMode.collect { stateLogger.log(it.toString()) }
             }
             launch {
                 shadeInteractor.shadeExpansion.collect {
@@ -59,6 +63,15 @@ constructor(
                     shadeDisplaysRepository.get().displayId.collect {
                         instantForGroup(TRACK_GROUP_NAME, "displayId", it)
                     }
+                }
+            }
+            launch {
+                configurationRepository.configurationValues.collect {
+                    instantForGroup(
+                        TRACK_GROUP_NAME,
+                        "configurationChange#smallestScreenWidthDp",
+                        it.smallestScreenWidthDp,
+                    )
                 }
             }
         }

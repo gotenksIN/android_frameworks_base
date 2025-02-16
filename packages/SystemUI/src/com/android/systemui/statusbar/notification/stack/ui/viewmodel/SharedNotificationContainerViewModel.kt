@@ -76,6 +76,7 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.LargeScreenHeaderHelper
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
+import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shade.shared.model.ShadeMode.Dual
 import com.android.systemui.shade.shared.model.ShadeMode.Single
 import com.android.systemui.shade.shared.model.ShadeMode.Split
@@ -90,6 +91,7 @@ import com.android.systemui.util.kotlin.sample
 import dagger.Lazy
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -99,6 +101,7 @@ import kotlinx.coroutines.flow.combineTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -110,6 +113,7 @@ import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.isActive
 
 /** View-model for the shared notification container, used by both the shade and keyguard spaces */
+@OptIn(ExperimentalCoroutinesApi::class)
 @SysUISingleton
 class SharedNotificationContainerViewModel
 @Inject
@@ -122,7 +126,8 @@ constructor(
     private val keyguardInteractor: KeyguardInteractor,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val shadeInteractor: ShadeInteractor,
-    private val notificationStackAppearanceInteractor: NotificationStackAppearanceInteractor,
+    shadeModeInteractor: ShadeModeInteractor,
+    notificationStackAppearanceInteractor: NotificationStackAppearanceInteractor,
     private val alternateBouncerToGoneTransitionViewModel:
         AlternateBouncerToGoneTransitionViewModel,
     private val alternateBouncerToPrimaryBouncerTransitionViewModel:
@@ -232,7 +237,7 @@ constructor(
         if (SceneContainerFlag.isEnabled) {
                 combine(
                     shadeInteractor.isShadeLayoutWide,
-                    shadeInteractor.shadeMode,
+                    shadeModeInteractor.shadeMode,
                     configurationInteractor.onAnyConfigurationChange,
                 ) { isShadeLayoutWide, shadeMode, _ ->
                     with(context.resources) {
@@ -473,11 +478,11 @@ constructor(
 
     /**
      * Ensure view is visible when the shade/qs are expanded. Also, as QS is expanding, fade out
-     * notifications unless in splitshade.
+     * notifications unless it's a large screen.
      */
     private val alphaForShadeAndQsExpansion: Flow<Float> =
         if (SceneContainerFlag.isEnabled) {
-                shadeInteractor.shadeMode.flatMapLatest { shadeMode ->
+                shadeModeInteractor.shadeMode.flatMapLatest { shadeMode ->
                     when (shadeMode) {
                         Single ->
                             combineTransform(
@@ -496,16 +501,26 @@ constructor(
                         Split -> isAnyExpanded.filter { it }.map { 1f }
                         Dual ->
                             combineTransform(
+                                shadeModeInteractor.isShadeLayoutWide,
                                 headsUpNotificationInteractor.get().isHeadsUpOrAnimatingAway,
                                 shadeInteractor.shadeExpansion,
                                 shadeInteractor.qsExpansion,
-                            ) { isHeadsUpOrAnimatingAway, shadeExpansion, qsExpansion ->
-                                if (isHeadsUpOrAnimatingAway) {
+                            ) {
+                                isShadeLayoutWide,
+                                isHeadsUpOrAnimatingAway,
+                                shadeExpansion,
+                                qsExpansion ->
+                                if (isShadeLayoutWide) {
+                                    if (shadeExpansion > 0f) {
+                                        emit(1f)
+                                    }
+                                } else if (isHeadsUpOrAnimatingAway) {
                                     // Ensure HUNs will be visible in QS shade (at least while
                                     // unlocked)
                                     emit(1f)
                                 } else if (shadeExpansion > 0f || qsExpansion > 0f) {
-                                    // Fade out as QS shade expands
+                                    // On a narrow screen, the QS shade overlaps with lockscreen
+                                    // notifications. Fade them out as the QS shade expands.
                                     emit(1f - qsExpansion)
                                 }
                             }
@@ -539,7 +554,7 @@ constructor(
 
     private fun bouncerToGoneNotificationAlpha(viewState: ViewStateAccessor): Flow<Float> =
         merge(
-                primaryBouncerToGoneTransitionViewModel.notificationAlpha,
+                primaryBouncerToGoneTransitionViewModel.notificationAlpha(viewState),
                 alternateBouncerToGoneTransitionViewModel.notificationAlpha(viewState),
             )
             .sample(communalSceneInteractor.isCommunalVisible) { alpha, isCommunalVisible ->
@@ -792,7 +807,8 @@ constructor(
     }
 
     /**
-     * Wallpaper needs the absolute bottom of notification stack to avoid occlusion
+     * Wallpaper focal area needs the absolute bottom of notification stack to avoid occlusion. It
+     * should not change with notifications in shade.
      *
      * @param calculateMaxNotifications is required by getMaxNotifications as calculateSpace by
      *   calling computeMaxKeyguardNotifications in NotificationStackSizeCalculator
@@ -807,18 +823,24 @@ constructor(
         SceneContainerFlag.assertInLegacyMode()
 
         return combine(
-            getLockscreenDisplayConfig(calculateMaxNotifications).map { (_, maxNotifications) ->
-                val height = calculateHeight(maxNotifications)
-                if (maxNotifications == 0) {
-                    height - shelfHeight
+                getLockscreenDisplayConfig(calculateMaxNotifications).map { (_, maxNotifications) ->
+                    val height = calculateHeight(maxNotifications)
+                    if (maxNotifications == 0) {
+                        height - shelfHeight
+                    } else {
+                        height
+                    }
+                },
+                bounds.map { it.top },
+                isOnLockscreenWithoutShade,
+            ) { height, top, isOnLockscreenWithoutShade ->
+                if (isOnLockscreenWithoutShade) {
+                    top + height
                 } else {
-                    height
+                    null
                 }
-            },
-            bounds.map { it.top },
-        ) { height, top ->
-            top + height
-        }
+            }
+            .filterNotNull()
     }
 
     fun notificationStackChanged() {

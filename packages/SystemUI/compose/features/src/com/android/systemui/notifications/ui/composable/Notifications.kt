@@ -91,6 +91,7 @@ import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.LowestZIndexContentPicker
 import com.android.compose.animation.scene.SceneTransitionLayoutState
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.gesture.NestedScrollableBound
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.common.ui.compose.windowinsets.LocalScreenCornerRadius
 import com.android.systemui.res.R
@@ -174,7 +175,7 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
     viewModel: NotificationsPlaceholderViewModel,
 ) {
 
-    val isHeadsUp by viewModel.isHeadsUpOrAnimatingAway.collectAsStateWithLifecycle(false)
+    val isSnoozable by viewModel.isHeadsUpOrAnimatingAway.collectAsStateWithLifecycle(false)
 
     var scrollOffset by remember { mutableFloatStateOf(0f) }
     val headsUpInset = with(LocalDensity.current) { headsUpTopInset().toPx() }
@@ -191,7 +192,7 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
         )
     }
 
-    val nestedScrollConnection =
+    val snoozeScrollConnection =
         object : NestedScrollConnection {
             override suspend fun onPreFling(available: Velocity): Velocity {
                 if (
@@ -205,7 +206,7 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
             }
         }
 
-    LaunchedEffect(isHeadsUp) { scrollOffset = 0f }
+    LaunchedEffect(isSnoozable) { scrollOffset = 0f }
 
     LaunchedEffect(scrollableState.isScrollInProgress) {
         if (!scrollableState.isScrollInProgress && scrollOffset <= minScrollOffset) {
@@ -229,10 +230,8 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
                             ),
                     )
                 }
-                .thenIf(isHeadsUp) {
-                    Modifier.nestedScroll(nestedScrollConnection)
-                        .scrollable(orientation = Orientation.Vertical, state = scrollableState)
-                },
+                .thenIf(isSnoozable) { Modifier.nestedScroll(snoozeScrollConnection) }
+                .scrollable(orientation = Orientation.Vertical, state = scrollableState),
     )
 }
 
@@ -579,6 +578,7 @@ fun ContentScope.NotificationScrollingStack(
                             Modifier.nestedScroll(scrimNestedScrollConnection)
                         }
                         .stackVerticalOverscroll(coroutineScope) { scrollState.canScrollForward }
+                        .disableSwipesWhenScrolling(NestedScrollableBound.BottomRight)
                         .verticalScroll(scrollState)
                         .padding(top = stackTopPadding, bottom = stackBottomPadding)
                         .fillMaxWidth()

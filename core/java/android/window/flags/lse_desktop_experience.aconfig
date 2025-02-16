@@ -565,6 +565,20 @@ flag {
 }
 
 flag {
+    name: "enable_display_disconnect_interaction"
+    namespace: "lse_desktop_experience"
+    description: "Enables new interaction that occurs when a display is disconnected."
+    bug: "391652399"
+}
+
+flag {
+    name: "enable_display_reconnect_interaction"
+    namespace: "lse_desktop_experience"
+    description: "Enables new interaction that occurs when a display is reconnected."
+    bug: "365873835"
+}
+
+flag {
     name: "show_desktop_experience_dev_option"
     namespace: "lse_desktop_experience"
     description: "Replace the freeform windowing dev options with a desktop experience one."
@@ -609,6 +623,16 @@ flag {
 }
 
 flag {
+  name: "exclude_caption_from_app_bounds"
+  namespace: "lse_desktop_experience"
+  description: "Whether caption insets are excluded from app bounds in freeform"
+  bug: "388014743"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
     name: "enable_desktop_mode_through_dev_option"
     namespace: "lse_desktop_experience"
     description: "Enables support for desktop mode through developer options for devices eligible for desktop mode."
@@ -630,4 +654,55 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables full support of presentation API for connected displays."
     bug: "378503083"
+}
+
+flag {
+    name: "enable_full_screen_window_on_removing_split_screen_stage_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables clearing the windowing mode of a freeform window when removing the task from the split screen stage."
+    bug: "372791604"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_trampoline_close_animation_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables a close animation when the app trampolines (a second window is opened, and the first is closed)."
+    bug: "391548553"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_window_context_resources_update_on_config_change"
+    namespace: "lse_desktop_experience"
+    description: "Updates window context resources before the view receives the config change callback."
+    bug: "394527409"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_tab_tearing_minimize_animation_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enabling a minimize animation when a new window is opened via tab tearing and the Desktop Windowing open windows limit is reached."
+    bug: "376459606"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_close_shortcut_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fix the window-close keyboard shortcut in Desktop Mode."
+    bug: "394599430"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

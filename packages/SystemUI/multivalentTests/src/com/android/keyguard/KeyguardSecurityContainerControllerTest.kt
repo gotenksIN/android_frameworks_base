@@ -13,8 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:OptIn(ExperimentalCoroutinesApi::class)
-
 package com.android.keyguard
 
 import android.app.admin.DevicePolicyManager
@@ -86,9 +84,9 @@ import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.settings.GlobalSettings
 import com.android.systemui.util.time.FakeSystemClock
+import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
 import com.google.common.truth.Truth
 import junit.framework.Assert
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runCurrent
@@ -283,9 +281,9 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 kosmos.keyguardDismissTransitionInteractor,
                 { primaryBouncerInteractor },
                 executor,
-            ) {
-                deviceEntryInteractor
-            }
+                { deviceEntryInteractor },
+                { kosmos.windowRootViewBlurInteractor },
+            )
     }
 
     @Test

@@ -38,6 +38,7 @@ import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.StatusBarManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -68,6 +69,7 @@ import com.android.wm.shell.bubbles.bar.BubbleBarDragListener;
 import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.animation.Interpolators;
+import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.splitscreen.SplitScreenController;
 
@@ -411,6 +413,8 @@ public class DragLayout extends LinearLayout
     }
 
     private void updateDropZoneSizesForSingleTask() {
+        resetDropZoneTranslations();
+
         final LinearLayout.LayoutParams dropZoneView1 =
                 (LayoutParams) mDropZoneView1.getLayoutParams();
         final LinearLayout.LayoutParams dropZoneView2 =
@@ -425,6 +429,19 @@ public class DragLayout extends LinearLayout
         mDropZoneView2.setLayoutParams(dropZoneView2);
     }
 
+    /** Zeroes out translationX and translationY on all drop zone views. */
+    void resetDropZoneTranslations() {
+        setDropZoneTranslations(0, 0);
+    }
+
+    /** Sets translationX and translationY on all drop zone views. */
+    void setDropZoneTranslations(int x, int y) {
+        mDropZoneView1.setTranslationX(x);
+        mDropZoneView1.setTranslationY(y);
+        mDropZoneView2.setTranslationX(x);
+        mDropZoneView2.setTranslationY(y);
+    }
+
     /**
      * Sets the size of the two drop zones based on the provided bounds. The divider sits between
      * the views and its size is included in the calculations.
@@ -433,6 +450,15 @@ public class DragLayout extends LinearLayout
      * @param bounds2 bounds to apply to the second dropzone view, null if split in half.
      */
     private void updateDropZoneSizes(Rect bounds1, Rect bounds2) {
+        if (bounds1 == null || bounds2 == null) {
+            // We're entering 50:50 split screen from a single app, no need for any translations.
+            resetDropZoneTranslations();
+        } else {
+            // We're already in split, so align our drop zones to match the left/top app edge. This
+            // is necessary because the left/top app can be offscreen.
+            setDropZoneTranslations(bounds1.left, bounds1.top);
+        }
+
         final int halfDivider = mDividerSize / 2;
         final LinearLayout.LayoutParams dropZoneView1 =
                 (LayoutParams) mDropZoneView1.getLayoutParams();
@@ -600,6 +626,11 @@ public class DragLayout extends LinearLayout
 
     @Nullable
     private BubbleBarLocation getBubbleBarLocation(int x, int y) {
+        Intent appData = mSession.appData;
+        if (appData == null) {
+            // there is no app data, so drop event over the bubble bar can not be handled
+            return null;
+        }
         for (BubbleBarLocation location : mBubbleBarLocations.keySet()) {
             if (mBubbleBarLocations.get(location).contains(x, y)) {
                 return location;
@@ -649,11 +680,16 @@ public class DragLayout extends LinearLayout
             @Nullable WindowContainerToken hideTaskToken, Runnable dropCompleteCallback) {
         final boolean handledDrop = mCurrentTarget != null || mCurrentBubbleBarTarget != null;
         mHasDropped = true;
+        Intent appData = mSession.appData;
 
-        // Process the drop
-        mPolicy.onDropped(mCurrentTarget, hideTaskToken);
-        //TODO(b/388894910) add info about the application
-        mBubbleBarDragListener.onItemDroppedOverBubbleBarDragZone(mCurrentBubbleBarTarget);
+        // Process the drop exclusive by DropTarget OR by the BubbleBar
+        if (mCurrentTarget != null) {
+            mPolicy.onDropped(mCurrentTarget, hideTaskToken);
+        } else if (appData != null && mCurrentBubbleBarTarget != null
+                && BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
+            mBubbleBarDragListener.onItemDroppedOverBubbleBarDragZone(mCurrentBubbleBarTarget,
+                    appData);
+        }
 
         // Start animating the drop UI out with the drag surface
         hide(event, dropCompleteCallback);

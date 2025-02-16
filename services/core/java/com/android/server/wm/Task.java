@@ -53,11 +53,9 @@ import static android.view.SurfaceControl.METADATA_TASK_ID;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES;
-import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_FLAG_APP_CRASHED;
 import static android.view.WindowManager.TRANSIT_NONE;
-import static android.view.WindowManager.TRANSIT_OLD_TASK_CHANGE_WINDOWING_MODE;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
@@ -76,7 +74,6 @@ import static com.android.server.wm.ActivityRecord.TRANSFER_SPLASH_SCREEN_COPYIN
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_RECENTS;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SWITCH;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_TRANSITION;
-import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_USER_LEAVING;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_CLEANUP;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_RECENTS;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_SWITCH;
@@ -163,7 +160,6 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
-import android.util.ArraySet;
 // QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
 import android.util.BoostFramework;
 // QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
@@ -172,10 +168,10 @@ import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.DisplayInfo;
 import android.view.InsetsState;
-import android.view.RemoteAnimationAdapter;
 import android.view.SurfaceControl;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.window.DesktopModeFlags;
 import android.window.ITaskOrganizer;
 import android.window.PictureInPictureSurfaceTransaction;
 import android.window.StartingWindowInfo;
@@ -2374,31 +2370,8 @@ class Task extends TaskFragment {
     }
 
     @VisibleForTesting
-    Point getLastSurfaceSize() {
-        return mLastSurfaceSize;
-    }
-
-    @VisibleForTesting
     boolean isInChangeTransition() {
-        return mSurfaceFreezer.hasLeash() || AppTransition.isChangeTransitOld(mTransit);
-    }
-
-    @Override
-    public SurfaceControl getFreezeSnapshotTarget() {
-        if (!mDisplayContent.mAppTransition.containsTransitRequest(TRANSIT_CHANGE)) {
-            return null;
-        }
-        // Skip creating snapshot if this transition is controlled by a remote animator which
-        // doesn't need it.
-        final ArraySet<Integer> activityTypes = new ArraySet<>();
-        activityTypes.add(getActivityType());
-        final RemoteAnimationAdapter adapter =
-                mDisplayContent.mAppTransitionController.getRemoteAnimationOverride(
-                        this, TRANSIT_OLD_TASK_CHANGE_WINDOWING_MODE, activityTypes);
-        if (adapter != null && !adapter.getChangeNeedsSnapshot()) {
-            return null;
-        }
-        return getSurfaceControl();
+        return AppTransition.isChangeTransitOld(mTransit);
     }
 
     @Override
@@ -2446,18 +2419,17 @@ class Task extends TaskFragment {
         mTaskSupervisor.mLaunchParamsPersister.saveTask(this, display);
     }
 
-    Rect updateOverrideConfigurationFromLaunchBounds() {
+    void updateOverrideConfigurationFromLaunchBounds() {
         // If the task is controlled by another organized task, do not set override
         // configurations and let its parent (organized task) to control it;
         final Task rootTask = getRootTask();
-        final Rect bounds = rootTask != this && rootTask.isOrganized() ? null : getLaunchBounds();
-        setBounds(bounds);
-        if (bounds != null && !bounds.isEmpty()) {
-            // TODO: Review if we actually want to do this - we are setting the launch bounds
-            // directly here.
-            bounds.set(getRequestedOverrideBounds());
+        boolean shouldInheritBounds = rootTask != this && rootTask.isOrganized();
+        if (Flags.enableMultipleDesktopsBackend()) {
+            // Only inherit from organized parent when this task is not organized.
+            shouldInheritBounds &= !isOrganized();
         }
-        return bounds;
+        final Rect bounds = shouldInheritBounds ? null : getLaunchBounds();
+        setBounds(bounds);
     }
 
     /** Returns the bounds that should be used to launch this task. */
@@ -3499,8 +3471,10 @@ class Task extends TaskFragment {
         info.lastNonFullscreenBounds = topTask.mLastNonFullscreenBounds;
         final WindowState windowState = top != null
                 ? top.findMainWindow(/* includeStartingApp= */ false) : null;
-        info.requestedVisibleTypes = (windowState != null && Flags.enableFullyImmersiveInDesktop())
-                ? windowState.getRequestedVisibleTypes() : WindowInsets.Type.defaultVisible();
+        info.requestedVisibleTypes =
+                (windowState != null && DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue())
+                        ? windowState.getRequestedVisibleTypes()
+                        : WindowInsets.Type.defaultVisible();
         AppCompatUtils.fillAppCompatTaskInfo(this, info, top);
         info.topActivityMainWindowFrame = calculateTopActivityMainWindowFrameForTaskInfo(top);
     }
@@ -5281,7 +5255,6 @@ class Task extends TaskFragment {
         }
         final boolean[] resumed = new boolean[1];
         final TaskFragment topFragment = topActivity.getTaskFragment();
-        resumed[0] = topFragment.resumeTopActivity(prev, options, deferPause);
 // QTI_BEGIN: 2024-05-29: Data: Update pauseActivityIfNeeded to avoid NullPointerException
         if (mActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED
                     && topActivity.info != null) {
@@ -5300,6 +5273,7 @@ class Task extends TaskFragment {
             }
             resumed[0] |= f.resumeTopActivity(prev, options, deferPause);
         }, true);
+        resumed[0] |= topFragment.resumeTopActivity(prev, options, deferPause);
         return resumed[0];
     }
 
@@ -6097,7 +6071,7 @@ class Task extends TaskFragment {
             IVoiceInteractor voiceInteractor, boolean toTop, ActivityRecord activity,
             ActivityRecord source, ActivityOptions options) {
 
-        Task task;
+        final Task task;
         if (canReuseAsLeafTask()) {
             // This root task will only contain one task, so just return itself since all root
             // tasks ara now tasks and all tasks are now root tasks.
@@ -6107,7 +6081,6 @@ class Task extends TaskFragment {
             final int taskId = activity != null
                     ? mTaskSupervisor.getNextTaskIdForUser(activity.mUserId)
                     : mTaskSupervisor.getNextTaskIdForUser();
-            final int activityType = getActivityType();
             task = new Task.Builder(mAtmService)
                     .setTaskId(taskId)
                     .setActivityInfo(info)
@@ -6120,17 +6093,21 @@ class Task extends TaskFragment {
                     .build();
         }
 
-        int displayId = getDisplayId();
-        if (displayId == INVALID_DISPLAY) displayId = DEFAULT_DISPLAY;
-        final boolean isLockscreenShown = mAtmService.mTaskSupervisor.getKeyguardController()
-                .isKeyguardOrAodShowing(displayId);
-        if (!mTaskSupervisor.getLaunchParamsController()
-                .layoutTask(task, info.windowLayout, activity, source, options)
-                && !getRequestedOverrideBounds().isEmpty()
-                && task.isResizeable() && !isLockscreenShown) {
-            task.setBounds(getRequestedOverrideBounds());
+        if (com.android.window.flags.Flags.fixLayoutExistingTask()) {
+            mTaskSupervisor.getLaunchParamsController()
+                    .layoutTask(task, info.windowLayout, activity, source, options);
+        } else {
+            int displayId = getDisplayId();
+            if (displayId == INVALID_DISPLAY) displayId = DEFAULT_DISPLAY;
+            final boolean isLockscreenShown =
+                    mAtmService.mKeyguardController.isKeyguardOrAodShowing(displayId);
+            if (!mTaskSupervisor.getLaunchParamsController()
+                    .layoutTask(task, info.windowLayout, activity, source, options)
+                    && !getRequestedOverrideBounds().isEmpty()
+                    && task.isResizeable() && !isLockscreenShown) {
+                task.setBounds(getRequestedOverrideBounds());
+            }
         }
-
         return task;
     }
 

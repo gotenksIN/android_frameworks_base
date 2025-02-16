@@ -71,7 +71,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
-import androidx.dynamicanimation.animation.SpringForce;
 
 import com.android.app.animation.Interpolators;
 import com.android.internal.annotations.VisibleForTesting;
@@ -171,6 +170,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private boolean mIsFaded;
 
     private boolean mIsPromotedOngoing = false;
+
+    @Nullable
+    public ImageModelIndex mImageModelIndex = null;
 
     /**
      * Listener for when {@link ExpandableNotificationRow} is laid out.
@@ -361,39 +363,14 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     };
 
-    private final SpringAnimation mMagneticAnimator = new SpringAnimation(
-            this, FloatPropertyCompat.createFloatPropertyCompat(TRANSLATE_CONTENT));
-
-    private final MagneticRowListener mMagneticRowListener = new MagneticRowListener() {
-
-        @Override
-        public void setMagneticTranslation(float translation) {
-            if (mMagneticAnimator.isRunning()) {
-                mMagneticAnimator.animateToFinalPosition(translation);
-            } else {
-                setTranslation(translation);
-            }
-        }
-
-        @Override
-        public void triggerMagneticForce(float endTranslation, @NonNull SpringForce springForce,
-                float startVelocity) {
-            cancelMagneticAnimations();
-            mMagneticAnimator.setSpring(springForce);
-            mMagneticAnimator.setStartVelocity(startVelocity);
-            mMagneticAnimator.animateToFinalPosition(endTranslation);
-        }
-
-        @Override
-        public void cancelMagneticAnimations() {
-            cancelSnapBackAnimation();
-            cancelTranslateAnimation();
-            mMagneticAnimator.cancel();
-        }
-    };
+    @Override
+    protected void cancelTranslationAnimations() {
+        cancelSnapBackAnimation();
+        cancelTranslateAnimation();
+    }
 
     private void cancelSnapBackAnimation() {
-        PhysicsAnimator<ExpandableNotificationRow> animator =
+        PhysicsAnimator<ExpandableView> animator =
                 PhysicsAnimator.getInstanceIfExists(this /* target */);
         if (animator != null) {
             animator.cancel();
@@ -1497,9 +1474,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             items.add(NotificationMenuRow.createPartialConversationItem(mContext));
             items.add(NotificationMenuRow.createInfoItem(mContext));
             items.add(NotificationMenuRow.createSnoozeItem(mContext));
-            if (android.app.Flags.notificationClassificationUi()) {
-                items.add(NotificationMenuRow.createBundleItem(mContext));
-            }
             mMenuRow.setMenuItems(items);
         }
         if (existed) {
@@ -2047,6 +2021,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 new NotificationInlineImageCache());
         float radius = getResources().getDimension(R.dimen.notification_corner_radius_small);
         mSmallRoundness = radius / getMaxRadius();
+        mMagneticAnimator = new SpringAnimation(
+                this, FloatPropertyCompat.createFloatPropertyCompat(TRANSLATE_CONTENT));
         initDimens();
     }
 
@@ -2971,6 +2947,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             if (isAboveShelf() != wasAboveShelf) {
                 mAboveShelfChangedListener.onAboveShelfStateChanged(!wasAboveShelf);
             }
+            if (SceneContainerFlag.isEnabled()) {
+                if (mIsSummaryWithChildren) {
+                    mChildrenContainer.setOnKeyguard(onKeyguard);
+                }
+            }
         }
     }
 
@@ -3300,6 +3281,19 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         // 1. Is HUN and not marked as seen yet (isHeadsUp && mustStayOnScreen)
         // 2. Is an FSI HUN (isPinned)
         return mIsHeadsUp && mMustStayOnScreen || notificationsPinnedHunInShade() && isPinned();
+    }
+
+    /**
+     * For the case of an {@link ExpandableNotificationRow}, the dismissibility of the row considers
+     * the exposure of guts, the state of the  notification entry, and if the view itself is allowed
+     * to be dismissed.
+     */
+    @Override
+    public boolean canExpandableViewBeDismissed() {
+        if (areGutsExposed() || !mEntry.hasFinishedInitialization()) {
+            return false;
+        }
+        return canViewBeDismissed();
     }
 
     /**
@@ -4070,6 +4064,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mLayouts = new NotificationContentView[]{mPrivateLayout, mPublicLayout};
     }
 
+    @VisibleForTesting
+    public void setMagneticRowListener(MagneticRowListener listener) {
+        mMagneticRowListener = listener;
+    }
+
     /**
      * Equivalent to View.OnLongClickListener with coordinates
      */
@@ -4115,7 +4114,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             pw.print(", alpha: " + getAlpha());
             pw.print(", translation: " + getTranslation());
             pw.print(", entry dismissable: " + canEntryBeDismissed());
-            pw.print(", mOnUserInteractionCallback null: " + (mOnUserInteractionCallback == null));
+            pw.print(", mOnUserInteractionCallback==null: " + (mOnUserInteractionCallback == null));
             pw.print(", removed: " + isRemoved());
             pw.print(", expandAnimationRunning: " + mExpandAnimationRunning);
             pw.print(", mShowingPublic: " + mShowingPublic);
@@ -4128,9 +4127,17 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             pw.print(", clipBounds: " + getClipBounds());
             if (PromotedNotificationUiForceExpanded.isEnabled()) {
                 pw.print(", isPromotedOngoing: " + isPromotedOngoing());
-                pw.print(", isExpandable: " + isExpandable());
-                pw.print(", mExpandable: " + mExpandable);
             }
+            pw.print(", isExpandable: " + isExpandable());
+            pw.print(", mExpandable: " + mExpandable);
+            pw.print(", isUserExpanded: " + isUserExpanded());
+            pw.print(", hasUserChangedExpansion: " + mHasUserChangedExpansion);
+            pw.print(", isOnKeyguard: " + isOnKeyguard());
+            pw.print(", isSummaryWithChildren: " + mIsSummaryWithChildren);
+            pw.print(", enableNonGroupedExpand: " + mEnableNonGroupedNotificationExpand);
+            pw.print(", isPinned: " + isPinned());
+            pw.print(", expandedWhenPinned: " + mExpandedWhenPinned);
+            pw.print(", isMinimized: " + mIsMinimized);
 
             pw.println();
             if (NotificationContentView.INCLUDE_HEIGHTS_TO_DUMP) {
@@ -4159,28 +4166,36 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 pw.println("Children Container Intrinsic Height: "
                         + mChildrenContainer.getIntrinsicHeight());
                 pw.println();
-                List<ExpandableNotificationRow> notificationChildren = getAttachedChildren();
-                pw.print("Children: " + notificationChildren.size() + " {");
-                pw.increaseIndent();
-                for (ExpandableNotificationRow child : notificationChildren) {
-                    pw.println();
-                    child.dump(pw, args);
-                }
-                pw.decreaseIndent();
-                pw.println("}");
-                pw.print("Transient Views: " + transientViewCount + " {");
-                pw.increaseIndent();
-                for (int i = 0; i < transientViewCount; i++) {
-                    pw.println();
-                    ExpandableView child = (ExpandableView) mChildrenContainer.getTransientView(i);
-                    child.dump(pw, args);
-                }
-                pw.decreaseIndent();
-                pw.println("}");
+                dumpChildren(pw, args);
+                dumpTransientViews(transientViewCount, pw, args);
             } else if (mPrivateLayout != null) {
                 mPrivateLayout.dumpSmartReplies(pw);
             }
         });
+    }
+
+    private void dumpChildren(IndentingPrintWriter pw, String[] args) {
+        List<ExpandableNotificationRow> notificationChildren = getAttachedChildren();
+        pw.print("Children: " + notificationChildren.size() + " {");
+        DumpUtilsKt.withIncreasedIndent(pw, () -> {
+            for (ExpandableNotificationRow child : notificationChildren) {
+                pw.println();
+                child.dump(pw, args);
+            }
+        });
+        pw.println("}");
+    }
+
+    private void dumpTransientViews(int transientCount, IndentingPrintWriter pw, String[] args) {
+        pw.print("Transient Views: " + transientCount + " {");
+        DumpUtilsKt.withIncreasedIndent(pw, () -> {
+            for (int i = 0; i < transientCount; i++) {
+                pw.println();
+                ExpandableView child = (ExpandableView) mChildrenContainer.getTransientView(i);
+                child.dump(pw, args);
+            }
+        });
+        pw.println("}");
     }
 
     private void dumpHeights(IndentingPrintWriter pw) {
@@ -4319,9 +4334,5 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             return;
         }
         mLogger.logRemoveTransientRow(row.getEntry(), getEntry());
-    }
-
-    public MagneticRowListener getMagneticRowListener() {
-        return mMagneticRowListener;
     }
 }

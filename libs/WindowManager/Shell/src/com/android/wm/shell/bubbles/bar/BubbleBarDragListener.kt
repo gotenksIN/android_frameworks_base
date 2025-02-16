@@ -16,6 +16,7 @@
 
 package com.android.wm.shell.bubbles.bar
 
+import android.content.Intent
 import android.graphics.Rect
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 
@@ -29,7 +30,7 @@ interface BubbleBarDragListener {
     fun onItemDraggedOutsideBubbleBarDropZone()
 
     /** Called when the drop event happens over the bubble bar drop zone. */
-    fun onItemDroppedOverBubbleBarDragZone(location: BubbleBarLocation?)
+    fun onItemDroppedOverBubbleBarDragZone(location: BubbleBarLocation, itemIntent: Intent)
 
     /**
      * Returns mapping of the bubble bar locations to the corresponding

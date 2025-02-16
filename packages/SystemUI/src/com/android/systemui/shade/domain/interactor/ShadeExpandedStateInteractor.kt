@@ -22,7 +22,6 @@ import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.ShadeTraceLogger.traceWaitForExpansion
 import com.android.systemui.shade.domain.interactor.ShadeExpandedStateInteractor.ShadeElement
-import com.android.systemui.shade.shared.flag.DualShade
 import com.android.systemui.util.kotlin.Utils.Companion.combineState
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
@@ -40,10 +39,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Wrapper around [ShadeInteractor] to facilitate expansion and collapse of Notifications and quick
  * settings.
  *
- * Specifially created to simplify [ShadeDisplaysInteractor] logic.
+ * Specifically created to simplify [ShadeDisplaysInteractor] logic.
  *
- * NOTE: with [SceneContainerFlag] or [DualShade] disabled, [currentlyExpandedElement] will always
- * return null!
+ * NOTE: with [SceneContainerFlag] disabled, [currentlyExpandedElement] will always return `null`!
  */
 interface ShadeExpandedStateInteractor {
     /** Returns the expanded [ShadeElement]. If none is, returns null. */
@@ -99,7 +97,7 @@ private suspend fun StateFlow<Float>.waitUntil(f: Float, coroutineContext: Corou
             ?: Log.e(
                 "ShadeExpStateInteractor",
                 "Timed out after ${EXPAND_COLLAPSE_TIMEOUT.inWholeMilliseconds}ms while waiting " +
-                        "for expansion to match $f. Current one: $value",
+                    "for expansion to match $f. Current one: $value",
             )
     }
 }
@@ -112,13 +110,17 @@ constructor(
     @Background private val bgContext: CoroutineContext,
 ) : ShadeElement() {
     override suspend fun expand(reason: String) {
-        shadeInteractor.expandNotificationsShade(reason)
-        shadeInteractor.shadeExpansion.waitUntil(1f, bgContext)
+        if (SceneContainerFlag.isEnabled) {
+            shadeInteractor.expandNotificationsShade(reason)
+            shadeInteractor.shadeExpansion.waitUntil(1f, bgContext)
+        }
     }
 
     override suspend fun collapse(reason: String) {
-        shadeInteractor.collapseNotificationsShade(reason)
-        shadeInteractor.shadeExpansion.waitUntil(0f, bgContext)
+        if (SceneContainerFlag.isEnabled) {
+            shadeInteractor.collapseNotificationsShade(reason)
+            shadeInteractor.shadeExpansion.waitUntil(0f, bgContext)
+        }
     }
 }
 
@@ -130,12 +132,16 @@ constructor(
     @Background private val bgContext: CoroutineContext,
 ) : ShadeElement() {
     override suspend fun expand(reason: String) {
-        shadeInteractor.expandQuickSettingsShade(reason)
-        shadeInteractor.qsExpansion.waitUntil(1f, bgContext)
+        if (SceneContainerFlag.isEnabled) {
+            shadeInteractor.expandQuickSettingsShade(reason)
+            shadeInteractor.qsExpansion.waitUntil(1f, bgContext)
+        }
     }
 
     override suspend fun collapse(reason: String) {
-        shadeInteractor.collapseQuickSettingsShade(reason)
-        shadeInteractor.qsExpansion.waitUntil(0f, bgContext)
+        if (SceneContainerFlag.isEnabled) {
+            shadeInteractor.collapseQuickSettingsShade(reason)
+            shadeInteractor.qsExpansion.waitUntil(0f, bgContext)
+        }
     }
 }

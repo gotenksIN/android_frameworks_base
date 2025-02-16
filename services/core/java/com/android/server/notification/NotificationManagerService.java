@@ -29,7 +29,6 @@ import static android.app.Flags.lifetimeExtensionRefactor;
 import static android.app.Flags.nmSummarization;
 import static android.app.Flags.nmSummarizationUi;
 import static android.app.Flags.notificationClassificationUi;
-import static android.app.Flags.redactSensitiveContentNotificationsOnLockscreen;
 import static android.app.Flags.sortSectionByTime;
 import static android.app.Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION;
 import static android.app.Notification.EXTRA_BUILDER_APPLICATION_INFO;
@@ -260,9 +259,6 @@ import android.content.pm.VersionedPackage;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.metrics.LogMaker;
-import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -675,7 +671,6 @@ public class NotificationManagerService extends SystemService {
     private UsageStatsManagerInternal mUsageStatsManagerInternal;
     private TelecomManager mTelecomManager;
     private PowerManager mPowerManager;
-    private ConnectivityManager mConnectivityManager;
     private PostNotificationTrackerFactory mPostNotificationTrackerFactory;
 
     private LockPatternUtils mLockUtils;
@@ -799,8 +794,6 @@ public class NotificationManagerService extends SystemService {
     private AppOpsManager.OnOpChangedListener mAppOpsListener;
 
     private ModuleInfo mAdservicesModuleInfo;
-
-    private boolean mConnectedToWifi;
 
     static class Archive {
         final SparseArray<Boolean> mEnabled;
@@ -2697,7 +2690,6 @@ public class NotificationManagerService extends SystemService {
             TelecomManager telecomManager, NotificationChannelLogger channelLogger,
             SystemUiSystemPropertiesFlags.FlagResolver flagResolver,
             PermissionManager permissionManager, PowerManager powerManager,
-            ConnectivityManager connectivityManager,
             PostNotificationTrackerFactory postNotificationTrackerFactory) {
         mHandler = handler;
         if (Flags.nmBinderPerfThrottleEffectsSuppressorBroadcast()) {
@@ -2733,8 +2725,6 @@ public class NotificationManagerService extends SystemService {
         mUm = userManager;
         mTelecomManager = telecomManager;
         mPowerManager = powerManager;
-        mConnectivityManager = connectivityManager;
-        registerNetworkCallback();
         mPostNotificationTrackerFactory = postNotificationTrackerFactory;
         mPlatformCompat = IPlatformCompat.Stub.asInterface(
                 ServiceManager.getService(Context.PLATFORM_COMPAT_SERVICE));
@@ -2950,28 +2940,6 @@ public class NotificationManagerService extends SystemService {
         mAppOps.startWatchingMode(AppOpsManager.OP_POST_NOTIFICATION, null, mAppOpsListener);
     }
 
-    private void registerNetworkCallback() {
-        mConnectivityManager.registerDefaultNetworkCallback(
-                new ConnectivityManager.NetworkCallback() {
-                    @Override
-                    public void onCapabilitiesChanged(@NonNull Network network,
-                            @NonNull NetworkCapabilities capabilities) {
-                        updateWifiConnectionState(capabilities);
-                    }
-                    @Override
-                    public void onLost(@NonNull Network network) {
-                        mConnectedToWifi = false;
-                    }
-                }, mHandler);
-    }
-
-    @VisibleForTesting()
-    void updateWifiConnectionState(NetworkCapabilities capabilities) {
-        mConnectedToWifi = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED);
-    }
-
     /**
      * Cleanup broadcast receivers change listeners.
      */
@@ -3094,7 +3062,6 @@ public class NotificationManagerService extends SystemService {
                 new NotificationChannelLoggerImpl(), SystemUiSystemPropertiesFlags.getResolver(),
                 getContext().getSystemService(PermissionManager.class),
                 getContext().getSystemService(PowerManager.class),
-                getContext().getSystemService(ConnectivityManager.class),
                 new PostNotificationTrackerFactory() {});
 
         publishBinderService(Context.NOTIFICATION_SERVICE, mService, /* allowIsolated= */ false,
@@ -5024,6 +4991,16 @@ public class NotificationManagerService extends SystemService {
             checkCallerIsSystemOrSameApp(pkg);
             return mPreferencesHelper.getNotificationChannelGroups(pkg, Binder.getCallingUid(),
                     NotificationChannelGroupsHelper.Params.forAllGroups());
+        }
+
+        @Override
+        public ParceledListSlice<NotificationChannelGroup>
+                getNotificationChannelGroupsWithoutChannels(String pkg) {
+            checkCallerIsSystemOrSameApp(pkg);
+            List<NotificationChannelGroup> groups = new ArrayList<>();
+            groups.addAll(mPreferencesHelper.getNotificationChannelGroupsWithoutChannels(pkg,
+                    Binder.getCallingUid()));
+            return new ParceledListSlice<>(groups);
         }
 
         @Override
@@ -7169,7 +7146,7 @@ public class NotificationManagerService extends SystemService {
             verifyPrivilegedListener(token, user, true);
 
             List<NotificationChannelGroup> groups = new ArrayList<>();
-            groups.addAll(mPreferencesHelper.getNotificationChannelGroups(
+            groups.addAll(mPreferencesHelper.getNotificationChannelGroupsWithoutChannels(
                     pkg, getUidForPackageAndUser(pkg, user)));
             return new ParceledListSlice<>(groups);
         }
@@ -11885,14 +11862,6 @@ public class NotificationManagerService extends SystemService {
                 if (!mListeners.isUidTrusted(info.uid) && mListeners.hasSensitiveContent(record)) {
                     smartActions = null;
                     smartReplies = null;
-                }
-                if (redactSensitiveContentNotificationsOnLockscreen()) {
-                    if (mListeners.hasSensitiveContent(record) && mConnectedToWifi
-                            && info.isSystemUi) {
-                        // We don't inform systemUI of sensitive content if
-                        // connected to wifi, though we do still redact from untrusted listeners.
-                        hasSensitiveContent = false;
-                    }
                 }
             }
             ranking.populate(

@@ -75,7 +75,6 @@ import com.android.systemui.util.time.FakeSystemClock
 import com.android.systemui.window.ui.viewmodel.WindowRootViewModel
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -93,7 +92,6 @@ import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.eq
 
-@ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @RunWithLooper(setAsMainLooper = true)
 @SmallTest
@@ -247,15 +245,6 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
         underTest.onConfigurationChanged(Configuration())
 
         verify(configurationForwarder, never()).onConfigurationChanged(any())
-    }
-
-    @Test
-    @EnableFlags(AConfigFlags.FLAG_SHADE_WINDOW_GOES_AROUND)
-    fun onConfigurationChanged_configForwarderSet_propagatesConfig() {
-        val config = Configuration()
-        underTest.onConfigurationChanged(config)
-
-        verify(configurationForwarder).onConfigurationChanged(eq(config))
     }
 
     @Test

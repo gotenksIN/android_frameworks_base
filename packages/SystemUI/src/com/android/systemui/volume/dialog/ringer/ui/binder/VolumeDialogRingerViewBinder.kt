@@ -40,6 +40,7 @@ import com.android.systemui.volume.dialog.ringer.ui.viewmodel.RingerViewModel
 import com.android.systemui.volume.dialog.ringer.ui.viewmodel.RingerViewModelState
 import com.android.systemui.volume.dialog.ringer.ui.viewmodel.VolumeDialogRingerDrawerViewModel
 import com.android.systemui.volume.dialog.ui.utils.suspendAnimate
+import com.android.systemui.volume.dialog.ui.viewmodel.VolumeDialogViewModel
 import javax.inject.Inject
 import kotlin.properties.Delegates
 import kotlinx.coroutines.CoroutineScope
@@ -56,7 +57,10 @@ private const val BUTTON_MIN_VISIBLE_CHANGE = 0.05F
 @VolumeDialogScope
 class VolumeDialogRingerViewBinder
 @Inject
-constructor(private val viewModel: VolumeDialogRingerDrawerViewModel) {
+constructor(
+    private val viewModel: VolumeDialogRingerDrawerViewModel,
+    private val dialogViewModel: VolumeDialogViewModel,
+) {
     private val roundnessSpringForce =
         SpringForce(1F).apply {
             stiffness = 800F
@@ -116,6 +120,7 @@ constructor(private val viewModel: VolumeDialogRingerDrawerViewModel) {
         drawerContainer.setTransitionListener(ringerDrawerTransitionListener)
         volumeDialogBackgroundView.background = volumeDialogBackgroundView.background.mutate()
         ringerBackgroundView.background = ringerBackgroundView.background.mutate()
+        launch { dialogViewModel.addTouchableBounds(drawerContainer) }
 
         viewModel.ringerViewModel
             .mapLatest { ringerState ->
@@ -241,16 +246,12 @@ constructor(private val viewModel: VolumeDialogRingerDrawerViewModel) {
                 uiModel.drawerState.currentMode != uiModel.drawerState.previousMode
         ) {
             val count = uiModel.availableButtons.size
-            val selectedButton =
-                getChildAt(count - uiModel.currentButtonIndex)
-                    .requireViewById<ImageButton>(R.id.volume_drawer_button)
+            val selectedButton = getChildAt(count - uiModel.currentButtonIndex) as ImageButton
             val previousIndex =
                 uiModel.availableButtons.indexOfFirst {
                     it.ringerMode == uiModel.drawerState.previousMode
                 }
-            val unselectedButton =
-                getChildAt(count - previousIndex)
-                    .requireViewById<ImageButton>(R.id.volume_drawer_button)
+            val unselectedButton = getChildAt(count - previousIndex) as ImageButton
             // We only need to execute on roundness animation end and volume dialog background
             // progress update once because these changes should be applied once on volume dialog
             // background and ringer drawer views.
@@ -301,7 +302,7 @@ constructor(private val viewModel: VolumeDialogRingerDrawerViewModel) {
     ) {
         val count = uiModel.availableButtons.size
         uiModel.availableButtons.fastForEachIndexed { index, ringerButton ->
-            val view = getChildAt(count - index)
+            val view = getChildAt(count - index) as ImageButton
             val isOpen = uiModel.drawerState is RingerDrawerState.Open
             if (index == uiModel.currentButtonIndex) {
                 view.bindDrawerButton(
@@ -318,37 +319,37 @@ constructor(private val viewModel: VolumeDialogRingerDrawerViewModel) {
         onAnimationEnd?.run()
     }
 
-    private fun View.bindDrawerButton(
+    private fun ImageButton.bindDrawerButton(
         buttonViewModel: RingerButtonViewModel,
         viewModel: VolumeDialogRingerDrawerViewModel,
         isOpen: Boolean,
         isSelected: Boolean = false,
         isAnimated: Boolean = false,
     ) {
+        // id = buttonViewModel.viewId
+        setSelected(isSelected)
         val ringerContentDesc = context.getString(buttonViewModel.contentDescriptionResId)
-        with(requireViewById<ImageButton>(R.id.volume_drawer_button)) {
-            setImageResource(buttonViewModel.imageResId)
-            contentDescription =
-                if (isSelected && !isOpen) {
-                    context.getString(
-                        R.string.volume_ringer_drawer_closed_content_description,
-                        ringerContentDesc,
-                    )
-                } else {
-                    ringerContentDesc
-                }
-            if (isSelected && !isAnimated) {
-                setBackgroundResource(R.drawable.volume_drawer_selection_bg)
-                setColorFilter(context.getColor(internalR.color.materialColorOnPrimary))
-                background = background.mutate()
-            } else if (!isAnimated) {
-                setBackgroundResource(R.drawable.volume_ringer_item_bg)
-                setColorFilter(context.getColor(internalR.color.materialColorOnSurface))
-                background = background.mutate()
+        setImageResource(buttonViewModel.imageResId)
+        contentDescription =
+            if (isSelected && !isOpen) {
+                context.getString(
+                    R.string.volume_ringer_drawer_closed_content_description,
+                    ringerContentDesc,
+                )
+            } else {
+                ringerContentDesc
             }
-            setOnClickListener {
-                viewModel.onRingerButtonClicked(buttonViewModel.ringerMode, isSelected)
-            }
+        if (isSelected && !isAnimated) {
+            setBackgroundResource(R.drawable.volume_drawer_selection_bg)
+            setColorFilter(context.getColor(internalR.color.materialColorOnPrimary))
+            background = background.mutate()
+        } else if (!isAnimated) {
+            setBackgroundResource(R.drawable.volume_ringer_item_bg)
+            setColorFilter(context.getColor(internalR.color.materialColorOnSurface))
+            background = background.mutate()
+        }
+        setOnClickListener {
+            viewModel.onRingerButtonClicked(buttonViewModel.ringerMode, isSelected)
         }
     }
 

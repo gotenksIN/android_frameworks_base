@@ -89,6 +89,7 @@ import com.android.internal.protolog.ProtoLog;
 import com.android.server.UiThread;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.statusbar.StatusBarManagerInternal;
+import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -126,6 +127,8 @@ public class DisplayRotation {
 // QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
     @Nullable
     private final DisplayRotationImmersiveAppCompatPolicy mCompatPolicyForImmersiveApps;
+    @Nullable
+    private DeviceStateAutoRotateSettingController mDeviceStateAutoRotateSettingController;
 
     public final boolean isDefaultDisplay;
     private final boolean mSupportAutoRotation;
@@ -418,8 +421,15 @@ public class DisplayRotation {
         }
 // QTI_END: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
 // QTI_BEGIN: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
-    }
 // QTI_END: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
+        if (mFoldController != null && (Flags.enableDeviceStateAutoRotateSettingLogging()
+                || Flags.enableDeviceStateAutoRotateSettingRefactor())) {
+            mDeviceStateAutoRotateSettingController =
+                    new DeviceStateAutoRotateSettingController(mContext,
+                            new DeviceStateAutoRotateSettingIssueLogger(
+                                    SystemClock::elapsedRealtime), mService.mH);
+        }
+    }
 
     private static boolean isFoldable(Context context) {
         return context.getResources().getIntArray(R.array.config_foldedDeviceStates).length > 0;
@@ -1798,6 +1808,9 @@ public class DisplayRotation {
         if (mFoldController != null) {
             synchronized (mLock) {
                 mFoldController.foldStateChanged(deviceState);
+                if (mDeviceStateAutoRotateSettingController != null) {
+                    mDeviceStateAutoRotateSettingController.onDeviceStateChange(deviceState);
+                }
             }
         }
     }

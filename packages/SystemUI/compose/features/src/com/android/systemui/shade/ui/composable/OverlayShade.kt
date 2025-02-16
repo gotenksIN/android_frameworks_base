@@ -58,7 +58,8 @@ import com.android.systemui.res.R
 /** Renders a lightweight shade UI container, as an overlay. */
 @Composable
 fun ContentScope.OverlayShade(
-    panelAlignment: Alignment,
+    panelElement: ElementKey,
+    alignmentOnWideScreens: Alignment,
     onScrimClicked: () -> Unit,
     modifier: Modifier = Modifier,
     header: @Composable () -> Unit,
@@ -70,12 +71,12 @@ fun ContentScope.OverlayShade(
 
         Box(
             modifier = Modifier.fillMaxSize().panelContainerPadding(isFullWidth),
-            contentAlignment = panelAlignment,
+            contentAlignment = if (isFullWidth) Alignment.TopCenter else alignmentOnWideScreens,
         ) {
             Panel(
                 modifier =
                     Modifier.overscroll(verticalOverscrollEffect)
-                        .element(OverlayShade.Elements.Panel)
+                        .element(panelElement)
                         .panelWidth(isFullWidth),
                 header = header.takeIf { isFullWidth },
                 content = content,
@@ -106,7 +107,10 @@ private fun ContentScope.Panel(
     header: (@Composable () -> Unit)?,
     content: @Composable () -> Unit,
 ) {
-    Box(modifier = modifier.clip(OverlayShade.Shapes.RoundedCornerPanel)) {
+    Box(
+        modifier =
+            modifier.clip(OverlayShade.Shapes.RoundedCornerPanel).disableSwipesWhenScrolling()
+    ) {
         Spacer(
             modifier =
                 Modifier.element(OverlayShade.Elements.PanelBackground)

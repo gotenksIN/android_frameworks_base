@@ -16,17 +16,16 @@
 
 package com.android.wm.shell.desktopmode
 
+import android.animation.AnimatorTestRule
 import android.app.ActivityManager.RunningTaskInfo
 import android.graphics.PointF
 import android.graphics.Rect
 import android.platform.test.annotations.EnableFlags
-import android.platform.test.flag.junit.SetFlagsRule
 import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper.RunWithLooper
 import android.view.SurfaceControl
 import androidx.test.filters.SmallTest
 import com.android.internal.policy.SystemBarUtils
-import com.android.modules.utils.testing.ExtendedMockitoRule
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
@@ -34,7 +33,7 @@ import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.common.SyncTransactionQueue
-import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
+import com.android.wm.shell.shared.bubbles.BubbleDropTargetBoundsProvider
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule
@@ -56,12 +55,7 @@ import org.mockito.kotlin.whenever
 @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
 class DesktopModeVisualIndicatorTest : ShellTestCase() {
 
-    @JvmField @Rule val setFlagsRule = SetFlagsRule()
-
-    @JvmField
-    @Rule
-    val extendedMockitoRule =
-        ExtendedMockitoRule.Builder(this).mockStatic(DesktopModeStatus::class.java).build()!!
+    @JvmField @Rule val animatorTestRule = AnimatorTestRule(this)
 
     private lateinit var taskInfo: RunningTaskInfo
     @Mock private lateinit var syncQueue: SyncTransactionQueue
@@ -69,17 +63,19 @@ class DesktopModeVisualIndicatorTest : ShellTestCase() {
     @Mock private lateinit var taskSurface: SurfaceControl
     @Mock private lateinit var taskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer
     @Mock private lateinit var displayLayout: DisplayLayout
+    @Mock private lateinit var bubbleBoundsProvider: BubbleDropTargetBoundsProvider
 
     private lateinit var visualIndicator: DesktopModeVisualIndicator
 
     @Before
     fun setUp() {
-        whenever(DesktopModeStatus.canEnterDesktopMode(any())).thenReturn(true)
         whenever(displayLayout.width()).thenReturn(DISPLAY_BOUNDS.width())
         whenever(displayLayout.height()).thenReturn(DISPLAY_BOUNDS.height())
         whenever(displayLayout.stableInsets()).thenReturn(STABLE_INSETS)
         whenever(displayController.getDisplayLayout(anyInt())).thenReturn(displayLayout)
         whenever(displayController.getDisplay(anyInt())).thenReturn(mContext.display)
+        whenever(bubbleBoundsProvider.getBubbleBarExpandedViewDropTargetBounds(any()))
+            .thenReturn(Rect())
         taskInfo = DesktopTestHelpers.createFullscreenTask()
     }
 
@@ -194,6 +190,40 @@ class DesktopModeVisualIndicatorTest : ShellTestCase() {
     }
 
     @Test
+    fun testBubbleLeftRegionCalculation() {
+        val bubbleRegionWidth =
+            context.resources.getDimensionPixelSize(R.dimen.bubble_transform_area_width)
+        val bubbleRegionHeight =
+            context.resources.getDimensionPixelSize(R.dimen.bubble_transform_area_height)
+        val expectedRect = Rect(0, 1600 - bubbleRegionHeight, bubbleRegionWidth, 1600)
+
+        createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_FULLSCREEN)
+        var testRegion = visualIndicator.calculateBubbleLeftRegion(displayLayout)
+        assertThat(testRegion.bounds).isEqualTo(expectedRect)
+
+        createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_SPLIT)
+        testRegion = visualIndicator.calculateBubbleLeftRegion(displayLayout)
+        assertThat(testRegion.bounds).isEqualTo(expectedRect)
+    }
+
+    @Test
+    fun testBubbleRightRegionCalculation() {
+        val bubbleRegionWidth =
+            context.resources.getDimensionPixelSize(R.dimen.bubble_transform_area_width)
+        val bubbleRegionHeight =
+            context.resources.getDimensionPixelSize(R.dimen.bubble_transform_area_height)
+        val expectedRect = Rect(2400 - bubbleRegionWidth, 1600 - bubbleRegionHeight, 2400, 1600)
+
+        createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_FULLSCREEN)
+        var testRegion = visualIndicator.calculateBubbleRightRegion(displayLayout)
+        assertThat(testRegion.bounds).isEqualTo(expectedRect)
+
+        createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_SPLIT)
+        testRegion = visualIndicator.calculateBubbleRightRegion(displayLayout)
+        assertThat(testRegion.bounds).isEqualTo(expectedRect)
+    }
+
+    @Test
     fun testDefaultIndicators() {
         createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_FULLSCREEN)
         var result = visualIndicator.updateIndicatorType(PointF(-10000f, 500f))
@@ -217,31 +247,86 @@ class DesktopModeVisualIndicatorTest : ShellTestCase() {
         com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE,
     )
     fun testDefaultIndicatorWithNoDesktop() {
-        whenever(DesktopModeStatus.canEnterDesktopMode(any())).thenReturn(false)
+        mContext.orCreateTestableResources.addOverride(
+            com.android.internal.R.bool.config_isDesktopModeSupported,
+            false,
+        )
+        mContext.orCreateTestableResources.addOverride(
+            com.android.internal.R.bool.config_isDesktopModeDevOptionSupported,
+            false,
+        )
 
+        // Fullscreen to center, no desktop indicator
         createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_FULLSCREEN)
         var result = visualIndicator.updateIndicatorType(PointF(500f, 500f))
         assertThat(result).isEqualTo(DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR)
-
+        // Fullscreen to split
         result = visualIndicator.updateIndicatorType(PointF(10000f, 500f))
         assertThat(result)
             .isEqualTo(DesktopModeVisualIndicator.IndicatorType.TO_SPLIT_RIGHT_INDICATOR)
-
         result = visualIndicator.updateIndicatorType(PointF(-10000f, 500f))
         assertThat(result)
             .isEqualTo(DesktopModeVisualIndicator.IndicatorType.TO_SPLIT_LEFT_INDICATOR)
-
+        // Fullscreen to bubble
+        result = visualIndicator.updateIndicatorType(PointF(100f, 1500f))
+        assertThat(result)
+            .isEqualTo(DesktopModeVisualIndicator.IndicatorType.TO_BUBBLE_LEFT_INDICATOR)
+        result = visualIndicator.updateIndicatorType(PointF(2300f, 1500f))
+        assertThat(result)
+            .isEqualTo(DesktopModeVisualIndicator.IndicatorType.TO_BUBBLE_RIGHT_INDICATOR)
+        // Split to center, no desktop indicator
         createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_SPLIT)
         result = visualIndicator.updateIndicatorType(PointF(500f, 500f))
         assertThat(result).isEqualTo(DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR)
-
+        // Split to fullscreen
         result = visualIndicator.updateIndicatorType(PointF(500f, 0f))
         assertThat(result)
             .isEqualTo(DesktopModeVisualIndicator.IndicatorType.TO_FULLSCREEN_INDICATOR)
-
+        // Split to bubble
+        result = visualIndicator.updateIndicatorType(PointF(100f, 1500f))
+        assertThat(result)
+            .isEqualTo(DesktopModeVisualIndicator.IndicatorType.TO_BUBBLE_LEFT_INDICATOR)
+        result = visualIndicator.updateIndicatorType(PointF(2300f, 1500f))
+        assertThat(result)
+            .isEqualTo(DesktopModeVisualIndicator.IndicatorType.TO_BUBBLE_RIGHT_INDICATOR)
+        // Drag app to center, no desktop indicator
         createVisualIndicator(DesktopModeVisualIndicator.DragStartState.DRAGGED_INTENT)
         result = visualIndicator.updateIndicatorType(PointF(500f, 500f))
         assertThat(result).isEqualTo(DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR)
+    }
+
+    @Test
+    @EnableFlags(
+        com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_TO_FULLSCREEN,
+        com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE,
+    )
+    fun testBubbleLeftVisualIndicatorSize() {
+        val dropTargetBounds = Rect(100, 100, 500, 1500)
+        whenever(bubbleBoundsProvider.getBubbleBarExpandedViewDropTargetBounds(/* onLeft= */ true))
+            .thenReturn(dropTargetBounds)
+        createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_FULLSCREEN)
+        visualIndicator.updateIndicatorType(PointF(100f, 1500f))
+
+        animatorTestRule.advanceTimeBy(200)
+
+        assertThat(visualIndicator.indicatorBounds).isEqualTo(dropTargetBounds)
+    }
+
+    @Test
+    @EnableFlags(
+        com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_TO_FULLSCREEN,
+        com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE,
+    )
+    fun testBubbleRightVisualIndicatorSize() {
+        val dropTargetBounds = Rect(1900, 100, 2300, 1500)
+        whenever(bubbleBoundsProvider.getBubbleBarExpandedViewDropTargetBounds(/* onLeft= */ false))
+            .thenReturn(dropTargetBounds)
+        createVisualIndicator(DesktopModeVisualIndicator.DragStartState.FROM_FULLSCREEN)
+        visualIndicator.updateIndicatorType(PointF(2300f, 1500f))
+
+        animatorTestRule.advanceTimeBy(200)
+
+        assertThat(visualIndicator.indicatorBounds).isEqualTo(dropTargetBounds)
     }
 
     private fun createVisualIndicator(dragStartState: DesktopModeVisualIndicator.DragStartState) {
@@ -254,6 +339,7 @@ class DesktopModeVisualIndicatorTest : ShellTestCase() {
                 taskSurface,
                 taskDisplayAreaOrganizer,
                 dragStartState,
+                bubbleBoundsProvider,
             )
     }
 

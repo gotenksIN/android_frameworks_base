@@ -643,6 +643,10 @@ public final class NotificationEntry extends ListEntry {
         return row.isMediaRow();
     }
 
+    public boolean containsCustomViews() {
+        return getSbn().getNotification().containsCustomViews();
+    }
+
     public void resetUserExpansion() {
         if (row != null) row.resetUserExpansion();
     }
@@ -810,11 +814,6 @@ public final class NotificationEntry extends ListEntry {
         }
         // don't dismiss ongoing Notifications when the device is locked
         return !mSbn.isOngoing() || !isLocked;
-    }
-
-    public boolean canViewBeDismissed() {
-        if (row == null) return true;
-        return row.canViewBeDismissed();
     }
 
     @VisibleForTesting

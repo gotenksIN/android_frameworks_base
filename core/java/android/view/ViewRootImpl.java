@@ -123,6 +123,7 @@ import static android.view.flags.Flags.toolkitFrameRateTouchBoost25q1;
 import static android.view.flags.Flags.toolkitFrameRateTypingReadOnly;
 import static android.view.flags.Flags.toolkitFrameRateVelocityMappingReadOnly;
 import static android.view.flags.Flags.toolkitFrameRateViewEnablingReadOnly;
+import static android.view.flags.Flags.toolkitInitialTouchBoost;
 import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
@@ -132,6 +133,7 @@ import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.enableBufferTransformHintFromDisplay;
+import static com.android.window.flags.Flags.enableWindowContextResourcesUpdateOnConfigChange;
 import static com.android.window.flags.Flags.predictiveBackSwipeEdgeNoneApi;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
@@ -273,7 +275,9 @@ import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import android.window.ScreenCapture;
 import android.window.SurfaceSyncGroup;
+import android.window.WindowContext;
 import android.window.WindowOnBackInvokedDispatcher;
+import android.window.WindowTokenClient;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -1116,9 +1120,13 @@ public final class ViewRootImpl implements ViewParent,
     private boolean mIsFrameRateConflicted = false;
     // Used to check whether SurfaceControl has been replaced.
     private boolean mSurfaceReplaced = false;
+    // Indicates whether a draw operation occurred during this frame while a touch event was active.
+    private boolean mTouchAndDrawn = false;
     // Used to set frame rate compatibility.
     @Surface.FrameRateCompatibility int mFrameRateCompatibility =
             FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
+    // time for initial touch boost period.
+    private static final int FRAME_RATE_INITIAL_TOUCH_BOOST_TIME = 30;
     // time for touch boost period.
     private static final int FRAME_RATE_TOUCH_BOOST_TIME = 3000;
     // Timeout for the other frame rate boosts other than touch boost.
@@ -1220,6 +1228,7 @@ public final class ViewRootImpl implements ViewParent,
     private static boolean sSurfaceFlingerBugfixFlagValue =
             com.android.graphics.surfaceflinger.flags.Flags.vrrBugfix24q4();
     private static final boolean sEnableVrr = ViewProperties.vrr_enabled().orElse(true);
+    private static final boolean sToolkitInitialTouchBoostFlagValue = toolkitInitialTouchBoost();
 
     static {
         sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
@@ -4445,6 +4454,10 @@ public final class ViewRootImpl implements ViewParent,
         // We set the preferred frame rate and frame rate category at the end of performTraversals
         // when the values are applicable.
         if (mDrawnThisFrame) {
+            if (sToolkitInitialTouchBoostFlagValue && mIsTouchBoosting) {
+                mTouchAndDrawn = true;
+            }
+
             mDrawnThisFrame = false;
             if (!mInvalidationIdleMessagePosted && sSurfaceFlingerBugfixFlagValue) {
                 mInvalidationIdleMessagePosted = true;
@@ -6609,10 +6622,24 @@ public final class ViewRootImpl implements ViewParent,
             mActivityConfigCallback.onConfigurationChanged(overrideConfig, newDisplayId,
                     activityWindowInfo);
         } else {
-            // There is no activity callback - update the configuration right away.
+            if (enableWindowContextResourcesUpdateOnConfigChange()) {
+                // There is no activity callback - update resources for window token, if needed.
+                final WindowTokenClient windowTokenClient = getWindowTokenClient();
+                if (windowTokenClient != null) {
+                    windowTokenClient.onConfigurationChanged(
+                            mLastReportedMergedConfiguration.getMergedConfiguration(),
+                            newDisplayId == INVALID_DISPLAY ? mDisplay.getDisplayId()
+                                    : newDisplayId);
+                }
+            }
             updateConfiguration(newDisplayId);
         }
         mForceNextConfigUpdate = false;
+    }
+
+    private WindowTokenClient getWindowTokenClient() {
+        if (!(mContext instanceof WindowContext)) return null;
+        return (WindowTokenClient) mContext.getWindowContextToken();
     }
 
     /**
@@ -6728,6 +6755,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final int MSG_REFRESH_POINTER_ICON = 41;
     private static final int MSG_FRAME_RATE_SETTING = 42;
     private static final int MSG_SURFACE_REPLACED_TIMEOUT = 43;
+    private static final int MSG_INITIAL_TOUCH_BOOST_TIMEOUT = 44;
 
     final class ViewRootHandler extends Handler {
         @Override
@@ -6801,6 +6829,8 @@ public final class ViewRootImpl implements ViewParent,
                     return "MSG_FRAME_RATE_SETTING";
                 case MSG_SURFACE_REPLACED_TIMEOUT:
                     return "MSG_SURFACE_REPLACED_TIMEOUT";
+                case MSG_INITIAL_TOUCH_BOOST_TIMEOUT:
+                    return "MSG_INITIAL_TOUCH_BOOST_TIMEOUT";
             }
             return super.getMessageName(message);
         }
@@ -7075,6 +7105,17 @@ public final class ViewRootImpl implements ViewParent,
                     if (!mDrawnThisFrame) {
                         setPreferredFrameRateCategory(FRAME_RATE_CATEGORY_NO_PREFERENCE);
                     }
+                    break;
+                case MSG_INITIAL_TOUCH_BOOST_TIMEOUT:
+                    if (mTouchAndDrawn) {
+                        mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
+                        mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
+                                FRAME_RATE_TOUCH_BOOST_TIME);
+                    } else {
+                        mIsTouchBoosting = false;
+                        setPreferredFrameRateCategory(FRAME_RATE_CATEGORY_NO_PREFERENCE);
+                    }
+                    mTouchAndDrawn = false;
                     break;
                 case MSG_REFRESH_POINTER_ICON:
                     if (mPointerIconEvent == null) {
@@ -8148,9 +8189,16 @@ public final class ViewRootImpl implements ViewParent,
              */
             if (mIsTouchBoosting && (action == MotionEvent.ACTION_UP
                     || action == MotionEvent.ACTION_CANCEL)) {
-                mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
-                mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
-                        FRAME_RATE_TOUCH_BOOST_TIME);
+
+                if (sToolkitInitialTouchBoostFlagValue) {
+                    mHandler.removeMessages(MSG_INITIAL_TOUCH_BOOST_TIMEOUT);
+                    mHandler.sendEmptyMessageDelayed(MSG_INITIAL_TOUCH_BOOST_TIMEOUT,
+                            FRAME_RATE_INITIAL_TOUCH_BOOST_TIME);
+                } else {
+                    mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
+                    mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
+                            FRAME_RATE_TOUCH_BOOST_TIME);
+                }
             }
             return handled ? FINISH_HANDLED : FORWARD;
         }
@@ -9334,6 +9382,16 @@ public final class ViewRootImpl implements ViewParent,
             mVibrator = mContext.getSystemService(Vibrator.class);
         }
         return mVibrator;
+    }
+
+    /**
+     * Clears the system vibrator.
+     *
+     * <p>This method releases the reference to the system vibrator. It's crucial to call this
+     * method when the vibrator is no longer needed to prevent any potential memory leaks.
+     */
+    public void clearSystemVibrator() {
+        mVibrator = null;
     }
 
     private @Nullable AutofillManager getAutofillManager() {

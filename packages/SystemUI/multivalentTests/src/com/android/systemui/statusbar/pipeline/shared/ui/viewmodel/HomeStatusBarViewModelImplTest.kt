@@ -44,6 +44,7 @@ import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.collectValues
+import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
@@ -52,6 +53,7 @@ import com.android.systemui.mediaprojection.data.model.MediaProjectionState
 import com.android.systemui.mediaprojection.data.repository.fakeMediaProjectionRepository
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.scene.data.repository.sceneContainerRepository
+import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.screenrecord.data.model.ScreenRecordModel
 import com.android.systemui.screenrecord.data.repository.screenRecordRepository
@@ -64,6 +66,7 @@ import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.shareToAppCh
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModelTest.Companion.assertIsScreenRecordChip
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModelTest.Companion.assertIsShareToAppChip
+import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.data.model.StatusBarMode
 import com.android.systemui.statusbar.data.repository.fakeStatusBarModeRepository
 import com.android.systemui.statusbar.disableflags.data.repository.fakeDisableFlagsRepository
@@ -83,21 +86,20 @@ import com.android.systemui.statusbar.notification.shared.NotificationsLiveDataS
 import com.android.systemui.statusbar.notification.stack.data.repository.headsUpNotificationRepository
 import com.android.systemui.statusbar.phone.SysuiDarkIconDispatcher
 import com.android.systemui.statusbar.phone.data.repository.fakeDarkIconRepository
+import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.setHomeStatusBarIconBlockList
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.setHomeStatusBarInteractorShowOperatorName
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @SmallTest
-@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class HomeStatusBarViewModelImplTest : SysuiTestCase() {
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
@@ -488,7 +490,7 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
 
             kosmos.screenRecordRepository.screenRecordState.value = ScreenRecordModel.DoingNothing
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Hidden::class.java)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
 
             kosmos.fakeMediaProjectionRepository.mediaProjectionState.value =
                 MediaProjectionState.Projecting.EntireScreen(NORMAL_PACKAGE)
@@ -556,6 +558,30 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
             kosmos.sceneContainerRepository.snapToScene(Scenes.Gone)
 
             assertThat(latest).isTrue()
+        }
+
+    @Test
+    fun isHomeStatusBarAllowedByScene_sceneGoneWithNotificationsShadeOverlay_false() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.isHomeStatusBarAllowedByScene)
+
+            kosmos.sceneContainerRepository.snapToScene(Scenes.Gone)
+            kosmos.sceneContainerRepository.showOverlay(Overlays.NotificationsShade)
+            runCurrent()
+
+            assertThat(latest).isFalse()
+        }
+
+    @Test
+    fun isHomeStatusBarAllowedByScene_sceneGoneWithQuickSettingsShadeOverlay_false() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.isHomeStatusBarAllowedByScene)
+
+            kosmos.sceneContainerRepository.snapToScene(Scenes.Gone)
+            kosmos.sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
+            runCurrent()
+
+            assertThat(latest).isFalse()
         }
 
     @Test
@@ -648,98 +674,6 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
 
             // THEN we still show the operator name view if NoHunBehavior flag is enabled
             assertThat(latest).isTrue()
-        }
-
-    @Test
-    fun shouldHomeStatusBarBeVisible_keyguardNotGone_noHun_false() =
-        kosmos.runTest {
-            // Do not transition from keyguard. i.e., we don't call transitionKeyguardToGone()
-
-            // Nothing disabled
-            fakeDisableFlagsRepository.disableFlags.value =
-                DisableFlagsModel(DISABLE_NONE, DISABLE2_NONE)
-
-            val latest by collectLastValue(underTest.shouldHomeStatusBarBeVisible)
-            assertThat(latest).isFalse()
-        }
-
-    @Test
-    fun shouldHomeStatusBarBeVisible_keyguardNotGone_hun_true() =
-        kosmos.runTest {
-            // Keyguard gone
-            transitionKeyguardToGone()
-
-            // Nothing disabled
-            fakeDisableFlagsRepository.disableFlags.value =
-                DisableFlagsModel(DISABLE_NONE, DISABLE2_NONE)
-
-            // there is an active HUN
-            headsUpNotificationRepository.setNotifications(
-                UnconfinedFakeHeadsUpRowRepository(
-                    key = "key",
-                    pinnedStatus = MutableStateFlow(PinnedStatus.PinnedByUser),
-                )
-            )
-
-            val latest by collectLastValue(underTest.shouldHomeStatusBarBeVisible)
-            assertThat(latest).isTrue()
-        }
-
-    @Test
-    fun shouldHomeStatusBarBeVisible_keyguardGone_noHun_notInCamera_true() =
-        kosmos.runTest {
-            // Keyguard gone
-            transitionKeyguardToGone()
-
-            // Nothing disabled
-            fakeDisableFlagsRepository.disableFlags.value =
-                DisableFlagsModel(DISABLE_NONE, DISABLE2_NONE)
-
-            val latest by collectLastValue(underTest.shouldHomeStatusBarBeVisible)
-            assertThat(latest).isTrue()
-        }
-
-    @Test
-    fun shouldHomeStatusBarBeVisible_keyguardGone_hun_notInCamera_true() =
-        kosmos.runTest {
-            // Keyguard gone
-            transitionKeyguardToGone()
-
-            // Nothing disabled
-            fakeDisableFlagsRepository.disableFlags.value =
-                DisableFlagsModel(DISABLE_NONE, DISABLE2_NONE)
-
-            // there is an active HUN
-            headsUpNotificationRepository.setNotifications(
-                UnconfinedFakeHeadsUpRowRepository(
-                    key = "key",
-                    pinnedStatus = MutableStateFlow(PinnedStatus.PinnedByUser),
-                )
-            )
-
-            val latest by collectLastValue(underTest.shouldHomeStatusBarBeVisible)
-            assertThat(latest).isTrue()
-        }
-
-    @Test
-    fun shouldHomeStatusBarBeVisible_keyguardGone_noHun_inCamera_false() =
-        kosmos.runTest {
-            // Keyguard gone
-            transitionKeyguardToGone()
-
-            // Nothing disabled
-            fakeDisableFlagsRepository.disableFlags.value =
-                DisableFlagsModel(DISABLE_NONE, DISABLE2_NONE)
-
-            fakeKeyguardTransitionRepository.sendTransitionSteps(
-                from = KeyguardState.LOCKSCREEN,
-                to = KeyguardState.OCCLUDED,
-                testScope = testScope,
-            )
-            kosmos.keyguardInteractor.onCameraLaunchDetected(CAMERA_LAUNCH_SOURCE_POWER_DOUBLE_TAP)
-
-            val latest by collectLastValue(underTest.shouldHomeStatusBarBeVisible)
-            assertThat(latest).isFalse()
         }
 
     @Test
@@ -901,6 +835,23 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(StatusBarRootModernization.FLAG_NAME, StatusBarChipsModernization.FLAG_NAME)
+    fun isNotificationIconContainerVisible_anyChipShowing_ChipsModernizationOn() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.isNotificationIconContainerVisible)
+            transitionKeyguardToGone()
+
+            kosmos.screenRecordRepository.screenRecordState.value = ScreenRecordModel.Recording
+
+            assertThat(latest!!.visibility).isEqualTo(View.GONE)
+
+            kosmos.screenRecordRepository.screenRecordState.value = ScreenRecordModel.DoingNothing
+
+            assertThat(latest!!.visibility).isEqualTo(View.VISIBLE)
+        }
+
+    @Test
+    @DisableFlags(StatusBarRootModernization.FLAG_NAME, StatusBarChipsModernization.FLAG_NAME)
     @EnableFlags(StatusBarNotifChips.FLAG_NAME)
     fun isNotificationIconContainerVisible_anyChipShowing_PromotedNotifsOn() =
         kosmos.runTest {
@@ -917,8 +868,12 @@ class HomeStatusBarViewModelImplTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(StatusBarNotifChips.FLAG_NAME)
-    fun isNotificationIconContainerVisible_anyChipShowing_PromotedNotifsOff() =
+    @DisableFlags(
+        StatusBarNotifChips.FLAG_NAME,
+        StatusBarRootModernization.FLAG_NAME,
+        StatusBarChipsModernization.FLAG_NAME,
+    )
+    fun isNotificationIconContainerVisible_anyChipShowing_ChipsModernizationAndPromotedNotifsOff() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.isNotificationIconContainerVisible)
             transitionKeyguardToGone()

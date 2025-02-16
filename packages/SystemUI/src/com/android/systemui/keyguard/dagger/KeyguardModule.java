@@ -41,6 +41,7 @@ import com.android.systemui.bouncer.dagger.BouncerLoggerModule;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.classifier.FalsingModule;
+import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor;
 import com.android.systemui.communal.ui.viewmodel.CommunalTransitionViewModel;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -61,6 +62,7 @@ import com.android.systemui.keyguard.data.repository.KeyguardRepositoryModule;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionBootInteractor;
 import com.android.systemui.keyguard.domain.interactor.StartKeyguardTransitionModule;
+import com.android.systemui.keyguard.ui.binder.SideFpsProgressBarViewBinder;
 import com.android.systemui.keyguard.ui.transitions.BlurConfig;
 import com.android.systemui.keyguard.ui.transitions.DeviceEntryIconTransitionModule;
 import com.android.systemui.keyguard.ui.view.AlternateBouncerWindowViewBinder;
@@ -179,6 +181,7 @@ public interface KeyguardModule {
             SelectedUserInteractor selectedUserInteractor,
             KeyguardInteractor keyguardInteractor,
             KeyguardTransitionBootInteractor transitionBootInteractor,
+            Lazy<CommunalSceneInteractor> communalSceneInteractor,
             WindowManagerOcclusionManager windowManagerOcclusionManager) {
         return new KeyguardViewMediator(
                 context,
@@ -230,6 +233,7 @@ public interface KeyguardModule {
                 selectedUserInteractor,
                 keyguardInteractor,
                 transitionBootInteractor,
+                communalSceneInteractor,
                 windowManagerOcclusionManager);
     }
 
@@ -271,4 +275,10 @@ public interface KeyguardModule {
     @IntoMap
     @ClassKey(AlternateBouncerWindowViewBinder.class)
     CoreStartable bindsAlternateBouncerWindowViewBinder(AlternateBouncerWindowViewBinder binder);
+
+    /** A silly lint rule made me write this, this is a self-documenting function! */
+    @Binds
+    @IntoMap
+    @ClassKey(SideFpsProgressBarViewBinder.class)
+    CoreStartable bindSideFpsProgressBarViewBinder(SideFpsProgressBarViewBinder impl);
 }

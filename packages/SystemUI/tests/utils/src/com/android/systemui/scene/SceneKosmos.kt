@@ -5,6 +5,8 @@ import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.classifier.domain.interactor.falsingInteractor
 import com.android.systemui.haptics.msdl.msdlPlayer
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
+import com.android.systemui.keyguard.ui.viewmodel.aodBurnInViewModel
+import com.android.systemui.keyguard.ui.viewmodel.keyguardClockViewModel
 import com.android.systemui.keyguard.ui.viewmodel.lightRevealScrimViewModel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
@@ -15,11 +17,11 @@ import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.FakeOverlay
-import com.android.systemui.scene.ui.composable.SceneContainerTransitions
+import com.android.systemui.scene.ui.composable.ConstantSceneContainerTransitionsBuilder
 import com.android.systemui.scene.ui.viewmodel.SceneContainerHapticsViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
-import com.android.systemui.scene.ui.viewmodel.splitEdgeDetector
 import com.android.systemui.shade.domain.interactor.shadeInteractor
+import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.domain.interactor.remoteInputInteractor
 import com.android.systemui.wallpapers.ui.viewmodel.wallpaperViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +51,8 @@ val Kosmos.fakeOverlays by Fixture { fakeOverlaysByKeys.values.toSet() }
 
 val Kosmos.overlays by Fixture { fakeOverlays }
 
+val Kosmos.sceneTransitionsBuilder by Fixture { ConstantSceneContainerTransitionsBuilder() }
+
 var Kosmos.sceneContainerConfig by Fixture {
     val navigationDistances =
         mapOf(
@@ -64,9 +68,9 @@ var Kosmos.sceneContainerConfig by Fixture {
     SceneContainerConfig(
         sceneKeys = sceneKeys,
         initialSceneKey = initialSceneKey,
-        transitions = SceneContainerTransitions,
         overlayKeys = overlayKeys,
         navigationDistances = navigationDistances,
+        transitionsBuilder = sceneTransitionsBuilder,
     )
 }
 
@@ -92,9 +96,8 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 sceneInteractor = sceneInteractor,
                 falsingInteractor = falsingInteractor,
                 powerInteractor = powerInteractor,
-                shadeInteractor = shadeInteractor,
+                shadeModeInteractor = shadeModeInteractor,
                 remoteInputInteractor = remoteInputInteractor,
-                splitEdgeDetector = splitEdgeDetector,
                 logger = sceneLogger,
                 hapticsViewModelFactory = sceneContainerHapticsViewModelFactory,
                 view = view,
@@ -102,6 +105,8 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 lightRevealScrim = lightRevealScrimViewModel,
                 wallpaperViewModel = wallpaperViewModel,
                 keyguardInteractor = keyguardInteractor,
+                burnIn = aodBurnInViewModel,
+                clock = keyguardClockViewModel,
             )
     }
 }

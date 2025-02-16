@@ -307,11 +307,8 @@ public class PropertyInvalidatedCache<Query, Result> {
     @GuardedBy("mLock")
     private long mMisses = 0;
 
-    // This counter tracks the number of times {@link #recompute} returned a null value.  Null
-    // results are cached, or not, depending on instantiation arguments.  Caching nulls when they
-    // should not be cached is a functional error. Failing to cache nulls that can be cached is a
-    // performance error.  A non-zero value here means the cache should be examined to be sure
-    // that nulls are correctly cached, or not.
+    // This counter tracks the number of times {@link #recompute} returned a null value and the
+    // result was not cached.
     @GuardedBy("mLock")
     private long mNulls = 0;
 
@@ -1166,6 +1163,17 @@ public class PropertyInvalidatedCache<Query, Result> {
     }
 
     /**
+     * Return the current cache nonce.
+     * @hide
+     */
+    @VisibleForTesting
+    public long getNonce() {
+        synchronized (mLock) {
+            return mNonce.getNonce();
+        }
+    }
+
+    /**
      * Complete key prefixes.
      */
     private static final String PREFIX_TEST = CACHE_KEY_PREFIX + "." + MODULE_TEST + ".";
@@ -1317,7 +1325,7 @@ public class PropertyInvalidatedCache<Query, Result> {
 
     /**
      * Burst a property name into module and api.  Throw if the key is invalid.  This method is
-     * used in to transition legacy cache constructors to the args constructor.
+     * used to transition legacy cache constructors to the Args constructor.
      */
     private static Args argsFromProperty(@NonNull String name) {
         throwIfInvalidCacheKey(name);
@@ -1327,6 +1335,15 @@ public class PropertyInvalidatedCache<Query, Result> {
         String module = base.substring(0, dot);
         String api = base.substring(dot + 1);
         return new Args(module).api(api);
+    }
+
+    /**
+     * Return the API porting of a legacy property.  This method is used to transition caches to
+     * the Args constructor.
+     * @hide
+     */
+    public static String apiFromProperty(@NonNull String name) {
+        return argsFromProperty(name).mApi;
     }
 
     /**
@@ -1728,8 +1745,8 @@ public class PropertyInvalidatedCache<Query, Result> {
                 if (mLastSeenNonce == currentNonce) {
                     if (result != null || mCacheNullResults) {
                         mCache.put(query, result);
-                    }
-                    if (result == null) {
+                    } else if (result == null) {
+                        // The result was null and it was not cached.
                         mNulls++;
                     }
                 }
@@ -2039,11 +2056,11 @@ public class PropertyInvalidatedCache<Query, Result> {
     }
 
     /**
-     * Disable all caches in the local process.  This is primarily useful for testing when
-     * the test needs to bypass the cache or when the test is for a server, and the test
-     * process does not have privileges to write SystemProperties. Once disabled it is not
-     * possible to re-enable caching in the current process.  If a client wants to
-     * temporarily disable caching, use the corking mechanism.
+     * Disable all caches in the local process.  This is primarily useful for testing when the
+     * test needs to bypass the cache or when the test is for a server, and the test process does
+     * not have privileges to write the nonce. Once disabled it is not possible to re-enable
+     * caching in the current process.  See {@link #testPropertyName} for a more focused way to
+     * bypass caches when the test is for a server.
      * @hide
      */
     public static void disableForTestMode() {

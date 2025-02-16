@@ -16,24 +16,25 @@
 
 package com.android.systemui.window.ui.viewmodel
 
+import android.platform.test.annotations.EnableFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.lifecycle.activateIn
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-@ExperimentalCoroutinesApi
 @SmallTest
 @RunWith(AndroidJUnit4::class)
+@EnableFlags(Flags.FLAG_BOUNCER_UI_REVAMP)
 class WindowRootViewModelTest : SysuiTestCase() {
     val kosmos = testKosmos()
     val testScope = kosmos.testScope
@@ -48,12 +49,14 @@ class WindowRootViewModelTest : SysuiTestCase() {
     @Test
     fun bouncerTransitionChangesWindowBlurRadius() =
         testScope.runTest {
-            val blurState by collectLastValue(underTest.blurState)
+            val blurRadius by collectLastValue(underTest.blurRadius)
+            val isBlurOpaque by collectLastValue(underTest.isBlurOpaque)
             runCurrent()
 
             kosmos.fakeBouncerTransitions.first().windowBlurRadius.value = 30.0f
             runCurrent()
 
-            assertThat(blurState).isEqualTo(BlurState(radius = 30, isOpaque = false))
+            assertThat(blurRadius).isEqualTo(30)
+            assertThat(isBlurOpaque).isEqualTo(false)
         }
 }

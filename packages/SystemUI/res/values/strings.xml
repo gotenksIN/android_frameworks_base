@@ -2426,6 +2426,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_action_label_expand_widget">Increase height</string>
+    <!-- Label for accessibility action to show the next media player. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_action_label_umo_show_next">Show next</string>
+    <!-- Label for accessibility action to show the previous media player. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_action_label_umo_show_previous">Show previous</string>
     <!-- Title shown above information regarding lock screen widgets. [CHAR LIMIT=50] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3692,11 +3696,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="no_shortcut"><xliff:g id="app_name" example="YouTube">%1$s</xliff:g> doesn\u2019t support conversation features</string>
 
-    <!-- TODO: b/381099727 - Mark translatable once feedback layout is finalized. -->
     <!-- [CHAR LIMIT=80] Text shown in feedback button in notification guts for a bundled notification -->
-<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="notification_guts_bundle_feedback" translatable="false">Provide Bundle Feedback</string>
+    <string name="notification_guts_bundle_feedback">Feedback</string>
 
     <!-- [CHAR LIMIT=30] Text shown in button used to dismiss this single notification. -->
     <string name="notification_inline_dismiss">Dismiss</string>
@@ -5825,6 +5826,8 @@
     <string name="rear_display_accessibility_unfolded_animation">Foldable device being flipped around</string>
     <!-- Text for a dialog telling the user that the front screen is turned on. [CHAR_LIMIT=NONE] -->
     <string name="rear_display_unfolded_front_screen_on">Front screen turned on</string>
+    <!-- Text for a dialog telling the user that sliding the progress bar cancels rear display mode, bringing the system contents back to the inner display. [CHAR_LIMIT=NONE] -->
+    <string name="rear_display_unfolded_front_screen_on_slide_to_cancel">Slide to use inner screen</string>
 
     <!-- QuickSettings: Additional label for the auto-rotation quicksettings tile indicating that the setting corresponds to the folded posture for a foldable device [CHAR LIMIT=32] -->
     <string name="quick_settings_rotation_posture_folded">folded</string>

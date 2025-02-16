@@ -17,8 +17,6 @@
 package com.android.systemui.qs.tiles
 
 import android.os.Handler
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.FlagsParameterization
 import android.platform.test.flag.junit.FlagsParameterization.allCombinationsOf
 import android.service.quicksettings.Tile
@@ -26,24 +24,19 @@ import android.testing.TestableLooper
 import android.testing.TestableLooper.RunWithLooper
 import androidx.test.filters.SmallTest
 import com.android.internal.logging.MetricsLogger
-import com.android.systemui.Flags.FLAG_SCENE_CONTAINER
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.classifier.FalsingManagerFake
-import com.android.systemui.keyguard.KeyguardWmStateRefactor
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.qs.QSHost
 import com.android.systemui.qs.QsEventLogger
 import com.android.systemui.qs.flags.QSComposeFragment
-import com.android.systemui.qs.flags.QsDetailedView
 import com.android.systemui.qs.logging.QSLogger
 import com.android.systemui.qs.tiles.dialog.InternetDetailsViewModel
 import com.android.systemui.qs.tiles.dialog.InternetDialogManager
 import com.android.systemui.qs.tiles.dialog.WifiStateWorker
 import com.android.systemui.res.R
-import com.android.systemui.shade.shared.flag.DualShade
 import com.android.systemui.statusbar.connectivity.AccessPointController
-import com.android.systemui.statusbar.notification.shared.NotificationThrottleHun
 import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
 import com.android.systemui.statusbar.pipeline.ethernet.domain.EthernetInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.FakeMobileIconsInteractor
@@ -58,7 +51,6 @@ import com.android.systemui.statusbar.pipeline.wifi.shared.model.WifiNetworkMode
 import com.android.systemui.statusbar.pipeline.wifi.shared.model.WifiScanEntry
 import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -76,7 +68,6 @@ import org.mockito.kotlin.whenever
 import platform.test.runner.parameterized.ParameterizedAndroidJunit4
 import platform.test.runner.parameterized.Parameters
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
 @RunWithLooper(setAsMainLooper = true)
 @RunWith(ParameterizedAndroidJunit4::class)
@@ -147,7 +138,7 @@ class InternetTileNewImplTest(flags: FlagsParameterization) : SysuiTestCase() {
                 dialogManager,
                 wifiStateWorker,
                 accessPointController,
-                internetDetailsViewModelFactory
+                internetDetailsViewModelFactory,
             )
 
         underTest.initialize()
@@ -272,45 +263,6 @@ class InternetTileNewImplTest(flags: FlagsParameterization) : SysuiTestCase() {
         looper.processAllMessages()
 
         verify(wifiStateWorker, times(1)).isWifiEnabled = eq(true)
-    }
-
-    @Test
-    @DisableFlags(QsDetailedView.FLAG_NAME)
-    fun click_withQsDetailedViewDisabled() {
-        underTest.click(null)
-        looper.processAllMessages()
-
-        verify(dialogManager, times(1))
-            .create(
-                aboveStatusBar = true,
-                accessPointController.canConfigMobileData(),
-                accessPointController.canConfigWifi(),
-                null,
-            )
-    }
-
-    @Test
-    @EnableFlags(
-        value =
-            [
-                QsDetailedView.FLAG_NAME,
-                FLAG_SCENE_CONTAINER,
-                KeyguardWmStateRefactor.FLAG_NAME,
-                NotificationThrottleHun.FLAG_NAME,
-                DualShade.FLAG_NAME,
-            ]
-    )
-    fun click_withQsDetailedViewEnabled() {
-        underTest.click(null)
-        looper.processAllMessages()
-
-        verify(dialogManager, times(0))
-            .create(
-                aboveStatusBar = true,
-                accessPointController.canConfigMobileData(),
-                accessPointController.canConfigWifi(),
-                null,
-            )
     }
 
     companion object {

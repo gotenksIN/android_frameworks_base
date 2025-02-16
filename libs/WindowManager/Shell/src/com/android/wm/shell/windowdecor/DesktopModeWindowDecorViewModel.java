@@ -904,13 +904,14 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
          * Whether to pilfer the next motion event to send cancellations to the windows below.
          * Useful when the caption window is spy and the gesture should be handled by the system
          * instead of by the app for their custom header content.
-         * Should not have any effect when {@link Flags#enableAccessibleCustomHeaders()}, because
-         * a spy window is not used then.
+         * Should not have any effect when
+         * {@link DesktopModeFlags#ENABLE_ACCESSIBLE_CUSTOM_HEADERS}, because a spy window is not
+         * used then.
          */
         private boolean mIsCustomHeaderGesture;
         private boolean mIsResizeGesture;
         private boolean mIsDragging;
-        private boolean mTouchscreenInUse;
+        private boolean mLongClickDisabled;
         private int mDragPointerId = -1;
         private MotionEvent mMotionEvent;
 
@@ -974,7 +975,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 //  should shared with the maximize menu's maximize/restore actions.
                 final DesktopRepository desktopRepository = mDesktopUserRepositories.getProfile(
                         decoration.mTaskInfo.userId);
-                if (Flags.enableFullyImmersiveInDesktop()
+                if (DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue()
                         && desktopRepository.isTaskInFullImmersiveState(
                                 decoration.mTaskInfo.taskId)) {
                     // Task is in immersive and should exit.
@@ -996,10 +997,12 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             mMotionEvent = e;
             final int id = v.getId();
             final DesktopModeWindowDecoration decoration = mWindowDecorByTaskId.get(mTaskId);
-            if ((e.getSource() & SOURCE_TOUCHSCREEN) == SOURCE_TOUCHSCREEN) {
-                mTouchscreenInUse = e.getActionMasked() != ACTION_UP
-                        && e.getActionMasked() != ACTION_CANCEL;
-            }
+            final boolean touchscreenSource =
+                    (e.getSource() & SOURCE_TOUCHSCREEN) == SOURCE_TOUCHSCREEN;
+            // Disable long click during events from a non-touchscreen source
+            mLongClickDisabled = !touchscreenSource && e.getActionMasked() != ACTION_UP
+                    && e.getActionMasked() != ACTION_CANCEL;
+
             if (id != R.id.caption_handle && id != R.id.desktop_mode_caption
                     && id != R.id.open_menu_button && id != R.id.close_window
                     && id != R.id.maximize_window && id != R.id.minimize_window) {
@@ -1047,7 +1050,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 return false;
             }
             if (mInputManager != null
-                    && !Flags.enableAccessibleCustomHeaders()) {
+                    && !DesktopModeFlags.ENABLE_ACCESSIBLE_CUSTOM_HEADERS.isTrue()) {
                 ViewRootImpl viewRootImpl = v.getViewRootImpl();
                 if (viewRootImpl != null) {
                     // Pilfer so that windows below receive cancellations for this gesture.
@@ -1069,7 +1072,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         @Override
         public boolean onLongClick(View v) {
             final int id = v.getId();
-            if (id == R.id.maximize_window && mTouchscreenInUse) {
+            if (id == R.id.maximize_window && !mLongClickDisabled) {
                 final DesktopModeWindowDecoration decoration = mWindowDecorByTaskId.get(mTaskId);
                 moveTaskToFront(decoration.mTaskInfo);
                 if (decoration.isMaximizeMenuActive()) {
@@ -1658,8 +1661,9 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         if (mDesktopModeCompatPolicy.isTopActivityExemptFromDesktopWindowing(taskInfo)) {
             return false;
         }
-        final boolean isOnLargeScreen = taskInfo.getConfiguration().smallestScreenWidthDp
-                >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP;
+        final boolean isOnLargeScreen =
+                mDisplayController.getDisplay(taskInfo.displayId).getMinSizeDimensionDp()
+                        >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP;
         if (!DesktopModeStatus.canEnterDesktopMode(mContext)
                 && DesktopModeStatus.overridesShowAppHandle(mContext) && !isOnLargeScreen) {
             // Devices with multiple screens may enable the app handle but it should not show on
@@ -1710,7 +1714,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                         mWindowDecorViewHostSupplier,
                         mMultiInstanceHelper,
                         mWindowDecorCaptionHandleRepository,
-                        mDesktopModeEventLogger);
+                        mDesktopModeEventLogger,
+                        mDesktopModeCompatPolicy);
         mWindowDecorByTaskId.put(taskInfo.taskId, windowDecoration);
 
         final TaskPositioner taskPositioner = mTaskPositionerFactory.create(
@@ -1991,7 +1996,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     continue;
                 }
                 if (decor.mTaskInfo.displayId == displayId
-                        && Flags.enableDesktopWindowingImmersiveHandleHiding()) {
+                        && DesktopModeFlags
+                        .ENABLE_DESKTOP_WINDOWING_IMMERSIVE_HANDLE_HIDING.isTrue()) {
                     decor.onInsetsStateChanged(insetsState);
                 }
                 if (!DesktopModeFlags.ENABLE_HANDLE_INPUT_FIX.isTrue()) {

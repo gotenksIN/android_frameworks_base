@@ -33,7 +33,6 @@ import android.window.WindowContainerTransaction
 import androidx.annotation.VisibleForTesting
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.protolog.ProtoLog
-import com.android.window.flags.Flags
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.freeform.FreeformTaskTransitionHandler
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter
@@ -53,7 +52,7 @@ class DesktopMixedTransitionHandler(
     private val freeformTaskTransitionHandler: FreeformTaskTransitionHandler,
     private val closeDesktopTaskTransitionHandler: CloseDesktopTaskTransitionHandler,
     private val desktopImmersiveController: DesktopImmersiveController,
-    private val desktopBackNavigationTransitionHandler: DesktopBackNavigationTransitionHandler,
+    private val desktopMinimizationTransitionHandler: DesktopMinimizationTransitionHandler,
     private val interactionJankMonitor: InteractionJankMonitor,
     @ShellMainThread private val handler: Handler,
     shellInit: ShellInit,
@@ -105,7 +104,7 @@ class DesktopMixedTransitionHandler(
         exitingImmersiveTask: Int? = null,
     ): IBinder {
         if (
-            !Flags.enableFullyImmersiveInDesktop() &&
+            !DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue &&
                 !DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS_BUGFIX.isTrue
         ) {
             return transitions.startTransition(transitionType, wct, /* handler= */ null)
@@ -317,8 +316,8 @@ class DesktopMixedTransitionHandler(
             )
         }
 
-        // Animate minimizing desktop task transition with [DesktopBackNavigationTransitionHandler].
-        return desktopBackNavigationTransitionHandler.startAnimation(
+        // Animate minimizing desktop task transition with [DesktopMinimizationTransitionHandler].
+        return desktopMinimizationTransitionHandler.startAnimation(
             transition,
             info,
             startTransaction,

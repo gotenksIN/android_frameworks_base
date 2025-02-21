@@ -250,8 +250,12 @@ final class InstallPackageHelper {
     private final UpdateOwnershipHelper mUpdateOwnershipHelper;
 // QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     private static final String PROPERTY_NO_RIL = "ro.radio.noril";
+// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
+// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
 
     private static final String PROPERTY_QSPA_Enabled = "ro.boot.vendor.qspa";
+// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
+// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     /**
      * Tracks packages that need to be disabled.
      * Map of package name to its path on the file system.
@@ -3883,14 +3887,22 @@ final class InstallPackageHelper {
 
 // QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     /**
+// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
+// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
      * Read the list of telephony packages that need to be disabled.
+// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
+// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
      *
      * For wifi-only devices (modem-less), telephony related applications do not need to run.
      * This method will read the list of packages from a predefined file in the file system,
      * and store it in {@link #mPackagesToBeDisabled}. These applications will be skipped when
      * directories are scanned later.
      */
+// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
+// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
     protected void readListOfTelephonyPackagesToBeDisabled() {
+// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
+// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         boolean wifiOnly = SystemProperties.getBoolean(PROPERTY_NO_RIL, false);
         if (!wifiOnly) {
             // Apps need to be disabled only for modem-less devices
@@ -3952,6 +3964,7 @@ final class InstallPackageHelper {
     }
 
 // QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
+// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
 
     /**
      * Read the list of packages that need to be disabled.
@@ -4073,6 +4086,7 @@ final class InstallPackageHelper {
         }
     }
 
+// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
     /**
      * Make sure all system apps that we expected to appear on
      * the userdata partition actually showed up. If they never

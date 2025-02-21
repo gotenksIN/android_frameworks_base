@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-02-10: Core: Add copyright markings am: d7be74277a am: d7be74277a
  /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-02-10: Core: Add copyright markings am: d7be74277a am: d7be74277a
 
 package com.android.server.pm;
 

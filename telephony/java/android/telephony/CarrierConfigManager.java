@@ -2204,7 +2204,9 @@ public class CarrierConfigManager {
             "show_precise_failed_cause_bool";
 
 
+// QTI_BEGIN: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
     /**
+// QTI_END: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
      * A list of carrier nr availability is used to determine whether the carrier enable the
      * non-standalone (NSA) mode of 5G NR, standalone (SA) mode of 5G NR
      *
@@ -2216,7 +2218,9 @@ public class CarrierConfigManager {
      * If the carrier doesn't support 5G NR, the value is the empty array.
      * If the key is invalid or not configured, the default value {
      * {@link #CARRIER_NR_AVAILABILITY_NSA},{@link #CARRIER_NR_AVAILABILITY_SA}} will apply.
+// QTI_BEGIN: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
      */
+// QTI_END: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
     public static final String KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY =
             "carrier_nr_availabilities_int_array";
 
@@ -2715,14 +2719,18 @@ public class CarrierConfigManager {
     public static final String KEY_ALLOW_ADD_CALL_DURING_VIDEO_CALL_BOOL =
             "allow_add_call_during_video_call";
 
+// QTI_BEGIN: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
     /**
+// QTI_END: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
      * When {@code true}, indicates that video calls can be put on hold in order to swap to another
      * call (e.g. a new outgoing call).
      * When {@code false}, indicates that video calls will be disconnected when swapping to another
      * call.
      * <p>
      * This is {@code true} by default.
+// QTI_BEGIN: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
      */
+// QTI_END: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
     public static final String KEY_ALLOW_HOLD_VIDEO_CALL_BOOL = "allow_hold_video_call_bool";
 
     /**

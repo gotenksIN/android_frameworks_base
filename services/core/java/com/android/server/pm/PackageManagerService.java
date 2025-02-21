@@ -2151,10 +2151,12 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mStorageEventHelper = new StorageEventHelper(this, mDeletePackageHelper,
                 mRemovePackageHelper);
 
+// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
         t.traceBegin("readListOfTelephonyPackagesToBeDisabled");
         mInstallPackageHelper.readListOfTelephonyPackagesToBeDisabled();
         t.traceEnd();
 
+// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
 // QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         t.traceBegin("readListOfPackagesToBeDisabled");
         mInstallPackageHelper.readListOfPackagesToBeDisabled();

@@ -405,13 +405,17 @@ public abstract class Connection extends Conferenceable {
     /** Call supports the deflect feature. */
     public static final int CAPABILITY_SUPPORT_DEFLECT = 0x02000000;
 
+// QTI_BEGIN: 2018-02-14: Telephony: IMS: Conference URI support.
     /**
+// QTI_END: 2018-02-14: Telephony: IMS: Conference URI support.
      * When set, indicates that this {@link Connection} supports initiation of a conference call
      * by directly adding participants using {@link #onAddConferenceParticipants(List)}. When
      * participants are added to a {@link Connection}, it will be replaced by a {@link Conference}
      * instance with {@link #PROPERTY_IS_ADHOC_CONFERENCE} set to indicate that it is an adhoc
      * conference call.
+// QTI_BEGIN: 2018-02-14: Telephony: IMS: Conference URI support.
      */
+// QTI_END: 2018-02-14: Telephony: IMS: Conference URI support.
 // QTI_BEGIN: 2018-02-27: Telephony: PPR1.180219.001_AOSP_Merge
     public static final int CAPABILITY_ADD_PARTICIPANT = 0x04000000;
 // QTI_END: 2018-02-27: Telephony: PPR1.180219.001_AOSP_Merge
@@ -432,9 +436,13 @@ public abstract class Connection extends Conferenceable {
      */
     public static final int CAPABILITY_TRANSFER_CONSULTATIVE = 0x10000000;
 
+// QTI_BEGIN: 2018-05-21: Telephony: IMS: Propagate RTT capability of the called party to UI
     /**
+// QTI_END: 2018-05-21: Telephony: IMS: Propagate RTT capability of the called party to UI
      * Indicates whether the remote party supports RTT or not to the UI.
+// QTI_BEGIN: 2018-05-21: Telephony: IMS: Propagate RTT capability of the called party to UI
      */
+// QTI_END: 2018-05-21: Telephony: IMS: Propagate RTT capability of the called party to UI
 
     public static final int CAPABILITY_REMOTE_PARTY_SUPPORTS_RTT = 0x20000000;
 

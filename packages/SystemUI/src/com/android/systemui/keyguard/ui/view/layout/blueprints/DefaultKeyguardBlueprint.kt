@@ -15,12 +15,14 @@
  *
  */
 
+// QTI_BEGIN: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
 package com.android.systemui.keyguard.ui.view.layout.blueprints
 
 import com.android.systemui.dagger.SysUISingleton
@@ -32,7 +34,9 @@ import com.android.systemui.keyguard.ui.view.layout.sections.AodNotificationIcon
 import com.android.systemui.keyguard.ui.view.layout.sections.AodPromotedNotificationSection
 import com.android.systemui.keyguard.ui.view.layout.sections.ClockSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultDeviceEntrySection
+// QTI_BEGIN: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultEmergencyButtonSection
+// QTI_END: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultIndicationAreaSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultNotificationStackScrollLayoutSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultSettingsPopupMenuSection
@@ -73,7 +77,9 @@ constructor(
     smartspaceSection: SmartspaceSection,
     keyguardSliceViewSection: KeyguardSliceViewSection,
     udfpsAccessibilityOverlaySection: DefaultUdfpsAccessibilityOverlaySection,
+// QTI_BEGIN: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
     defaultEmergencyButtonSection: DefaultEmergencyButtonSection,
+// QTI_END: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
 ) : KeyguardBlueprint {
     override val id: String = DEFAULT
 
@@ -93,7 +99,9 @@ constructor(
             clockSection,
             keyguardSliceViewSection,
             defaultDeviceEntrySection,
+// QTI_BEGIN: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
             defaultEmergencyButtonSection,
+// QTI_END: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
             udfpsAccessibilityOverlaySection, // Add LAST: Intentionally has z-order above others
         )
 

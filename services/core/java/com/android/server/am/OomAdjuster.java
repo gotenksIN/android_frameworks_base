@@ -2174,7 +2174,7 @@ public class OomAdjuster {
                                + app.processName + ", renderThreadTid: " + app.getRenderThreadTid());
 // QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
                         if (mPerfHandle >= 0) {
-                            mPerfBoost.perfLockRelease();
+                            mPerfBoost.perfLockReleaseHandler(mPerfHandle);
                             mPerfHandle = -1;
                         }
                         mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_BOOST_RENDERTHREAD,

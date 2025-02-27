@@ -280,15 +280,6 @@ public class Process {
      */
     public static final int INET_GID = 3003;
 
-// QTI_BEGIN: 2023-10-10: Data: CACert Framework UID changes
-    /**
-     * Defines the UID/GID for the vendor based data process.
-     * This is used to register AIDL service from vendor app context.
-     * @hide
-     */
-    public static final int VENDOR_DATA_UID = 2918;
-
-// QTI_END: 2023-10-10: Data: CACert Framework UID changes
     /** {@hide} */
     public static final int NOBODY_UID = 9999;
 

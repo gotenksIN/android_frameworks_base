@@ -376,9 +376,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private static final int SE_UID = Process.SE_UID;
     private static final int NETWORKSTACK_UID = Process.NETWORK_STACK_UID;
     private static final int UWB_UID = Process.UWB_UID;
-// QTI_BEGIN: 2023-10-10: Data: CACert Framework UID changes
-    private static final int VENDOR_DATA_UID = Process.VENDOR_DATA_UID;
-// QTI_END: 2023-10-10: Data: CACert Framework UID changes
 
     static final int SCAN_NO_DEX = 1 << 0;
     static final int SCAN_UPDATE_SIGNATURE = 1 << 1;
@@ -2069,10 +2066,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
         mSettings.addSharedUserLPw("android.uid.uwb", UWB_UID,
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
-// QTI_BEGIN: 2023-10-10: Data: CACert Framework UID changes
-        mSettings.addSharedUserLPw("android.uid.vendordata", VENDOR_DATA_UID,
-                ApplicationInfo.PRIVATE_FLAG_VENDOR, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
-// QTI_END: 2023-10-10: Data: CACert Framework UID changes
+
         final ArrayMap<String, Integer> oemDefinedUids = systemConfig.getOemDefinedUids();
         final int numOemDefinedUids = oemDefinedUids.size();
         for (int i = 0; i < numOemDefinedUids; i++) {

@@ -33,7 +33,9 @@ import android.util.MathUtils
 import android.util.TypedValue
 import android.view.View.MeasureSpec.EXACTLY
 import android.view.animation.Interpolator
+import android.view.animation.PathInterpolator
 import android.widget.TextView
+import com.android.app.animation.Interpolators
 import com.android.internal.annotations.VisibleForTesting
 import com.android.systemui.animation.GSFAxes
 import com.android.systemui.animation.TextAnimator
@@ -84,17 +86,20 @@ open class SimpleDigitalClockTextView(
             else -> listOf(FLEX_AOD_SMALL_WEIGHT_AXIS, FLEX_AOD_WIDTH_AXIS)
         }
 
-    private var lsFontVariation =
-        if (!isLegacyFlex) listOf(LS_WEIGHT_AXIS, WIDTH_AXIS, ROUND_AXIS, SLANT_AXIS).toFVar()
-        else listOf(FLEX_LS_WEIGHT_AXIS, FLEX_LS_WIDTH_AXIS, FLEX_ROUND_AXIS, SLANT_AXIS).toFVar()
+    private var lsFontVariation: String
+    private var aodFontVariation: String
+    private var fidgetFontVariation: String
 
-    private var aodFontVariation = run {
+    init {
         val roundAxis = if (!isLegacyFlex) ROUND_AXIS else FLEX_ROUND_AXIS
-        (fixedAodAxes + listOf(roundAxis, SLANT_AXIS)).toFVar()
-    }
+        val lsFontAxes =
+            if (!isLegacyFlex) listOf(LS_WEIGHT_AXIS, WIDTH_AXIS, ROUND_AXIS, SLANT_AXIS)
+            else listOf(FLEX_LS_WEIGHT_AXIS, FLEX_LS_WIDTH_AXIS, FLEX_ROUND_AXIS, SLANT_AXIS)
 
-    // TODO(b/374306512): Fidget endpoint to spec
-    private var fidgetFontVariation = aodFontVariation
+        lsFontVariation = lsFontAxes.toFVar()
+        aodFontVariation = (fixedAodAxes + listOf(roundAxis, SLANT_AXIS)).toFVar()
+        fidgetFontVariation = buildFidgetVariation(lsFontAxes).toFVar()
+    }
 
     private val parser = DimensionParser(clockCtx.context)
     var maxSingleDigitHeight = -1
@@ -121,7 +126,7 @@ open class SimpleDigitalClockTextView(
     protected val logger = ClockLogger(this, clockCtx.messageBuffer, this::class.simpleName!!)
         get() = field ?: ClockLogger.INIT_LOGGER
 
-    private var aodDozingInterpolator: Interpolator? = null
+    private var aodDozingInterpolator: Interpolator = Interpolators.LINEAR
 
     @VisibleForTesting lateinit var textAnimator: TextAnimator
 
@@ -149,7 +154,7 @@ open class SimpleDigitalClockTextView(
         lockscreenColor = color
         lockScreenPaint.color = lockscreenColor
         if (dozeFraction < 1f) {
-            textAnimator.setTextStyle(color = lockscreenColor, animate = false)
+            textAnimator.setTextStyle(TextAnimator.Style(color = lockscreenColor))
         }
         invalidate()
     }
@@ -157,10 +162,8 @@ open class SimpleDigitalClockTextView(
     fun updateAxes(lsAxes: List<ClockFontAxisSetting>) {
         lsFontVariation = lsAxes.toFVar()
         aodFontVariation = lsAxes.replace(fixedAodAxes).toFVar()
-        logger.i({ "updateAxes(LS = $str1, AOD = $str2)" }) {
-            str1 = lsFontVariation
-            str2 = aodFontVariation
-        }
+        fidgetFontVariation = buildFidgetVariation(lsAxes).toFVar()
+        logger.updateAxes(lsFontVariation, aodFontVariation)
 
         lockScreenPaint.typeface = typefaceCache.getTypefaceForVariant(lsFontVariation)
         typeface = lockScreenPaint.typeface
@@ -168,11 +171,26 @@ open class SimpleDigitalClockTextView(
         lockScreenPaint.getTextBounds(text, 0, text.length, textBounds)
         targetTextBounds.set(textBounds)
 
-        textAnimator.setTextStyle(fvar = lsFontVariation, animate = false)
+        textAnimator.setTextStyle(TextAnimator.Style(fVar = lsFontVariation))
         measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED)
         recomputeMaxSingleDigitSizes()
         requestLayout()
         invalidate()
+    }
+
+    fun buildFidgetVariation(axes: List<ClockFontAxisSetting>): List<ClockFontAxisSetting> {
+        val result = mutableListOf<ClockFontAxisSetting>()
+        for (axis in axes) {
+            result.add(
+                FIDGET_DISTS.get(axis.key)?.let { (dist, midpoint) ->
+                    ClockFontAxisSetting(
+                        axis.key,
+                        axis.value + dist * if (axis.value > midpoint) -1 else 1,
+                    )
+                } ?: axis
+            )
+        }
+        return result
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -197,43 +215,7 @@ open class SimpleDigitalClockTextView(
             )
         }
 
-        var expectedWidth: Int
-        var expectedHeight: Int
-
-        if (MeasureSpec.getMode(heightMeasureSpec) == EXACTLY) {
-            // For view which has fixed height, e.g. small clock,
-            // we should always return the size required from parent view
-            expectedHeight = heightMeasureSpec
-        } else {
-            expectedHeight =
-                MeasureSpec.makeMeasureSpec(
-                    if (isSingleDigit()) {
-                        maxSingleDigitHeight
-                    } else {
-                        textBounds.height() + 2 * lockScreenPaint.strokeWidth.toInt()
-                    },
-                    MeasureSpec.getMode(measuredHeightAndState),
-                )
-        }
-
-        if (MeasureSpec.getMode(widthMeasureSpec) == EXACTLY) {
-            expectedWidth = widthMeasureSpec
-        } else {
-            expectedWidth =
-                MeasureSpec.makeMeasureSpec(
-                    if (isSingleDigit()) {
-                        maxSingleDigitWidth
-                    } else {
-                        max(
-                            textBounds.width() + 2 * lockScreenPaint.strokeWidth.toInt(),
-                            MeasureSpec.getSize(measuredWidthAndState),
-                        )
-                    },
-                    MeasureSpec.getMode(measuredWidthAndState),
-                )
-        }
-
-        setMeasuredDimension(expectedWidth, expectedHeight)
+        setInterpolatedViewBounds(getInterpolatedTextBounds(), widthMeasureSpec, heightMeasureSpec)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -276,40 +258,54 @@ open class SimpleDigitalClockTextView(
 
     fun animateDoze(isDozing: Boolean, isAnimated: Boolean) {
         if (!this::textAnimator.isInitialized) return
+        logger.animateDoze()
         textAnimator.setTextStyle(
-            animate = isAnimated && isAnimationEnabled,
-            color = if (isDozing) AOD_COLOR else lockscreenColor,
-            textSize = if (isDozing) aodFontSizePx else lockScreenPaint.textSize,
-            fvar = if (isDozing) aodFontVariation else lsFontVariation,
-            duration = aodStyle.transitionDuration,
-            interpolator = aodDozingInterpolator,
+            TextAnimator.Style(
+                fVar = if (isDozing) aodFontVariation else lsFontVariation,
+                color = if (isDozing) AOD_COLOR else lockscreenColor,
+                textSize = if (isDozing) aodFontSizePx else lockScreenPaint.textSize,
+            ),
+            TextAnimator.Animation(
+                animate = isAnimated && isAnimationEnabled,
+                duration = aodStyle.transitionDuration,
+                interpolator = aodDozingInterpolator,
+            ),
         )
         updateTextBoundsForTextAnimator()
     }
 
     fun animateCharge() {
-        if (!this::textAnimator.isInitialized || textAnimator.isRunning()) {
+        if (!this::textAnimator.isInitialized || textAnimator.isRunning) {
             // Skip charge animation if dozing animation is already playing.
             return
         }
-        logger.d("animateCharge()")
+        logger.animateCharge()
+
+        val lsStyle = TextAnimator.Style(fVar = lsFontVariation)
+        val aodStyle = TextAnimator.Style(fVar = aodFontVariation)
+
         textAnimator.setTextStyle(
-            fvar = if (dozeFraction == 0F) aodFontVariation else lsFontVariation,
-            animate = isAnimationEnabled,
-            onAnimationEnd =
-                Runnable {
+            if (dozeFraction == 0f) aodStyle else lsStyle,
+            TextAnimator.Animation(
+                animate = isAnimationEnabled,
+                duration = CHARGE_ANIMATION_DURATION,
+                onAnimationEnd = {
                     textAnimator.setTextStyle(
-                        fvar = if (dozeFraction == 0F) lsFontVariation else aodFontVariation,
-                        animate = isAnimationEnabled,
+                        if (dozeFraction == 0f) lsStyle else aodStyle,
+                        TextAnimator.Animation(
+                            animate = isAnimationEnabled,
+                            duration = CHARGE_ANIMATION_DURATION,
+                        ),
                     )
                     updateTextBoundsForTextAnimator()
                 },
+            ),
         )
         updateTextBoundsForTextAnimator()
     }
 
     fun animateFidget(x: Float, y: Float) {
-        if (!this::textAnimator.isInitialized || textAnimator.isRunning()) {
+        if (!this::textAnimator.isInitialized || textAnimator.isRunning) {
             // Skip fidget animation if other animation is already playing.
             return
         }
@@ -317,19 +313,25 @@ open class SimpleDigitalClockTextView(
         logger.animateFidget(x, y)
         clockCtx.vibrator?.vibrate(FIDGET_HAPTICS)
 
-        // TODO(b/374306512): Duplicated charge animation as placeholder. Implement final version
-        // when we have a complete spec. May require additional code to animate individual digits.
+        // TODO(b/374306512): Delay each glyph's animation based on x/y position
         textAnimator.setTextStyle(
-            fvar = fidgetFontVariation,
-            animate = isAnimationEnabled,
-            onAnimationEnd =
-                Runnable {
+            TextAnimator.Style(fVar = fidgetFontVariation),
+            TextAnimator.Animation(
+                animate = isAnimationEnabled,
+                duration = FIDGET_ANIMATION_DURATION,
+                interpolator = FIDGET_INTERPOLATOR,
+                onAnimationEnd = {
                     textAnimator.setTextStyle(
-                        fvar = if (dozeFraction == 0F) lsFontVariation else aodFontVariation,
-                        animate = isAnimationEnabled,
+                        TextAnimator.Style(fVar = lsFontVariation),
+                        TextAnimator.Animation(
+                            animate = isAnimationEnabled,
+                            duration = FIDGET_ANIMATION_DURATION,
+                            interpolator = FIDGET_INTERPOLATOR,
+                        ),
                     )
                     updateTextBoundsForTextAnimator()
                 },
+            ),
         )
         updateTextBoundsForTextAnimator()
     }
@@ -359,47 +361,58 @@ open class SimpleDigitalClockTextView(
             id == R.id.MINUTE_SECOND_DIGIT
     }
 
-    private fun updateInterpolatedTextBounds(): Rect {
-        val interpolatedTextBounds = Rect()
-        if (textAnimator.animator.animatedFraction != 1.0f && textAnimator.animator.isRunning) {
-            interpolatedTextBounds.left =
-                MathUtils.lerp(
-                        prevTextBounds.left,
-                        targetTextBounds.left,
-                        textAnimator.animator.animatedValue as Float,
-                    )
-                    .toInt()
-
-            interpolatedTextBounds.right =
-                MathUtils.lerp(
-                        prevTextBounds.right,
-                        targetTextBounds.right,
-                        textAnimator.animator.animatedValue as Float,
-                    )
-                    .toInt()
-
-            interpolatedTextBounds.top =
-                MathUtils.lerp(
-                        prevTextBounds.top,
-                        targetTextBounds.top,
-                        textAnimator.animator.animatedValue as Float,
-                    )
-                    .toInt()
-
-            interpolatedTextBounds.bottom =
-                MathUtils.lerp(
-                        prevTextBounds.bottom,
-                        targetTextBounds.bottom,
-                        textAnimator.animator.animatedValue as Float,
-                    )
-                    .toInt()
-        } else {
-            interpolatedTextBounds.set(targetTextBounds)
+    private fun getInterpolatedTextBounds(): Rect {
+        val progress = textAnimator.animator?.let { it.animatedValue as Float } ?: 1f
+        if (!textAnimator.isRunning || progress >= 1f) {
+            return Rect(targetTextBounds)
         }
+
+        val interpolatedTextBounds = Rect()
+        interpolatedTextBounds.left =
+            MathUtils.lerp(prevTextBounds.left, targetTextBounds.left, progress).toInt()
+        interpolatedTextBounds.right =
+            MathUtils.lerp(prevTextBounds.right, targetTextBounds.right, progress).toInt()
+        interpolatedTextBounds.top =
+            MathUtils.lerp(prevTextBounds.top, targetTextBounds.top, progress).toInt()
+        interpolatedTextBounds.bottom =
+            MathUtils.lerp(prevTextBounds.bottom, targetTextBounds.bottom, progress).toInt()
         return interpolatedTextBounds
     }
 
-    private fun updateXtranslation(inPoint: Point, interpolatedTextBounds: Rect): Point {
+    private fun setInterpolatedViewBounds(
+        interpBounds: Rect,
+        widthMeasureSpec: Int = measuredWidthAndState,
+        heightMeasureSpec: Int = measuredHeightAndState,
+    ) {
+        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+        val widthMode = MeasureSpec.getMode(widthMeasureSpec)
+
+        val heightSpec =
+            if (heightMode == EXACTLY) {
+                heightMeasureSpec
+            } else {
+                MeasureSpec.makeMeasureSpec(
+                    if (isSingleDigit()) maxSingleDigitHeight
+                    else interpBounds.height() + 2 * lockScreenPaint.strokeWidth.toInt(),
+                    heightMode,
+                )
+            }
+
+        val widthSpec =
+            if (widthMode == EXACTLY) {
+                widthMeasureSpec
+            } else {
+                MeasureSpec.makeMeasureSpec(
+                    if (isSingleDigit()) maxSingleDigitWidth
+                    else interpBounds.width() + 2 * lockScreenPaint.strokeWidth.toInt(),
+                    widthMode,
+                )
+            }
+
+        setMeasuredDimension(widthSpec, heightSpec)
+    }
+
+    private fun updateXTranslation(inPoint: Point, interpolatedTextBounds: Rect): Point {
         when (horizontalAlignment) {
             HorizontalAlignment.LEFT -> {
                 inPoint.x = lockScreenPaint.strokeWidth.toInt() - interpolatedTextBounds.left
@@ -422,7 +435,9 @@ open class SimpleDigitalClockTextView(
     // translation of reference point of text
     // used for translation when calling textInterpolator
     private fun getLocalTranslation(): Point {
-        val interpolatedTextBounds = updateInterpolatedTextBounds()
+        val interpolatedTextBounds = getInterpolatedTextBounds()
+        setInterpolatedViewBounds(interpolatedTextBounds)
+
         val localTranslation = Point(0, 0)
         val correctedBaseline = if (baseline != -1) baseline else baselineFromMeasure
         // get the change from current baseline to expected baseline
@@ -452,7 +467,7 @@ open class SimpleDigitalClockTextView(
             }
         }
 
-        return updateXtranslation(localTranslation, interpolatedTextBounds)
+        return updateXTranslation(localTranslation, interpolatedTextBounds)
     }
 
     fun applyStyles(textStyle: FontTextStyle, aodStyle: FontTextStyle?) {
@@ -463,7 +478,7 @@ open class SimpleDigitalClockTextView(
         textStyle.lineHeight?.let { lineHeight = it.toInt() }
 
         this.aodStyle = aodStyle ?: textStyle.copy()
-        this.aodStyle.transitionInterpolator?.let { aodDozingInterpolator = it }
+        aodDozingInterpolator = this.aodStyle.transitionInterpolator ?: Interpolators.LINEAR
         lockScreenPaint.strokeWidth = textBorderWidth
         measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED)
         setInterpolatorPaint()
@@ -492,7 +507,7 @@ open class SimpleDigitalClockTextView(
         recomputeMaxSingleDigitSizes()
 
         if (this::textAnimator.isInitialized) {
-            textAnimator.setTextStyle(textSize = lockScreenPaint.textSize, animate = false)
+            textAnimator.setTextStyle(TextAnimator.Style(textSize = lockScreenPaint.textSize))
         }
     }
 
@@ -517,10 +532,11 @@ open class SimpleDigitalClockTextView(
             textAnimator.textInterpolator.targetPaint.set(lockScreenPaint)
             textAnimator.textInterpolator.onTargetPaintModified()
             textAnimator.setTextStyle(
-                fvar = lsFontVariation,
-                textSize = lockScreenPaint.textSize,
-                color = lockscreenColor,
-                animate = false,
+                TextAnimator.Style(
+                    fVar = lsFontVariation,
+                    textSize = lockScreenPaint.textSize,
+                    color = lockscreenColor,
+                )
             )
         }
     }
@@ -563,6 +579,17 @@ open class SimpleDigitalClockTextView(
                 .addPrimitive(VibrationEffect.Composition.PRIMITIVE_THUD, 1.0f, 0)
                 .addPrimitive(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 1.0f, 43)
                 .compose()
+
+        val CHARGE_ANIMATION_DURATION = 500L
+        val FIDGET_ANIMATION_DURATION = 250L
+        val FIDGET_INTERPOLATOR = PathInterpolator(0.26873f, 0f, 0.45042f, 1f)
+        val FIDGET_DISTS =
+            mapOf(
+                GSFAxes.WEIGHT to Pair(200f, 500f),
+                GSFAxes.WIDTH to Pair(30f, 75f),
+                GSFAxes.ROUND to Pair(0f, 50f),
+                GSFAxes.SLANT to Pair(0f, -5f),
+            )
 
         val AOD_COLOR = Color.WHITE
         val LS_WEIGHT_AXIS = ClockFontAxisSetting(GSFAxes.WEIGHT, 400f)

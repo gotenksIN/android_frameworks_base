@@ -34,7 +34,6 @@ import static android.os.UserHandle.USER_NULL;
 import static android.view.SurfaceControl.Transaction;
 import static android.view.WindowInsets.Type.InsetsType;
 import static android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE;
-import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.window.TaskFragmentAnimationParams.DEFAULT_ANIMATION_BACKGROUND_COLOR;
 import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION;
 
@@ -97,7 +96,6 @@ import android.view.InsetsSource;
 import android.view.InsetsState;
 import android.view.MagnificationSpec;
 import android.view.RemoteAnimationDefinition;
-import android.view.RemoteAnimationTarget;
 import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.Builder;
@@ -303,7 +301,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * This gets used during some open/close transitions as well as during a change transition
      * where it represents the starting-state snapshot.
      */
-    WindowContainerThumbnail mThumbnail;
     final Point mTmpPoint = new Point();
     protected final Rect mTmpRect = new Rect();
     final Rect mTmpPrevBounds = new Rect();
@@ -903,10 +900,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      */
     @CallSuper
     void removeImmediately() {
-        final DisplayContent dc = getDisplayContent();
-        if (dc != null) {
-            dc.mClosingChangingContainers.remove(this);
-        }
         while (!mChildren.isEmpty()) {
             final E child = mChildren.getLast();
             child.removeImmediately();
@@ -1118,10 +1111,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             if (asWindowState() == null) {
                 mTransitionController.collect(this);
             }
-            // Cancel any change transition queued-up for this container on the old display when
-            // this container is moved from the old display.
-            mDisplayContent.mClosingChangingContainers.remove(this);
-            mDisplayContent.mChangingContainers.remove(this);
         }
         mDisplayContent = dc;
         if (dc != null && dc != this && mPendingTransaction != null) {
@@ -1270,14 +1259,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
     }
 
     /**
-     * @return {@code true} when the container is waiting the app transition start, {@code false}
-     *         otherwise.
-     */
-    boolean isWaitingForTransitionStart() {
-        return false;
-    }
-
-    /**
      * @return {@code true} if in this subtree of the hierarchy we have an
      *         {@code ActivityRecord#isAnimating(TRANSITION)}, {@code false} otherwise.
      */
@@ -1302,13 +1283,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      */
     final boolean isAnimating() {
         return isAnimating(0 /* self only */);
-    }
-
-    /**
-     * @return {@code true} if the container is in changing app transition.
-     */
-    boolean isChangingAppTransition() {
-        return mDisplayContent != null && mDisplayContent.mChangingContainers.contains(this);
     }
 
     boolean inTransition() {
@@ -1427,12 +1401,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             }
         }
         return setVisibleRequested(newVisReq);
-    }
-
-    /** Whether this window is closing while resizing. */
-    boolean isClosingWhenResizing() {
-        return mDisplayContent != null
-                && mDisplayContent.mClosingChangingContainers.containsKey(this);
     }
 
     void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
@@ -2095,12 +2063,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         }
 
         return getActivity((r) -> !r.finishing && !r.isTaskOverlay());
-    }
-
-    void forAllWallpaperWindows(Consumer<WallpaperWindowToken> callback) {
-        for (int i = mChildren.size() - 1; i >= 0; --i) {
-            mChildren.get(i).forAllWallpaperWindows(callback);
-        }
     }
 
     /**
@@ -3052,36 +3014,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
                 || (getParent() != null && getParent().inPinnedWindowingMode());
     }
 
-    /**
-     * Initializes a change transition.
-     *
-     * For now, this will only be called for the following cases:
-     * 1. {@link Task} is changing windowing mode between fullscreen and freeform.
-     * 2. {@link TaskFragment} is organized and is changing window bounds.
-     * 3. {@link ActivityRecord} is reparented into an organized {@link TaskFragment}. (The
-     *    transition will happen on the {@link TaskFragment} for this case).
-     *
-     * This shouldn't be called on other {@link WindowContainer} unless there is a valid
-     * use case.
-     *
-     * @param startBounds The original bounds (on screen) of the surface we are snapshotting.
-     */
-    void initializeChangeTransition(Rect startBounds, @Nullable SurfaceControl freezeTarget) {
-        if (mDisplayContent.mTransitionController.isShellTransitionsEnabled()) {
-            mDisplayContent.mTransitionController.collectVisibleChange(this);
-            return;
-        }
-        mDisplayContent.prepareAppTransition(TRANSIT_CHANGE);
-        mDisplayContent.mChangingContainers.add(this);
-        // Calculate the relative position in parent container.
-        final Rect parentBounds = getParent().getBounds();
-        mTmpPoint.set(startBounds.left - parentBounds.left, startBounds.top - parentBounds.top);
-    }
-
-    void initializeChangeTransition(Rect startBounds) {
-        initializeChangeTransition(startBounds, null /* freezeTarget */);
-    }
-
     ArraySet<WindowContainer> getAnimationSources() {
         return mSurfaceAnimationSources;
     }
@@ -3174,61 +3106,9 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         getAnimationPosition(mTmpPoint);
         mTmpRect.offsetTo(0, 0);
 
-        final AppTransition appTransition = getDisplayContent().mAppTransition;
-        final RemoteAnimationController controller = appTransition.getRemoteAnimationController();
-        final boolean isChanging = AppTransition.isChangeTransitOld(transit) && enter
-                && isChangingAppTransition();
+        final boolean isChanging = AppTransition.isChangeTransitOld(transit);
 
-        if (controller != null) {
-            // Here we load App XML in order to read com.android.R.styleable#Animation_showBackdrop.
-            boolean showBackdrop = false;
-            // Optionally set backdrop color if App explicitly provides it through
-            // {@link Activity#overridePendingTransition(int, int, int)}.
-            @ColorInt int backdropColor = 0;
-            if (controller.isFromActivityEmbedding()) {
-                if (isChanging) {
-                    // When there are more than one changing containers, it may leave part of the
-                    // screen empty. Show background color to cover that.
-                    showBackdrop = getDisplayContent().mChangingContainers.size() > 1;
-                    backdropColor = appTransition.getNextAppTransitionBackgroundColor();
-                } else {
-                    // Check whether the app has requested to show backdrop for open/close
-                    // transition.
-                    final Animation a = appTransition.getNextAppRequestedAnimation(enter);
-                    if (a != null) {
-                        showBackdrop = a.getShowBackdrop();
-                        backdropColor = a.getBackdropColor();
-                    }
-                }
-            }
-            final Rect localBounds = new Rect(mTmpRect);
-            localBounds.offsetTo(mTmpPoint.x, mTmpPoint.y);
-            final RemoteAnimationController.RemoteAnimationRecord adapters;
-            if (!isChanging && !enter && isClosingWhenResizing()) {
-                // Container that is closing while resizing. Pass in the closing start bounds, so
-                // the animation can start with the correct bounds, there won't be a snapshot.
-                // Cleanup the mClosingChangingContainers so that when the animation is finished, it
-                // will reset the surface.
-                final Rect closingStartBounds = getDisplayContent().mClosingChangingContainers
-                        .remove(this);
-                adapters = controller.createRemoteAnimationRecord(
-                        this, mTmpPoint, localBounds, screenBounds, closingStartBounds,
-                        showBackdrop, false /* shouldCreateSnapshot */);
-            } else {
-                final Rect startBounds = null;
-                adapters = controller.createRemoteAnimationRecord(
-                        this, mTmpPoint, localBounds, screenBounds, startBounds, showBackdrop);
-            }
-            if (backdropColor != 0) {
-                adapters.setBackDropColor(backdropColor);
-            }
-            if (!isChanging) {
-                adapters.setMode(enter
-                        ? RemoteAnimationTarget.MODE_OPENING
-                        : RemoteAnimationTarget.MODE_CLOSING);
-            }
-            resultAdapters = new Pair<>(adapters.mAdapter, adapters.mThumbnailAdapter);
-        } else if (isChanging) {
+        if (isChanging) {
             final float durationScale = mWmService.getTransitionAnimationScaleLocked();
             final DisplayInfo displayInfo = getDisplayContent().getDisplayInfo();
             mTmpRect.offsetTo(mTmpPoint.x, mTmpPoint.y);
@@ -3359,7 +3239,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
 
     private Animation loadAnimation(WindowManager.LayoutParams lp, int transit, boolean enter,
                                     boolean isVoiceInteraction) {
-        if (AppTransitionController.isTaskViewTask(this) || (isOrganized()
+        if ((isOrganized()
                 // TODO(b/161711458): Clean-up when moved to shell.
                 && getWindowingMode() != WINDOWING_MODE_FULLSCREEN
                 && getWindowingMode() != WINDOWING_MODE_FREEFORM
@@ -3415,11 +3295,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             a.scaleCurrentDuration(mWmService.getTransitionAnimationScaleLocked());
         }
         return a;
-    }
-
-    RemoteAnimationTarget createRemoteAnimationTarget(
-            RemoteAnimationController.RemoteAnimationRecord record) {
-        return null;
     }
 
     boolean canCreateRemoteAnimationTarget() {
@@ -3583,9 +3458,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
                 && (mSurfaceAnimator.getAnimationType() & typesToCheck) > 0) {
             return true;
         }
-        if ((flags & TRANSITION) != 0 && isWaitingForTransitionStart()) {
-            return true;
-        }
         return false;
     }
 
@@ -3667,13 +3539,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             return;
         }
 
-        if (isClosingWhenResizing()) {
-            // This container is closing while resizing, keep its surface at the starting position
-            // to prevent animation flicker.
-            getRelativePosition(mDisplayContent.mClosingChangingContainers.get(this), mTmpPos);
-        } else {
-            getRelativePosition(mTmpPos);
-        }
+        getRelativePosition(mTmpPos);
         final int deltaRotation = getRelativeDisplayRotation();
         if (mTmpPos.equals(mLastSurfacePosition) && deltaRotation == mLastDeltaRotation) {
             return;

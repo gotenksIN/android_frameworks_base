@@ -164,6 +164,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 
 /**
  * Tests for the {@link DisplayContent} class.
@@ -1172,11 +1173,12 @@ public class DisplayContentTests extends WindowTestsBase {
                 .setScreenOrientation(getRotatedOrientation(mDisplayContent)).build();
         prev.setVisibleRequested(false);
         final ActivityRecord top = new ActivityBuilder(mAtm).setCreateTask(true)
+                .setVisible(false)
                 .setScreenOrientation(SCREEN_ORIENTATION_BEHIND).build();
         assertNotEquals(WindowConfiguration.ROTATION_UNDEFINED,
                 mDisplayContent.rotationForActivityInDifferentOrientation(top));
 
-        mDisplayContent.requestTransitionAndLegacyPrepare(WindowManager.TRANSIT_OPEN, 0);
+        requestTransition(top, WindowManager.TRANSIT_OPEN);
         top.setVisibility(true);
         mDisplayContent.updateOrientation();
         // The top uses "behind", so the orientation is decided by the previous.
@@ -1609,8 +1611,7 @@ public class DisplayContentTests extends WindowTestsBase {
         final ActivityRecord app = mAppWindow.mActivityRecord;
         app.setVisible(false);
         app.setVisibleRequested(false);
-        registerTestTransitionPlayer();
-        mDisplayContent.requestTransitionAndLegacyPrepare(WindowManager.TRANSIT_OPEN, 0);
+        requestTransition(app, WindowManager.TRANSIT_OPEN);
         app.setVisibility(true);
         final int newOrientation = getRotatedOrientation(mDisplayContent);
         app.setRequestedOrientation(newOrientation);
@@ -1799,8 +1800,7 @@ public class DisplayContentTests extends WindowTestsBase {
         final ActivityRecord app = new ActivityBuilder(mAtm).setCreateTask(true).build();
         app.setVisible(false);
         app.setState(ActivityRecord.State.RESUMED, "test");
-        mDisplayContent.prepareAppTransition(WindowManager.TRANSIT_OPEN);
-        mDisplayContent.mOpeningApps.add(app);
+        requestTransition(app, WindowManager.TRANSIT_OPEN);
         final int newOrientation = getRotatedOrientation(mDisplayContent);
         app.setRequestedOrientation(newOrientation);
 
@@ -2674,16 +2674,67 @@ public class DisplayContentTests extends WindowTestsBase {
     public void testKeyguardGoingAwayWhileAodShown() {
         mDisplayContent.getDisplayPolicy().setAwake(true);
 
-        final WindowState appWin = newWindowBuilder("appWin", TYPE_APPLICATION).setDisplay(
-                mDisplayContent).build();
-        final ActivityRecord activity = appWin.mActivityRecord;
+        final KeyguardController keyguard = mAtm.mKeyguardController;
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final int displayId = mDisplayContent.getDisplayId();
 
-        mAtm.mKeyguardController.setKeyguardShown(appWin.getDisplayId(), true /* keyguardShowing */,
-                true /* aodShowing */);
-        assertFalse(activity.isVisibleRequested());
+        final BooleanSupplier keyguardShowing = () -> keyguard.isKeyguardShowing(displayId);
+        final BooleanSupplier keyguardGoingAway = () -> keyguard.isKeyguardGoingAway(displayId);
+        final BooleanSupplier appVisible = activity::isVisibleRequested;
 
-        mAtm.mKeyguardController.keyguardGoingAway(appWin.getDisplayId(), 0 /* flags */);
-        assertTrue(activity.isVisibleRequested());
+        // Begin locked and in AOD
+        keyguard.setKeyguardShown(displayId, true /* keyguard */, true /* aod */);
+        assertFalse(keyguardGoingAway.getAsBoolean());
+        assertFalse(appVisible.getAsBoolean());
+
+        // Start unlocking from AOD.
+        keyguard.keyguardGoingAway(displayId, 0x0 /* flags */);
+        assertTrue(keyguardGoingAway.getAsBoolean());
+        assertTrue(appVisible.getAsBoolean());
+
+        // Clear AOD. This does *not* clear the going-away status.
+        keyguard.setKeyguardShown(displayId, true /* keyguard */, false /* aod */);
+        assertTrue(keyguardGoingAway.getAsBoolean());
+        assertTrue(appVisible.getAsBoolean());
+
+        // Finish unlock
+        keyguard.setKeyguardShown(displayId, false /* keyguard */, false /* aod */);
+        assertFalse(keyguardGoingAway.getAsBoolean());
+        assertTrue(appVisible.getAsBoolean());
+    }
+
+    @Test
+    public void testKeyguardGoingAwayCanceledWhileAodShown() {
+        mDisplayContent.getDisplayPolicy().setAwake(true);
+
+        final KeyguardController keyguard = mAtm.mKeyguardController;
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final int displayId = mDisplayContent.getDisplayId();
+
+        final BooleanSupplier keyguardShowing = () -> keyguard.isKeyguardShowing(displayId);
+        final BooleanSupplier keyguardGoingAway = () -> keyguard.isKeyguardGoingAway(displayId);
+        final BooleanSupplier appVisible = activity::isVisibleRequested;
+
+        // Begin locked and in AOD
+        keyguard.setKeyguardShown(displayId, true /* keyguard */, true /* aod */);
+        assertFalse(keyguardGoingAway.getAsBoolean());
+        assertFalse(appVisible.getAsBoolean());
+
+        // Start unlocking from AOD.
+        keyguard.keyguardGoingAway(displayId, 0x0 /* flags */);
+        assertTrue(keyguardGoingAway.getAsBoolean());
+        assertTrue(appVisible.getAsBoolean());
+
+        // Clear AOD. This does *not* clear the going-away status.
+        keyguard.setKeyguardShown(displayId, true /* keyguard */, false /* aod */);
+        assertTrue(keyguardGoingAway.getAsBoolean());
+        assertTrue(appVisible.getAsBoolean());
+
+        // Same API call a second time cancels the unlock, because AOD isn't changing.
+        keyguard.setKeyguardShown(displayId, true /* keyguard */, false /* aod */);
+        assertTrue(keyguardShowing.getAsBoolean());
+        assertFalse(keyguardGoingAway.getAsBoolean());
+        assertFalse(appVisible.getAsBoolean());
     }
 
     @Test

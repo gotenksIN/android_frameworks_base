@@ -62,7 +62,7 @@ data class DeviceItemClick(val deviceItem: DeviceItem, val clickedView: View, va
 class BluetoothDetailsContentManager
 @AssistedInject
 constructor(
-    @Assisted private val initialUiProperties: BluetoothTileDialogViewModel.UiProperties,
+    @Assisted private val initialUiProperties: BluetoothDetailsContentViewModel.UiProperties,
     @Assisted private val cachedContentHeight: Int,
     @Assisted private val bluetoothTileDialogCallback: BluetoothTileDialogCallback,
     @Assisted private val isInDialog: Boolean,
@@ -114,7 +114,7 @@ constructor(
     @AssistedFactory
     interface Factory {
         fun create(
-            initialUiProperties: BluetoothTileDialogViewModel.UiProperties,
+            initialUiProperties: BluetoothDetailsContentViewModel.UiProperties,
             cachedContentHeight: Int,
             dialogCallback: BluetoothTileDialogCallback,
             isInDialog: Boolean,
@@ -226,7 +226,7 @@ constructor(
 
     internal fun onBluetoothStateUpdated(
         isEnabled: Boolean,
-        uiProperties: BluetoothTileDialogViewModel.UiProperties,
+        uiProperties: BluetoothDetailsContentViewModel.UiProperties,
     ) {
         bluetoothToggle.apply {
             isChecked = isEnabled
@@ -383,6 +383,11 @@ constructor(
 
                     actionIcon.setImageResource(item.actionIconRes)
                     actionIcon.drawable?.setTint(tintColor)
+                    actionIconView.contentDescription =
+                        resources.getString(
+                            R.string.accessibility_bluetooth_device_settings_gear_with_name,
+                            item.deviceName,
+                        )
 
                     divider.setBackgroundColor(tintColor)
 

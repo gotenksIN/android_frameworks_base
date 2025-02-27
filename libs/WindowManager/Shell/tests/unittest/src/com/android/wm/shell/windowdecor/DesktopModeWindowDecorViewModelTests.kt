@@ -28,7 +28,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.ACTION_MAIN
-import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.graphics.Region
 import android.hardware.display.DisplayManager
@@ -310,14 +309,10 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODALS_POLICY)
     fun testDecorationIsNotCreatedForDefaultHomePackage() {
-        val packageManager: PackageManager = org.mockito.kotlin.mock()
-        val homeActivities = ComponentName("defaultHomePackage", /* class */ "")
         val task = createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
-            baseActivity = homeActivities
+            baseActivity = homeComponentName
             isTopActivityNoDisplay = false
         }
-        mContext.setMockPackageManager(packageManager)
-        whenever(packageManager.getHomeActivities(any())).thenReturn(homeActivities)
 
         onTaskOpening(task)
 
@@ -489,7 +484,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             eq(SnapPosition.LEFT),
             eq(ResizeTrigger.SNAP_LEFT_MENU),
             eq(InputMethod.UNKNOWN_INPUT_METHOD),
-            eq(decor)
         )
     }
 
@@ -525,7 +519,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             eq(SnapPosition.LEFT),
             eq(ResizeTrigger.SNAP_LEFT_MENU),
             eq(InputMethod.UNKNOWN_INPUT_METHOD),
-            eq(decor),
         )
     }
 
@@ -547,7 +540,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 eq(decor.mTaskInfo), any(), eq(currentBounds), eq(SnapPosition.LEFT),
                 eq(ResizeTrigger.MAXIMIZE_BUTTON),
                 eq(InputMethod.UNKNOWN_INPUT_METHOD),
-                eq(decor),
             )
     }
 
@@ -567,7 +559,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             eq(SnapPosition.RIGHT),
             eq(ResizeTrigger.SNAP_RIGHT_MENU),
             eq(InputMethod.UNKNOWN_INPUT_METHOD),
-            eq(decor),
         )
     }
 
@@ -603,7 +594,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             eq(SnapPosition.RIGHT),
             eq(ResizeTrigger.SNAP_RIGHT_MENU),
             eq(InputMethod.UNKNOWN_INPUT_METHOD),
-            eq(decor),
         )
     }
 
@@ -625,7 +615,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 eq(decor.mTaskInfo), any(), eq(currentBounds), eq(SnapPosition.RIGHT),
                 eq(ResizeTrigger.MAXIMIZE_BUTTON),
                 eq(InputMethod.UNKNOWN_INPUT_METHOD),
-                eq(decor),
             )
     }
 

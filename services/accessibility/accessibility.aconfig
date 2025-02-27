@@ -11,6 +11,16 @@ flag {
 }
 
 flag {
+    name: "allow_secure_screenshots"
+    namespace: "accessibility"
+    description: "Allow certain AccessibilityServices to take screenshots of FLAG_SECURE screens"
+    bug: "373705911"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "always_allow_observing_touch_events"
     namespace: "accessibility"
     description: "Always allows InputFilter observing SOURCE_TOUCHSCREEN events, even if touch exploration is enabled."
@@ -142,6 +152,13 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_magnification_follows_mouse_with_pointer_motion_filter"
+    namespace: "accessibility"
+    description: "Whether to enable mouse following using pointer motion filter"
+    bug: "361817142"
 }
 
 flag {

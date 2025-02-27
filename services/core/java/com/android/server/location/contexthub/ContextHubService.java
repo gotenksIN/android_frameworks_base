@@ -259,6 +259,9 @@ public class ContextHubService extends IContextHubService.Stub {
             if (mHubInfoRegistry != null) {
                 mHubInfoRegistry.onHalRestart();
             }
+            if (mEndpointManager != null) {
+                mEndpointManager.onHalRestart();
+            }
             resetSettings();
             if (Flags.reconnectHostEndpointsAfterHalRestart()) {
                 mClientManager.forEachClientOfHub(mContextHubId,
@@ -1575,6 +1578,12 @@ public class ContextHubService extends IContextHubService.Stub {
         pw.println("");
         pw.println("=================== CLIENTS ====================");
         pw.println(mClientManager);
+
+        if (mEndpointManager != null) {
+            pw.println("");
+            pw.println("=================== ENDPOINTS ====================");
+            pw.println(mEndpointManager);
+        }
 
         pw.println("");
         pw.println("=================== TRANSACTIONS ====================");

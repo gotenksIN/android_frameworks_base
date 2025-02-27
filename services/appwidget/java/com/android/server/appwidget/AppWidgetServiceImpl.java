@@ -16,7 +16,6 @@
 
 package com.android.server.appwidget;
 
-import static android.appwidget.flags.Flags.checkRemoteViewsUriPermission;
 import static android.appwidget.flags.Flags.remoteAdapterConversion;
 import static android.appwidget.flags.Flags.remoteViewsProto;
 import static android.appwidget.flags.Flags.removeAppWidgetServiceIoFromCriticalPath;
@@ -51,6 +50,7 @@ import android.app.IApplicationThread;
 import android.app.IServiceConnection;
 import android.app.KeyguardManager;
 import android.app.PendingIntent;
+import android.app.StatsManager;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.admin.DevicePolicyManagerInternal.OnCrossProfileWidgetProvidersChangeListener;
 import android.app.usage.Flags;
@@ -125,6 +125,7 @@ import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
 import android.util.SparseLongArray;
+import android.util.StatsEvent;
 import android.util.TypedValue;
 import android.util.Xml;
 import android.util.proto.ProtoInputStream;
@@ -146,6 +147,7 @@ import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
+import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.widget.IRemoteViewsFactory;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
@@ -434,6 +436,44 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         mActivityManagerInternal = LocalServices.getService(ActivityManagerInternal.class);
         mAppOpsManagerInternal = LocalServices.getService(AppOpsManagerInternal.class);
         mUsageStatsManagerInternal = LocalServices.getService(UsageStatsManagerInternal.class);
+        registerPullCallbacks();
+    }
+
+    /**
+     * Register callbacks for pull atoms.
+     */
+    private void registerPullCallbacks() {
+        final StatsManager manager = mContext.getSystemService(StatsManager.class);
+        manager.setPullAtomCallback(FrameworkStatsLog.WIDGET_MEMORY_STATS,
+                new StatsManager.PullAtomMetadata.Builder().build(),
+                new HandlerExecutor(mCallbackHandler), this::onPullAtom);
+    }
+
+    /**
+     * Callback from StatsManager to log events indicated by the atomTag. This function will add
+     * the relevant events to the data list.
+     *
+     * @return PULL_SUCCESS if the pull was successful and events should be used, else PULL_SKIP.
+     */
+    private int onPullAtom(int atomTag, @NonNull List<StatsEvent> data) {
+        if (atomTag == FrameworkStatsLog.WIDGET_MEMORY_STATS) {
+            synchronized (mLock) {
+                for (Widget widget : mWidgets) {
+                    if (widget.views != null) {
+                        final int uid = widget.provider.id.uid;
+                        final int appWidgetId = widget.appWidgetId;
+                        final long bitmapMemoryUsage =
+                                widget.views.estimateTotalBitmapMemoryUsage();
+                        StatsEvent event = FrameworkStatsLog.buildStatsEvent(
+                                FrameworkStatsLog.WIDGET_MEMORY_STATS, uid, appWidgetId,
+                                bitmapMemoryUsage);
+                        data.add(event);
+                    }
+                }
+            }
+            return StatsManager.PULL_SUCCESS;
+        }
+        return StatsManager.PULL_SKIP;
     }
 
     /**
@@ -2560,9 +2600,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         // Make sure the package runs under the caller uid.
         mSecurityPolicy.enforceCallFromPackage(callingPackage);
         // Make sure RemoteViews do not contain URIs that the caller cannot access.
-        if (checkRemoteViewsUriPermission()) {
-            checkRemoteViewsUris(views);
-        }
+        checkRemoteViewsUris(views);
         synchronized (mLock) {
             ensureGroupStateLoadedLocked(userId);
 

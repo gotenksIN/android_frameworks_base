@@ -25,8 +25,8 @@ import static android.view.KeyEvent.KEYCODE_UNKNOWN;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 
 import static com.android.hardware.input.Flags.enableCustomizableInputGestures;
-import static com.android.hardware.input.Flags.touchpadVisualizer;
 import static com.android.hardware.input.Flags.keyEventActivityDetection;
+import static com.android.hardware.input.Flags.touchpadVisualizer;
 import static com.android.hardware.input.Flags.useKeyGestureEventHandler;
 import static com.android.server.policy.WindowManagerPolicy.ACTION_PASS_TO_USER;
 
@@ -143,6 +143,7 @@ import com.android.internal.policy.KeyInterceptionInfo;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.Preconditions;
 import com.android.server.DisplayThread;
+import com.android.server.IoThread;
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.Watchdog;
@@ -193,15 +194,11 @@ public class InputManagerService extends IInputManager.Stub
     private static final int MSG_SYSTEM_READY = 5;
 
     private static final int DEFAULT_VIBRATION_MAGNITUDE = 192;
-    private static final AdditionalDisplayInputProperties
-            DEFAULT_ADDITIONAL_DISPLAY_INPUT_PROPERTIES = new AdditionalDisplayInputProperties();
 
     private final NativeInputManagerService mNative;
 
     private final Context mContext;
     private final InputManagerHandler mHandler;
-    @UserIdInt
-    private int mCurrentUserId = UserHandle.USER_SYSTEM;
     private DisplayManagerInternal mDisplayManagerInternal;
 
     private WindowManagerInternal mWindowManagerInternal;
@@ -289,7 +286,7 @@ public class InputManagerService extends IInputManager.Stub
 
     final Object mKeyEventActivityLock = new Object();
     @GuardedBy("mKeyEventActivityLock")
-    private List<IKeyEventActivityListener> mKeyEventActivityListenersToNotify =
+    private final List<IKeyEventActivityListener> mKeyEventActivityListenersToNotify =
             new ArrayList<>();
 
     // Rate limit for key event activity detection. Prevent the listener from being notified
@@ -460,16 +457,26 @@ public class InputManagerService extends IInputManager.Stub
     private boolean mShowKeyPresses = false;
     private boolean mShowRotaryInput = false;
 
+    /**
+     * A lock for the accessibility pointer motion filter. Don't call native methods while holding
+     * this lock.
+     */
+    private final Object mAccessibilityPointerMotionFilterLock = new Object();
+    private InputManagerInternal.AccessibilityPointerMotionFilter
+            mAccessibilityPointerMotionFilter = null;
+
     /** Point of injection for test dependencies. */
     @VisibleForTesting
     static class Injector {
         private final Context mContext;
         private final Looper mLooper;
+        private final Looper mIoLooper;
         private final UEventManager mUEventManager;
 
-        Injector(Context context, Looper looper, UEventManager uEventManager) {
+        Injector(Context context, Looper looper, Looper ioLooper, UEventManager uEventManager) {
             mContext = context;
             mLooper = looper;
+            mIoLooper = ioLooper;
             mUEventManager = uEventManager;
         }
 
@@ -479,6 +486,10 @@ public class InputManagerService extends IInputManager.Stub
 
         Looper getLooper() {
             return mLooper;
+        }
+
+        Looper getIoLooper() {
+            return mIoLooper;
         }
 
         UEventManager getUEventManager() {
@@ -501,8 +512,8 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     public InputManagerService(Context context) {
-        this(new Injector(context, DisplayThread.get().getLooper(), new UEventManager() {}),
-                context.getSystemService(PermissionEnforcer.class));
+        this(new Injector(context, DisplayThread.get().getLooper(), IoThread.get().getLooper(),
+                new UEventManager() {}), context.getSystemService(PermissionEnforcer.class));
     }
 
     @VisibleForTesting
@@ -528,7 +539,7 @@ public class InputManagerService extends IInputManager.Stub
         mStickyModifierStateController = new StickyModifierStateController();
         mInputDataStore = new InputDataStore();
         mKeyGestureController = new KeyGestureController(mContext, injector.getLooper(),
-                mInputDataStore);
+                injector.getIoLooper(), mInputDataStore);
         mKeyboardLedController = new KeyboardLedController(mContext, injector.getLooper(),
                 mNative);
         mKeyRemapper = new KeyRemapper(mContext, mNative, mDataStore, injector.getLooper());
@@ -2593,6 +2604,23 @@ public class InputManagerService extends IInputManager.Stub
 
     // Native callback.
     @SuppressWarnings("unused")
+    final float[] filterPointerMotion(float dx, float dy, float currentX, float currentY,
+            int displayId) {
+        // This call happens on the input hot path and it is extremely performance sensitive.
+        // This must not call back into native code. This is called while the
+        // PointerChoreographer's lock is held.
+        synchronized (mAccessibilityPointerMotionFilterLock) {
+            if (mAccessibilityPointerMotionFilter == null) {
+                throw new IllegalStateException(
+                        "filterCursor is invoked but no callback is registered.");
+            }
+            return mAccessibilityPointerMotionFilter.filterPointerMotionEvent(dx, dy, currentX,
+                    currentY, displayId);
+        }
+    }
+
+    // Native callback.
+    @SuppressWarnings("unused")
     @VisibleForTesting
     public int interceptKeyBeforeQueueing(KeyEvent event, int policyFlags) {
         notifyKeyActivityListeners(event);
@@ -2775,7 +2803,7 @@ public class InputManagerService extends IInputManager.Stub
                 }
                 return true;
             case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_BOUNCE_KEYS:
-                if (complete && InputSettings.isAccessibilityBounceKeysFeatureEnabled()) {
+                if (complete) {
                     final boolean bounceKeysEnabled =
                             InputSettings.isAccessibilityBounceKeysEnabled(mContext);
                     InputSettings.setAccessibilityBounceKeysThreshold(mContext,
@@ -2793,7 +2821,7 @@ public class InputManagerService extends IInputManager.Stub
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_STICKY_KEYS:
-                if (complete && InputSettings.isAccessibilityStickyKeysFeatureEnabled()) {
+                if (complete) {
                     final boolean stickyKeysEnabled =
                             InputSettings.isAccessibilityStickyKeysEnabled(mContext);
                     InputSettings.setAccessibilityStickyKeysEnabled(mContext, !stickyKeysEnabled);
@@ -2801,7 +2829,7 @@ public class InputManagerService extends IInputManager.Stub
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SLOW_KEYS:
-                if (complete && InputSettings.isAccessibilitySlowKeysFeatureFlagEnabled()) {
+                if (complete) {
                     final boolean slowKeysEnabled =
                             InputSettings.isAccessibilitySlowKeysEnabled(mContext);
                     InputSettings.setAccessibilitySlowKeysThreshold(mContext,
@@ -3215,7 +3243,6 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     private void handleCurrentUserChanged(@UserIdInt int userId) {
-        mCurrentUserId = userId;
         mKeyGestureController.setCurrentUserId(userId);
     }
 
@@ -3828,6 +3855,12 @@ public class InputManagerService extends IInputManager.Stub
                         payload.get(BACKUP_CATEGORY_INPUT_GESTURES), userId);
             }
         }
+
+        @Override
+        public void registerAccessibilityPointerMotionFilter(
+                AccessibilityPointerMotionFilter filter) {
+            InputManagerService.this.registerAccessibilityPointerMotionFilter(filter);
+        }
     }
 
     @Override
@@ -4012,6 +4045,26 @@ public class InputManagerService extends IInputManager.Stub
 
     void setAccessibilityPointerIconScaleFactor(int displayId, float scaleFactor) {
         mPointerIconCache.setAccessibilityScaleFactor(displayId, scaleFactor);
+    }
+
+    void registerAccessibilityPointerMotionFilter(
+            InputManagerInternal.AccessibilityPointerMotionFilter filter) {
+        // `#filterPointerMotion` expects that when it's called, `mAccessibilityPointerMotionFilter`
+        // is not null.
+        // Also, to avoid potential lock contention, we shouldn't call native method while holding
+        // the lock here. Native code calls `#filterPointerMotion` while PointerChoreographer's
+        // lock is held.
+        // Thus, we must set filter before we enable the filter in native, and reset the filter
+        // after we disable the filter.
+        // This also ensures the previously installed filter isn't called after the filter is
+        // updated.
+        mNative.setAccessibilityPointerMotionFilterEnabled(false);
+        synchronized (mAccessibilityPointerMotionFilterLock) {
+            mAccessibilityPointerMotionFilter = filter;
+        }
+        if (filter != null) {
+            mNative.setAccessibilityPointerMotionFilterEnabled(true);
+        }
     }
 
     interface KeyboardBacklightControllerInterface {

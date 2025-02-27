@@ -58,6 +58,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
 import org.mockito.Mockito
@@ -123,17 +124,6 @@ class DesktopMixedTransitionHandlerTest : ShellTestCase() {
         mixedHandler.startWindowingModeTransition(windowingMode, wct)
 
         verify(freeformTaskTransitionHandler).startWindowingModeTransition(windowingMode, wct)
-    }
-
-    @Test
-    fun startMinimizedModeTransition_callsFreeformTaskTransitionHandler() {
-        val wct = WindowContainerTransaction()
-        whenever(freeformTaskTransitionHandler.startMinimizedModeTransition(any()))
-            .thenReturn(mock())
-
-        mixedHandler.startMinimizedModeTransition(wct)
-
-        verify(freeformTaskTransitionHandler).startMinimizedModeTransition(wct)
     }
 
     @Test
@@ -528,6 +518,131 @@ class DesktopMixedTransitionHandlerTest : ShellTestCase() {
         assertThat(started).isEqualTo(true)
         verify(desktopImmersiveController)
             .animateResizeChange(eq(immersiveChange), any(), any(), any())
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_EXIT_BY_MINIMIZE_TRANSITION_BUGFIX)
+    fun startMinimizedModeTransition_exitByMinimizeTransitionFlagsDisabled_doesNotUseMixedHandler() {
+        val wct = WindowContainerTransaction()
+        val task = createTask(WINDOWING_MODE_FREEFORM)
+        whenever(
+                freeformTaskTransitionHandler.startMinimizedModeTransition(
+                    any(),
+                    anyInt(),
+                    anyBoolean(),
+                )
+            )
+            .thenReturn(mock())
+
+        mixedHandler.startMinimizedModeTransition(
+            wct = wct,
+            taskId = task.taskId,
+            isLastTask = true,
+        )
+
+        verify(freeformTaskTransitionHandler)
+            .startMinimizedModeTransition(eq(wct), eq(task.taskId), eq(true))
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_EXIT_BY_MINIMIZE_TRANSITION_BUGFIX)
+    fun startMinimizedModeTransition_exitByMinimizeTransitionFlagsEnabled_notLastTask_callsMinimizationHandler() {
+        val wct = WindowContainerTransaction()
+        val minimizingTask = createTask(WINDOWING_MODE_FREEFORM)
+        val minimizingTaskChange = createChange(minimizingTask)
+        val transition = Binder()
+        whenever(
+                transitions.startTransition(eq(Transitions.TRANSIT_MINIMIZE), eq(wct), anyOrNull())
+            )
+            .thenReturn(transition)
+        whenever(
+                desktopMinimizationTransitionHandler.startAnimation(
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .thenReturn(true)
+
+        mixedHandler.startMinimizedModeTransition(
+            wct = wct,
+            taskId = minimizingTask.taskId,
+            isLastTask = false,
+        )
+        val started =
+            mixedHandler.startAnimation(
+                transition = transition,
+                info =
+                    createCloseTransitionInfo(
+                        Transitions.TRANSIT_MINIMIZE,
+                        listOf(minimizingTaskChange),
+                    ),
+                startTransaction = mock(),
+                finishTransaction = mock(),
+                finishCallback = {},
+            )
+
+        assertTrue("Should delegate animation to minimization transition handler", started)
+        verify(desktopMinimizationTransitionHandler)
+            .startAnimation(
+                eq(transition),
+                argThat { info -> info.changes.contains(minimizingTaskChange) },
+                any(),
+                any(),
+                any(),
+            )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_EXIT_BY_MINIMIZE_TRANSITION_BUGFIX)
+    fun startMinimizedModeTransition_exitByMinimizeTransitionFlagsEnabled_withMinimizingLastTask_dispatchesTransition() {
+        val wct = WindowContainerTransaction()
+        val minimizingTask = createTask(WINDOWING_MODE_FREEFORM)
+        val minimizingTaskChange = createChange(minimizingTask)
+        val transition = Binder()
+        whenever(
+                transitions.startTransition(eq(Transitions.TRANSIT_MINIMIZE), eq(wct), anyOrNull())
+            )
+            .thenReturn(transition)
+        whenever(
+                desktopMinimizationTransitionHandler.startAnimation(
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .thenReturn(true)
+
+        mixedHandler.startMinimizedModeTransition(
+            wct = wct,
+            taskId = minimizingTask.taskId,
+            isLastTask = true,
+        )
+        mixedHandler.startAnimation(
+            transition = transition,
+            info =
+                createCloseTransitionInfo(
+                    Transitions.TRANSIT_MINIMIZE,
+                    listOf(minimizingTaskChange),
+                ),
+            startTransaction = mock(),
+            finishTransaction = mock(),
+            finishCallback = {},
+        )
+
+        verify(transitions)
+            .dispatchTransition(
+                eq(transition),
+                argThat { info -> info.changes.contains(minimizingTaskChange) },
+                any(),
+                any(),
+                any(),
+                eq(mixedHandler),
+            )
     }
 
     @Test

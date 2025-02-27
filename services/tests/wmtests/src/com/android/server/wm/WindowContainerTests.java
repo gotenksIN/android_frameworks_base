@@ -32,8 +32,6 @@ import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_OLD_TASK_CLOSE;
-import static android.view.WindowManager.TRANSIT_OLD_TASK_OPEN;
-import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.window.DisplayAreaOrganizer.FEATURE_DEFAULT_TASK_CONTAINER;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.any;
@@ -85,12 +83,8 @@ import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.util.ArraySet;
-import android.view.IRemoteAnimationFinishedCallback;
-import android.view.IRemoteAnimationRunner;
 import android.view.InsetsFrameProvider;
 import android.view.InsetsSource;
-import android.view.RemoteAnimationAdapter;
-import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.SurfaceSession;
 import android.view.WindowInsets;
@@ -412,17 +406,6 @@ public class WindowContainerTests extends WindowTestsBase {
         assertEquals(child23, child2.getChildAt(2));
         assertEquals(child1, root.getChildAt(0));
         assertEquals(child2, root.getChildAt(1));
-    }
-
-    @Test
-    public void testIsAnimating_TransitionFlag() {
-        final TestWindowContainerBuilder builder = new TestWindowContainerBuilder(mWm);
-        final TestWindowContainer root = builder.setLayer(0).build();
-        final TestWindowContainer child1 = root.addChildWindow(
-                builder.setWaitForTransitionStart(true));
-
-        assertFalse(root.isAnimating(TRANSITION));
-        assertTrue(child1.isAnimating(TRANSITION));
     }
 
     @Test
@@ -1055,25 +1038,6 @@ public class WindowContainerTests extends WindowTestsBase {
     }
 
     @Test
-    public void testTaskCanApplyAnimation() {
-        final Task rootTask = createTask(mDisplayContent);
-        final Task task = createTaskInRootTask(rootTask, 0 /* userId */);
-        final ActivityRecord activity2 = createActivityRecord(mDisplayContent, task);
-        final ActivityRecord activity1 = createActivityRecord(mDisplayContent, task);
-        verifyWindowContainerApplyAnimation(task, activity1, activity2);
-    }
-
-    @Test
-    public void testRootTaskCanApplyAnimation() {
-        final Task rootTask = createTask(mDisplayContent);
-        final ActivityRecord activity2 = createActivityRecord(mDisplayContent,
-                createTaskInRootTask(rootTask, 0 /* userId */));
-        final ActivityRecord activity1 = createActivityRecord(mDisplayContent,
-                createTaskInRootTask(rootTask, 0 /* userId */));
-        verifyWindowContainerApplyAnimation(rootTask, activity1, activity2);
-    }
-
-    @Test
     public void testGetDisplayArea() {
         // WindowContainer
         final WindowContainer windowContainer = new WindowContainer(mWm);
@@ -1101,59 +1065,6 @@ public class WindowContainerTests extends WindowTestsBase {
         final DisplayArea displayArea = new DisplayArea(mWm, ANY, "DisplayArea");
 
         assertEquals(displayArea, displayArea.getDisplayArea());
-    }
-
-    private void verifyWindowContainerApplyAnimation(WindowContainer wc, ActivityRecord act,
-            ActivityRecord act2) {
-        // Initial remote animation for app transition.
-        final RemoteAnimationAdapter adapter = new RemoteAnimationAdapter(
-                new IRemoteAnimationRunner.Stub() {
-                    @Override
-                    public void onAnimationStart(@WindowManager.TransitionOldType int transit,
-                            RemoteAnimationTarget[] apps,
-                            RemoteAnimationTarget[] wallpapers,
-                            RemoteAnimationTarget[] nonApps,
-                            IRemoteAnimationFinishedCallback finishedCallback) {
-                        try {
-                            finishedCallback.onAnimationFinished();
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                    @Override
-                    public void onAnimationCancelled() {
-                    }
-                }, 0, 0, false);
-        adapter.setCallingPidUid(123, 456);
-        wc.getDisplayContent().prepareAppTransition(TRANSIT_OPEN);
-        wc.getDisplayContent().mAppTransition.overridePendingAppTransitionRemote(adapter);
-        spyOn(wc);
-        doReturn(true).when(wc).okToAnimate();
-
-        // Make sure animating state is as expected after applied animation.
-
-        // Animation target is promoted from act to wc. act2 is a descendant of wc, but not a source
-        // of the animation.
-        ArrayList<WindowContainer<WindowState>> sources = new ArrayList<>();
-        sources.add(act);
-        assertTrue(wc.applyAnimation(null, TRANSIT_OLD_TASK_OPEN, true, false, sources));
-
-        assertEquals(act, wc.getTopMostActivity());
-        assertTrue(wc.isAnimating());
-        assertTrue(wc.isAnimating(0, ANIMATION_TYPE_APP_TRANSITION));
-        assertTrue(wc.getAnimationSources().contains(act));
-        assertFalse(wc.getAnimationSources().contains(act2));
-        assertTrue(act.isAnimating(PARENTS));
-        assertTrue(act.isAnimating(PARENTS, ANIMATION_TYPE_APP_TRANSITION));
-        assertEquals(wc, act.getAnimatingContainer(PARENTS, ANIMATION_TYPE_APP_TRANSITION));
-
-        // Make sure animation finish callback will be received and reset animating state after
-        // animation finish.
-        wc.getDisplayContent().mAppTransition.goodToGo(TRANSIT_OLD_TASK_OPEN, act);
-        verify(wc).onAnimationFinished(eq(ANIMATION_TYPE_APP_TRANSITION), any());
-        assertFalse(wc.isAnimating());
-        assertFalse(act.isAnimating(PARENTS));
     }
 
     @Test
@@ -1733,7 +1644,7 @@ public class WindowContainerTests extends WindowTestsBase {
         };
 
         TestWindowContainer(WindowManagerService wm, int layer, boolean isAnimating,
-                boolean isVisible, boolean waitTransitStart, Integer orientation, WindowState ws) {
+                boolean isVisible, Integer orientation, WindowState ws) {
             super(wm);
 
             mLayer = layer;
@@ -1741,7 +1652,6 @@ public class WindowContainerTests extends WindowTestsBase {
             mIsVisible = isVisible;
             mFillsParent = true;
             mOrientation = orientation;
-            mWaitForTransitStart = waitTransitStart;
             mWindowState = ws;
             spyOn(mSurfaceAnimator);
             doReturn(mIsAnimating).when(mSurfaceAnimator).isAnimating();
@@ -1807,11 +1717,6 @@ public class WindowContainerTests extends WindowTestsBase {
         }
 
         @Override
-        boolean isWaitingForTransitionStart() {
-            return mWaitForTransitStart;
-        }
-
-        @Override
         WindowState asWindowState() {
             return mWindowState;
         }
@@ -1822,7 +1727,6 @@ public class WindowContainerTests extends WindowTestsBase {
         private int mLayer;
         private boolean mIsAnimating;
         private boolean mIsVisible;
-        private boolean mIsWaitTransitStart;
         private Integer mOrientation;
         private WindowState mWindowState;
 
@@ -1860,14 +1764,9 @@ public class WindowContainerTests extends WindowTestsBase {
             return this;
         }
 
-        TestWindowContainerBuilder setWaitForTransitionStart(boolean waitTransitStart) {
-            mIsWaitTransitStart = waitTransitStart;
-            return this;
-        }
-
         TestWindowContainer build() {
             return new TestWindowContainer(mWm, mLayer, mIsAnimating, mIsVisible,
-                    mIsWaitTransitStart, mOrientation, mWindowState);
+                    mOrientation, mWindowState);
         }
     }
 

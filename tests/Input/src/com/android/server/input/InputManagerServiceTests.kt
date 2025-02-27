@@ -160,7 +160,7 @@ class InputManagerServiceTests {
         testLooper = TestLooper()
         service =
             InputManagerService(object : InputManagerService.Injector(
-                    context, testLooper.looper, uEventManager) {
+                    context, testLooper.looper, testLooper.looper, uEventManager) {
                 override fun getNativeService(
                     service: InputManagerService?
                 ): NativeInputManagerService {
@@ -333,7 +333,7 @@ class InputManagerServiceTests {
     fun testKeyActivenessNotifyEventsLifecycle() {
         service.systemRunning()
 
-        fakePermissionEnforcer.grant(android.Manifest.permission.LISTEN_FOR_KEY_ACTIVITY);
+        fakePermissionEnforcer.grant(android.Manifest.permission.LISTEN_FOR_KEY_ACTIVITY)
 
         val inputManager = context.getSystemService(InputManager::class.java)
 
@@ -356,6 +356,34 @@ class InputManagerServiceTests {
 
         /* verify onKeyEventActivity callback not called */
         verifyNoMoreInteractions(listener)
+    }
+
+    @Test
+    fun testKeyEventsForwardedToFocusedWindow_whenWmAllows() {
+        service.systemRunning()
+        overrideSendActionKeyEventsToFocusedWindow(
+            /* hasPermission = */false,
+            /* hasPrivateFlag = */false
+        )
+        whenever(wmCallbacks.interceptKeyBeforeDispatching(any(), any(), anyInt())).thenReturn(0)
+
+        val event = KeyEvent( /* downTime= */0, /* eventTime= */0, KeyEvent.ACTION_DOWN,
+            KeyEvent.KEYCODE_SPACE, /* repeat= */0, KeyEvent.META_CTRL_ON)
+        assertEquals(0, service.interceptKeyBeforeDispatching(null, event, 0))
+    }
+
+    @Test
+    fun testKeyEventsNotForwardedToFocusedWindow_whenWmConsumes() {
+        service.systemRunning()
+        overrideSendActionKeyEventsToFocusedWindow(
+            /* hasPermission = */false,
+            /* hasPrivateFlag = */false
+        )
+        whenever(wmCallbacks.interceptKeyBeforeDispatching(any(), any(), anyInt())).thenReturn(-1)
+
+        val event = KeyEvent( /* downTime= */0, /* eventTime= */0, KeyEvent.ACTION_DOWN,
+            KeyEvent.KEYCODE_SPACE, /* repeat= */0, KeyEvent.META_CTRL_ON)
+        assertEquals(-1, service.interceptKeyBeforeDispatching(null, event, 0))
     }
 
     private class AutoClosingVirtualDisplays(val displays: List<VirtualDisplay>) : AutoCloseable {
@@ -559,9 +587,6 @@ class InputManagerServiceTests {
 
     @Test
     fun handleKeyGestures_a11yBounceKeysShortcut() {
-        ExtendedMockito.doReturn(true).`when` {
-            InputSettings.isAccessibilityBounceKeysFeatureEnabled()
-        }
         val toggleBounceKeysEvent =
             KeyGestureEvent.Builder()
                 .setKeyGestureType(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_BOUNCE_KEYS)
@@ -594,9 +619,6 @@ class InputManagerServiceTests {
 
     @Test
     fun handleKeyGestures_a11yStickyKeysShortcut() {
-        ExtendedMockito.doReturn(true).`when` {
-            InputSettings.isAccessibilityStickyKeysFeatureEnabled()
-        }
         val toggleStickyKeysEvent =
             KeyGestureEvent.Builder()
                 .setKeyGestureType(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_STICKY_KEYS)
@@ -610,9 +632,6 @@ class InputManagerServiceTests {
 
     @Test
     fun handleKeyGestures_a11ySlowKeysShortcut() {
-        ExtendedMockito.doReturn(true).`when` {
-            InputSettings.isAccessibilitySlowKeysFeatureFlagEnabled()
-        }
         val toggleSlowKeysEvent =
             KeyGestureEvent.Builder()
                 .setKeyGestureType(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SLOW_KEYS)

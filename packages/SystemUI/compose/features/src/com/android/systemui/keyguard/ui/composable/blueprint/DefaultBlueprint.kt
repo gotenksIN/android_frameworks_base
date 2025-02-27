@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -31,7 +30,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.unit.dp
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.modifiers.padding
 import com.android.systemui.compose.modifiers.sysuiResTag
@@ -44,6 +43,8 @@ import com.android.systemui.keyguard.ui.composable.section.SettingsMenuSection
 import com.android.systemui.keyguard.ui.composable.section.StatusBarSection
 import com.android.systemui.keyguard.ui.composable.section.TopAreaSection
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel
+import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel.NotificationsPlacement.BelowClock
+import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel.NotificationsPlacement.BesideClock
 import com.android.systemui.res.R
 import java.util.Optional
 import javax.inject.Inject
@@ -70,11 +71,8 @@ constructor(
     @Composable
     override fun ContentScope.Content(viewModel: LockscreenContentViewModel, modifier: Modifier) {
         val isUdfpsVisible = viewModel.isUdfpsVisible
-        val isShadeLayoutWide by viewModel.isShadeLayoutWide.collectAsStateWithLifecycle()
-        val unfoldTranslations by viewModel.unfoldTranslations.collectAsStateWithLifecycle()
-        val areNotificationsVisible by
-            viewModel.areNotificationsVisible().collectAsStateWithLifecycle(initialValue = false)
-        val isBypassEnabled by viewModel.isBypassEnabled.collectAsStateWithLifecycle()
+        val isBypassEnabled = viewModel.isBypassEnabled
+        val notificationsPlacement = viewModel.notificationsPlacement
 
         if (isBypassEnabled) {
             with(notificationSection) { HeadsUpNotifications() }
@@ -91,7 +89,9 @@ constructor(
                                 modifier =
                                     Modifier.fillMaxWidth()
                                         .padding(
-                                            horizontal = { unfoldTranslations.start.roundToInt() }
+                                            horizontal = {
+                                                viewModel.unfoldTranslations.start.roundToInt()
+                                            }
                                         )
                             )
                         }
@@ -100,29 +100,29 @@ constructor(
                             with(topAreaSection) {
                                 DefaultClockLayout(
                                     smartSpacePaddingTop = viewModel::getSmartSpacePaddingTop,
-                                    isShadeLayoutWide = isShadeLayoutWide,
                                     modifier =
                                         Modifier.fillMaxWidth().graphicsLayer {
-                                            translationX = unfoldTranslations.start
+                                            translationX = viewModel.unfoldTranslations.start
                                         },
                                 )
                             }
-                            if (isShadeLayoutWide && !isBypassEnabled) {
+                            if (notificationsPlacement is BesideClock && !isBypassEnabled) {
                                 with(notificationSection) {
                                     Box(modifier = Modifier.fillMaxHeight()) {
                                         AodPromotedNotificationArea(
                                             modifier =
                                                 Modifier.fillMaxWidth(0.5f)
-                                                    .align(alignment = Alignment.TopEnd)
+                                                    .align(notificationsPlacement.alignment)
                                         )
                                         Notifications(
-                                            areNotificationsVisible = areNotificationsVisible,
-                                            isShadeLayoutWide = true,
+                                            areNotificationsVisible =
+                                                viewModel.areNotificationsVisible,
                                             burnInParams = null,
                                             modifier =
                                                 Modifier.fillMaxWidth(0.5f)
                                                     .fillMaxHeight()
-                                                    .align(alignment = Alignment.TopEnd),
+                                                    .align(notificationsPlacement.alignment)
+                                                    .padding(top = 12.dp),
                                         )
                                     }
                                 }
@@ -137,7 +137,7 @@ constructor(
                             dimensionResource(R.dimen.below_clock_padding_start_icons)
 
                         with(notificationSection) {
-                            if (!isShadeLayoutWide && !isBypassEnabled) {
+                            if (notificationsPlacement is BelowClock && !isBypassEnabled) {
                                 Box(modifier = Modifier.weight(weight = 1f)) {
                                     Column(Modifier.align(alignment = Alignment.TopStart)) {
                                         AodPromotedNotificationArea(
@@ -149,14 +149,13 @@ constructor(
                                         )
                                     }
                                     Notifications(
-                                        areNotificationsVisible = areNotificationsVisible,
-                                        isShadeLayoutWide = false,
+                                        areNotificationsVisible = viewModel.areNotificationsVisible,
                                         burnInParams = null,
                                     )
                                 }
                             } else {
                                 Column {
-                                    if (!isShadeLayoutWide) {
+                                    if (viewModel.notificationsPlacement is BelowClock) {
                                         AodPromotedNotificationArea(
                                             modifier =
                                                 Modifier.padding(top = aodPromotedNotifTopPadding)
@@ -204,13 +203,17 @@ constructor(
                             isStart = true,
                             applyPadding = true,
                             modifier =
-                                Modifier.graphicsLayer { translationX = unfoldTranslations.start },
+                                Modifier.graphicsLayer {
+                                    translationX = viewModel.unfoldTranslations.start
+                                },
                         )
                         Shortcut(
                             isStart = false,
                             applyPadding = true,
                             modifier =
-                                Modifier.graphicsLayer { translationX = unfoldTranslations.end },
+                                Modifier.graphicsLayer {
+                                    translationX = viewModel.unfoldTranslations.end
+                                },
                         )
                     }
                     with(settingsMenuSection) { SettingsMenu(onSettingsMenuPlaced) }

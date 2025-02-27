@@ -56,7 +56,6 @@ import com.android.systemui.unfold.data.repository.UnfoldTransitionRepositoryImp
 import com.android.systemui.unfold.domain.interactor.UnfoldTransitionInteractor
 import com.android.systemui.unfoldedDeviceState
 import com.android.systemui.util.animation.data.repository.fakeAnimationStatusRepository
-import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.capture
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
@@ -79,8 +78,10 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when` as whenever
 import org.mockito.MockitoAnnotations
+import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
+import org.mockito.kotlin.verifyNoMoreInteractions
 
 @RunWith(AndroidJUnit4::class)
 @SmallTest
@@ -172,15 +173,13 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
             runCurrent()
             setDeviceState(UNFOLDED)
 
-            verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
-            val loggedEvent = loggerArgumentCaptor.value
             val expectedLoggedEvent =
-                DisplaySwitchLatencyEvent(
+                successfulEvent(
                     latencyMs = 250,
                     fromFoldableDeviceState = FOLDABLE_DEVICE_STATE_CLOSED,
                     toFoldableDeviceState = FOLDABLE_DEVICE_STATE_HALF_OPEN,
                 )
-            assertThat(loggedEvent).isEqualTo(expectedLoggedEvent)
+            assertThat(capturedLogEvent()).isEqualTo(expectedLoggedEvent)
         }
     }
 
@@ -224,15 +223,13 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
             runCurrent()
             setDeviceState(UNFOLDED)
 
-            verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
-            val loggedEvent = loggerArgumentCaptor.value
             val expectedLoggedEvent =
-                DisplaySwitchLatencyEvent(
+                successfulEvent(
                     latencyMs = 50,
                     fromFoldableDeviceState = FOLDABLE_DEVICE_STATE_CLOSED,
                     toFoldableDeviceState = FOLDABLE_DEVICE_STATE_HALF_OPEN,
                 )
-            assertThat(loggedEvent).isEqualTo(expectedLoggedEvent)
+            assertThat(capturedLogEvent()).isEqualTo(expectedLoggedEvent)
         }
     }
 
@@ -257,15 +254,13 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
             runCurrent()
             setDeviceState(UNFOLDED)
 
-            verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
-            val loggedEvent = loggerArgumentCaptor.value
             val expectedLoggedEvent =
-                DisplaySwitchLatencyEvent(
+                successfulEvent(
                     latencyMs = 50,
                     fromFoldableDeviceState = FOLDABLE_DEVICE_STATE_CLOSED,
                     toFoldableDeviceState = FOLDABLE_DEVICE_STATE_HALF_OPEN,
                 )
-            assertThat(loggedEvent).isEqualTo(expectedLoggedEvent)
+            assertThat(capturedLogEvent()).isEqualTo(expectedLoggedEvent)
         }
     }
 
@@ -286,15 +281,13 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
             powerInteractor.setScreenPowerState(SCREEN_ON)
             runCurrent()
 
-            verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
-            val loggedEvent = loggerArgumentCaptor.value
             val expectedLoggedEvent =
-                DisplaySwitchLatencyEvent(
+                successfulEvent(
                     latencyMs = 200,
                     fromFoldableDeviceState = FOLDABLE_DEVICE_STATE_HALF_OPEN,
                     toFoldableDeviceState = FOLDABLE_DEVICE_STATE_CLOSED,
                 )
-            assertThat(loggedEvent).isEqualTo(expectedLoggedEvent)
+            assertThat(capturedLogEvent()).isEqualTo(expectedLoggedEvent)
         }
     }
 
@@ -316,16 +309,14 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
             powerInteractor.setScreenPowerState(SCREEN_ON)
             runCurrent()
 
-            verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
-            val loggedEvent = loggerArgumentCaptor.value
             val expectedLoggedEvent =
-                DisplaySwitchLatencyEvent(
+                successfulEvent(
                     latencyMs = 200,
                     fromFoldableDeviceState = FOLDABLE_DEVICE_STATE_HALF_OPEN,
                     toFoldableDeviceState = FOLDABLE_DEVICE_STATE_CLOSED,
                     toState = SysUiStatsLog.DISPLAY_SWITCH_LATENCY_TRACKED__TO_STATE__AOD,
                 )
-            assertThat(loggedEvent).isEqualTo(expectedLoggedEvent)
+            assertThat(capturedLogEvent()).isEqualTo(expectedLoggedEvent)
         }
     }
 
@@ -368,16 +359,14 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
             powerInteractor.setScreenPowerState(SCREEN_OFF)
             runCurrent()
 
-            verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
-            val loggedEvent = loggerArgumentCaptor.value
             val expectedLoggedEvent =
-                DisplaySwitchLatencyEvent(
+                successfulEvent(
                     latencyMs = 0,
                     fromFoldableDeviceState = FOLDABLE_DEVICE_STATE_HALF_OPEN,
                     toFoldableDeviceState = FOLDABLE_DEVICE_STATE_CLOSED,
                     toState = SysUiStatsLog.DISPLAY_SWITCH_LATENCY_TRACKED__TO_STATE__SCREEN_OFF,
                 )
-            assertThat(loggedEvent).isEqualTo(expectedLoggedEvent)
+            assertThat(capturedLogEvent()).isEqualTo(expectedLoggedEvent)
         }
     }
 
@@ -554,6 +543,23 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
     }
 
     @Test
+    fun interruptedDisplaySwitchFinished_coolDownPassed_eventWithCorruptedResultSent() {
+        testScope.runTest {
+            startInFoldedState(displaySwitchLatencyTracker)
+
+            startUnfolding()
+            startFolding()
+            systemClock.advanceTime(5000) // clock for measuring latency
+            advanceTimeBy(COOL_DOWN_DURATION.plus(10.milliseconds)) // clock for triggering timeout
+
+            val event = capturedLogEvent()
+            assertThat(event.trackingResult)
+                .isEqualTo(SysUiStatsLog.DISPLAY_SWITCH_LATENCY_TRACKED__TRACKING_RESULT__CORRUPTED)
+            assertThat(event.latencyMs).isEqualTo(5000)
+        }
+    }
+
+    @Test
     fun displaySwitchInterrupted_coolDownExtendedByStartEvents() {
         testScope.runTest {
             startInFoldedState(displaySwitchLatencyTracker)
@@ -603,8 +609,71 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
         }
     }
 
+    @Test
+    fun displaySwitchTimedOut_eventLoggedWithTimeOut() {
+        testScope.runTest {
+            startInFoldedState(displaySwitchLatencyTracker)
+
+            startUnfolding()
+            advanceTimeBy(SCREEN_EVENT_TIMEOUT + 10.milliseconds)
+            finishUnfolding()
+
+            val event = capturedLogEvent()
+            assertThat(event.trackingResult)
+                .isEqualTo(SysUiStatsLog.DISPLAY_SWITCH_LATENCY_TRACKED__TRACKING_RESULT__TIMED_OUT)
+            assertThat(event.latencyMs).isEqualTo(SCREEN_EVENT_TIMEOUT.inWholeMilliseconds)
+        }
+    }
+
+    private fun capturedLogEvent(): DisplaySwitchLatencyEvent {
+        verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
+        return loggerArgumentCaptor.value
+    }
+
+    @Test
+    fun foldingStarted_screenStillOn_eventSentOnlyAfterScreenSwitches() {
+        // can happen for both folding and unfolding (with animations off) but it's more likely to
+        // happen when folding as waiting for screen on is the default case then
+        testScope.runTest {
+            startInUnfoldedState(displaySwitchLatencyTracker)
+            setDeviceState(FOLDED)
+            powerInteractor.setScreenPowerState(SCREEN_ON)
+            runCurrent()
+
+            verifyNoMoreInteractions(displaySwitchLatencyLogger)
+
+            powerInteractor.setScreenPowerState(SCREEN_OFF)
+            runCurrent()
+            powerInteractor.setScreenPowerState(SCREEN_ON)
+            runCurrent()
+
+            verify(displaySwitchLatencyLogger).log(any())
+        }
+    }
+
+    private fun successfulEvent(
+        latencyMs: Int,
+        fromFoldableDeviceState: Int,
+        toFoldableDeviceState: Int,
+        toState: Int = SysUiStatsLog.DISPLAY_SWITCH_LATENCY_TRACKED__FROM_STATE__UNKNOWN,
+    ): DisplaySwitchLatencyEvent {
+        return DisplaySwitchLatencyEvent(
+            latencyMs = latencyMs,
+            fromFoldableDeviceState = fromFoldableDeviceState,
+            toFoldableDeviceState = toFoldableDeviceState,
+            toState = toState,
+            trackingResult = SysUiStatsLog.DISPLAY_SWITCH_LATENCY_TRACKED__TRACKING_RESULT__SUCCESS,
+        )
+    }
+
     private suspend fun TestScope.startInFoldedState(tracker: DisplaySwitchLatencyTracker) {
         setDeviceState(FOLDED)
+        tracker.start()
+        runCurrent()
+    }
+
+    private suspend fun TestScope.startInUnfoldedState(tracker: DisplaySwitchLatencyTracker) {
+        setDeviceState(UNFOLDED)
         tracker.start()
         runCurrent()
     }

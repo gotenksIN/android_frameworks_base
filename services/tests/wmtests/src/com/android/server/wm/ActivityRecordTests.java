@@ -992,6 +992,27 @@ public class ActivityRecordTests extends WindowTestsBase {
         assertEquals(persistentSavedState, activity.getPersistentSavedState());
     }
 
+    @Test
+    public void testReadWindowStyle() {
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setActivityTheme(
+                com.android.frameworks.wmtests.R.style.ActivityWindowStyleTest).build();
+        assertTrue(activity.isNoDisplay());
+        assertTrue("Fill parent because showWallpaper", activity.mStyleFillsParent);
+
+        final ActivityRecord.WindowStyle style = mAtm.getWindowStyle(
+                activity.packageName, activity.info.theme, activity.mUserId);
+        assertNotNull(style);
+        assertTrue(style.isTranslucent());
+        assertTrue(style.isFloating());
+        assertTrue(style.showWallpaper());
+        assertTrue(style.noDisplay());
+        assertTrue(style.disablePreview());
+        assertTrue(style.optOutEdgeToEdge());
+        assertEquals(1 /* icon_preferred */, style.mSplashScreenBehavior);
+        assertEquals(style.noDisplay(), mAtm.mInternal.isNoDisplay(activity.packageName,
+                activity.info.theme, activity.mUserId));
+    }
+
     /**
      * Verify that activity finish request is not performed if activity is finishing or is in
      * incorrect state.
@@ -2881,7 +2902,6 @@ public class ActivityRecordTests extends WindowTestsBase {
         activity2.addStartingWindow(mPackageName, android.R.style.Theme, activity1, true, true,
                 false, true, false, false, false);
         waitUntilHandlersIdle();
-        assertFalse(mDisplayContent.mSkipAppTransitionAnimation);
         assertNoStartingWindow(activity1);
         assertHasStartingWindow(activity2);
     }
@@ -2965,7 +2985,6 @@ public class ActivityRecordTests extends WindowTestsBase {
                 false /* newTask */, false /* isTaskSwitch */, null /* options */,
                 null /* sourceRecord */);
 
-        assertTrue(mDisplayContent.mSkipAppTransitionAnimation);
         assertNull(middle.mStartingWindow);
         assertHasStartingWindow(top);
         assertTrue(top.isVisible());
@@ -3265,26 +3284,6 @@ public class ActivityRecordTests extends WindowTestsBase {
                 > activity.getConfiguration().windowConfiguration.getAppBounds().height());
     }
 
-    @Test
-    public void testSetVisibility_visibleToVisible() {
-        final ActivityRecord activity = new ActivityBuilder(mAtm)
-                .setCreateTask(true).build();
-        // By default, activity is visible.
-        assertTrue(activity.isVisible());
-        assertTrue(activity.isVisibleRequested());
-        assertFalse(activity.mDisplayContent.mClosingApps.contains(activity));
-
-        // Request the activity to be visible. Although the activity is already visible, app
-        // transition animation should be applied on this activity. This might be unnecessary, but
-        // until we verify no logic relies on this behavior, we'll keep this as is.
-        mDisplayContent.prepareAppTransition(0);
-        activity.setVisibility(true);
-        assertTrue(activity.isVisible());
-        assertTrue(activity.isVisibleRequested());
-        assertTrue(activity.mDisplayContent.mOpeningApps.contains(activity));
-        assertFalse(activity.mDisplayContent.mClosingApps.contains(activity));
-    }
-
     @SetupWindows(addWindows = W_ACTIVITY)
     @Test
     public void testSetVisibility_visibleToInvisible() {
@@ -3316,50 +3315,30 @@ public class ActivityRecordTests extends WindowTestsBase {
     public void testSetVisibility_invisibleToVisible() {
         final ActivityRecord activity = new ActivityBuilder(mAtm)
                 .setCreateTask(true).setVisible(false).build();
-        // Activiby is invisible. However ATMS requests it to become visible, since this is a top
-        // activity.
         assertFalse(activity.isVisible());
-        assertTrue(activity.isVisibleRequested());
-        assertFalse(activity.mDisplayContent.mClosingApps.contains(activity));
+        assertFalse(activity.isVisibleRequested());
 
         // Request the activity to be visible. Since the visibility changes, app transition
         // animation should be applied on this activity.
-        activity.setVisibility(true);
+        requestTransition(activity, WindowManager.TRANSIT_OPEN);
+        mWm.mRoot.resumeFocusedTasksTopActivities();
         assertFalse(activity.isVisible());
         assertTrue(activity.isVisibleRequested());
-        assertTrue(activity.mDisplayContent.mOpeningApps.contains(activity));
-        assertFalse(activity.mDisplayContent.mClosingApps.contains(activity));
-
-        // There should still be animation (add to opening) if keyguard is going away while the
-        // screen is off because it will be visible after screen is turned on by unlocking.
-        mDisplayContent.mOpeningApps.remove(activity);
-        mDisplayContent.mClosingApps.remove(activity);
-        activity.commitVisibility(false /* visible */, false /* performLayout */);
-        mDisplayContent.getDisplayPolicy().screenTurnedOff(false /* acquireSleepToken */);
-        final KeyguardController controller = mSupervisor.getKeyguardController();
-        doReturn(true).when(controller).isKeyguardGoingAway(anyInt());
-        activity.setVisibility(true);
-        assertTrue(mDisplayContent.mOpeningApps.contains(activity));
+        assertTrue(activity.inTransition());
     }
 
     @Test
     public void testSetVisibility_invisibleToInvisible() {
         final ActivityRecord activity = new ActivityBuilder(mAtm)
                 .setCreateTask(true).setVisible(false).build();
-        // Activiby is invisible. However ATMS requests it to become visible, since this is a top
-        // activity.
-        assertFalse(activity.isVisible());
-        assertTrue(activity.isVisibleRequested());
-        assertTrue(activity.mDisplayContent.mOpeningApps.contains(activity));
-        assertFalse(activity.mDisplayContent.mClosingApps.contains(activity));
+        requestTransition(activity, WindowManager.TRANSIT_CLOSE);
 
         // Request the activity to be invisible. Since the activity is already invisible, no app
         // transition should be applied on this activity.
         activity.setVisibility(false);
         assertFalse(activity.isVisible());
         assertFalse(activity.isVisibleRequested());
-        assertFalse(activity.mDisplayContent.mOpeningApps.contains(activity));
-        assertFalse(activity.mDisplayContent.mClosingApps.contains(activity));
+        assertFalse(activity.inTransition());
     }
 
     @Test
@@ -3368,16 +3347,13 @@ public class ActivityRecordTests extends WindowTestsBase {
         makeWindowVisibleAndDrawn(app);
 
         // Put the activity in close transition.
-        mDisplayContent.mOpeningApps.clear();
-        mDisplayContent.mClosingApps.add(app.mActivityRecord);
-        mDisplayContent.prepareAppTransition(TRANSIT_CLOSE);
+        requestTransition(app.mActivityRecord, WindowManager.TRANSIT_CLOSE);
 
         // Remove window during transition, so it is requested to hide, but won't be committed until
         // the transition is finished.
         app.mActivityRecord.onRemovedFromDisplay();
         app.mActivityRecord.prepareSurfaces();
 
-        assertTrue(mDisplayContent.mClosingApps.contains(app.mActivityRecord));
         assertFalse(app.mActivityRecord.isVisibleRequested());
         assertTrue(app.mActivityRecord.isVisible());
         assertTrue(app.mActivityRecord.isSurfaceShowing());
@@ -3394,11 +3370,6 @@ public class ActivityRecordTests extends WindowTestsBase {
         final WindowState app = newWindowBuilder("app", TYPE_APPLICATION).build();
         makeWindowVisibleAndDrawn(app);
         app.mActivityRecord.prepareSurfaces();
-
-        // Put the activity in close transition.
-        mDisplayContent.mOpeningApps.clear();
-        mDisplayContent.mClosingApps.add(app.mActivityRecord);
-        mDisplayContent.prepareAppTransition(TRANSIT_CLOSE);
 
         // Commit visibility before start transition.
         app.mActivityRecord.commitVisibility(false, false);

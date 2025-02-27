@@ -861,11 +861,9 @@ public class WindowTestsBase extends SystemServiceTestsBase {
     /** Creates a {@link DisplayContent} and adds it to the system. */
     private DisplayContent createNewDisplay(DisplayInfo info, @DisplayImePolicy int imePolicy,
             @Nullable SettingsEntry overrideSettings) {
-        final DisplayContent display =
-                new TestDisplayContent.Builder(mAtm, info)
-                        .setOverrideSettings(overrideSettings)
-                        .build();
-        final DisplayContent dc = display.mDisplayContent;
+        final DisplayContent dc = new TestDisplayContent.Builder(mAtm, info)
+                .setOverrideSettings(overrideSettings)
+                .build();
         // this display can show IME.
         dc.mWmService.mDisplayWindowSettings.setDisplayImePolicy(dc, imePolicy);
         return dc;
@@ -959,6 +957,15 @@ public class WindowTestsBase extends SystemServiceTestsBase {
                 mAtm.getTransitionController(), mAtm.mWindowOrganizerController);
         testPlayer.mController.registerTransitionPlayer(testPlayer, null /* playerProc */);
         return testPlayer;
+    }
+
+    void requestTransition(WindowContainer<?> wc, int transit) {
+        final TransitionController controller = mRootWindowContainer.mTransitionController;
+        if (controller.getTransitionPlayer() == null) {
+            registerTestTransitionPlayer();
+        }
+        controller.requestTransitionIfNeeded(transit, 0 /* flags */, null /* trigger */,
+                wc.mDisplayContent);
     }
 
     /** Overrides the behavior of config_reverseDefaultRotation for the given display. */
@@ -1417,7 +1424,9 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             activity.setProcess(wpc);
 
             // Resume top activities to make sure all other signals in the system are connected.
-            mService.mRootWindowContainer.resumeFocusedTasksTopActivities();
+            if (mVisible) {
+                mService.mRootWindowContainer.resumeFocusedTasksTopActivities();
+            }
             return activity;
         }
     }

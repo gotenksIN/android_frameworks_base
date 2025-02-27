@@ -55,6 +55,8 @@ import com.android.systemui.statusbar.InflationTask;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.notification.ConversationNotificationProcessor;
 import com.android.systemui.statusbar.notification.InflationException;
+import com.android.systemui.statusbar.notification.NmSummarizationUiFlag;
+import com.android.systemui.statusbar.notification.collection.EntryAdapter;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationContentExtractor;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUiForceExpanded;
@@ -201,13 +203,13 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                 mNotifLayoutInflaterFactoryProvider,
                 mHeadsUpStyleProvider,
                 mLogger);
-
         result = inflateSmartReplyViews(result, reInflateFlags, entry, row.getContext(),
                 packageContext, row.getExistingSmartReplyState(), smartRepliesInflater, mLogger);
         boolean isConversation = entry.getRanking().isConversation();
         Notification.MessagingStyle messagingStyle = null;
-        if (isConversation && (AsyncHybridViewInflation.isEnabled()
-                || LockscreenOtpRedaction.isSingleLineViewEnabled())) {
+        if (NmSummarizationUiFlag.isEnabled()
+                || (isConversation && (AsyncHybridViewInflation.isEnabled()
+                || LockscreenOtpRedaction.isSingleLineViewEnabled()))) {
             messagingStyle = mConversationProcessor
                     .processNotification(entry, builder, mLogger);
         }
@@ -245,7 +247,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                                 entry.getRanking().getSummarization());
             } else {
                 result.mPublicInflatedSingleLineViewModel =
-                        SingleLineViewInflater.inflateRedactedSingleLineViewModel(
+                        SingleLineViewInflater.inflatePublicSingleLineViewModel(
                                 row.getContext(),
                                 isConversation
                         );
@@ -507,7 +509,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                 new Notification.Builder(packageContext, original.getChannelId());
         redacted.setContentTitle(original.extras.getCharSequence(Notification.EXTRA_TITLE));
         CharSequence redactedMessage = systemUiContext.getString(
-                R.string.redacted_notification_single_line_text
+                R.string.redacted_otp_notification_single_line_text
         );
         redacted.setWhen(original.getWhen());
 
@@ -1360,7 +1362,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                             );
                 } else {
                     result.mPublicInflatedSingleLineViewModel =
-                            SingleLineViewInflater.inflateRedactedSingleLineViewModel(
+                            SingleLineViewInflater.inflatePublicSingleLineViewModel(
                                     mContext,
                                     isConversation
                             );
@@ -1456,12 +1458,12 @@ public class NotificationContentInflater implements NotificationRowContentBinder
         }
 
         @Override
-        public void handleInflationException(NotificationEntry entry, Exception e) {
+        public void handleInflationException(Exception e) {
             handleError(e);
         }
 
         @Override
-        public void onAsyncInflationFinished(NotificationEntry entry) {
+        public void onAsyncInflationFinished() {
             mEntry.onInflationTaskFinished();
             mRow.onNotificationUpdated();
             if (mCallback != null) {

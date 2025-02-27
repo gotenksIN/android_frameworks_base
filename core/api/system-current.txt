@@ -7,7 +7,7 @@ package android {
     field public static final String ACCESS_BROADCAST_RADIO = "android.permission.ACCESS_BROADCAST_RADIO";
     field public static final String ACCESS_BROADCAST_RESPONSE_STATS = "android.permission.ACCESS_BROADCAST_RESPONSE_STATS";
     field public static final String ACCESS_CACHE_FILESYSTEM = "android.permission.ACCESS_CACHE_FILESYSTEM";
-    field @FlaggedApi("android.app.contextualsearch.flags.enable_service") public static final String ACCESS_CONTEXTUAL_SEARCH = "android.permission.ACCESS_CONTEXTUAL_SEARCH";
+    field public static final String ACCESS_CONTEXTUAL_SEARCH = "android.permission.ACCESS_CONTEXTUAL_SEARCH";
     field public static final String ACCESS_CONTEXT_HUB = "android.permission.ACCESS_CONTEXT_HUB";
     field public static final String ACCESS_DRM_CERTIFICATES = "android.permission.ACCESS_DRM_CERTIFICATES";
     field @FlaggedApi("android.permission.flags.fine_power_monitor_permission") public static final String ACCESS_FINE_POWER_MONITORS = "android.permission.ACCESS_FINE_POWER_MONITORS";
@@ -151,6 +151,8 @@ package android {
     field @FlaggedApi("android.content.pm.emergency_install_permission") public static final String EMERGENCY_INSTALL_PACKAGES = "android.permission.EMERGENCY_INSTALL_PACKAGES";
     field public static final String ENTER_CAR_MODE_PRIORITIZED = "android.permission.ENTER_CAR_MODE_PRIORITIZED";
     field public static final String EXEMPT_FROM_AUDIO_RECORD_RESTRICTIONS = "android.permission.EXEMPT_FROM_AUDIO_RECORD_RESTRICTIONS";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String EYE_CALIBRATION = "android.permission.EYE_CALIBRATION";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String FACE_TRACKING_CALIBRATION = "android.permission.FACE_TRACKING_CALIBRATION";
     field public static final String FORCE_BACK = "android.permission.FORCE_BACK";
     field public static final String FORCE_STOP_PACKAGES = "android.permission.FORCE_STOP_PACKAGES";
     field public static final String GET_APP_METADATA = "android.permission.GET_APP_METADATA";
@@ -168,6 +170,7 @@ package android {
     field public static final String HARDWARE_TEST = "android.permission.HARDWARE_TEST";
     field public static final String HDMI_CEC = "android.permission.HDMI_CEC";
     field @Deprecated public static final String HIDE_NON_SYSTEM_OVERLAY_WINDOWS = "android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String IMPORT_XR_ANCHOR = "android.permission.IMPORT_XR_ANCHOR";
     field public static final String INJECT_EVENTS = "android.permission.INJECT_EVENTS";
     field @FlaggedApi("android.content.pm.sdk_dependency_installer") public static final String INSTALL_DEPENDENCY_SHARED_LIBRARIES = "android.permission.INSTALL_DEPENDENCY_SHARED_LIBRARIES";
     field public static final String INSTALL_DPC_PACKAGES = "android.permission.INSTALL_DPC_PACKAGES";
@@ -450,6 +453,7 @@ package android {
     field public static final String WRITE_SECURITY_LOG = "android.permission.WRITE_SECURITY_LOG";
     field public static final String WRITE_SMS = "android.permission.WRITE_SMS";
     field @FlaggedApi("android.provider.user_keys") public static final String WRITE_VERIFICATION_STATE_E2EE_CONTACT_KEYS = "android.permission.WRITE_VERIFICATION_STATE_E2EE_CONTACT_KEYS";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String XR_TRACKING_IN_BACKGROUND = "android.permission.XR_TRACKING_IN_BACKGROUND";
   }
 
   public static final class Manifest.permission_group {
@@ -2231,7 +2235,7 @@ package android.app.contextualsearch {
     field @NonNull public static final android.os.Parcelable.Creator<android.app.contextualsearch.CallbackToken> CREATOR;
   }
 
-  public final class ContextualSearchManager {
+  @FlaggedApi("android.app.contextualsearch.flags.self_invocation") public final class ContextualSearchManager {
     method @RequiresPermission(android.Manifest.permission.ACCESS_CONTEXTUAL_SEARCH) public void startContextualSearch(int);
     field public static final String ACTION_LAUNCH_CONTEXTUAL_SEARCH = "android.app.contextualsearch.action.LAUNCH_CONTEXTUAL_SEARCH";
     field public static final int ENTRYPOINT_LONG_PRESS_HOME = 2; // 0x2
@@ -2930,6 +2934,14 @@ package android.app.smartspace.uitemplatedata {
     method @NonNull public android.app.smartspace.uitemplatedata.Text build();
     method @NonNull public android.app.smartspace.uitemplatedata.Text.Builder setMaxLines(int);
     method @NonNull public android.app.smartspace.uitemplatedata.Text.Builder setTruncateAtType(@NonNull android.text.TextUtils.TruncateAt);
+  }
+
+}
+
+package android.app.supervision {
+
+  @FlaggedApi("android.app.supervision.flags.supervision_manager_apis") public class SupervisionManager {
+    method @FlaggedApi("android.app.supervision.flags.supervision_manager_apis") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean isSupervisionEnabled();
   }
 
 }
@@ -3797,6 +3809,7 @@ package android.content {
     field public static final String SHARED_CONNECTIVITY_SERVICE = "shared_connectivity";
     field public static final String SMARTSPACE_SERVICE = "smartspace";
     field public static final String STATS_MANAGER = "stats";
+    field @FlaggedApi("android.app.supervision.flags.supervision_manager_apis") public static final String SUPERVISION_SERVICE = "supervision";
     field public static final String SYSTEM_CONFIG_SERVICE = "system_config";
     field public static final String SYSTEM_UPDATE_SERVICE = "system_update";
     field @FlaggedApi("com.android.net.thread.platform.flags.thread_enabled_platform") public static final String THREAD_NETWORK_SERVICE = "thread_network";
@@ -4186,7 +4199,7 @@ package android.content.pm {
     method public void setInstallAsInstantApp(boolean);
     method public void setInstallAsVirtualPreload();
     method public void setRequestDowngrade(boolean);
-    method @FlaggedApi("android.content.pm.recoverability_detection") @RequiresPermission(android.Manifest.permission.MANAGE_ROLLBACKS) public void setRollbackImpactLevel(int);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_ROLLBACKS) public void setRollbackImpactLevel(int);
     method @FlaggedApi("android.content.pm.rollback_lifetime") @RequiresPermission(android.Manifest.permission.MANAGE_ROLLBACKS) public void setRollbackLifetimeMillis(long);
     method @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public void setStaged();
   }
@@ -4361,9 +4374,9 @@ package android.content.pm {
     field public static final int ROLLBACK_DATA_POLICY_RESTORE = 0; // 0x0
     field public static final int ROLLBACK_DATA_POLICY_RETAIN = 2; // 0x2
     field public static final int ROLLBACK_DATA_POLICY_WIPE = 1; // 0x1
-    field @FlaggedApi("android.content.pm.recoverability_detection") public static final int ROLLBACK_USER_IMPACT_HIGH = 1; // 0x1
-    field @FlaggedApi("android.content.pm.recoverability_detection") public static final int ROLLBACK_USER_IMPACT_LOW = 0; // 0x0
-    field @FlaggedApi("android.content.pm.recoverability_detection") public static final int ROLLBACK_USER_IMPACT_ONLY_MANUAL = 2; // 0x2
+    field public static final int ROLLBACK_USER_IMPACT_HIGH = 1; // 0x1
+    field public static final int ROLLBACK_USER_IMPACT_LOW = 0; // 0x0
+    field public static final int ROLLBACK_USER_IMPACT_ONLY_MANUAL = 2; // 0x2
     field public static final int SYSTEM_APP_STATE_HIDDEN_UNTIL_INSTALLED_HIDDEN = 0; // 0x0
     field public static final int SYSTEM_APP_STATE_HIDDEN_UNTIL_INSTALLED_VISIBLE = 1; // 0x1
     field public static final int SYSTEM_APP_STATE_INSTALLED = 2; // 0x2
@@ -15272,7 +15285,7 @@ package android.telephony {
     method @NonNull public android.telephony.NetworkRegistrationInfo.Builder setCellIdentity(@Nullable android.telephony.CellIdentity);
     method @NonNull public android.telephony.NetworkRegistrationInfo.Builder setDomain(int);
     method @NonNull public android.telephony.NetworkRegistrationInfo.Builder setEmergencyOnly(boolean);
-    method @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") @NonNull public android.telephony.NetworkRegistrationInfo.Builder setIsNonTerrestrialNetwork(boolean);
+    method @NonNull public android.telephony.NetworkRegistrationInfo.Builder setIsNonTerrestrialNetwork(boolean);
     method @NonNull public android.telephony.NetworkRegistrationInfo.Builder setRegisteredPlmn(@Nullable String);
     method @NonNull public android.telephony.NetworkRegistrationInfo.Builder setRegistrationState(int);
     method @NonNull public android.telephony.NetworkRegistrationInfo.Builder setRejectCause(int);
@@ -16409,7 +16422,7 @@ package android.telephony.data {
     field public static final String TYPE_MMS_STRING = "mms";
     field @FlaggedApi("com.android.internal.telephony.flags.oem_paid_private") public static final String TYPE_OEM_PAID_STRING = "oem_paid";
     field @FlaggedApi("com.android.internal.telephony.flags.oem_paid_private") public static final String TYPE_OEM_PRIVATE_STRING = "oem_private";
-    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final String TYPE_RCS_STRING = "rcs";
+    field public static final String TYPE_RCS_STRING = "rcs";
     field public static final String TYPE_SUPL_STRING = "supl";
     field public static final String TYPE_VSIM_STRING = "vsim";
     field public static final String TYPE_XCAP_STRING = "xcap";
@@ -18577,12 +18590,13 @@ package android.telephony.satellite {
   }
 
   @FlaggedApi("com.android.internal.telephony.flags.satellite_state_change_listener") public final class SatelliteManager {
-    method @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void addAttachRestrictionForCarrier(int, int, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
+    method @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void addAttachRestrictionForCarrier(int, int, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
     method @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void deprovisionSatellite(@NonNull java.util.List<android.telephony.satellite.SatelliteSubscriberInfo>, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.telephony.satellite.SatelliteManager.SatelliteException>);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void deprovisionService(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
-    method @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") @NonNull @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public java.util.Set<java.lang.Integer> getAttachRestrictionReasonsForCarrier(int);
+    method @NonNull @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public java.util.Set<java.lang.Integer> getAttachRestrictionReasonsForCarrier(int);
+    method @FlaggedApi("com.android.internal.telephony.flags.satellite_25q4_apis") @NonNull @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public java.util.List<java.lang.String> getSatelliteDataOptimizedApps();
     method @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") @NonNull @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public int[] getSatelliteDisallowedReasons();
-    method @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") @NonNull @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public java.util.List<java.lang.String> getSatellitePlmnsForCarrier(int);
+    method @NonNull @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public java.util.List<java.lang.String> getSatellitePlmnsForCarrier(int);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void pollPendingDatagrams(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
     method @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void provisionSatellite(@NonNull java.util.List<android.telephony.satellite.SatelliteSubscriberInfo>, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.telephony.satellite.SatelliteManager.SatelliteException>);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void provisionService(@NonNull String, @NonNull byte[], @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
@@ -18595,11 +18609,11 @@ package android.telephony.satellite {
     method @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void registerForSatelliteDisallowedReasonsChanged(@NonNull java.util.concurrent.Executor, @NonNull android.telephony.satellite.SatelliteDisallowedReasonsCallback);
     method @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public int registerForSelectedNbIotSatelliteSubscriptionChanged(@NonNull java.util.concurrent.Executor, @NonNull android.telephony.satellite.SelectedNbIotSatelliteSubscriptionCallback);
     method @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public int registerForSupportedStateChanged(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
-    method @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void removeAttachRestrictionForCarrier(int, int, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
-    method @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestAttachEnabledForCarrier(int, boolean, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
+    method @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void removeAttachRestrictionForCarrier(int, int, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
+    method @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestAttachEnabledForCarrier(int, boolean, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestCapabilities(@NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.telephony.satellite.SatelliteCapabilities,android.telephony.satellite.SatelliteManager.SatelliteException>);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestEnabled(@NonNull android.telephony.satellite.EnableRequestAttributes, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
-    method @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestIsAttachEnabledForCarrier(int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,android.telephony.satellite.SatelliteManager.SatelliteException>);
+    method @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestIsAttachEnabledForCarrier(int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,android.telephony.satellite.SatelliteManager.SatelliteException>);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestIsCommunicationAllowedForCurrentLocation(@NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,android.telephony.satellite.SatelliteManager.SatelliteException>);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestIsDemoModeEnabled(@NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,android.telephony.satellite.SatelliteManager.SatelliteException>);
     method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") @RequiresPermission(android.Manifest.permission.SATELLITE_COMMUNICATION) public void requestIsEmergencyModeEnabled(@NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,android.telephony.satellite.SatelliteManager.SatelliteException>);
@@ -18643,15 +18657,15 @@ package android.telephony.satellite {
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int DISPLAY_MODE_OPENED = 2; // 0x2
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int DISPLAY_MODE_UNKNOWN = 0; // 0x0
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_SOS = 1; // 0x1
-    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final int EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_T911 = 2; // 0x2
+    field public static final int EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_T911 = 2; // 0x2
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int NT_RADIO_TECHNOLOGY_EMTC_NTN = 3; // 0x3
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int NT_RADIO_TECHNOLOGY_NB_IOT_NTN = 1; // 0x1
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int NT_RADIO_TECHNOLOGY_NR_NTN = 2; // 0x2
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int NT_RADIO_TECHNOLOGY_PROPRIETARY = 4; // 0x4
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int NT_RADIO_TECHNOLOGY_UNKNOWN = 0; // 0x0
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final String PROPERTY_SATELLITE_MANUAL_CONNECT_P2P_SUPPORT = "android.telephony.satellite.PROPERTY_SATELLITE_MANUAL_CONNECT_P2P_SUPPORT";
-    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final int SATELLITE_COMMUNICATION_RESTRICTION_REASON_ENTITLEMENT = 2; // 0x2
-    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final int SATELLITE_COMMUNICATION_RESTRICTION_REASON_GEOLOCATION = 1; // 0x1
+    field public static final int SATELLITE_COMMUNICATION_RESTRICTION_REASON_ENTITLEMENT = 2; // 0x2
+    field public static final int SATELLITE_COMMUNICATION_RESTRICTION_REASON_GEOLOCATION = 1; // 0x1
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final int SATELLITE_COMMUNICATION_RESTRICTION_REASON_USER = 0; // 0x0
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int SATELLITE_DATAGRAM_TRANSFER_STATE_IDLE = 0; // 0x0
     field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int SATELLITE_DATAGRAM_TRANSFER_STATE_RECEIVE_FAILED = 7; // 0x7

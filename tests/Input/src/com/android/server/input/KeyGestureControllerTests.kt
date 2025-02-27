@@ -207,7 +207,7 @@ class KeyGestureControllerTests {
 
     private fun setupKeyGestureController() {
         keyGestureController =
-            KeyGestureController(context, testLooper.looper, inputDataStore)
+            KeyGestureController(context, testLooper.looper, testLooper.looper, inputDataStore)
         Mockito.`when`(iInputManager.getAppLaunchBookmarks())
             .thenReturn(keyGestureController.appLaunchBookmarks)
         keyGestureController.systemRunning()
@@ -368,18 +368,6 @@ class KeyGestureControllerTests {
                 KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_NOTIFICATION_PANEL,
                 intArrayOf(KeyEvent.KEYCODE_N),
                 KeyEvent.META_META_ON,
-                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
-            ),
-            TestData(
-                "META + CTRL + N -> Open Notes",
-                intArrayOf(
-                    KeyEvent.KEYCODE_META_LEFT,
-                    KeyEvent.KEYCODE_CTRL_LEFT,
-                    KeyEvent.KEYCODE_N
-                ),
-                KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_NOTES,
-                intArrayOf(KeyEvent.KEYCODE_N),
-                KeyEvent.META_META_ON or KeyEvent.META_CTRL_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
             ),
             TestData(
@@ -754,9 +742,6 @@ class KeyGestureControllerTests {
     @EnableFlags(
         com.android.server.flags.Flags.FLAG_NEW_BUGREPORT_KEYBOARD_SHORTCUT,
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_SHORTCUT_CONTROL,
-        com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_BOUNCE_KEYS_FLAG,
-        com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_SLOW_KEYS_FLAG,
-        com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_STICKY_KEYS_FLAG,
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_MOUSE_KEYS,
         com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_AND_MAGNIFIER_KEY_GESTURES,
         com.android.hardware.input.Flags.FLAG_ENABLE_VOICE_ACCESS_KEY_GESTURES,
@@ -773,9 +758,6 @@ class KeyGestureControllerTests {
     @EnableFlags(
         com.android.server.flags.Flags.FLAG_NEW_BUGREPORT_KEYBOARD_SHORTCUT,
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_SHORTCUT_CONTROL,
-        com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_BOUNCE_KEYS_FLAG,
-        com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_SLOW_KEYS_FLAG,
-        com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_STICKY_KEYS_FLAG,
         com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_MOUSE_KEYS,
         com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_AND_MAGNIFIER_KEY_GESTURES,
         com.android.hardware.input.Flags.FLAG_ENABLE_VOICE_ACCESS_KEY_GESTURES,

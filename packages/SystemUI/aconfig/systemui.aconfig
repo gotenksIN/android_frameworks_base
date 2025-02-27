@@ -67,6 +67,13 @@ flag {
 }
 
 flag {
+  name: "notifications_redesign_guts"
+  namespace: "systemui"
+  description: "Notifications Redesign: Update the look of the notification guts (that appear on long press). This includes using the new cache for app icons."
+  bug: "394822197"
+}
+
+flag {
    name: "notification_row_content_binder_refactor"
    namespace: "systemui"
    description: "Convert the NotificationContentInflater to Kotlin and restructure it to support modern views"
@@ -957,20 +964,30 @@ flag {
 }
 
 flag {
-    name: "dedicated_notif_inflation_thread"
+    name: "bind_keyguard_media_visibility"
     namespace: "systemui"
-    description: "Create a separate background thread for inflating notifications"
-    bug: "308967184"
+    description: "Binds Keyguard Media Controller Visibility to MediaContainerView"
+    bug: "298213983"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
 }
 
 flag {
-    name: "bind_keyguard_media_visibility"
+    name: "use_notif_inflation_thread_for_footer"
     namespace: "systemui"
-    description: "Binds Keyguard Media Controller Visibility to MediaContainerView"
-    bug: "298213983"
+    description: "use the @NotifInflation thread for FooterView and EmptyShadeView inflation"
+    bug: "375320642"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "use_notif_inflation_thread_for_row"
+    namespace: "systemui"
+    description: "use the @NotifInflation thread for ExpandableNotificationRow inflation"
+    bug: "375320642"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1258,13 +1275,6 @@ flag {
 }
 
 flag {
-    name: "glanceable_hub_back_action"
-    namespace: "systemui"
-    description: "Support back action from glanceable hub"
-    bug: "382771533"
-}
-
-flag {
     name: "dream_overlay_updated_font"
     namespace: "systemui"
     description: "Flag to enable updated font settings for dream overlay"
@@ -1357,6 +1367,16 @@ flag {
   namespace: "systemui"
   description: "Enables media visuals update"
   bug: "379044958"
+}
+
+flag {
+    name: "media_controls_a11y_colors"
+    namespace: "systemui"
+    description: "Color scheme updates for improved a11y"
+    bug: "378848399"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1905,6 +1925,13 @@ flag {
 }
 
 flag {
+   name: "physical_notification_movement"
+   namespace: "systemui"
+   description: "Make notifications use physics based animations for movement"
+   bug: "393581344"
+}
+
+flag {
    name: "glanceable_hub_direct_edit_mode"
    namespace: "systemui"
    description: "Invokes edit mode directly from long press in glanceable hub"
@@ -1987,6 +2014,16 @@ flag {
 }
 
 flag {
+    name: "hardware_color_styles"
+    namespace: "systemui"
+    description: "Enables loading initial colors based ion hardware color"
+    bug: "347286986"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
    name: "shade_launch_accessibility"
    namespace: "systemui"
    description: "Intercept accessibility focus events for the Shade during launch animations to avoid stray TalkBack events."
@@ -1994,6 +2031,16 @@ flag {
    metadata {
         purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+  name: "expand_collapse_privacy_dialog"
+  namespace: "systemui"
+  description: "Add expand and collapse actions to accessibility, to allow announcement in TalkBack when state changes."
+  bug: "380161221"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -2015,4 +2062,24 @@ flag {
     namespace: "systemui"
     description: "Enables the clock fidget animation"
     bug: "364664389"
+}
+
+flag {
+    name: "notifications_launch_radius"
+    namespace: "systemui"
+    description: "Fixes a discrepancy in corner radius between expanding notification and opening window during launch animations."
+    bug: "396054791"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "skip_hide_sensitive_notif_animation"
+    namespace: "systemui"
+    description: "Skip hide sensitive notification animation when the showing layout is not changed."
+    bug: "390624334"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+   }
 }

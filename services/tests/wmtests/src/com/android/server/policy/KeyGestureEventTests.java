@@ -244,9 +244,6 @@ public class KeyGestureEventTests extends ShortcutKeyTestBase {
                 {"Meta + L -> Lock Homescreen", new int[]{META_KEY, KeyEvent.KEYCODE_L},
                         KeyGestureEvent.KEY_GESTURE_TYPE_LOCK_SCREEN, KeyEvent.KEYCODE_L,
                         META_ON},
-                {"Meta + Ctrl + N -> Open Notes", new int[]{META_KEY, CTRL_KEY, KeyEvent.KEYCODE_N},
-                        KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_NOTES, KeyEvent.KEYCODE_N,
-                        META_ON | CTRL_ON},
                 {"Meta + Ctrl + DPAD_DOWN -> Enter desktop mode",
                         new int[]{META_KEY, CTRL_KEY, KeyEvent.KEYCODE_DPAD_DOWN},
                         KeyGestureEvent.KEY_GESTURE_TYPE_DESKTOP_MODE,
@@ -402,9 +399,6 @@ public class KeyGestureEventTests extends ShortcutKeyTestBase {
 
     @Test
     @EnableFlags({com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_SHORTCUT_CONTROL,
-            com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_BOUNCE_KEYS_FLAG,
-            com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_SLOW_KEYS_FLAG,
-            com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_STICKY_KEYS_FLAG,
             com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_MOUSE_KEYS})
     @DisableFlags(com.android.hardware.input.Flags.FLAG_USE_KEY_GESTURE_EVENT_HANDLER)
     public void testKeyboardAccessibilityToggleShortcutPress() {

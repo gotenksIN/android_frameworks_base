@@ -22,6 +22,7 @@ import static android.service.notification.NotificationListenerService.REASON_CA
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+import static android.view.WindowManager.TRANSIT_CHANGE;
 
 import static com.android.wm.shell.bubbles.BubbleDebugConfig.TAG_BUBBLES;
 import static com.android.wm.shell.bubbles.BubbleDebugConfig.TAG_WITH_CLASS_NAME;
@@ -594,7 +595,10 @@ public class BubbleController implements ConfigurationChangeListener,
      * <p>If bubble bar is supported, bubble views will be updated to switch to bar mode.
      */
     public void registerBubbleStateListener(Bubbles.BubbleStateListener listener) {
-        if (Flags.enableBubbleBar() && mBubblePositioner.isLargeScreen() && listener != null) {
+        final boolean bubbleBarAllowed = Flags.enableBubbleBar()
+                && (mBubblePositioner.isLargeScreen() || Flags.enableBubbleBarOnPhones())
+                && listener != null;
+        if (bubbleBarAllowed) {
             // Only set the listener if we can show the bubble bar.
             mBubbleStateListener = listener;
             setUpBubbleViewsForMode();
@@ -771,7 +775,7 @@ public class BubbleController implements ConfigurationChangeListener,
     /** Whether bubbles would be shown with the bubble bar UI. */
     public boolean isShowingAsBubbleBar() {
         return Flags.enableBubbleBar()
-                && mBubblePositioner.isLargeScreen()
+                && (mBubblePositioner.isLargeScreen() || Flags.enableBubbleBarOnPhones())
                 && mBubbleStateListener != null;
     }
 
@@ -844,6 +848,10 @@ public class BubbleController implements ConfigurationChangeListener,
                 mLogger.log(onLeft ? BubbleLogger.Event.BUBBLE_BAR_MOVED_LEFT_APP_ICON_DROP
                         : BubbleLogger.Event.BUBBLE_BAR_MOVED_RIGHT_APP_ICON_DROP);
                 break;
+            case BubbleBarLocation.UpdateSource.DRAG_TASK:
+                mLogger.log(onLeft ? BubbleLogger.Event.BUBBLE_BAR_MOVED_LEFT_DRAG_TASK
+                        : BubbleLogger.Event.BUBBLE_BAR_MOVED_RIGHT_DRAG_TASK);
+                break;
         }
     }
 
@@ -904,7 +912,7 @@ public class BubbleController implements ConfigurationChangeListener,
             // TODO(b/393172431) : Utilise DragZoneFactory once it is ready
             final int bubbleBarDropZoneSideSize = getContext().getResources().getDimensionPixelSize(
                     R.dimen.bubble_bar_drop_zone_side_size);
-            int top = t - bubbleBarDropZoneSideSize;
+            int top = b - bubbleBarDropZoneSideSize;
             result.put(BubbleBarLocation.LEFT,
                     new Rect(l, top, l + bubbleBarDropZoneSideSize, b));
             result.put(BubbleBarLocation.RIGHT,
@@ -1290,6 +1298,11 @@ public class BubbleController implements ConfigurationChangeListener,
                         mContext.getResources().getDimensionPixelSize(
                                 com.android.internal.R.dimen.importance_ring_stroke_width));
                 mStackView.onDisplaySizeChanged();
+                // TODO b/392893178: Merge the unfold and the task view transition so that we don't
+                //  have to post a delayed runnable to the looper to update the bounds
+                if (mStackView.isExpanded()) {
+                    mStackView.postDelayed(() -> mStackView.updateExpandedView(), 500);
+                }
             }
             if (newConfig.fontScale != mFontScale) {
                 mFontScale = newConfig.fontScale;
@@ -1590,20 +1603,34 @@ public class BubbleController implements ConfigurationChangeListener,
      * Expands and selects a bubble created from a running task in a different mode.
      *
      * @param taskInfo the task.
+     * @param dragData optional information about the task when it is being dragged into a bubble
      */
-    public void expandStackAndSelectBubble(ActivityManager.RunningTaskInfo taskInfo) {
+    public void expandStackAndSelectBubble(ActivityManager.RunningTaskInfo taskInfo,
+            @Nullable BubbleTransitions.DragData dragData) {
         if (!BubbleAnythingFlagHelper.enableBubbleToFullscreen()) return;
         Bubble b = mBubbleData.getOrCreateBubble(taskInfo); // Removes from overflow
         ProtoLog.v(WM_SHELL_BUBBLES, "expandStackAndSelectBubble - intent=%s", taskInfo.taskId);
+        BubbleBarLocation location = null;
+        if (dragData != null) {
+            location =
+                    dragData.isReleasedOnLeft() ? BubbleBarLocation.LEFT : BubbleBarLocation.RIGHT;
+        }
         if (b.isInflated()) {
-            mBubbleData.setSelectedBubbleAndExpandStack(b);
+            mBubbleData.setSelectedBubbleAndExpandStack(b, location);
+            if (dragData != null && dragData.getPendingWct() != null) {
+                mTransitions.startTransition(TRANSIT_CHANGE,
+                        dragData.getPendingWct(), /* handler= */ null);
+            }
         } else {
+            if (location != null) {
+                setBubbleBarLocation(location, BubbleBarLocation.UpdateSource.DRAG_TASK);
+            }
             b.enable(Notification.BubbleMetadata.FLAG_AUTO_EXPAND_BUBBLE);
             // Lazy init stack view when a bubble is created
             ensureBubbleViewsAndWindowCreated();
             mBubbleTransitions.startConvertToBubble(b, taskInfo, mExpandedViewManager,
                     mBubbleTaskViewFactory, mBubblePositioner, mStackView, mLayerView,
-                    mBubbleIconFactory, mInflateSynchronously);
+                    mBubbleIconFactory, dragData, mInflateSynchronously);
         }
     }
 

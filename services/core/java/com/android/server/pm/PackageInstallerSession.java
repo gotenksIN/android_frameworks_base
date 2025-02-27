@@ -967,6 +967,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     break;
                 case MSG_ON_NATIVE_LIBS_EXTRACTED:
                     handleOnNativeLibsExtracted();
+                    break;
             }
 
             return true;

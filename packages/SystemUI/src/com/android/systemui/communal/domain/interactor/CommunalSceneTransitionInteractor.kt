@@ -16,11 +16,11 @@
 
 package com.android.systemui.communal.domain.interactor
 
+import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SceneTransitionLayout
 import com.android.systemui.CoreStartable
-import com.android.systemui.Flags.communalSceneKtfRefactor
 import com.android.systemui.communal.data.repository.CommunalSceneTransitionRepository
 import com.android.systemui.communal.shared.model.CommunalScenes
 import com.android.systemui.dagger.SysUISingleton
@@ -32,6 +32,7 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.TransitionInfo
 import com.android.systemui.keyguard.shared.model.TransitionModeOnCanceled
 import com.android.systemui.keyguard.shared.model.TransitionState
+import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.util.kotlin.pairwise
 import java.util.UUID
@@ -44,7 +45,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
-import com.android.app.tracing.coroutines.launchTraced as launch
 
 /**
  * This class listens to [SceneTransitionLayout] transitions and manages keyguard transition
@@ -66,6 +66,7 @@ constructor(
     @Application private val applicationScope: CoroutineScope,
     private val sceneInteractor: CommunalSceneInteractor,
     private val repository: CommunalSceneTransitionRepository,
+    private val powerInteractor: PowerInteractor,
     keyguardInteractor: KeyguardInteractor,
 ) : CoreStartable, CommunalSceneInteractor.OnSceneAboutToChangeListener {
 
@@ -89,12 +90,15 @@ constructor(
         combine(
                 // Don't use delayed dreaming signal as otherwise we might go to occluded or lock
                 // screen when closing hub if dream just started under the hub.
+                powerInteractor.isAsleep,
                 keyguardInteractor.isDreamingWithOverlay,
                 keyguardInteractor.isKeyguardOccluded,
                 keyguardInteractor.isKeyguardGoingAway,
                 keyguardInteractor.isKeyguardShowing,
-            ) { dreaming, occluded, keyguardGoingAway, keyguardShowing ->
-                if (keyguardGoingAway) {
+            ) { asleep, dreaming, occluded, keyguardGoingAway, keyguardShowing ->
+                if (asleep) {
+                    KeyguardState.DOZING
+                } else if (keyguardGoingAway) {
                     KeyguardState.GONE
                 } else if (occluded && !dreaming) {
                     KeyguardState.OCCLUDED
@@ -122,11 +126,7 @@ constructor(
             )
 
     override fun start() {
-        if (
-            communalSceneKtfRefactor() &&
-                settingsInteractor.isCommunalFlagEnabled() &&
-                !SceneContainerFlag.isEnabled
-        ) {
+        if (settingsInteractor.isCommunalFlagEnabled() && !SceneContainerFlag.isEnabled) {
             sceneInteractor.registerSceneStateProcessor(this)
             listenForSceneTransitionProgress()
         }

@@ -57,6 +57,8 @@ public enum DesktopModeFlags {
             true),
     ENABLE_DESKTOP_CLOSE_SHORTCUT_BUGFIX(Flags::enableDesktopCloseShortcutBugfix, false),
     ENABLE_DESKTOP_COMPAT_UI_VISIBILITY_STATUS(Flags::enableCompatUiVisibilityStatus, true),
+    ENABLE_DESKTOP_INDICATOR_IN_SEPARATE_THREAD_BUGFIX(
+            Flags::enableDesktopIndicatorInSeparateThreadBugfix, false),
     ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX(
             Flags::enableDesktopRecentsTransitionsCornersBugfix, false),
     ENABLE_DESKTOP_SKIP_COMPAT_UI_EDUCATION_IN_DESKTOP_MODE_BUGFIX(
@@ -94,10 +96,12 @@ public enum DesktopModeFlags {
     ENABLE_DESKTOP_WINDOWING_TASK_LIMIT(Flags::enableDesktopWindowingTaskLimit, true),
     ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY(Flags::enableDesktopWindowingWallpaperActivity,
             true),
+    ENABLE_DRAG_RESIZE_SET_UP_IN_BG_THREAD(Flags::enableDragResizeSetUpInBgThread, false),
     ENABLE_FULLY_IMMERSIVE_IN_DESKTOP(Flags::enableFullyImmersiveInDesktop, true),
     ENABLE_HANDLE_INPUT_FIX(Flags::enableHandleInputFix, true),
     ENABLE_HOLD_TO_DRAG_APP_HANDLE(Flags::enableHoldToDragAppHandle, true),
     ENABLE_MINIMIZE_BUTTON(Flags::enableMinimizeButton, true),
+    ENABLE_MODALS_FULLSCREEN_WITH_PERMISSIONS(Flags::enableModalsFullscreenWithPermission, false),
     ENABLE_RESIZING_METRICS(Flags::enableResizingMetrics, true),
     ENABLE_RESTORE_TO_PREVIOUS_SIZE_FROM_DESKTOP_IMMERSIVE(
             Flags::enableRestoreToPreviousSizeFromDesktopImmersive, true),
@@ -112,6 +116,7 @@ public enum DesktopModeFlags {
     ENABLE_WINDOWING_SCALED_RESIZING(Flags::enableWindowingScaledResizing, true),
     ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS(
             Flags::enableWindowingTransitionHandlersObservers, false),
+    EXCLUDE_CAPTION_FROM_APP_BOUNDS(Flags::excludeCaptionFromAppBounds, false),
     INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC(
             Flags::includeTopTransparentFullscreenTaskInDesktopHeuristic, true)
     // go/keep-sorted end

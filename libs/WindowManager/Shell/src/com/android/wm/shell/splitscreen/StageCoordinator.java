@@ -40,11 +40,13 @@ import static com.android.wm.shell.Flags.enableFlexibleSplit;
 import static com.android.wm.shell.Flags.enableFlexibleTwoAppSplit;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_ALIGN_CENTER;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX;
+import static com.android.wm.shell.common.split.SplitLayout.RESTING_DIM_LAYER;
 import static com.android.wm.shell.common.split.SplitScreenUtils.reverseSplitPosition;
 import static com.android.wm.shell.common.split.SplitScreenUtils.splitFailureMessage;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN;
 import static com.android.wm.shell.shared.TransitionUtil.isClosingType;
 import static com.android.wm.shell.shared.TransitionUtil.isOpeningType;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.FLAG_IS_DIM_LAYER;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.FLAG_IS_DIVIDER_BAR;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_10_90;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_50_50;
@@ -1316,6 +1318,10 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         WindowContainerTransaction noFocus = new WindowContainerTransaction();
         noFocus.setFocusable(mRootTaskInfo.token, false);
         mSyncQueue.queue(noFocus);
+        // Remove touch layers, since offscreen apps coming onscreen will not need their touch
+        // layers anymore. populateTouchZones() is called in the end callback to inflate new touch
+        // layers in the appropriate places.
+        mSplitLayout.removeTouchZones();
 
         mSplitLayout.playSwapAnimation(t, topLeftStage, bottomRightStage,
                 insets -> {
@@ -1336,6 +1342,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     mSyncQueue.runInSync(st -> {
                         mSplitLayout.updateStateWithCurrentPosition();
                         updateSurfaceBounds(mSplitLayout, st, false /* applyResizingOffset */);
+                        mSplitLayout.populateTouchZones();
 
                         // updateSurfaceBounds(), above, officially puts the two apps in their new
                         // stages. Starting on the next frame, all calculations are made using the
@@ -1825,6 +1832,14 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         // Ensure divider surface are re-parented back into the hierarchy at the end of the
         // transition. See Transition#buildFinishTransaction for more detail.
         finishT.reparent(mSplitLayout.getDividerLeash(), mRootTaskLeash);
+        if (Flags.enableFlexibleSplit()) {
+            mStageOrderOperator.getActiveStages().forEach(stage -> {
+                finishT.reparent(stage.mDimLayer, stage.mRootLeash);
+            });
+        } else if (Flags.enableFlexibleTwoAppSplit()) {
+            finishT.reparent(mMainStage.mDimLayer, mMainStage.mRootLeash);
+            finishT.reparent(mSideStage.mDimLayer, mSideStage.mRootLeash);
+        }
 
         updateSurfaceBounds(mSplitLayout, finishT, false /* applyResizingOffset */);
         finishT.show(mRootTaskLeash);
@@ -2860,14 +2875,6 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     prepareExitSplitScreen(dismissTop, out, EXIT_REASON_APP_FINISHED);
                     mSplitTransitions.setDismissTransition(transition, dismissTop,
                             EXIT_REASON_APP_FINISHED);
-                } else if (isOpening && !mPausingTasks.isEmpty()) {
-                    // One of the splitting task is opening while animating the split pair in
-                    // recents, which means to dismiss the split pair to this task.
-                    int dismissTop = getStageType(stage) == STAGE_TYPE_MAIN
-                            ? STAGE_TYPE_MAIN : STAGE_TYPE_SIDE;
-                    prepareExitSplitScreen(dismissTop, out, EXIT_REASON_APP_FINISHED);
-                    mSplitTransitions.setDismissTransition(transition, dismissTop,
-                            EXIT_REASON_APP_FINISHED);
                 } else if (!isSplitScreenVisible() && isOpening) {
                     // If split is running in the background and the trigger task is appearing into
                     // split, prepare to enter split screen.
@@ -3549,6 +3556,9 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
         finishEnterSplitScreen(finishT);
         addDividerBarToTransition(info, true /* show */);
+        if (Flags.enableFlexibleTwoAppSplit()) {
+            addAllDimLayersToTransition(info, true /* show */);
+        }
         return true;
     }
 
@@ -3799,6 +3809,9 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
 
         addDividerBarToTransition(info, false /* show */);
+        if (Flags.enableFlexibleTwoAppSplit()) {
+            addAllDimLayersToTransition(info, false /* show */);
+        }
     }
 
     /** Call this when the recents animation canceled during split-screen. */
@@ -3845,6 +3858,19 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 returnToApp);
         mPausingTasks.clear();
         if (returnToApp) {
+            // Reparent auxiliary surfaces (divider bar and dim layers) back onto their
+            // original roots.
+            if (Flags.enableFlexibleSplit()) {
+                mStageOrderOperator.getActiveStages().forEach(stage -> {
+                    finishT.reparent(stage.mDimLayer, stage.mRootLeash);
+                    finishT.setLayer(stage.mDimLayer, RESTING_DIM_LAYER);
+                });
+            } else if (Flags.enableFlexibleTwoAppSplit()) {
+                finishT.reparent(mMainStage.mDimLayer, mMainStage.mRootLeash);
+                finishT.reparent(mSideStage.mDimLayer, mSideStage.mRootLeash);
+                finishT.setLayer(mMainStage.mDimLayer, RESTING_DIM_LAYER);
+                finishT.setLayer(mSideStage.mDimLayer, RESTING_DIM_LAYER);
+            }
             updateSurfaceBounds(mSplitLayout, finishT,
                     false /* applyResizingOffset */);
             finishT.reparent(mSplitLayout.getDividerLeash(), mRootTaskLeash);
@@ -3909,6 +3935,39 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         // Technically this should be order-0, but this is running after layer assignment
         // and it's a special case, so just add to end.
         info.addChange(barChange);
+    }
+
+    /** Add dim layers to the transition, so that they can be hidden/shown when animation starts. */
+    private void addAllDimLayersToTransition(@NonNull TransitionInfo info, boolean show) {
+        if (Flags.enableFlexibleSplit()) {
+            List<StageTaskListener> stages = mStageOrderOperator.getActiveStages();
+            for (int i = 0; i < stages.size(); i++) {
+                final StageTaskListener stage = stages.get(i);
+                mSplitState.getCurrentLayout().get(i).roundOut(mTempRect1);
+                addDimLayerToTransition(info, show, stage, mTempRect1);
+            }
+        } else {
+            addDimLayerToTransition(info, show, mMainStage, getMainStageBounds());
+            addDimLayerToTransition(info, show, mSideStage, getSideStageBounds());
+        }
+    }
+
+    /** Adds a single dim layer to the given TransitionInfo. */
+    private void addDimLayerToTransition(@NonNull TransitionInfo info, boolean show,
+            StageTaskListener stage, Rect bounds) {
+        final SurfaceControl dimLayer = stage.mDimLayer;
+        if (dimLayer == null || !dimLayer.isValid()) {
+            Slog.w(TAG, "addDimLayerToTransition but leash was released or not created");
+        } else {
+            final TransitionInfo.Change change =
+                    new TransitionInfo.Change(null /* token */, dimLayer);
+            change.setParent(mRootTaskInfo.token);
+            change.setStartAbsBounds(bounds);
+            change.setEndAbsBounds(bounds);
+            change.setMode(show ? TRANSIT_TO_FRONT : TRANSIT_TO_BACK);
+            change.setFlags(FLAG_IS_DIM_LAYER);
+            info.addChange(change);
+        }
     }
 
     @NeverCompile

@@ -174,7 +174,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         }
         assertTrue(ZenModeConfig.areAllPriorityOnlyRingerSoundsMuted(config));
 
-        config.areChannelsBypassingDnd = true;
+        config.hasPriorityChannels = true;
         assertTrue(ZenModeConfig.areAllPriorityOnlyRingerSoundsMuted(config));
 
         if (Flags.modesUi()) {
@@ -187,7 +187,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
 
         assertFalse(ZenModeConfig.areAllPriorityOnlyRingerSoundsMuted(config));
 
-        config.areChannelsBypassingDnd = false;
+        config.hasPriorityChannels = false;
         if (Flags.modesUi()) {
             config.manualRule.zenPolicy = new ZenPolicy.Builder(config.manualRule.zenPolicy)
                     .allowPriorityChannels(false)
@@ -417,7 +417,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertTrue(ZenModeConfig.areAllPriorityOnlyRingerSoundsMuted(config));
         assertTrue(ZenModeConfig.areAllZenBehaviorSoundsMuted(config));
 
-        config.areChannelsBypassingDnd = true;
+        config.hasPriorityChannels = true;
         if (Flags.modesUi()) {
             config.manualRule.zenPolicy = new ZenPolicy.Builder(config.manualRule.zenPolicy)
                     .allowPriorityChannels(true)
@@ -429,7 +429,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertFalse(ZenModeConfig.areAllPriorityOnlyRingerSoundsMuted(config));
         assertFalse(ZenModeConfig.areAllZenBehaviorSoundsMuted(config));
 
-        config.areChannelsBypassingDnd = false;
+        config.hasPriorityChannels = false;
         if (Flags.modesUi()) {
             config.manualRule.zenPolicy = new ZenPolicy.Builder(config.manualRule.zenPolicy)
                     .allowPriorityChannels(false)
@@ -488,33 +488,33 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         ZenModeConfig.ZenRule rule = new ZenModeConfig.ZenRule();
         rule.zenPolicy = null;
         rule.zenDeviceEffects = null;
-        assertThat(rule.canBeUpdatedByApp()).isTrue();
+        assertThat(rule.isUserModified()).isFalse();
 
         rule.userModifiedFields = 1;
 
-        assertThat(rule.canBeUpdatedByApp()).isFalse();
+        assertThat(rule.isUserModified()).isTrue();
     }
 
     @Test
     public void testCanBeUpdatedByApp_policyModified() throws Exception {
         ZenModeConfig.ZenRule rule = new ZenModeConfig.ZenRule();
         rule.zenPolicy = new ZenPolicy();
-        assertThat(rule.canBeUpdatedByApp()).isTrue();
+        assertThat(rule.isUserModified()).isFalse();
 
         rule.zenPolicyUserModifiedFields = 1;
 
-        assertThat(rule.canBeUpdatedByApp()).isFalse();
+        assertThat(rule.isUserModified()).isTrue();
     }
 
     @Test
     public void testCanBeUpdatedByApp_deviceEffectsModified() throws Exception {
         ZenModeConfig.ZenRule rule = new ZenModeConfig.ZenRule();
         rule.zenDeviceEffects = new ZenDeviceEffects.Builder().build();
-        assertThat(rule.canBeUpdatedByApp()).isTrue();
+        assertThat(rule.isUserModified()).isFalse();
 
         rule.zenDeviceEffectsUserModifiedFields = 1;
 
-        assertThat(rule.canBeUpdatedByApp()).isFalse();
+        assertThat(rule.isUserModified()).isTrue();
     }
 
     @Test
@@ -548,7 +548,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.creationTime = 123;
         rule.id = "id";
         rule.zenMode = INTERRUPTION_FILTER;
-        rule.modified = true;
         rule.name = NAME;
         rule.setConditionOverride(OVERRIDE_DEACTIVATE);
         rule.pkg = OWNER.getPackageName();
@@ -564,6 +563,9 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.deletionInstant = Instant.ofEpochMilli(1701790147000L);
         if (Flags.modesUi()) {
             rule.disabledOrigin = ZenModeConfig.ORIGIN_USER_IN_SYSTEMUI;
+            if (Flags.modesCleanupImplicit()) {
+                rule.lastActivation = Instant.ofEpochMilli(456);
+            }
         }
         config.automaticRules.put(rule.id, rule);
 
@@ -585,7 +587,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertEquals(rule.condition, ruleActual.condition);
         assertEquals(rule.enabled, ruleActual.enabled);
         assertEquals(rule.creationTime, ruleActual.creationTime);
-        assertEquals(rule.modified, ruleActual.modified);
         assertEquals(rule.conditionId, ruleActual.conditionId);
         assertEquals(rule.name, ruleActual.name);
         assertEquals(rule.zenMode, ruleActual.zenMode);
@@ -602,6 +603,9 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertEquals(rule.deletionInstant, ruleActual.deletionInstant);
         if (Flags.modesUi()) {
             assertEquals(rule.disabledOrigin, ruleActual.disabledOrigin);
+            if (Flags.modesCleanupImplicit()) {
+                assertEquals(rule.lastActivation, ruleActual.lastActivation);
+            }
         }
         if (Flags.backupRestoreLogging()) {
             verify(logger).logItemsBackedUp(DATA_TYPE_ZEN_RULES, 2);
@@ -620,7 +624,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.creationTime = 123;
         rule.id = "id";
         rule.zenMode = INTERRUPTION_FILTER;
-        rule.modified = true;
         rule.name = NAME;
         rule.setConditionOverride(OVERRIDE_DEACTIVATE);
         rule.pkg = OWNER.getPackageName();
@@ -636,6 +639,9 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.deletionInstant = Instant.ofEpochMilli(1701790147000L);
         if (Flags.modesUi()) {
             rule.disabledOrigin = ZenModeConfig.ORIGIN_USER_IN_SYSTEMUI;
+            if (Flags.modesCleanupImplicit()) {
+                rule.lastActivation = Instant.ofEpochMilli(789);
+            }
         }
 
         Parcel parcel = Parcel.obtain();
@@ -651,7 +657,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertEquals(rule.condition, parceled.condition);
         assertEquals(rule.enabled, parceled.enabled);
         assertEquals(rule.creationTime, parceled.creationTime);
-        assertEquals(rule.modified, parceled.modified);
         assertEquals(rule.conditionId, parceled.conditionId);
         assertEquals(rule.name, parceled.name);
         assertEquals(rule.zenMode, parceled.zenMode);
@@ -668,6 +673,9 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertEquals(rule.deletionInstant, parceled.deletionInstant);
         if (Flags.modesUi()) {
             assertEquals(rule.disabledOrigin, parceled.disabledOrigin);
+            if (Flags.modesCleanupImplicit()) {
+                assertEquals(rule.lastActivation, parceled.lastActivation);
+            }
         }
 
         assertEquals(rule, parceled);
@@ -685,7 +693,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.creationTime = 123;
         rule.id = "id";
         rule.zenMode = Settings.Global.ZEN_MODE_ALARMS;
-        rule.modified = true;
         rule.name = "name";
         rule.snoozing = true;
         rule.pkg = "b";
@@ -705,7 +712,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertEquals(rule.condition, fromXml.condition);
         assertEquals(rule.enabled, fromXml.enabled);
         assertEquals(rule.creationTime, fromXml.creationTime);
-        assertEquals(rule.modified, fromXml.modified);
         assertEquals(rule.conditionId, fromXml.conditionId);
         assertEquals(rule.name, fromXml.name);
         assertEquals(rule.zenMode, fromXml.zenMode);
@@ -721,7 +727,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.enabled = ENABLED;
         rule.id = "id";
         rule.zenMode = INTERRUPTION_FILTER;
-        rule.modified = true;
         rule.name = NAME;
         rule.setConditionOverride(OVERRIDE_DEACTIVATE);
         rule.pkg = OWNER.getPackageName();
@@ -753,6 +758,9 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.deletionInstant = Instant.ofEpochMilli(1701790147000L);
         if (Flags.modesUi()) {
             rule.disabledOrigin = ZenModeConfig.ORIGIN_APP;
+            if (Flags.modesCleanupImplicit()) {
+                rule.lastActivation = Instant.ofEpochMilli(123);
+            }
         }
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -770,7 +778,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertEquals(rule.condition, fromXml.condition);
         assertEquals(rule.enabled, fromXml.enabled);
         assertEquals(rule.creationTime, fromXml.creationTime);
-        assertEquals(rule.modified, fromXml.modified);
         assertEquals(rule.conditionId, fromXml.conditionId);
         assertEquals(rule.name, fromXml.name);
         assertEquals(rule.zenMode, fromXml.zenMode);
@@ -789,6 +796,9 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         assertEquals(rule.deletionInstant, fromXml.deletionInstant);
         if (Flags.modesUi()) {
             assertEquals(rule.disabledOrigin, fromXml.disabledOrigin);
+            if (Flags.modesCleanupImplicit()) {
+                assertEquals(rule.lastActivation, fromXml.lastActivation);
+            }
         }
     }
 
@@ -916,7 +926,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         ZenModeConfig.ZenRule rule = new ZenModeConfig.ZenRule();
         rule.userModifiedFields |= AutomaticZenRule.FIELD_NAME;
         assertThat(rule.userModifiedFields).isEqualTo(1);
-        assertThat(rule.canBeUpdatedByApp()).isFalse();
+        assertThat(rule.isUserModified()).isTrue();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         writeRuleXml(rule, baos);
@@ -924,7 +934,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         ZenModeConfig.ZenRule fromXml = readRuleXml(bais);
 
         assertThat(fromXml.userModifiedFields).isEqualTo(rule.userModifiedFields);
-        assertThat(fromXml.canBeUpdatedByApp()).isFalse();
+        assertThat(fromXml.isUserModified()).isTrue();
     }
 
     @Test
@@ -1259,7 +1269,6 @@ public class ZenModeConfigTest extends UiServiceTestCase {
         rule.creationTime = 123;
         rule.id = "id";
         rule.zenMode = ZEN_MODE_IMPORTANT_INTERRUPTIONS;
-        rule.modified = true;
         rule.name = "name";
         rule.pkg = "b";
         config.automaticRules.put("key", rule);
@@ -1348,7 +1357,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
             config.setSuppressedVisualEffects(0);
             config.setAllowPriorityChannels(false);
         }
-        config.areChannelsBypassingDnd = false;
+        config.hasPriorityChannels = false;
 
         return config;
     }
@@ -1383,7 +1392,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
             config.setSuppressedVisualEffects(0);
             config.setAllowPriorityChannels(true);
         }
-        config.areChannelsBypassingDnd = false;
+        config.hasPriorityChannels = false;
         return config;
     }
 
@@ -1410,7 +1419,7 @@ public class ZenModeConfigTest extends UiServiceTestCase {
             config.setAllowConversationsFrom(CONVERSATION_SENDERS_NONE);
             config.setSuppressedVisualEffects(0);
         }
-        config.areChannelsBypassingDnd = false;
+        config.hasPriorityChannels = false;
         return config;
     }
 

@@ -126,6 +126,7 @@ interface INotificationManager
     boolean areChannelsBypassingDnd();
     ParceledListSlice getNotificationChannelsBypassingDnd(String pkg, int uid);
     ParceledListSlice getPackagesBypassingDnd(int userId);
+    List<String> getPackagesWithAnyChannels(int userId);
     boolean isPackagePaused(String pkg);
     void deleteNotificationHistoryItem(String pkg, int uid, long postedTime);
     boolean isPermissionFixed(String pkg, int userId);
@@ -224,8 +225,6 @@ interface INotificationManager
     ZenPolicy getDefaultZenPolicy();
     AutomaticZenRule getAutomaticZenRule(String id);
     Map<String, AutomaticZenRule> getAutomaticZenRules();
-    // TODO: b/310620812 - Remove getZenRules() when MODES_API is inlined.
-    List<ZenModeConfig.ZenRule> getZenRules();
     String addAutomaticZenRule(in AutomaticZenRule automaticZenRule, String pkg, boolean fromUser);
     boolean updateAutomaticZenRule(String id, in AutomaticZenRule automaticZenRule, boolean fromUser);
     boolean removeAutomaticZenRule(String id, boolean fromUser);

@@ -67,6 +67,7 @@ import com.android.systemui.media.controls.util.MediaFeatureFlag;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips;
 import com.android.systemui.statusbar.notification.ConversationNotificationProcessor;
+import com.android.systemui.statusbar.notification.collection.EntryAdapter;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.promoted.FakePromotedNotificationContentExtractor;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi;
@@ -209,6 +210,26 @@ public class NotificationContentInflaterTest extends SysuiTestCase {
     }
 
     @Test
+    public void testInflationProcessesMessagingStyle() throws Exception {
+        String displayName = "Display Name";
+        String messageText = "Message Text";
+        Icon personIcon = Icon.createWithResource(
+                mContext, com.android.systemui.res.R.drawable.ic_person);
+        Person testPerson = new Person.Builder().setName(displayName).setIcon(personIcon).build();
+        Notification.MessagingStyle messagingStyle = new Notification.MessagingStyle(testPerson);
+        messagingStyle.addMessage(new Notification.MessagingStyle.Message(
+                messageText, System.currentTimeMillis(), testPerson));
+        Notification messageNotif = new Notification.Builder(mContext)
+                .setSmallIcon(com.android.systemui.res.R.drawable.ic_person)
+                .setStyle(messagingStyle)
+                .build();
+        ExpandableNotificationRow newRow = mHelper.createRow(messageNotif);
+        inflateAndWait(mNotificationInflater, FLAG_CONTENT_VIEW_ALL, newRow);
+
+        verify(mConversationNotificationProcessor).processNotification(any(), any(), any());
+    }
+
+    @Test
     @Ignore
     public void testInflationIsRetriedIfAsyncFails() throws Exception {
         NotificationContentInflater.InflationProgress result =
@@ -228,14 +249,13 @@ public class NotificationContentInflaterTest extends SysuiTestCase {
                 true /* isNewView */, (v, p, r) -> true,
                 new InflationCallback() {
                     @Override
-                    public void handleInflationException(NotificationEntry entry,
-                            Exception e) {
+                    public void handleInflationException(Exception e) {
                         countDownLatch.countDown();
                         throw new RuntimeException("No Exception expected");
                     }
 
                     @Override
-                    public void onAsyncInflationFinished(NotificationEntry entry) {
+                    public void onAsyncInflationFinished() {
                         countDownLatch.countDown();
                     }
                 }, mRow.getPrivateLayout(), null, null, new HashMap<>(),
@@ -519,8 +539,7 @@ public class NotificationContentInflaterTest extends SysuiTestCase {
         inflater.setInflateSynchronously(true);
         InflationCallback callback = new InflationCallback() {
             @Override
-            public void handleInflationException(NotificationEntry entry,
-                    Exception e) {
+            public void handleInflationException(Exception e) {
                 if (!expectingException) {
                     exceptionHolder.setException(e);
                 }
@@ -528,7 +547,7 @@ public class NotificationContentInflaterTest extends SysuiTestCase {
             }
 
             @Override
-            public void onAsyncInflationFinished(NotificationEntry entry) {
+            public void onAsyncInflationFinished() {
                 if (expectingException) {
                     exceptionHolder.setException(new RuntimeException(
                             "Inflation finished even though there should be an error"));

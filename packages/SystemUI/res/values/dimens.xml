@@ -203,16 +203,32 @@
     <!-- Size of the view displaying the mobile signal icon in the status bar. This value should
         match the core/status_bar_system_icon_size and change to sp unit -->
     <dimen name="status_bar_mobile_signal_size">15sp</dimen>
-    <dimen name="status_bar_mobile_signal_size_updated">14sp</dimen>
+    <dimen name="status_bar_mobile_signal_size_updated">12sp</dimen>
+
     <!-- Size of the view displaying the mobile signal icon in the status bar. This value should
-        match the viewport height of mobile signal drawables such as ic_lte_mobiledata -->
+        match the viewport height of mobile signal drawables such as ic_lte_mobiledata
+        Note: can be removed once new_status_bar_icons is rolled out -->
     <dimen name="status_bar_mobile_type_size">16sp</dimen>
     <!-- Size of the view that contains the network type. Should be equal to
-    status_bar_mobile_type_size + 2, to account for 1sp top and bottom padding -->
+        status_bar_mobile_type_size + 2, to account for 1sp top and bottom padding
+        Note: can be removed once new_status_bar_icons is rolled out -->
     <dimen name="status_bar_mobile_container_height">18sp</dimen>
     <!-- Corner radius for the background of the network type indicator. Should be equal to
-        status_bar_mobile_container_height / 2 -->
+        status_bar_mobile_container_height / 2
+        Note: can be removed once new_status_bar_icons is rolled out -->
     <dimen name="status_bar_mobile_container_corner_radius">9sp</dimen>
+
+    <!-- Size of the view displaying the mobile signal icon in the status bar. This value should
+        match the viewport height of mobile signal drawables such as ic_lte_mobiledata -->
+    <dimen name="status_bar_mobile_type_size_updated">12sp</dimen>
+    <!-- Size of the view that contains the network type. Should be equal to
+   status_bar_mobile_type_size + 2, to account for 1sp top and bottom padding -->
+    <dimen name="status_bar_mobile_container_height_updated">14sp</dimen>
+    <dimen name="status_bar_mobile_container_margin_end">2sp</dimen>
+    <!-- Corner radius for the background of the network type indicator. Should be equal to
+        status_bar_mobile_container_height / 2 -->
+    <dimen name="status_bar_mobile_container_corner_radius_updated">7sp</dimen>
+
     <!-- Size of the view displaying the mobile roam icon in the status bar. This value should
         match the viewport size of drawable stat_sys_roaming -->
     <dimen name="status_bar_mobile_roam_size">8sp</dimen>
@@ -1242,8 +1258,11 @@
     <dimen name="min_window_blur_radius">1px</dimen>
     <dimen name="max_window_blur_radius">23px</dimen>
 
+    <!-- Blur radius of the Notification Shade content (notifications, footer, shelf) -->
+    <dimen name="max_shade_content_blur_radius">@dimen/max_window_blur_radius</dimen>
+
     <!-- Blur radius behind Notification Shade -->
-    <dimen name="max_shade_window_blur_radius">60dp</dimen>
+    <dimen name="max_shade_window_blur_radius">34dp</dimen>
 
     <!-- How much into a DisplayCutout's bounds we can go, on each side -->
     <dimen name="display_cutout_margin_consumption">0px</dimen>
@@ -1254,6 +1273,8 @@
     <dimen name="ongoing_appops_chip_side_padding">8dp</dimen>
     <!-- Margin between icons of Ongoing App Ops chip -->
     <dimen name="ongoing_appops_chip_icon_margin">4dp</dimen>
+    <!-- Side margins for the content of an appops chip -->
+    <dimen name="ongoing_appops_chip_content_horizontal_margin">10dp</dimen>
     <!-- Icon size of Ongoing App Ops chip -->
     <dimen name="ongoing_appops_chip_icon_size">16sp</dimen>
     <!-- Radius of Ongoing App Ops chip corners -->
@@ -1305,7 +1326,8 @@
     <dimen name="qs_media_seekbar_progress_amplitude">1.5dp</dimen>
     <dimen name="qs_media_seekbar_progress_phase">8dp</dimen>
     <dimen name="qs_media_seekbar_progress_stroke_width">2dp</dimen>
-    <dimen name="qs_media_session_collapsed_guideline">144dp</dimen>
+    <dimen name="qs_media_session_collapsed_legacy_guideline">144dp</dimen>
+    <dimen name="qs_media_session_collapsed_guideline">168dp</dimen>
 
     <!-- Size of Smartspace media recommendations cards in the QSPanel carousel -->
     <dimen name="qs_media_rec_default_width">380dp</dimen>
@@ -1800,7 +1822,8 @@
     <!-- The activity chip side padding, used with the default phone icon. -->
     <dimen name="ongoing_activity_chip_side_padding">12dp</dimen>
     <!-- The activity chip side padding, used with an icon that has embedded padding (e.g. if the icon comes from the notification's smallIcon field). If the icon has padding, the chip itself can have less padding. -->
-    <dimen name="ongoing_activity_chip_side_padding_for_embedded_padding_icon">6dp</dimen>
+    <dimen name="ongoing_activity_chip_side_padding_for_embedded_padding_icon">2dp</dimen>
+    <dimen name="ongoing_activity_chip_side_padding_for_embedded_padding_icon_legacy">6dp</dimen>
     <!-- The icon size, used with the default phone icon. -->
     <dimen name="ongoing_activity_chip_icon_size">16dp</dimen>
     <!-- The icon size, used with an icon that has embedded padding. (If the icon has embedded padding, we need to make the whole icon larger so the icon itself doesn't look small.) -->
@@ -1811,6 +1834,7 @@
     <dimen name="ongoing_activity_chip_text_end_padding_for_embedded_padding_icon">6dp</dimen>
     <dimen name="ongoing_activity_chip_text_fading_edge_length">12dp</dimen>
     <dimen name="ongoing_activity_chip_corner_radius">28dp</dimen>
+    <dimen name="ongoing_activity_chip_outline_width">2px</dimen>
 
     <!-- Status bar user chip -->
     <dimen name="status_bar_user_chip_avatar_size">16dp</dimen>
@@ -2135,31 +2159,40 @@
     <dimen name="volume_dialog_width">60dp</dimen>
 
     <dimen name="volume_dialog_background_corner_radius">30dp</dimen>
-    <dimen name="volume_dialog_background_vertical_margin">-10dp</dimen>
+    <dimen name="volume_dialog_background_vertical_margin">
+        @dimen/volume_dialog_buttons_margin_negative
+    </dimen>
     <!-- top margin covers half the ringer button + components spacing -->
     <dimen name="volume_dialog_background_top_margin">-28dp</dimen>
 
+    <dimen name="volume_dialog_window_margin">14dp</dimen>
     <dimen name="volume_dialog_components_spacing">8dp</dimen>
     <dimen name="volume_dialog_floating_sliders_spacing">8dp</dimen>
     <dimen name="volume_dialog_floating_sliders_vertical_padding">10dp</dimen>
-    <dimen name="volume_dialog_floating_sliders_vertical_padding_negative">-10dp</dimen>
+    <dimen name="volume_dialog_floating_sliders_vertical_padding_negative">
+        @dimen/volume_dialog_buttons_margin_negative
+    </dimen>
     <dimen name="volume_dialog_floating_sliders_horizontal_padding">4dp</dimen>
     <dimen name="volume_dialog_button_size">40dp</dimen>
     <dimen name="volume_dialog_slider_width">52dp</dimen>
     <dimen name="volume_dialog_slider_height">254dp</dimen>
+    <dimen name="volume_dialog_buttons_margin">10dp</dimen>
+    <dimen name="volume_dialog_buttons_margin_negative">-10dp</dimen>
     <!--
         A primary goal of this margin is to vertically constraint slider height in the landscape
         orientation when the vertical space is limited
     -->
     <dimen name="volume_dialog_slider_vertical_margin">124dp</dimen>
-
-    <fraction name="volume_dialog_half_opened_bias">0.2</fraction>
-
+    <dimen name="volume_dialog_half_opened_offset">-128dp</dimen>
     <dimen name="volume_dialog_slider_max_deviation">56dp</dimen>
 
     <dimen name="volume_dialog_background_square_corner_radius">12dp</dimen>
 
-    <dimen name="volume_dialog_ringer_drawer_margin">10dp</dimen>
+    <dimen name="volume_dialog_ringer_drawer_margin">@dimen/volume_dialog_buttons_margin</dimen>
+    <!--
+     (volume_dialog_slider_width - volume_dialog_button_size) / 2
+     This centers ringer drawer against the volume slider
+    -->
     <dimen name="volume_dialog_ringer_drawer_diff_end_margin">6dp</dimen>
     <dimen name="volume_dialog_ringer_drawer_button_size">@dimen/volume_dialog_button_size</dimen>
     <dimen name="volume_dialog_ringer_drawer_button_icon_radius">10dp</dimen>

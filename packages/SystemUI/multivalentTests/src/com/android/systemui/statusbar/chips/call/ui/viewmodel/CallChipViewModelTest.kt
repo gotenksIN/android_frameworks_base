@@ -31,19 +31,18 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.activityStarter
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
-import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.view.ChipBackgroundContainer
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
-import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.notification.data.model.activeNotificationModel
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationListRepository
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationsStore
 import com.android.systemui.statusbar.notification.data.repository.activeNotificationListRepository
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 import com.android.systemui.statusbar.notification.shared.CallType
-import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
+import com.android.systemui.statusbar.phone.ongoingcall.DisableChipsModernization
+import com.android.systemui.statusbar.phone.ongoingcall.EnableChipsModernization
 import com.android.systemui.statusbar.phone.ongoingcall.data.repository.ongoingCallRepository
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallModel
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.inCallModel
@@ -265,91 +264,25 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun chip_positiveStartTime_notPromoted_colorsAreThemed() =
+    fun chip_positiveStartTime_colorsAreAccentThemed() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
             repo.setOngoingCallState(inCallModel(startTimeMs = 1000, promotedContent = null))
 
             assertThat((latest as OngoingActivityChipModel.Active).colors)
-                .isEqualTo(ColorsModel.Themed)
+                .isEqualTo(ColorsModel.AccentThemed)
         }
 
     @Test
-    fun chip_zeroStartTime_notPromoted_colorsAreThemed() =
+    fun chip_zeroStartTime_colorsAreAccentThemed() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
 
             repo.setOngoingCallState(inCallModel(startTimeMs = 0, promotedContent = null))
 
             assertThat((latest as OngoingActivityChipModel.Active).colors)
-                .isEqualTo(ColorsModel.Themed)
-        }
-
-    @Test
-    @DisableFlags(StatusBarNotifChips.FLAG_NAME)
-    fun chip_positiveStartTime_promoted_notifChipsFlagOff_colorsAreThemed() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            repo.setOngoingCallState(
-                inCallModel(startTimeMs = 1000, promotedContent = PROMOTED_CONTENT_WITH_COLOR)
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).colors)
-                .isEqualTo(ColorsModel.Themed)
-        }
-
-    @Test
-    @DisableFlags(StatusBarNotifChips.FLAG_NAME)
-    fun chip_zeroStartTime_promoted_notifChipsFlagOff_colorsAreThemed() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            repo.setOngoingCallState(
-                inCallModel(startTimeMs = 0, promotedContent = PROMOTED_CONTENT_WITH_COLOR)
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).colors)
-                .isEqualTo(ColorsModel.Themed)
-        }
-
-    @Test
-    @EnableFlags(StatusBarNotifChips.FLAG_NAME)
-    fun chip_positiveStartTime_promoted_notifChipsFlagOn_colorsAreCustom() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            repo.setOngoingCallState(
-                inCallModel(startTimeMs = 1000, promotedContent = PROMOTED_CONTENT_WITH_COLOR)
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).colors)
-                .isEqualTo(
-                    ColorsModel.Custom(
-                        backgroundColorInt = PROMOTED_BACKGROUND_COLOR,
-                        primaryTextColorInt = PROMOTED_PRIMARY_TEXT_COLOR,
-                    )
-                )
-        }
-
-    @Test
-    @EnableFlags(StatusBarNotifChips.FLAG_NAME)
-    fun chip_zeroStartTime_promoted_notifChipsFlagOff_colorsAreCustom() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            repo.setOngoingCallState(
-                inCallModel(startTimeMs = 0, promotedContent = PROMOTED_CONTENT_WITH_COLOR)
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).colors)
-                .isEqualTo(
-                    ColorsModel.Custom(
-                        backgroundColorInt = PROMOTED_BACKGROUND_COLOR,
-                        primaryTextColorInt = PROMOTED_PRIMARY_TEXT_COLOR,
-                    )
-                )
+                .isEqualTo(ColorsModel.AccentThemed)
         }
 
     @Test
@@ -381,7 +314,7 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(StatusBarChipsModernization.FLAG_NAME)
+    @DisableChipsModernization
     fun chip_inCall_nullIntent_nullClickListener() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -392,7 +325,7 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(StatusBarChipsModernization.FLAG_NAME)
+    @DisableChipsModernization
     fun chip_inCall_positiveStartTime_validIntent_clickListenerLaunchesIntent() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -410,7 +343,7 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(StatusBarChipsModernization.FLAG_NAME)
+    @DisableChipsModernization
     fun chip_inCall_zeroStartTime_validIntent_clickListenerLaunchesIntent() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -429,7 +362,7 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(StatusBarRootModernization.FLAG_NAME, StatusBarChipsModernization.FLAG_NAME)
+    @EnableChipsModernization
     fun chip_inCall_nullIntent_noneClickBehavior() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -445,7 +378,7 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(StatusBarRootModernization.FLAG_NAME, StatusBarChipsModernization.FLAG_NAME)
+    @EnableChipsModernization
     fun chip_inCall_positiveStartTime_validIntent_clickBehaviorLaunchesIntent() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -470,7 +403,7 @@ class CallChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(StatusBarRootModernization.FLAG_NAME, StatusBarChipsModernization.FLAG_NAME)
+    @EnableChipsModernization
     fun chip_inCall_zeroStartTime_validIntent_clickBehaviorLaunchesIntent() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)

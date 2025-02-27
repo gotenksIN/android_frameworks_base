@@ -47,6 +47,7 @@
 #include <dispatcher/Entry.h>
 #include <include/gestures.h>
 #include <input/Input.h>
+#include <input/InputFlags.h>
 #include <input/PointerController.h>
 #include <input/PrintTools.h>
 #include <input/SpriteController.h>
@@ -124,6 +125,7 @@ static struct {
     jmethodID notifyStylusGestureStarted;
     jmethodID notifyVibratorState;
     jmethodID filterInputEvent;
+    jmethodID filterPointerMotion;
     jmethodID interceptKeyBeforeQueueing;
     jmethodID interceptMotionBeforeQueueingNonInteractive;
     jmethodID interceptKeyBeforeDispatching;
@@ -451,6 +453,8 @@ public:
     void notifyPointerDisplayIdChanged(ui::LogicalDisplayId displayId,
                                        const vec2& position) override;
     void notifyMouseCursorFadedOnTyping() override;
+    std::optional<vec2> filterPointerMotionForAccessibility(
+            const vec2& current, const vec2& delta, const ui::LogicalDisplayId& displayId) override;
 
     /* --- InputFilterPolicyInterface implementation --- */
     void notifyStickyModifierStateChanged(uint32_t modifierState,
@@ -663,13 +667,15 @@ void NativeInputManager::setDisplayViewports(JNIEnv* env, jobjectArray viewportO
 }
 
 void NativeInputManager::setDisplayTopology(JNIEnv* env, jobject topologyGraph) {
-    if (!com::android::input::flags::connected_displays_cursor()) {
+    if (!InputFlags::connectedDisplaysCursorEnabled()) {
         return;
     }
 
     // TODO(b/383092013): Add topology validation
-    mInputManager->getChoreographer().setDisplayTopology(
-            android_hardware_display_DisplayTopologyGraph_toNative(env, topologyGraph));
+    const DisplayTopologyGraph displayTopology =
+            android_hardware_display_DisplayTopologyGraph_toNative(env, topologyGraph);
+    mInputManager->getDispatcher().setDisplayTopology(displayTopology);
+    mInputManager->getChoreographer().setDisplayTopology(displayTopology);
 }
 
 base::Result<std::unique_ptr<InputChannel>> NativeInputManager::createInputChannel(
@@ -934,6 +940,27 @@ void NativeInputManager::notifyStickyModifierStateChanged(uint32_t modifierState
     env->CallVoidMethod(mServiceObj, gServiceClassInfo.notifyStickyModifierStateChanged,
                         modifierState, lockedModifierState);
     checkAndClearExceptionFromCallback(env, "notifyStickyModifierStateChanged");
+}
+
+std::optional<vec2> NativeInputManager::filterPointerMotionForAccessibility(
+        const vec2& current, const vec2& delta, const ui::LogicalDisplayId& displayId) {
+    JNIEnv* env = jniEnv();
+    ScopedFloatArrayRO filtered(env,
+                                jfloatArray(
+                                        env->CallObjectMethod(mServiceObj,
+                                                              gServiceClassInfo.filterPointerMotion,
+                                                              delta.x, delta.y, current.x,
+                                                              current.y, displayId.val())));
+    if (checkAndClearExceptionFromCallback(env, "filterPointerMotionForAccessibilityLocked")) {
+        ALOGE("Disabling accessibility pointer motion filter due to an error. "
+              "The filter state in Java and PointerChoreographer would no longer be in sync.");
+        return std::nullopt;
+    }
+    LOG_ALWAYS_FATAL_IF(filtered.size() != 2,
+                        "Accessibility pointer motion filter is misbehaving. Returned array size "
+                        "%zu should be 2.",
+                        filtered.size());
+    return vec2{filtered[0], filtered[1]};
 }
 
 sp<SurfaceControl> NativeInputManager::getParentSurfaceForPointers(ui::LogicalDisplayId displayId) {
@@ -3269,6 +3296,12 @@ static jboolean nativeSetKernelWakeEnabled(JNIEnv* env, jobject nativeImplObj, j
     return im->getInputManager()->getReader().setKernelWakeEnabled(deviceId, enabled);
 }
 
+static void nativeSetAccessibilityPointerMotionFilterEnabled(JNIEnv* env, jobject nativeImplObj,
+                                                             jboolean enabled) {
+    NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
+    im->getInputManager()->getChoreographer().setAccessibilityPointerMotionFilterEnabled(enabled);
+}
+
 // ----------------------------------------------------------------------------
 
 static const JNINativeMethod gInputManagerMethods[] = {
@@ -3396,6 +3429,8 @@ static const JNINativeMethod gInputManagerMethods[] = {
         {"setInputMethodConnectionIsActive", "(Z)V", (void*)nativeSetInputMethodConnectionIsActive},
         {"getLastUsedInputDeviceId", "()I", (void*)nativeGetLastUsedInputDeviceId},
         {"setKernelWakeEnabled", "(IZ)Z", (void*)nativeSetKernelWakeEnabled},
+        {"setAccessibilityPointerMotionFilterEnabled", "(Z)V",
+         (void*)nativeSetAccessibilityPointerMotionFilterEnabled},
 };
 
 #define FIND_CLASS(var, className) \
@@ -3479,6 +3514,8 @@ int register_android_server_InputManager(JNIEnv* env) {
 
     GET_METHOD_ID(gServiceClassInfo.filterInputEvent, clazz,
             "filterInputEvent", "(Landroid/view/InputEvent;I)Z");
+
+    GET_METHOD_ID(gServiceClassInfo.filterPointerMotion, clazz, "filterPointerMotion", "(FFFFI)[F");
 
     GET_METHOD_ID(gServiceClassInfo.interceptKeyBeforeQueueing, clazz,
             "interceptKeyBeforeQueueing", "(Landroid/view/KeyEvent;I)I");

@@ -78,10 +78,8 @@ import com.android.systemui.util.CarrierNameCustomization
 // QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -601,12 +599,7 @@ class MobileIconInteractorImpl(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
-    override val isNonTerrestrial: StateFlow<Boolean> =
-        if (Flags.carrierEnabledSatelliteFlag()) {
-            connectionRepository.isNonTerrestrial
-        } else {
-            MutableStateFlow(false).asStateFlow()
-        }
+    override val isNonTerrestrial: StateFlow<Boolean> = connectionRepository.isNonTerrestrial
 
     private val level: StateFlow<Int> =
 // QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon

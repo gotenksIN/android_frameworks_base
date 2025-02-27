@@ -141,11 +141,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
     @Mock private lateinit var context: Context
 
     private val mobileMappings = FakeMobileMappingsProxy()
-    private val systemUiCarrierConfig =
-        SystemUiCarrierConfig(
-            SUB_1_ID,
-            createTestConfig(),
-        )
+    private val systemUiCarrierConfig = SystemUiCarrierConfig(SUB_1_ID, createTestConfig())
 // QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
     private val fiveGServiceClient = FiveGServiceClient(mContext)
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
@@ -922,11 +918,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
 
             assertThat(latest).isEqualTo(NetworkNameModel.IntentDerived("$PLMN$SEP$DATA_SPN"))
 
-            val intentWithoutInfo =
-                spnIntent(
-                    showSpn = false,
-                    showPlmn = false,
-                )
+            val intentWithoutInfo = spnIntent(showSpn = false, showPlmn = false)
 
             captor.lastValue.onReceive(context, intentWithoutInfo)
 
@@ -949,11 +941,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
 
             assertThat(latest).isEqualTo(NetworkNameModel.IntentDerived("$PLMN$SEP$DATA_SPN"))
 
-            val intentWithoutInfo =
-                spnIntent(
-                    showSpn = false,
-                    showPlmn = false,
-                )
+            val intentWithoutInfo = spnIntent(showSpn = false, showPlmn = false)
 
             captor.lastValue.onReceive(context, intentWithoutInfo)
 
@@ -1321,7 +1309,6 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(com.android.internal.telephony.flags.Flags.FLAG_CARRIER_ENABLED_SATELLITE_FLAG)
     fun isNonTerrestrial_updatesFromCallback0() =
         testScope.runTest {
             val latest by collectLastValue(underTest.isNonTerrestrial)
@@ -1450,10 +1437,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
         return MobileTelephonyHelpers.getTelephonyCallbackForType(telephonyManager)
     }
 
-    private fun carrierIdIntent(
-        subId: Int = SUB_1_ID,
-        carrierId: Int,
-    ): Intent =
+    private fun carrierIdIntent(subId: Int = SUB_1_ID, carrierId: Int): Intent =
         Intent(TelephonyManager.ACTION_SUBSCRIPTION_CARRIER_IDENTITY_CHANGED).apply {
             putExtra(EXTRA_SUBSCRIPTION_ID, subId)
             putExtra(EXTRA_CARRIER_ID, carrierId)

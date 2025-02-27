@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.chips.ui.compose
 import android.content.res.ColorStateList
 import android.view.ViewGroup
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.android.compose.animation.Expandable
 import com.android.compose.modifiers.thenIf
@@ -48,11 +48,18 @@ import com.android.systemui.animation.Expandable
 import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.common.ui.compose.load
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
+import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
+import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerViewBinder
 
 @Composable
-fun OngoingActivityChip(model: OngoingActivityChipModel.Active, modifier: Modifier = Modifier) {
+fun OngoingActivityChip(
+    model: OngoingActivityChipModel.Active,
+    iconViewStore: NotificationIconContainerViewBinder.IconViewStore?,
+    modifier: Modifier = Modifier,
+) {
     when (val clickBehavior = model.clickBehavior) {
         is OngoingActivityChipModel.ClickBehavior.ExpandAction -> {
             // Wrap the chip in an Expandable so we can animate the expand transition.
@@ -64,15 +71,15 @@ fun OngoingActivityChip(model: OngoingActivityChipModel.Active, modifier: Modifi
                     ),
                 modifier = modifier,
             ) { expandable ->
-                ChipBody(model, onClick = { clickBehavior.onClick(expandable) })
+                ChipBody(model, iconViewStore, onClick = { clickBehavior.onClick(expandable) })
             }
         }
         is OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification -> {
-            ChipBody(model, onClick = { clickBehavior.onClick() })
+            ChipBody(model, iconViewStore, onClick = { clickBehavior.onClick() })
         }
 
         is OngoingActivityChipModel.ClickBehavior.None -> {
-            ChipBody(model, modifier = modifier)
+            ChipBody(model, iconViewStore, modifier = modifier)
         }
     }
 }
@@ -80,12 +87,15 @@ fun OngoingActivityChip(model: OngoingActivityChipModel.Active, modifier: Modifi
 @Composable
 private fun ChipBody(
     model: OngoingActivityChipModel.Active,
+    iconViewStore: NotificationIconContainerViewBinder.IconViewStore?,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val isClickable = onClick != null
-    val hasEmbeddedIcon = model.icon is OngoingActivityChipModel.ChipIcon.StatusBarView
+    val hasEmbeddedIcon =
+        model.icon is OngoingActivityChipModel.ChipIcon.StatusBarView ||
+            model.icon is OngoingActivityChipModel.ChipIcon.StatusBarNotificationIcon
     val contentDescription =
         when (val icon = model.icon) {
             is OngoingActivityChipModel.ChipIcon.StatusBarView -> icon.contentDescription.load()
@@ -103,6 +113,13 @@ private fun ChipBody(
         } else {
             dimensionResource(id = R.dimen.ongoing_activity_chip_min_text_width) + chipSidePadding
         }
+
+    val outline = model.colors.outline(context)
+    val outlineWidth = dimensionResource(R.dimen.ongoing_activity_chip_outline_width)
+
+    val shape =
+        RoundedCornerShape(dimensionResource(id = R.dimen.ongoing_activity_chip_corner_radius))
+
     // Use a Box with `fillMaxHeight` to create a larger click surface for the chip. The visible
     // height of the chip is determined by the height of the background of the Row below.
     Box(
@@ -121,12 +138,7 @@ private fun ChipBody(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
             modifier =
-                Modifier.clip(
-                        RoundedCornerShape(
-                            dimensionResource(id = R.dimen.ongoing_activity_chip_corner_radius)
-                        )
-                    )
-                    .height(dimensionResource(R.dimen.ongoing_appops_chip_height))
+                Modifier.height(dimensionResource(R.dimen.ongoing_appops_chip_height))
                     .thenIf(isClickable) { Modifier.widthIn(min = minWidth) }
                     .layout { measurable, constraints ->
                         val placeable = measurable.measure(constraints)
@@ -136,17 +148,29 @@ private fun ChipBody(
                             }
                         }
                     }
-                    .background(Color(model.colors.background(context).defaultColor))
+                    .background(Color(model.colors.background(context).defaultColor), shape = shape)
+                    .thenIf(outline != null) {
+                        Modifier.border(
+                            width = outlineWidth,
+                            color = Color(outline!!),
+                            shape = shape,
+                        )
+                    }
                     .padding(
                         horizontal =
                             if (hasEmbeddedIcon) {
-                                0.dp
+                                dimensionResource(
+                                    R.dimen
+                                        .ongoing_activity_chip_side_padding_for_embedded_padding_icon
+                                )
                             } else {
                                 dimensionResource(id = R.dimen.ongoing_activity_chip_side_padding)
                             }
                     ),
         ) {
-            model.icon?.let { ChipIcon(viewModel = it, colors = model.colors) }
+            model.icon?.let {
+                ChipIcon(viewModel = it, iconViewStore = iconViewStore, colors = model.colors)
+            }
 
             val isIconOnly = model is OngoingActivityChipModel.Active.IconOnly
             if (!isIconOnly) {
@@ -159,6 +183,7 @@ private fun ChipBody(
 @Composable
 private fun ChipIcon(
     viewModel: OngoingActivityChipModel.ChipIcon,
+    iconViewStore: NotificationIconContainerViewBinder.IconViewStore?,
     colors: ColorsModel,
     modifier: Modifier = Modifier,
 ) {
@@ -166,22 +191,16 @@ private fun ChipIcon(
 
     when (viewModel) {
         is OngoingActivityChipModel.ChipIcon.StatusBarView -> {
-            // TODO(b/364653005): If the notification updates their small icon, ensure it's updated
-            // in the chip.
-            val originalIcon = viewModel.impl
-            val iconSizePx =
-                context.resources.getDimensionPixelSize(
-                    R.dimen.ongoing_activity_chip_embedded_padding_icon_size
-                )
-            AndroidView(
-                modifier = modifier,
-                factory = { _ ->
-                    originalIcon.apply {
-                        layoutParams = ViewGroup.LayoutParams(iconSizePx, iconSizePx)
-                        imageTintList = ColorStateList.valueOf(colors.text(context))
-                    }
-                },
-            )
+            StatusBarConnectedDisplays.assertInLegacyMode()
+            StatusBarIcon(colors, viewModel.impl.notification?.key, modifier) { viewModel.impl }
+        }
+        is OngoingActivityChipModel.ChipIcon.StatusBarNotificationIcon -> {
+            StatusBarConnectedDisplays.assertInNewMode()
+            check(iconViewStore != null)
+
+            StatusBarIcon(colors, viewModel.notificationKey, modifier) {
+                iconViewStore.iconView(viewModel.notificationKey)
+            }
         }
 
         is OngoingActivityChipModel.ChipIcon.SingleColorIcon -> {
@@ -197,6 +216,31 @@ private fun ChipIcon(
         // StatusBarNotificationIcons
         is OngoingActivityChipModel.ChipIcon.StatusBarNotificationIcon -> {}
     }
+}
+
+/** A Compose wrapper around [StatusBarIconView]. */
+@Composable
+private fun StatusBarIcon(
+    colors: ColorsModel,
+    notificationKey: String?,
+    modifier: Modifier = Modifier,
+    iconFactory: () -> StatusBarIconView?,
+) {
+    val context = LocalContext.current
+
+    val iconSizePx =
+        context.resources.getDimensionPixelSize(
+            R.dimen.ongoing_activity_chip_embedded_padding_icon_size
+        )
+    AndroidView(
+        modifier = modifier,
+        factory = { _ ->
+            iconFactory.invoke()?.apply {
+                layoutParams = ViewGroup.LayoutParams(iconSizePx, iconSizePx)
+                imageTintList = ColorStateList.valueOf(colors.text(context))
+            } ?: throw IllegalStateException("Missing StatusBarIconView for $notificationKey")
+        },
+    )
 }
 
 @Composable

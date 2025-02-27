@@ -52,6 +52,9 @@
 #include <renderthread/RenderThread.h>
 #include <src/image/SkImage_Base.h>
 #include <thread/CommonPool.h>
+#ifdef __ANDROID__
+#include <ui/GraphicBufferAllocator.h>
+#endif
 #include <utils/Color.h>
 #include <utils/RefBase.h>
 #include <utils/StrongPointer.h>
@@ -849,6 +852,17 @@ static void android_view_ThreadedRenderer_preload(JNIEnv*, jclass) {
     RenderProxy::preload();
 }
 
+static void android_view_ThreadedRenderer_preInitBufferAllocator(JNIEnv*, jclass) {
+#ifdef __ANDROID__
+    CommonPool::async([] {
+        ATRACE_NAME("preInitBufferAllocator:GraphicBufferAllocator");
+        // This involves several binder calls which we do not want blocking
+        // critical path of the activity that is launching.
+        GraphicBufferAllocator::getInstance();
+    });
+#endif
+}
+
 static void android_view_ThreadedRenderer_setRtAnimationsEnabled(JNIEnv* env, jobject clazz,
                                                                  jboolean enabled) {
     RenderProxy::setRtAnimationsEnabled(enabled);
@@ -901,20 +915,22 @@ static jboolean android_view_ThreadedRenderer_isDrawingEnabled(JNIEnv*, jclass) 
 
 static void android_view_ThreadedRenderer_addObserver(JNIEnv* env, jclass clazz,
         jlong proxyPtr, jlong observerPtr) {
-    HardwareRendererObserver* observer = reinterpret_cast<HardwareRendererObserver*>(observerPtr);
+    FrameMetricsObserver* rawObserver = reinterpret_cast<FrameMetricsObserver*>(observerPtr);
+    sp<FrameMetricsObserver> observer = sp<FrameMetricsObserver>::fromExisting(rawObserver);
     renderthread::RenderProxy* renderProxy =
             reinterpret_cast<renderthread::RenderProxy*>(proxyPtr);
 
-    renderProxy->addFrameMetricsObserver(observer);
+    renderProxy->addFrameMetricsObserver(std::move(observer));
 }
 
 static void android_view_ThreadedRenderer_removeObserver(JNIEnv* env, jclass clazz,
         jlong proxyPtr, jlong observerPtr) {
-    HardwareRendererObserver* observer = reinterpret_cast<HardwareRendererObserver*>(observerPtr);
+    FrameMetricsObserver* rawObserver = reinterpret_cast<FrameMetricsObserver*>(observerPtr);
+    sp<FrameMetricsObserver> observer = sp<FrameMetricsObserver>::fromExisting(rawObserver);
     renderthread::RenderProxy* renderProxy =
             reinterpret_cast<renderthread::RenderProxy*>(proxyPtr);
 
-    renderProxy->removeFrameMetricsObserver(observer);
+    renderProxy->removeFrameMetricsObserver(std::move(observer));
 }
 
 // ----------------------------------------------------------------------------
@@ -1040,6 +1056,8 @@ static const JNINativeMethod gMethods[] = {
          (void*)android_view_ThreadedRenderer_setDisplayDensityDpi},
         {"nInitDisplayInfo", "(IIFIJJZZZ)V", (void*)android_view_ThreadedRenderer_initDisplayInfo},
         {"preload", "()V", (void*)android_view_ThreadedRenderer_preload},
+        {"preInitBufferAllocator", "()V",
+         (void*)android_view_ThreadedRenderer_preInitBufferAllocator},
         {"isWebViewOverlaysEnabled", "()Z",
          (void*)android_view_ThreadedRenderer_isWebViewOverlaysEnabled},
         {"nSetDrawingEnabled", "(Z)V", (void*)android_view_ThreadedRenderer_setDrawingEnabled},

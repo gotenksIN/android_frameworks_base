@@ -22,8 +22,6 @@ import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.annotations.Presubmit
 import android.platform.test.flag.junit.SetFlagsRule
-import android.provider.Settings
-import android.provider.Settings.Global.DEVELOPMENT_OVERRIDE_DESKTOP_MODE_FEATURES
 import android.window.DesktopModeFlags
 import androidx.test.filters.SmallTest
 import com.android.internal.R
@@ -63,14 +61,12 @@ class DesktopModeStatusTest : ShellTestCase() {
         doReturn(context.contentResolver).whenever(mockContext).contentResolver
         resetDesktopModeFlagsCache()
         resetEnforceDeviceRestriction()
-        resetFlagOverride()
     }
 
     @After
     fun tearDown() {
         resetDesktopModeFlagsCache()
         resetEnforceDeviceRestriction()
-        resetFlagOverride()
     }
 
     @DisableFlags(
@@ -157,23 +153,40 @@ class DesktopModeStatusTest : ShellTestCase() {
     }
 
     @Test
-    fun isInternalDisplayEligibleToHostDesktops_configDEModeOn_returnsTrue() {
+    fun isDeviceEligibleForDesktopMode_configDEModeOnAndIntDispHostsDesktop_returnsTrue() {
+        doReturn(true).whenever(mockResources).getBoolean(eq(R.bool.config_isDesktopModeSupported))
         doReturn(true).whenever(mockResources).getBoolean(eq(R.bool.config_canInternalDisplayHostDesktops))
 
-        assertThat(DesktopModeStatus.isInternalDisplayEligibleToHostDesktops(mockContext)).isTrue()
+        assertThat(DesktopModeStatus.isDeviceEligibleForDesktopMode(mockContext)).isTrue()
+    }
+
+    @Test
+    fun isDeviceEligibleForDesktopMode_configDEModeOffAndIntDispHostsDesktop_returnsFalse() {
+        doReturn(false).whenever(mockResources).getBoolean(eq(R.bool.config_isDesktopModeSupported))
+        doReturn(true).whenever(mockResources).getBoolean(eq(R.bool.config_canInternalDisplayHostDesktops))
+
+        assertThat(DesktopModeStatus.isDeviceEligibleForDesktopMode(mockContext)).isFalse()
+    }
+
+    @Test
+    fun isDeviceEligibleForDesktopMode_configDEModeOnAndIntDispHostsDesktopOff_returnsFalse() {
+        doReturn(true).whenever(mockResources).getBoolean(eq(R.bool.config_isDesktopModeSupported))
+        doReturn(false).whenever(mockResources).getBoolean(eq(R.bool.config_canInternalDisplayHostDesktops))
+
+        assertThat(DesktopModeStatus.isDeviceEligibleForDesktopMode(mockContext)).isFalse()
     }
 
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_MODE_THROUGH_DEV_OPTION)
     @Test
     fun isInternalDisplayEligibleToHostDesktops_supportFlagOff_returnsFalse() {
-        assertThat(DesktopModeStatus.isInternalDisplayEligibleToHostDesktops(mockContext)).isFalse()
+        assertThat(DesktopModeStatus.isDeviceEligibleForDesktopMode(mockContext)).isFalse()
     }
 
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_MODE_THROUGH_DEV_OPTION)
     @Test
     fun isInternalDisplayEligibleToHostDesktops_supportFlagOn_returnsFalse() {
-        assertThat(DesktopModeStatus.isInternalDisplayEligibleToHostDesktops(mockContext)).isFalse()
+        assertThat(DesktopModeStatus.isDeviceEligibleForDesktopMode(mockContext)).isFalse()
     }
 
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_MODE_THROUGH_DEV_OPTION)
@@ -183,7 +196,7 @@ class DesktopModeStatusTest : ShellTestCase() {
             eq(R.bool.config_isDesktopModeDevOptionSupported)
         )
 
-        assertThat(DesktopModeStatus.isInternalDisplayEligibleToHostDesktops(mockContext)).isTrue()
+        assertThat(DesktopModeStatus.isDeviceEligibleForDesktopMode(mockContext)).isTrue()
     }
 
     @DisableFlags(Flags.FLAG_SHOW_DESKTOP_EXPERIENCE_DEV_OPTION)
@@ -229,18 +242,11 @@ class DesktopModeStatusTest : ShellTestCase() {
         cachedToggleOverride.set(null, null)
     }
 
-    private fun resetFlagOverride() {
-        Settings.Global.putString(
-            context.contentResolver,
-            DEVELOPMENT_OVERRIDE_DESKTOP_MODE_FEATURES, null
-        )
-    }
-
     private fun setFlagOverride(override: DesktopModeFlags.ToggleOverride) {
-        Settings.Global.putInt(
-            context.contentResolver,
-            DEVELOPMENT_OVERRIDE_DESKTOP_MODE_FEATURES, override.setting
-        )
+        val cachedToggleOverride =
+            DesktopModeFlags::class.java.getDeclaredField("sCachedToggleOverride")
+        cachedToggleOverride.isAccessible = true
+        cachedToggleOverride.set(null, override)
     }
 
     private fun setDeviceEligibleForDesktopMode(eligible: Boolean) {

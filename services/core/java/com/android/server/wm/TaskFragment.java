@@ -102,7 +102,6 @@ import android.util.DisplayMetrics;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.DisplayInfo;
-import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.window.ITaskFragmentOrganizer;
 import android.window.TaskFragmentAnimationParams;
@@ -408,6 +407,12 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      */
     private boolean mAllowTransitionWhenEmpty;
 
+    /**
+     * Specifies which configuration changes should trigger TaskFragment info changed callbacks.
+     * Only system TaskFragment organizers are allowed to set this value.
+     */
+    private @ActivityInfo.Config int mConfigurationChangeMaskForOrganizer;
+
     /** When set, will force the task to report as invisible. */
     static final int FLAG_FORCE_HIDDEN_FOR_PINNED_TASK = 1;
     static final int FLAG_FORCE_HIDDEN_FOR_TASK_ORG = 1 << 1;
@@ -668,6 +673,17 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return;
         }
         mAllowTransitionWhenEmpty = allowTransitionWhenEmpty;
+    }
+
+    void setConfigurationChangeMaskForOrganizer(@ActivityInfo.Config int mask) {
+        // Only system organizers are allowed to set configuration change mask.
+        if (mTaskFragmentOrganizerController.isSystemOrganizer(mTaskFragmentOrganizer.asBinder())) {
+            mConfigurationChangeMaskForOrganizer = mask;
+        }
+    }
+
+    @ActivityInfo.Config int getConfigurationChangeMaskForOrganizer() {
+        return mConfigurationChangeMaskForOrganizer;
     }
 
     /** @see #mIsolatedNav */
@@ -1947,7 +1963,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (!hasDirectChildActivities()) {
             return false;
         }
-        if (mResumedActivity != null && mTransitionController.isTransientLaunch(mResumedActivity)) {
+        if (mResumedActivity != null && !mResumedActivity.finishing
+                && mTransitionController.isTransientLaunch(mResumedActivity)) {
             // Even if the transient activity is occluded, defer pausing (addToStopping will still
             // be called) it until the transient transition is done. So the current resuming
             // activity won't need to wait for additional pause complete.
@@ -2355,18 +2372,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     void executeAppTransition(ActivityOptions options) {
         mDisplayContent.executeAppTransition();
         ActivityOptions.abort(options);
-    }
-
-    @Override
-    RemoteAnimationTarget createRemoteAnimationTarget(
-            RemoteAnimationController.RemoteAnimationRecord record) {
-        final ActivityRecord activity = record.getMode() == RemoteAnimationTarget.MODE_OPENING
-                // There may be a launching (e.g. trampoline or embedded) activity without a window
-                // on top of the existing task which is moving to front. Exclude finishing activity
-                // so the window of next activity can be chosen to create the animation target.
-                ? getActivity(r -> !r.finishing && r.hasChild())
-                : getTopMostActivity();
-        return activity != null ? activity.createRemoteAnimationTarget(record) : null;
     }
 
     @Override
@@ -2844,9 +2849,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         }
 
         // If this TaskFragment is closing while resizing, crop to the starting bounds instead.
-        final Rect bounds = isClosingWhenResizing()
-                ? mDisplayContent.mClosingChangingContainers.get(this)
-                : getBounds();
+        final Rect bounds = getBounds();
         final int width = bounds.width();
         final int height = bounds.height();
         if (!forceUpdate && width == mLastSurfaceSize.x && height == mLastSurfaceSize.y) {

@@ -35,12 +35,15 @@ import com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD
 import com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_RELEASE
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.protolog.ProtoLog
+import com.android.internal.util.LatencyTracker
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.animation.FloatProperties
+import com.android.wm.shell.bubbles.BubbleController
+import com.android.wm.shell.bubbles.BubbleTransitions
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_CANCEL_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_END_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_START_DRAG_TO_DESKTOP
-import com.android.wm.shell.protolog.ShellProtoLogGroup
+import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.TransitionUtil
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT
@@ -49,10 +52,12 @@ import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_UND
 import com.android.wm.shell.shared.split.SplitScreenConstants.SplitPosition
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.transition.Transitions
+import com.android.wm.shell.transition.Transitions.TRANSIT_CONVERT_TO_BUBBLE
 import com.android.wm.shell.transition.Transitions.TransitionHandler
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator.Companion.DRAG_FREEFORM_SCALE
 import com.android.wm.shell.windowdecor.OnTaskResizeAnimationListener
+import java.util.Optional
 import java.util.function.Supplier
 import kotlin.math.max
 
@@ -72,6 +77,7 @@ sealed class DragToDesktopTransitionHandler(
     private val taskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer,
     private val desktopUserRepositories: DesktopUserRepositories,
     protected val interactionJankMonitor: InteractionJankMonitor,
+    private val bubbleController: Optional<BubbleController>,
     protected val transactionSupplier: Supplier<SurfaceControl.Transaction>,
 ) : TransitionHandler {
 
@@ -114,10 +120,7 @@ sealed class DragToDesktopTransitionHandler(
         dragToDesktopAnimator: MoveToDesktopAnimator,
     ) {
         if (inProgress) {
-            ProtoLog.v(
-                ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE,
-                "DragToDesktop: Drag to desktop transition already in progress.",
-            )
+            logV("Drag to desktop transition already in progress.")
             return
         }
 
@@ -241,6 +244,21 @@ sealed class DragToDesktopTransitionHandler(
             state.startTransitionFinishCb?.onTransitionFinished(/* wct= */ null)
             requestSplitFromScaledTask(splitPosition, wct)
             clearState()
+        } else if (
+            state.draggedTaskChange != null &&
+                (cancelState == CancelState.CANCEL_BUBBLE_LEFT ||
+                    cancelState == CancelState.CANCEL_BUBBLE_RIGHT)
+        ) {
+            if (bubbleController.isEmpty || state !is TransitionState.FromFullscreen) {
+                // TODO(b/388853233): add support for dragging split task to bubble
+                startCancelAnimation()
+            } else {
+                // Animation is handled by BubbleController
+                val wct = WindowContainerTransaction()
+                restoreWindowOrder(wct, state)
+                val onLeft = cancelState == CancelState.CANCEL_BUBBLE_LEFT
+                requestBubbleFromScaledTask(wct, onLeft)
+            }
         } else {
             // There's no dragged task, this can happen when the "cancel" happened too quickly
             // before the "start" transition is even ready (like on a fling gesture). The
@@ -258,20 +276,25 @@ sealed class DragToDesktopTransitionHandler(
     ) {
         val state = requireTransitionState()
         val taskInfo = state.draggedTaskChange?.taskInfo ?: error("Expected non-null taskInfo")
+        val animatedTaskBounds = getAnimatedTaskBounds()
+        requestSplitSelect(wct, taskInfo, splitPosition, animatedTaskBounds)
+    }
+
+    private fun getAnimatedTaskBounds(): Rect {
+        val state = requireTransitionState()
+        val taskInfo = state.draggedTaskChange?.taskInfo ?: error("Expected non-null taskInfo")
         val taskBounds = Rect(taskInfo.configuration.windowConfiguration.bounds)
         val taskScale = state.dragAnimator.scale
         val scaledWidth = taskBounds.width() * taskScale
         val scaledHeight = taskBounds.height() * taskScale
         val dragPosition = PointF(state.dragAnimator.position)
         state.dragAnimator.cancelAnimator()
-        val animatedTaskBounds =
-            Rect(
-                dragPosition.x.toInt(),
-                dragPosition.y.toInt(),
-                (dragPosition.x + scaledWidth).toInt(),
-                (dragPosition.y + scaledHeight).toInt(),
-            )
-        requestSplitSelect(wct, taskInfo, splitPosition, animatedTaskBounds)
+        return Rect(
+            dragPosition.x.toInt(),
+            dragPosition.y.toInt(),
+            (dragPosition.x + scaledWidth).toInt(),
+            (dragPosition.y + scaledHeight).toInt(),
+        )
     }
 
     private fun requestSplitSelect(
@@ -292,6 +315,29 @@ sealed class DragToDesktopTransitionHandler(
         wct.setWindowingMode(taskInfo.token, WINDOWING_MODE_MULTI_WINDOW)
         wct.setDensityDpi(taskInfo.token, context.resources.displayMetrics.densityDpi)
         splitScreenController.requestEnterSplitSelect(taskInfo, wct, splitPosition, taskBounds)
+    }
+
+    private fun requestBubbleFromScaledTask(wct: WindowContainerTransaction, onLeft: Boolean) {
+        // TODO(b/391928049): update density once we can drag from desktop to bubble
+        val state = requireTransitionState()
+        val taskInfo = state.draggedTaskChange?.taskInfo ?: error("Expected non-null taskInfo")
+        val taskBounds = getAnimatedTaskBounds()
+        state.dragAnimator.cancelAnimator()
+        requestBubble(wct, taskInfo, onLeft, taskBounds)
+    }
+
+    private fun requestBubble(
+        wct: WindowContainerTransaction,
+        taskInfo: RunningTaskInfo,
+        onLeft: Boolean,
+        taskBounds: Rect = Rect(taskInfo.configuration.windowConfiguration.bounds),
+    ) {
+        val controller =
+            bubbleController.orElseThrow { IllegalStateException("BubbleController not set") }
+        controller.expandStackAndSelectBubble(
+            taskInfo,
+            BubbleTransitions.DragData(taskBounds, wct, onLeft),
+        )
     }
 
     override fun startAnimation(
@@ -446,6 +492,21 @@ sealed class DragToDesktopTransitionHandler(
             state.startTransitionFinishTransaction?.apply()
             state.startTransitionFinishCb?.onTransitionFinished(/* wct= */ null)
             requestSplitSelect(wct, taskInfo, splitPosition)
+        } else if (
+            state.cancelState == CancelState.CANCEL_BUBBLE_LEFT ||
+                state.cancelState == CancelState.CANCEL_BUBBLE_RIGHT
+        ) {
+            if (bubbleController.isEmpty || state !is TransitionState.FromFullscreen) {
+                // TODO(b/388853233): add support for dragging split task to bubble
+                startCancelDragToDesktopTransition()
+                return true
+            }
+            val taskInfo =
+                state.draggedTaskChange?.taskInfo ?: error("Expected non-null task info.")
+            val wct = WindowContainerTransaction()
+            restoreWindowOrder(wct)
+            val onLeft = state.cancelState == CancelState.CANCEL_BUBBLE_LEFT
+            requestBubble(wct, taskInfo, onLeft)
         }
         return true
     }
@@ -473,6 +534,15 @@ sealed class DragToDesktopTransitionHandler(
             state.cancelState == CancelState.CANCEL_SPLIT_LEFT ||
                 state.cancelState == CancelState.CANCEL_SPLIT_RIGHT
         ) {
+            logV("mergeAnimation: cancel through split")
+            clearState()
+            return
+        }
+        // In case of bubble animation, finish the initial desktop drag animation, but keep the
+        // current animation running and have bubbles take over
+        if (info.type == TRANSIT_CONVERT_TO_BUBBLE) {
+            logV("mergeAnimation: convert-to-bubble")
+            state.startTransitionFinishCb?.onTransitionFinished(/* wct= */ null)
             clearState()
             return
         }
@@ -491,6 +561,7 @@ sealed class DragToDesktopTransitionHandler(
             state.startTransitionFinishCb
                 ?: error("Start transition expected to be waiting for merge but wasn't")
         if (isEndTransition) {
+            logV("mergeAnimation: end-transition, target=$mergeTarget")
             setupEndDragToDesktop(
                 info,
                 startTransaction = startT,
@@ -498,8 +569,15 @@ sealed class DragToDesktopTransitionHandler(
             )
             // Call finishCallback to merge animation before startTransitionFinishCb is called
             finishCallback.onTransitionFinished(/* wct= */ null)
+            LatencyTracker.getInstance(context)
+                .onActionEnd(LatencyTracker.ACTION_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG)
             animateEndDragToDesktop(startTransaction = startT, startTransitionFinishCb)
-        } else if (isCancelTransition) {
+            return
+        }
+        if (isCancelTransition) {
+            logV("mergeAnimation: cancel-transition, target=$mergeTarget")
+            LatencyTracker.getInstance(context)
+                .onActionCancel(LatencyTracker.ACTION_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG)
             info.changes.forEach { change ->
                 startT.show(change.leash)
                 startTransactionFinishT.show(change.leash)
@@ -508,7 +586,9 @@ sealed class DragToDesktopTransitionHandler(
             finishCallback.onTransitionFinished(/* wct= */ null)
             startTransitionFinishCb.onTransitionFinished(/* wct= */ null)
             clearState()
+            return
         }
+        logW("unhandled merge transition: transitionInfo=$info")
     }
 
     protected open fun setupEndDragToDesktop(
@@ -582,7 +662,7 @@ sealed class DragToDesktopTransitionHandler(
                 startPosition.y.toInt() + unscaledStartHeight,
             )
 
-        dragToDesktopStateListener?.onCommitToDesktopAnimationStart(startTransaction)
+        dragToDesktopStateListener?.onCommitToDesktopAnimationStart()
         // Accept the merge by applying the merging transaction (applied by #showResizeVeil)
         // and finish callback. Show the veil and position the task at the first frame before
         // starting the final animation.
@@ -649,10 +729,7 @@ sealed class DragToDesktopTransitionHandler(
             return
         }
         if (state.startTransitionToken == transition) {
-            ProtoLog.v(
-                ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE,
-                "DragToDesktop: onTransitionConsumed() start transition aborted",
-            )
+            logV("onTransitionConsumed() start transition aborted")
             state.startAborted = true
             // The start-transition (DRAG_HOLD) is aborted, cancel its jank interaction.
             interactionJankMonitor.cancel(CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD)
@@ -713,7 +790,7 @@ sealed class DragToDesktopTransitionHandler(
                 addListener(
                     object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator) {
-                            dragToDesktopStateListener?.onCancelToDesktopAnimationEnd(tx)
+                            dragToDesktopStateListener?.onCancelToDesktopAnimationEnd()
                             // Start the cancel transition to restore order.
                             startCancelDragToDesktopTransition()
                         }
@@ -806,9 +883,9 @@ sealed class DragToDesktopTransitionHandler(
     )
 
     interface DragToDesktopStateListener {
-        fun onCommitToDesktopAnimationStart(tx: SurfaceControl.Transaction)
+        fun onCommitToDesktopAnimationStart()
 
-        fun onCancelToDesktopAnimationEnd(tx: SurfaceControl.Transaction)
+        fun onCancelToDesktopAnimationEnd()
     }
 
     sealed class TransitionState {
@@ -869,9 +946,22 @@ sealed class DragToDesktopTransitionHandler(
         CANCEL_SPLIT_LEFT,
         /** A cancel event where the task will request to enter split on the right side. */
         CANCEL_SPLIT_RIGHT,
+        /** A cancel event where the task will request to bubble on the left side. */
+        CANCEL_BUBBLE_LEFT,
+        /** A cancel event where the task will request to bubble on the right side. */
+        CANCEL_BUBBLE_RIGHT,
+    }
+
+    private fun logV(msg: String, vararg arguments: Any?) {
+        ProtoLog.v(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+    }
+
+    private fun logW(msg: String, vararg arguments: Any?) {
+        ProtoLog.w(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }
 
     companion object {
+        private const val TAG = "DragToDesktopTransitionHandler"
         /** The duration of the animation to commit or cancel the drag-to-desktop gesture. */
         @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
         const val DRAG_TO_DESKTOP_FINISH_ANIM_DURATION_MS = 336L
@@ -887,6 +977,7 @@ constructor(
     taskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer,
     desktopUserRepositories: DesktopUserRepositories,
     interactionJankMonitor: InteractionJankMonitor,
+    bubbleController: Optional<BubbleController>,
     transactionSupplier: Supplier<SurfaceControl.Transaction> = Supplier {
         SurfaceControl.Transaction()
     },
@@ -897,6 +988,7 @@ constructor(
         taskDisplayAreaOrganizer,
         desktopUserRepositories,
         interactionJankMonitor,
+        bubbleController,
         transactionSupplier,
     ) {
 
@@ -925,6 +1017,7 @@ constructor(
     taskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer,
     desktopUserRepositories: DesktopUserRepositories,
     interactionJankMonitor: InteractionJankMonitor,
+    bubbleController: Optional<BubbleController>,
     transactionSupplier: Supplier<SurfaceControl.Transaction> = Supplier {
         SurfaceControl.Transaction()
     },
@@ -935,6 +1028,7 @@ constructor(
         taskDisplayAreaOrganizer,
         desktopUserRepositories,
         interactionJankMonitor,
+        bubbleController,
         transactionSupplier,
     ) {
 
@@ -969,10 +1063,7 @@ constructor(
         val state = requireTransitionState()
         val homeLeash = state.homeChange?.leash
         if (homeLeash == null) {
-            ProtoLog.e(
-                ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE,
-                "DragToDesktop: home leash is null",
-            )
+            logE("home leash is null")
         } else {
             // Hide home on finish to prevent flickering when wallpaper activity flag is enabled
             finishTransaction.hide(homeLeash)
@@ -1013,7 +1104,13 @@ constructor(
         val startBoundsWithOffset =
             Rect(startBounds).apply { offset(startPosition.x.toInt(), startPosition.y.toInt()) }
 
-        dragToDesktopStateListener?.onCommitToDesktopAnimationStart(startTransaction)
+        logV(
+            "animateEndDragToDesktop: startBounds=$startBounds, endBounds=$endBounds, " +
+                "startScale=$startScale, startPosition=$startPosition, " +
+                "startBoundsWithOffset=$startBoundsWithOffset"
+        )
+
+        dragToDesktopStateListener?.onCommitToDesktopAnimationStart()
         // Accept the merge by applying the merging transaction (applied by #showResizeVeil)
         // and finish callback. Show the veil and position the task at the first frame before
         // starting the final animation.
@@ -1094,7 +1191,16 @@ constructor(
             .start()
     }
 
+    private fun logV(msg: String, vararg arguments: Any?) {
+        ProtoLog.v(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+    }
+
+    private fun logE(msg: String, vararg arguments: Any?) {
+        ProtoLog.e(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+    }
+
     companion object {
+        private const val TAG = "SpringDragToDesktopTransitionHandler"
         /** The freeform tasks initial scale when committing the drag-to-desktop gesture. */
         private val FREEFORM_TASKS_INITIAL_SCALE =
             propertyValue("freeform_tasks_initial_scale", scale = 100f, default = 0.9f)

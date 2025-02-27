@@ -20,60 +20,38 @@ import android.content.Context
 import android.content.res.Resources
 import android.graphics.PointF
 import android.graphics.RectF
+import android.util.Log
 import android.util.TypedValue
-import androidx.annotation.VisibleForTesting
 import com.android.app.animation.MathUtils
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.res.R
 import com.android.systemui.shade.data.repository.ShadeRepository
-import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
 import com.android.systemui.wallpapers.data.repository.WallpaperFocalAreaRepository
-import com.android.systemui.wallpapers.data.repository.WallpaperRepository
 import javax.inject.Inject
 import kotlin.math.min
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 @SysUISingleton
 class WallpaperFocalAreaInteractor
 @Inject
 constructor(
-    @Application private val applicationScope: CoroutineScope,
     private val context: Context,
     private val wallpaperFocalAreaRepository: WallpaperFocalAreaRepository,
     shadeRepository: ShadeRepository,
-    activeNotificationsInteractor: ActiveNotificationsInteractor,
-    val wallpaperRepository: WallpaperRepository,
 ) {
-    // When there's notifications in splitshade, the focal area should be left aligned
-    @VisibleForTesting
-    val notificationInShadeWideLayout: Flow<Boolean> =
-        combine(
-            shadeRepository.isShadeLayoutWide,
-            activeNotificationsInteractor.areAnyNotificationsPresent,
-        ) { isShadeLayoutWide, areAnyNotificationsPresent: Boolean ->
-            when {
-                !isShadeLayoutWide -> false
-                !areAnyNotificationsPresent -> false
-                else -> true
-            }
-        }
-
-    val hasFocalArea = wallpaperRepository.shouldSendFocalArea
+    val hasFocalArea = wallpaperFocalAreaRepository.hasFocalArea
 
     val wallpaperFocalAreaBounds: Flow<RectF> =
         combine(
                 shadeRepository.isShadeLayoutWide,
-                notificationInShadeWideLayout,
                 wallpaperFocalAreaRepository.notificationStackAbsoluteBottom,
                 wallpaperFocalAreaRepository.shortcutAbsoluteTop,
                 wallpaperFocalAreaRepository.notificationDefaultTop,
             ) {
                 isShadeLayoutWide,
-                notificationInShadeWideLayout,
                 notificationStackAbsoluteBottom,
                 shortcutAbsoluteTop,
                 notificationDefaultTop ->
@@ -97,28 +75,21 @@ constructor(
                         screenBounds.centerY() + screenBounds.height() / 2F / wallpaperZoomedInScale,
                     )
 
+                val focalAreaMaxWidthDp = getFocalAreaMaxWidthDp(context)
                 val maxFocalAreaWidth =
                     TypedValue.applyDimension(
                         TypedValue.COMPLEX_UNIT_DIP,
-                        FOCAL_AREA_MAX_WIDTH_DP.toFloat(),
+                        focalAreaMaxWidthDp.toFloat(),
                         context.resources.displayMetrics,
                     )
 
                 val (left, right) =
-                // tablet landscape
-                if (context.resources.getBoolean(R.bool.center_align_focal_area_shape)) {
+                // Tablet & unfold foldable landscape
+                if (isShadeLayoutWide) {
                         Pair(
                             scaledBounds.centerX() - maxFocalAreaWidth / 2F,
                             scaledBounds.centerX() + maxFocalAreaWidth / 2F,
                         )
-                        // unfold foldable landscape
-                    } else if (isShadeLayoutWide) {
-                        if (notificationInShadeWideLayout) {
-                            Pair(scaledBounds.left, scaledBounds.centerX())
-                        } else {
-                            Pair(scaledBounds.centerX(), scaledBounds.right)
-                        }
-                        // handheld / portrait
                     } else {
                         val focalAreaWidth = min(scaledBounds.width(), maxFocalAreaWidth)
                         Pair(
@@ -147,8 +118,10 @@ constructor(
                                 wallpaperZoomedInScale
                     }
                 val bottom = scaledBounds.bottom - scaledBottomMargin
-                RectF(left, top, right, bottom)
+                RectF(left, top, right, bottom).also { Log.d(TAG, "Focal area changes to $it") }
             }
+            // Make sure a valid rec
+            .filter { it.width() >= 0 && it.height() >= 0 }
             .distinctUntilChanged()
 
     fun setFocalAreaBounds(bounds: RectF) {
@@ -187,8 +160,17 @@ constructor(
             return if (scale == 0f) 1f else scale
         }
 
-        // A max width for focal area shape effects bounds, to avoid
-        // it becoming too large in large screen portrait mode
-        const val FOCAL_AREA_MAX_WIDTH_DP = 500
+        // A max width for focal area shape effects bounds, to avoid it becoming too large,
+        // especially in portrait mode
+        const val FOCAL_AREA_MAX_WIDTH_DP_TABLET = 500
+        const val FOCAL_AREA_MAX_WIDTH_DP_FOLDABLE = 400
+
+        fun getFocalAreaMaxWidthDp(context: Context): Int {
+            return if (context.resources.getBoolean(R.bool.center_align_focal_area_shape))
+                FOCAL_AREA_MAX_WIDTH_DP_TABLET
+            else FOCAL_AREA_MAX_WIDTH_DP_FOLDABLE
+        }
+
+        private val TAG = WallpaperFocalAreaInteractor::class.simpleName
     }
 }

@@ -27,7 +27,7 @@ import com.android.systemui.res.R
 import com.android.systemui.statusbar.chips.notification.domain.interactor.StatusBarNotificationChipsInteractor
 import com.android.systemui.statusbar.chips.notification.domain.model.NotificationChipModel
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
-import com.android.systemui.statusbar.chips.ui.model.ColorsModel.Companion.toCustomColorsModel
+import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
@@ -35,6 +35,7 @@ import com.android.systemui.statusbar.notification.domain.model.TopPinnedState
 import com.android.systemui.statusbar.notification.headsup.PinnedStatus
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
+import com.android.systemui.util.time.SystemClock
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -51,6 +52,7 @@ constructor(
     @Application private val applicationScope: CoroutineScope,
     private val notifChipsInteractor: StatusBarNotificationChipsInteractor,
     headsUpNotificationInteractor: HeadsUpNotificationInteractor,
+    private val systemClock: SystemClock,
 ) {
     /**
      * A flow modeling the notification chips that should be shown. Emits an empty list if there are
@@ -58,7 +60,7 @@ constructor(
      */
     val chips: Flow<List<OngoingActivityChipModel.Active>> =
         combine(
-                notifChipsInteractor.notificationChips,
+                notifChipsInteractor.shownNotificationChips,
                 headsUpNotificationInteractor.statusBarHeadsUpState,
             ) { notifications, headsUpState ->
                 notifications.map { it.toActivityChipModel(headsUpState) }
@@ -85,8 +87,7 @@ constructor(
                     contentDescription,
                 )
             }
-        val colors = this.promotedContent.toCustomColorsModel()
-
+        val colors = ColorsModel.SystemThemed
         val clickListener: () -> Unit = {
             // The notification pipeline needs everything to run on the main thread, so keep
             // this event on the main thread.
@@ -159,34 +160,46 @@ constructor(
                 clickBehavior,
             )
         }
-        when (this.promotedContent.time.mode) {
-            PromotedNotificationContentModel.When.Mode.BasicTime -> {
-                return OngoingActivityChipModel.Active.ShortTimeDelta(
-                    this.key,
-                    icon,
-                    colors,
-                    time = this.promotedContent.time.time,
-                    onClickListenerLegacy,
-                    clickBehavior,
-                )
+
+        when (this.promotedContent.time) {
+            is PromotedNotificationContentModel.When.Time -> {
+                return if (
+                    this.promotedContent.time.currentTimeMillis >=
+                        systemClock.currentTimeMillis() + FUTURE_TIME_THRESHOLD_MILLIS
+                ) {
+                    OngoingActivityChipModel.Active.ShortTimeDelta(
+                        this.key,
+                        icon,
+                        colors,
+                        time = this.promotedContent.time.currentTimeMillis,
+                        onClickListenerLegacy,
+                        clickBehavior,
+                    )
+                } else {
+                    // Don't show a `when` time that's close to now or in the past because it's
+                    // likely that the app didn't intentionally set the `when` time to be shown in
+                    // the status bar chip.
+                    // TODO(b/393369213): If a notification sets a `when` time in the future and
+                    // then that time comes and goes, the chip *will* start showing times in the
+                    // past. Not going to fix this right now because the Compose implementation
+                    // automatically handles this for us and we're hoping to launch the notification
+                    // chips at the same time as the Compose chips.
+                    return OngoingActivityChipModel.Active.IconOnly(
+                        this.key,
+                        icon,
+                        colors,
+                        onClickListenerLegacy,
+                        clickBehavior,
+                    )
+                }
             }
-            PromotedNotificationContentModel.When.Mode.CountUp -> {
+            is PromotedNotificationContentModel.When.Chronometer -> {
+                // TODO(b/364653005): Check isCountDown and support CountDown.
                 return OngoingActivityChipModel.Active.Timer(
                     this.key,
                     icon,
                     colors,
-                    startTimeMs = this.promotedContent.time.time,
-                    onClickListenerLegacy,
-                    clickBehavior,
-                )
-            }
-            PromotedNotificationContentModel.When.Mode.CountDown -> {
-                // TODO(b/364653005): Support CountDown.
-                return OngoingActivityChipModel.Active.Timer(
-                    this.key,
-                    icon,
-                    colors,
-                    startTimeMs = this.promotedContent.time.time,
+                    startTimeMs = this.promotedContent.time.elapsedRealtimeMillis,
                     onClickListenerLegacy,
                     clickBehavior,
                 )
@@ -204,5 +217,13 @@ constructor(
                 ongoingDescription,
             )
         )
+    }
+
+    companion object {
+        /**
+         * Notifications must have a `when` time of at least 1 minute in the future in order for the
+         * status bar chip to show the time.
+         */
+        private const val FUTURE_TIME_THRESHOLD_MILLIS = 60 * 1000
     }
 }

@@ -46,9 +46,6 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.app.WindowConfiguration.activityTypeToString;
-import static android.app.admin.DevicePolicyResources.Drawables.Source.PROFILE_SWITCH_ANIMATION;
-import static android.app.admin.DevicePolicyResources.Drawables.Style.OUTLINE;
-import static android.app.admin.DevicePolicyResources.Drawables.WORK_PROFILE_ICON;
 import static android.content.Context.CONTEXT_RESTRICTED;
 import static android.content.Intent.ACTION_MAIN;
 import static android.content.Intent.CATEGORY_HOME;
@@ -113,7 +110,6 @@ import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED;
 import static android.view.WindowManager.PROPERTY_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING_STATE_SHARING;
 import static android.view.WindowManager.TRANSIT_CLOSE;
-import static android.view.WindowManager.TRANSIT_FLAG_OPEN_BEHIND;
 import static android.view.WindowManager.TRANSIT_OLD_UNSET;
 import static android.view.WindowManager.TRANSIT_RELAUNCH;
 import static android.view.WindowManager.hasWindowExtensionsEnabled;
@@ -163,7 +159,6 @@ import static com.android.server.wm.ActivityRecordProto.FRONT_OF_TASK;
 import static com.android.server.wm.ActivityRecordProto.IN_SIZE_COMPAT_MODE;
 import static com.android.server.wm.ActivityRecordProto.IS_ANIMATING;
 import static com.android.server.wm.ActivityRecordProto.IS_USER_FULLSCREEN_OVERRIDE_ENABLED;
-import static com.android.server.wm.ActivityRecordProto.IS_WAITING_FOR_TRANSITION_START;
 import static com.android.server.wm.ActivityRecordProto.LAST_ALL_DRAWN;
 import static com.android.server.wm.ActivityRecordProto.LAST_DROP_INPUT_MODE;
 import static com.android.server.wm.ActivityRecordProto.LAST_SURFACE_SHOWING;
@@ -190,7 +185,6 @@ import static com.android.server.wm.ActivityRecordProto.STARTING_DISPLAYED;
 import static com.android.server.wm.ActivityRecordProto.STARTING_MOVED;
 import static com.android.server.wm.ActivityRecordProto.STARTING_WINDOW;
 import static com.android.server.wm.ActivityRecordProto.STATE;
-import static com.android.server.wm.ActivityRecordProto.THUMBNAIL;
 import static com.android.server.wm.ActivityRecordProto.TRANSLUCENT;
 import static com.android.server.wm.ActivityRecordProto.VISIBLE;
 import static com.android.server.wm.ActivityRecordProto.VISIBLE_REQUESTED;
@@ -269,7 +263,6 @@ import android.app.PictureInPictureParams;
 import android.app.ResultInfo;
 import android.app.WaitResult;
 import android.app.WindowConfiguration;
-import android.app.admin.DevicePolicyManager;
 import android.app.assist.ActivityId;
 import android.app.compat.CompatChanges;
 import android.app.servertransaction.ActivityConfigurationChangeItem;
@@ -299,12 +292,12 @@ import android.content.pm.PackageManagerInternal;
 import android.content.pm.UserProperties;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.Rect;
-import android.graphics.drawable.Drawable;
 import android.gui.DropInputMode;
 import android.hardware.HardwareBuffer;
 import android.net.Uri;
@@ -343,15 +336,12 @@ import android.view.IAppTransitionAnimationSpecsFuture;
 import android.view.InputApplicationHandle;
 import android.view.RemoteAnimationAdapter;
 import android.view.RemoteAnimationDefinition;
-import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
 import android.view.WindowInsets;
-import android.view.WindowInsets.Type;
 import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
 import android.view.WindowManager.TransitionOldType;
-import android.view.animation.Animation;
 import android.window.ActivityWindowInfo;
 import android.window.ITaskFragmentOrganizer;
 import android.window.RemoteTransition;
@@ -372,7 +362,6 @@ import com.android.internal.app.ResolverActivity;
 import com.android.internal.content.ReferrerIntent;
 import com.android.internal.os.TimeoutRecord;
 import com.android.internal.os.TransferPipe;
-import com.android.internal.policy.AttributeCache;
 import com.android.internal.policy.PhoneWindow;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.XmlUtils;
@@ -390,7 +379,6 @@ import com.android.server.uri.UriPermissionOwner;
 import com.android.server.wm.ActivityMetricsLogger.TransitionInfoSnapshot;
 import com.android.server.wm.SurfaceAnimator.AnimationType;
 import com.android.server.wm.WindowManagerService.H;
-import com.android.server.wm.utils.InsetUtils;
 import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -506,6 +494,8 @@ public final class ActivityRecord extends WindowToken {
     final String processName; // process where this component wants to run
     final String taskAffinity; // as per ActivityInfo.taskAffinity
     final boolean stateNotNeeded; // As per ActivityInfo.flags
+    @Nullable
+    final WindowStyle mWindowStyle;
     @VisibleForTesting
     int mHandoverLaunchDisplayId = INVALID_DISPLAY; // Handover launch display id to next activity.
     @VisibleForTesting
@@ -691,8 +681,6 @@ public final class ActivityRecord extends WindowToken {
     private boolean mRemovingFromDisplay = false;
 
     private RemoteAnimationDefinition mRemoteAnimationDefinition;
-
-    AnimatingActivityRegistry mAnimatingActivityRegistry;
 
     // Set to the previous Task parent of the ActivityRecord when it is reparented to a new Task
     // due to picture-in-picture. This gets cleared whenever this activity or the Task
@@ -889,12 +877,6 @@ public final class ActivityRecord extends WindowToken {
             SPLASH_SCREEN_BEHAVIOR_ICON_PREFERRED
     })
     @interface SplashScreenBehavior { }
-
-    // Force an app transition to be ran in the case the visibility of the app did not change.
-    // We use this for the case of moving a Root Task to the back with multiple activities, and the
-    // top activity enters PIP; the bottom activity's visibility stays the same, but we need to
-    // run the transition.
-    boolean mRequestForceTransition;
 
     boolean mEnteringAnimation;
     boolean mOverrideTaskTransition;
@@ -1571,17 +1553,7 @@ public final class ActivityRecord extends WindowToken {
         this.task = newTask;
 
         if (shouldStartChangeTransition(newParent, oldParent)) {
-            if (mTransitionController.isShellTransitionsEnabled()) {
-                // For Shell transition, call #initializeChangeTransition directly to take the
-                // screenshot at the Activity level. And Shell will be in charge of handling the
-                // surface reparent and crop.
-                initializeChangeTransition(getBounds());
-            } else {
-                // For legacy app transition, we want to take a screenshot of the Activity surface,
-                // but animate the change transition on TaskFragment level to get the correct window
-                // crop.
-                newParent.initializeChangeTransition(getBounds(), getSurfaceControl());
-            }
+            mTransitionController.collectVisibleChange(this);
         }
 
         super.onParentChanged(newParent, oldParent);
@@ -1609,20 +1581,7 @@ public final class ActivityRecord extends WindowToken {
             mLastReportedPictureInPictureMode = inPinnedWindowingMode();
         }
 
-        // When the associated task is {@code null}, the {@link ActivityRecord} can no longer
-        // access visual elements like the {@link DisplayContent}. We must remove any associations
-        // such as animations.
-        if (task == null) {
-            // It is possible we have been marked as a closing app earlier. We must remove ourselves
-            // from this list so we do not participate in any future animations.
-            if (getDisplayContent() != null) {
-                getDisplayContent().mClosingApps.remove(this);
-            }
-        }
         final Task rootTask = getRootTask();
-
-        updateAnimatingActivityRegistry();
-
         if (task == mLastParentBeforePip && task != null) {
             // Notify the TaskFragmentOrganizer that the activity is reparented back from pip.
             mAtmService.mWindowOrganizerController.mTaskFragmentOrganizerController
@@ -1724,20 +1683,6 @@ public final class ActivityRecord extends WindowToken {
         return !organizedTaskFragment.isAllowedToEmbedActivityInTrustedMode(this);
     }
 
-    void updateAnimatingActivityRegistry() {
-        final Task rootTask = getRootTask();
-        final AnimatingActivityRegistry registry = rootTask != null
-                ? rootTask.getAnimatingActivityRegistry()
-                : null;
-
-        // If we reparent, make sure to remove ourselves from the old animation registry.
-        if (mAnimatingActivityRegistry != null && mAnimatingActivityRegistry != registry) {
-            mAnimatingActivityRegistry.notifyFinished(this);
-        }
-
-        mAnimatingActivityRegistry = registry;
-    }
-
     boolean canAutoEnterPip() {
         // beforeStopping=false since the actual pip-ing will take place after startPausing()
         final boolean activityCanPip = checkEnterPictureInPictureState(
@@ -1818,15 +1763,6 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
         prevDc.onRunningActivityChanged();
-
-        if (prevDc.mOpeningApps.remove(this)) {
-            // Transfer opening transition to new display.
-            mDisplayContent.mOpeningApps.add(this);
-            mDisplayContent.transferAppTransitionFrom(prevDc);
-            mDisplayContent.executeAppTransition();
-        }
-
-        prevDc.mClosingApps.remove(this);
         prevDc.getDisplayPolicy().removeRelaunchingApp(this);
 
         if (prevDc.mFocusedApp == this) {
@@ -2026,22 +1962,17 @@ public final class ActivityRecord extends WindowToken {
                     ? android.R.style.Theme : android.R.style.Theme_Holo;
         }
 
-        final AttributeCache.Entry ent = AttributeCache.instance().get(packageName,
-                realTheme, com.android.internal.R.styleable.Window, mUserId);
-
-        if (ent != null) {
-            final boolean styleTranslucent = ent.array.getBoolean(
-                    com.android.internal.R.styleable.Window_windowIsTranslucent, false);
-            final boolean styleFloating = ent.array.getBoolean(
-                    com.android.internal.R.styleable.Window_windowIsFloating, false);
-            mOccludesParent = !(styleTranslucent || styleFloating)
+        final WindowStyle style = mAtmService.getWindowStyle(packageName, realTheme, mUserId);
+        mWindowStyle = style;
+        if (style != null) {
+            mOccludesParent = !(style.isTranslucent() || style.isFloating())
                     // This style is propagated to the main window attributes with
                     // FLAG_SHOW_WALLPAPER from PhoneWindow#generateLayout.
-                    || ent.array.getBoolean(R.styleable.Window_windowShowWallpaper, false);
+                    || style.showWallpaper();
             mStyleFillsParent = mOccludesParent;
-            mNoDisplay = ent.array.getBoolean(R.styleable.Window_windowNoDisplay, false);
-            mOptOutEdgeToEdge = PhoneWindow.isOptingOutEdgeToEdgeEnforcement(
-                    aInfo.applicationInfo, false /* local */, ent.array);
+            mNoDisplay = style.noDisplay();
+            mOptOutEdgeToEdge = style.optOutEdgeToEdge() && PhoneWindow.isOptOutEdgeToEdgeEnabled(
+                    aInfo.applicationInfo, false /* local */);
         } else {
             mStyleFillsParent = mOccludesParent = true;
             mNoDisplay = false;
@@ -2384,21 +2315,17 @@ public final class ActivityRecord extends WindowToken {
             return false;
         }
 
-        final AttributeCache.Entry ent = AttributeCache.instance().get(pkg, theme,
-                com.android.internal.R.styleable.Window, mWmService.mCurrentUserId);
-        if (ent == null) {
+        final WindowStyle style = theme == this.theme
+                ? mWindowStyle : mAtmService.getWindowStyle(pkg, theme, mUserId);
+        if (style == null) {
             // Whoops!  App doesn't exist. Um. Okay. We'll just pretend like we didn't
             // see that.
             return false;
         }
-        final boolean windowIsTranslucent = ent.array.getBoolean(
-                com.android.internal.R.styleable.Window_windowIsTranslucent, false);
-        final boolean windowIsFloating = ent.array.getBoolean(
-                com.android.internal.R.styleable.Window_windowIsFloating, false);
-        final boolean windowShowWallpaper = ent.array.getBoolean(
-                com.android.internal.R.styleable.Window_windowShowWallpaper, false);
-        final boolean windowDisableStarting = ent.array.getBoolean(
-                com.android.internal.R.styleable.Window_windowDisablePreview, false);
+        final boolean windowIsTranslucent = style.isTranslucent();
+        final boolean windowIsFloating = style.isFloating();
+        final boolean windowShowWallpaper = style.showWallpaper();
+        final boolean windowDisableStarting = style.disablePreview();
         ProtoLog.v(WM_DEBUG_STARTING_WINDOW,
                 "Translucent=%s Floating=%s ShowWallpaper=%s Disable=%s",
                 windowIsTranslucent, windowIsFloating, windowShowWallpaper,
@@ -4500,7 +4427,6 @@ public final class ActivityRecord extends WindowToken {
 
         ProtoLog.v(WM_DEBUG_APP_TRANSITIONS, "Removing app token: %s", this);
 
-        getDisplayContent().mOpeningApps.remove(this);
         getDisplayContent().mUnknownAppVisibilityController.appRemovedOrHidden(this);
         mWmService.mSnapshotController.onAppRemoved(this);
         mAtmService.mStartingProcessActivities.remove(this);
@@ -4512,20 +4438,9 @@ public final class ActivityRecord extends WindowToken {
         mAppCompatController.getTransparentPolicy().stop();
 
         // Defer removal of this activity when either a child is animating, or app transition is on
-        // going. App transition animation might be applied on the parent task not on the activity,
-        // but the actual frame buffer is associated with the activity, so we have to keep the
-        // activity while a parent is animating.
-        boolean delayed = isAnimating(TRANSITION | PARENTS | CHILDREN,
-                ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_WINDOW_ANIMATION);
-        if (getDisplayContent().mClosingApps.contains(this)) {
-            delayed = true;
-        } else if (getDisplayContent().mAppTransition.isTransitionSet()) {
-            getDisplayContent().mClosingApps.add(this);
-            delayed = true;
-        } else if (mTransitionController.inTransition()) {
-            delayed = true;
-        }
-
+        // going. The handleCompleteDeferredRemoval will continue the removal.
+        final boolean delayed = isAnimating(CHILDREN, ANIMATION_TYPE_WINDOW_ANIMATION)
+                || mTransitionController.inTransition();
         // Don't commit visibility if it is waiting to animate. It will be set post animation.
         if (!delayed) {
             commitVisibility(false /* visible */, true /* performLayout */);
@@ -4703,12 +4618,6 @@ public final class ActivityRecord extends WindowToken {
                 }
             }
 
-            // In this case, the starting icon has already been displayed, so start
-            // letting windows get shown immediately without any more transitions.
-            if (fromActivity.mVisible) {
-                mDisplayContent.mSkipAppTransitionAnimation = true;
-            }
-
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Moving existing starting %s"
                     + " from %s to %s", tStartingWindow, fromActivity, this);
 
@@ -4805,8 +4714,6 @@ public final class ActivityRecord extends WindowToken {
             scheduleAddStartingWindow();
             return true;
         }
-
-        // TODO: Transfer thumbnail
 
         return false;
     }
@@ -5668,9 +5575,6 @@ public final class ActivityRecord extends WindowToken {
 
         mAtmService.mBackNavigationController.onAppVisibilityChanged(this, visible);
 
-        final DisplayContent displayContent = getDisplayContent();
-        displayContent.mOpeningApps.remove(this);
-        displayContent.mClosingApps.remove(this);
         setVisibleRequested(visible);
         mLastDeferHidingClient = deferHidingClient;
 
@@ -5683,13 +5587,6 @@ public final class ActivityRecord extends WindowToken {
                 setClientVisible(false);
             }
         } else {
-            if (!appTransition.isTransitionSet()
-                    && appTransition.isReady()) {
-                // Add the app mOpeningApps if transition is unset but ready. This means
-                // we're doing a screen freeze, and the unfreeze will wait for all opening
-                // apps to be ready.
-                displayContent.mOpeningApps.add(this);
-            }
             startingMoved = false;
             // If the token is currently hidden (should be the common case), or has been
             // stopped, then we need to set up to wait for its windows to be ready.
@@ -5739,66 +5636,9 @@ public final class ActivityRecord extends WindowToken {
             mTransitionController.mValidateCommitVis.add(this);
             return;
         }
-        // If we are preparing an app transition, then delay changing
-        // the visibility of this token until we execute that transition.
-        if (deferCommitVisibilityChange(visible)) {
-            return;
-        }
 
         commitVisibility(visible, true /* performLayout */);
         updateReportedVisibilityLocked();
-    }
-
-    /**
-     * Returns {@code true} if this activity is either added to opening-apps or closing-apps.
-     * Then its visibility will be committed until the transition is ready.
-     */
-    private boolean deferCommitVisibilityChange(boolean visible) {
-        if (mTransitionController.isShellTransitionsEnabled()) {
-            // Shell transition doesn't use opening/closing sets.
-            return false;
-        }
-        if (!mDisplayContent.mAppTransition.isTransitionSet()) {
-            return false;
-        }
-        if (mWaitForEnteringPinnedMode && mVisible == visible) {
-            // If the visibility is not changed during enter PIP, we don't want to include it in
-            // app transition to affect the animation theme, because the Pip organizer will
-            // animate the entering PIP instead.
-            return false;
-        }
-
-        // The animation will be visible soon so do not skip by screen off.
-        final boolean ignoreScreenOn = canTurnScreenOn() || mTaskSupervisor.getKeyguardController()
-                .isKeyguardGoingAway(mDisplayContent.mDisplayId);
-        // Ignore display frozen so the opening / closing transition type can be updated correctly
-        // even if the display is frozen. And it's safe since in applyAnimation will still check
-        // DC#okToAnimate again if the transition animation is fine to apply.
-        if (!okToAnimate(true /* ignoreFrozen */, ignoreScreenOn)) {
-            return false;
-        }
-        if (visible) {
-            mDisplayContent.mOpeningApps.add(this);
-            mEnteringAnimation = true;
-        } else if (mVisible) {
-            mDisplayContent.mClosingApps.add(this);
-            mEnteringAnimation = false;
-        }
-        if ((mDisplayContent.mAppTransition.getTransitFlags() & TRANSIT_FLAG_OPEN_BEHIND) != 0) {
-            // Add the launching-behind activity to mOpeningApps.
-            final WindowState win = mDisplayContent.findFocusedWindow();
-            if (win != null) {
-                final ActivityRecord focusedActivity = win.mActivityRecord;
-                if (focusedActivity != null) {
-                    ProtoLog.d(WM_DEBUG_APP_TRANSITIONS,
-                            "TRANSIT_FLAG_OPEN_BEHIND,  adding %s to mOpeningApps",
-                            focusedActivity);
-                    // Force animation to be loaded.
-                    mDisplayContent.mOpeningApps.add(focusedActivity);
-                }
-            }
-        }
-        return true;
     }
 
     @Override
@@ -5807,8 +5647,6 @@ public final class ActivityRecord extends WindowToken {
         if ((mTransitionChangeFlags & FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT) != 0) {
             return false;
         }
-        // If it was set to true, reset the last request to force the transition.
-        mRequestForceTransition = false;
         return super.applyAnimation(lp, transit, enter, isVoiceInteraction, sources);
     }
 
@@ -5871,7 +5709,21 @@ public final class ActivityRecord extends WindowToken {
         displayContent.getInputMonitor().updateInputWindowsLw(false /*force*/);
         mTransitionChangeFlags = 0;
 
-        postApplyAnimation(visible, fromTransition);
+        // Set client visibility if:
+        // 1. The activity is becoming visible. This is usually no-op because assume that
+        //    setVisibility(true) should have been called. Just in case if that was missed.
+        // 2. The activity is becoming invisible and not RESUMED state (it is usually PAUSED unless
+        //    the activity is transient-hide). If the state is RESUMED, setVisibility(false) will be
+        //    called until activityStopped. This is to avoid crashing apps that assume its view root
+        //    won't be invisible before the activity is paused.
+        if (visible || mState != RESUMED) {
+            setClientVisible(visible);
+        }
+        // Notify the visibility change outside of transition in case onTransitionFinish is not
+        // called for updating snapshot states.
+        if (!fromTransition) {
+            mWmService.mSnapshotController.notifyAppVisibilityChanged(this, visible);
+        }
     }
 
     void commitVisibility(boolean visible, boolean performLayout) {
@@ -5890,75 +5742,6 @@ public final class ActivityRecord extends WindowToken {
         return mNeedsLetterboxedAnimation && isAnimating();
     }
 
-    /**
-     * Post process after applying an app transition animation.
-     *
-     * <p class="note"><strong>Note: </strong> This function must be called after the animations
-     * have been applied and {@link #commitVisibility}.</p>
-     *
-     * @param visible {@code true} if this {@link ActivityRecord} has become visible, otherwise
-     *                this has become invisible.
-     * @param fromTransition {@code true} if this call is part of finishing a transition. This is
-     *                       needed because the shell transition is no-longer active by the time
-     *                       commitVisibility is called.
-     */
-    private void postApplyAnimation(boolean visible, boolean fromTransition) {
-        final boolean usingShellTransitions = mTransitionController.isShellTransitionsEnabled();
-        final boolean delayed = !usingShellTransitions && isAnimating(PARENTS | CHILDREN,
-                ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_WINDOW_ANIMATION);
-        if (!delayed && !usingShellTransitions) {
-            // We aren't delayed anything, but exiting windows rely on the animation finished
-            // callback being called in case the ActivityRecord was pretending to be delayed,
-            // which we might have done because we were in closing/opening apps list.
-            onAnimationFinished(ANIMATION_TYPE_APP_TRANSITION, null /* AnimationAdapter */);
-            if (visible) {
-                // The token was made immediately visible, there will be no entrance animation.
-                // We need to inform the client the enter animation was finished.
-                mEnteringAnimation = true;
-                mWmService.mActivityManagerAppTransitionNotifier.onAppTransitionFinishedLocked(
-                        token);
-            }
-        }
-
-        // If we're becoming visible, immediately change client visibility as well. there seem
-        // to be some edge cases where we change our visibility but client visibility never gets
-        // updated.
-        // If we're becoming invisible, update the client visibility if we are not running an
-        // animation and aren't in RESUMED state. Otherwise, we'll update client visibility in
-        // onAnimationFinished or activityStopped.
-        if (visible || (mState != RESUMED && (usingShellTransitions || !isAnimating(
-                PARENTS, ANIMATION_TYPE_APP_TRANSITION)))) {
-            setClientVisible(visible);
-        }
-
-        final DisplayContent displayContent = getDisplayContent();
-        if (!displayContent.mClosingApps.contains(this)
-                && !displayContent.mOpeningApps.contains(this)
-                && !fromTransition) {
-            // Take the screenshot before possibly hiding the WSA, otherwise the screenshot
-            // will not be taken.
-            mWmService.mSnapshotController.notifyAppVisibilityChanged(this, visible);
-        }
-
-        // If we are hidden but there is no delay needed we immediately
-        // apply the Surface transaction so that the ActivityManager
-        // can have some guarantee on the Surface state following
-        // setting the visibility. This captures cases like dismissing
-        // the docked or root pinned task where there is no app transition.
-        //
-        // In the case of a "Null" animation, there will be
-        // no animation but there will still be a transition set.
-        // We still need to delay hiding the surface such that it
-        // can be synchronized with showing the next surface in the transition.
-        if (!usingShellTransitions && !isVisible() && !delayed
-                && !displayContent.mAppTransition.isTransitionSet()) {
-            forAllWindows(win -> {
-                win.mWinAnimator.hide(getPendingTransaction(), "immediately hidden");
-            }, true);
-            scheduleAnimation();
-        }
-    }
-
     /** Updates draw state and shows drawn windows. */
     void commitFinishDrawing(SurfaceControl.Transaction t) {
         boolean committed = false;
@@ -5968,27 +5751,6 @@ public final class ActivityRecord extends WindowToken {
         if (committed) {
             requestUpdateWallpaperIfNeeded();
         }
-    }
-
-    /**
-     * Check if visibility of this {@link ActivityRecord} should be updated as part of an app
-     * transition.
-     *
-     * <p class="note><strong>Note:</strong> If the visibility of this {@link ActivityRecord} is
-     * already set to {@link #mVisible}, we don't need to update the visibility. So {@code false} is
-     * returned.</p>
-     *
-     * @param visible {@code true} if this {@link ActivityRecord} should become visible,
-     *                {@code false} if this should become invisible.
-     * @return {@code true} if visibility of this {@link ActivityRecord} should be updated, and
-     *         an app transition animation should be run.
-     */
-    boolean shouldApplyAnimation(boolean visible) {
-        // Allow for state update and animation to be applied if:
-        // * activity is transitioning visibility state
-        // * or the activity was marked as hidden and is exiting before we had a chance to play the
-        // transition animation
-        return isVisible() != visible || mRequestForceTransition || (!isVisible() && mIsExiting);
     }
 
     /**
@@ -7194,7 +6956,7 @@ public final class ActivityRecord extends WindowToken {
         setAppLayoutChanges(FINISH_LAYOUT_REDO_ANIM, "checkAppWindowsReadyToShow");
 
         // We can now show all of the drawn windows!
-        if (!getDisplayContent().mOpeningApps.contains(this) && canShowWindows()) {
+        if (canShowWindows()) {
             showAllWindowsLocked();
         }
     }
@@ -7606,14 +7368,10 @@ public final class ActivityRecord extends WindowToken {
         if (theme == 0) {
             return false;
         }
-        final AttributeCache.Entry ent = AttributeCache.instance().get(packageName, theme,
-                R.styleable.Window, mWmService.mCurrentUserId);
-        if (ent != null) {
-            if (ent.array.hasValue(R.styleable.Window_windowSplashScreenBehavior)) {
-                return ent.array.getInt(R.styleable.Window_windowSplashScreenBehavior,
-                        SPLASH_SCREEN_BEHAVIOR_DEFAULT)
-                        == SPLASH_SCREEN_BEHAVIOR_ICON_PREFERRED;
-            }
+        final WindowStyle style = theme == this.theme
+                ? mWindowStyle : mAtmService.getWindowStyle(packageName, theme, mUserId);
+        if (style != null) {
+            return style.mSplashScreenBehavior == SPLASH_SCREEN_BEHAVIOR_ICON_PREFERRED;
         }
         return false;
     }
@@ -7881,22 +7639,6 @@ public final class ActivityRecord extends WindowToken {
         return boundsLayer;
     }
 
-    @Override
-    public boolean shouldDeferAnimationFinish(Runnable endDeferFinishCallback) {
-        return mAnimatingActivityRegistry != null
-                && mAnimatingActivityRegistry.notifyAboutToFinish(
-                this, endDeferFinishCallback);
-    }
-
-    @Override
-    boolean isWaitingForTransitionStart() {
-        final DisplayContent dc = getDisplayContent();
-        return dc != null && dc.mAppTransition.isTransitionSet()
-                && (dc.mOpeningApps.contains(this)
-                || dc.mClosingApps.contains(this)
-                || dc.mChangingContainers.contains(this));
-    }
-
     boolean isTransitionForward() {
         return (mStartingData != null && mStartingData.mIsTransitionForward)
                 || mDisplayContent.isNextTransitionForward();
@@ -7909,10 +7651,6 @@ public final class ActivityRecord extends WindowToken {
 
     @Override
     public void onLeashAnimationStarting(Transaction t, SurfaceControl leash) {
-        if (mAnimatingActivityRegistry != null) {
-            mAnimatingActivityRegistry.notifyStarting(this);
-        }
-
         if (mNeedsLetterboxedAnimation) {
             updateLetterboxSurfaceIfNeeded(findMainWindow(), t);
             mNeedsAnimationBoundsLayer = true;
@@ -7923,17 +7661,7 @@ public final class ActivityRecord extends WindowToken {
         // new layer.
         if (mNeedsAnimationBoundsLayer) {
             mTmpRect.setEmpty();
-            if (getDisplayContent().mAppTransitionController.isTransitWithinTask(
-                    getTransit(), task)) {
-                task.getBounds(mTmpRect);
-            } else {
-                final Task rootTask = getRootTask();
-                if (rootTask == null) {
-                    return;
-                }
-                // Set clip rect to root task bounds.
-                rootTask.getBounds(mTmpRect);
-            }
+            task.getBounds(mTmpRect);
             mAnimationBoundsLayer = createAnimationBoundsLayer(t);
 
             // Crop to root task bounds.
@@ -7984,9 +7712,6 @@ public final class ActivityRecord extends WindowToken {
                 mActivityRecordInputSink.applyChangesToSurfaceIfChanged(getPendingTransaction());
             }
         }
-        if (mThumbnail != null) {
-            mThumbnail.setShowing(getPendingTransaction(), show);
-        }
         mLastSurfaceShowing = show;
         super.prepareSurfaces();
     }
@@ -7996,84 +7721,6 @@ public final class ActivityRecord extends WindowToken {
      */
     boolean isSurfaceShowing() {
         return mLastSurfaceShowing;
-    }
-
-    void attachThumbnailAnimation() {
-        if (!isAnimating(PARENTS, ANIMATION_TYPE_APP_TRANSITION)) {
-            return;
-        }
-        final HardwareBuffer thumbnailHeader =
-                getDisplayContent().mAppTransition.getAppTransitionThumbnailHeader(task);
-        if (thumbnailHeader == null) {
-            ProtoLog.d(WM_DEBUG_APP_TRANSITIONS, "No thumbnail header bitmap for: %s", task);
-            return;
-        }
-        clearThumbnail();
-        final Transaction transaction = getAnimatingContainer().getPendingTransaction();
-        mThumbnail = new WindowContainerThumbnail(transaction, getAnimatingContainer(),
-                thumbnailHeader);
-        mThumbnail.startAnimation(transaction, loadThumbnailAnimation(thumbnailHeader));
-    }
-
-    /**
-     * Attaches a surface with a thumbnail for the
-     * {@link android.app.ActivityOptions#ANIM_OPEN_CROSS_PROFILE_APPS} animation.
-     */
-    void attachCrossProfileAppsThumbnailAnimation() {
-        if (!isAnimating(PARENTS, ANIMATION_TYPE_APP_TRANSITION)) {
-            return;
-        }
-        clearThumbnail();
-
-        final WindowState win = findMainWindow();
-        if (win == null) {
-            return;
-        }
-        final Rect frame = win.getRelativeFrame();
-        final Context context = mAtmService.getUiContext();
-        final Drawable thumbnailDrawable;
-        if (task.mUserId == mWmService.mCurrentUserId) {
-            thumbnailDrawable = context.getDrawable(R.drawable.ic_account_circle);
-        } else {
-            final DevicePolicyManager dpm = context.getSystemService(DevicePolicyManager.class);
-            thumbnailDrawable = dpm.getResources().getDrawable(
-                    WORK_PROFILE_ICON, OUTLINE, PROFILE_SWITCH_ANIMATION,
-                    () -> context.getDrawable(R.drawable.ic_corp_badge));
-        }
-        final HardwareBuffer thumbnail = getDisplayContent().mAppTransition
-                .createCrossProfileAppsThumbnail(thumbnailDrawable, frame);
-        if (thumbnail == null) {
-            return;
-        }
-        final Transaction transaction = getPendingTransaction();
-        mThumbnail = new WindowContainerThumbnail(transaction, getTask(), thumbnail);
-        final Animation animation =
-                getDisplayContent().mAppTransition.createCrossProfileAppsThumbnailAnimationLocked(
-                        frame);
-        mThumbnail.startAnimation(transaction, animation, new Point(frame.left, frame.top));
-    }
-
-    private Animation loadThumbnailAnimation(HardwareBuffer thumbnailHeader) {
-        final DisplayInfo displayInfo = mDisplayContent.getDisplayInfo();
-
-        // If this is a multi-window scenario, we use the windows frame as
-        // destination of the thumbnail header animation. If this is a full screen
-        // window scenario, we use the whole display as the target.
-        WindowState win = findMainWindow();
-        Rect insets;
-        Rect appRect;
-        if (win != null) {
-            insets = win.getInsetsStateWithVisibilityOverride().calculateInsets(
-                    win.getFrame(), Type.systemBars(), false /* ignoreVisibility */).toRect();
-            appRect = new Rect(win.getFrame());
-            appRect.inset(insets);
-        } else {
-            insets = null;
-            appRect = new Rect(0, 0, displayInfo.appWidth, displayInfo.appHeight);
-        }
-        final Configuration displayConfig = mDisplayContent.getConfiguration();
-        return getDisplayContent().mAppTransition.createThumbnailAspectScaleAnimationLocked(
-                appRect, insets, thumbnailHeader, task, displayConfig.orientation);
     }
 
     @Override
@@ -8089,10 +7736,6 @@ public final class ActivityRecord extends WindowToken {
             mNeedsLetterboxedAnimation = false;
             updateLetterboxSurfaceIfNeeded(findMainWindow(), t);
         }
-
-        if (mAnimatingActivityRegistry != null) {
-            mAnimatingActivityRegistry.notifyFinished(this);
-        }
     }
 
     @Override
@@ -8106,7 +7749,6 @@ public final class ActivityRecord extends WindowToken {
         setAppLayoutChanges(FINISH_LAYOUT_REDO_ANIM | FINISH_LAYOUT_REDO_WALLPAPER,
                 "ActivityRecord");
 
-        clearThumbnail();
         setClientVisible(isVisible() || mVisibleRequested);
 
         getDisplayContent().computeImeTargetIfNeeded(this);
@@ -8115,12 +7757,6 @@ public final class ActivityRecord extends WindowToken {
                 + ": reportedVisible=%b okToDisplay=%b okToAnimate=%b startingDisplayed=%b",
                 this, reportedVisible, okToDisplay(), okToAnimate(),
                 isStartingWindowDisplayed());
-
-        // clean up thumbnail window
-        if (mThumbnail != null) {
-            mThumbnail.destroy();
-            mThumbnail = null;
-        }
 
         // WindowState.onExitAnimationDone might modify the children list, so make a copy and then
         // traverse the copy.
@@ -8158,20 +7794,6 @@ public final class ActivityRecord extends WindowToken {
         if (wallpaperMightChange) {
             requestUpdateWallpaperIfNeeded();
         }
-    }
-
-    @Override
-    void cancelAnimation() {
-        super.cancelAnimation();
-        clearThumbnail();
-    }
-
-    private void clearThumbnail() {
-        if (mThumbnail == null) {
-            return;
-        }
-        mThumbnail.destroy();
-        mThumbnail = null;
     }
 
     public @TransitionOldType int getTransit() {
@@ -8610,6 +8232,7 @@ public final class ActivityRecord extends WindowToken {
         mConfigurationSeq = Math.max(++mConfigurationSeq, 1);
         getResolvedOverrideConfiguration().seq = mConfigurationSeq;
 
+        // TODO(b/392069771): Move to AppCompatSandboxingPolicy.
         // Sandbox max bounds by setting it to the activity bounds, if activity is letterboxed, or
         // has or will have mAppCompatDisplayInsets for size compat. Also forces an activity to be
         // sandboxed or not depending upon the configuration settings.
@@ -8637,6 +8260,9 @@ public final class ActivityRecord extends WindowToken {
             }
             resolvedConfig.windowConfiguration.setMaxBounds(mTmpBounds);
         }
+
+        mAppCompatController.getSandboxingPolicy().sandboxBoundsIfNeeded(resolvedConfig,
+                parentWindowingMode);
 
         applySizeOverrideIfNeeded(
                 mDisplayContent,
@@ -10124,12 +9750,8 @@ public final class ActivityRecord extends WindowToken {
         writeNameToProto(proto, NAME);
         super.dumpDebug(proto, WINDOW_TOKEN, logLevel);
         proto.write(LAST_SURFACE_SHOWING, mLastSurfaceShowing);
-        proto.write(IS_WAITING_FOR_TRANSITION_START, isWaitingForTransitionStart());
         proto.write(IS_ANIMATING, isAnimating(TRANSITION | PARENTS | CHILDREN,
                 ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_WINDOW_ANIMATION));
-        if (mThumbnail != null){
-            mThumbnail.dumpDebug(proto, THUMBNAIL);
-        }
         proto.write(FILLS_PARENT, fillsParent());
         proto.write(APP_STOPPED, mAppStopped);
         proto.write(TRANSLUCENT, !occludesParent());
@@ -10233,31 +9855,6 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Override
-    RemoteAnimationTarget createRemoteAnimationTarget(
-            RemoteAnimationController.RemoteAnimationRecord record) {
-        final WindowState mainWindow = findMainWindow();
-        if (task == null || mainWindow == null) {
-            return null;
-        }
-        final Rect insets = mainWindow.getInsetsStateWithVisibilityOverride().calculateInsets(
-                task.getBounds(), Type.systemBars(), false /* ignoreVisibility */).toRect();
-        InsetUtils.addInsets(insets, getLetterboxInsets());
-
-        final RemoteAnimationTarget target = new RemoteAnimationTarget(task.mTaskId,
-                record.getMode(), record.mAdapter.mCapturedLeash, !fillsParent(),
-                new Rect(), insets,
-                getPrefixOrderIndex(), record.mAdapter.mPosition, record.mAdapter.mLocalBounds,
-                record.mAdapter.mEndBounds, task.getWindowConfiguration(),
-                false /*isNotInRecents*/,
-                record.mThumbnailAdapter != null ? record.mThumbnailAdapter.mCapturedLeash : null,
-                record.mStartBounds, task.getTaskInfo(), checkEnterPictureInPictureAppOpsState());
-        target.setShowBackdrop(record.mShowBackdrop);
-        target.setWillShowImeOnTarget(mStartingData != null && mStartingData.hasImeSurface());
-        target.hasAnimatingParent = record.hasAnimatingParent();
-        return target;
-    }
-
-    @Override
     boolean canCreateRemoteAnimationTarget() {
         return true;
     }
@@ -10308,7 +9905,18 @@ public final class ActivityRecord extends WindowToken {
                     && !mDisplayContent.isSleeping()) {
                 // Visibility of starting activities isn't calculated until pause-complete, so if
                 // this is not paused yet, don't consider it ready.
-                return false;
+                // However, due to pip1 having an intermediate state, add a special exception here
+                // that skips waiting if the next activity is already visible.
+                final ActivityRecord toResume = isPip2ExperimentEnabled() ? null
+                        : mDisplayContent.getActivity((r) -> !r.finishing
+                        && r.isVisibleRequested()
+                        && !r.isTaskOverlay()
+                        && !r.isAlwaysOnTop());
+                if (toResume == null || !toResume.isVisible()) {
+                    return false;
+                } else {
+                    Slog.i(TAG, "Assuming sync-finish while pausing due to visible target");
+                }
             }
             return true;
         }
@@ -10465,6 +10073,68 @@ public final class ActivityRecord extends WindowToken {
         int mEnterAnim;
         int mExitAnim;
         int mBackgroundColor;
+    }
+
+    static class WindowStyle {
+        private static final int FLAG_IS_TRANSLUCENT = 1;
+        private static final int FLAG_IS_FLOATING = 1 << 1;
+        private static final int FLAG_SHOW_WALLPAPER = 1 << 2;
+        private static final int FLAG_NO_DISPLAY = 1 << 3;
+        private static final int FLAG_DISABLE_PREVIEW = 1 << 4;
+        private static final int FLAG_OPT_OUT_EDGE_TO_EDGE = 1 << 5;
+
+        final int mFlags;
+
+        @SplashScreenBehavior
+        final int mSplashScreenBehavior;
+
+        WindowStyle(TypedArray array) {
+            int flags = 0;
+            if (array.getBoolean(R.styleable.Window_windowIsTranslucent, false)) {
+                flags |= FLAG_IS_TRANSLUCENT;
+            }
+            if (array.getBoolean(R.styleable.Window_windowIsFloating, false)) {
+                flags |= FLAG_IS_FLOATING;
+            }
+            if (array.getBoolean(R.styleable.Window_windowShowWallpaper, false)) {
+                flags |= FLAG_SHOW_WALLPAPER;
+            }
+            if (array.getBoolean(R.styleable.Window_windowNoDisplay, false)) {
+                flags |= FLAG_NO_DISPLAY;
+            }
+            if (array.getBoolean(R.styleable.Window_windowDisablePreview, false)) {
+                flags |= FLAG_DISABLE_PREVIEW;
+            }
+            if (array.getBoolean(R.styleable.Window_windowOptOutEdgeToEdgeEnforcement, false)) {
+                flags |= FLAG_OPT_OUT_EDGE_TO_EDGE;
+            }
+            mFlags = flags;
+            mSplashScreenBehavior = array.getInt(R.styleable.Window_windowSplashScreenBehavior, 0);
+        }
+
+        boolean isTranslucent() {
+            return (mFlags & FLAG_IS_TRANSLUCENT) != 0;
+        }
+
+        boolean isFloating() {
+            return (mFlags & FLAG_IS_FLOATING) != 0;
+        }
+
+        boolean showWallpaper() {
+            return (mFlags & FLAG_SHOW_WALLPAPER) != 0;
+        }
+
+        boolean noDisplay() {
+            return (mFlags & FLAG_NO_DISPLAY) != 0;
+        }
+
+        boolean disablePreview() {
+            return (mFlags & FLAG_DISABLE_PREVIEW) != 0;
+        }
+
+        boolean optOutEdgeToEdge() {
+            return (mFlags & FLAG_OPT_OUT_EDGE_TO_EDGE) != 0;
+        }
     }
 
     static class Builder {

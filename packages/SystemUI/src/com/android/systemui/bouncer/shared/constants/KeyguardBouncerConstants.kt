@@ -87,6 +87,14 @@ private fun <T> c(old: T, new: T): T {
     }
 }
 
+object PatternBouncerConstants {
+    object ColorId {
+        @JvmField val dotColor = colors.materialColorOnSurfaceVariant
+        @JvmField val activatedDotColor = colors.materialColorOnPrimary
+        @JvmField val pathColor = colors.materialColorPrimary
+    }
+}
+
 object PinBouncerConstants {
     @JvmField
     val pinShapes = c(old = R.array.bouncer_pin_shapes, new = R.array.updated_bouncer_pin_shapes)
@@ -126,5 +134,8 @@ object PinBouncerConstants {
         @JvmField
         val contractionColorInterpolator =
             c(old = Interpolators.LINEAR, new = Interpolators.STANDARD)!!
+
+        const val pressedTextScaleX = 1.35f
+        const val normalTextScaleX = 1.0f
     }
 }

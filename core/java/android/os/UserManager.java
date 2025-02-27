@@ -982,8 +982,8 @@ public class UserManager {
     /**
      * Specifies if a user is disallowed from adding new users. This can only be set by device
      * owners or profile owners on the main user. The default value is <code>false</code>.
-     * <p> When the device is an organization-owned device provisioned with a managed profile,
-     * this restriction will be set as a base restriction which cannot be removed by any admin.
+     * <p> When the device is an organization-owned device, this restriction will be set as
+     * a base restriction which cannot be removed by any admin.
      *
      * <p>Holders of the permission
      * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_MODIFY_USERS}
@@ -2776,7 +2776,7 @@ public class UserManager {
     }
 
     /**
-     * Returns whether logging out is currently allowed for the context user.
+     * Returns whether logging out is currently allowed for the specified user.
      *
      * <p>Logging out is not allowed in the following cases:
      * <ol>
@@ -2794,11 +2794,10 @@ public class UserManager {
      * {@link #LOGOUTABILITY_STATUS_CANNOT_SWITCH}.
      * @hide
      */
-    @UserHandleAware
     @RequiresPermission(Manifest.permission.MANAGE_USERS)
-    public @UserLogoutability int getUserLogoutability() {
+    public @UserLogoutability int getUserLogoutability(@UserIdInt int userId) {
         try {
-            return mService.getUserLogoutability(mUserId);
+            return mService.getUserLogoutability(userId);
         } catch (RemoteException re) {
             throw re.rethrowFromSystemServer();
         }

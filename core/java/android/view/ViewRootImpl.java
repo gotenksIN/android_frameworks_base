@@ -118,6 +118,7 @@ import static android.view.flags.Flags.addSchandleToVriSurface;
 import static android.view.flags.Flags.disableDrawWakeLock;
 import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.view.flags.Flags.sensitiveContentPrematureProtectionRemovedFix;
+import static android.view.flags.Flags.toolkitFrameRateDebug;
 import static android.view.flags.Flags.toolkitFrameRateFunctionEnablingReadOnly;
 import static android.view.flags.Flags.toolkitFrameRateTouchBoost25q1;
 import static android.view.flags.Flags.toolkitFrameRateTypingReadOnly;
@@ -135,6 +136,7 @@ import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.enableBufferTransformHintFromDisplay;
 import static com.android.window.flags.Flags.enableWindowContextResourcesUpdateOnConfigChange;
 import static com.android.window.flags.Flags.predictiveBackSwipeEdgeNoneApi;
+import static com.android.window.flags.Flags.reduceChangedExclusionRectsMsgs;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
 import android.Manifest;
@@ -151,8 +153,6 @@ import android.annotation.UiContext;
 import android.app.ActivityManager;
 import android.app.ActivityThread;
 import android.app.ResourcesManager;
-import android.app.UiModeManager;
-import android.app.UiModeManager.ForceInvertStateChangeListener;
 import android.app.WindowConfiguration;
 import android.app.compat.CompatChanges;
 import android.app.servertransaction.WindowStateTransactionItem;
@@ -168,6 +168,7 @@ import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.database.ContentObserver;
 import android.graphics.BLASTBufferQueue;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -213,6 +214,7 @@ import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.sysprop.DisplayProperties;
 import android.sysprop.ViewProperties;
 import android.text.TextUtils;
@@ -256,6 +258,7 @@ import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.accessibility.IAccessibilityEmbeddedConnection;
 import android.view.accessibility.IAccessibilityInteractionConnection;
 import android.view.accessibility.IAccessibilityInteractionConnectionCallback;
+import android.view.accessibility.IWindowSurfaceInfoCallback;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Interpolator;
 import android.view.autofill.AutofillManager;
@@ -275,9 +278,9 @@ import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import android.window.ScreenCapture;
 import android.window.SurfaceSyncGroup;
-import android.window.WindowContext;
 import android.window.WindowOnBackInvokedDispatcher;
 import android.window.WindowTokenClient;
+import android.window.WindowTokenClientController;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -470,8 +473,10 @@ public final class ViewRootImpl implements ViewParent,
     private CompatOnBackInvokedCallback mCompatOnBackInvokedCallback;
 
     @Nullable
-    private ForceInvertStateChangeListener mForceInvertStateChangeListener;
+    private ContentObserver mForceInvertObserver;
 
+    private static final int INVALID_VALUE = Integer.MIN_VALUE;
+    private int mForceInvertEnabled = INVALID_VALUE;
     /**
      * Callback for notifying about global configuration changes.
      */
@@ -541,14 +546,17 @@ public final class ViewRootImpl implements ViewParent,
     private static boolean sAlwaysAssignFocus;
 
     /**
+     * whether we pre-initialized the Buffer Allocator
+     */
+    private static boolean sPreInitializedBufferAllocator = false;
+
+    /**
      * This list must only be modified by the main thread.
      */
     final ArrayList<WindowCallbacks> mWindowCallbacks = new ArrayList<>();
     @UnsupportedAppUsage
     @UiContext
     public final Context mContext;
-
-    private UiModeManager mUiModeManager;
 
     @UnsupportedAppUsage
     final IWindowSession mWindowSession;
@@ -1229,6 +1237,7 @@ public final class ViewRootImpl implements ViewParent,
             com.android.graphics.surfaceflinger.flags.Flags.vrrBugfix24q4();
     private static final boolean sEnableVrr = ViewProperties.vrr_enabled().orElse(true);
     private static final boolean sToolkitInitialTouchBoostFlagValue = toolkitInitialTouchBoost();
+    private static boolean sToolkitFrameRateDebugFlagValue =  toolkitFrameRateDebug();
 
     static {
         sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
@@ -1254,7 +1263,6 @@ public final class ViewRootImpl implements ViewParent,
     public ViewRootImpl(@UiContext Context context, Display display, IWindowSession session,
             WindowLayout windowLayout) {
         mContext = context;
-        mUiModeManager = context.getSystemService(UiModeManager.class);
         mWindowSession = session;
         mWindowLayout = windowLayout;
         mDisplay = display;
@@ -1349,6 +1357,11 @@ public final class ViewRootImpl implements ViewParent,
                 com.android.server.display.feature.flags.Flags.subscribeGranularDisplayEvents();
 
         mSendPerfHintOnTouch = adpfViewrootimplActionDownBoost();
+
+        if (!sPreInitializedBufferAllocator) {
+            preInitBufferAllocator();
+            sPreInitializedBufferAllocator = true;
+        }
     }
 
     public static void addFirstDrawHandler(Runnable callback) {
@@ -1798,6 +1811,23 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
+    private boolean isForceInvertEnabled() {
+        if (mForceInvertEnabled == INVALID_VALUE) {
+            reloadForceInvertEnabled();
+        }
+        return mForceInvertEnabled == 1;
+    }
+
+    private void reloadForceInvertEnabled() {
+        if (forceInvertColor()) {
+            mForceInvertEnabled = Settings.Secure.getIntForUser(
+                    mContext.getContentResolver(),
+                    Settings.Secure.ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED,
+                    /* def= */ 0,
+                    UserHandle.myUserId());
+        }
+    }
+
     /**
      * Register any kind of listeners if setView was success.
      */
@@ -1829,11 +1859,21 @@ public final class ViewRootImpl implements ViewParent,
                         mBasePackageName);
 
         if (forceInvertColor()) {
-            if (mForceInvertStateChangeListener == null) {
-                mForceInvertStateChangeListener =
-                        forceInvertState -> updateForceDarkMode();
-                mUiModeManager.addForceInvertStateChangeListener(mExecutor,
-                        mForceInvertStateChangeListener);
+            if (mForceInvertObserver == null) {
+                mForceInvertObserver = new ContentObserver(mHandler) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        reloadForceInvertEnabled();
+                        updateForceDarkMode();
+                    }
+                };
+                mContext.getContentResolver().registerContentObserver(
+                        Settings.Secure.getUriFor(
+                                Settings.Secure.ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED
+                        ),
+                        false,
+                        mForceInvertObserver,
+                        UserHandle.myUserId());
             }
         }
     }
@@ -1851,10 +1891,9 @@ public final class ViewRootImpl implements ViewParent,
                 .unregisterDisplayListener(mDisplayListener);
 
         if (forceInvertColor()) {
-            if (mForceInvertStateChangeListener != null) {
-                mUiModeManager.removeForceInvertStateChangeListener(
-                        mForceInvertStateChangeListener);
-                mForceInvertStateChangeListener = null;
+            if (mForceInvertObserver != null) {
+                mContext.getContentResolver().unregisterContentObserver(mForceInvertObserver);
+                mForceInvertObserver = null;
             }
         }
 
@@ -2041,25 +2080,21 @@ public final class ViewRootImpl implements ViewParent,
         return getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
     }
 
-    /**
-     * Determines the type of force dark to apply, considering force inversion, system night mode,
-     * and app-specific settings (including developer opt-outs).
-     *
-     * @return A {@link ForceDarkType.ForceDarkTypeDef} constant indicating the force dark type.
-     */
+    /** Returns true if force dark should be enabled according to various settings */
     @VisibleForTesting
     public @ForceDarkType.ForceDarkTypeDef int determineForceDarkType() {
         if (forceInvertColor()) {
             // Force invert ignores all developer opt-outs.
             // We also ignore dark theme, since the app developer can override the user's preference
-            // for dark mode in configuration.uiMode. Instead, we assume that both force invert and
-            // the system's dark theme are enabled.
-            if (mUiModeManager.getForceInvertState() == UiModeManager.FORCE_INVERT_TYPE_DARK) {
+            // for dark mode in configuration.uiMode. Instead, we assume that the force invert
+            // setting will be enabled at the same time dark theme is in the Settings app.
+            if (isForceInvertEnabled()) {
                 return ForceDarkType.FORCE_INVERT_COLOR_DARK;
             }
         }
 
         boolean useAutoDark = getNightMode() == Configuration.UI_MODE_NIGHT_YES;
+
         if (useAutoDark) {
             boolean forceDarkAllowedDefault =
                     SystemProperties.getBoolean(ThreadedRenderer.DEBUG_FORCE_DARK, false);
@@ -6050,8 +6085,12 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     void updateSystemGestureExclusionRectsForView(View view) {
+        boolean msgInQueue = reduceChangedExclusionRectsMsgs()
+                && mGestureExclusionTracker.isWaitingForComputeChanges();
         mGestureExclusionTracker.updateRectsForView(view);
-        mHandler.sendEmptyMessage(MSG_SYSTEM_GESTURE_EXCLUSION_CHANGED);
+        if (!msgInQueue) {
+            mHandler.sendEmptyMessage(MSG_SYSTEM_GESTURE_EXCLUSION_CHANGED);
+        }
     }
 
     void systemGestureExclusionChanged() {
@@ -6095,8 +6134,12 @@ public final class ViewRootImpl implements ViewParent,
      * the root's view hierarchy.
      */
     public void setRootSystemGestureExclusionRects(@NonNull List<Rect> rects) {
+        boolean msgInQueue = reduceChangedExclusionRectsMsgs()
+                && mGestureExclusionTracker.isWaitingForComputeChanges();
         mGestureExclusionTracker.setRootRects(rects);
-        mHandler.sendEmptyMessage(MSG_SYSTEM_GESTURE_EXCLUSION_CHANGED);
+        if (!msgInQueue) {
+            mHandler.sendEmptyMessage(MSG_SYSTEM_GESTURE_EXCLUSION_CHANGED);
+        }
     }
 
     /**
@@ -6624,22 +6667,20 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             if (enableWindowContextResourcesUpdateOnConfigChange()) {
                 // There is no activity callback - update resources for window token, if needed.
-                final WindowTokenClient windowTokenClient = getWindowTokenClient();
-                if (windowTokenClient != null) {
-                    windowTokenClient.onConfigurationChanged(
+                final IBinder windowContextToken = mContext.getWindowContextToken();
+                if (windowContextToken instanceof WindowTokenClient) {
+                    WindowTokenClientController.getInstance().onWindowConfigurationChanged(
+                            windowContextToken,
                             mLastReportedMergedConfiguration.getMergedConfiguration(),
-                            newDisplayId == INVALID_DISPLAY ? mDisplay.getDisplayId()
-                                    : newDisplayId);
+                            newDisplayId == INVALID_DISPLAY
+                                    ? mDisplay.getDisplayId()
+                                    : newDisplayId
+                    );
                 }
             }
             updateConfiguration(newDisplayId);
         }
         mForceNextConfigUpdate = false;
-    }
-
-    private WindowTokenClient getWindowTokenClient() {
-        if (!(mContext instanceof WindowContext)) return null;
-        return (WindowTokenClient) mContext.getWindowContextToken();
     }
 
     /**
@@ -12302,6 +12343,15 @@ public final class ViewRootImpl implements ViewParent,
             }
         }
 
+        @Override
+        public void getWindowSurfaceInfo(IWindowSurfaceInfoCallback callback) {
+            ViewRootImpl viewRootImpl = mViewRootImpl.get();
+            if (viewRootImpl != null && viewRootImpl.mView != null) {
+                viewRootImpl.getAccessibilityInteractionController()
+                        .getWindowSurfaceInfoClientThread(callback);
+            }
+        }
+
         public void attachAccessibilityOverlayToWindow(
                 SurfaceControl sc,
                 int interactionId,
@@ -13158,6 +13208,11 @@ public final class ViewRootImpl implements ViewParent,
                 if (sToolkitFrameRateFunctionEnablingReadOnlyFlagValue) {
                     mFrameRateTransaction.setFrameRateCategory(mSurfaceControl,
                         frameRateCategory, false).applyAsyncUnsafe();
+
+                    if (sToolkitFrameRateDebugFlagValue) {
+                        Log.v(mTag, "### ViewRootImpl setFrameRateCategory '"
+                                + categoryToString(frameRateCategory) + "'");
+                    }
                 }
                 mLastPreferredFrameRateCategory = frameRateCategory;
             }
@@ -13220,8 +13275,15 @@ public final class ViewRootImpl implements ViewParent,
                     if (preferredFrameRate > 0) {
                         mFrameRateTransaction.setFrameRate(mSurfaceControl, preferredFrameRate,
                                 mFrameRateCompatibility);
+                        if (sToolkitFrameRateDebugFlagValue) {
+                            Log.v(mTag, "### ViewRootImpl setFrameRate '"
+                                    + preferredFrameRate + "'");
+                        }
                     } else {
                         mFrameRateTransaction.clearFrameRate(mSurfaceControl);
+                        if (sToolkitFrameRateDebugFlagValue) {
+                            Log.v(mTag, "### ViewRootImpl setFrameRate 0 Hz");
+                        }
                     }
                     mFrameRateTransaction.applyAsyncUnsafe();
                 }
@@ -13275,6 +13337,12 @@ public final class ViewRootImpl implements ViewParent,
             // mFrameRateCategoryView = view == null ? "-" : view.getClass().getSimpleName();
         }
         mDrawnThisFrame = true;
+
+        if (sToolkitFrameRateDebugFlagValue) {
+            String viewName = view == null ? "-" : view.getClass().getSimpleName();
+            Log.v(mTag, "### View: " + viewName +  " votes '"
+                    + categoryToString(frameRateCategory) + "'");
+        }
     }
 
     /**
@@ -13589,6 +13657,12 @@ public final class ViewRootImpl implements ViewParent,
         if (!sProtoLogInitialized) {
             ProtoLog.init(ViewProtoLogGroups.ALL_GROUPS);
             sProtoLogInitialized = true;
+        }
+    }
+
+    private void preInitBufferAllocator() {
+        if (com.android.graphics.hwui.flags.Flags.earlyPreinitBufferAllocator()) {
+            ThreadedRenderer.preInitBufferAllocator();
         }
     }
 }

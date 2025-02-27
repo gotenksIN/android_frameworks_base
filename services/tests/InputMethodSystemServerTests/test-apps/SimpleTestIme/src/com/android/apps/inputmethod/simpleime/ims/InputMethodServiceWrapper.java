@@ -21,6 +21,13 @@ import android.inputmethodservice.InputMethodService;
 import android.util.Log;
 import android.view.inputmethod.EditorInfo;
 
+import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.ref.WeakReference;
 import java.util.concurrent.CountDownLatch;
 
 /** Wrapper of {@link InputMethodService} to expose interfaces for testing purpose. */
@@ -29,40 +36,44 @@ public class InputMethodServiceWrapper extends InputMethodService {
     private static final String TAG = "InputMethodServiceWrapper";
 
     /** Last created instance of this wrapper. */
-    private static InputMethodServiceWrapper sInstance;
+    @NonNull
+    private static WeakReference<InputMethodServiceWrapper> sInstance = new WeakReference<>(null);
+
+    /** IME show event ({@link #onStartInputView}). */
+    public static final int EVENT_SHOW = 0;
+
+    /** IME hide event ({@link #onFinishInputView}). */
+    public static final int EVENT_HIDE = 1;
+
+    /** IME configuration change event ({@link #onConfigurationChanged}). */
+    public static final int EVENT_CONFIG = 2;
+
+    /** The type of event that can be waited with a latch. */
+    @IntDef(value = {
+            EVENT_SHOW,
+            EVENT_HIDE,
+            EVENT_CONFIG,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface Event {}
+
+    /** The IME event type that the current latch, if any, waits on. */
+    @Event
+    private int mLatchEvent;
 
     private boolean mInputViewStarted;
 
     /**
      * @see #setCountDownLatchForTesting
      */
-    private CountDownLatch mCountDownLatchForTesting;
-
-    /** Gets the last created instance of this wrapper, if available. */
-    public static InputMethodServiceWrapper getInstance() {
-        return sInstance;
-    }
-
-    public boolean getCurrentInputViewStarted() {
-        return mInputViewStarted;
-    }
-
-    /**
-     * Sets the latch used to wait for the IME to start showing ({@link #onStartInputView},
-     * start hiding ({@link #onFinishInputView}) or receive a configuration change
-     * ({@link #onConfigurationChanged}).
-     *
-     * @param countDownLatchForTesting the latch to wait on.
-     */
-    public void setCountDownLatchForTesting(CountDownLatch countDownLatchForTesting) {
-        mCountDownLatchForTesting = countDownLatchForTesting;
-    }
+    @Nullable
+    private CountDownLatch mCountDownLatch;
 
     @Override
     public void onCreate() {
         Log.i(TAG, "onCreate()");
         super.onCreate();
-        sInstance = this;
+        sInstance = new WeakReference<>(this);
     }
 
     @Override
@@ -72,20 +83,20 @@ public class InputMethodServiceWrapper extends InputMethodService {
     }
 
     @Override
+    public void onFinishInput() {
+        Log.i(TAG, "onFinishInput()");
+        super.onFinishInput();
+    }
+
+    @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         Log.i(TAG, "onStartInputView() editor=" + dumpEditorInfo(info)
                 + ", restarting=" + restarting);
         super.onStartInputView(info, restarting);
         mInputViewStarted = true;
-        if (mCountDownLatchForTesting != null) {
-            mCountDownLatchForTesting.countDown();
+        if (mCountDownLatch != null && mLatchEvent == EVENT_SHOW) {
+            mCountDownLatch.countDown();
         }
-    }
-
-    @Override
-    public void onFinishInput() {
-        Log.i(TAG, "onFinishInput()");
-        super.onFinishInput();
     }
 
     @Override
@@ -94,15 +105,9 @@ public class InputMethodServiceWrapper extends InputMethodService {
         super.onFinishInputView(finishingInput);
         mInputViewStarted = false;
 
-        if (mCountDownLatchForTesting != null) {
-            mCountDownLatchForTesting.countDown();
+        if (mCountDownLatch != null && mLatchEvent == EVENT_HIDE) {
+            mCountDownLatch.countDown();
         }
-    }
-
-    @Override
-    public void requestHideSelf(int flags) {
-        Log.i(TAG, "requestHideSelf() " + flags);
-        super.requestHideSelf(flags);
     }
 
     @Override
@@ -110,11 +115,48 @@ public class InputMethodServiceWrapper extends InputMethodService {
         Log.i(TAG, "onConfigurationChanged() " + newConfig);
         super.onConfigurationChanged(newConfig);
 
-        if (mCountDownLatchForTesting != null) {
-            mCountDownLatchForTesting.countDown();
+        if (mCountDownLatch != null && mLatchEvent == EVENT_CONFIG) {
+            mCountDownLatch.countDown();
         }
     }
 
+    public boolean getCurrentInputViewStarted() {
+        return mInputViewStarted;
+    }
+
+    /**
+     * Sets the latch used to wait for the IME event.
+     *
+     * @param latch      the latch to wait on.
+     * @param latchEvent the event to set the latch on.
+     */
+    public void setCountDownLatchForTesting(@Nullable CountDownLatch latch, @Event int latchEvent) {
+        mCountDownLatch = latch;
+        mLatchEvent = latchEvent;
+    }
+
+    /** Gets the last created instance of this wrapper, if available. */
+    @Nullable
+    public static InputMethodServiceWrapper getInstance() {
+        return sInstance.get();
+    }
+
+    /**
+     * Gets the string representation of the IME event that is being waited on.
+     *
+     * @param eventType the IME event type.
+     */
+    @NonNull
+    public static String eventToString(@Event int eventType) {
+        return switch (eventType) {
+            case EVENT_SHOW -> "onStartInputView";
+            case EVENT_HIDE -> "onFinishInputView";
+            case EVENT_CONFIG -> "onConfigurationChanged";
+            default -> "unknownEvent";
+        };
+    }
+
+    @NonNull
     private String dumpEditorInfo(EditorInfo info) {
         if (info == null) {
             return "null";

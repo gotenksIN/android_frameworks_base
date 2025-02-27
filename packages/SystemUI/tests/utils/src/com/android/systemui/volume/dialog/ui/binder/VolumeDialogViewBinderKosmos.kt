@@ -28,12 +28,14 @@ import com.android.systemui.volume.dialog.utils.volumeTracer
 val Kosmos.volumeDialogViewBinder by
     Kosmos.Fixture {
         VolumeDialogViewBinder(
-            applicationContext.resources,
+            applicationContext,
             volumeDialogViewModel,
             jankListenerFactory,
             volumeTracer,
-            volumeDialogRingerViewBinder,
-            volumeDialogSlidersViewBinder,
-            volumeDialogSettingsButtonViewBinder,
+            listOf(
+                volumeDialogSlidersViewBinder,
+                volumeDialogRingerViewBinder,
+                volumeDialogSettingsButtonViewBinder,
+            ),
         )
     }

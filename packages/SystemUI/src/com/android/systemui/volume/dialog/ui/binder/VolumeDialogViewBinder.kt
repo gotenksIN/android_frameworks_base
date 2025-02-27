@@ -17,38 +17,47 @@
 package com.android.systemui.volume.dialog.ui.binder
 
 import android.app.Dialog
-import android.content.res.Resources
+import android.content.Context
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.WindowInsets
-import androidx.constraintlayout.motion.widget.MotionLayout
+import androidx.compose.ui.util.lerp
 import androidx.core.view.updatePadding
+import androidx.dynamicanimation.animation.DynamicAnimation
+import androidx.dynamicanimation.animation.FloatValueHolder
+import androidx.dynamicanimation.animation.SpringAnimation
+import androidx.dynamicanimation.animation.SpringForce
+import com.android.app.tracing.coroutines.launchInTraced
+import com.android.app.tracing.coroutines.launchTraced
 import com.android.internal.view.RotationPolicy
 import com.android.systemui.common.ui.view.onApplyWindowInsets
-import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.res.R
 import com.android.systemui.util.kotlin.awaitCancellationThenDispose
-import com.android.systemui.volume.SystemUIInterpolators
 import com.android.systemui.volume.dialog.dagger.scope.VolumeDialogScope
-import com.android.systemui.volume.dialog.ringer.ui.binder.VolumeDialogRingerViewBinder
-import com.android.systemui.volume.dialog.settings.ui.binder.VolumeDialogSettingsButtonViewBinder
 import com.android.systemui.volume.dialog.shared.model.VolumeDialogVisibilityModel
-import com.android.systemui.volume.dialog.sliders.ui.VolumeDialogSlidersViewBinder
 import com.android.systemui.volume.dialog.ui.utils.JankListenerFactory
 import com.android.systemui.volume.dialog.ui.utils.suspendAnimate
 import com.android.systemui.volume.dialog.ui.viewmodel.VolumeDialogViewModel
 import com.android.systemui.volume.dialog.utils.VolumeTracer
 import javax.inject.Inject
+import kotlin.math.ceil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+
+private const val SPRING_STIFFNESS = 700f
+private const val SPRING_DAMPING_RATIO = 0.9f
+
+private const val FRACTION_HIDE = 0f
+private const val FRACTION_SHOW = 1f
+private const val ANIMATION_MINIMUM_VISIBLE_CHANGE = 0.01f
 
 /** Binds the root view of the Volume Dialog. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -56,40 +65,43 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class VolumeDialogViewBinder
 @Inject
 constructor(
-    @Main resources: Resources,
+    @Application context: Context,
     private val viewModel: VolumeDialogViewModel,
     private val jankListenerFactory: JankListenerFactory,
     private val tracer: VolumeTracer,
-    private val volumeDialogRingerViewBinder: VolumeDialogRingerViewBinder,
-    private val slidersViewBinder: VolumeDialogSlidersViewBinder,
-    private val settingsButtonViewBinder: VolumeDialogSettingsButtonViewBinder,
+    private val viewBinders: List<@JvmSuppressWildcards ViewBinder>,
 ) {
 
-    private val dialogShowAnimationDurationMs =
-        resources.getInteger(R.integer.config_dialogShowAnimationDurationMs).toLong()
-    private val dialogHideAnimationDurationMs =
-        resources.getInteger(R.integer.config_dialogHideAnimationDurationMs).toLong()
+    private val halfOpenedOffsetPx: Float =
+        context.resources.getDimensionPixelSize(R.dimen.volume_dialog_half_opened_offset).toFloat()
 
     fun CoroutineScope.bind(dialog: Dialog) {
         val insets: MutableStateFlow<WindowInsets> =
             MutableStateFlow(WindowInsets.Builder().build())
         // Root view of the Volume Dialog.
-        val root: MotionLayout = dialog.requireViewById(R.id.volume_dialog)
+        val root: ViewGroup = dialog.requireViewById(R.id.volume_dialog)
 
         animateVisibility(root, dialog, viewModel.dialogVisibilityModel)
 
-        viewModel.dialogTitle.onEach { dialog.window?.setTitle(it) }.launchIn(this)
-        viewModel.motionState
-            .scan(0) { acc, motionState ->
+        viewModel.dialogTitle
+            .onEach { dialog.window?.setTitle(it) }
+            .launchInTraced("VDVB#dialogTitle", this)
+        viewModel.isHalfOpened
+            .scan<Boolean, Boolean?>(null) { acc, isHalfOpened ->
                 // don't animate the initial state
-                root.transitionToState(motionState, animate = acc != 0)
-                acc + 1
+                root.applyVerticalOffset(
+                    offsetPx = if (isHalfOpened) halfOpenedOffsetPx else 0f,
+                    shouldAnimate = acc != null,
+                )
+                isHalfOpened
             }
-            .launchIn(this)
+            .launchInTraced("VDVB#isHalfOpened", this)
 
-        launch { root.viewTreeObserver.listenToComputeInternalInsets() }
+        launchTraced("VDVB#viewTreeObserver") {
+            root.viewTreeObserver.listenToComputeInternalInsets()
+        }
 
-        launch {
+        launchTraced("VDVB#insets") {
             root
                 .onApplyWindowInsets { v, newInsets ->
                     val insetsValues = newInsets.getInsets(WindowInsets.Type.displayCutout())
@@ -105,9 +117,9 @@ constructor(
                 .awaitCancellationThenDispose()
         }
 
-        with(volumeDialogRingerViewBinder) { bind(root) }
-        with(slidersViewBinder) { bind(root) }
-        with(settingsButtonViewBinder) { bind(root) }
+        for (viewBinder in viewBinders) {
+            with(viewBinder) { bind(root) }
+        }
     }
 
     private fun CoroutineScope.animateVisibility(
@@ -115,22 +127,35 @@ constructor(
         dialog: Dialog,
         visibilityModel: Flow<VolumeDialogVisibilityModel>,
     ) {
+        view.applyAnimationProgress(FRACTION_HIDE)
+        val animationValueHolder = FloatValueHolder(FRACTION_HIDE)
+        val animation: SpringAnimation =
+            SpringAnimation(animationValueHolder)
+                .setSpring(
+                    SpringForce()
+                        .setStiffness(SPRING_STIFFNESS)
+                        .setDampingRatio(SPRING_DAMPING_RATIO)
+                )
+                .setMinimumVisibleChange(ANIMATION_MINIMUM_VISIBLE_CHANGE)
+                .addUpdateListener { _, value, _ -> view.applyAnimationProgress(value) }
+        var junkListener: DynamicAnimation.OnAnimationUpdateListener? = null
+
         visibilityModel
             .mapLatest {
                 when (it) {
                     is VolumeDialogVisibilityModel.Visible -> {
                         tracer.traceVisibilityEnd(it)
-                        view.animateShow(
-                            duration = dialogShowAnimationDurationMs,
-                            translationX = calculateTranslationX(view),
-                        )
+                        junkListener?.let(animation::removeUpdateListener)
+                        junkListener =
+                            jankListenerFactory.show(view).also(animation::addUpdateListener)
+                        animation.animateToFinalPosition(FRACTION_SHOW)
                     }
                     is VolumeDialogVisibilityModel.Dismissed -> {
                         tracer.traceVisibilityEnd(it)
-                        view.animateHide(
-                            duration = dialogHideAnimationDurationMs,
-                            translationX = calculateTranslationX(view),
-                        )
+                        junkListener?.let(animation::removeUpdateListener)
+                        junkListener =
+                            jankListenerFactory.dismiss(view).also(animation::addUpdateListener)
+                        animation.suspendAnimate(FRACTION_HIDE)
                         dialog.dismiss()
                     }
                     is VolumeDialogVisibilityModel.Invisible -> {
@@ -138,40 +163,24 @@ constructor(
                     }
                 }
             }
-            .launchIn(this)
+            .launchInTraced("VDVB#visibilityModel", this)
     }
 
-    private fun calculateTranslationX(view: View): Float? {
-        return if (view.display.rotation == RotationPolicy.NATURAL_ROTATION) {
-            if (view.isLayoutRtl) {
-                -1
+    /**
+     * @param fraction in range [0, 1]. 0 corresponds to the dialog being hidden and 1 - visible.
+     */
+    private fun View.applyAnimationProgress(fraction: Float) {
+        alpha = ceil(fraction)
+        if (display.rotation == RotationPolicy.NATURAL_ROTATION) {
+                if (isLayoutRtl) {
+                    -1
+                } else {
+                    1
+                } * width / 2f
             } else {
-                1
-            } * view.width / 2f
-        } else {
-            null
-        }
-    }
-
-    private suspend fun View.animateShow(duration: Long, translationX: Float?) {
-        translationX?.let { setTranslationX(translationX) }
-        alpha = 0f
-        animate()
-            .alpha(1f)
-            .translationX(0f)
-            .setDuration(duration)
-            .setInterpolator(SystemUIInterpolators.LogDecelerateInterpolator())
-            .suspendAnimate(jankListenerFactory.show(this, duration))
-    }
-
-    private suspend fun View.animateHide(duration: Long, translationX: Float?) {
-        val animator =
-            animate()
-                .alpha(0f)
-                .setDuration(duration)
-                .setInterpolator(SystemUIInterpolators.LogAccelerateInterpolator())
-        translationX?.let { animator.translationX(it) }
-        animator.suspendAnimate(jankListenerFactory.dismiss(this, duration))
+                null
+            }
+            ?.let { maxTranslationX -> translationX = lerp(maxTranslationX, 0f, fraction) }
     }
 
     private suspend fun ViewTreeObserver.listenToComputeInternalInsets() =
@@ -184,11 +193,11 @@ constructor(
             continuation.invokeOnCancellation { removeOnComputeInternalInsetsListener(listener) }
         }
 
-    private fun MotionLayout.transitionToState(newState: Int, animate: Boolean) {
-        if (animate) {
-            transitionToState(newState)
-        } else {
-            jumpToState(newState)
+    private suspend fun View.applyVerticalOffset(offsetPx: Float, shouldAnimate: Boolean) {
+        if (!shouldAnimate) {
+            translationY = offsetPx
+            return
         }
+        animate().setDuration(150).translationY(offsetPx).suspendAnimate()
     }
 }

@@ -796,7 +796,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                                 "  unhandled root taskId=%d", taskInfo.taskId);
                     }
-                } else if (TransitionUtil.isDividerBar(change)) {
+                } else if (TransitionUtil.isDividerBar(change)
+                        || TransitionUtil.isDimLayer(change)) {
                     final RemoteAnimationTarget target = TransitionUtil.newTarget(change,
                             belowLayers - i, info, t, mLeashMap);
                     // Add this as a app and we will separate them on launcher side by window type.
@@ -1214,13 +1215,16 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             // Since we're accepting the merge, update the finish transaction so that changes via
             // that transaction will be applied on top of those of the merged transitions
             mFinishTransaction = finishT;
-            // not using the incoming anim-only surfaces
-            info.releaseAnimSurfaces();
+            boolean passTransitionInfo = ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX.isTrue();
+            if (!passTransitionInfo) {
+                // not using the incoming anim-only surfaces
+                info.releaseAnimSurfaces();
+            }
             if (appearedTargets != null) {
                 try {
                     ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                             "[%d] RecentsController.merge: calling onTasksAppeared", mInstanceId);
-                    mListener.onTasksAppeared(appearedTargets);
+                    mListener.onTasksAppeared(appearedTargets, passTransitionInfo ? info : null);
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Error sending appeared tasks to recents animation", e);
                 }

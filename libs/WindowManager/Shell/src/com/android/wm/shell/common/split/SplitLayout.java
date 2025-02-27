@@ -128,6 +128,8 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
     // The touch layer is on a stage root, and is sibling with things like the app activity itself
     // and the app veil. We want it to be above all those.
     public static final int RESTING_TOUCH_LAYER = Integer.MAX_VALUE;
+    // The dim layer is also on the stage root, and stays under the touch layer.
+    public static final int RESTING_DIM_LAYER = RESTING_TOUCH_LAYER - 1;
 
     // Animation specs for the swap animation
     private static final int SWAP_ANIMATION_TOTAL_DURATION = 500;
@@ -459,7 +461,14 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
             return;
         }
 
-        mOffscreenTouchZones.forEach(OffscreenTouchZone::release);
+        // TODO (b/349828130): It would be good to reuse a Transaction from StageCoordinator's
+        //  mTransactionPool here, but passing it through SplitLayout and specifically
+        //  SplitLayout.release() is complicated because that function is purposely called with a
+        //  null value sometimes. When that function is refactored, we should also pass the
+        //  Transaction in here.
+        SurfaceControl.Transaction t = new SurfaceControl.Transaction();
+        mOffscreenTouchZones.forEach(touchZone -> touchZone.release(t));
+        t.apply();
         mOffscreenTouchZones.clear();
     }
 
@@ -973,8 +982,16 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
         final boolean shouldVeil =
                 insets.left != 0 || insets.top != 0 || insets.right != 0 || insets.bottom != 0;
 
+        // Find the "left/top"-most position of the app surface -- usually 0, but sometimes negative
+        // if the left/top app is offscreen.
+        int leftTop = 0;
+        if (Flags.enableFlexibleTwoAppSplit()) {
+            leftTop = mIsLeftRightSplit ? getTopLeftBounds().left : getTopLeftBounds().top;
+        }
+
         final int dividerPos = mDividerSnapAlgorithm.calculateNonDismissingSnapTarget(
-                mIsLeftRightSplit ? getBottomRightBounds().width() : getBottomRightBounds().height()
+                leftTop + (mIsLeftRightSplit
+                        ? getBottomRightBounds().width() : getBottomRightBounds().height())
         ).position;
         final Rect endBounds1 = new Rect();
         final Rect endBounds2 = new Rect();
@@ -1200,6 +1217,12 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
             t.setPosition(dividerLeash, mTempRect.left, mTempRect.top);
             // Resets layer of divider bar to make sure it is always on top.
             t.setLayer(dividerLeash, RESTING_DIVIDER_LAYER);
+        }
+        if (dimLayer1 != null) {
+            t.setLayer(dimLayer1, RESTING_DIM_LAYER);
+        }
+        if (dimLayer2 != null) {
+            t.setLayer(dimLayer2, RESTING_DIM_LAYER);
         }
         copyTopLeftRefBounds(mTempRect);
         t.setPosition(leash1, mTempRect.left, mTempRect.top)

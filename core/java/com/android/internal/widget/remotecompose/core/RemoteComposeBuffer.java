@@ -38,6 +38,7 @@ import com.android.internal.widget.remotecompose.core.operations.DrawBitmapFontT
 import com.android.internal.widget.remotecompose.core.operations.DrawBitmapInt;
 import com.android.internal.widget.remotecompose.core.operations.DrawBitmapScaled;
 import com.android.internal.widget.remotecompose.core.operations.DrawCircle;
+import com.android.internal.widget.remotecompose.core.operations.DrawContent;
 import com.android.internal.widget.remotecompose.core.operations.DrawLine;
 import com.android.internal.widget.remotecompose.core.operations.DrawOval;
 import com.android.internal.widget.remotecompose.core.operations.DrawPath;
@@ -84,6 +85,7 @@ import com.android.internal.widget.remotecompose.core.operations.TimeAttribute;
 import com.android.internal.widget.remotecompose.core.operations.TouchExpression;
 import com.android.internal.widget.remotecompose.core.operations.Utils;
 import com.android.internal.widget.remotecompose.core.operations.layout.CanvasContent;
+import com.android.internal.widget.remotecompose.core.operations.layout.CanvasOperations;
 import com.android.internal.widget.remotecompose.core.operations.layout.ComponentStart;
 import com.android.internal.widget.remotecompose.core.operations.layout.ContainerEnd;
 import com.android.internal.widget.remotecompose.core.operations.layout.ImpulseOperation;
@@ -191,6 +193,11 @@ public class RemoteComposeBuffer {
     // Supported operations on the buffer
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    /** Insert a header */
+    public void addHeader(short[] tags, Object[] values) {
+        Header.apply(mBuffer, tags, values);
+    }
+
     /**
      * Insert a header
      *
@@ -200,6 +207,28 @@ public class RemoteComposeBuffer {
      * @param capabilities bitmask indicating needed capabilities (unused for now)
      */
     public void header(
+            int width,
+            int height,
+            @Nullable String contentDescription,
+            float density,
+            long capabilities) {
+        Header.apply(mBuffer, width, height, density, capabilities);
+        int contentDescriptionId = 0;
+        if (contentDescription != null) {
+            contentDescriptionId = addText(contentDescription);
+            RootContentDescription.apply(mBuffer, contentDescriptionId);
+        }
+    }
+
+    /**
+     * Insert a header
+     *
+     * @param width the width of the document in pixels
+     * @param height the height of the document in pixels
+     * @param contentDescription content description of the document
+     * @param capabilities bitmask indicating needed capabilities (unused for now)
+     */
+    public void addHeader(
             int width,
             int height,
             @Nullable String contentDescription,
@@ -1860,7 +1889,7 @@ public class RemoteComposeBuffer {
     }
 
     /** Add a component end tag */
-    public void addComponentEnd() {
+    public void addContainerEnd() {
         ContainerEnd.apply(mBuffer);
     }
 
@@ -2204,6 +2233,11 @@ public class RemoteComposeBuffer {
         LayoutComponentContent.apply(mBuffer, mLastComponentId);
     }
 
+    /** Add a canvas operations start tag */
+    public void addCanvasOperationsStart() {
+        CanvasOperations.apply(mBuffer);
+    }
+
     /**
      * Add a component width value
      *
@@ -2399,5 +2433,10 @@ public class RemoteComposeBuffer {
         int id = mRemoteComposeState.nextId();
         TimeAttribute.apply(mBuffer, id, timeId, attribute, args);
         return Utils.asNan(id);
+    }
+
+    /** In the context of a component draw modifier, draw the content of the component */
+    public void drawComponentContent() {
+        DrawContent.apply(mBuffer);
     }
 }

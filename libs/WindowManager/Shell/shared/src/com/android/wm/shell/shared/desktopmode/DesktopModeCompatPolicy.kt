@@ -24,7 +24,6 @@ import android.content.pm.ActivityInfo.OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGUR
 import android.content.pm.ActivityInfo.OVERRIDE_EXCLUDE_CAPTION_INSETS_FROM_APP_BOUNDS
 import android.window.DesktopModeFlags
 import com.android.internal.R
-import com.android.window.flags.Flags
 
 /**
  * Class to decide whether to apply app compat policies in desktop mode.
@@ -50,7 +49,7 @@ class DesktopModeCompatPolicy(private val context: Context) {
         numActivities: Int, isTopActivityNoDisplay: Boolean, isActivityStackTransparent: Boolean) =
         DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODALS_POLICY.isTrue
                 && ((isSystemUiTask(packageName)
-                || isPartOfDefaultHomePackage(packageName)
+                || isPartOfDefaultHomePackageOrNoHomeAvailable(packageName)
                 || isTransparentTask(isActivityStackTransparent, numActivities))
                 && !isTopActivityNoDisplay)
 
@@ -64,7 +63,7 @@ class DesktopModeCompatPolicy(private val context: Context) {
      * is enabled.
      */
     fun shouldExcludeCaptionFromAppBounds(taskInfo: TaskInfo): Boolean =
-        Flags.excludeCaptionFromAppBounds()
+        DesktopModeFlags.EXCLUDE_CAPTION_FROM_APP_BOUNDS.isTrue
                 && isAnyForceConsumptionFlagsEnabled()
                 && taskInfo.topActivityInfo?.let {
             isInsetsCoupledWithConfiguration(it) && (!taskInfo.isResizeable || it.isChangeEnabled(
@@ -85,10 +84,11 @@ class DesktopModeCompatPolicy(private val context: Context) {
     private fun isSystemUiTask(packageName: String?) = packageName == systemUiPackage
 
     /**
-     * Returns true if the tasks base activity is part of the default home package.
+     * Returns true if the tasks base activity is part of the default home package, or there is
+     * currently no default home package available.
      */
-    private fun isPartOfDefaultHomePackage(packageName: String?) =
-        packageName != null && packageName == defaultHomePackage
+    private fun isPartOfDefaultHomePackageOrNoHomeAvailable(packageName: String?) =
+        defaultHomePackage == null || (packageName != null && packageName == defaultHomePackage)
 
     private fun isAnyForceConsumptionFlagsEnabled(): Boolean =
         DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION_ALWAYS.isTrue

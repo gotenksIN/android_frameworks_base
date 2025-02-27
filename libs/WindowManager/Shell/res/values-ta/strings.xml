@@ -43,8 +43,7 @@
     <string name="accessibility_action_divider_left_50" msgid="3488317024557521561">"இடது புறம் 50%"</string>
     <string name="accessibility_action_divider_left_30" msgid="6023611335723838727">"இடது புறம் 30%"</string>
     <string name="accessibility_action_divider_right_full" msgid="3408505054325944903">"வலது புறம் முழுத் திரை"</string>
-    <!-- no translation found for accessibility_action_divider_swap (7026003137401725787) -->
-    <skip />
+    <string name="accessibility_action_divider_swap" msgid="7026003137401725787">"ஆப்ஸை மாற்றும்"</string>
     <string name="accessibility_action_divider_top_full" msgid="3495871951082107594">"மேற்புறம் முழுத் திரை"</string>
     <string name="accessibility_action_divider_top_70" msgid="1779164068887875474">"மேலே 70%"</string>
     <string name="accessibility_action_divider_top_50" msgid="8649582798829048946">"மேலே 50%"</string>
@@ -120,20 +119,22 @@
     <string name="handle_text" msgid="4419667835599523257">"ஆப்ஸ் ஹேண்டில்"</string>
     <string name="app_icon_text" msgid="2823268023931811747">"ஆப்ஸ் ஐகான்"</string>
     <string name="fullscreen_text" msgid="1162316685217676079">"முழுத்திரை"</string>
-    <string name="desktop_text" msgid="1077633567027630454">"டெஸ்க்டாப் பயன்முறை"</string>
+    <!-- no translation found for desktop_text (1582173066857454541) -->
+    <skip />
     <string name="split_screen_text" msgid="1396336058129570886">"திரையைப் பிரிக்கும்"</string>
     <string name="more_button_text" msgid="3655388105592893530">"கூடுதல் விருப்பத்தேர்வுகள்"</string>
     <string name="float_button_text" msgid="9221657008391364581">"மிதக்கும் சாளரம்"</string>
     <string name="select_text" msgid="5139083974039906583">"தேர்ந்தெடுக்கும்"</string>
     <string name="screenshot_text" msgid="1477704010087786671">"ஸ்கிரீன்ஷாட்"</string>
-    <string name="open_in_browser_text" msgid="9181692926376072904">"உலாவியில் திறக்கும்"</string>
+    <string name="open_in_browser_text" msgid="9181692926376072904">"பிரவுசரில் திற"</string>
     <string name="open_in_app_text" msgid="2874590745116268525">"ஆப்ஸில் திறக்கும்"</string>
     <string name="new_window_text" msgid="6318648868380652280">"புதிய சாளரம்"</string>
     <string name="manage_windows_text" msgid="5567366688493093920">"சாளரங்களை நிர்வகிக்கலாம்"</string>
     <string name="change_aspect_ratio_text" msgid="9104456064548212806">"தோற்ற விகிதத்தை மாற்று"</string>
     <string name="close_text" msgid="4986518933445178928">"மூடும்"</string>
     <string name="collapse_menu_text" msgid="7515008122450342029">"மெனுவை மூடும்"</string>
-    <string name="desktop_mode_app_header_chip_text" msgid="6366422614991687237">"மெனுவைத் திறக்கும்"</string>
+    <!-- no translation found for desktop_mode_app_header_chip_text (8300164817452574565) -->
+    <skip />
     <string name="desktop_mode_maximize_menu_maximize_text" msgid="3275717276171114411">"திரையைப் பெரிதாக்கு"</string>
     <string name="desktop_mode_maximize_menu_snap_text" msgid="5673738963174074006">"அளவை மாற்று"</string>
     <string name="desktop_mode_non_resizable_snap_text" msgid="3771776422751387878">"ஆப்ஸை இங்கே நகர்த்த முடியாது"</string>
@@ -143,26 +144,18 @@
     <string name="desktop_mode_maximize_menu_restore_button_text" msgid="4234449220944704387">"மீட்டெடுக்கும்"</string>
     <string name="desktop_mode_maximize_menu_snap_left_button_text" msgid="8077452201179893424">"இடதுபுறம் நகர்த்தும்"</string>
     <string name="desktop_mode_maximize_menu_snap_right_button_text" msgid="7117751068945657304">"வலதுபுறம் நகர்த்தும்"</string>
-    <!-- no translation found for desktop_mode_a11y_action_snap_left (2932955411661734668) -->
+    <string name="desktop_mode_a11y_action_snap_left" msgid="2932955411661734668">"ஆப்ஸ் சாளரத்தின் இடதுபுறத்தில் அளவை மாற்றும்"</string>
+    <string name="desktop_mode_a11y_action_snap_right" msgid="4577032451624261787">"ஆப்ஸ் சாளரத்தின் வலதுபுறத்தில் அளவை மாற்றும்"</string>
+    <string name="desktop_mode_a11y_action_maximize_restore" msgid="8026037983417986686">"சாளரத்தின் அளவைப் பெரிதாக்கும்/மீட்டெடுக்கும்"</string>
+    <!-- no translation found for app_handle_chip_accessibility_announce (499881698947450536) -->
     <skip />
-    <!-- no translation found for desktop_mode_a11y_action_snap_right (4577032451624261787) -->
+    <!-- no translation found for app_handle_menu_accessibility_announce (7928858564852785398) -->
     <skip />
-    <!-- no translation found for desktop_mode_a11y_action_maximize_restore (8026037983417986686) -->
-    <skip />
-    <!-- no translation found for app_handle_menu_talkback_split_screen_mode_button_text (7182959681057464802) -->
-    <skip />
-    <!-- no translation found for app_handle_menu_talkback_desktop_mode_button_text (1230110046930843630) -->
-    <skip />
-    <!-- no translation found for maximize_menu_talkback_action_snap_left_text (500309467459084564) -->
-    <skip />
-    <!-- no translation found for maximize_menu_talkback_action_snap_right_text (7010831426654467163) -->
-    <skip />
-    <!-- no translation found for maximize_menu_talkback_action_maximize_restore_text (4942610897847934859) -->
-    <skip />
-    <!-- no translation found for maximize_button_talkback_action_maximize_restore_text (4122441323153198455) -->
-    <skip />
-    <!-- no translation found for minimize_button_talkback_action_maximize_restore_text (8890767445425625935) -->
-    <skip />
+    <string name="maximize_menu_talkback_action_snap_left_text" msgid="500309467459084564">"சாளரத்தை இடதுபுறமாக அளவு மாற்றும்"</string>
+    <string name="maximize_menu_talkback_action_snap_right_text" msgid="7010831426654467163">"சாளரத்தை வலதுபுறமாக அளவு மாற்றும்"</string>
+    <string name="maximize_menu_talkback_action_maximize_restore_text" msgid="4942610897847934859">"சாளரத்தின் அளவைப் பெரிதாக்கும்/மீட்டெடுக்கும்"</string>
+    <string name="maximize_button_talkback_action_maximize_restore_text" msgid="4122441323153198455">"சாளரத்தின் அளவைப் பெரிதாக்கும்/மீட்டெடுக்கும்"</string>
+    <string name="minimize_button_talkback_action_maximize_restore_text" msgid="8890767445425625935">"ஆப்ஸ் சாளரத்தைச் சிறிதாக்கும்"</string>
     <string name="open_by_default_settings_text" msgid="2526548548598185500">"இயல்பாக அமைப்புகளைத் திறக்கும்"</string>
     <string name="open_by_default_dialog_subheader_text" msgid="1729599730664063881">"இந்த ஆப்ஸில் வலை இணைப்புகளைத் திறக்கும் வழிமுறையைத் தேர்வுசெய்யுங்கள்"</string>
     <string name="open_by_default_dialog_in_app_text" msgid="6978022419634199806">"ஆப்ஸில்"</string>

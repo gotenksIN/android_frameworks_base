@@ -1041,15 +1041,17 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_bluetooth_device_settings_gear">Click to configure device detail</string>
+    <!-- Content description of the bluetooth device settings gear icon. [CHAR LIMIT=NONE] [BACKUP_MESSAGE_ID=3314916468105272540] -->
+    <string name="accessibility_bluetooth_device_settings_gear_with_name"><xliff:g id="device_name">%s</xliff:g>. Configure device detail</string>
     <!-- Content description of the bluetooth device settings see all. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="accessibility_bluetooth_device_settings_see_all">Click to see all devices</string>
+    <string name="accessibility_bluetooth_device_settings_see_all">See all devices</string>
     <!-- Content description of the bluetooth device settings pair new device. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="accessibility_bluetooth_device_settings_pair_new_device">Click to pair new device</string>
 
+    <string name="accessibility_bluetooth_device_settings_pair_new_device">Pair new device</string>
     <!-- Content description of the battery when battery state is unknown for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3703,7 +3705,13 @@
     <string name="notification_inline_dismiss">Dismiss</string>
 
     <!-- [CHAR LIMIT=30] Text shown in button used to prevent app from showing Live Updates, for this notification and all future ones -->
-    <string name="notification_inline_disable_promotion">Don\'t show again</string>
+    <string name="notification_inline_disable_promotion">Don\'t show as pinned</string>
+
+    <!-- Text accompanying the "Show live updates" switch explaining the purpose of the setting -->
+    <string name="live_notifications_title">Showing Live Updates</string>
+
+    <!-- Text accompanying the "Show live updates" switch explaining the purpose of the setting -->
+    <string name="live_notifications_desc">Pinned notifications display live info from apps, and always appear on the status bar and lock screen</string>
 
     <!-- Notification: Control panel: Label that displays when the app's notifications cannot be blocked. -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4129,6 +4137,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="system_multitasking_full_screen">Switch to full screen</string>
+    <!-- User visible title for the keyboard shortcut that switches to desktop view [CHAR LIMIT=70] -->
+    <string name="system_multitasking_desktop_view">Use desktop view</string>
     <!-- User visible title for the keyboard shortcut that switches to app on right or below while using split screen [CHAR LIMIT=70] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4525,6 +4535,9 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="other">Other</string>
+
+    <!-- Accessibility description of action to toggle QS tile size on click. It will read as "Double-tap to toggle the tile's size" in screen readers [CHAR LIMIT=NONE] -->
+    <string name="accessibility_qs_edit_toggle_tile_size_action">toggle the tile\'s size</string>
 
     <!-- Accessibility description of action to remove QS tile on click. It will read as "Double-tap to remove tile" in screen readers [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -6167,6 +6180,8 @@
     <string name="touchpad_tutorial_switch_apps_gesture_button">Switch apps</string>
     <!-- Label for button finishing touchpad tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_tutorial_done_button">Done</string>
+    <!-- Label for button proceeding touchpad tutorial [CHAR LIMIT=NONE] -->
+    <string name="touchpad_tutorial_next_button">Next</string>
     <!-- Screen title after gesture was not done correctly [CHAR LIMIT=NONE] -->
     <string name="gesture_error_title">Try again!</string>
     <!-- BACK GESTURE -->
@@ -6252,8 +6267,10 @@
 
     <!-- Title of the one line view of a redacted notification -->
     <string name="redacted_notification_single_line_title">Redacted</string>
-    <!-- Main text of the one line view of a redacted notification -->
-    <string name="redacted_notification_single_line_text">Unlock to view</string>
+    <!-- Main text of the one line view of a public notification -->
+    <string name="public_notification_single_line_text">Unlock to view</string>
+    <!-- Main text of the one line view of a redacted OTP notification -->
+    <string name="redacted_otp_notification_single_line_text">Unlock to view code</string>
 
     <!-- Content description for contextual education dialog [CHAR LIMIT=NONE] -->
     <string name="contextual_education_dialog_title">Contextual education</string>

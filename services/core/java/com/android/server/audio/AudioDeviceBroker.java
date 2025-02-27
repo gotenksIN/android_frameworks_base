@@ -25,6 +25,7 @@ package com.android.server.audio;
 import static android.media.audio.Flags.scoManagedByAudio;
 
 import static com.android.media.audio.Flags.equalScoLeaVcIndexRange;
+import static com.android.media.audio.Flags.optimizeBtDeviceSwitch;
 import static com.android.server.audio.AudioService.BT_COMM_DEVICE_ACTIVE_BLE_HEADSET;
 import static com.android.server.audio.AudioService.BT_COMM_DEVICE_ACTIVE_BLE_SPEAKER;
 import static com.android.server.audio.AudioService.BT_COMM_DEVICE_ACTIVE_SCO;
@@ -300,8 +301,8 @@ public class AudioDeviceBroker {
     }
 
     @GuardedBy("mDeviceStateLock")
-    /*package*/ void onSetBtScoActiveDevice(BluetoothDevice btDevice) {
-        mBtHelper.onSetBtScoActiveDevice(btDevice);
+    /*package*/ void onSetBtScoActiveDevice(BluetoothDevice btDevice, boolean deviceSwitch) {
+        mBtHelper.onSetBtScoActiveDevice(btDevice, deviceSwitch);
     }
 
     /*package*/ void setBluetoothA2dpOn_Async(boolean on, String source) {
@@ -953,6 +954,7 @@ public class AudioDeviceBroker {
         final @NonNull String mEventSource;
         final int mAudioSystemDevice;
         final int mMusicDevice;
+        final boolean mIsDeviceSwitch;
 
         BtDeviceInfo(@NonNull BtDeviceChangedData d, @NonNull BluetoothDevice device, int state,
                     int audioDevice, @AudioSystem.AudioFormatNativeEnumForBtCodec int codec) {
@@ -965,6 +967,8 @@ public class AudioDeviceBroker {
             mEventSource = d.mEventSource;
             mAudioSystemDevice = audioDevice;
             mMusicDevice = AudioSystem.DEVICE_NONE;
+            mIsDeviceSwitch = optimizeBtDeviceSwitch()
+                    && d.mNewDevice != null && d.mPreviousDevice != null;
         }
 
         // constructor used by AudioDeviceBroker to search similar message
@@ -978,6 +982,7 @@ public class AudioDeviceBroker {
             mSupprNoisy = false;
             mVolume = -1;
             mIsLeOutput = false;
+            mIsDeviceSwitch = false;
         }
 
         // constructor used by AudioDeviceInventory when config change failed
@@ -992,6 +997,7 @@ public class AudioDeviceBroker {
             mSupprNoisy = false;
             mVolume = -1;
             mIsLeOutput = false;
+            mIsDeviceSwitch = false;
         }
 
         BtDeviceInfo(@NonNull BtDeviceInfo src, int state) {
@@ -1004,6 +1010,7 @@ public class AudioDeviceBroker {
             mEventSource = src.mEventSource;
             mAudioSystemDevice = src.mAudioSystemDevice;
             mMusicDevice = src.mMusicDevice;
+            mIsDeviceSwitch = false;
         }
 
         // redefine equality op so we can match messages intended for this device
@@ -1038,42 +1045,15 @@ public class AudioDeviceBroker {
                             + " isLeOutput=" + mIsLeOutput
                             + " eventSource=" + mEventSource
                             + " audioSystemDevice=" + mAudioSystemDevice
-                            + " musicDevice=" + mMusicDevice;
+                            + " musicDevice=" + mMusicDevice
+                            + " isDeviceSwitch=" + mIsDeviceSwitch;
         }
     }
 
-    BtDeviceInfo createBtDeviceInfo(@NonNull BtDeviceChangedData d, @NonNull BluetoothDevice device,
-                int state) {
-        int audioDevice;
-        int codec = AudioSystem.AUDIO_FORMAT_DEFAULT;
-        switch (d.mInfo.getProfile()) {
-            case BluetoothProfile.A2DP_SINK:
-                audioDevice = AudioSystem.DEVICE_IN_BLUETOOTH_A2DP;
-                break;
-            case BluetoothProfile.A2DP:
-                audioDevice = AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP;
-                break;
-            case BluetoothProfile.HEARING_AID:
-                audioDevice = AudioSystem.DEVICE_OUT_HEARING_AID;
-                break;
-            case BluetoothProfile.LE_AUDIO:
-                if (d.mInfo.isLeOutput()) {
-                    audioDevice = AudioSystem.DEVICE_OUT_BLE_HEADSET;
-                } else {
-                    audioDevice = AudioSystem.DEVICE_IN_BLE_HEADSET;
-                }
-                break;
-            case BluetoothProfile.LE_AUDIO_BROADCAST:
-                audioDevice = AudioSystem.DEVICE_OUT_BLE_BROADCAST;
-                break;
-            case BluetoothProfile.HEADSET:
-                // the actual device type is not important at this point and
-                // will be set by BtHelper.handleBtScoActiveDeviceChange()
-                audioDevice = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO;
-                break;
-            default: throw new IllegalArgumentException("Invalid profile " + d.mInfo.getProfile());
-        }
-        return new BtDeviceInfo(d, device, state, audioDevice, codec);
+    /*package*/ static BtDeviceInfo createBtDeviceInfo(@NonNull BtDeviceChangedData d,
+            @NonNull BluetoothDevice device, int state) {
+        int audioDevice = BtHelper.getTypeFromProfile(d.mInfo.getProfile(), d.mInfo.isLeOutput());
+        return new BtDeviceInfo(d, device, state, audioDevice, AudioSystem.AUDIO_FORMAT_DEFAULT);
     }
 
     private void btMediaMetricRecord(@NonNull BluetoothDevice device, String state,
@@ -1312,6 +1292,8 @@ public class AudioDeviceBroker {
                     + ";bt_wbs=" + (mHasWbsEnabled ? "on" : "off"));
 // QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
             AudioSystem.setParameters("BT_SCO=on");
+            mBluetoothA2dpSuspendedApplied = true;
+            mBluetoothLeSuspendedApplied = true;
         } else {
             AudioSystem.setParameters("BT_SCO=off");
             if (mBluetoothA2dpSuspendedApplied) {
@@ -1796,10 +1778,11 @@ public class AudioDeviceBroker {
     }
 
     /*package*/ boolean handleDeviceConnection(@NonNull AudioDeviceAttributes attributes,
-                                boolean connect, @Nullable BluetoothDevice btDevice) {
+                                boolean connect, @Nullable BluetoothDevice btDevice,
+                                boolean deviceSwitch) {
         synchronized (mDeviceStateLock) {
             return mDeviceInventory.handleDeviceConnection(
-                    attributes, connect, false /*for test*/, btDevice);
+                    attributes, connect, false /*for test*/, btDevice, deviceSwitch);
         }
     }
 
@@ -1816,8 +1799,8 @@ public class AudioDeviceBroker {
     }
 
     // must be called synchronized on mConnectedDevices
-    /*package*/ boolean hasScheduledA2dpConnection(BluetoothDevice btDevice) {
-        final BtDeviceInfo devInfoToCheck = new BtDeviceInfo(btDevice, BluetoothProfile.A2DP);
+    /*package*/ boolean hasScheduledA2dpConnection(BluetoothDevice btDevice, int profile) {
+        final BtDeviceInfo devInfoToCheck = new BtDeviceInfo(btDevice, profile);
         return mBrokerHandler.hasEqualMessages(MSG_L_SET_BT_ACTIVE_DEVICE, devInfoToCheck);
     }
 
@@ -1893,6 +1876,18 @@ public class AudioDeviceBroker {
         pw.println("\n" + prefix + "mAudioModeOwner: " + mAudioModeOwner);
 
         pw.println("\n" + prefix + "mScoManagedByAudio: " + mScoManagedByAudio);
+
+        pw.println("\n" + prefix + "Bluetooth SCO on"
+                + ", requested: " + mBluetoothScoOn
+                + ", applied: " + mBluetoothScoOnApplied);
+        pw.println("\n" + prefix +  "Bluetooth A2DP suspended"
+                + ", requested ext: " + mBluetoothA2dpSuspendedExt
+                + ", requested int: " + mBluetoothA2dpSuspendedInt
+                + ", applied " + mBluetoothA2dpSuspendedApplied);
+        pw.println("\n" + prefix +  "Bluetooth LE Audio suspended"
+                + ", requested ext: " + mBluetoothLeSuspendedExt
+                + ", requested int: " + mBluetoothLeSuspendedInt
+                + ", applied " + mBluetoothLeSuspendedApplied);
 
         mBtHelper.dump(pw, prefix);
     }
@@ -2048,10 +2043,12 @@ public class AudioDeviceBroker {
                                                 || btInfo.mIsLeOutput)
                                             ? mAudioService.getBluetoothContextualVolumeStream()
                                             : AudioSystem.STREAM_DEFAULT);
-                                if (btInfo.mProfile == BluetoothProfile.LE_AUDIO
+                                if ((btInfo.mProfile == BluetoothProfile.LE_AUDIO
                                         || btInfo.mProfile == BluetoothProfile.HEARING_AID
                                         || (mScoManagedByAudio
-                                            && btInfo.mProfile == BluetoothProfile.HEADSET)) {
+                                            && btInfo.mProfile == BluetoothProfile.HEADSET))
+                                        && (btInfo.mState == BluetoothProfile.STATE_CONNECTED
+                                            || !btInfo.mIsDeviceSwitch)) {
                                     onUpdateCommunicationRouteClient(
                                             bluetoothScoRequestOwnerAttributionSource(),
                                             "setBluetoothActiveDevice");

@@ -28,6 +28,8 @@ import com.android.systemui.scrim.ScrimView;
 import com.android.systemui.shade.ui.ShadeColors;
 import com.android.systemui.statusbar.notification.stack.StackStateAnimator;
 
+import java.util.function.Supplier;
+
 import kotlinx.coroutines.ExperimentalCoroutinesApi;
 
 /**
@@ -88,7 +90,8 @@ public enum ScrimState {
             }
             if (Flags.notificationShadeBlur()) {
                 mBehindTint = Color.TRANSPARENT;
-                mNotifTint = ShadeColors.notificationScrim(mScrimBehind.getResources());
+                mNotifTint = ShadeColors.notificationScrim(mScrimBehind.getResources(),
+                        mIsBlurSupported.get());
                 mBehindAlpha = 0.0f;
                 mNotifAlpha = 0.0f;
                 mFrontAlpha = 0.0f;
@@ -148,7 +151,9 @@ public enum ScrimState {
         @Override
         public void prepare(ScrimState previousState) {
             if (Flags.bouncerUiRevamp()) {
-                if (previousState == SHADE_LOCKED) {
+                // Add unlocked here because scrim state is unlocked when there is an app on top of
+                // the lockscreen and shade is pulled over it.
+                if (previousState == SHADE_LOCKED || previousState == UNLOCKED) {
                     mBehindAlpha = previousState.getBehindAlpha();
                     mNotifAlpha = previousState.getNotifAlpha();
                 } else {
@@ -184,12 +189,23 @@ public enum ScrimState {
         @Override
         public void prepare(ScrimState previousState) {
             if (Flags.notificationShadeBlur()) {
-                mBehindTint = ShadeColors.shadePanel(mScrimBehind.getResources());
+                mBehindTint = ShadeColors.shadePanel(mScrimBehind.getResources(),
+                        mIsBlurSupported.get());
                 mBehindAlpha = Color.alpha(mBehindTint) / 255.0f;
-                mNotifTint = ShadeColors.notificationScrim(mScrimBehind.getResources());
+                mNotifTint = ShadeColors.notificationScrim(mScrimBehind.getResources(),
+                        mIsBlurSupported.get());
                 mNotifAlpha = Color.alpha(mNotifTint) / 255.0f;
                 mFrontAlpha = 0.0f;
             } else {
+                if (Flags.bouncerUiRevamp()) {
+                    // This is only required until shade blur flag is fully enabled, shade is always
+                    // opaque when shade blur is not enabled, and mClipQsScrim is always false.
+                    mBehindAlpha = 1f;
+                    mNotifAlpha = 1f;
+                    mFrontAlpha = 0f;
+                    mBehindTint = mBackgroundColor;
+                    return;
+                }
                 mBehindAlpha = mClipQsScrim ? 1 : mDefaultScrimAlpha;
                 mNotifAlpha = 1f;
                 mFrontAlpha = 0f;
@@ -305,9 +321,11 @@ public enum ScrimState {
                 mBehindTint = mBackgroundColor;
                 mBlankScreen = true;
             } else if (Flags.notificationShadeBlur()) {
-                mBehindTint = ShadeColors.shadePanel(mScrimBehind.getResources());
+                mBehindTint = ShadeColors.shadePanel(mScrimBehind.getResources(),
+                        mIsBlurSupported.get());
                 mBehindAlpha = Color.alpha(mBehindTint) / 255.0f;
-                mNotifTint = ShadeColors.notificationScrim(mScrimBehind.getResources());
+                mNotifTint = ShadeColors.notificationScrim(mScrimBehind.getResources(),
+                        mIsBlurSupported.get());
                 mNotifAlpha = Color.alpha(mNotifTint) / 255.0f;
                 mFrontAlpha = 0.0f;
                 return;
@@ -400,6 +418,7 @@ public enum ScrimState {
     DozeParameters mDozeParameters;
     DockManager mDockManager;
     boolean mDisplayRequiresBlanking;
+    protected Supplier<Boolean> mIsBlurSupported;
     boolean mLaunchingAffordanceWithPreview;
     boolean mOccludeAnimationPlaying;
     boolean mWakeLockScreenSensorActive;
@@ -413,7 +432,7 @@ public enum ScrimState {
     protected float mNotifBlurRadius = 0.0f;
 
     public void init(ScrimView scrimInFront, ScrimView scrimBehind, DozeParameters dozeParameters,
-            DockManager dockManager) {
+            DockManager dockManager, Supplier<Boolean> isBlurSupported) {
         mBackgroundColor = scrimBehind.getContext().getColor(R.color.shade_scrim_background_dark);
         mScrimInFront = scrimInFront;
         mScrimBehind = scrimBehind;
@@ -421,6 +440,7 @@ public enum ScrimState {
         mDozeParameters = dozeParameters;
         mDockManager = dockManager;
         mDisplayRequiresBlanking = dozeParameters.getDisplayNeedsBlanking();
+        mIsBlurSupported = isBlurSupported;
     }
 
     /** Prepare state for transition. */

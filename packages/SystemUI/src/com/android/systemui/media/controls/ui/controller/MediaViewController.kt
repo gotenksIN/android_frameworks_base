@@ -81,8 +81,8 @@ import javax.inject.Inject
 open class MediaViewController
 @Inject
 constructor(
-    private val context: Context,
-    private val configurationController: ConfigurationController,
+    @Main private val context: Context,
+    @Main private val configurationController: ConfigurationController,
     private val mediaHostStatesManager: MediaHostStatesManager,
     private val logger: MediaViewLogger,
     private val seekBarViewModel: SeekBarViewModel,
@@ -1040,13 +1040,19 @@ constructor(
                 expandedLayout.load(context, R.xml.media_recommendations_expanded)
             }
         }
-        readjustPlayPauseWidth()
+        readjustUIUpdateConstraints()
         refreshState()
     }
 
-    private fun readjustPlayPauseWidth() {
+    private fun readjustUIUpdateConstraints() {
         // TODO: move to xml file when flag is removed.
         if (Flags.mediaControlsUiUpdate()) {
+            collapsedLayout.setGuidelineEnd(
+                R.id.action_button_guideline,
+                context.resources.getDimensionPixelSize(
+                    R.dimen.qs_media_session_collapsed_guideline
+                ),
+            )
             collapsedLayout.constrainWidth(
                 R.id.actionPlayPause,
                 context.resources.getDimensionPixelSize(R.dimen.qs_media_action_play_pause_width),
@@ -1231,9 +1237,15 @@ constructor(
         val width = targetView.width
         val height = targetView.height
         val random = Random()
+        val luminosity =
+            if (Flags.mediaControlsA11yColors()) {
+                0.6f
+            } else {
+                TurbulenceNoiseAnimationConfig.DEFAULT_LUMINOSITY_MULTIPLIER
+            }
         return TurbulenceNoiseAnimationConfig(
             gridCount = 2.14f,
-            TurbulenceNoiseAnimationConfig.DEFAULT_LUMINOSITY_MULTIPLIER,
+            luminosity,
             random.nextFloat(),
             random.nextFloat(),
             random.nextFloat(),
@@ -1241,7 +1253,7 @@ constructor(
             noiseMoveSpeedY = 0f,
             TurbulenceNoiseAnimationConfig.DEFAULT_NOISE_SPEED_Z,
             // Color will be correctly updated in ColorSchemeTransition.
-            colorSchemeTransition.accentPrimary.currentColor,
+            colorSchemeTransition.getSurfaceEffectColor(),
             screenColor = Color.BLACK,
             width.toFloat(),
             height.toFloat(),

@@ -16,6 +16,17 @@ flag {
 }
 
 flag {
+    name: "enable_modals_fullscreen_with_permission"
+    namespace: "lse_desktop_experience"
+    description: "Uses permissions to understand if modal fullscreen is allowed for /n"
+                 "transparent activities."
+    bug: "394714626"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "include_top_transparent_fullscreen_task_in_desktop_heuristic"
     namespace: "lse_desktop_experience"
     description: "Whether to include any top transparent fullscreen task launched in desktop /n"
@@ -73,6 +84,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables a SurfaceControlViewHost cache for window decorations"
     bug: "360452034"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_drag_resize_set_up_in_bg_thread"
+    namespace: "lse_desktop_experience"
+    description: "Enables setting up the drag-resize input listener in a bg thread"
+    bug: "396445663"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -162,6 +183,26 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Whether to apply Camera Compat treatment to fixed-orientation apps in desktop windowing mode"
     bug: "314952133"
+}
+
+flag {
+    name: "enable_camera_compat_track_task_and_app_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Whether to use taskId and app process to track camera apps, and notify the policies only on first camera open and final close"
+    bug: "380840084"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_camera_compat_for_desktop_windowing_opt_out"
+    namespace: "lse_desktop_experience"
+    description: "Whether to allow developers to opt-out of Camera Compat treatment to fixed-orientation apps in desktop windowing mode"
+    bug: "328616176"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -623,6 +664,13 @@ flag {
 }
 
 flag {
+    name: "enable_multi_display_split"
+    namespace: "lse_desktop_experience"
+    description: "Enables split screen on multiple displays at the same time"
+    bug: "395943397"
+}
+
+flag {
   name: "exclude_caption_from_app_bounds"
   namespace: "lse_desktop_experience"
   description: "Whether caption insets are excluded from app bounds in freeform"
@@ -702,6 +750,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Fix the window-close keyboard shortcut in Desktop Mode."
     bug: "394599430"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_indicator_in_separate_thread_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables running visual indicator view operations in ShellDesktopThread."
+    bug: "366413536"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

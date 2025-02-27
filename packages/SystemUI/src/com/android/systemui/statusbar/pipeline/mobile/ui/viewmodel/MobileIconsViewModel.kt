@@ -104,15 +104,20 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
 
 // QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-    private val firstMobileSubViewModel: StateFlow<MobileIconViewModelCommon?> =
+    val mobileSubViewModels: StateFlow<List<MobileIconViewModelCommon>> =
         subscriptionIdsFlow
+            .map { ids -> ids.map { commonViewModelForSub(it) } }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
+
+    private val firstMobileSubViewModel: StateFlow<MobileIconViewModelCommon?> =
+        mobileSubViewModels
             .map {
                 if (it.isEmpty()) {
                     null
                 } else {
                     // Mobile icons get reversed by [StatusBarIconController], so the last element
                     // in this list will show up visually first.
-                    commonViewModelForSub(it.last())
+                    it.last()
                 }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
@@ -127,6 +132,8 @@ constructor(
                 firstMobileSubViewModel?.networkTypeIcon?.map { it != null } ?: flowOf(false)
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
+    val isStackable: StateFlow<Boolean> = interactor.isStackable
 
     init {
 // QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature

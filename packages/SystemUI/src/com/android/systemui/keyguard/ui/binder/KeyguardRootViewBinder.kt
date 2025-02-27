@@ -26,6 +26,8 @@ import android.view.HapticFeedbackConstants
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
+import android.view.View.GONE
+import android.view.View.INVISIBLE
 import android.view.View.OnLayoutChangeListener
 import android.view.View.VISIBLE
 import android.view.ViewGroup
@@ -300,12 +302,13 @@ object KeyguardRootViewBinder {
                     }
 
                     launch {
-                        viewModel.isNotifIconContainerVisible.collect { isVisible ->
+                        viewModel.isAodPromotedNotifVisible.collect { isVisible ->
                             if (isVisible.value) {
                                 blueprintViewModel.refreshBlueprint()
                             }
-                            childViews[aodPromotedNotificationId]
-                                ?.setAodNotifIconContainerIsVisible(isVisible)
+                            childViews[aodPromotedNotificationId]?.setAodPromotedNotifIsVisible(
+                                isVisible
+                            )
                         }
                     }
 
@@ -313,7 +316,7 @@ object KeyguardRootViewBinder {
                         shadeInteractor.isAnyFullyExpanded.collect { isFullyAnyExpanded ->
                             view.visibility =
                                 if (isFullyAnyExpanded) {
-                                    View.INVISIBLE
+                                    INVISIBLE
                                 } else {
                                     View.VISIBLE
                                 }
@@ -369,6 +372,14 @@ object KeyguardRootViewBinder {
             view.repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     if (wallpaperFocalAreaViewModel.hasFocalArea.value) {
+                        launch {
+                            wallpaperFocalAreaViewModel.wallpaperFocalAreaBounds.collect {
+                                wallpaperFocalAreaBounds ->
+                                wallpaperFocalAreaViewModel.setFocalAreaBounds(
+                                    wallpaperFocalAreaBounds
+                                )
+                            }
+                        }
                         launch {
                             wallpaperFocalAreaViewModel.wallpaperFocalAreaBounds
                                 .filterNotNull()
@@ -516,10 +527,10 @@ object KeyguardRootViewBinder {
                 visibility =
                     if (isVisible.value) {
                         alpha = 1f
-                        View.VISIBLE
+                        VISIBLE
                     } else {
                         alpha = 0f
-                        View.INVISIBLE
+                        INVISIBLE
                     }
             }
 
@@ -529,6 +540,36 @@ object KeyguardRootViewBinder {
                 } else {
                     CrossFadeHelper.fadeOut(this, animatorListener)
                 }
+            }
+        }
+    }
+
+    private fun View.setAodPromotedNotifIsVisible(isVisible: AnimatedValue<Boolean>) {
+        animate().cancel()
+        val animatorListener =
+            object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    isVisible.stopAnimating()
+                }
+            }
+
+        if (isVisible.isAnimating) {
+            if (isVisible.value) {
+                alpha = 0f
+                visibility = VISIBLE
+                CrossFadeHelper.fadeIn(this, animatorListener)
+            } else {
+                CrossFadeHelper.fadeOut(this, animatorListener)
+            }
+        } else {
+            if (isVisible.value) {
+                alpha = 1f
+                visibility = VISIBLE
+            } else {
+                // Hide with GONE, not INVISIBLE, so there won't be a redundant bottom
+                // margin between the smart space and the shelf.
+                alpha = 0f
+                visibility = GONE
             }
         }
     }

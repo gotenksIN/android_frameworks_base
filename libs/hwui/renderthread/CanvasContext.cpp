@@ -789,7 +789,13 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
     int64_t frameDeadline = mCurrentFrameInfo->get(FrameInfoIndex::FrameDeadline);
     int64_t dequeueBufferDuration = mCurrentFrameInfo->get(FrameInfoIndex::DequeueBufferDuration);
 
-    mHintSessionWrapper->updateTargetWorkDuration(frameDeadline - intendedVsync);
+    if (Properties::calcWorkloadOrigDeadline()) {
+        // Uses the unmodified frame deadline in calculating workload target duration
+        mHintSessionWrapper->updateTargetWorkDuration(
+                mCurrentFrameInfo->get(FrameInfoIndex::WorkloadTarget));
+    } else {
+        mHintSessionWrapper->updateTargetWorkDuration(frameDeadline - intendedVsync);
+    }
 
     if (didDraw) {
         int64_t frameStartTime = mCurrentFrameInfo->get(FrameInfoIndex::FrameStartTime);
@@ -853,7 +859,7 @@ void CanvasContext::reportMetricsWithPresentTime() {
     }  // release lock
 }
 
-void CanvasContext::addFrameMetricsObserver(FrameMetricsObserver* observer) {
+void CanvasContext::addFrameMetricsObserver(sp<FrameMetricsObserver>&& observer) {
     std::scoped_lock lock(mFrameInfoMutex);
     if (mFrameMetricsReporter.get() == nullptr) {
         mFrameMetricsReporter.reset(new FrameMetricsReporter());
@@ -864,10 +870,10 @@ void CanvasContext::addFrameMetricsObserver(FrameMetricsObserver* observer) {
     // their frame metrics.
     uint64_t nextFrameNumber = getFrameNumber();
     observer->reportMetricsFrom(nextFrameNumber, mSurfaceControlGenerationId);
-    mFrameMetricsReporter->addObserver(observer);
+    mFrameMetricsReporter->addObserver(std::move(observer));
 }
 
-void CanvasContext::removeFrameMetricsObserver(FrameMetricsObserver* observer) {
+void CanvasContext::removeFrameMetricsObserver(const sp<FrameMetricsObserver>& observer) {
     std::scoped_lock lock(mFrameInfoMutex);
     if (mFrameMetricsReporter.get() != nullptr) {
         mFrameMetricsReporter->removeObserver(observer);

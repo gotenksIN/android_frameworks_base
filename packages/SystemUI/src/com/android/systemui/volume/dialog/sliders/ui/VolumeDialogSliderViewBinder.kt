@@ -19,7 +19,6 @@ package com.android.systemui.volume.dialog.sliders.ui
 import android.graphics.drawable.Drawable
 import android.view.View
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,7 +39,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,11 +59,9 @@ import com.android.systemui.volume.haptics.ui.VolumeHapticsConfigsProvider
 import javax.inject.Inject
 import kotlin.math.round
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 @VolumeDialogSliderScope
 class VolumeDialogSliderViewBinder
@@ -102,7 +98,6 @@ private fun VolumeDialogSlider(
     hapticsViewModelFactory: SliderHapticsViewModel.Factory?,
     modifier: Modifier = Modifier,
 ) {
-    val coroutineScope = rememberCoroutineScope()
     val colors =
         SliderDefaults.colors(
             thumbColor = MaterialTheme.colorScheme.primary,
@@ -115,10 +110,6 @@ private fun VolumeDialogSlider(
     val sliderStateModel = collectedSliderStateModel ?: return
 
     val steps = with(sliderStateModel.valueRange) { endInclusive - start - 1 }.toInt()
-
-    var animateJob: Job? = null
-    val animatedSliderValue =
-        remember(sliderStateModel.value) { Animatable(sliderStateModel.value) }
 
     val interactionSource = remember { MutableInteractionSource() }
     val hapticsViewModel: SliderHapticsViewModel? =
@@ -149,16 +140,7 @@ private fun VolumeDialogSlider(
                         hapticsViewModel?.onValueChangeEnded()
                     }
                     sliderState.onValueChange = { newValue ->
-                        if (newValue != animatedSliderValue.targetValue) {
-                            animateJob?.cancel()
-                            animateJob =
-                                coroutineScope.launch {
-                                    animatedSliderValue.animateTo(newValue) {
-                                        sliderState.value = value
-                                    }
-                                }
-                        }
-
+                        sliderState.value = newValue
                         hapticsViewModel?.addVelocityDataPoint(newValue)
                         overscrollViewModel.setSlider(
                             value = sliderState.value,
@@ -173,7 +155,7 @@ private fun VolumeDialogSlider(
     var lastDiscreteStep by remember { mutableFloatStateOf(round(sliderStateModel.value)) }
     LaunchedEffect(sliderStateModel.value) {
         val value = sliderStateModel.value
-        launch { animatedSliderValue.animateTo(value) }
+        sliderState.value = value
         if (value != lastDiscreteStep) {
             lastDiscreteStep = value
             hapticsViewModel?.onValueChange(value)

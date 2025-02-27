@@ -19,7 +19,10 @@ package com.android.systemui.keyguard.domain.interactor
 
 import android.annotation.SuppressLint
 import android.util.Log
+import com.android.app.tracing.coroutines.flow.filterTraced
+import com.android.app.tracing.coroutines.flow.traceAs
 import com.android.app.tracing.coroutines.launchTraced as launch
+import com.android.app.tracing.coroutines.traceCoroutine
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.SceneKey
 import com.android.systemui.Flags.keyguardTransitionForceFinishOnScreenOff
@@ -90,6 +93,7 @@ constructor(
                     onBufferOverflow = BufferOverflow.DROP_OLDEST,
                 )
                 .also { it.tryEmit(0f) }
+                .traceAs("KTF-${state.name}")
         }
     }
 
@@ -222,10 +226,11 @@ constructor(
 
         val flow: Flow<TransitionStep> =
             transitionMap.getOrPut(mappedEdge) {
-                MutableSharedFlow(
-                    extraBufferCapacity = 10,
-                    onBufferOverflow = BufferOverflow.DROP_OLDEST,
-                )
+                MutableSharedFlow<TransitionStep>(
+                        extraBufferCapacity = 10,
+                        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+                    )
+                    .traceAs("KTF-${mappedEdge.from}-to-${mappedEdge.to}")
             }
 
         if (!SceneContainerFlag.isEnabled) {
@@ -234,7 +239,7 @@ constructor(
         if (edge.isSceneWildcardEdge()) {
             return simulateTransitionStepsForSceneTransitions(edge)
         }
-        return flow.filter { step ->
+        return flow.filterTraced("stl-filter") { step ->
             val fromScene =
                 when (edge) {
                     is Edge.StateToState -> edge.from?.mapToSceneContainerScene()
@@ -273,7 +278,7 @@ constructor(
                     step.transitionState == TransitionState.CANCELED) &&
                     sceneTransitionPair.value.previousValue.isTransitioning(fromScene, toScene)
 
-            return@filter isTransitioningBetweenLockscreenStates ||
+            return@filterTraced isTransitioningBetweenLockscreenStates ||
                 isTransitioningBetweenDesiredScenes ||
                 terminalStepBelongsToPreviousTransition ||
                 belongsToInstantReversedTransition
@@ -362,27 +367,27 @@ constructor(
 
         coroutineScope {
             collect { value ->
-                job?.cancelAndJoin()
+                traceCoroutine("cancelAndJoin") { job?.cancelAndJoin() }
 
-                job = launch {
+                job = launch("inner") {
                     val innerFlow = transform(value)
                     try {
                         innerFlow.collect { step ->
                             if (step.transitionState == TransitionState.STARTED) {
                                 startedEmitted = true
                             }
-                            send(step)
+                            traceCoroutine("send($step)") { send(step) }
                         }
                     } finally {
                         if (startedEmitted) {
-                            send(
+                            val step =
                                 TransitionStep(
                                     from = UNDEFINED,
                                     to = UNDEFINED,
                                     value = 1f,
                                     transitionState = TransitionState.FINISHED,
                                 )
-                            )
+                            traceCoroutine("send($step)") { send(step) }
                             startedEmitted = false
                         }
                     }
@@ -390,6 +395,7 @@ constructor(
             }
         }
     }
+    .traceAs("flatMapLatestWithFinished")
 
     /**
      * Converts old KTF states to UNDEFINED when [SceneContainerFlag] is enabled.
@@ -545,6 +551,7 @@ constructor(
                 }
             }
             .onStart { emit(false) }
+            .traceAs("isInTransition-$edge-$edgeWithoutSceneContainer")
             .distinctUntilChanged()
     }
 

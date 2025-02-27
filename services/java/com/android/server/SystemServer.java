@@ -1287,12 +1287,6 @@ public final class SystemServer implements Dumpable {
         if (!Flags.refactorCrashrecovery()) {
             // Initialize RescueParty.
             CrashRecoveryAdaptor.rescuePartyRegisterHealthObserver(mSystemContext);
-            if (!Flags.recoverabilityDetection()) {
-                // Now that we have the bare essentials of the OS up and running, take
-                // note that we just booted, which might send out a rescue party if
-                // we're stuck in a runtime restart loop.
-                CrashRecoveryAdaptor.packageWatchdogNoteBoot(mSystemContext);
-            }
         }
 
 
@@ -1588,14 +1582,6 @@ public final class SystemServer implements Dumpable {
 
         boolean enableVrService = context.getPackageManager().hasSystemFeature(
                 PackageManager.FEATURE_VR_MODE_HIGH_PERFORMANCE);
-
-        if (!Flags.recoverabilityDetection()) {
-            // For debugging RescueParty
-            if (Build.IS_DEBUGGABLE
-                    && SystemProperties.getBoolean("debug.crash_system", false)) {
-                throw new RuntimeException();
-            }
-        }
 
         try {
             final String SECONDARY_ZYGOTE_PRELOAD = "SecondaryZygotePreload";
@@ -3245,13 +3231,11 @@ public final class SystemServer implements Dumpable {
             CrashRecoveryAdaptor.initializeCrashrecoveryModuleService(mSystemServiceManager);
             t.traceEnd();
         } else {
-            if (Flags.recoverabilityDetection()) {
-                // Now that we have the essential services needed for mitigations, register the boot
-                // with package watchdog.
-                // Note that we just booted, which might send out a rescue party if we're stuck in a
-                // runtime restart loop.
-                CrashRecoveryAdaptor.packageWatchdogNoteBoot(mSystemContext);
-            }
+            // Now that we have the essential services needed for mitigations, register the boot
+            // with package watchdog.
+            // Note that we just booted, which might send out a rescue party if we're stuck in a
+            // runtime restart loop.
+            CrashRecoveryAdaptor.packageWatchdogNoteBoot(mSystemContext);
         }
 
         t.traceBegin("MakeDisplayManagerServiceReady");
@@ -3665,12 +3649,10 @@ public final class SystemServer implements Dumpable {
      * are updated outside of OTA; and to avoid breaking dependencies from system into apexes.
      */
     private void startApexServices(@NonNull TimingsTraceAndSlog t) {
-        if (Flags.recoverabilityDetection()) {
-            // For debugging RescueParty
-            if (Build.IS_DEBUGGABLE
-                    && SystemProperties.getBoolean("debug.crash_system", false)) {
-                throw new RuntimeException();
-            }
+        // For debugging RescueParty
+        if (Build.IS_DEBUGGABLE
+                && SystemProperties.getBoolean("debug.crash_system", false)) {
+            throw new RuntimeException();
         }
 
         t.traceBegin("startApexServices");

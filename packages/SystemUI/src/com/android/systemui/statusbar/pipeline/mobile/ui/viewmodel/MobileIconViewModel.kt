@@ -37,6 +37,7 @@ import com.android.systemui.flags.FeatureFlagsClassic
 import com.android.systemui.flags.Flags.NEW_NETWORK_SLICE_UI
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.core.NewStatusBarIcons
 import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
@@ -352,10 +353,11 @@ private class CellularIconViewModel(
                 flowOf(null)
             } else {
                 iconInteractor.showSliceAttribution.map {
-                    if (it) {
-                        Icon.Resource(R.drawable.mobile_network_type_background, null)
-                    } else {
-                        null
+                    when {
+                        it && NewStatusBarIcons.isEnabled ->
+                            Icon.Resource(R.drawable.mobile_network_type_background_updated, null)
+                        it -> Icon.Resource(R.drawable.mobile_network_type_background, null)
+                        else -> null
                     }
                 }
             }

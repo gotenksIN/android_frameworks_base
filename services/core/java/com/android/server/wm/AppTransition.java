@@ -89,7 +89,6 @@ import static com.android.internal.R.styleable.WindowAnimation_wallpaperIntraOpe
 import static com.android.internal.R.styleable.WindowAnimation_wallpaperOpenEnterAnimation;
 import static com.android.internal.R.styleable.WindowAnimation_wallpaperOpenExitAnimation;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ANIM;
-import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_APP_TRANSITIONS;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_APP_TRANSITIONS_ANIM;
 import static com.android.server.wm.AppTransitionProto.APP_TRANSITION_STATE;
 import static com.android.server.wm.AppTransitionProto.LAST_USED_APP_TRANSITION;
@@ -230,8 +229,6 @@ public class AppTransition implements Dump {
 
     private final int mDefaultWindowAnimationStyleResId;
     private boolean mOverrideTaskTransition;
-
-    private RemoteAnimationController mRemoteAnimationController;
 
     final Handler mHandler;
     final Runnable mHandleAppTransitionTimeoutRunnable = () -> handleAppTransitionTimeout();
@@ -398,9 +395,7 @@ public class AppTransition implements Dump {
                         : SystemClock.uptimeMillis(),
                 AnimationAdapter.STATUS_BAR_TRANSITION_DURATION);
 
-        if (mRemoteAnimationController != null) {
-            mRemoteAnimationController.goodToGo(transit);
-        } else if ((isTaskOpenTransitOld(transit) || transit == TRANSIT_OLD_WALLPAPER_CLOSE)
+        if ((isTaskOpenTransitOld(transit) || transit == TRANSIT_OLD_WALLPAPER_CLOSE)
                 && topOpeningAnim != null) {
             if (mDisplayContent.getDisplayPolicy().shouldAttachNavBarToAppDuringTransition()) {
                 final NavBarFadeAnimationController controller =
@@ -424,7 +419,6 @@ public class AppTransition implements Dump {
         mNextAppTransitionType = NEXT_TRANSIT_TYPE_NONE;
         mNextAppTransitionOverrideRequested = false;
         mNextAppTransitionAnimationsSpecs.clear();
-        mRemoteAnimationController = null;
         mNextAppTransitionAnimationsSpecsFuture = null;
         mDefaultNextAppTransitionAnimationSpec = null;
         mAnimationFinishedCallback = null;
@@ -442,13 +436,6 @@ public class AppTransition implements Dump {
         final boolean keyguardGoingAwayCancelled = mNextAppTransitionRequests.contains(
                 TRANSIT_KEYGUARD_GOING_AWAY);
 
-        // The RemoteAnimationControl didn't register AppTransitionListener and
-        // only initialized the finish and timeout callback when goodToGo().
-        // So cancel the remote animation here to prevent the animation can't do
-        // finish after transition state cleared.
-        if (mRemoteAnimationController != null) {
-            mRemoteAnimationController.cancelAnimation("freeze");
-        }
         mNextAppTransitionRequests.clear();
         clear();
         setReady();
@@ -717,10 +704,6 @@ public class AppTransition implements Dump {
                 && mNextAppTransitionType != NEXT_TRANSIT_TYPE_CUSTOM_IN_PLACE
                 && mNextAppTransitionType != NEXT_TRANSIT_TYPE_CLIP_REVEAL
                 && !mNextAppTransitionRequests.contains(TRANSIT_KEYGUARD_GOING_AWAY);
-    }
-
-    RemoteAnimationController getRemoteAnimationController() {
-        return mRemoteAnimationController;
     }
 
     /**
@@ -1082,17 +1065,6 @@ public class AppTransition implements Dump {
 
     void overridePendingAppTransitionRemote(RemoteAnimationAdapter remoteAnimationAdapter,
             boolean sync, boolean isActivityEmbedding) {
-        ProtoLog.i(WM_DEBUG_APP_TRANSITIONS, "Override pending remote transitionSet=%b adapter=%s",
-                        isTransitionSet(), remoteAnimationAdapter);
-        if (isTransitionSet() && !mNextAppTransitionIsSync) {
-            // ActivityEmbedding animation will run by the app process for which we want to respect
-            // the app override for whether or not to show background color.
-            clear(!isActivityEmbedding /* clearAppOverride */);
-            mNextAppTransitionType = NEXT_TRANSIT_TYPE_REMOTE;
-            mRemoteAnimationController = new RemoteAnimationController(mService, mDisplayContent,
-                    remoteAnimationAdapter, mHandler, isActivityEmbedding);
-            mNextAppTransitionIsSync = sync;
-        }
     }
 
     void overrideInPlaceAppTransition(String packageName, int anim) {
@@ -1462,7 +1434,7 @@ public class AppTransition implements Dump {
     }
 
     boolean prepareAppTransition(@TransitionType int transit, @TransitionFlags int flags) {
-        if (mDisplayContent.mTransitionController.isShellTransitionsEnabled()) {
+        if (WindowManagerService.sEnableShellTransitions) {
             return false;
         }
         mNextAppTransitionRequests.add(transit);
@@ -1581,26 +1553,6 @@ public class AppTransition implements Dump {
     }
 
     private void handleAppTransitionTimeout() {
-        synchronized (mService.mGlobalLock) {
-            final DisplayContent dc = mDisplayContent;
-            if (dc == null) {
-                return;
-            }
-            notifyAppTransitionTimeoutLocked();
-            if (isTransitionSet() || !dc.mOpeningApps.isEmpty() || !dc.mClosingApps.isEmpty()
-                    || !dc.mChangingContainers.isEmpty()) {
-                ProtoLog.v(WM_DEBUG_APP_TRANSITIONS,
-                            "*** APP TRANSITION TIMEOUT. displayId=%d isTransitionSet()=%b "
-                                    + "mOpeningApps.size()=%d mClosingApps.size()=%d "
-                                    + "mChangingApps.size()=%d",
-                            dc.getDisplayId(), dc.mAppTransition.isTransitionSet(),
-                            dc.mOpeningApps.size(), dc.mClosingApps.size(),
-                            dc.mChangingContainers.size());
-
-                setTimeout();
-                mService.mWindowPlacerLocked.performSurfacePlacement();
-            }
-        }
     }
 
     private static void doAnimationCallback(@NonNull IRemoteCallback callback) {

@@ -31,6 +31,7 @@ import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.notification.data.model.activeNotificationModel
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 import com.android.systemui.testKosmos
+import com.android.systemui.util.time.fakeSystemClock
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -183,7 +184,7 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
                         statusBarChipIcon = null,
                         promotedContent = PROMOTED_CONTENT,
                     ),
-                    32L,
+                    creationTime = 32L,
                 )
 
             val latest by collectLastValue(underTest.notificationChip)
@@ -246,7 +247,7 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
                     statusBarChipIcon = mock(),
                     promotedContent = PROMOTED_CONTENT,
                 )
-            val underTest = factory.create(startingNotif, 123L)
+            val underTest = factory.create(startingNotif, creationTime = 123L)
             val latest by collectLastValue(underTest.notificationChip)
             assertThat(latest).isNotNull()
 
@@ -306,9 +307,10 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun notificationChip_appIsVisibleOnCreation_emitsNull() =
+    fun notificationChip_appIsVisibleOnCreation_emitsIsAppVisibleTrueWithTime() =
         kosmos.runTest {
             activityManagerRepository.fake.startingIsAppVisibleValue = true
+            fakeSystemClock.setCurrentTimeMillis(9000)
 
             val underTest =
                 factory.create(
@@ -323,72 +325,87 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
 
             val latest by collectLastValue(underTest.notificationChip)
 
-            assertThat(latest).isNull()
+            assertThat(latest).isNotNull()
+            assertThat(latest!!.isAppVisible).isTrue()
+            assertThat(latest!!.lastAppVisibleTime).isEqualTo(9000)
         }
 
     @Test
-    fun notificationChip_appNotVisibleOnCreation_emitsValue() =
+    fun notificationChip_appNotVisibleOnCreation_emitsIsAppVisibleFalseWithNoTime() =
+        kosmos.runTest {
+            activityManagerRepository.fake.startingIsAppVisibleValue = false
+            fakeSystemClock.setCurrentTimeMillis(9000)
+
+            val underTest =
+                factory.create(
+                    activeNotificationModel(
+                        key = "notif",
+                        uid = UID,
+                        statusBarChipIcon = mock(),
+                        promotedContent = PROMOTED_CONTENT,
+                    ),
+                    creationTime = 1,
+                )
+
+            val latest by collectLastValue(underTest.notificationChip)
+
+            assertThat(latest).isNotNull()
+            assertThat(latest!!.isAppVisible).isFalse()
+            assertThat(latest!!.lastAppVisibleTime).isNull()
+        }
+
+    @Test
+    fun notificationChip_updatesWhenAppIsVisible() =
+        kosmos.runTest {
+            activityManagerRepository.fake.startingIsAppVisibleValue = false
+            fakeSystemClock.setCurrentTimeMillis(9000)
+
+            val underTest =
+                factory.create(
+                    activeNotificationModel(
+                        key = "notif",
+                        uid = UID,
+                        statusBarChipIcon = mock(),
+                        promotedContent = PROMOTED_CONTENT,
+                    ),
+                    creationTime = 1,
+                )
+
+            val latest by collectLastValue(underTest.notificationChip)
+
+            activityManagerRepository.fake.setIsAppVisible(UID, isAppVisible = false)
+            assertThat(latest!!.isAppVisible).isFalse()
+            assertThat(latest!!.lastAppVisibleTime).isNull()
+
+            fakeSystemClock.setCurrentTimeMillis(11000)
+            activityManagerRepository.fake.setIsAppVisible(UID, isAppVisible = true)
+            assertThat(latest!!.isAppVisible).isTrue()
+            assertThat(latest!!.lastAppVisibleTime).isEqualTo(11000)
+
+            fakeSystemClock.setCurrentTimeMillis(13000)
+            activityManagerRepository.fake.setIsAppVisible(UID, isAppVisible = false)
+            assertThat(latest!!.isAppVisible).isFalse()
+            assertThat(latest!!.lastAppVisibleTime).isEqualTo(11000)
+
+            fakeSystemClock.setCurrentTimeMillis(15000)
+            activityManagerRepository.fake.setIsAppVisible(UID, isAppVisible = true)
+            assertThat(latest!!.isAppVisible).isTrue()
+            assertThat(latest!!.lastAppVisibleTime).isEqualTo(15000)
+        }
+
+    @Test
+    fun notificationChip_updatedUid_newUidIsIgnoredButOtherDataNotIgnored() =
         kosmos.runTest {
             activityManagerRepository.fake.startingIsAppVisibleValue = false
 
-            val underTest =
-                factory.create(
-                    activeNotificationModel(
-                        key = "notif",
-                        uid = UID,
-                        statusBarChipIcon = mock(),
-                        promotedContent = PROMOTED_CONTENT,
-                    ),
-                    creationTime = 1,
-                )
-
-            val latest by collectLastValue(underTest.notificationChip)
-
-            assertThat(latest).isNotNull()
-        }
-
-    @Test
-    fun notificationChip_hidesWhenAppIsVisible() =
-        kosmos.runTest {
-            val underTest =
-                factory.create(
-                    activeNotificationModel(
-                        key = "notif",
-                        uid = UID,
-                        statusBarChipIcon = mock(),
-                        promotedContent = PROMOTED_CONTENT,
-                    ),
-                    creationTime = 1,
-                )
-
-            val latest by collectLastValue(underTest.notificationChip)
-
-            activityManagerRepository.fake.setIsAppVisible(UID, false)
-            assertThat(latest).isNotNull()
-
-            activityManagerRepository.fake.setIsAppVisible(UID, true)
-            assertThat(latest).isNull()
-
-            activityManagerRepository.fake.setIsAppVisible(UID, false)
-            assertThat(latest).isNotNull()
-        }
-
-    // Note: This test is theoretically impossible because the notification key should contain the
-    // UID, so if the UID changes then the key would also change and a new interactor would be
-    // created. But, test it just in case.
-    @Test
-    fun notificationChip_updatedUid_rechecksAppVisibility_oldObserverUnregistered() =
-        kosmos.runTest {
-            activityManagerRepository.fake.startingIsAppVisibleValue = false
-
-            val hiddenUid = 100
-            val shownUid = 101
+            val originalUid = 100
+            val newUid = 101
 
             val underTest =
                 factory.create(
                     activeNotificationModel(
                         key = "notif",
-                        uid = hiddenUid,
+                        uid = originalUid,
                         statusBarChipIcon = mock(),
                         promotedContent = PROMOTED_CONTENT,
                     ),
@@ -396,21 +413,39 @@ class SingleNotificationChipInteractorTest : SysuiTestCase() {
                 )
             val latest by collectLastValue(underTest.notificationChip)
             assertThat(latest).isNotNull()
+            assertThat(latest!!.isAppVisible).isFalse()
 
             // WHEN the notif gets a new UID that starts as visible
             activityManagerRepository.fake.startingIsAppVisibleValue = true
+            val newPromotedContentBuilder =
+                PromotedNotificationContentModel.Builder("notif").apply {
+                    this.shortCriticalText = "Arrived"
+                }
+            val newPromotedContent = newPromotedContentBuilder.build()
             underTest.setNotification(
                 activeNotificationModel(
                     key = "notif",
-                    uid = shownUid,
+                    uid = newUid,
                     statusBarChipIcon = mock(),
-                    promotedContent = PROMOTED_CONTENT,
+                    promotedContent = newPromotedContent,
                 )
             )
 
-            // THEN we re-fetch the app visibility state with the new UID, and since that UID is
-            // visible, we hide the chip
-            assertThat(latest).isNull()
+            // THEN we do update other fields like promoted content
+            assertThat(latest!!.promotedContent).isEqualTo(newPromotedContent)
+
+            // THEN we don't fetch the app visibility state for the new UID
+            assertThat(latest!!.isAppVisible).isFalse()
+
+            // AND don't listen to updates for the new UID
+            activityManagerRepository.fake.setIsAppVisible(newUid, isAppVisible = false)
+            activityManagerRepository.fake.setIsAppVisible(newUid, isAppVisible = true)
+            assertThat(latest!!.isAppVisible).isFalse()
+
+            // AND we still use updates from the old UID
+            // TODO(b/364653005): This particular behavior isn't great, can we do better?
+            activityManagerRepository.fake.setIsAppVisible(originalUid, isAppVisible = true)
+            assertThat(latest!!.isAppVisible).isTrue()
         }
 
     companion object {

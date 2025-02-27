@@ -26,6 +26,7 @@ flag {
   bug: "378660052"
 }
 
+# Flag for finalized API: In Nextfood but exported (and therefore must stay).
 flag {
   name: "modes_api"
   is_exported: true
@@ -79,6 +80,13 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+  name: "modes_cleanup_implicit"
+  namespace: "systemui"
+  description: "Deletes implicit modes if never customized and not used for some time. Depends on MODES_UI"
+  bug: "394087495"
 }
 
 flag {
@@ -308,10 +316,20 @@ flag {
 }
 
 flag {
+  name: "nm_binder_perf_get_apps_with_channels"
+  namespace: "systemui"
+  description: "Use a single binder call to get the set of apps with channels for a user"
+  bug: "362981561"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "no_sbnholder"
   namespace: "systemui"
   description: "removes sbnholder from NLS"
-  bug: "362981561"
+  bug: "378128805"
 }
 
 flag {

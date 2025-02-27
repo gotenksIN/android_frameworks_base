@@ -25,6 +25,8 @@ import com.android.internal.jank.InteractionJankMonitor
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestRunningTaskInfoBuilder
+import com.android.wm.shell.bubbles.BubbleController
+import com.android.wm.shell.bubbles.BubbleTransitions
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_CANCEL_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_END_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_START_DRAG_TO_DESKTOP
@@ -34,6 +36,7 @@ import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_TOP
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
+import java.util.Optional
 import java.util.function.Supplier
 import junit.framework.Assert.assertEquals
 import junit.framework.Assert.assertFalse
@@ -48,6 +51,7 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
 import org.mockito.MockitoSession
+import org.mockito.kotlin.argThat
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -71,6 +75,7 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
     @Mock private lateinit var draggedTaskLeash: SurfaceControl
     @Mock private lateinit var homeTaskLeash: SurfaceControl
     @Mock private lateinit var desktopUserRepositories: DesktopUserRepositories
+    @Mock private lateinit var bubbleController: BubbleController
 
     private val transactionSupplier = Supplier { mock<SurfaceControl.Transaction>() }
 
@@ -87,6 +92,7 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
                     taskDisplayAreaOrganizer,
                     desktopUserRepositories,
                     mockInteractionJankMonitor,
+                    Optional.of(bubbleController),
                     transactionSupplier,
                 )
                 .apply { setSplitScreenController(splitScreenController) }
@@ -97,6 +103,7 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
                     taskDisplayAreaOrganizer,
                     desktopUserRepositories,
                     mockInteractionJankMonitor,
+                    Optional.of(bubbleController),
                     transactionSupplier,
                 )
                 .apply { setSplitScreenController(splitScreenController) }
@@ -166,6 +173,32 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
         )
         verify(splitScreenController)
             .requestEnterSplitSelect(any(), any(), eq(SPLIT_POSITION_BOTTOM_OR_RIGHT), any())
+    }
+
+    @Test
+    fun startDragToDesktop_cancelledBeforeReady_verifyBubbleLeftCancel() {
+        performEarlyCancel(
+            defaultHandler,
+            DragToDesktopTransitionHandler.CancelState.CANCEL_BUBBLE_LEFT,
+        )
+        verify(bubbleController)
+            .expandStackAndSelectBubble(
+                any<RunningTaskInfo>(),
+                argThat<BubbleTransitions.DragData> { isReleasedOnLeft },
+            )
+    }
+
+    @Test
+    fun startDragToDesktop_cancelledBeforeReady_verifyBubbleRightCancel() {
+        performEarlyCancel(
+            defaultHandler,
+            DragToDesktopTransitionHandler.CancelState.CANCEL_BUBBLE_RIGHT,
+        )
+        verify(bubbleController)
+            .expandStackAndSelectBubble(
+                any<RunningTaskInfo>(),
+                argThat<BubbleTransitions.DragData> { !isReleasedOnLeft },
+            )
     }
 
     @Test
@@ -340,6 +373,40 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
         // Verify the request went through split controller.
         verify(splitScreenController)
             .requestEnterSplitSelect(any(), any(), eq(SPLIT_POSITION_BOTTOM_OR_RIGHT), any())
+    }
+
+    @Test
+    fun cancelDragToDesktop_bubbleLeftCancelType_bubbleRequested() {
+        startDrag(defaultHandler)
+
+        // Then user cancelled it, requesting bubble.
+        defaultHandler.cancelDragToDesktopTransition(
+            DragToDesktopTransitionHandler.CancelState.CANCEL_BUBBLE_LEFT
+        )
+
+        // Verify the request went through bubble controller.
+        verify(bubbleController)
+            .expandStackAndSelectBubble(
+                any<RunningTaskInfo>(),
+                argThat<BubbleTransitions.DragData> { isReleasedOnLeft },
+            )
+    }
+
+    @Test
+    fun cancelDragToDesktop_bubbleRightCancelType_bubbleRequested() {
+        startDrag(defaultHandler)
+
+        // Then user cancelled it, requesting bubble.
+        defaultHandler.cancelDragToDesktopTransition(
+            DragToDesktopTransitionHandler.CancelState.CANCEL_BUBBLE_RIGHT
+        )
+
+        // Verify the request went through bubble controller.
+        verify(bubbleController)
+            .expandStackAndSelectBubble(
+                any<RunningTaskInfo>(),
+                argThat<BubbleTransitions.DragData> { !isReleasedOnLeft },
+            )
     }
 
     @Test

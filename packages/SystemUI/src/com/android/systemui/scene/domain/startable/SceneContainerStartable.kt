@@ -90,6 +90,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -553,6 +554,7 @@ constructor(
                         targetSceneKey = Scenes.Lockscreen,
                         loggingReason = "device is starting to sleep",
                         sceneState = keyguardInteractor.asleepKeyguardState.value,
+                        freezeAndAnimateToCurrentState = true,
                     )
                 } else {
                     val canSwipeToEnter = deviceEntryInteractor.canSwipeToEnter.value
@@ -610,15 +612,24 @@ constructor(
 
     private fun handleShadeTouchability() {
         applicationScope.launch {
-            shadeInteractor.isShadeTouchable
-                .distinctUntilChanged()
-                .filter { !it }
-                .collect {
-                    switchToScene(
-                        targetSceneKey = Scenes.Lockscreen,
-                        loggingReason = "device became non-interactive (SceneContainerStartable)",
-                    )
+            repeatWhen(deviceEntryInteractor.isDeviceEntered.map { !it }) {
+                // Run logic only when the device isn't entered.
+                repeatWhen(
+                    sceneInteractor.transitionState.map { !it.isTransitioning(to = Scenes.Gone) }
+                ) {
+                    // Run logic only when not transitioning to gone.
+                    shadeInteractor.isShadeTouchable
+                        .distinctUntilChanged()
+                        .filter { !it }
+                        .collect {
+                            switchToScene(
+                                targetSceneKey = Scenes.Lockscreen,
+                                loggingReason =
+                                    "device became non-interactive (SceneContainerStartable)",
+                            )
+                        }
                 }
+            }
         }
     }
 
@@ -923,11 +934,13 @@ constructor(
         targetSceneKey: SceneKey,
         loggingReason: String,
         sceneState: Any? = null,
+        freezeAndAnimateToCurrentState: Boolean = false,
     ) {
         sceneInteractor.changeScene(
             toScene = targetSceneKey,
             loggingReason = loggingReason,
             sceneState = sceneState,
+            forceSettleToTargetScene = freezeAndAnimateToCurrentState,
         )
     }
 
@@ -1009,6 +1022,14 @@ constructor(
                         "Exited trusted environment while not device not entered"
                     )
                 }
+            }
+        }
+    }
+
+    private suspend fun repeatWhen(condition: Flow<Boolean>, block: suspend () -> Unit) {
+        condition.distinctUntilChanged().collectLatest { conditionMet ->
+            if (conditionMet) {
+                block()
             }
         }
     }

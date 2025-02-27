@@ -86,6 +86,11 @@ public class DisplayManagerFlags {
             com.android.graphics.surfaceflinger.flags.Flags.FLAG_DISPLAY_CONFIG_ERROR_HAL,
             com.android.graphics.surfaceflinger.flags.Flags::displayConfigErrorHal);
 
+    private final FlagState mSyncedResolutionSwitch = new FlagState(
+            com.android.graphics.surfaceflinger.flags.Flags.FLAG_SYNCED_RESOLUTION_SWITCH,
+            com.android.graphics.surfaceflinger.flags.Flags::syncedResolutionSwitch
+    );
+
     private final FlagState mBrightnessIntRangeUserPerceptionFlagState = new FlagState(
             Flags.FLAG_BRIGHTNESS_INT_RANGE_USER_PERCEPTION,
             Flags::brightnessIntRangeUserPerception);
@@ -150,11 +155,6 @@ public class DisplayManagerFlags {
     private final FlagState mDozeBrightnessFloat = new FlagState(
             Flags.FLAG_DOZE_BRIGHTNESS_FLOAT,
             Flags::dozeBrightnessFloat);
-
-    private final FlagState mOffloadControlsDozeAutoBrightness = new FlagState(
-            Flags.FLAG_OFFLOAD_CONTROLS_DOZE_AUTO_BRIGHTNESS,
-            Flags::offloadControlsDozeAutoBrightness
-    );
 
     private final FlagState mPeakRefreshRatePhysicalLimit = new FlagState(
             Flags.FLAG_ENABLE_PEAK_REFRESH_RATE_PHYSICAL_LIMIT,
@@ -275,6 +275,11 @@ public class DisplayManagerFlags {
             Flags::refreshRateEventForForegroundApps
     );
 
+    private final FlagState mCommittedStateSeparateEvent = new FlagState(
+            Flags.FLAG_COMMITTED_STATE_SEPARATE_EVENT,
+            Flags::committedStateSeparateEvent
+    );
+
     /**
      * @return {@code true} if 'port' is allowed in display layout configuration file.
      */
@@ -359,6 +364,10 @@ public class DisplayManagerFlags {
         return mDisplayConfigErrorHalFlagState.isEnabled();
     }
 
+    public boolean isSyncedResolutionSwitchEnabled() {
+        return mSyncedResolutionSwitch.isEnabled();
+    }
+
     public boolean isBrightnessIntRangeUserPerceptionEnabled() {
         return mBrightnessIntRangeUserPerceptionFlagState.isEnabled();
     }
@@ -424,13 +433,6 @@ public class DisplayManagerFlags {
 
     public boolean isDozeBrightnessFloatEnabled() {
         return mDozeBrightnessFloat.isEnabled();
-    }
-
-    /**
-     * @return Whether DisplayOffload should control auto-brightness in doze
-     */
-    public boolean offloadControlsDozeAutoBrightness() {
-        return mOffloadControlsDozeAutoBrightness.isEnabled();
     }
 
     public boolean isPeakRefreshRatePhysicalLimitEnabled() {
@@ -594,6 +596,14 @@ public class DisplayManagerFlags {
     }
 
     /**
+     * @return {@code true} if the flag for having a separate event for display's committed state
+     * is enabled
+     */
+    public boolean isCommittedStateSeparateEventEnabled() {
+        return mCommittedStateSeparateEvent.isEnabled();
+    }
+
+    /**
      * dumps all flagstates
      * @param pw printWriter
      */
@@ -611,6 +621,7 @@ public class DisplayManagerFlags {
         pw.println(" " + mEvenDimmerFlagState);
         pw.println(" " + mSmallAreaDetectionFlagState);
         pw.println(" " + mDisplayConfigErrorHalFlagState);
+        pw.println(" " + mSyncedResolutionSwitch);
         pw.println(" " + mBrightnessIntRangeUserPerceptionFlagState);
         pw.println(" " + mRestrictDisplayModes);
         pw.println(" " + mBrightnessWearBedtimeModeClamperFlagState);
@@ -624,7 +635,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mResolutionBackupRestore);
         pw.println(" " + mUseFusionProxSensor);
         pw.println(" " + mDozeBrightnessFloat);
-        pw.println(" " + mOffloadControlsDozeAutoBrightness);
         pw.println(" " + mPeakRefreshRatePhysicalLimit);
         pw.println(" " + mIgnoreAppPreferredRefreshRate);
         pw.println(" " + mSynthetic60hzModes);
@@ -649,6 +659,7 @@ public class DisplayManagerFlags {
         pw.println(" " + mBaseDensityForExternalDisplays);
         pw.println(" " + mFramerateOverrideTriggersRrCallbacks);
         pw.println(" " + mRefreshRateEventForForegroundApps);
+        pw.println(" " + mCommittedStateSeparateEvent);
     }
 
     private static class FlagState {

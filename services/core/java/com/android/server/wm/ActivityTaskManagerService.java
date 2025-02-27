@@ -286,6 +286,7 @@ import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
+import com.android.server.wm.utils.WindowStyleCache;
 import com.android.wm.shell.Flags;
 
 import java.io.BufferedReader;
@@ -500,6 +501,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     boolean mSuppressResizeConfigChanges;
 
+    private final WindowStyleCache<ActivityRecord.WindowStyle> mWindowStyleCache =
+            new WindowStyleCache<>(ActivityRecord.WindowStyle::new);
     final UpdateConfigurationResult mTmpUpdateConfigurationResult =
             new UpdateConfigurationResult();
 
@@ -4132,22 +4135,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     @Override
     public void registerRemoteAnimationsForDisplay(int displayId,
             RemoteAnimationDefinition definition) {
-        mAmInternal.enforceCallingPermission(CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS,
-                "registerRemoteAnimations");
-        definition.setCallingPidUid(Binder.getCallingPid(), Binder.getCallingUid());
-        synchronized (mGlobalLock) {
-            final DisplayContent display = mRootWindowContainer.getDisplayContent(displayId);
-            if (display == null) {
-                Slog.e(TAG, "Couldn't find display with id: " + displayId);
-                return;
-            }
-            final long origId = Binder.clearCallingIdentity();
-            try {
-                display.registerRemoteAnimations(definition);
-            } finally {
-                Binder.restoreCallingIdentity(origId);
-            }
-        }
+        // TODO(b/365884835): Remove callers.
     }
 
     /** @see android.app.ActivityManager#alwaysShowUnsupportedCompileSdkWarning */
@@ -5603,6 +5591,16 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return mUserManagerInternal;
     }
 
+    @Nullable
+    ActivityRecord.WindowStyle getWindowStyle(String packageName, int theme, int userId) {
+        if (!com.android.window.flags.Flags.cacheWindowStyle()) {
+            final AttributeCache.Entry ent = AttributeCache.instance().get(packageName,
+                    theme, com.android.internal.R.styleable.Window, userId);
+            return ent != null ? new ActivityRecord.WindowStyle(ent.array) : null;
+        }
+        return mWindowStyleCache.get(packageName, theme, userId);
+    }
+
     AppWarnings getAppWarningsLocked() {
         return mAppWarnings;
     }
@@ -6551,6 +6549,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 mCompatModePackages.handlePackageUninstalledLocked(name);
                 mPackageConfigPersister.onPackageUninstall(name, userId);
             }
+            mWindowStyleCache.invalidatePackage(name);
         }
 
         @Override
@@ -6567,6 +6566,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (mRootWindowContainer == null) return;
                 mRootWindowContainer.updateActivityApplicationInfo(aInfo);
             }
+            mWindowStyleCache.invalidatePackage(aInfo.packageName);
         }
 
         @Override
@@ -7463,6 +7463,18 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLock) {
                 return getLockTaskController().isBaseOfLockedTask(packageName);
             }
+        }
+
+        @Override
+        public boolean isNoDisplay(String packageName, int theme, int userId) {
+            if (!com.android.window.flags.Flags.cacheWindowStyle()) {
+                final AttributeCache.Entry ent = AttributeCache.instance()
+                        .get(packageName, theme, R.styleable.Window, userId);
+                return ent != null
+                        && ent.array.getBoolean(R.styleable.Window_windowNoDisplay, false);
+            }
+            final ActivityRecord.WindowStyle style = getWindowStyle(packageName, theme, userId);
+            return style != null && style.noDisplay();
         }
 
         @Override

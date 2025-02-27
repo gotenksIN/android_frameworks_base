@@ -48,6 +48,8 @@ import com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTIO
 import com.android.systemui.statusbar.NotificationRemoteInputManager
 import com.android.systemui.statusbar.notification.ConversationNotificationProcessor
 import com.android.systemui.statusbar.notification.InflationException
+import com.android.systemui.statusbar.notification.NmSummarizationUiFlag
+import com.android.systemui.statusbar.notification.collection.EntryAdapter
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationContentExtractor
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
@@ -75,6 +77,7 @@ import com.android.systemui.statusbar.notification.row.shared.NotificationConten
 import com.android.systemui.statusbar.notification.row.shared.NotificationRowContentBinderRefactor
 import com.android.systemui.statusbar.notification.row.ui.viewbinder.SingleLineViewBinder
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationViewWrapper
+import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.statusbar.notification.stack.NotificationChildrenContainer
 import com.android.systemui.statusbar.policy.InflatedSmartReplyState
 import com.android.systemui.statusbar.policy.InflatedSmartReplyViewHolder
@@ -535,7 +538,7 @@ constructor(
             val ident: String = (sbn.packageName + "/0x" + Integer.toHexString(sbn.id))
             Log.e(TAG, "couldn't inflate view for notification $ident", e)
             callback?.handleInflationException(
-                row.entry,
+                if (NotificationBundleUi.isEnabled) entry else row.entry,
                 InflationException("Couldn't inflate contentViews$e"),
             )
 
@@ -553,11 +556,11 @@ constructor(
             logger.logAsyncTaskProgress(entry, "aborted")
         }
 
-        override fun handleInflationException(entry: NotificationEntry, e: Exception) {
+        override fun handleInflationException(e: Exception) {
             handleError(e)
         }
 
-        override fun onAsyncInflationFinished(entry: NotificationEntry) {
+        override fun onAsyncInflationFinished() {
             this.entry.onInflationTaskFinished()
             row.onNotificationUpdated()
             callback?.onAsyncInflationFinished(this.entry)
@@ -700,7 +703,7 @@ constructor(
 
             // process conversations and extract the messaging style
             val messagingStyle =
-                if (entry.ranking.isConversation) {
+                if (NmSummarizationUiFlag.isEnabled || entry.ranking.isConversation) {
                     conversationProcessor.processNotification(entry, builder, logger)
                 } else null
 
@@ -730,9 +733,8 @@ constructor(
                         builder = builder,
                         systemUiContext = systemUiContext,
                         redactText = false,
-                        summarization = entry.sbn.notification.extras.getCharSequence(
-                            EXTRA_SUMMARIZED_CONTENT,
-                        )
+                        summarization =
+                            entry.sbn.notification.extras.getCharSequence(EXTRA_SUMMARIZED_CONTENT),
                     )
                 } else null
 
@@ -752,7 +754,7 @@ constructor(
                             summarization = null,
                         )
                     } else {
-                        SingleLineViewInflater.inflateRedactedSingleLineViewModel(
+                        SingleLineViewInflater.inflatePublicSingleLineViewModel(
                             systemUiContext,
                             entry.ranking.isConversation,
                         )
@@ -790,7 +792,7 @@ constructor(
             val redacted = Notification.Builder(packageContext, original.channelId)
             redacted.setContentTitle(original.extras.getCharSequence(Notification.EXTRA_TITLE))
             val redactedMessage =
-                sysUiContext.getString(R.string.redacted_notification_single_line_text)
+                sysUiContext.getString(R.string.redacted_otp_notification_single_line_text)
 
             if (originalStyle is MessagingStyle) {
                 val newStyle = MessagingStyle(originalStyle.user)

@@ -171,6 +171,7 @@ import android.view.InsetsState;
 import android.view.SurfaceControl;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
 import android.window.ITaskOrganizer;
 import android.window.PictureInPictureSurfaceTransaction;
@@ -512,9 +513,6 @@ class Task extends TaskFragment {
      * for the specific app.
      */
     boolean mAllowForceResizeOverride = true;
-
-    private final AnimatingActivityRegistry mAnimatingActivityRegistry =
-            new AnimatingActivityRegistry();
 
     private static final int TRANSLUCENT_TIMEOUT_MSG = FIRST_ACTIVITY_TASK_MSG + 1;
 
@@ -1130,17 +1128,6 @@ class Task extends TaskFragment {
         // already ran fully within super.onParentChanged
         updateTaskOrganizerState();
 
-        // TODO(b/168037178): The check for null display content and setting it to null doesn't
-        //                    really make sense here...
-
-        // TODO(b/168037178): This is mostly taking care of the case where the stask is removing
-        //                    from the display, so we should probably consolidate it there instead.
-
-        if (getParent() == null && mDisplayContent != null) {
-            mDisplayContent = null;
-            mWmService.mWindowPlacerLocked.requestTraversal();
-        }
-
         if (oldParent != null) {
             final Task oldParentTask = oldParent.asTask();
             if (oldParentTask != null) {
@@ -1193,9 +1180,6 @@ class Task extends TaskFragment {
         }
 
         mRootWindowContainer.updateUIDsPresentOnDisplay();
-
-        // Ensure all animations are finished at same time in split-screen mode.
-        forAllActivities(ActivityRecord::updateAnimatingActivityRegistry);
     }
 
     @Override
@@ -2073,7 +2057,7 @@ class Task extends TaskFragment {
         }
 
         if (shouldStartChangeTransition(prevWinMode, mTmpPrevBounds)) {
-            initializeChangeTransition(mTmpPrevBounds);
+            mTransitionController.collectVisibleChange(this);
         }
 
         // If the configuration supports persistent bounds (eg. Freeform), keep track of the
@@ -2424,7 +2408,7 @@ class Task extends TaskFragment {
         // configurations and let its parent (organized task) to control it;
         final Task rootTask = getRootTask();
         boolean shouldInheritBounds = rootTask != this && rootTask.isOrganized();
-        if (Flags.enableMultipleDesktopsBackend()) {
+        if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()) {
             // Only inherit from organized parent when this task is not organized.
             shouldInheritBounds &= !isOrganized();
         }
@@ -2799,6 +2783,7 @@ class Task extends TaskFragment {
         }
 
         super.removeImmediately();
+        mDisplayContent = null;
         mRemoving = false;
     }
 
@@ -3373,13 +3358,6 @@ class Task extends TaskFragment {
         }
         mLastSurfaceShowing = show;
     }
-
-    @Override
-    void dump(PrintWriter pw, String prefix, boolean dumpAll) {
-        super.dump(pw, prefix, dumpAll);
-        mAnimatingActivityRegistry.dump(pw, "AnimatingApps:", prefix);
-    }
-
 
     /**
      * Fills in a {@link TaskInfo} with information from this task. Note that the base intent in the
@@ -6350,10 +6328,6 @@ class Task extends TaskFragment {
 
     public DisplayInfo getDisplayInfo() {
         return mDisplayContent.getDisplayInfo();
-    }
-
-    AnimatingActivityRegistry getAnimatingActivityRegistry() {
-        return mAnimatingActivityRegistry;
     }
 
     public void onARStopTriggered(ActivityRecord r) {

@@ -698,7 +698,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                         /* isValidated= */ false,
                         /* level= */ 0,
                         /* ssid= */ "",
-                        /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE));
+                        /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE,
+                        /* wifiStandard= */0));
         assertTrue(mWifiRepository.isWifiConnectedWithValidSsid());
 
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();
@@ -737,7 +738,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                         /* isValidated= */ false,
                         /* level= */ 0,
                         /* ssid= */ "",
-                        /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE));
+                        /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE,
+                        /* wifiStandard= */0));
         assertTrue(mWifiRepository.isWifiConnectedWithValidSsid());
 
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();

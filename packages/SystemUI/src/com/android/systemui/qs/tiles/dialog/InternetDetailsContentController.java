@@ -1334,24 +1334,30 @@ public class InternetDetailsContentController implements AccessPointController.A
     public void onSettingsActivityTriggered(Intent settingsIntent) {
     }
 
-    private void registerTelephonyCallbackOnNddsSub() {
+    private void registerTelephonyCallbackOnNddsSub(int previousNddsSubId) {
         if (SubscriptionManager.isUsableSubscriptionId(mNddsSubId)) {
-            TelephonyCallback telephonyCallback = createNddsSubTelephonyCallback(mNddsSubId);
-            if (!mSubIdTelephonyCallbackMap.containsKey(mNddsSubId)) {
+            boolean needUpdateCallback = false;
+            if (previousNddsSubId != mNddsSubId) {
+                if (mSubIdTelephonyCallbackMap.containsKey(previousNddsSubId)) {
+                    unRegisterCallback(previousNddsSubId);
+                    Log.d(TAG, "unregister for old  Ndds : " + previousNddsSubId);
+                }
+                needUpdateCallback = true;
+            } else if (needChangeCallback()){
+                needUpdateCallback = true;
+            }
+
+            if (needUpdateCallback) {
+                if (mSubIdTelephonyCallbackMap.containsKey(mNddsSubId)) {
+                    unRegisterCallback(mNddsSubId);
+                    Log.d(TAG, "unregister old callback for new Ndds : " + mNddsSubId);
+                }
+                TelephonyCallback telephonyCallback = createNddsSubTelephonyCallback(mNddsSubId);
                 TelephonyManager nDdsSubTm = mTelephonyManager.createForSubscriptionId(mNddsSubId);
                 nDdsSubTm.registerTelephonyCallback(mExecutor, telephonyCallback);
                 mSubIdTelephonyCallbackMap.put(mNddsSubId, telephonyCallback);
                 mSubIdTelephonyManagerMap.put(mNddsSubId, nDdsSubTm);
-                Log.d(TAG, "registerTelephonyCallOnNddsSub on SUB: " + mNddsSubId);
-            } else {
-                TelephonyCallback oldTelephonyCallback = mSubIdTelephonyCallbackMap.get(mNddsSubId);
-                if (!oldTelephonyCallback.getClass().equals(telephonyCallback.getClass())) {
-                    Log.d(TAG, "registerTelephonyCallOnNddsSub refreshing on SUB: " + mNddsSubId);
-                    TelephonyManager nDdsSubTm = mSubIdTelephonyManagerMap.get(mNddsSubId);
-                    nDdsSubTm.unregisterTelephonyCallback(oldTelephonyCallback);
-                    nDdsSubTm.registerTelephonyCallback(mExecutor, telephonyCallback);
-                    mSubIdTelephonyCallbackMap.put(mNddsSubId, telephonyCallback);
-                }
+                Log.d(TAG, "register for nDDS: " + mNddsSubId);
             }
         } else {
             // Prune stale SUBs
@@ -1393,6 +1399,9 @@ public class InternetDetailsContentController implements AccessPointController.A
         public void onDataEnabledChanged(boolean enabled,
                 @TelephonyManager.DataEnabledChangedReason int reason) {
             mIsNddsDataEnabled = enabled;
+            if (mCallback != null) {
+                mCallback.onDataEnabledChanged();
+            }
             Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
        }
     }
@@ -1417,6 +1426,9 @@ public class InternetDetailsContentController implements AccessPointController.A
         public void onDataEnabledChanged(boolean enabled,
                 @TelephonyManager.DataEnabledChangedReason int reason) {
             mIsNddsDataEnabled = enabled;
+            if (mCallback != null) {
+                mCallback.onDataEnabledChanged();
+            }
             Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
        }
     }
@@ -1505,6 +1517,9 @@ public class InternetDetailsContentController implements AccessPointController.A
         public void onDataEnabledChanged(boolean b, int i) {
             if (mSubId == mDefaultDataSubId) {
                 mIsMobileDataEnabled = b;
+            }
+            if (mCallback != null) {
+                mCallback.onDataEnabledChanged();
             }
         }
     }
@@ -1653,7 +1668,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         }
 
         if (SubscriptionManager.isUsableSubscriptionId(defaultDataSubId)) {
-            updateNddsSubId(defaultDataSubId);
             // clean up old defaultDataSubId
             TelephonyCallback oldCallback = mSubIdTelephonyCallbackMap.get(mDefaultDataSubId);
             if (oldCallback != null) {
@@ -1665,6 +1679,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             mSubIdTelephonyDisplayInfoMap.remove(mDefaultDataSubId);
             mSubIdTelephonyManagerMap.remove(mDefaultDataSubId);
 
+            updateNddsSubId(defaultDataSubId);
             // create for new defaultDataSubId
             mTelephonyManager = mTelephonyManager.createForSubscriptionId(defaultDataSubId);
             mSubIdTelephonyManagerMap.put(defaultDataSubId, mTelephonyManager);
@@ -1714,6 +1729,7 @@ public class InternetDetailsContentController implements AccessPointController.A
 
     private void updateNddsSubId(int defaultDataSubId) {
         // update mNddsSubId
+        int previousNddsSubId = mNddsSubId;
         mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         List<SubscriptionInfo> subInfos =
                 mSubscriptionManager.getActiveSubscriptionInfoList();
@@ -1724,7 +1740,7 @@ public class InternetDetailsContentController implements AccessPointController.A
                 }
             }
         }
-        registerTelephonyCallbackOnNddsSub();
+        registerTelephonyCallbackOnNddsSub(previousNddsSubId);
     }
 
     public boolean isDualDataEnabled() {
@@ -1831,6 +1847,8 @@ public class InternetDetailsContentController implements AccessPointController.A
         void onWifiScan(boolean isScan);
 
         void onFiveGStateOverride();
+
+        default void onDataEnabledChanged() {}
     }
 
     private class FiveGStateMonitor implements IFiveGStateListener {
@@ -1944,5 +1962,24 @@ public class InternetDetailsContentController implements AccessPointController.A
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         WifiDppIntentHelper.setConfiguratorIntentExtra(intent, mWifiManager, wifiConfiguration);
         return intent;
+    }
+
+    private void unRegisterCallback (int subId) {
+        TelephonyCallback callback = mSubIdTelephonyCallbackMap.get(subId);
+        TelephonyManager telephonyManager = mSubIdTelephonyManagerMap.get(subId);
+        if (callback != null && telephonyManager != null) {
+            telephonyManager.unregisterTelephonyCallback(callback);
+
+        }
+        mSubIdTelephonyCallbackMap.remove(subId);
+    }
+
+    private boolean needChangeCallback() {
+        TelephonyCallback oldCallback = mSubIdTelephonyCallbackMap.get(mNddsSubId);
+        if (oldCallback != null) {
+            return oldCallback.getClass() != (isDualDataEnabled() ?
+                    NonDdsInternetTelephonyCallback.class : NonDdsCallStateCallback.class);
+        }
+        return true;
     }
 }

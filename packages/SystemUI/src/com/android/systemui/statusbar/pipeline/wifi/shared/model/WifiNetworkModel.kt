@@ -248,7 +248,7 @@ sealed class WifiNetworkModel : Diffable<WifiNetworkModel> {
 
 // QTI_BEGIN: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
         /** See [android.net.wifi.WifiInfo.getWifiStandard]. */
-        val wifiStandard: Int? = 0,
+        val wifiStandard: Int?,
 // QTI_END: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
     ) : WifiNetworkModel() {
         companion object {
@@ -262,11 +262,12 @@ sealed class WifiNetworkModel : Diffable<WifiNetworkModel> {
                 level: Int,
                 ssid: String? = null,
                 hotspotDeviceType: HotspotDeviceType = HotspotDeviceType.NONE,
+                wifiStandard: Int? = 0,
             ): WifiNetworkModel {
                 if (!level.isValid()) {
                     return Inactive(getInvalidLevelErrorString(level))
                 }
-                return Active(isValidated, level, ssid, hotspotDeviceType)
+                return Active(isValidated, level, ssid, hotspotDeviceType, wifiStandard)
             }
 
             private fun Int.isValid(): Boolean {

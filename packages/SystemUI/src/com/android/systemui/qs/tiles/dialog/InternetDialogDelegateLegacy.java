@@ -1372,6 +1372,11 @@ public class InternetDialogDelegateLegacy implements
         mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
     }
 
+    @Override
+    public void onDataEnabledChanged() {
+        mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
+    }
+
     private void updateCiwlanConfigs() {
         if (mExtTelephonyManager != null) {
             try {

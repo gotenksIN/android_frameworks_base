@@ -50,6 +50,7 @@ import android.annotation.AppIdInt;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SpecialUsers.CanBeALL;
 import android.annotation.StringRes;
 import android.annotation.UserIdInt;
 import android.annotation.WorkerThread;
@@ -1596,7 +1597,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         scheduleWritePackageRestrictions(userId);
     }
 
-    void scheduleWritePackageRestrictions(int userId) {
+    void scheduleWritePackageRestrictions(@CanBeALL @UserIdInt int userId) {
         invalidatePackageInfoCache();
         if (userId == UserHandle.USER_ALL) {
             synchronized (mDirtyUsers) {
@@ -3115,7 +3116,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     @NonNull
-    int[] resolveUserIds(int userId) {
+    int[] resolveUserIds(@CanBeALL @UserIdInt int userId) {
         return (userId == UserHandle.USER_ALL) ? mUserManager.getUserIds() : new int[] { userId };
     }
 
@@ -3153,7 +3154,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     void killApplication(String pkgName, @AppIdInt int appId,
-            @UserIdInt int userId, String reason, int exitInfoReason) {
+            @CanBeALL @UserIdInt int userId, String reason, int exitInfoReason) {
         // Request the ActivityManager to kill the process(only for existing packages)
         // so that we do not end up in a confused state while the user is still using the older
         // version of the application while the new one gets installed.
@@ -3172,7 +3173,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     void killApplicationSync(String pkgName, @AppIdInt int appId,
-            @UserIdInt int userId, String reason, int exitInfoReason) {
+            @CanBeALL @UserIdInt int userId, String reason, int exitInfoReason) {
         ActivityManagerInternal mAmi = LocalServices.getService(ActivityManagerInternal.class);
         if (Thread.holdsLock(mLock) || mAmi == null) {
             // holds PM's lock, go back killApplication to avoid it run into watchdog reset.
@@ -3426,7 +3427,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     // TODO(b/261957226): centralise this logic in DPM
-    boolean isPackageDeviceAdmin(String packageName, int userId) {
+    boolean isPackageDeviceAdmin(String packageName, @CanBeALL @UserIdInt int userId) {
         final IDevicePolicyManager dpm = getDevicePolicyManager();
         final DevicePolicyManagerInternal dpmi =
                 mInjector.getLocalService(DevicePolicyManagerInternal.class);
@@ -3596,7 +3597,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     /** This method takes a specific user id as well as UserHandle.USER_ALL. */
     @GuardedBy("mLock")
     void clearPackagePreferredActivitiesLPw(String packageName,
-            @NonNull SparseBooleanArray outUserChanged, int userId) {
+            @NonNull SparseBooleanArray outUserChanged, @CanBeALL @UserIdInt int userId) {
         mSettings.clearPackagePreferredActivities(packageName, outUserChanged, userId);
     }
 
@@ -4432,14 +4433,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
     }
 
-    public PackageFreezer freezePackage(String packageName, int userId, String killReason,
-            int exitInfoReason, InstallRequest request) {
+    public PackageFreezer freezePackage(String packageName, @CanBeALL @UserIdInt int userId,
+            String killReason, int exitInfoReason, InstallRequest request) {
         return freezePackage(packageName, userId, killReason, exitInfoReason, request,
                 /* waitAppKilled= */ false);
     }
 
-    private PackageFreezer freezePackage(String packageName, int userId, String killReason,
-            int exitInfoReason, InstallRequest request, boolean waitAppKilled) {
+    private PackageFreezer freezePackage(String packageName, @CanBeALL @UserIdInt int userId,
+            String killReason, int exitInfoReason, InstallRequest request, boolean waitAppKilled) {
         return new PackageFreezer(packageName, userId, killReason, this, exitInfoReason, request,
                 waitAppKilled);
     }

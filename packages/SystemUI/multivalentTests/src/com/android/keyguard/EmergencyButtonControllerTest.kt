@@ -103,7 +103,7 @@ class EmergencyButtonControllerTest : SysuiTestCase() {
     fun testUpdateEmergencyButton() {
         Mockito.`when`(telecomManager.isInCall).thenReturn(true)
         Mockito.`when`(lockPatternUtils.isSecure(anyInt())).thenReturn(true)
-        Mockito.`when`(packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY))
+        Mockito.`when`(packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_CALLING))
             .thenReturn(true)
         underTest.updateEmergencyCallButton()
         backgroundExecutor.runAllReady()

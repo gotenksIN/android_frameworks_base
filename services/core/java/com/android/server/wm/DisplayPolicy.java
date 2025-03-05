@@ -878,7 +878,6 @@ public class DisplayPolicy {
                 mHandler.post(mAppTransitionFinished);
             }
         };
-        displayContent.mAppTransition.registerListenerLocked(mAppTransitionListener);
         displayContent.mTransitionController.registerLegacyListener(mAppTransitionListener);
 
         // TODO: Make it can take screenshot on external display

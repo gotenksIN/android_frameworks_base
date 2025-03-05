@@ -72,6 +72,8 @@ constructor(
     @VisibleForTesting
     val reuseCache = ConcurrentHashMap<Int, Pair<MobileIconViewModel, CoroutineScope>>()
 
+    val activeMobileDataSubscriptionId: StateFlow<Int?> = interactor.activeMobileDataSubscriptionId
+
 // QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions

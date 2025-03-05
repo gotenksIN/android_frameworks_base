@@ -2118,10 +2118,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 removeRootTasksInWindowingModes(WINDOWING_MODE_PINNED);
             }
 
-            // Set a transition to ensure that we don't immediately try and update the visibility
-            // of the activity entering PIP
-            r.getDisplayContent().prepareAppTransition(TRANSIT_NONE);
-
             transitionController.collect(task);
 
             // Defer the windowing mode change until after the transition to prevent the activity

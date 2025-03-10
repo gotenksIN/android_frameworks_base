@@ -49,6 +49,7 @@ import android.media.AudioManager;
 import android.media.AudioManager.AudioDeviceCategory;
 import android.media.AudioSystem;
 import android.media.BluetoothProfileConnectionInfo;
+import android.telecom.TelecomManager;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.UserHandle;
@@ -773,7 +774,12 @@ public class BtHelper {
 // QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
         mScoAudioState = SCO_STATE_INACTIVE;
         broadcastScoConnectionState(AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
-        mDeviceBroker.clearA2dpSuspended(false /* internalOnly */);
+
+        TelecomManager telecomManager =
+                (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
+        if (telecomManager == null || !telecomManager.isInCall()) {
+            mDeviceBroker.clearA2dpSuspended(false /* internalOnly */);
+        }
         mDeviceBroker.clearLeAudioSuspended(false /* internalOnly */);
         mScoClientDevices.clear();
         mDeviceBroker.setBluetoothScoOn(false, "resetBluetoothSco");

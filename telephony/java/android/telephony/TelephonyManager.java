@@ -679,62 +679,8 @@ public class TelephonyManager {
         static final int UNSUPPORTED = 4;
     }
 
-    /**
-     * Returns true if concurrent calls on both subscriptions are possible (ex: DSDA).
-     * Returns false for other cases.
-     */
-    /** {@hide} */
-    public static boolean isConcurrentCallsPossible() {
-        int mSimVoiceConfig = TelephonyProperties.multi_sim_voice_capability().orElse(
-                MultiSimVoiceCapability.UNKNOWN);
-        return mSimVoiceConfig == MultiSimVoiceCapability.DSDA;
-    }
-
 // QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
 // QTI_BEGIN: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
-
-    /**
-     * Returns true if device is in DSDA mode where concurrent calls on both subscriptions are
-     * possible or if device is in a mode that supports DSDA features ex.DSDS Transition mode
-     * Returns false for other cases.
-     */
-    /** {@hide} */
-    public boolean isDsdaOrDsdsTransitionMode() {
-        return isConcurrentCallsPossible() || isDsdsTransitionMode();
-    }
-
-    /**
-     * DSDS Transition mode is a mode when the device in DSDA transitions into DSDS mode due
-     * to temporary RAT changes while still retaining the calls on both subscriptions.
-     * In this mode, incoming calls and call swap work like DSDA mode but outgoing concurrent
-     * calls are only allowed on the subscription that has a call in ACTIVE state. Outgoing
-     * calls made on the subscription with call(s) in non-ACTIVE state will result in framework
-     * disconnecting calls on the other subscription.
-     * This API is not guaranteed to work when invoked from ImsPhoneCallTracker as the call states
-     * might not be updated at the time of invocation.
-     *
-     * Returns true if there are calls on both subscriptions in DSDS mode
-     * Returns false otherwise
-     */
-    /** {@hide} */
-    public boolean isDsdsTransitionMode() {
-        if (!isDsdsTransitionSupported()) {
-            return false;
-        }
-
-        if (TelephonyProperties.multi_sim_voice_capability().orElse(
-                MultiSimVoiceCapability.UNKNOWN) != MultiSimVoiceCapability.DSDS) {
-            return false;
-        }
-
-        for (int i = 0; i < getActiveModemCount(); i++) {
-            if (getCallState(SubscriptionManager.getSubscriptionId(i))== CALL_STATE_IDLE) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /**
      * Returns true if on multisim devices, DSDA features are supported in non-DSDA modes
      * Returns false otherwise
@@ -745,19 +691,7 @@ public class TelephonyManager {
     }
 
 // QTI_END: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
-// QTI_BEGIN: 2023-03-19: Telephony: DSDA: Add API to support DSDS transition use cases
-    /**
-     * Returns true if Multi SIM voice capability is DSDS.
-     * Returns false for other cases.
-     */
-    /** {@hide} */
-    public static boolean isDsdsMode() {
-        int mSimVoiceConfig = TelephonyProperties.multi_sim_voice_capability().orElse(
-                MultiSimVoiceCapability.UNKNOWN);
-        return mSimVoiceConfig == MultiSimVoiceCapability.DSDS;
-    }
 
-// QTI_END: 2023-03-19: Telephony: DSDA: Add API to support DSDS transition use cases
     /**
      * Returns the number of phones available.
      *

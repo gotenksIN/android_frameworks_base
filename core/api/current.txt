@@ -16993,7 +16993,7 @@ package android.graphics {
     method public void setFilterBitmap(boolean);
     method public void setFlags(int);
     method public void setFontFeatureSettings(String);
-    method @FlaggedApi("com.android.text.flags.typeface_redesign_readonly") public boolean setFontVariationOverride(@Nullable String);
+    method @FlaggedApi("com.android.text.flags.typeface_redesign_readonly") public void setFontVariationOverride(@Nullable String);
     method public boolean setFontVariationSettings(String);
     method public void setHinting(int);
     method public void setLetterSpacing(float);
@@ -18112,7 +18112,7 @@ package android.graphics.drawable {
     method public void setThickness(@Px int);
     method public void setThicknessRatio(@FloatRange(from=0.0f, fromInclusive=false) float);
     method public void setUseLevel(boolean);
-    field @FlaggedApi("com.android.graphics.flags.gradient_drawable_shape_rounded_cap") public static final int ARC = 4; // 0x4
+    field @FlaggedApi("com.android.graphics.flags.gradient_drawable_shape_arc_for_rounded_cap") public static final int ARC = 4; // 0x4
     field public static final int LINE = 2; // 0x2
     field public static final int LINEAR_GRADIENT = 0; // 0x0
     field public static final int OVAL = 1; // 0x1
@@ -23332,12 +23332,12 @@ package android.media {
   public static final class MediaCodecInfo.CodecCapabilities {
     ctor public MediaCodecInfo.CodecCapabilities();
     method public static android.media.MediaCodecInfo.CodecCapabilities createFromProfileLevel(String, int, int);
-    method public android.media.MediaCodecInfo.AudioCapabilities getAudioCapabilities();
+    method @Nullable public android.media.MediaCodecInfo.AudioCapabilities getAudioCapabilities();
     method public android.media.MediaFormat getDefaultFormat();
-    method public android.media.MediaCodecInfo.EncoderCapabilities getEncoderCapabilities();
+    method @Nullable public android.media.MediaCodecInfo.EncoderCapabilities getEncoderCapabilities();
     method public int getMaxSupportedInstances();
     method public String getMimeType();
-    method public android.media.MediaCodecInfo.VideoCapabilities getVideoCapabilities();
+    method @Nullable public android.media.MediaCodecInfo.VideoCapabilities getVideoCapabilities();
     method public boolean isFeatureRequired(String);
     method public boolean isFeatureSupported(String);
     method public boolean isFormatSupported(android.media.MediaFormat);
@@ -46377,7 +46377,7 @@ package android.telephony {
     field public static final int OUT_OF_NETWORK = 11; // 0xb
     field public static final int OUT_OF_SERVICE = 18; // 0x12
     field public static final int POWER_OFF = 17; // 0x11
-    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int SATELLITE_ENABLED = 82; // 0x52
+    field public static final int SATELLITE_ENABLED = 82; // 0x52
     field public static final int SERVER_ERROR = 12; // 0xc
     field public static final int SERVER_UNREACHABLE = 9; // 0x9
     field public static final int TIMED_OUT = 13; // 0xd
@@ -47079,7 +47079,7 @@ package android.telephony {
     method public int getSubscriptionType();
     method public int getUsageSetting();
     method public boolean isEmbedded();
-    method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public boolean isOnlyNonTerrestrialNetwork();
+    method public boolean isOnlyNonTerrestrialNetwork();
     method public boolean isOpportunistic();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.SubscriptionInfo> CREATOR;
@@ -47530,7 +47530,7 @@ package android.telephony {
     field @Deprecated @FlaggedApi("com.android.internal.telephony.flags.deprecate_cdma") public static final int ERI_FLASH = 2; // 0x2
     field @Deprecated @FlaggedApi("com.android.internal.telephony.flags.deprecate_cdma") public static final int ERI_OFF = 1; // 0x1
     field @Deprecated @FlaggedApi("com.android.internal.telephony.flags.deprecate_cdma") public static final int ERI_ON = 0; // 0x0
-    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final String EVENT_DISPLAY_EMERGENCY_MESSAGE = "android.telephony.event.DISPLAY_EMERGENCY_MESSAGE";
+    field public static final String EVENT_DISPLAY_EMERGENCY_MESSAGE = "android.telephony.event.DISPLAY_EMERGENCY_MESSAGE";
     field public static final String EXTRA_ACTIVE_SIM_SUPPORTED_COUNT = "android.telephony.extra.ACTIVE_SIM_SUPPORTED_COUNT";
     field public static final String EXTRA_APN_PROTOCOL = "android.telephony.extra.APN_PROTOCOL";
     field public static final String EXTRA_APN_TYPE = "android.telephony.extra.APN_TYPE";
@@ -47539,8 +47539,8 @@ package android.telephony {
     field public static final String EXTRA_CARRIER_NAME = "android.telephony.extra.CARRIER_NAME";
     field public static final String EXTRA_DATA_FAIL_CAUSE = "android.telephony.extra.DATA_FAIL_CAUSE";
     field public static final String EXTRA_DEFAULT_NETWORK_AVAILABLE = "android.telephony.extra.DEFAULT_NETWORK_AVAILABLE";
-    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final String EXTRA_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE = "android.telephony.extra.EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE";
-    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final String EXTRA_EMERGENCY_CALL_TO_SATELLITE_LAUNCH_INTENT = "android.telephony.extra.EMERGENCY_CALL_TO_SATELLITE_LAUNCH_INTENT";
+    field public static final String EXTRA_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE = "android.telephony.extra.EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE";
+    field public static final String EXTRA_EMERGENCY_CALL_TO_SATELLITE_LAUNCH_INTENT = "android.telephony.extra.EMERGENCY_CALL_TO_SATELLITE_LAUNCH_INTENT";
     field public static final String EXTRA_HIDE_PUBLIC_SETTINGS = "android.telephony.extra.HIDE_PUBLIC_SETTINGS";
     field @Deprecated public static final String EXTRA_INCOMING_NUMBER = "incoming_number";
     field public static final String EXTRA_IS_REFRESH = "android.telephony.extra.IS_REFRESH";
@@ -53804,8 +53804,8 @@ package android.view {
     method @FlaggedApi("com.android.graphics.hwui.flags.limited_hdr") public void setDesiredHdrHeadroom(@FloatRange(from=0.0f, to=10000.0) float);
     method public void setSecure(boolean);
     method public void setSurfaceLifecycle(int);
-    method public void setZOrderMediaOverlay(boolean);
-    method public void setZOrderOnTop(boolean);
+    method @Deprecated @FlaggedApi("android.view.flags.deprecate_surface_view_z_order_apis") public void setZOrderMediaOverlay(boolean);
+    method @Deprecated @FlaggedApi("android.view.flags.deprecate_surface_view_z_order_apis") public void setZOrderOnTop(boolean);
     field public static final int SURFACE_LIFECYCLE_DEFAULT = 0; // 0x0
     field public static final int SURFACE_LIFECYCLE_FOLLOWS_ATTACHMENT = 2; // 0x2
     field public static final int SURFACE_LIFECYCLE_FOLLOWS_VISIBILITY = 1; // 0x1

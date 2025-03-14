@@ -44,6 +44,7 @@ import androidx.annotation.OptIn;
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.statusbar.IStatusBarService;
+import com.android.internal.util.LatencyTracker;
 import com.android.launcher3.icons.IconProvider;
 import com.android.window.flags.Flags;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
@@ -99,6 +100,7 @@ import com.android.wm.shell.desktopmode.DesktopTasksLimiter;
 import com.android.wm.shell.desktopmode.DesktopTasksTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler;
+import com.android.wm.shell.desktopmode.DragToDisplayTransitionHandler;
 import com.android.wm.shell.desktopmode.EnterDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.OverviewToDesktopTransitionObserver;
@@ -431,9 +433,10 @@ public abstract class WMShellModule {
             Transitions transitions,
             DisplayController displayController,
             @ShellMainThread ShellExecutor mainExecutor,
-            @ShellAnimationThread ShellExecutor animExecutor) {
+            @ShellAnimationThread ShellExecutor animExecutor,
+            @ShellAnimationThread Handler animHandler) {
         return new FreeformTaskTransitionHandler(
-                transitions, displayController, mainExecutor, animExecutor);
+                transitions, displayController, mainExecutor, animExecutor, animHandler);
     }
 
     @WMSingleton
@@ -768,7 +771,8 @@ public abstract class WMShellModule {
             DesksOrganizer desksOrganizer,
             DesksTransitionObserver desksTransitionObserver,
             UserProfileContexts userProfileContexts,
-            DesktopModeCompatPolicy desktopModeCompatPolicy) {
+            DesktopModeCompatPolicy desktopModeCompatPolicy,
+            DragToDisplayTransitionHandler dragToDisplayTransitionHandler) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -798,6 +802,7 @@ public abstract class WMShellModule {
                 recentTasksController.orElse(null),
                 interactionJankMonitor,
                 mainHandler,
+                focusTransitionObserver,
                 desktopModeEventLogger,
                 desktopModeUiEventLogger,
                 desktopWallpaperActivityTokenProvider,
@@ -806,7 +811,8 @@ public abstract class WMShellModule {
                 desksOrganizer,
                 desksTransitionObserver,
                 userProfileContexts,
-                desktopModeCompatPolicy);
+                desktopModeCompatPolicy,
+                dragToDisplayTransitionHandler);
     }
 
     @WMSingleton
@@ -928,6 +934,12 @@ public abstract class WMShellModule {
                 : new DefaultDragToDesktopTransitionHandler(
                         context, transitions, rootTaskDisplayAreaOrganizer, desktopUserRepositories,
                         interactionJankMonitor, bubbleController);
+    }
+
+    @WMSingleton
+    @Provides
+    static DragToDisplayTransitionHandler provideDragToDisplayTransitionHandler() {
+        return new DragToDisplayTransitionHandler();
     }
 
     @WMSingleton
@@ -1073,8 +1085,10 @@ public abstract class WMShellModule {
     static EnterDesktopTaskTransitionHandler provideEnterDesktopModeTaskTransitionHandler(
             Transitions transitions,
             Optional<DesktopTasksLimiter> desktopTasksLimiter,
-            InteractionJankMonitor interactionJankMonitor) {
-        return new EnterDesktopTaskTransitionHandler(transitions, interactionJankMonitor);
+            InteractionJankMonitor interactionJankMonitor,
+            LatencyTracker latencyTracker) {
+        return new EnterDesktopTaskTransitionHandler(
+                transitions, interactionJankMonitor, latencyTracker);
     }
 
     @WMSingleton
@@ -1101,8 +1115,9 @@ public abstract class WMShellModule {
             Context context,
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellAnimationThread ShellExecutor animExecutor,
-            @ShellMainThread Handler handler) {
-        return new CloseDesktopTaskTransitionHandler(context, mainExecutor, animExecutor, handler);
+            @ShellAnimationThread Handler animHandler) {
+        return new CloseDesktopTaskTransitionHandler(context, mainExecutor, animExecutor,
+                animHandler);
     }
 
     @WMSingleton
@@ -1110,9 +1125,10 @@ public abstract class WMShellModule {
     static DesktopMinimizationTransitionHandler provideDesktopMinimizationTransitionHandler(
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellAnimationThread ShellExecutor animExecutor,
-            DisplayController displayController) {
+            DisplayController displayController,
+            @ShellAnimationThread Handler mainHandler) {
         return new DesktopMinimizationTransitionHandler(mainExecutor, animExecutor,
-                displayController);
+                displayController, mainHandler);
     }
 
     @WMSingleton

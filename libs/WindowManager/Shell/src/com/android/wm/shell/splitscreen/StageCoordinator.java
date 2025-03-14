@@ -93,6 +93,7 @@ import android.app.ActivityManager;
 import android.app.ActivityOptions;
 import android.app.IActivityTaskManager;
 import android.app.PendingIntent;
+import android.app.PictureInPictureParams;
 import android.app.TaskInfo;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -122,6 +123,7 @@ import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.widget.Toast;
+import android.window.DesktopExperienceFlags;
 import android.window.DisplayAreaInfo;
 import android.window.RemoteTransition;
 import android.window.TransitionInfo;
@@ -220,6 +222,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     private final Context mContext;
     private final List<SplitScreen.SplitScreenListener> mListeners = new ArrayList<>();
     private final Set<SplitScreen.SplitSelectListener> mSelectListeners = new HashSet<>();
+    private final Transitions mTransitions;
     private final DisplayController mDisplayController;
     private final DisplayImeController mDisplayImeController;
     private final DisplayInsetsController mDisplayInsetsController;
@@ -420,6 +423,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     iconProvider,
                     mWindowDecorViewModel, STAGE_TYPE_SIDE);
         }
+        mTransitions = transitions;
         mDisplayController = displayController;
         mDisplayImeController = displayImeController;
         mDisplayInsetsController = displayInsetsController;
@@ -456,6 +460,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mTaskOrganizer = taskOrganizer;
         mMainStage = mainStage;
         mSideStage = sideStage;
+        mTransitions = transitions;
         mDisplayController = displayController;
         mDisplayImeController = displayImeController;
         mDisplayInsetsController = displayInsetsController;
@@ -661,16 +666,22 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         return mLogger;
     }
 
-    void requestEnterSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
+    @Nullable
+    IBinder requestEnterSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
             WindowContainerTransaction wct, int splitPosition, Rect taskBounds) {
         boolean enteredSplitSelect = false;
         for (SplitScreen.SplitSelectListener listener : mSelectListeners) {
             enteredSplitSelect |= listener.onRequestEnterSplitSelect(taskInfo, splitPosition,
                     taskBounds);
         }
-        if (enteredSplitSelect) {
-            mTaskOrganizer.applyTransaction(wct);
+        if (!enteredSplitSelect) {
+            return null;
         }
+        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()) {
+            mTaskOrganizer.applyTransaction(wct);
+            return null;
+        }
+        return mTransitions.startTransition(TRANSIT_CHANGE, wct, /* handler= */ null);
     }
 
     void startShortcut(String packageName, String shortcutId, @SplitPosition int position,
@@ -2070,8 +2081,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                             Math.max(topLeftBounds.top, 0);
                     bottomRightBounds.right =
                             Math.min(bottomRightBounds.right, mSplitLayout.getDisplayWidth());
-                    bottomRightBounds.top =
-                            Math.min(bottomRightBounds.top, mSplitLayout.getDisplayHeight());
+                    bottomRightBounds.bottom =
+                            Math.min(bottomRightBounds.bottom, mSplitLayout.getDisplayHeight());
 
                     // TODO (b/349828130): Can change to getState() fully after brief soak time.
                     if (mSplitState.get() != currentSnapPosition) {
@@ -2881,6 +2892,16 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     prepareEnterSplitScreen(out);
                     mSplitTransitions.setEnterTransition(transition, request.getRemoteTransition(),
                             TRANSIT_SPLIT_SCREEN_PAIR_OPEN, !mIsDropEntering);
+                } else if (isSplitScreenVisible() && isOpening) {
+                    // launching into an existing split stage; possibly launchAdjacent
+                    // If we're replacing a pip-able app, we need to let mixed handler take care of
+                    // it. Otherwise we'll just treat it as an enter+resize
+                    if (mSplitLayout.calculateCurrentSnapPosition() != SNAP_TO_2_50_50) {
+                        // updated layout will get applied in startAnimation pendingResize
+                        mSplitTransitions.setEnterTransition(transition,
+                                request.getRemoteTransition(),
+                                TRANSIT_SPLIT_SCREEN_OPEN_TO_SIDE, true /*resizeAnim*/);
+                    }
                 } else if (inFullscreen && isSplitScreenVisible()) {
                     // If the trigger task is in fullscreen and in split, exit split and place
                     // task on top

@@ -22,9 +22,10 @@ import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
 import android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED
 import android.content.ContentResolver
 import android.os.Binder
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.provider.Settings
 import android.provider.Settings.Global.DEVELOPMENT_FORCE_DESKTOP_MODE_ON_EXTERNAL_DISPLAYS
-import android.testing.AndroidTestingRunner
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.IWindowManager
 import android.view.WindowManager.TRANSIT_CHANGE
@@ -32,6 +33,7 @@ import android.window.DisplayAreaInfo
 import android.window.WindowContainerTransaction
 import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.never
+import com.android.window.flags.Flags
 import com.android.wm.shell.MockToken
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
@@ -40,6 +42,8 @@ import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider
 import com.android.wm.shell.transition.Transitions
 import com.google.common.truth.Truth.assertThat
+import com.google.testing.junit.testparameterinjector.TestParameter
+import com.google.testing.junit.testparameterinjector.TestParameterInjector
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,7 +63,7 @@ import org.mockito.kotlin.whenever
  * Usage: atest WMShellUnitTests:DesktopDisplayModeControllerTest
  */
 @SmallTest
-@RunWith(AndroidTestingRunner::class)
+@RunWith(TestParameterInjector::class)
 class DesktopDisplayModeControllerTest : ShellTestCase() {
     private val transitions = mock<Transitions>()
     private val rootTaskDisplayAreaOrganizer = mock<RootTaskDisplayAreaOrganizer>()
@@ -101,7 +105,7 @@ class DesktopDisplayModeControllerTest : ShellTestCase() {
     private fun testDisplayWindowingModeSwitch(
         defaultWindowingMode: Int,
         extendedDisplayEnabled: Boolean,
-        expectTransition: Boolean,
+        expectToSwitch: Boolean,
     ) {
         defaultTDA.configuration.windowConfiguration.windowingMode = defaultWindowingMode
         whenever(mockWindowManager.getWindowingMode(anyInt())).thenReturn(defaultWindowingMode)
@@ -113,10 +117,14 @@ class DesktopDisplayModeControllerTest : ShellTestCase() {
 
         settingsSession.use {
             connectExternalDisplay()
-            defaultTDA.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
+            if (expectToSwitch) {
+                // Assumes [connectExternalDisplay] properly triggered the switching transition.
+                // Will verify the transition later along with [disconnectExternalDisplay].
+                defaultTDA.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
+            }
             disconnectExternalDisplay()
 
-            if (expectTransition) {
+            if (expectToSwitch) {
                 val arg = argumentCaptor<WindowContainerTransaction>()
                 verify(transitions, times(2))
                     .startTransition(eq(TRANSIT_CHANGE), arg.capture(), isNull())
@@ -135,33 +143,30 @@ class DesktopDisplayModeControllerTest : ShellTestCase() {
     }
 
     @Test
-    fun displayWindowingModeSwitchOnDisplayConnected_extendedDisplayDisabled() {
+    @DisableFlags(Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING)
+    fun displayWindowingModeSwitchOnDisplayConnected_flagDisabled(
+        @TestParameter param: ModeSwitchTestCase
+    ) {
         testDisplayWindowingModeSwitch(
-            defaultWindowingMode = WINDOWING_MODE_FULLSCREEN,
-            extendedDisplayEnabled = false,
-            expectTransition = false,
+            param.defaultWindowingMode,
+            param.extendedDisplayEnabled,
+            // When the flag is disabled, never switch.
+            expectToSwitch = false,
         )
     }
 
     @Test
-    fun displayWindowingModeSwitchOnDisplayConnected_fullscreenDisplay() {
+    @EnableFlags(Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING)
+    fun displayWindowingModeSwitchOnDisplayConnected(@TestParameter param: ModeSwitchTestCase) {
         testDisplayWindowingModeSwitch(
-            defaultWindowingMode = WINDOWING_MODE_FULLSCREEN,
-            extendedDisplayEnabled = true,
-            expectTransition = true,
+            param.defaultWindowingMode,
+            param.extendedDisplayEnabled,
+            param.expectToSwitchByDefault,
         )
     }
 
     @Test
-    fun displayWindowingModeSwitchOnDisplayConnected_freeformDisplay() {
-        testDisplayWindowingModeSwitch(
-            defaultWindowingMode = WINDOWING_MODE_FREEFORM,
-            extendedDisplayEnabled = true,
-            expectTransition = false,
-        )
-    }
-
-    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING)
     fun displayWindowingModeSwitch_existingTasksOnConnected() {
         defaultTDA.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
         whenever(mockWindowManager.getWindowingMode(anyInt())).thenReturn(WINDOWING_MODE_FULLSCREEN)
@@ -180,6 +185,7 @@ class DesktopDisplayModeControllerTest : ShellTestCase() {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING)
     fun displayWindowingModeSwitch_existingTasksOnDisconnected() {
         defaultTDA.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
         whenever(mockWindowManager.getWindowingMode(anyInt())).thenAnswer {
@@ -227,7 +233,34 @@ class DesktopDisplayModeControllerTest : ShellTestCase() {
         }
     }
 
-    private companion object {
+    companion object {
         const val EXTERNAL_DISPLAY_ID = 100
+
+        enum class ModeSwitchTestCase(
+            val defaultWindowingMode: Int,
+            val extendedDisplayEnabled: Boolean,
+            val expectToSwitchByDefault: Boolean,
+        ) {
+            FULLSCREEN_DISPLAY(
+                defaultWindowingMode = WINDOWING_MODE_FULLSCREEN,
+                extendedDisplayEnabled = true,
+                expectToSwitchByDefault = true,
+            ),
+            FULLSCREEN_DISPLAY_MIRRORING(
+                defaultWindowingMode = WINDOWING_MODE_FULLSCREEN,
+                extendedDisplayEnabled = false,
+                expectToSwitchByDefault = false,
+            ),
+            FREEFORM_DISPLAY(
+                defaultWindowingMode = WINDOWING_MODE_FREEFORM,
+                extendedDisplayEnabled = true,
+                expectToSwitchByDefault = false,
+            ),
+            FREEFORM_DISPLAY_MIRRORING(
+                defaultWindowingMode = WINDOWING_MODE_FREEFORM,
+                extendedDisplayEnabled = false,
+                expectToSwitchByDefault = false,
+            ),
+        }
     }
 }

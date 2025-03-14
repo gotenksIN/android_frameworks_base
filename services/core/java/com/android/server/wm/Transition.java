@@ -36,6 +36,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
+import static android.view.WindowManager.TRANSIT_FLAG_AOD_APPEARING;
 import static android.view.WindowManager.TRANSIT_FLAG_IS_RECENTS;
 import static android.view.WindowManager.TRANSIT_FLAG_KEYGUARD_LOCKED;
 import static android.view.WindowManager.TRANSIT_OPEN;
@@ -77,6 +78,7 @@ import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
 import static com.android.server.wm.WindowState.BLAST_TIMEOUT_DURATION;
 import static com.android.window.flags.Flags.enableDisplayFocusInShellTransitions;
 
+import android.annotation.ColorInt;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -265,6 +267,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
     /** Custom activity-level animation options and callbacks. */
     private AnimationOptions mOverrideOptions;
+
+    /**
+     * Custom background color
+     */
+    @ColorInt
+    private int mOverrideBackgroundColor;
 
     private IRemoteCallback mClientAnimationStartCallback = null;
     private IRemoteCallback mClientAnimationFinishCallback = null;
@@ -998,6 +1006,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         return false;
     }
 
+    boolean isInAodAppearTransition() {
+        return (mFlags & TRANSIT_FLAG_AOD_APPEARING) != 0;
+    }
+
     /**
      * Specifies configuration change explicitly for the window container, so it can be chosen as
      * transition target. This is usually used with transition mode
@@ -1033,6 +1045,13 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         sendRemoteCallback(mClientAnimationStartCallback);
         mClientAnimationStartCallback = startCallback;
         mClientAnimationFinishCallback = finishCallback;
+    }
+
+    /**
+     * Set background color for collecting transition.
+     */
+    void setOverrideBackgroundColor(@ColorInt int backgroundColor) {
+        mOverrideBackgroundColor = backgroundColor;
     }
 
     /**
@@ -2063,23 +2082,17 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (mOverrideOptions == null) {
             return;
         }
-
-        if (!Flags.moveAnimationOptionsToChange()) {
-            info.setAnimationOptions(mOverrideOptions);
-        } else {
-            final List<TransitionInfo.Change> changes = info.getChanges();
-            for (int i = changes.size() - 1; i >= 0; --i) {
-                final WindowContainer<?> container = mTargets.get(i).mContainer;
-                if (container.asActivityRecord() != null
-                        || shouldApplyAnimOptionsToTask(container.asTask())) {
-                    changes.get(i).setAnimationOptions(mOverrideOptions);
-                    // TODO(b/295805497): Extract mBackgroundColor from AnimationOptions.
-                    changes.get(i).setBackgroundColor(mOverrideOptions.getBackgroundColor());
-                } else if (shouldApplyAnimOptionsToEmbeddedTf(container.asTaskFragment())) {
-                    // We only override AnimationOptions because backgroundColor should be from
-                    // TaskFragmentAnimationParams.
-                    changes.get(i).setAnimationOptions(mOverrideOptions);
-                }
+        final List<TransitionInfo.Change> changes = info.getChanges();
+        for (int i = changes.size() - 1; i >= 0; --i) {
+            final WindowContainer<?> container = mTargets.get(i).mContainer;
+            if (container.asActivityRecord() != null
+                    || shouldApplyAnimOptionsToTask(container.asTask())) {
+                changes.get(i).setAnimationOptions(mOverrideOptions);
+                changes.get(i).setBackgroundColor(mOverrideBackgroundColor);
+            } else if (shouldApplyAnimOptionsToEmbeddedTf(container.asTaskFragment())) {
+                // We only override AnimationOptions because backgroundColor should be from
+                // TaskFragmentAnimationParams.
+                changes.get(i).setAnimationOptions(mOverrideOptions);
             }
         }
         updateActivityTargetForCrossProfileAnimation(info);
@@ -2531,7 +2544,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         sb.append(" id=" + mSyncId);
         sb.append(" type=" + transitTypeToString(mType));
         sb.append(" flags=0x" + Integer.toHexString(mFlags));
-        sb.append(" overrideAnimOptions=" + mOverrideOptions);
+        if (mOverrideOptions != null) {
+            sb.append(" overrideAnimOptions=" + mOverrideOptions);
+        }
+        if (mOverrideBackgroundColor != 0) {
+            sb.append(" overrideBackgroundColor=" + mOverrideBackgroundColor);
+        }
         if (!mChanges.isEmpty()) {
             sb.append(" c=[");
             for (int i = 0; i < mChanges.size(); i++) {
@@ -2970,9 +2988,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
         final AnimationOptions animOptionsForActivityTransition =
                 calculateAnimationOptionsForActivityTransition(type, sortedTargets);
-        if (!Flags.moveAnimationOptionsToChange() && animOptionsForActivityTransition != null) {
-            out.setAnimationOptions(animOptionsForActivityTransition);
-        }
 
         final ArraySet<WindowContainer> occludedAtEndContainers = new ArraySet<>();
         // Convert all the resolved ChangeInfos into TransactionInfo.Change objects in order.
@@ -3045,9 +3060,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final Rect parentBounds = parent.getBounds();
             change.setEndRelOffset(bounds.left - parentBounds.left,
                     bounds.top - parentBounds.top);
-            if (Flags.activityEmbeddingOverlayPresentationFlag()) {
-                change.setEndParentSize(parentBounds.width(), parentBounds.height());
-            }
+            change.setEndParentSize(parentBounds.width(), parentBounds.height());
             int endRotation = target.getWindowConfiguration().getRotation();
             if (activityRecord != null) {
                 // TODO(b/227427984): Shell needs to aware letterbox.
@@ -3096,27 +3109,21 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             }
 
             AnimationOptions animOptions = null;
-            if (Flags.moveAnimationOptionsToChange()) {
-                if (activityRecord != null && animOptionsForActivityTransition != null) {
-                    animOptions = animOptionsForActivityTransition;
-                } else if (Flags.activityEmbeddingOverlayPresentationFlag()
-                        && isEmbeddedTaskFragment) {
-                    final TaskFragmentAnimationParams params = taskFragment.getAnimationParams();
-                    if (params.hasOverrideAnimation()) {
-                        // Only set AnimationOptions if there's any animation override.
-                        // We use separated field for backgroundColor, and
-                        // AnimationOptions#backgroundColor will be removed in long term.
-                        animOptions = AnimationOptions.makeCustomAnimOptions(
-                                taskFragment.getTask().getBasePackageName(),
-                                params.getOpenAnimationResId(), params.getChangeAnimationResId(),
-                                params.getCloseAnimationResId(), 0 /* backgroundColor */,
-                                false /* overrideTaskTransition */);
-                        animOptions.setUserId(taskFragment.getTask().mUserId);
-                    }
+            if (activityRecord != null && animOptionsForActivityTransition != null) {
+                animOptions = animOptionsForActivityTransition;
+            } else if (isEmbeddedTaskFragment) {
+                final TaskFragmentAnimationParams params = taskFragment.getAnimationParams();
+                if (params.hasOverrideAnimation()) {
+                    // Only set AnimationOptions if there's any animation override.
+                    animOptions = AnimationOptions.makeCustomAnimOptions(
+                            taskFragment.getTask().getBasePackageName(),
+                            params.getOpenAnimationResId(), params.getChangeAnimationResId(),
+                            params.getCloseAnimationResId(), false /* overrideTaskTransition */);
+                    animOptions.setUserId(taskFragment.getTask().mUserId);
                 }
-                if (animOptions != null) {
-                    change.setAnimationOptions(animOptions);
-                }
+            }
+            if (animOptions != null) {
+                change.setAnimationOptions(animOptions);
             }
 
             if (activityRecord != null) {
@@ -3373,14 +3380,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (mainWin == null) return ROTATION_ANIMATION_UNSPECIFIED;
         int anim = mainWin.getRotationAnimationHint();
         if (anim >= 0) return anim;
-        anim = mainWin.getAttrs().rotationAnimation;
+        anim = mainWin.mAttrs.rotationAnimation;
         if (anim != ROTATION_ANIMATION_SEAMLESS) return anim;
         if (mainWin != task.mDisplayContent.getDisplayPolicy().getTopFullscreenOpaqueWindow()
                 || !top.matchParentBounds()) {
             // At the moment, we only support seamless rotation if there is only one window showing.
             return ROTATION_ANIMATION_UNSPECIFIED;
         }
-        return mainWin.getAttrs().rotationAnimation;
+        return mainWin.mAttrs.rotationAnimation;
     }
 
     private void validateKeyguardOcclusion() {
@@ -3667,11 +3674,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             }
             final boolean nowVisible = wc.isVisibleRequested();
             if (nowVisible == mVisible) {
-                if (mRestoringTransientHide) {
-                    // The requested visibility has not changed for transient-hide containers, but
-                    // we are restoring them so we should considering them moving to front again
-                    return TRANSIT_TO_FRONT;
-                }
                 return TRANSIT_CHANGE;
             }
             if (mExistenceChanged) {

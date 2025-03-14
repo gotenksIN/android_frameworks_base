@@ -569,8 +569,7 @@ public final class DreamManagerService extends SystemService {
     }
 
     private void requestDreamInternal() {
-        if (isDreamingInternal() && !dreamIsFrontmost() && mController.bringDreamToFront()
-                && !isDozingInternal()) {
+        if (isDreamingInternal() && !dreamIsFrontmost() && mController.bringDreamToFront()) {
             return;
         }
 
@@ -1361,6 +1360,21 @@ public final class DreamManagerService extends SystemService {
             final long ident = Binder.clearCallingIdentity();
             try {
                 setDevicePosturedInternal(isPostured);
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
+        }
+
+        @Override
+        public void setScreensaverEnabled(boolean enabled) {
+            checkPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS);
+            final UserHandle userHandle = getCallingUserHandle();
+            final long ident = Binder.clearCallingIdentity();
+            try {
+                Settings.Secure.putIntForUser(mContext.getContentResolver(),
+                        Settings.Secure.SCREENSAVER_ENABLED, enabled ? 1 : 0,
+                        userHandle.getIdentifier());
+                mPowerManagerInternal.updateSettings();
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }

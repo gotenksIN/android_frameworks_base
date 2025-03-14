@@ -203,6 +203,16 @@ flag {
 }
 
 flag {
+    name: "notifications_hun_shared_animation_values"
+    namespace: "systemui"
+    description: "Adds a shared class for fetching HUN animation values."
+    bug: "393369891"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "notification_undo_guts_on_config_changed"
     namespace: "systemui"
     description: "Fixes a bug where a theme or font change while notification guts were open"
@@ -1936,6 +1946,16 @@ flag {
    namespace: "systemui"
    description: "Invokes edit mode directly from long press in glanceable hub"
    bug: "382531177"
+}
+
+flag {
+   name: "notification_appear_nonlinear"
+   namespace: "systemui"
+   description: "Fix linear usage of notification appear"
+   bug: "397658189"
+   metadata {
+     purpose: PURPOSE_BUGFIX
+   }
 }
 
 flag {

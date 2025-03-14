@@ -65,8 +65,8 @@ class BundleEntryTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(NotificationBundleUi.FLAG_NAME)
-    fun getGroupRoot_adapter() {
-        assertThat(underTest.entryAdapter.groupRoot).isEqualTo(underTest.entryAdapter)
+    fun isGroupRoot_adapter() {
+        assertThat(underTest.entryAdapter.isGroupRoot).isTrue()
     }
 
     @Test
@@ -104,5 +104,53 @@ class BundleEntryTest : SysuiTestCase() {
     @EnableFlags(NotificationBundleUi.FLAG_NAME)
     fun getWhen_adapter() {
         assertThat(underTest.entryAdapter.`when`).isEqualTo(0)
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun isColorized() {
+        assertThat(underTest.entryAdapter.isColorized).isFalse()
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun getSbn() {
+        assertThat(underTest.entryAdapter.sbn).isNull()
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun canDragAndDrop() {
+        assertThat(underTest.entryAdapter.canDragAndDrop()).isFalse()
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun isBubble() {
+        assertThat(underTest.entryAdapter.isBubbleCapable).isFalse()
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun getStyle() {
+        assertThat(underTest.entryAdapter.style).isNull()
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun getSectionBucket() {
+        assertThat(underTest.entryAdapter.sectionBucket).isEqualTo(underTest.bucket)
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun isAmbient() {
+        assertThat(underTest.entryAdapter.isAmbient).isFalse()
+    }
+
+    @Test
+    @EnableFlags(NotificationBundleUi.FLAG_NAME)
+    fun canShowFullScreen() {
+        assertThat(underTest.entryAdapter.isFullScreenCapable()).isFalse()
     }
 }

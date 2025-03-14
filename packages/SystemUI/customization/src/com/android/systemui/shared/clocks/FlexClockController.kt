@@ -130,39 +130,25 @@ class FlexClockController(private val clockCtx: ClockContext) : ClockController 
 
         private val FONT_AXES =
             listOf(
-                ClockFontAxis(
-                    key = GSFAxes.WEIGHT,
+                GSFAxes.WEIGHT.toClockAxis(
                     type = AxisType.Float,
-                    minValue = 25f,
-                    currentValue = 400f,
-                    maxValue = 1000f,
+                    currentValue = 475f,
                     name = "Weight",
                     description = "Glyph Weight",
                 ),
-                ClockFontAxis(
-                    key = GSFAxes.WIDTH,
+                GSFAxes.WIDTH.toClockAxis(
                     type = AxisType.Float,
-                    minValue = 25f,
                     currentValue = 85f,
-                    maxValue = 151f,
                     name = "Width",
                     description = "Glyph Width",
                 ),
-                ClockFontAxis(
-                    key = GSFAxes.ROUND,
+                GSFAxes.ROUND.toClockAxis(
                     type = AxisType.Boolean,
-                    minValue = 0f,
-                    currentValue = 0f,
-                    maxValue = 100f,
                     name = "Round",
                     description = "Glyph Roundness",
                 ),
-                ClockFontAxis(
-                    key = GSFAxes.SLANT,
+                GSFAxes.SLANT.toClockAxis(
                     type = AxisType.Boolean,
-                    minValue = 0f,
-                    currentValue = 0f,
-                    maxValue = -10f,
                     name = "Slant",
                     description = "Glyph Slant",
                 ),
@@ -170,10 +156,64 @@ class FlexClockController(private val clockCtx: ClockContext) : ClockController 
 
         private val LEGACY_FLEX_SETTINGS =
             listOf(
-                ClockFontAxisSetting(GSFAxes.WEIGHT, 600f),
-                ClockFontAxisSetting(GSFAxes.WIDTH, 100f),
-                ClockFontAxisSetting(GSFAxes.ROUND, 100f),
-                ClockFontAxisSetting(GSFAxes.SLANT, 0f),
+                GSFAxes.WEIGHT.toClockAxisSetting(600f),
+                GSFAxes.WIDTH.toClockAxisSetting(100f),
+                GSFAxes.ROUND.toClockAxisSetting(100f),
+                GSFAxes.SLANT.toClockAxisSetting(0f),
+            )
+
+        val AXIS_PRESETS =
+            listOf(
+                FONT_AXES.map { it.toSetting() },
+                LEGACY_FLEX_SETTINGS,
+                listOf( // Porcelain
+                    GSFAxes.WEIGHT.toClockAxisSetting(500f),
+                    GSFAxes.WIDTH.toClockAxisSetting(100f),
+                    GSFAxes.ROUND.toClockAxisSetting(0f),
+                    GSFAxes.SLANT.toClockAxisSetting(0f),
+                ),
+                listOf( // Midnight
+                    GSFAxes.WEIGHT.toClockAxisSetting(300f),
+                    GSFAxes.WIDTH.toClockAxisSetting(100f),
+                    GSFAxes.ROUND.toClockAxisSetting(100f),
+                    GSFAxes.SLANT.toClockAxisSetting(-10f),
+                ),
+                listOf( // Sterling
+                    GSFAxes.WEIGHT.toClockAxisSetting(1000f),
+                    GSFAxes.WIDTH.toClockAxisSetting(100f),
+                    GSFAxes.ROUND.toClockAxisSetting(0f),
+                    GSFAxes.SLANT.toClockAxisSetting(0f),
+                ),
+                listOf( // Smoky Green
+                    GSFAxes.WEIGHT.toClockAxisSetting(150f),
+                    GSFAxes.WIDTH.toClockAxisSetting(50f),
+                    GSFAxes.ROUND.toClockAxisSetting(0f),
+                    GSFAxes.SLANT.toClockAxisSetting(0f),
+                ),
+                listOf( // Iris
+                    GSFAxes.WEIGHT.toClockAxisSetting(500f),
+                    GSFAxes.WIDTH.toClockAxisSetting(100f),
+                    GSFAxes.ROUND.toClockAxisSetting(100f),
+                    GSFAxes.SLANT.toClockAxisSetting(0f),
+                ),
+                listOf( // Margarita
+                    GSFAxes.WEIGHT.toClockAxisSetting(300f),
+                    GSFAxes.WIDTH.toClockAxisSetting(30f),
+                    GSFAxes.ROUND.toClockAxisSetting(100f),
+                    GSFAxes.SLANT.toClockAxisSetting(-10f),
+                ),
+                listOf( // Raspberry
+                    GSFAxes.WEIGHT.toClockAxisSetting(700f),
+                    GSFAxes.WIDTH.toClockAxisSetting(140f),
+                    GSFAxes.ROUND.toClockAxisSetting(100f),
+                    GSFAxes.SLANT.toClockAxisSetting(-7f),
+                ),
+                listOf( // Ultra Blue
+                    GSFAxes.WEIGHT.toClockAxisSetting(850f),
+                    GSFAxes.WIDTH.toClockAxisSetting(130f),
+                    GSFAxes.ROUND.toClockAxisSetting(0f),
+                    GSFAxes.SLANT.toClockAxisSetting(0f),
+                ),
             )
     }
 }

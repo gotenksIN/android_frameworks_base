@@ -50,7 +50,6 @@ import com.android.systemui.keyguard.ui.viewmodel.AodToGoneTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.AodToLockscreenTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.AodToOccludedTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.AodToPrimaryBouncerTransitionViewModel
-import com.android.systemui.keyguard.ui.viewmodel.DozingToDreamingTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DozingToGlanceableHubTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DozingToLockscreenTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DozingToOccludedTransitionViewModel
@@ -76,6 +75,7 @@ import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToLockscreenTran
 import com.android.systemui.keyguard.ui.viewmodel.ViewStateAccessor
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
+import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.LargeScreenHeaderHelper
 import com.android.systemui.shade.ShadeDisplayAware
@@ -143,7 +143,6 @@ constructor(
     private val aodToOccludedTransitionViewModel: AodToOccludedTransitionViewModel,
     private val aodToGlanceableHubTransitionViewModel: AodToGlanceableHubTransitionViewModel,
     private val aodToPrimaryBouncerTransitionViewModel: AodToPrimaryBouncerTransitionViewModel,
-    private val dozingToDreamingTransitionViewModel: DozingToDreamingTransitionViewModel,
     dozingToGlanceableHubTransitionViewModel: DozingToGlanceableHubTransitionViewModel,
     private val dozingToLockscreenTransitionViewModel: DozingToLockscreenTransitionViewModel,
     private val dozingToOccludedTransitionViewModel: DozingToOccludedTransitionViewModel,
@@ -307,7 +306,7 @@ constructor(
             keyguardTransitionInteractor.transitionValue(ALTERNATE_BOUNCER).map { it > 0f },
             keyguardTransitionInteractor
                 .transitionValue(
-                    scene = Scenes.Bouncer,
+                    content = Overlays.Bouncer,
                     stateWithoutSceneContainer = PRIMARY_BOUNCER,
                 )
                 .map { it > 0f },
@@ -361,7 +360,7 @@ constructor(
     private val isOnGlanceableHub: Flow<Boolean> =
         combine(
                 keyguardTransitionInteractor.isFinishedIn(
-                    scene = Scenes.Communal,
+                    content = Scenes.Communal,
                     stateWithoutSceneContainer = GLANCEABLE_HUB,
                 ),
                 anyOf(
@@ -602,7 +601,6 @@ constructor(
             aodToOccludedTransitionViewModel.lockscreenAlpha(viewState),
             aodToGlanceableHubTransitionViewModel.lockscreenAlpha(viewState),
             aodToPrimaryBouncerTransitionViewModel.notificationAlpha,
-            dozingToDreamingTransitionViewModel.notificationAlpha,
             dozingToLockscreenTransitionViewModel.lockscreenAlpha,
             dozingToOccludedTransitionViewModel.lockscreenAlpha(viewState),
             dozingToPrimaryBouncerTransitionViewModel.notificationAlpha,
@@ -638,7 +636,7 @@ constructor(
                 anyOf(
                     isKeyguardOccluded,
                     keyguardTransitionInteractor
-                        .transitionValue(scene = Scenes.Gone, stateWithoutSceneContainer = GONE)
+                        .transitionValue(content = Scenes.Gone, stateWithoutSceneContainer = GONE)
                         .map { it == 1f },
                 )
             }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.OverscrollFactory
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
@@ -45,6 +46,7 @@ import com.android.compose.animation.scene.ElementContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.ElementScope
 import com.android.compose.animation.scene.ElementStateScope
+import com.android.compose.animation.scene.ElementWithValues
 import com.android.compose.animation.scene.InternalContentScope
 import com.android.compose.animation.scene.MovableElement
 import com.android.compose.animation.scene.MovableElementContentScope
@@ -171,7 +173,7 @@ internal sealed class Content(
                 .thenIf(layoutImpl.state.isElevationPossible(content = key, element = null)) {
                     Modifier.container(containerState)
                 }
-                .testTag(key.testTag)
+                .thenIf(layoutImpl.implicitTestTags) { Modifier.testTag(key.testTag) }
         ) {
             CompositionLocalProvider(LocalOverscrollFactory provides lastFactory) {
                 scope.content()
@@ -222,9 +224,18 @@ internal class ContentScopeImpl(
     override fun Element(
         key: ElementKey,
         modifier: Modifier,
-        content: @Composable (ElementScope<ElementContentScope>.() -> Unit),
+        content: @Composable BoxScope.() -> Unit,
     ) {
         Element(layoutImpl, this@ContentScopeImpl.content, key, modifier, content)
+    }
+
+    @Composable
+    override fun ElementWithValues(
+        key: ElementKey,
+        modifier: Modifier,
+        content: @Composable (ElementScope<ElementContentScope>.() -> Unit),
+    ) {
+        ElementWithValues(layoutImpl, this@ContentScopeImpl.content, key, modifier, content)
     }
 
     @Composable
@@ -290,6 +301,7 @@ internal class ContentScopeImpl(
             sharedElementMap = layoutImpl.elements,
             ancestors = ancestors,
             lookaheadScope = layoutImpl.lookaheadScope,
+            implicitTestTags = layoutImpl.implicitTestTags,
         )
     }
 }

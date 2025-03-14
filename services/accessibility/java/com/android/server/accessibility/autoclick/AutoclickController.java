@@ -103,12 +103,16 @@ public class AutoclickController extends BaseEventStreamTransformation {
                 @Override
                 public void toggleAutoclickPause(boolean paused) {
                     if (paused) {
-                        if (mClickScheduler != null) {
-                            mClickScheduler.cancel();
-                        }
-                        if (mAutoclickIndicatorScheduler != null) {
-                            mAutoclickIndicatorScheduler.cancel();
-                        }
+                        cancelPendingClick();
+                    }
+                }
+
+                @Override
+                public void onHoverChange(boolean hovered) {
+                    // Cancel all pending clicks when the mouse moves outside the panel while
+                    // autoclick is still paused.
+                    if (!hovered && isPaused()) {
+                        cancelPendingClick();
                     }
                 }
             };
@@ -156,7 +160,7 @@ public class AutoclickController extends BaseEventStreamTransformation {
 
         mWindowManager = mContext.getSystemService(WindowManager.class);
         mAutoclickTypePanel =
-                new AutoclickTypePanel(mContext, mWindowManager, clickPanelController);
+                new AutoclickTypePanel(mContext, mWindowManager, mUserId, clickPanelController);
 
         mAutoclickTypePanel.show();
         mWindowManager.addView(mAutoclickIndicatorView, mAutoclickIndicatorView.getLayoutParams());
@@ -226,8 +230,22 @@ public class AutoclickController extends BaseEventStreamTransformation {
     }
 
     private boolean isPaused() {
-        // TODO (b/397460424): Unpause when hovering over panel.
-        return Flags.enableAutoclickIndicator() && mAutoclickTypePanel.isPaused();
+        return Flags.enableAutoclickIndicator() && mAutoclickTypePanel.isPaused()
+                && !mAutoclickTypePanel.isHovered();
+    }
+
+    private void cancelPendingClick() {
+        if (mClickScheduler != null) {
+            mClickScheduler.cancel();
+        }
+        if (mAutoclickIndicatorScheduler != null) {
+            mAutoclickIndicatorScheduler.cancel();
+        }
+    }
+
+    @VisibleForTesting
+    void onChangeForTesting(boolean selfChange, Uri uri) {
+        mAutoclickSettingsObserver.onChange(selfChange, uri);
     }
 
     /**

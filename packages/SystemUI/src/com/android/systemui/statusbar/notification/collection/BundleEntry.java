@@ -24,29 +24,66 @@ import static android.app.NotificationChannel.SOCIAL_MEDIA_ID;
 import android.app.Notification;
 import android.content.Context;
 import android.os.Build;
+import android.service.notification.StatusBarNotification;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.systemui.statusbar.notification.icon.IconPack;
+import com.android.systemui.statusbar.notification.collection.listbuilder.NotifSection;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 
 import java.util.List;
 
+import kotlinx.coroutines.flow.MutableStateFlow;
+import kotlinx.coroutines.flow.StateFlow;
+import kotlinx.coroutines.flow.StateFlowKt;
+
 /**
- * Abstract class to represent notification section bundled by AI.
+ * Class to represent notifications bundled by classification.
  */
 public class BundleEntry extends PipelineEntry {
 
-    private final String mKey;
     private final BundleEntryAdapter mEntryAdapter;
+
+    // TODO(b/394483200): move NotificationEntry's implementation to PipelineEntry?
+    private final MutableStateFlow<Boolean> mSensitive = StateFlowKt.MutableStateFlow(false);
 
     // TODO (b/389839319): implement the row
     private ExpandableNotificationRow mRow;
 
     public BundleEntry(String key) {
-        mKey = key;
+        super(key);
         mEntryAdapter = new BundleEntryAdapter();
+    }
+
+    @Nullable
+    @Override
+    public NotificationEntry getRepresentativeEntry() {
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public NotifSection getSection() {
+        return null;
+    }
+
+    @Override
+    public int getSectionIndex() {
+        return 0;
+    }
+
+    @Nullable
+    @Override
+    public PipelineEntry getParent() {
+        return null;
+    }
+
+    @Override
+    public boolean wasAttachedInPreviousPass() {
+        return false;
     }
 
     @VisibleForTesting
@@ -69,20 +106,26 @@ public class BundleEntry extends PipelineEntry {
             return true;
         }
 
+        @NonNull
         @Override
         public String getKey() {
             return mKey;
         }
 
         @Override
+        @Nullable
         public ExpandableNotificationRow getRow() {
             return mRow;
         }
 
-        @Nullable
         @Override
-        public EntryAdapter getGroupRoot() {
-            return this;
+        public boolean isGroupRoot() {
+            return true;
+        }
+
+        @Override
+        public StateFlow<Boolean> isSensitive() {
+            return BundleEntry.this.mSensitive;
         }
 
         @Override
@@ -120,6 +163,48 @@ public class BundleEntry extends PipelineEntry {
         public IconPack getIcons() {
             // TODO(b/396446620): implement bundle icons
             return null;
+        }
+
+        @Override
+        public boolean isColorized() {
+            return false;
+        }
+
+        @Override
+        @Nullable
+        public StatusBarNotification getSbn() {
+            return null;
+        }
+
+        @Override
+        public boolean canDragAndDrop() {
+            return false;
+        }
+
+        @Override
+        public boolean isBubbleCapable() {
+            return false;
+        }
+
+        @Override
+        @Nullable
+        public String getStyle() {
+            return null;
+        }
+
+        @Override
+        public int getSectionBucket() {
+            return mBucket;
+        }
+
+        @Override
+        public boolean isAmbient() {
+            return false;
+        }
+
+        @Override
+        public boolean isFullScreenCapable() {
+            return false;
         }
     }
 

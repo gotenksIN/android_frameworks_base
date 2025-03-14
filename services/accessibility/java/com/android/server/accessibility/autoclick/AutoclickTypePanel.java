@@ -16,6 +16,7 @@
 
 package com.android.server.accessibility.autoclick;
 
+import static android.provider.Settings.Secure.ACCESSIBILITY_AUTOCLICK_PANEL_POSITION;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 
 import android.annotation.IntDef;
@@ -23,8 +24,11 @@ import android.content.Context;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
@@ -50,6 +54,19 @@ public class AutoclickTypePanel {
     public static final int CORNER_BOTTOM_LEFT = 1;
     public static final int CORNER_TOP_LEFT = 2;
     public static final int CORNER_TOP_RIGHT = 3;
+
+    // Used to remember and restore panel's position.
+    protected static final String POSITION_DELIMITER = ",";
+
+    // Distance between panel and screen edge.
+    // TODO(b/396402941): Finalize edge margin.
+    private static final int PANEL_EDGE_MARGIN = 15;
+
+    // Touch point when drag starts, it can be anywhere inside the panel.
+    private float mTouchStartX, mTouchStartY;
+    // Initial panel position in screen coordinates.
+    private int mPanelStartX, mPanelStartY;
+    private boolean mIsDragging = false;
 
     // Types of click the AutoclickTypePanel supports.
     @IntDef({
@@ -93,13 +110,24 @@ public class AutoclickTypePanel {
          * @param paused {@code true} to pause autoclick, {@code false} to resume.
          */
         void toggleAutoclickPause(boolean paused);
+
+        /**
+         * Called when the hovered state of the panel changes.
+         *
+         * @param hovered {@code true} if the panel is now hovered, {@code false} otherwise.
+         */
+        void onHoverChange(boolean hovered);
     }
 
     private final Context mContext;
 
-    private final View mContentView;
+    private final AutoclickLinearLayout mContentView;
 
     private final WindowManager mWindowManager;
+
+    private final int mUserId;
+
+    private WindowManager.LayoutParams mParams;
 
     private final ClickPanelControllerInterface mClickPanelController;
 
@@ -129,10 +157,13 @@ public class AutoclickTypePanel {
     public AutoclickTypePanel(
             Context context,
             WindowManager windowManager,
+            int userId,
             ClickPanelControllerInterface clickPanelController) {
         mContext = context;
         mWindowManager = windowManager;
+        mUserId = userId;
         mClickPanelController = clickPanelController;
+        mParams = getDefaultLayoutParams();
 
         mPauseButtonDrawable = mContext.getDrawable(
                 R.drawable.accessibility_autoclick_pause);
@@ -140,8 +171,9 @@ public class AutoclickTypePanel {
                 R.drawable.accessibility_autoclick_resume);
 
         mContentView =
-                LayoutInflater.from(context)
+                (AutoclickLinearLayout) LayoutInflater.from(context)
                         .inflate(R.layout.accessibility_autoclick_type_panel, null);
+        mContentView.setOnHoverChangedListener(mClickPanelController::onHoverChange);
         mLeftClickButton =
                 mContentView.findViewById(R.id.accessibility_autoclick_left_click_layout);
         mRightClickButton =
@@ -154,6 +186,91 @@ public class AutoclickTypePanel {
         mPositionButton = mContentView.findViewById(R.id.accessibility_autoclick_position_layout);
 
         initializeButtonState();
+
+        // Set up touch event handling for the panel to allow the user to drag and reposition the
+        // panel by touching and moving it.
+        mContentView.setOnTouchListener(this::onPanelTouch);
+    }
+
+    /**
+     * Handles touch events on the panel, enabling the user to drag and reposition it.
+     * This function supports the draggable panel feature, allowing users to move the panel
+     * to different screen locations for better usability and customization.
+     */
+    private boolean onPanelTouch(View v, MotionEvent event) {
+        // TODO(b/397681794): Make sure this works on multiple screens.
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                // Store initial touch positions.
+                mTouchStartX = event.getRawX();
+                mTouchStartY = event.getRawY();
+
+                // Store initial panel position relative to screen's top-left corner.
+                // getLocationOnScreen provides coordinates relative to the top-left corner of the
+                // screen's display. We are using this coordinate system to consistently track the
+                // panel's position during drag operations.
+                int[] location = new int[2];
+                v.getLocationOnScreen(location);
+                mPanelStartX = location[0];
+                mPanelStartY = location[1];
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                mIsDragging = true;
+
+                // Set panel gravity to TOP|LEFT to match getLocationOnScreen's coordinate system
+                mParams.gravity = Gravity.LEFT | Gravity.TOP;
+
+                if (mIsDragging) {
+                    // Calculate touch distance moved from start position.
+                    float deltaX = event.getRawX() - mTouchStartX;
+                    float deltaY = event.getRawY() - mTouchStartY;
+
+                    // Update panel position, based on Top-Left absolute positioning.
+                    mParams.x = mPanelStartX + (int) deltaX;
+                    mParams.y = mPanelStartY + (int) deltaY;
+                    mWindowManager.updateViewLayout(mContentView, mParams);
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                if (mIsDragging) {
+                    // When drag ends, snap panel to nearest edge.
+                    snapToNearestEdge(mParams);
+                }
+                mIsDragging = false;
+                return true;
+        }
+        return false;
+    }
+
+    private void snapToNearestEdge(WindowManager.LayoutParams params) {
+        // Get screen width to determine which side to snap to.
+        // TODO(b/397944891): Handle device rotation case.
+        int screenWidth = mContext.getResources().getDisplayMetrics().widthPixels;
+        int yPosition = params.y;
+
+        // Determine which half of the screen the panel is on.
+        boolean isOnLeftHalf = params.x < screenWidth / 2;
+
+        if (isOnLeftHalf) {
+            // Snap to left edge. Set params.gravity to make sure x, y offsets from correct anchor.
+            params.gravity = Gravity.START | Gravity.TOP;
+            // Set the current corner to be bottom-left to ensure that the subsequent reposition
+            // action rotates the panel clockwise from bottom-left towards top-left.
+            mCurrentCornerIndex = 1;
+        } else {
+            // Snap to right edge. Set params.gravity to make sure x, y offsets from correct anchor.
+            params.gravity = Gravity.END | Gravity.TOP;
+            // Set the current corner to be top-right to ensure that the subsequent reposition
+            // action rotates the panel clockwise from top-right towards bottom-right.
+            mCurrentCornerIndex = 3;
+        }
+
+        // Apply final position: set params.x to be edge margin, params.y to maintain vertical
+        // position.
+        params.x = PANEL_EDGE_MARGIN;
+        params.y = yPosition;
+        mWindowManager.updateViewLayout(mContentView, params);
     }
 
     private void initializeButtonState() {
@@ -209,7 +326,10 @@ public class AutoclickTypePanel {
     }
 
     public void show() {
-        mWindowManager.addView(mContentView, getLayoutParams());
+        // Restores the panel position from saved settings. If no valid position is saved,
+        // defaults to bottom-right corner.
+        restorePanelPosition();
+        mWindowManager.addView(mContentView, mParams);
     }
 
     public void hide() {
@@ -217,11 +337,18 @@ public class AutoclickTypePanel {
         // button background styling is correct when the panel shows up next time.
         toggleSelectedButtonStyle(mSelectedButton, /* isSelected= */ false);
 
+        // Save the panel's position when user turns off the autoclick.
+        savePanelPosition();
+
         mWindowManager.removeView(mContentView);
     }
 
     public boolean isPaused() {
         return mPaused;
+    }
+
+    public boolean isHovered() {
+        return mContentView.isHovered();
     }
 
     /** Toggles the panel expanded or collapsed state. */
@@ -291,9 +418,8 @@ public class AutoclickTypePanel {
         @Corner int nextCornerIndex = (mCurrentCornerIndex + 1) % CORNER_ROTATION_ORDER.length;
         mCurrentCornerIndex = nextCornerIndex;
 
-        // getLayoutParams() will update the panel position based on current corner.
-        WindowManager.LayoutParams params = getLayoutParams();
-        mWindowManager.updateViewLayout(mContentView, params);
+        setPanelPositionForCorner(mParams, mCurrentCornerIndex);
+        mWindowManager.updateViewLayout(mContentView, mParams);
     }
 
     private void setPanelPositionForCorner(WindowManager.LayoutParams params, @Corner int corner) {
@@ -303,27 +429,100 @@ public class AutoclickTypePanel {
         switch (corner) {
             case CORNER_BOTTOM_RIGHT:
                 params.gravity = Gravity.END | Gravity.BOTTOM;
-                params.x = 15;
+                params.x = PANEL_EDGE_MARGIN;
                 params.y = 90;
                 break;
             case CORNER_BOTTOM_LEFT:
                 params.gravity = Gravity.START | Gravity.BOTTOM;
-                params.x = 15;
+                params.x = PANEL_EDGE_MARGIN;
                 params.y = 90;
                 break;
             case CORNER_TOP_LEFT:
                 params.gravity = Gravity.START | Gravity.TOP;
-                params.x = 15;
+                params.x = PANEL_EDGE_MARGIN;
                 params.y = 30;
                 break;
             case CORNER_TOP_RIGHT:
                 params.gravity = Gravity.END | Gravity.TOP;
-                params.x = 15;
+                params.x = PANEL_EDGE_MARGIN;
                 params.y = 30;
                 break;
             default:
                 throw new IllegalArgumentException("Invalid corner: " + corner);
         }
+    }
+
+    private void savePanelPosition() {
+        String positionString = TextUtils.join(POSITION_DELIMITER, new String[]{
+                String.valueOf(mParams.gravity),
+                String.valueOf(mParams.x),
+                String.valueOf(mParams.y),
+                String.valueOf(mCurrentCornerIndex)
+        });
+        Settings.Secure.putStringForUser(mContext.getContentResolver(),
+                ACCESSIBILITY_AUTOCLICK_PANEL_POSITION, positionString, mUserId);
+    }
+
+    /**
+     * Restores the panel position from saved settings. If no valid position is saved,
+     * defaults to bottom-right corner.
+     */
+    private void restorePanelPosition() {
+        // Try to get saved position from settings.
+        String savedPosition = Settings.Secure.getStringForUser(mContext.getContentResolver(),
+                ACCESSIBILITY_AUTOCLICK_PANEL_POSITION, mUserId);
+        if (savedPosition == null) {
+            setPanelPositionForCorner(mParams, CORNER_BOTTOM_RIGHT);
+            mCurrentCornerIndex = 0;
+            return;
+        }
+
+        // Parse saved position string in "gravity,x,y,corner" format.
+        String[] parts = TextUtils.split(savedPosition, POSITION_DELIMITER);
+        if (!isValidPositionParts(parts)) {
+            setPanelPositionForCorner(mParams, CORNER_BOTTOM_RIGHT);
+            mCurrentCornerIndex = 0;
+            return;
+        }
+
+        // Restore the saved position values.
+        mParams.gravity = Integer.parseInt(parts[0]);
+        mParams.x = Integer.parseInt(parts[1]);
+        mParams.y = Integer.parseInt(parts[2]);
+        mCurrentCornerIndex = Integer.parseInt(parts[3]);
+    }
+
+    private boolean isValidPositionParts(String[] parts) {
+        // Check basic array validity.
+        if (parts == null || parts.length != 4) {
+            return false;
+        }
+
+        // Parse values after validating they are numbers.
+        int gravity = Integer.parseInt(parts[0]);
+        int x = Integer.parseInt(parts[1]);
+        int y = Integer.parseInt(parts[2]);
+        int cornerIndex = Integer.parseInt(parts[3]);
+
+        // Check gravity is valid (START/END | TOP/BOTTOM).
+        if (gravity != (Gravity.START | Gravity.TOP) && gravity != (Gravity.END | Gravity.TOP)
+                && gravity != (Gravity.START | Gravity.BOTTOM) && gravity != (Gravity.END
+                | Gravity.BOTTOM)) {
+            return false;
+        }
+
+        // Check coordinates are positive and within screen bounds.
+        int screenWidth = mContext.getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = mContext.getResources().getDisplayMetrics().heightPixels;
+        if (x < 0 || x > screenWidth || y < 0 || y > screenHeight) {
+            return false;
+        }
+
+        // Check corner index is valid.
+        if (cornerIndex < 0 || cornerIndex >= 4) {
+            return false;
+        }
+        return true;
     }
 
     @VisibleForTesting
@@ -333,7 +532,7 @@ public class AutoclickTypePanel {
 
     @VisibleForTesting
     @NonNull
-    View getContentViewForTesting() {
+    AutoclickLinearLayout getContentViewForTesting() {
         return mContentView;
     }
 
@@ -343,13 +542,22 @@ public class AutoclickTypePanel {
         return mCurrentCornerIndex;
     }
 
+    @VisibleForTesting
+    WindowManager.LayoutParams getLayoutParamsForTesting() {
+        return mParams;
+    }
+
+    @VisibleForTesting
+    boolean getIsDraggingForTesting() {
+        return mIsDragging;
+    }
+
     /**
      * Retrieves the layout params for AutoclickIndicatorView, used when it's added to the Window
      * Manager.
      */
-    @VisibleForTesting
     @NonNull
-    WindowManager.LayoutParams getLayoutParams() {
+    private WindowManager.LayoutParams getDefaultLayoutParams() {
         final WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
         layoutParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
@@ -362,7 +570,7 @@ public class AutoclickTypePanel {
                 mContext.getString(R.string.accessibility_autoclick_type_settings_panel_title);
         layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT;
         layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
-        setPanelPositionForCorner(layoutParams, mCurrentCornerIndex);
+        setPanelPositionForCorner(layoutParams, CORNER_BOTTOM_RIGHT);
         return layoutParams;
     }
 }

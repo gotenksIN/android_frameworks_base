@@ -101,12 +101,6 @@ public class PipTransition extends PipTransitionController implements
             "animating_bounds_change_duration";
     static final int BOUNDS_CHANGE_JUMPCUT_DURATION = 0;
 
-    /**
-     * The fixed start delay in ms when fading out the content overlay from bounds animation.
-     * The fadeout animation is guaranteed to start after the client has drawn under the new config.
-     */
-    private static final int CONTENT_OVERLAY_FADE_OUT_DELAY_MS = 500;
-
     //
     // Dependencies
     //
@@ -477,7 +471,8 @@ public class PipTransition extends PipTransitionController implements
 
         if (swipePipToHomeOverlay != null) {
             // fadeout the overlay if needed.
-            startOverlayFadeoutAnimation(swipePipToHomeOverlay, () -> {
+            mPipScheduler.startOverlayFadeoutAnimation(swipePipToHomeOverlay,
+                    true /* withStartDelay */, () -> {
                 SurfaceControl.Transaction tx = new SurfaceControl.Transaction();
                 tx.remove(swipePipToHomeOverlay);
                 tx.apply();
@@ -538,22 +533,13 @@ public class PipTransition extends PipTransitionController implements
         animator.setAnimationStartCallback(() -> animator.setEnterStartState(pipChange));
         animator.setAnimationEndCallback(() -> {
             if (animator.getContentOverlayLeash() != null) {
-                startOverlayFadeoutAnimation(animator.getContentOverlayLeash(),
-                        animator::clearAppIconOverlay);
+                mPipScheduler.startOverlayFadeoutAnimation(animator.getContentOverlayLeash(),
+                        true /* withStartDelay */, animator::clearAppIconOverlay);
             }
             finishTransition();
         });
         cacheAndStartTransitionAnimator(animator);
         return true;
-    }
-
-    private void startOverlayFadeoutAnimation(@NonNull SurfaceControl overlayLeash,
-            @NonNull Runnable onAnimationEnd) {
-        PipAlphaAnimator animator = new PipAlphaAnimator(mContext, overlayLeash,
-                null /* startTx */, null /* finishTx */, PipAlphaAnimator.FADE_OUT);
-        animator.setDuration(CONTENT_OVERLAY_FADE_OUT_DELAY_MS);
-        animator.setAnimationEndCallback(onAnimationEnd);
-        animator.start();
     }
 
     private void handleBoundsEnterFixedRotation(TransitionInfo info,

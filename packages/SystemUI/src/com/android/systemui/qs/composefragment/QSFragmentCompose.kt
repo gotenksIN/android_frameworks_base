@@ -21,6 +21,7 @@ import android.content.Context
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
+import android.os.Trace
 import android.util.IndentingPrintWriter
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -112,6 +113,7 @@ import com.android.systemui.plugins.qs.QS
 import com.android.systemui.plugins.qs.QSContainerController
 import com.android.systemui.qs.composefragment.SceneKeys.QuickQuickSettings
 import com.android.systemui.qs.composefragment.SceneKeys.QuickSettings
+import com.android.systemui.qs.composefragment.SceneKeys.debugName
 import com.android.systemui.qs.composefragment.SceneKeys.toIdleSceneKey
 import com.android.systemui.qs.composefragment.ui.GridAnchor
 import com.android.systemui.qs.composefragment.ui.NotificationScrimClipParams
@@ -252,18 +254,17 @@ constructor(
                     Box(
                         modifier =
                             Modifier.graphicsLayer { alpha = viewModel.viewAlpha }
+                                .thenIf(notificationScrimClippingParams.isEnabled) {
+                                    Modifier.notificationScrimClip {
+                                        notificationScrimClippingParams.params
+                                    }
+                                }
                                 .thenIf(!Flags.notificationShadeBlur()) {
-                                    // Clipping before translation to match QSContainerImpl.onDraw
                                     Modifier.offset {
                                         IntOffset(
                                             x = 0,
                                             y = viewModel.viewTranslationY.fastRoundToInt(),
                                         )
-                                    }
-                                }
-                                .thenIf(notificationScrimClippingParams.isEnabled) {
-                                    Modifier.notificationScrimClip {
-                                        notificationScrimClippingParams.params
                                     }
                                 }
                                 // Disable touches in the whole composable while the mirror is
@@ -286,6 +287,12 @@ constructor(
      */
     @Composable
     private fun CollapsableQuickSettingsSTL() {
+        val nextCookie = remember {
+            object {
+                var value = 0
+            }
+        }
+        val transitionToCookie = remember { mutableMapOf<TransitionState.Transition, Int>() }
         val sceneState =
             rememberMutableSceneTransitionLayoutState(
                 initialScene = remember { viewModel.expansionState.toIdleSceneKey() },
@@ -299,6 +306,20 @@ constructor(
                             toEditMode()
                         }
                     },
+                onTransitionStart = { transition ->
+                    val cookie = nextCookie.value++
+                    transitionToCookie[transition] = cookie
+                    Trace.beginAsyncSection(
+                        "CollapsableQuickSettingsSTL ${transition.debugName}",
+                        cookie,
+                    )
+                },
+                onTransitionEnd = { transition ->
+                    Trace.endAsyncSection(
+                        "CollapsableQuickSettingsSTL ${transition.debugName}",
+                        transitionToCookie.remove(transition) ?: -1,
+                    )
+                },
             )
 
         LaunchedEffect(Unit) {
@@ -306,27 +327,24 @@ constructor(
                 sceneState,
                 viewModel.containerViewModel.editModeViewModel.isEditing,
                 snapshotFlow { viewModel.expansionState }.map { it.progress },
-                snapshotFlow { viewModel.isQSExpandingOrCollapsing },
             )
         }
 
         SceneTransitionLayout(state = sceneState, modifier = Modifier.fillMaxSize()) {
             scene(QuickSettings) {
                 LaunchedEffect(Unit) { viewModel.onQSOpen() }
-                QuickSettingsElement(Modifier.element(QuickSettings.rootElementKey))
+                Element(QuickSettings.rootElementKey, Modifier) { QuickSettingsElement() }
             }
 
             scene(QuickQuickSettings) {
                 LaunchedEffect(Unit) { viewModel.onQQSOpen() }
                 // Cannot pass the element modifier in because the top element has a `testTag`
                 // and this would overwrite it.
-                Box(Modifier.element(QuickQuickSettings.rootElementKey)) {
-                    QuickQuickSettingsElement()
-                }
+                Element(QuickQuickSettings.rootElementKey, Modifier) { QuickQuickSettingsElement() }
             }
 
             scene(SceneKeys.EditMode) {
-                EditModeElement(Modifier.element(SceneKeys.EditMode.rootElementKey))
+                Element(SceneKeys.EditMode.rootElementKey, Modifier) { EditModeElement() }
             }
         }
     }
@@ -538,10 +556,6 @@ constructor(
         return qqsVisible.value
     }
 
-    override fun setQSExpandingOrCollapsing(isQSExpandingOrCollapsing: Boolean) {
-        viewModel.isQSExpandingOrCollapsing = isQSExpandingOrCollapsing
-    }
-
     private fun setListenerCollections() {
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -661,10 +675,7 @@ constructor(
                 )
         ) {
             if (viewModel.isQsEnabled) {
-                Box(
-                    modifier =
-                        Modifier.element(ElementKeys.QuickSettingsContent).fillMaxSize().weight(1f)
-                ) {
+                Element(ElementKeys.QuickSettingsContent, modifier = Modifier.weight(1f)) {
                     DisposableEffect(Unit) {
                         lifecycleScope.launch { scrollState.scrollTo(0) }
                         onDispose { lifecycleScope.launch { scrollState.scrollTo(0) } }
@@ -672,7 +683,8 @@ constructor(
 
                     Column(
                         modifier =
-                            Modifier.onPlaced { coordinates ->
+                            Modifier.fillMaxSize()
+                                .onPlaced { coordinates ->
                                     val positionOnScreen = coordinates.positionOnScreen()
                                     val left = positionOnScreen.x
                                     val right = left + coordinates.size.width
@@ -749,13 +761,15 @@ constructor(
                     }
                 }
                 QuickSettingsTheme {
-                    FooterActions(
-                        viewModel = viewModel.footerActionsViewModel,
-                        qsVisibilityLifecycleOwner = this@QSFragmentCompose,
-                        modifier =
-                            Modifier.sysuiResTag(ResIdTags.qsFooterActions)
-                                .element(ElementKeys.FooterActions),
-                    )
+                    Element(
+                        ElementKeys.FooterActions,
+                        Modifier.sysuiResTag(ResIdTags.qsFooterActions),
+                    ) {
+                        FooterActions(
+                            viewModel = viewModel.footerActionsViewModel,
+                            qsVisibilityLifecycleOwner = this@QSFragmentCompose,
+                        )
+                    }
                 }
             }
         }
@@ -862,6 +876,9 @@ object SceneKeys {
     val QuickSettings = SceneKey("QuickSettingsScene")
     val EditMode = SceneKey("EditModeScene")
 
+    val TransitionState.Transition.debugName: String
+        get() = "[from=${fromContent.debugName}, to=${toContent.debugName}]"
+
     fun QSFragmentComposeViewModel.QSExpansionState.toIdleSceneKey(): SceneKey {
         return when {
             progress < 0.5f -> QuickQuickSettings
@@ -882,7 +899,6 @@ private suspend fun synchronizeQsState(
     state: MutableSceneTransitionLayoutState,
     editMode: Flow<Boolean>,
     expansion: Flow<Float>,
-    isQSExpandingOrCollapsing: Flow<Boolean>,
 ) {
     coroutineScope {
         val animationScope = this
@@ -894,46 +910,31 @@ private suspend fun synchronizeQsState(
             currentTransition = null
         }
 
-        var lastValidProgress = 0f
-        combine(editMode, expansion, isQSExpandingOrCollapsing, ::Triple).collectLatest {
-            (editMode, progress, isQSExpandingOrCollapsing) ->
+        editMode.combine(expansion, ::Pair).collectLatest { (editMode, progress) ->
             if (editMode && state.currentScene != SceneKeys.EditMode) {
                 state.setTargetScene(SceneKeys.EditMode, animationScope)?.second?.join()
             } else if (!editMode && state.currentScene == SceneKeys.EditMode) {
                 state.setTargetScene(SceneKeys.QuickSettings, animationScope)?.second?.join()
             }
-
             if (!editMode) {
-                if (!isQSExpandingOrCollapsing) {
-                    if (progress == 0f) {
-                        snapTo(QuickQuickSettings)
-                        return@collectLatest
+                when (progress) {
+                    0f -> snapTo(QuickQuickSettings)
+                    1f -> snapTo(QuickSettings)
+                    else -> {
+                        val transition = currentTransition
+                        if (transition != null) {
+                            transition.progress = progress
+                            return@collectLatest
+                        }
+
+                        val newTransition =
+                            ExpansionTransition(progress).also { currentTransition = it }
+                        state.startTransitionImmediately(
+                            animationScope = animationScope,
+                            transition = newTransition,
+                        )
                     }
-
-                    if (progress == 1f) {
-                        snapTo(QuickSettings)
-                        return@collectLatest
-                    }
                 }
-
-                var progress = progress
-                if (progress >= 0f || progress <= 1f) {
-                    lastValidProgress = progress
-                } else {
-                    progress = lastValidProgress
-                }
-
-                val transition = currentTransition
-                if (transition != null) {
-                    transition.progress = progress
-                    return@collectLatest
-                }
-
-                val newTransition = ExpansionTransition(progress).also { currentTransition = it }
-                state.startTransitionImmediately(
-                    animationScope = animationScope,
-                    transition = newTransition,
-                )
             }
         }
     }

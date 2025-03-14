@@ -172,7 +172,6 @@ public final class PerfettoTrackEventExtra {
         private final Pool<FieldDouble> mFieldDoubleCache;
         private final Pool<FieldString> mFieldStringCache;
         private final Pool<FieldNested> mFieldNestedCache;
-        private final Pool<Flow> mFlowCache;
         private final Pool<Builder> mBuilderCache;
 
         private Builder() {
@@ -187,7 +186,6 @@ public final class PerfettoTrackEventExtra {
             mFieldDoubleCache = mExtra.mFieldDoubleCache;
             mFieldStringCache = mExtra.mFieldStringCache;
             mFieldNestedCache = mExtra.mFieldNestedCache;
-            mFlowCache = mExtra.mFlowCache;
             mBuilderCache = mExtra.mBuilderCache;
 
             mCounterInt64 = mExtra.getCounterInt64();
@@ -216,9 +214,6 @@ public final class PerfettoTrackEventExtra {
          * Initialize the builder for a new trace event.
          */
         public Builder init(int traceType, PerfettoTrace.Category category) {
-            if (!category.isEnabled()) {
-                return this;
-            }
             mTraceType = traceType;
             mCategory = category;
             mEventName = "";
@@ -227,11 +222,10 @@ public final class PerfettoTrackEventExtra {
             mFieldStringCache.reset();
             mFieldNestedCache.reset();
             mBuilderCache.reset();
-            mFlowCache.reset();
 
             mExtra.reset();
             // Reset after on init in case the thread created builders without calling emit
-            return initInternal(this, null, true);
+            return initInternal(this, null, category.isEnabled());
         }
 
         /**
@@ -325,39 +319,7 @@ public final class PerfettoTrackEventExtra {
         /**
          * Adds a flow with {@code id}.
          */
-        public Builder addFlow(int id) {
-            if (!mIsCategoryEnabled) {
-                return this;
-            }
-            if (DEBUG) {
-                checkParent();
-            }
-            Flow flow = mFlowCache.get(sFlowSupplier);
-            flow.setProcessFlow(id);
-            mExtra.addPerfettoPointer(flow);
-            return this;
-        }
-
-        /**
-         * Adds a terminating flow with {@code id}.
-         */
-        public Builder addTerminatingFlow(int id) {
-            if (!mIsCategoryEnabled) {
-                return this;
-            }
-            if (DEBUG) {
-                checkParent();
-            }
-            Flow flow = mFlowCache.get(sFlowSupplier);
-            flow.setProcessTerminatingFlow(id);
-            mExtra.addPerfettoPointer(flow);
-            return this;
-        }
-
-        /**
-         * Adds a flow with {@code id}.
-         */
-        public Builder setFlow(int id) {
+        public Builder setFlow(long id) {
             if (!mIsCategoryEnabled) {
                 return this;
             }
@@ -372,7 +334,7 @@ public final class PerfettoTrackEventExtra {
         /**
          * Adds a terminating flow with {@code id}.
          */
-        public Builder setTerminatingFlow(int id) {
+        public Builder setTerminatingFlow(long id) {
             if (!mIsCategoryEnabled) {
                 return this;
             }
@@ -670,7 +632,6 @@ public final class PerfettoTrackEventExtra {
     private final Pool<FieldDouble> mFieldDoubleCache = new Pool(DEFAULT_EXTRA_CACHE_SIZE);
     private final Pool<FieldString> mFieldStringCache = new Pool(DEFAULT_EXTRA_CACHE_SIZE);
     private final Pool<FieldNested> mFieldNestedCache = new Pool(DEFAULT_EXTRA_CACHE_SIZE);
-    private final Pool<Flow> mFlowCache = new Pool(DEFAULT_EXTRA_CACHE_SIZE);
     private final Pool<Builder> mBuilderCache = new Pool(DEFAULT_EXTRA_CACHE_SIZE);
 
     private static final NativeAllocationRegistry sRegistry =

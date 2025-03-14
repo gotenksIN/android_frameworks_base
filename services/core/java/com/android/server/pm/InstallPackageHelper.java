@@ -1104,6 +1104,9 @@ final class InstallPackageHelper {
     void doPostDexopt(List<ReconciledPackage> reconciledPackages,
             List<InstallRequest> requests, Map<String, Boolean> createdAppId,
             MoveInfo moveInfo, long acquireTime) {
+        for (InstallRequest request : requests) {
+            request.onWaitDexoptFinished();
+        }
         boolean success = false;
         try {
             if (commitInstallPackages(reconciledPackages)) {
@@ -1255,6 +1258,7 @@ final class InstallPackageHelper {
             CompletableFuture<Void> future =
                     DexOptHelper.performDexoptIfNeededAsync(request, mDexManager);
             completableFutures.add(future);
+            request.onWaitDexoptStarted();
         }
 
         if (!completableFutures.isEmpty()) {
@@ -1435,6 +1439,8 @@ final class InstallPackageHelper {
             Map<String, Boolean> createdAppId, boolean success) {
         if (success) {
             for (InstallRequest request : requests) {
+                mInjector.getAppOpsManagerInternal().onPackageAdded(
+                        request.getName(), request.getAppId());
                 if (request.getDataLoaderType() != DataLoaderType.INCREMENTAL) {
                     continue;
                 }

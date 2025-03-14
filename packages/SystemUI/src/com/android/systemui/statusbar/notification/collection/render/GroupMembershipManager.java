@@ -22,6 +22,7 @@ import android.annotation.Nullable;
 import com.android.systemui.statusbar.notification.collection.EntryAdapter;
 import com.android.systemui.statusbar.notification.collection.ListEntry;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.collection.PipelineEntry;
 
 import java.util.List;
 
@@ -50,17 +51,6 @@ public interface GroupMembershipManager {
     NotificationEntry getGroupSummary(@NonNull NotificationEntry entry);
 
     /**
-     * Gets the EntryAdapter that is the nearest root of the collection of rows the given entry
-     * belongs to. If the given entry is a BundleEntry or an isolated child of a BundleEntry, the
-     * BundleEntry will be returned. If the given notification is a group summary NotificationEntry,
-     * or a child of a group summary, the summary NotificationEntry will be returned, even if that
-     * summary belongs to a BundleEntry. If the entry is a notification that does not belong to any
-     * group or bundle grouping, null will be returned.
-     */
-    @Nullable
-    EntryAdapter getGroupRoot(@NonNull EntryAdapter entry);
-
-    /**
      * @return whether a given notification is a child in a group
      */
     boolean isChildInGroup(@NonNull NotificationEntry entry);
@@ -78,5 +68,5 @@ public interface GroupMembershipManager {
      * @return list of the children
      */
     @Nullable
-    List<NotificationEntry> getChildren(@NonNull ListEntry summary);
+    List<NotificationEntry> getChildren(@NonNull PipelineEntry summary);
 }

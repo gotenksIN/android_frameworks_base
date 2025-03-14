@@ -27,8 +27,6 @@ import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IInputConstants.UNMULTIPLIED_DEFAULT_DISPATCHING_TIMEOUT_MILLIS
 import android.os.SystemClock
-import android.provider.Settings
-import android.provider.Settings.Global.HIDE_ERROR_DIALOGS
 import android.server.wm.CtsWindowInfoUtils.waitForStableWindowGeometry
 import android.testing.PollingCheck
 
@@ -81,16 +79,11 @@ class AnrTest {
 
     @Before
     fun setUp() {
-        val contentResolver = instrumentation.targetContext.contentResolver
-        hideErrorDialogs = Settings.Global.getInt(contentResolver, HIDE_ERROR_DIALOGS, 0)
-        Settings.Global.putInt(contentResolver, HIDE_ERROR_DIALOGS, 0)
         PACKAGE_NAME = UnresponsiveGestureMonitorActivity::class.java.getPackage()!!.getName()
     }
 
     @After
     fun tearDown() {
-        val contentResolver = instrumentation.targetContext.contentResolver
-        Settings.Global.putInt(contentResolver, HIDE_ERROR_DIALOGS, hideErrorDialogs)
     }
 
     @Test

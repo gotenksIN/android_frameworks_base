@@ -43,8 +43,6 @@ import android.view.WindowManager.LayoutParams;
 import android.util.Log;
 // QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
 
-import com.android.aconfig.annotations.VisibleForTesting;
-
 /**
  * CompatibilityInfo class keeps the information about the screen compatibility mode that the
  * application is running under.
@@ -789,7 +787,6 @@ public class CompatibilityInfo implements Parcelable {
     }
 
     /** @see #sOverrideDisplayRotation */
-    @VisibleForTesting
     public static int getOverrideDisplayRotation() {
         return sOverrideDisplayRotation;
     }

@@ -46,6 +46,7 @@ import static android.view.Display.FLAG_PRIVATE;
 import static android.view.Display.FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.Display.STATE_UNKNOWN;
+import static android.view.Display.TYPE_EXTERNAL;
 import static android.view.Display.isSuspendedState;
 import static android.view.InsetsSource.ID_IME;
 import static android.view.Surface.ROTATION_0;
@@ -155,6 +156,8 @@ import static com.android.server.wm.utils.DisplayInfoOverrides.WM_OVERRIDE_FIELD
 import static com.android.server.wm.utils.DisplayInfoOverrides.copyDisplayInfoFields;
 import static com.android.server.wm.utils.RegionUtils.forEachRectReverse;
 import static com.android.server.wm.utils.RegionUtils.rectListToRegion;
+import static com.android.window.flags.Flags.enablePersistingDensityScaleForConnectedDisplays;
+import static com.android.window.flags.Flags.enablePresentationForConnectedDisplays;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -426,6 +429,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * @see WindowManagerService#setForcedDisplayDensityForUser(int, int, int)
      */
     int mBaseDisplayDensity = 0;
+
+    /**
+     * Ratio between overridden display density for current user and the initial display density,
+     * used only for external displays.
+     */
+    float mExternalDisplayForcedDensityRatio = 0.0f;
     boolean mIsDensityForced = false;
 
     /**
@@ -3065,6 +3074,17 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mDisplayPolicy.physicalDisplayChanged();
             }
 
+            // Real display metrics changed, so we should also update initial values.
+            mInitialDisplayWidth = newWidth;
+            mInitialDisplayHeight = newHeight;
+            mInitialDisplayDensity = newDensity;
+            mInitialPhysicalXDpi = newXDpi;
+            mInitialPhysicalYDpi = newYDpi;
+            mInitialDisplayCutout = newCutout;
+            mInitialRoundedCorners = newRoundedCorners;
+            mInitialDisplayShape = newDisplayShape;
+            mCurrentUniqueDisplayId = newUniqueId;
+
             // If there is an override set for base values - use it, otherwise use new values.
             updateBaseDisplayMetrics(mIsSizeForced ? mBaseDisplayWidth : newWidth,
                     mIsSizeForced ? mBaseDisplayHeight : newHeight,
@@ -3081,16 +3101,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mWmService.mDisplayWindowSettings.applyRotationSettingsToDisplayLocked(this);
             }
 
-            // Real display metrics changed, so we should also update initial values.
-            mInitialDisplayWidth = newWidth;
-            mInitialDisplayHeight = newHeight;
-            mInitialDisplayDensity = newDensity;
-            mInitialPhysicalXDpi = newXDpi;
-            mInitialPhysicalYDpi = newYDpi;
-            mInitialDisplayCutout = newCutout;
-            mInitialRoundedCorners = newRoundedCorners;
-            mInitialDisplayShape = newDisplayShape;
-            mCurrentUniqueDisplayId = newUniqueId;
             reconfigureDisplayLocked();
 
             if (physicalDisplayChanged) {
@@ -3143,6 +3153,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                         + mBaseDisplayHeight + " on display:" + getDisplayId());
             }
         }
+        // Update the base density if there is a forced density ratio.
+        if (enablePersistingDensityScaleForConnectedDisplays()
+                && mIsDensityForced && mExternalDisplayForcedDensityRatio != 0.0f) {
+            mBaseDisplayDensity = (int)
+                    (mInitialDisplayDensity * mExternalDisplayForcedDensityRatio + 0.5);
+        }
         if (mDisplayReady && !mDisplayPolicy.shouldKeepCurrentDecorInsets()) {
             mDisplayPolicy.mDecorInsets.invalidate();
         }
@@ -3171,6 +3187,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         if (density == getInitialDisplayDensity()) {
             density = 0;
+        }
+        // Save the new density ratio to settings for external displays.
+        if (enablePersistingDensityScaleForConnectedDisplays()
+                && mDisplayInfo.type == TYPE_EXTERNAL) {
+            mExternalDisplayForcedDensityRatio = (float)
+                    mBaseDisplayDensity / getInitialDisplayDensity();
+            mWmService.mDisplayWindowSettings.setForcedDensityRatio(getDisplayInfo(),
+                    mExternalDisplayForcedDensityRatio);
         }
         mWmService.mDisplayWindowSettings.setForcedDensity(getDisplayInfo(), density, userId);
     }
@@ -3271,7 +3295,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             return false;
         }
 
-        // TODO(b/391965805): Remove this after introducing FLAG_ALLOW_SYSTEM_DECORATIONS_CHANGE.
+        // TODO(b/391965805): Remove this after introducing FLAG_ALLOW_CONTENT_MODE_SWITCH.
+        if ((mDisplay.getFlags() & Display.FLAG_REAR) != 0) {
+            return false;
+        }
+
+        // TODO(b/391965805): Remove this after introducing FLAG_ALLOW_CONTENT_MODE_SWITCH.
         // Virtual displays cannot add or remove system decorations during their lifecycle.
         if (mDisplay.getType() == Display.TYPE_VIRTUAL) {
             return false;
@@ -3645,6 +3674,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         pw.println();
         super.dump(pw, prefix, dumpAll);
+        pw.print(prefix);
+        if (mHasSetIgnoreOrientationRequest) {
+            pw.print("mHasSetIgnoreOrientationRequest=true ");
+        }
+        pw.print("ignoreOrientationRequest="); pw.println(getIgnoreOrientationRequest());
         pw.print(prefix); pw.print("mLayoutSeq="); pw.println(mLayoutSeq);
 
         pw.print("  mCurrentFocus="); pw.println(mCurrentFocus);
@@ -3807,13 +3841,18 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     /**
      * Looking for the focused window on this display if the top focused display hasn't been
-     * found yet (topFocusedDisplayId is INVALID_DISPLAY) or per-display focused was allowed.
+     * found yet (topFocusedDisplayId is INVALID_DISPLAY), per-display focused was allowed, or
+     * the display is presenting. The last one is needed to update system bar visibility in response
+     * to presentation visibility because per-display focus is needed to change system bar
+     * visibility, but the display shouldn't get global focus when a presentation gets shown.
      *
      * @param topFocusedDisplayId Id of the top focused display.
      * @return The focused window or null if there isn't any or no need to seek.
      */
     WindowState findFocusedWindowIfNeeded(int topFocusedDisplayId) {
-        return (hasOwnFocus() || topFocusedDisplayId == INVALID_DISPLAY)
+        return (hasOwnFocus() || topFocusedDisplayId == INVALID_DISPLAY
+                || (enablePresentationForConnectedDisplays()
+                && mWmService.mPresentationController.isPresentationVisible(mDisplayId)))
                     ? findFocusedWindow() : null;
     }
 
@@ -5811,7 +5850,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         // For each window, we only take the rects that fall within its touchable region.
         forAllWindows(w -> {
             if (!w.canReceiveTouchInput() || !w.isVisible()
-                    || (w.getAttrs().flags & FLAG_NOT_TOUCHABLE) != 0
+                    || (w.mAttrs.flags & FLAG_NOT_TOUCHABLE) != 0
                     || unhandled.isEmpty()) {
                 return;
             }
@@ -5901,7 +5940,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if (win.mWmService.mConstants.mSystemGestureExclusionLogDebounceTimeoutMillis <= 0) {
             return false;
         }
-        final WindowManager.LayoutParams attrs = win.getAttrs();
+        final WindowManager.LayoutParams attrs = win.mAttrs;
         final int type = attrs.type;
         return type != TYPE_WALLPAPER
                 && type != TYPE_APPLICATION_STARTING
@@ -6536,6 +6575,22 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 .getKeyguardController().isKeyguardLocked(mDisplayId);
     }
 
+    boolean isKeyguardLockedOrAodShowing() {
+        return isKeyguardLocked() || isAodShowing();
+    }
+
+    /**
+     * @return whether aod is showing for this display
+     */
+    boolean isAodShowing() {
+        final boolean isAodShowing = mRootWindowContainer.mTaskSupervisor
+                .getKeyguardController().isAodShowing(mDisplayId);
+        if (mDisplayId == DEFAULT_DISPLAY && isAodShowing) {
+            return !isKeyguardGoingAway();
+        }
+        return isAodShowing;
+    }
+
     /**
      * @return whether keyguard is going away on this display
      */
@@ -6904,6 +6959,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         /** The actual requested visible inset types for this display */
         private @InsetsType int mRequestedVisibleTypes = WindowInsets.Type.defaultVisible();
 
+        private @InsetsType int mAnimatingTypes = 0;
+
         /** The component name of the top focused window on this display */
         private ComponentName mTopFocusedComponentName = null;
 
@@ -7040,6 +7097,18 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 return changedTypes;
             }
             return 0;
+        }
+
+        @Override
+        public @InsetsType int getAnimatingTypes() {
+            return mAnimatingTypes;
+        }
+
+        @Override
+        public void setAnimatingTypes(@InsetsType int animatingTypes) {
+            if (mAnimatingTypes != animatingTypes) {
+                mAnimatingTypes = animatingTypes;
+            }
         }
     }
 

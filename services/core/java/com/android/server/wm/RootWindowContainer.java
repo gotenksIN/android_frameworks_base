@@ -2968,13 +2968,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
 
         startHomeOnDisplay(mCurrentUser, reason, displayContent.getDisplayId());
-        if (enableDisplayContentModeManagement()) {
-            if (displayContent.isSystemDecorationsSupported()) {
-                displayContent.getDisplayPolicy().notifyDisplayAddSystemDecorations();
-            }
-        } else {
-            displayContent.getDisplayPolicy().notifyDisplayAddSystemDecorations();
-        }
+        displayContent.getDisplayPolicy().notifyDisplayAddSystemDecorations();
     }
 
     @Override

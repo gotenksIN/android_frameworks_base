@@ -227,7 +227,13 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
     /** Hides the IME for Bubbles when the device is locked. */
     public void hideImeForBubblesWhenLocked(int displayId) {
         PerDisplay pd = mImePerDisplay.get(displayId);
-        pd.setImeInputTargetRequestedVisibility(false, pd.getImeSourceControl().getImeStatsToken());
+        InsetsSourceControl imeSourceControl = pd.getImeSourceControl();
+        if (imeSourceControl != null) {
+            ImeTracker.Token imeStatsToken = imeSourceControl.getImeStatsToken();
+            if (imeStatsToken != null) {
+                pd.setImeInputTargetRequestedVisibility(false, imeStatsToken);
+            }
+        }
     }
 
     /** An implementation of {@link IDisplayWindowInsetsController} for a given display id. */
@@ -455,6 +461,14 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
             }
         }
 
+        private void setAnimating(boolean imeAnimationOngoing) {
+            int animatingTypes = imeAnimationOngoing ? WindowInsets.Type.ime() : 0;
+            try {
+                mWmService.updateDisplayWindowAnimatingTypes(mDisplayId, animatingTypes);
+            } catch (RemoteException e) {
+            }
+        }
+
         private int imeTop(float surfaceOffset, float surfacePositionY) {
             // surfaceOffset is already offset by the surface's top inset, so we need to subtract
             // the top inset so that the return value is in screen coordinates.
@@ -613,6 +627,9 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
                                 + imeTop(hiddenY, defaultY) + "->" + imeTop(shownY, defaultY)
                                 + " showing:" + (mAnimationDirection == DIRECTION_SHOW));
                     }
+                    if (android.view.inputmethod.Flags.reportAnimatingInsetsTypes()) {
+                        setAnimating(true);
+                    }
                     int flags = dispatchStartPositioning(mDisplayId, imeTop(hiddenY, defaultY),
                             imeTop(shownY, defaultY), mAnimationDirection == DIRECTION_SHOW,
                             isFloating, t);
@@ -660,6 +677,8 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
                     }
                     if (!android.view.inputmethod.Flags.refactorInsetsController()) {
                         dispatchEndPositioning(mDisplayId, mCancelled, t);
+                    } else if (android.view.inputmethod.Flags.reportAnimatingInsetsTypes()) {
+                        setAnimating(false);
                     }
                     if (mAnimationDirection == DIRECTION_HIDE && !mCancelled) {
                         ImeTracker.forLogging().onProgress(mStatsToken,

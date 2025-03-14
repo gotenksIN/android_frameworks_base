@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package android.telephony.ims;
@@ -942,6 +946,9 @@ public final class ImsCallProfile implements Parcelable {
      */
     public static int getVideoStateFromImsCallProfile(ImsCallProfile callProfile) {
         int videostate = getVideoStateFromCallType(callProfile.mCallType);
+        int dualVtCallType = callProfile.getDualVtCallType(videostate);
+
+        videostate = videostate | dualVtCallType;
         if (callProfile.isVideoPaused() && !VideoProfile.isAudioOnly(videostate)) {
             videostate |= VideoProfile.STATE_PAUSED;
         } else {
@@ -1299,5 +1306,10 @@ public final class ImsCallProfile implements Parcelable {
             rtpHeaderExtensions) {
         mAcceptedRtpHeaderExtensionTypes.clear();
         mAcceptedRtpHeaderExtensionTypes.addAll(rtpHeaderExtensions);
+    }
+
+    // helper function to retrieve dual VT call type from extras
+    private int getDualVtCallType(int callType) {
+        return getCallExtraInt("dualVtCallType", callType);
     }
 }

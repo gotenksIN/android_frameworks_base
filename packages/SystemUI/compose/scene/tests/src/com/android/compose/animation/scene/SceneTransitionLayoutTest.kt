@@ -97,7 +97,7 @@ class SceneTransitionLayoutTest {
             MutableSceneTransitionLayoutStateForTests(SceneA, EmptyTestTransitions)
         }
 
-        SceneTransitionLayout(state = layoutState, modifier = Modifier.size(LayoutSize)) {
+        SceneTransitionLayoutForTesting(state = layoutState, modifier = Modifier.size(LayoutSize)) {
             scene(SceneA, userActions = mapOf(Back to SceneB)) {
                 Box(Modifier.fillMaxSize()) {
                     SharedFoo(size = 50.dp, childOffset = 0.dp, Modifier.align(Alignment.TopEnd))
@@ -129,7 +129,7 @@ class SceneTransitionLayoutTest {
 
     @Composable
     private fun ContentScope.SharedFoo(size: Dp, childOffset: Dp, modifier: Modifier = Modifier) {
-        Element(TestElements.Foo, modifier.size(size).background(Color.Red)) {
+        ElementWithValues(TestElements.Foo, modifier.size(size).background(Color.Red)) {
             // Offset the single child of Foo by some animated shared offset.
             val offset by animateElementDpAsState(childOffset, TestValues.Value1)
 

@@ -105,13 +105,14 @@ import com.android.systemui.util.kotlin.JavaAdapter;
 
 import dalvik.annotation.optimization.NeverCompile;
 
+import dagger.Lazy;
+
+import kotlin.Unit;
+
 import java.io.PrintWriter;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
-
-import dagger.Lazy;
-import kotlin.Unit;
 
 /** Handles QuickSettings touch handling, expansion and animation state. */
 @SysUISingleton
@@ -2157,6 +2158,8 @@ public class QuickSettingsControllerImpl implements QuickSettingsController, Dum
 
     /** */
     public final class QsFragmentListener implements FragmentHostManager.FragmentListener {
+        private boolean mPreviouslyVisibleMedia = false;
+
         /** */
         @Override
         public void onFragmentViewCreated(String tag, Fragment fragment) {
@@ -2182,7 +2185,12 @@ public class QuickSettingsControllerImpl implements QuickSettingsController, Dum
                     setAnimateNextNotificationBounds(
                             StackStateAnimator.ANIMATION_DURATION_STANDARD, 0);
                     mNotificationStackScrollLayoutController.animateNextTopPaddingChange();
+                    if (QSComposeFragment.isEnabled() && mPreviouslyVisibleMedia && !visible) {
+                        updateHeightsOnShadeLayoutChange();
+                        mPanelViewControllerLazy.get().positionClockAndNotifications();
+                    }
                 }
+                mPreviouslyVisibleMedia = visible;
             });
             mLockscreenShadeTransitionController.setQS(mQs);
             if (QSComposeFragment.isEnabled()) {
@@ -2365,16 +2373,8 @@ public class QuickSettingsControllerImpl implements QuickSettingsController, Dum
             return;
         }
         if (startTracing) {
-            if (mQs != null) {
-                mQs.setQSExpandingOrCollapsing(true);
-            }
-
             monitor.begin(mPanelView, Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE);
         } else {
-            if (mQs != null) {
-                mQs.setQSExpandingOrCollapsing(false);
-            }
-
             if (wasCancelled) {
                 monitor.cancel(Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE);
             } else {

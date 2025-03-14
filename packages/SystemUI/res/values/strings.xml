@@ -1070,6 +1070,12 @@
     <!-- Content description of the button to expand the group of devices. [CHAR LIMIT=NONE] -->
     <string name="accessibility_expand_group">Expand group.</string>
 
+    <!-- Content description of the button to add a device to a group. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_add_device_to_group">Add device to group.</string>
+
+    <!-- Content description of the button to remove a device from a group. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_remove_device_from_group">Remove device from group.</string>
+
     <!-- Content description of the button to open the application . [CHAR LIMIT=NONE] -->
     <string name="accessibility_open_application">Open application.</string>
 
@@ -1434,7 +1440,7 @@
     <!-- QuickSettings: Brightness [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="quick_settings_brightness_unable_adjust_msg">Can\'t adjust brightness because it\'s being\n controlled by the top app</string>
+<string name="quick_settings_brightness_unable_adjust_msg">Can\'t adjust brightness because it\'s being controlled by the top app</string>
     <!-- QuickSettings: Rotation Unlocked [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1834,6 +1840,12 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="hearing_devices_ambient_control_right">Right</string>
+    <!-- QuickSettings: Content description for unified ambient control slider. [CHAR LIMIT=NONE] -->
+    <string name="hearing_devices_ambient_control_description">Surroundings</string>
+    <!-- QuickSettings: Content description for left ambient control slider. [CHAR LIMIT=NONE] -->
+    <string name="hearing_devices_ambient_control_left_description">Left surroundings</string>
+    <!-- QuickSettings: Content description for left ambient control slider. [CHAR LIMIT=NONE] -->
+    <string name="hearing_devices_ambient_control_right_description">Right surroundings</string>
     <!-- QuickSettings: Content description for a button, that expands ambient volume sliders [CHAR_LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -5335,8 +5347,8 @@
     <string name="controls_media_settings_button">Settings</string>
     <!-- Description for media control's playing media item, including information for the media's title, the artist, and source app [CHAR LIMIT=NONE]-->
     <string name="controls_media_playing_item_description"><xliff:g id="song_name" example="Daily mix">%1$s</xliff:g> by <xliff:g id="artist_name" example="Various artists">%2$s</xliff:g> is playing from <xliff:g id="app_label" example="Spotify">%3$s</xliff:g></string>
-    <!-- Content description for media controls progress bar [CHAR_LIMIT=NONE] -->
-    <string name="controls_media_seekbar_description"><xliff:g id="elapsed_time" example="1 hour 2 minutes 30 seconds">%1$s</xliff:g> of <xliff:g id="total_time" example="4 hours 5 seconds">%2$s</xliff:g></string>
+    <!-- Content description for media cotnrols progress bar [CHAR_LIMIT=NONE] -->
+    <string name="controls_media_seekbar_description"><xliff:g id="elapsed_time" example="1:30">%1$s</xliff:g> of <xliff:g id="total_time" example="3:00">%2$s</xliff:g></string>
     <!-- Placeholder title to inform user that an app has posted media controls [CHAR_LIMIT=NONE] -->
     <string name="controls_media_empty_title"><xliff:g id="app_name" example="Foo Music App">%1$s</xliff:g> is running</string>
 
@@ -6339,4 +6351,7 @@
     <string name="qs_edit_mode_reset_dialog_content">
         All Quick Settings tiles will reset to the device’s original settings
     </string>
+
+    <!-- Template that joins disabled message with the label for the voice over. [CHAR LIMIT=NONE] -->
+    <string name="volume_slider_disabled_message_template"><xliff:g example="Notification" id="stream_name">%1$s</xliff:g>, <xliff:g example="Disabled because ring is muted" id="disabled_message">%2$s</xliff:g></string>
 </resources>

@@ -17,12 +17,15 @@
 package com.android.systemui.statusbar.notification.collection;
 
 import android.content.Context;
+import android.service.notification.StatusBarNotification;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.systemui.statusbar.notification.icon.IconPack;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
+
+import kotlinx.coroutines.flow.StateFlow;
 
 /**
  * Adapter interface for UI to get relevant info.
@@ -51,15 +54,10 @@ public interface EntryAdapter {
     ExpandableNotificationRow getRow();
 
     /**
-     * Gets the EntryAdapter that is the nearest root of the collection of rows the given entry
-     * belongs to. If the given entry is a BundleEntry or an isolated child of a BundleEntry, the
-     * BundleEntry will be returned. If the given notification is a group summary NotificationEntry,
-     * or a child of a group summary, the summary NotificationEntry will be returned, even if that
-     * summary belongs to a BundleEntry. If the entry is a notification that does not belong to any
-     * group or bundle grouping, null will be returned.
+     * Whether this entry is the root of its collapsable 'group' - either a BundleEntry or a
+     * notification group summary
      */
-    @Nullable
-    EntryAdapter getGroupRoot();
+    boolean isGroupRoot();
 
     /**
      * @return whether the row can be removed with the 'Clear All' action
@@ -107,4 +105,35 @@ public interface EntryAdapter {
      * Retrieves the pack of icons associated with this entry
      */
     IconPack getIcons();
+
+    /**
+     * Returns whether the content of this entry is sensitive
+     */
+    StateFlow<Boolean> isSensitive();
+
+    /**
+     * Returns whether this row has a background color set by an app
+     */
+    boolean isColorized();
+
+    /**
+     * Returns the SBN that backs this row, if present
+     */
+    @Nullable
+    StatusBarNotification getSbn();
+
+    boolean canDragAndDrop();
+
+    boolean isBubbleCapable();
+
+    @Nullable String getStyle();
+
+    int getSectionBucket();
+
+    boolean isAmbient();
+
+    default boolean isFullScreenCapable() {
+        return false;
+    }
 }
+

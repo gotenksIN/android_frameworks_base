@@ -130,6 +130,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 class BroadcastController {
@@ -166,6 +167,12 @@ class BroadcastController {
      */
     @GuardedBy("mService")
     private ArraySet<String> mBackgroundLaunchBroadcasts;
+
+    /**
+    * Map of Broadcast actions to list of packages
+    * which can receive broadcast
+    */
+    private ArrayMap<String, Set<String>> mQtiBackgroundLaunchBroadcasts;
 
     /**
      * State of all active sticky broadcasts per user.  Keys are the action of the
@@ -1105,6 +1112,12 @@ class BroadcastController {
                 }
                 intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
             }
+            if (getQtiBackgroundLaunchBroadcasts().containsKey(action)) {
+                if (DEBUG_BACKGROUND_CHECK) {
+                    Slog.i(TAG, "Broadcast action qti " + action + " forcing include-background");
+                }
+                intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
+            }
 
             // TODO: b/329211459 - Remove this after background remote intent is fixed.
             if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
@@ -1605,6 +1618,23 @@ class BroadcastController {
                 }
             }
 
+            if(getQtiBackgroundLaunchBroadcasts().containsKey(intent.getAction())) {
+                 Set<String> nonSkipPackages = getQtiBackgroundLaunchBroadcasts().get(intent.getAction());
+                 List<ResolveInfo> packageAddedReceivers = new ArrayList<>();
+                 for (String nonSkipPackage : nonSkipPackages) {
+                    if (nonSkipPackage != null) {
+                        int NT = receivers.size();
+                        for (int it=0; it<NT; it++) {
+                            ResolveInfo curt = (ResolveInfo)receivers.get(it);
+                            if (curt.activityInfo.packageName.equals(nonSkipPackage)) {
+                                packageAddedReceivers.add(curt);
+                            }
+                        }
+                    }
+                }
+                receivers = packageAddedReceivers;
+            }
+
             int NT = receivers != null ? receivers.size() : 0;
             int it = 0;
             ResolveInfo curt = null;
@@ -1925,6 +1955,13 @@ class BroadcastController {
             mBackgroundLaunchBroadcasts = SystemConfig.getInstance().getAllowImplicitBroadcasts();
         }
         return mBackgroundLaunchBroadcasts;
+    }
+
+    private ArrayMap<String, Set<String>> getQtiBackgroundLaunchBroadcasts() {
+        if (mQtiBackgroundLaunchBroadcasts == null) {
+            mQtiBackgroundLaunchBroadcasts = SystemConfig.getInstance().getQtiAllowImplicitBroadcasts();
+        }
+        return mQtiBackgroundLaunchBroadcasts;
     }
 
     private boolean isInstantApp(ProcessRecord record, @Nullable String callerPackage, int uid) {

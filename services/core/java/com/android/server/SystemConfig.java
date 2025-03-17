@@ -367,6 +367,9 @@ public class SystemConfig {
     private ArrayMap<String, Set<String>> mPackageToUserTypeWhitelist = new ArrayMap<>();
     private ArrayMap<String, Set<String>> mPackageToUserTypeBlacklist = new ArrayMap<>();
 
+    // Map of intent actions to the list of packages that want to receive those broadcast actions
+    private ArrayMap<String, Set<String>> mQtiAllowImplicitBroadcasts = new ArrayMap<>();
+
     private final ArraySet<String> mRollbackWhitelistedPackages = new ArraySet<>();
     private final ArraySet<String> mWhitelistedStagedInstallers = new ArraySet<>();
     // A map from package name of vendor APEXes that can be updated to an installer package name
@@ -580,6 +583,15 @@ public class SystemConfig {
     public ArrayMap<String, Set<String>> getAndClearPackageToUserTypeWhitelist() {
         ArrayMap<String, Set<String>> r = mPackageToUserTypeWhitelist;
         mPackageToUserTypeWhitelist = new ArrayMap<>(0);
+        return r;
+    }
+
+    /**
+     * Gets map of intents to list of packages that want to receive those broadcast actions
+     */
+    public ArrayMap<String, Set<String>> getQtiAllowImplicitBroadcasts() {
+        ArrayMap<String, Set<String>> r = mQtiAllowImplicitBroadcasts;
+        mQtiAllowImplicitBroadcasts = new ArrayMap<>(0);
         return r;
     }
 
@@ -1540,6 +1552,10 @@ public class SystemConfig {
                         readInstallInUserType(parser,
                                 mPackageToUserTypeWhitelist, mPackageToUserTypeBlacklist);
                     } break;
+                    case "qti-allow-implicit-broadcast": {
+                        MapOfImplicitBroadcastToPackageNames(parser,
+                                mQtiAllowImplicitBroadcasts);
+                    } break;
                     case "named-actor": {
                         String namespace = TextUtils.safeIntern(
                                 parser.getAttributeValue(null, "namespace"));
@@ -1996,6 +2012,39 @@ public class SystemConfig {
                 userTypesNo.add(userType);
             } else {
                 Slog.w(TAG, "unrecognized tag in <install-in-user-type> in "
+                        + parser.getPositionDescription());
+            }
+        }
+    }
+
+    private void MapOfImplicitBroadcastToPackageNames(XmlPullParser parser,
+            Map<String, Set<String>> broadcastPackagesMap)
+            throws IOException, XmlPullParserException {
+        final String actionName = parser.getAttributeValue(null, "action");
+        if (TextUtils.isEmpty(actionName)) {
+            Slog.w(TAG, "actionName is required for <qti-allow-implicit-broadcast> in "
+                    + parser.getPositionDescription());
+            return;
+        }
+
+        Set<String> actionInSet = broadcastPackagesMap.get(actionName);
+        final int depth = parser.getDepth();
+        while (XmlUtils.nextElementWithin(parser, depth)) {
+            final String name = parser.getName();
+            if ("package-name".equals(name)) {
+                final String realPackageName = parser.getAttributeValue(null, "packagename");
+                if (TextUtils.isEmpty(realPackageName)) {
+                    Slog.w(TAG, "package-name is required for <qti-allow-implicit-broadcast> in "
+                            + parser.getPositionDescription());
+                    continue;
+                }
+                if (actionInSet == null) {
+                    actionInSet = new ArraySet<>();
+                    broadcastPackagesMap.put(actionName, actionInSet);
+                }
+                actionInSet.add(realPackageName);
+            } else {
+                Slog.w(TAG, "unrecognized tag in <qti-allow-implicit-broadcast> in "
                         + parser.getPositionDescription());
             }
         }

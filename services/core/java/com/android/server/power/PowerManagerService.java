@@ -7271,6 +7271,37 @@ public final class PowerManagerService extends SystemService
         }
     }
 
+    private void forceDisplaySleepInternal() {
+        synchronized (mLock) {
+            if (!SystemProperties.getBoolean("config.enable_qti_suspend_manager", false)) {
+                Slog.e(TAG, "forceDisplaySleep is not enabled!");
+                return;
+            }
+            mForceSuspendActive = true;
+            goToSleepInternal(DEFAULT_DISPLAY_GROUP_IDS,
+                            mClock.uptimeMillis(),
+                            PowerManager.GO_TO_SLEEP_REASON_FORCE_SUSPEND,
+                            0);
+        }
+    }
+
+    private void wakeupFromForceDisplaySleepInternal() {
+        synchronized (mLock) {
+            if (!SystemProperties.getBoolean("config.enable_qti_suspend_manager", false)) {
+                Slog.e(TAG, "wakeupFromForceDisplay is not enabled!");
+                return;
+            }
+            mForceSuspendActive = false;
+            wakePowerGroupLocked(mPowerGroups.get(Display.DEFAULT_DISPLAY_GROUP),
+                            mClock.uptimeMillis(),
+                            PowerManager.WAKE_REASON_UNKNOWN,
+                            "wakeupFromForceDisplaySleepInternal",
+                            Process.SYSTEM_UID,
+                            mContext.getOpPackageName(),
+                            Process.SYSTEM_UID);
+       }
+    }
+
     @VisibleForTesting
     final class LocalService extends PowerManagerInternal {
         @Override
@@ -7451,6 +7482,16 @@ public final class PowerManagerService extends SystemService
             synchronized (mLock) {
                 updateSettingsLocked();
             }
+        }
+
+        @Override
+        public void forceDisplaySleep() {
+            forceDisplaySleepInternal();
+        }
+
+        @Override
+        public void wakeupFromForceDisplaySleep() {
+            wakeupFromForceDisplaySleepInternal();
         }
     }
 

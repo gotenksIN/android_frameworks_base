@@ -141,6 +141,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     private BluetoothLeBroadcastMetadata mBluetoothLeBroadcastMetadata;
     private BluetoothLeAudioContentMetadata.Builder mBuilder;
     private int mBroadcastId = UNKNOWN_VALUE_PLACEHOLDER;
+    private final Object mBroadcastIdLock = new Object();
     private String mAppSourceName = "";
     private String mNewAppSourceName = "";
     private boolean mIsBroadcastProfileReady = false;
@@ -674,11 +675,15 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
 
     private void setLatestBroadcastId(int broadcastId) {
         Log.d(TAG, "setLatestBroadcastId: mBroadcastId is " + broadcastId);
-        mBroadcastId = broadcastId;
+        synchronized (mBroadcastIdLock) {
+            mBroadcastId = broadcastId;
+        }
     }
 
     public int getLatestBroadcastId() {
-        return mBroadcastId;
+        synchronized (mBroadcastIdLock) {
+            return mBroadcastId;
+        }
     }
 
     private void setAppSourceName(String appSourceName, boolean updateContentResolver) {
@@ -709,10 +714,12 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
 
     private void setLatestBluetoothLeBroadcastMetadata(
             BluetoothLeBroadcastMetadata bluetoothLeBroadcastMetadata) {
-        if (bluetoothLeBroadcastMetadata != null
-                && bluetoothLeBroadcastMetadata.getBroadcastId() == mBroadcastId) {
-            mBluetoothLeBroadcastMetadata = bluetoothLeBroadcastMetadata;
-            updateBroadcastInfoFromBroadcastMetadata(bluetoothLeBroadcastMetadata);
+        synchronized (mBroadcastIdLock) {
+            if (bluetoothLeBroadcastMetadata != null
+                    && bluetoothLeBroadcastMetadata.getBroadcastId() == mBroadcastId) {
+                mBluetoothLeBroadcastMetadata = bluetoothLeBroadcastMetadata;
+                updateBroadcastInfoFromBroadcastMetadata(bluetoothLeBroadcastMetadata);
+            }
         }
     }
 
@@ -724,11 +731,14 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         if (mBluetoothLeBroadcastMetadata == null) {
             final List<BluetoothLeBroadcastMetadata> metadataList =
                     mServiceBroadcast.getAllBroadcastMetadata();
-            mBluetoothLeBroadcastMetadata =
-                    metadataList.stream()
-                            .filter(i -> i.getBroadcastId() == mBroadcastId)
-                            .findFirst()
-                            .orElse(null);
+            synchronized (mBroadcastIdLock) {
+                Log.d(TAG, "mBroadcastId: " + mBroadcastId);
+                mBluetoothLeBroadcastMetadata =
+                        metadataList.stream()
+                                .filter(i -> i.getBroadcastId() == mBroadcastId)
+                                .findFirst()
+                                .orElse(null);
+            }
         }
         return mBluetoothLeBroadcastMetadata;
     }
@@ -802,7 +812,9 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
      * the corresponding callback {@link BluetoothLeBroadcast.Callback}.
      */
     public void stopLatestBroadcast() {
-        stopBroadcast(mBroadcastId);
+        synchronized (mBroadcastIdLock) {
+            stopBroadcast(mBroadcastId);
+        }
     }
 
     /**
@@ -837,7 +849,9 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
         mNewAppSourceName = appSourceName;
         mBluetoothLeAudioContentMetadata = mBuilder.setProgramInfo(programInfo).build();
-        mServiceBroadcast.updateBroadcast(mBroadcastId, mBluetoothLeAudioContentMetadata);
+        synchronized (mBroadcastIdLock) {
+            mServiceBroadcast.updateBroadcast(mBroadcastId, mBluetoothLeAudioContentMetadata);
+        }
     }
 
     /**
@@ -871,7 +885,9 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                             + " programInfo = "
                             + programInfo);
         }
-        mServiceBroadcast.updateBroadcast(mBroadcastId, settings);
+        synchronized (mBroadcastIdLock) {
+            mServiceBroadcast.updateBroadcast(mBroadcastId, settings);
+        }
     }
 
     /**
@@ -1087,7 +1103,9 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
         setAppSourceName("", /* updateContentResolver= */ true);
         mBluetoothLeBroadcastMetadata = null;
-        mBroadcastId = UNKNOWN_VALUE_PLACEHOLDER;
+        synchronized (mBroadcastIdLock) {
+            mBroadcastId = UNKNOWN_VALUE_PLACEHOLDER;
+        }
     }
 
     private static String generateRandomPassword() {
@@ -1210,10 +1228,12 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                         device -> {
                             List<BluetoothLeBroadcastReceiveState> sourceList =
                                     mServiceBroadcastAssistant.getAllSources(device);
-                            return !sourceList.isEmpty() && sourceList.stream().anyMatch(
-                                    source -> hysteresisModeFixEnabled
-                                            ? BluetoothUtils.isSourceMatched(source, mBroadcastId)
-                                            : BluetoothUtils.isConnected(source));
+                            synchronized (mBroadcastIdLock) {
+                                return !sourceList.isEmpty() && sourceList.stream().anyMatch(
+                                        source -> hysteresisModeFixEnabled
+                                                ? BluetoothUtils.isSourceMatched(source, mBroadcastId)
+                                                : BluetoothUtils.isConnected(source));
+                            }
                         })
                 .collect(Collectors.groupingBy(
                         device -> BluetoothUtils.getGroupId(mDeviceManager.findDevice(device))));

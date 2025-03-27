@@ -24,7 +24,7 @@ import com.android.keyguard.KeyguardUpdateMonitorCallback
 import com.android.systemui.biometrics.AuthController
 import com.android.systemui.biometrics.data.repository.FacePropertyRepository
 import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
-import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
+import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
@@ -662,12 +662,12 @@ constructor(
     }
 
     override fun setShowKeyguardWhenReenabled(isShowKeyguardWhenReenabled: Boolean) {
-        SceneContainerFlag.assertInNewMode()
+        SceneContainerFlag.unsafeAssertInNewMode()
         this.isShowKeyguardWhenReenabled = isShowKeyguardWhenReenabled
     }
 
     override fun isShowKeyguardWhenReenabled(): Boolean {
-        SceneContainerFlag.assertInNewMode()
+        SceneContainerFlag.unsafeAssertInNewMode()
         return isShowKeyguardWhenReenabled
     }
 

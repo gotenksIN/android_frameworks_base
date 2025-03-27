@@ -168,10 +168,10 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
@@ -349,6 +349,7 @@ import com.android.server.wm.WindowManagerInternal;
 
 import com.google.android.collect.Lists;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 
 import libcore.junit.util.compat.CoreCompatChangeRule.DisableCompatChanges;
 import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
@@ -2788,8 +2789,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 nr1.getSbn().getId(), nr1.getSbn().getUserId());
         waitForIdle();
 
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr0), any());
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr1), any());
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr0), any(), eq(false));
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr1), any(), eq(false));
 
         // GroupHelper would send 'remove summary' event
         mService.clearAutogroupSummaryLocked(nr1.getUserId(), nr1.getSbn().getPackageName(),
@@ -3155,8 +3156,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         waitForIdle();
 
         // Check that onGroupedNotificationRemovedWithDelay was called only once
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r1), any());
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r2), any());
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r1), any(), eq(false));
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r2), any(), eq(false));
         verify(mGroupHelper, times(1)).onGroupedNotificationRemovedWithDelay(eq(summary), any(),
                 any());
     }
@@ -3201,9 +3202,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         waitForIdle();
 
         // Check that onGroupedNotificationRemovedWithDelay was never called: summary was canceled
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r1), any());
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r2), any());
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(summary), any());
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r1), any(), eq(false));
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(r2), any(), eq(false));
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(summary), any(), eq(false));
         verify(mGroupHelper, never()).onGroupedNotificationRemovedWithDelay(any(), any(), any());
     }
 
@@ -5197,41 +5198,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         doThrow(new SecurityException("no access")).when(mUgmInternal)
                 .checkGrantUriPermission(eq(Process.myUid()), any(), eq(soundUri),
                 anyInt(), eq(Process.myUserHandle().getIdentifier()));
-
-        mBinderService.updateNotificationChannelFromPrivilegedListener(
-                null, mPkg, Process.myUserHandle(), updatedNotificationChannel);
-
-        verify(mPreferencesHelper, times(1)).updateNotificationChannel(
-                anyString(), anyInt(), any(), anyBoolean(),  anyInt(), anyBoolean());
-
-        verify(mListeners, never()).notifyNotificationChannelChanged(eq(mPkg),
-                eq(Process.myUserHandle()), eq(mTestNotificationChannel),
-                eq(NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_UPDATED));
-    }
-
-    @Test
-    public void
-        updateNotificationChannelFromPrivilegedListener_oldSoundNoUriPerm_newSoundHasUriPerm()
-            throws Exception {
-        mService.setPreferencesHelper(mPreferencesHelper);
-        when(mCompanionMgr.getAssociations(mPkg, mUserId))
-                .thenReturn(singletonList(mock(AssociationInfo.class)));
-        when(mPreferencesHelper.getNotificationChannel(eq(mPkg), anyInt(),
-                eq(mTestNotificationChannel.getId()), anyBoolean()))
-                .thenReturn(mTestNotificationChannel);
-
-        // Missing Uri permissions for the old channel sound
-        final Uri oldSoundUri = Settings.System.DEFAULT_NOTIFICATION_URI;
-        doThrow(new SecurityException("no access")).when(mUgmInternal)
-                .checkGrantUriPermission(eq(Process.myUid()), any(), eq(oldSoundUri),
-                anyInt(), eq(Process.myUserHandle().getIdentifier()));
-
-        // Has Uri permissions for the old channel sound
-        final Uri newSoundUri = Uri.parse("content://media/test/sound/uri");
-        final NotificationChannel updatedNotificationChannel = new NotificationChannel(
-                TEST_CHANNEL_ID, TEST_CHANNEL_ID, IMPORTANCE_DEFAULT);
-        updatedNotificationChannel.setSound(newSoundUri,
-                updatedNotificationChannel.getAudioAttributes());
 
         mBinderService.updateNotificationChannelFromPrivilegedListener(
                 null, mPkg, Process.myUserHandle(), updatedNotificationChannel);
@@ -14122,9 +14088,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         waitForIdle();
 
         // Check that child notifications are also removed
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(aggregateSummary), any());
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr0), any());
-        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr1), any());
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(aggregateSummary), any(),
+                eq(false));
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr0), any(), eq(false));
+        verify(mGroupHelper, times(1)).onNotificationRemoved(eq(nr1), any(), eq(false));
 
         // Make sure the summary was removed and not re-posted
         assertThat(mService.getNotificationRecordCount()).isEqualTo(0);
@@ -18659,4 +18626,35 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         }
     }
 
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void clearAll_fromUser_willSendDeleteIntentForCachedSummaries() throws Exception {
+        NotificationRecord n = generateNotificationRecord(
+                mTestNotificationChannel, 1, "group", true);
+        mBinderService.enqueueNotificationWithTag(mPkg, mPkg, "tag",
+                n.getSbn().getId(), n.getSbn().getNotification(), n.getSbn().getUserId());
+        waitForIdle();
+        n = Iterables.getOnlyElement(mService.mNotificationList);
+
+        mService.mNotificationDelegate.onClearAll(mUid, Binder.getCallingPid(), n.getUserId());
+        waitForIdle();
+
+        verify(mGroupHelper).onNotificationRemoved(eq(n), any(), eq(true));
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void cancel_fromApp_willNotSendDeleteIntentForCachedSummaries() throws Exception {
+        NotificationRecord n = generateNotificationRecord(
+                mTestNotificationChannel, 1, "group", true);
+        mBinderService.enqueueNotificationWithTag(mPkg, mPkg, "tag",
+                n.getSbn().getId(), n.getSbn().getNotification(), n.getSbn().getUserId());
+        waitForIdle();
+        n = Iterables.getOnlyElement(mService.mNotificationList);
+
+        mBinderService.cancelAllNotifications(mPkg, mUserId);
+        waitForIdle();
+
+        verify(mGroupHelper).onNotificationRemoved(eq(n), any(), eq(false));
+    }
 }

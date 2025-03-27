@@ -56,13 +56,11 @@ import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnec
 import com.android.systemui.statusbar.policy.data.repository.FakeUserSetupRepository
 import com.android.systemui.testKosmos
 import com.android.systemui.util.CarrierConfigTracker
-import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -136,7 +134,6 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
-                mock(),
             )
 
         interactor =
@@ -152,16 +149,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 iconsInteractor.isDefaultConnectionFailed,
                 iconsInteractor.isForceHidden,
                 repository,
-                iconsInteractor.alwaysUseRsrpLevelForLte,
-                iconsInteractor.hideNoInternetState,
-                iconsInteractor.networkTypeIconCustomization,
-                iconsInteractor.showVolteIcon,
-                iconsInteractor.showVowifiIcon,
                 context,
-                MutableStateFlow(0),
-                MutableStateFlow(null),
-                MutableStateFlow(false),
-                iconsInteractor.carrierNameCustomization,
                 MobileIconCarrierIdOverridesFake(),
             )
         createAndSetViewModel()

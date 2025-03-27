@@ -1118,11 +1118,11 @@ class ActivityClientController extends IActivityClientController.Stub {
                     false /* fromClient */);
         }
 
+        final EnterPipRequestedItem item = new EnterPipRequestedItem(r.token);
         try {
-            final EnterPipRequestedItem item = new EnterPipRequestedItem(r.token);
-            mService.getLifecycleManager().scheduleTransactionItem(r.app.getThread(), item);
-            return true;
-        } catch (Exception e) {
+            return mService.getLifecycleManager().scheduleTransactionItem(r.app.getThread(), item);
+        } catch (RemoteException e) {
+            // TODO(b/323801078): remove Exception when cleanup
             Slog.w(TAG, "Failed to send enter pip requested item: "
                     + r.intent.getComponent(), e);
             return false;
@@ -1134,10 +1134,11 @@ class ActivityClientController extends IActivityClientController.Stub {
      */
     void onPictureInPictureUiStateChanged(@NonNull ActivityRecord r,
             PictureInPictureUiState pipState) {
+        final PipStateTransactionItem item = new PipStateTransactionItem(r.token, pipState);
         try {
-            final PipStateTransactionItem item = new PipStateTransactionItem(r.token, pipState);
             mService.getLifecycleManager().scheduleTransactionItem(r.app.getThread(), item);
-        } catch (Exception e) {
+        } catch (RemoteException e) {
+            // TODO(b/323801078): remove Exception when cleanup
             Slog.w(TAG, "Failed to send pip state transaction item: "
                     + r.intent.getComponent(), e);
         }
@@ -1515,9 +1516,6 @@ class ActivityClientController extends IActivityClientController.Stub {
         synchronized (mGlobalLock) {
             final ActivityRecord r = ActivityRecord.isInRootTaskLocked(token);
             if (r != null && r.isState(RESUMED, PAUSING)) {
-                r.mDisplayContent.mAppTransition.overridePendingAppTransition(
-                        packageName, enterAnim, exitAnim, backgroundColor, null, null,
-                        r.mOverrideTaskTransition);
                 r.mTransitionController.setOverrideAnimation(
                         TransitionInfo.AnimationOptions.makeCustomAnimOptions(packageName,
                                 enterAnim, 0 /* changeResId */, exitAnim,

@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.android.systemui.statusbar.pipeline.shared.ui.viewmodel
-
 import android.content.Context
 import android.text.Html
 import com.android.systemui.common.shared.model.ContentDescription
@@ -45,7 +43,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-
 /**
  * View model for the quick settings [InternetTile]. This model exposes mainly a single flow of
  * InternetTileModel objects, so that updating the tile is as simple as collecting on this state
@@ -64,7 +61,6 @@ constructor(
     @Background scope: CoroutineScope,
 ) {
     private val internetLabel: String = context.getString(R.string.quick_settings_internet_label)
-
     // Three symmetrical Flows that can be switched upon based on the value of
     // [DefaultConnectionModel]
     private val wifiIconFlow: Flow<InternetTileModel> =
@@ -84,7 +80,6 @@ constructor(
                 notConnectedFlow
             }
         }
-
     private val mobileDataContentName: Flow<CharSequence?> =
         mobileIconsInteractor.activeDataIconInteractor.flatMapLatest {
             if (it == null) {
@@ -105,19 +100,15 @@ constructor(
                 }
             }
         }
-
     private val mobileIconFlow: Flow<InternetTileModel> =
         mobileIconsInteractor.activeDataIconInteractor.flatMapLatest {
             if (it == null) {
                 notConnectedFlow
             } else {
-                combine(
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
-                    it.customizedNetworkName,
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
-                    it.signalLevelIcon,
-                    mobileDataContentName,
-                ) { networkNameModel, signalIcon, dataContentDescription ->
+                combine(it.networkName, it.signalLevelIcon, mobileDataContentName) {
+                    networkNameModel,
+                    signalIcon,
+                    dataContentDescription ->
                     when (signalIcon) {
                         is SignalIconModel.Cellular -> {
                             val secondary =
@@ -146,7 +137,6 @@ constructor(
                 }
             }
         }
-
     private fun mobileDataContentConcat(
         networkName: String?,
         dataContentDescription: CharSequence?,
@@ -157,7 +147,6 @@ constructor(
         if (networkName == null) {
             return Html.fromHtml(dataContentDescription.toString(), 0)
         }
-
         return Html.fromHtml(
             context.getString(
                 R.string.mobile_carrier_text_format,
@@ -167,14 +156,12 @@ constructor(
             0,
         )
     }
-
     private fun loadString(resId: Int): CharSequence? =
         if (resId > 0) {
             context.getString(resId)
         } else {
             null
         }
-
     private val ethernetIconFlow: Flow<InternetTileModel> =
         ethernetInteractor.icon.flatMapLatest {
             if (it == null) {
@@ -191,7 +178,6 @@ constructor(
                 )
             }
         }
-
     private val notConnectedFlow: StateFlow<InternetTileModel> =
         combine(wifiInteractor.areNetworksAvailable, airplaneModeRepository.isAirplaneMode) {
                 networksAvailable,
@@ -223,7 +209,6 @@ constructor(
                 }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), NOT_CONNECTED_NETWORKS_UNAVAILABLE)
-
     /**
      * Strict ordering of which repo is sending its data to the internet tile. Swaps between each of
      * the interim providers (wifi, mobile, ethernet, or not-connected)
@@ -237,11 +222,9 @@ constructor(
                 else -> notConnectedFlow
             }
         }
-
     /** Consumable flow describing the correct state for the InternetTile */
     val tileModel: StateFlow<InternetTileModel> =
         activeModelProvider.stateIn(scope, SharingStarted.WhileSubscribed(), notConnectedFlow.value)
-
     companion object {
         val NOT_CONNECTED_NETWORKS_UNAVAILABLE =
             InternetTileModel.Inactive(
@@ -251,7 +234,6 @@ constructor(
                 contentDescription =
                     ContentDescription.Resource(R.string.quick_settings_networks_unavailable),
             )
-
         private fun removeDoubleQuotes(string: String?): String? {
             if (string == null) return null
             val length = string.length
@@ -259,7 +241,6 @@ constructor(
                 string.substring(1, length - 1)
             } else string
         }
-
         private fun ContentDescription.toText(): Text =
             when (this) {
                 is ContentDescription.Loaded -> Text.Loaded(this.description)

@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
- */
-
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 
 import android.platform.test.annotations.DisableFlags
@@ -51,11 +45,8 @@ import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -550,36 +541,6 @@ class MobileIconInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun alwaysUseRsrpLevelForLte_matchesParent() =
-        runBlocking(IMMEDIATE) {
-            var latest: Boolean? = null
-            val job = underTest.alwaysUseRsrpLevelForLte.onEach { latest = it }.launchIn(this)
-
-            mobileIconsInteractor.alwaysUseRsrpLevelForLte.value = true
-            assertThat(latest).isTrue()
-
-            mobileIconsInteractor.alwaysUseRsrpLevelForLte.value = false
-            assertThat(latest).isFalse()
-
-            job.cancel()
-        }
-
-    @Test
-    fun hideNoInternetState_matchesParent() =
-        runBlocking(IMMEDIATE) {
-            var latest: Boolean? = null
-            val job = underTest.hideNoInternetState.onEach { latest = it }.launchIn(this)
-
-            mobileIconsInteractor.hideNoInternetState.value = true
-            assertThat(latest).isTrue()
-
-            mobileIconsInteractor.hideNoInternetState.value = false
-            assertThat(latest).isFalse()
-
-            job.cancel()
-        }
-
-    @Test
     fun isAllowedDuringAirplaneMode_matchesRepo() =
         testScope.runTest {
             val latest by collectLastValue(underTest.isAllowedDuringAirplaneMode)
@@ -889,16 +850,7 @@ class MobileIconInteractorTest : SysuiTestCase() {
             mobileIconsInteractor.isDefaultConnectionFailed,
             mobileIconsInteractor.isForceHidden,
             connectionRepository,
-            mobileIconsInteractor.alwaysUseRsrpLevelForLte,
-            mobileIconsInteractor.hideNoInternetState,
-            mobileIconsInteractor.networkTypeIconCustomization,
-            mobileIconsInteractor.showVolteIcon,
-            mobileIconsInteractor.showVowifiIcon,
             context,
-            MutableStateFlow(0),
-            MutableStateFlow(null),
-            MutableStateFlow(false),
-            mock(),
             overrides,
         )
 
@@ -912,6 +864,5 @@ class MobileIconInteractorTest : SysuiTestCase() {
         private val DEFAULT_NAME_MODEL = NetworkNameModel.Default(DEFAULT_NAME)
         private const val DERIVED_NAME = "test derived name"
         private val DERIVED_NAME_MODEL = NetworkNameModel.IntentDerived(DERIVED_NAME)
-        private val IMMEDIATE = Dispatchers.Main.immediate
     }
 }

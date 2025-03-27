@@ -17,7 +17,6 @@
 package com.android.server.wm;
 
 import static android.Manifest.permission.ACCESS_SURFACE_FLINGER;
-import static android.Manifest.permission.CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS;
 import static android.Manifest.permission.INPUT_CONSUMER;
 import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
 import static android.Manifest.permission.MANAGE_APP_TOKENS;
@@ -88,7 +87,6 @@ import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
 import static android.view.WindowManager.LayoutParams.TYPE_VOICE_INTERACTION;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
 import static android.view.WindowManager.REMOVE_CONTENT_MODE_UNDEFINED;
-import static android.view.WindowManager.TRANSIT_NONE;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.fixScale;
@@ -147,6 +145,7 @@ import static com.android.server.wm.WindowManagerDebugConfig.SHOW_VERBOSE_TRANSA
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerInternal.OnWindowRemovedListener;
+import static com.android.server.wm.WindowManagerInternal.WindowFocusChangeListener;
 import static com.android.server.wm.WindowManagerServiceDumpProto.BACK_NAVIGATION;
 import static com.android.server.wm.WindowManagerServiceDumpProto.FOCUSED_APP;
 import static com.android.server.wm.WindowManagerServiceDumpProto.FOCUSED_DISPLAY_ID;
@@ -360,7 +359,6 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
-import com.android.server.wallpaper.WallpaperCropper.WallpaperCropUtils;
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
@@ -1095,14 +1093,12 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private ViewServer mViewServer;
     final ArrayList<WindowChangeListener> mWindowChangeListeners = new ArrayList<>();
+    final ArrayList<WindowFocusChangeListener> mWindowFocusChangeListeners = new ArrayList<>();
     boolean mWindowsChanged = false;
 
-    public interface WindowChangeListener {
+    interface WindowChangeListener {
         /** Notify on windows changed */
         void windowsChanged();
-
-        /** Notify on focus changed */
-        void focusChanged();
     }
 
     final HighRefreshRateDenylist mHighRefreshRateDenylist;
@@ -3265,49 +3261,17 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    // TODO(multi-display): remove when no default display use case.
-    void prepareAppTransitionNone() {
-        if (!checkCallingPermission(MANAGE_APP_TOKENS, "prepareAppTransition()")) {
-            throw new SecurityException("Requires MANAGE_APP_TOKENS permission");
-        }
-        getDefaultDisplayContentLocked().prepareAppTransition(TRANSIT_NONE);
-    }
-
     @Override
     public void overridePendingAppTransitionMultiThumbFuture(
             IAppTransitionAnimationSpecsFuture specsFuture, IRemoteCallback callback,
             boolean scaleUp, int displayId) {
-        synchronized (mGlobalLock) {
-            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
-            if (displayContent == null) {
-                Slog.w(TAG, "Attempted to call overridePendingAppTransitionMultiThumbFuture"
-                        + " for the display " + displayId + " that does not exist.");
-                return;
-            }
-            displayContent.mAppTransition.overridePendingAppTransitionMultiThumbFuture(specsFuture,
-                    callback, scaleUp);
-        }
+        // TODO(b/365884835): remove this method and callers.
     }
 
     @Override
     public void overridePendingAppTransitionRemote(RemoteAnimationAdapter remoteAnimationAdapter,
             int displayId) {
-        if (!checkCallingPermission(CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS,
-                "overridePendingAppTransitionRemote()")) {
-            throw new SecurityException(
-                    "Requires CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS permission");
-        }
-        synchronized (mGlobalLock) {
-            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
-            if (displayContent == null) {
-                Slog.w(TAG, "Attempted to call overridePendingAppTransitionRemote"
-                        + " for the display " + displayId + " that does not exist.");
-                return;
-            }
-            remoteAnimationAdapter.setCallingPidUid(Binder.getCallingPid(), Binder.getCallingUid());
-            displayContent.mAppTransition.overridePendingAppTransitionRemote(
-                    remoteAnimationAdapter);
-        }
+        // TODO(b/365884835): remove this method and callers.
     }
 
     @Override
@@ -3421,11 +3385,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
             }
         }
-    }
-
-    @Override
-    public boolean isAppTransitionStateIdle() {
-        return getDefaultDisplayContentLocked().mAppTransition.isIdle();
     }
 
     @Override
@@ -5395,15 +5354,27 @@ public class WindowManagerService extends IWindowManager.Stub
         return success;
     }
 
-    public void addWindowChangeListener(WindowChangeListener listener) {
+    void addWindowChangeListener(WindowChangeListener listener) {
         synchronized (mGlobalLock) {
             mWindowChangeListeners.add(listener);
         }
     }
 
-    public void removeWindowChangeListener(WindowChangeListener listener) {
+    void removeWindowChangeListener(WindowChangeListener listener) {
         synchronized (mGlobalLock) {
             mWindowChangeListeners.remove(listener);
+        }
+    }
+
+    void addWindowFocusChangeListener(WindowFocusChangeListener listener) {
+        synchronized (mGlobalLock) {
+            mWindowFocusChangeListeners.add(listener);
+        }
+    }
+
+    void removeWindowFocusChangeListener(WindowFocusChangeListener listener) {
+        synchronized (mGlobalLock) {
+            mWindowFocusChangeListeners.remove(listener);
         }
     }
 
@@ -5439,18 +5410,19 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    private void notifyFocusChanged() {
-        WindowChangeListener[] windowChangeListeners;
+    private void notifyFocusChanged(IBinder focusedWindowToken) {
+        WindowFocusChangeListener[] windowFocusChangeListeners;
         synchronized (mGlobalLock) {
-            if(mWindowChangeListeners.isEmpty()) {
+            if(mWindowFocusChangeListeners.isEmpty()) {
                 return;
             }
-            windowChangeListeners = new WindowChangeListener[mWindowChangeListeners.size()];
-            windowChangeListeners = mWindowChangeListeners.toArray(windowChangeListeners);
+            windowFocusChangeListeners =
+                    new WindowFocusChangeListener[mWindowFocusChangeListeners.size()];
+            mWindowFocusChangeListeners.toArray(windowFocusChangeListeners);
         }
-        int N = windowChangeListeners.length;
+        int N = windowFocusChangeListeners.length;
         for(int i = 0; i < N; i++) {
-            windowChangeListeners[i].focusChanged();
+            windowFocusChangeListeners[i].focusChanged(focusedWindowToken);
         }
     }
 
@@ -5725,7 +5697,7 @@ public class WindowManagerService extends IWindowManager.Stub
         if (newFocusedWindow != null && newFocusedWindow.mInputChannelToken == newToken) {
             mAnrController.onFocusChanged(newFocusedWindow);
             newFocusedWindow.reportFocusChangedSerialized(true);
-            notifyFocusChanged();
+            notifyFocusChanged(newTarget.getWindowToken());
         }
 
         WindowState lastFocusedWindow = lastTarget != null ? lastTarget.getWindowState() : null;
@@ -6913,7 +6885,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 pw.print(' '); pw.println(imeControlTarget);
             }
             pw.print("  Minimum task size of display#"); pw.print(displayId);
-            pw.print(' '); pw.print(dc.mMinSizeOfResizeableTaskDp);
+            pw.print(' '); pw.println(dc.mMinSizeOfResizeableTaskDp);
         });
         pw.print("  mBlurEnabled="); pw.println(mBlurController.getBlurEnabled());
         pw.print("  mDisableSecureWindows="); pw.println(mDisableSecureWindows);
@@ -8018,7 +7990,6 @@ public class WindowManagerService extends IWindowManager.Stub
         @Override
         public void registerAppTransitionListener(AppTransitionListener listener) {
             synchronized (mGlobalLock) {
-                getDefaultDisplayContentLocked().mAppTransition.registerListenerLocked(listener);
                 mAtmService.getTransitionController().registerLegacyListener(listener);
             }
         }
@@ -8175,12 +8146,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 token.asWallpaperToken().setCropHints(cropHints);
             }
-        }
-
-        @Override
-        public void setWallpaperCropUtils(WallpaperCropUtils wallpaperCropUtils) {
-            mRoot.getDisplayContent(DEFAULT_DISPLAY).mWallpaperController
-                    .setWallpaperCropUtils(wallpaperCropUtils);
         }
 
         @Override
@@ -8737,6 +8702,16 @@ public class WindowManagerService extends IWindowManager.Stub
                     mCaptureBlockedToastShownUids.clear();
                 }
             }
+        }
+
+        @Override
+        public void registerWindowFocusChangeListener(WindowFocusChangeListener listener) {
+            WindowManagerService.this.addWindowFocusChangeListener(listener);
+        }
+
+        @Override
+        public void unregisterWindowFocusChangeListener(WindowFocusChangeListener listener) {
+            WindowManagerService.this.removeWindowFocusChangeListener(listener);
         }
 
         @Override
@@ -9442,23 +9417,6 @@ public class WindowManagerService extends IWindowManager.Stub
             return focusedActivity;
         }
 
-        if (!Flags.allowMultipleAdjacentTaskFragments()) {
-            final TaskFragment adjacentTaskFragment = taskFragment.getAdjacentTaskFragment();
-            final ActivityRecord adjacentTopActivity = adjacentTaskFragment.topRunningActivity();
-            if (adjacentTopActivity == null) {
-                // Return if no adjacent activity.
-                return focusedActivity;
-            }
-
-            if (adjacentTopActivity.getLastWindowCreateTime()
-                    < focusedActivity.getLastWindowCreateTime()) {
-                // Return if the current focus activity has more recently active window.
-                return focusedActivity;
-            }
-
-            return adjacentTopActivity;
-        }
-
         // Find the adjacent activity with more recently active window.
         final ActivityRecord[] mostRecentActiveActivity = { focusedActivity };
         final long[] mostRecentActiveTime = { focusedActivity.getLastWindowCreateTime() };
@@ -9529,20 +9487,15 @@ public class WindowManagerService extends IWindowManager.Stub
             // No adjacent window.
             return false;
         }
-        final TaskFragment adjacentFragment;
-        if (Flags.allowMultipleAdjacentTaskFragments()) {
-            if (fromFragment.getAdjacentTaskFragments().size() > 2) {
-                throw new IllegalStateException("Not yet support 3+ adjacent for non-Task TFs");
-            }
-            final TaskFragment[] tmpAdjacent = new TaskFragment[1];
-            fromFragment.forOtherAdjacentTaskFragments(adjacentTF -> {
-                tmpAdjacent[0] = adjacentTF;
-                return true;
-            });
-            adjacentFragment = tmpAdjacent[0];
-        } else {
-            adjacentFragment = fromFragment.getAdjacentTaskFragment();
+        if (fromFragment.getAdjacentTaskFragments().size() > 2) {
+            throw new IllegalStateException("Not yet support 3+ adjacent for non-Task TFs");
         }
+        final TaskFragment[] tmpAdjacent = new TaskFragment[1];
+        fromFragment.forOtherAdjacentTaskFragments(adjacentTF -> {
+            tmpAdjacent[0] = adjacentTF;
+            return true;
+        });
+        final TaskFragment adjacentFragment = tmpAdjacent[0];
         if (adjacentFragment.isIsolatedNav()) {
             // Don't move the focus if the adjacent TF is isolated navigation.
             return false;

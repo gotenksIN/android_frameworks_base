@@ -1075,6 +1075,7 @@ public class NotificationManagerService extends SystemService {
                         summary.getSbn().getNotification().getGroupAlertBehavior();
 
         if (notificationForceGrouping()) {
+            summary.getNotification().flags |= Notification.FLAG_SILENT;
             if (!summary.getChannel().getId().equals(summaryAttr.channelId)) {
                 NotificationChannel newChannel = mPreferencesHelper.getNotificationChannel(pkg,
                         summary.getUid(), summaryAttr.channelId, false);
@@ -2809,7 +2810,6 @@ public class NotificationManagerService extends SystemService {
                 mNotificationChannelLogger,
                 mAppOps,
                 mUserProfiles,
-                mUgmInternal,
                 mShowReviewPermissionsNotification,
                 Clock.systemUTC());
         mRankingHelper = new RankingHelper(getContext(), mRankingHandler, mPreferencesHelper,
@@ -3208,6 +3208,11 @@ public class NotificationManagerService extends SystemService {
                 synchronized (mNotificationLock) {
                     removeAppSummaryLocked(key);
                 }
+            }
+
+            @Override
+            public void sendAppProvidedSummaryDeleteIntent(String pkg, PendingIntent deleteIntent) {
+                sendDeleteIntent(deleteIntent, pkg);
             }
 
             @Override
@@ -7205,7 +7210,13 @@ public class NotificationManagerService extends SystemService {
             final Uri originalSoundUri =
                     (originalChannel != null) ? originalChannel.getSound() : null;
             if (soundUri != null && !Objects.equals(originalSoundUri, soundUri)) {
-                PermissionHelper.grantUriPermission(mUgmInternal, soundUri, sourceUid);
+                Binder.withCleanCallingIdentity(() -> {
+                    mUgmInternal.checkGrantUriPermission(sourceUid, null,
+                            ContentProvider.getUriWithoutUserId(soundUri),
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                            ContentProvider.getUserIdFromUri(soundUri,
+                            UserHandle.getUserId(sourceUid)));
+                });
             }
         }
 
@@ -7440,6 +7451,7 @@ public class NotificationManagerService extends SystemService {
                     // Override group key early for forced grouped notifications
                     r.setOverrideGroupKey(groupName);
                 }
+                r.getNotification().flags |= Notification.FLAG_SILENT;
             }
 
             addAutoGroupAdjustment(r, groupName);
@@ -9898,7 +9910,8 @@ public class NotificationManagerService extends SystemService {
                             if (notificationForceGrouping()) {
                                 mHandler.post(() -> {
                                     synchronized (mNotificationLock) {
-                                        mGroupHelper.onNotificationRemoved(r, mNotificationList);
+                                        mGroupHelper.onNotificationRemoved(r, mNotificationList,
+                                                /* sendingDelete= */ false);
                                     }
                                 });
                             } else {
@@ -10185,6 +10198,12 @@ public class NotificationManagerService extends SystemService {
         }
         if (isSummary) {
             mSummaryByGroupKey.put(group, r);
+
+            if (notificationForceGrouping()) {
+                // If any formerly-ungrouped notifications will be grouped by this summary, update
+                // accordingly.
+                mGroupHelper.onGroupSummaryAdded(r, mNotificationList);
+            }
         }
 
         FlagChecker childrenFlagChecker = (flags) -> {
@@ -10826,20 +10845,7 @@ public class NotificationManagerService extends SystemService {
 
         // tell the app
         if (sendDelete) {
-            final PendingIntent deleteIntent = r.getNotification().deleteIntent;
-            if (deleteIntent != null) {
-                try {
-                    // make sure deleteIntent cannot be used to start activities from background
-                    LocalServices.getService(ActivityManagerInternal.class)
-                            .clearPendingIntentAllowBgActivityStarts(deleteIntent.getTarget(),
-                                    ALLOWLIST_TOKEN);
-                    deleteIntent.send();
-                } catch (PendingIntent.CanceledException ex) {
-                    // do nothing - there's no relevant way to recover, and
-                    //     no reason to let this propagate
-                    Slog.w(TAG, "canceled PendingIntent for " + r.getSbn().getPackageName(), ex);
-                }
-            }
+            sendDeleteIntent(r.getNotification().deleteIntent, r.getSbn().getPackageName());
         }
 
         // Only cancel these if this notification actually got to be posted.
@@ -10854,7 +10860,7 @@ public class NotificationManagerService extends SystemService {
                     mHandler.removeCallbacksAndEqualMessages(r.getKey());
                     mHandler.post(() -> {
                         synchronized (NotificationManagerService.this.mNotificationLock) {
-                            mGroupHelper.onNotificationRemoved(r, mNotificationList);
+                            mGroupHelper.onNotificationRemoved(r, mNotificationList, sendDelete);
                         }
                     });
 
@@ -10949,6 +10955,21 @@ public class NotificationManagerService extends SystemService {
         if (wasPosted) {
             mNotificationRecordLogger.logNotificationCancelled(r, reason,
                     r.getStats().getDismissalSurface());
+        }
+    }
+
+    private static void sendDeleteIntent(@Nullable PendingIntent deleteIntent, String fromPkg) {
+        if (deleteIntent != null) {
+            try {
+                // make sure deleteIntent cannot be used to start activities from background
+                LocalServices.getService(ActivityManagerInternal.class)
+                        .clearPendingIntentAllowBgActivityStarts(deleteIntent.getTarget(),
+                                ALLOWLIST_TOKEN);
+                deleteIntent.send();
+            } catch (PendingIntent.CanceledException ex) {
+                // There's no relevant way to recover, and no reason to let this propagate
+                Slog.w(TAG, "canceled PendingIntent for " + fromPkg, ex);
+            }
         }
     }
 

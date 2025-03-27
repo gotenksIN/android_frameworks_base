@@ -653,6 +653,14 @@ public class TouchExplorer extends BaseEventStreamTransformation
             case ACTION_UP:
                 handleActionUp(event, rawEvent, policyFlags);
                 break;
+            case ACTION_POINTER_UP:
+                if (com.android.server.accessibility.Flags
+                        .pointerUpMotionEventInTouchExploration()) {
+                    if (mState.isServiceDetectingGestures()) {
+                        mAms.sendMotionEventToListeningServices(rawEvent);
+                    }
+                }
+                break;
             default:
                 break;
         }
@@ -886,6 +894,9 @@ public class TouchExplorer extends BaseEventStreamTransformation
                     // scheduled sending events.
                     mSendHoverEnterAndMoveDelayed.cancel();
                     mSendHoverExitDelayed.cancel();
+                }
+                if (pointerIndex < 0) {
+                    return;
                 }
                 // If the user is touch exploring the second pointer may be
                 // performing a double tap to activate an item without need

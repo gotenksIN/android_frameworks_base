@@ -546,7 +546,7 @@ public class AudioService extends IAudioService.Stub
      */
     private InputDeviceVolumeHelper mInputDeviceVolumeHelper;
 
-    /*package*/ int getVssVolumeForDevice(int stream, int device) {
+    /*package*/ int getVolumeForDeviceIgnoreMute(int stream, int device) {
         final VolumeStreamState streamState = mStreamStates.get(stream);
         return streamState != null ? streamState.getIndex(device) : -1;
     }
@@ -5065,6 +5065,8 @@ public class AudioService extends IAudioService.Stub
         pw.println("\tcom.android.media.audio.disablePrescaleAbsoluteVolume:"
                 + disablePrescaleAbsoluteVolume());
         pw.println("\tcom.android.media.audio.setStreamVolumeOrder - EOL");
+        pw.println("\tandroid.media.audio.ringtoneUserUriCheck:"
+                + android.media.audio.Flags.ringtoneUserUriCheck());
         pw.println("\tandroid.media.audio.roForegroundAudioControl:"
                 + roForegroundAudioControl());
         pw.println("\tandroid.media.audio.scoManagedByAudio:"
@@ -5166,7 +5168,7 @@ public class AudioService extends IAudioService.Stub
         }
 
         final int device = absVolumeDevices.toArray(new Integer[0])[0].intValue();
-        final int index = getStreamVolume(streamType, device);
+        final int index = (getVolumeForDeviceIgnoreMute(streamType, device) + 5) / 10;
 
         if (DEBUG_VOL) {
             Slog.i(TAG, "onUpdateContextualVolumes streamType: " + streamType
@@ -7908,7 +7910,8 @@ public class AudioService extends IAudioService.Stub
                 return AudioSystem.STREAM_RING;
             }
         default:
-            if (isInCommunication()) {
+            if (isInCommunication()
+                    || mAudioSystem.isStreamActive(AudioManager.STREAM_VOICE_CALL, 0)) {
                 if (!replaceStreamBtSco()
                         && mBtCommDeviceActive.get() == BT_COMM_DEVICE_ACTIVE_SCO) {
                     if (DEBUG_VOL) Log.v(TAG, "getActiveStreamType: Forcing STREAM_BLUETOOTH_SCO");

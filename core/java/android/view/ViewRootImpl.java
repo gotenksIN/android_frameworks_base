@@ -1843,6 +1843,7 @@ public final class ViewRootImpl implements ViewParent,
                         eventsToBeRegistered,
                         mBasePackageName);
 
+        // LINT.IfChange(fi_cb)
         if (forceInvertColor()) {
             if (mForceInvertObserver == null) {
                 mForceInvertObserver = new ContentObserver(mHandler) {
@@ -1851,7 +1852,6 @@ public final class ViewRootImpl implements ViewParent,
                         updateForceDarkMode();
                     }
                 };
-
                 final Uri[] urisToObserve = {
                     Settings.Secure.getUriFor(
                         Settings.Secure.ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED),
@@ -1866,6 +1866,7 @@ public final class ViewRootImpl implements ViewParent,
                 }
             }
         }
+        // LINT.ThenChange(/services/core/java/com/android/server/UiModeManagerService.java:fi_cb)
     }
 
     /**
@@ -3483,6 +3484,9 @@ public final class ViewRootImpl implements ViewParent,
      * TODO(b/260382739): Apply this to all windows.
      */
     private static boolean shouldOptimizeMeasure(final WindowManager.LayoutParams lp) {
+        if (com.android.window.flags.Flags.reduceUnnecessaryMeasure()) {
+            return true;
+        }
         return (lp.privateFlags & PRIVATE_FLAG_OPTIMIZE_MEASURE) != 0;
     }
 
@@ -13680,5 +13684,12 @@ public final class ViewRootImpl implements ViewParent,
         if (com.android.graphics.hwui.flags.Flags.earlyPreinitBufferAllocator()) {
             ThreadedRenderer.preInitBufferAllocator();
         }
+    }
+
+    /**
+     * @hide
+     */
+    public Choreographer getChoreographer() {
+        return mChoreographer;
     }
 }

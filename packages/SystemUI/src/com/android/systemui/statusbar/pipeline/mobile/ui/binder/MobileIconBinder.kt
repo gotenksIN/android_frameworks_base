@@ -13,17 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-/*
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
- */
-
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
 package com.android.systemui.statusbar.pipeline.mobile.ui.binder
-
 import android.annotation.ColorInt
 import android.content.res.ColorStateList
 import android.view.View
@@ -46,9 +36,6 @@ import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.StatusBarIconView.STATE_HIDDEN
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
-import com.android.systemui.statusbar.phone.StatusBarLocation
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.LocationBasedMobileViewModel
@@ -60,9 +47,7 @@ import com.android.systemui.util.kotlin.pairwiseBy
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-
 private data class Colors(@ColorInt val tint: Int, @ColorInt val contrast: Int)
-
 object MobileIconBinder {
     /** Binds the view to the view-model, continuing to update the former based on the latter */
     @JvmStatic
@@ -83,17 +68,11 @@ object MobileIconBinder {
         val roamingView = view.requireViewById<ImageView>(R.id.mobile_roaming)
         val roamingSpace = view.requireViewById<Space>(R.id.mobile_roaming_space)
         val dotView = view.requireViewById<StatusBarIconView>(R.id.status_bar_dot)
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-        val volteView = view.requireViewById<ImageView>(R.id.mobile_volte)
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-
         view.isVisible = viewModel.isVisible.value
         iconView.isVisible = true
-
         // TODO(b/238425913): We should log this visibility state.
         @StatusBarIconView.VisibleState
         val visibilityState: MutableStateFlow<Int> = MutableStateFlow(initialVisibilityState)
-
         val iconTint: MutableStateFlow<Colors> =
             MutableStateFlow(
                 Colors(
@@ -102,9 +81,7 @@ object MobileIconBinder {
                 )
             )
         val decorTint: MutableStateFlow<Int> = MutableStateFlow(viewModel.defaultColor)
-
         var isCollecting = false
-
         view.repeatWhenAttached {
             lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.CREATED) {
@@ -126,12 +103,10 @@ object MobileIconBinder {
                     }
                 }
             }
-
             lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     logger.logCollectionStarted(view, viewModel)
                     isCollecting = true
-
                     launch {
                         visibilityState.collect { state ->
                             ModernStatusBarViewVisibilityHelper.setVisibilityState(
@@ -139,11 +114,9 @@ object MobileIconBinder {
                                 mobileGroupView,
                                 dotView,
                             )
-
                             view.requestLayout()
                         }
                     }
-
                     // Set the icon for the triangle
                     launch {
                         viewModel.icon
@@ -172,19 +145,16 @@ object MobileIconBinder {
                                 } else if (newIcon is SignalIconModel.Satellite) {
                                     IconViewBinder.bind(newIcon.icon, iconView)
                                 }
-
                                 if (shouldRequestLayout) {
                                     iconView.requestLayout()
                                 }
                             }
                     }
-
                     launch {
                         viewModel.contentDescription.distinctUntilChanged().collect {
                             MobileContentDescriptionViewBinder.bind(it, view)
                         }
                     }
-
                     // Set the network type icon
                     launch {
                         viewModel.networkTypeIcon.distinctUntilChanged().collect { dataTypeId ->
@@ -196,23 +166,16 @@ object MobileIconBinder {
                             dataTypeId?.let { IconViewBinder.bind(dataTypeId, networkTypeView) }
                             val prevVis = networkTypeContainer.visibility
                             networkTypeContainer.visibility =
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
-                                if (dataTypeId != null
-                                    && viewModel.location != StatusBarLocation.SHADE_CARRIER_GROUP)
-                                    VISIBLE else GONE
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
-
+                                if (dataTypeId != null) VISIBLE else GONE
                             if (prevVis != networkTypeContainer.visibility) {
                                 view.requestLayout()
                             }
                         }
                     }
-
                     // Set the network type background
                     launch {
                         viewModel.networkTypeBackground.collect { background ->
                             networkTypeContainer.setBackgroundResource(background?.res ?: 0)
-
                             // Tint will invert when this bit changes
                             if (background?.res != null) {
                                 networkTypeContainer.backgroundTintList =
@@ -225,7 +188,6 @@ object MobileIconBinder {
                             }
                         }
                     }
-
                     // Set the roaming indicator
                     launch {
                         viewModel.roaming.distinctUntilChanged().collect { isRoaming ->
@@ -233,7 +195,6 @@ object MobileIconBinder {
                             roamingSpace.isVisible = isRoaming
                         }
                     }
-
                     if (statusBarStaticInoutIndicators()) {
                         // Set the opacity of the activity indicators
                         launch {
@@ -242,7 +203,6 @@ object MobileIconBinder {
                                     (if (visible) ALPHA_ACTIVE else ALPHA_INACTIVE)
                             }
                         }
-
                         launch {
                             viewModel.activityOutVisible.collect { visible ->
                                 activityOut.imageAlpha =
@@ -252,26 +212,21 @@ object MobileIconBinder {
                     } else {
                         // Set the activity indicators
                         launch { viewModel.activityInVisible.collect { activityIn.isVisible = it } }
-
                         launch {
                             viewModel.activityOutVisible.collect { activityOut.isVisible = it }
                         }
                     }
-
                     launch {
                         viewModel.activityContainerVisible.collect {
                             activityContainer.isVisible = it
                         }
                     }
-
                     // Set the tint
                     launch {
                         iconTint.collect { colors ->
                             val tint = ColorStateList.valueOf(colors.tint)
                             val contrast = ColorStateList.valueOf(colors.contrast)
-
                             iconView.imageTintList = tint
-
                             // If the bg is visible, tint it and use the contrast for the fg
                             if (viewModel.networkTypeBackground.value != null) {
                                 networkTypeContainer.backgroundTintList = tint
@@ -279,43 +234,13 @@ object MobileIconBinder {
                             } else {
                                 networkTypeView.imageTintList = tint
                             }
-
                             roamingView.imageTintList = tint
                             activityIn.imageTintList = tint
                             activityOut.imageTintList = tint
                             dotView.setDecorColor(colors.tint)
-                            volteView.imageTintList = tint
                         }
                     }
-
-                    launch {
-                        viewModel.volteId.distinctUntilChanged().collect { volteId ->
-// QTI_BEGIN: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
-                            val prevVisibility = volteView.visibility;
-// QTI_END: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
-                            if (volteId != 0 &&
-                                viewModel.location != StatusBarLocation.SHADE_CARRIER_GROUP) {
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
-                                volteView.visibility = VISIBLE
-                                volteView.setImageResource(volteId)
-                            } else {
-                                volteView.visibility = GONE
-                            }
-// QTI_BEGIN: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
-                            if (prevVisibility != volteView.visibility) {
-                                view.requestLayout()
-                            }
-// QTI_END: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-                        }
-                    }
-
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-                    launch { viewModel.showSignalStrengthIcon.collect { iconView.isVisible = it } }
-
                     launch { decorTint.collect { tint -> dotView.setDecorColor(tint) } }
-
                     try {
                         awaitCancellation()
                     } finally {
@@ -325,24 +250,19 @@ object MobileIconBinder {
                 }
             }
         }
-
         return object : ModernStatusBarViewBinding {
             override fun getShouldIconBeVisible(): Boolean {
                 return viewModel.isVisible.value
             }
-
             override fun onVisibilityStateChanged(@StatusBarIconView.VisibleState state: Int) {
                 visibilityState.value = state
             }
-
             override fun onIconTintChanged(newTint: Int, contrastTint: Int) {
                 iconTint.value = Colors(tint = newTint, contrast = contrastTint)
             }
-
             override fun onDecorTintChanged(newTint: Int) {
                 decorTint.value = newTint
             }
-
             override fun isCollecting(): Boolean {
                 return isCollecting
             }

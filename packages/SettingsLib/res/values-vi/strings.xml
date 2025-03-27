@@ -109,7 +109,7 @@
     <string name="bluetooth_saved_device" msgid="4895871321722311428">"Đã lưu"</string>
     <string name="bluetooth_hearing_aid_left_active" msgid="8330226430756799572">"Đang hoạt động (chỉ tai trái)"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="2244728507170385397">"Đang hoạt động (chỉ tai phải)"</string>
-    <string name="bluetooth_hearing_aid_left_and_right_active" msgid="4294571497939983181">"Đang hoạt động (cả tai phải và tai trái)"</string>
+    <string name="bluetooth_hearing_aid_left_and_right_active" msgid="4294571497939983181">"Đang hoạt động (trái và phải)"</string>
     <string name="bluetooth_hearing_device_ambient_error" msgid="6035857289108813878">"Không cập nhật được âm lượng xung quanh"</string>
     <string name="bluetooth_active_media_only_battery_level" msgid="7772517511061834073">"Đang hoạt động (chỉ phát nội dung đa phương tiện). Còn <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> pin."</string>
     <string name="bluetooth_active_media_only_battery_level_untethered" msgid="7444753133664620926">"Đang hoạt động (chỉ phát nội dung đa phương tiện). Bên trái: Còn <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g> pin. Bên phải: Còn <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g> pin."</string>
@@ -539,6 +539,8 @@
     <string name="disabled_by_app_ops_text" msgid="8373595926549098012">"Do chế độ Cài đặt hạn chế kiểm soát"</string>
     <string name="disabled_in_phone_call_text" msgid="6568931334337318320">"Không dùng được khi có cuộc gọi"</string>
     <string name="disabled" msgid="8017887509554714950">"Đã tắt"</string>
+    <!-- no translation found for enabled (3997122818554810678) -->
+    <skip />
     <string name="external_source_trusted" msgid="1146522036773132905">"Được phép"</string>
     <string name="external_source_untrusted" msgid="5037891688911672227">"Không được phép"</string>
     <string name="install_other_apps" msgid="3232595082023199454">"Cài ứng dụng không rõ nguồn"</string>

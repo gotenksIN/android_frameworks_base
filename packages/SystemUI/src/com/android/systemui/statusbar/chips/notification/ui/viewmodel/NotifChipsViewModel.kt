@@ -71,7 +71,7 @@ constructor(
     private fun NotificationChipModel.toActivityChipModel(
         headsUpState: TopPinnedState
     ): OngoingActivityChipModel.Active {
-        StatusBarNotifChips.assertInNewMode()
+        StatusBarNotifChips.unsafeAssertInNewMode()
         val contentDescription = getContentDescription(this.appName)
         val icon =
             if (this.statusBarChipIconView != null) {
@@ -81,7 +81,7 @@ constructor(
                     contentDescription,
                 )
             } else {
-                StatusBarConnectedDisplays.assertInNewMode()
+                StatusBarConnectedDisplays.unsafeAssertInNewMode()
                 OngoingActivityChipModel.ChipIcon.StatusBarNotificationIcon(
                     this.key,
                     contentDescription,
@@ -103,7 +103,7 @@ constructor(
             }
         val clickBehavior =
             OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification({
-                StatusBarChipsModernization.assertInNewMode()
+                StatusBarChipsModernization.unsafeAssertInNewMode()
                 clickListener.invoke()
             })
 
@@ -141,7 +141,7 @@ constructor(
             // When we're promoting notifications automatically, the `when` time set on the
             // notification will likely just be set to the current time, which would cause the chip
             // to always show "now". We don't want early testers to get that experience since it's
-            // not what will happen at launch, so just don't show any time.
+            // not what will happen at launch, so just don't show any time.onometerstate
             return OngoingActivityChipModel.Active.IconOnly(
                 this.key,
                 icon,
@@ -194,12 +194,12 @@ constructor(
                 }
             }
             is PromotedNotificationContentModel.When.Chronometer -> {
-                // TODO(b/364653005): Check isCountDown and support CountDown.
                 return OngoingActivityChipModel.Active.Timer(
                     this.key,
                     icon,
                     colors,
                     startTimeMs = this.promotedContent.time.elapsedRealtimeMillis,
+                    isEventInFuture = this.promotedContent.time.isCountDown,
                     onClickListenerLegacy,
                     clickBehavior,
                 )

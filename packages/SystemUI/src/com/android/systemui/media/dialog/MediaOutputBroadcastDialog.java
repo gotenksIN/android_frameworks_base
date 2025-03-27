@@ -56,6 +56,8 @@ import com.google.zxing.WriterException;
 import java.nio.charset.StandardCharsets;
 
 // QTI_END: 2024-01-17: Bluetooth: [LE Broadcast] improve broadcast code and name rule checking
+import java.util.concurrent.Executor;
+
 /**
  * Dialog for media output broadcast.
  */
@@ -257,13 +259,16 @@ public class MediaOutputBroadcastDialog extends MediaOutputBaseDialog {
             Context context,
             boolean aboveStatusbar,
             BroadcastSender broadcastSender,
-            MediaSwitchingController mediaSwitchingController) {
+            MediaSwitchingController mediaSwitchingController,
+            Executor mainExecutor,
+            Executor backgroundExecutor) {
         super(
                 context,
                 broadcastSender,
                 mediaSwitchingController, /* includePlaybackAndAppMetadata */
                 true);
-        mAdapter = new MediaOutputAdapterLegacy(mMediaSwitchingController);
+        mAdapter = new MediaOutputAdapterLegacy(mMediaSwitchingController, mainExecutor,
+                backgroundExecutor);
         // TODO(b/226710953): Move the part to MediaOutputBaseDialog for every class
         //  that extends MediaOutputBaseDialog
         if (!aboveStatusbar) {
@@ -311,12 +316,6 @@ public class MediaOutputBroadcastDialog extends MediaOutputBaseDialog {
     @Override
     IconCompat getHeaderIcon() {
         return mMediaSwitchingController.getHeaderIcon();
-    }
-
-    @Override
-    int getHeaderIconSize() {
-        return mContext.getResources().getDimensionPixelSize(
-                R.dimen.media_output_dialog_header_album_icon_size);
     }
 
     @Override

@@ -111,7 +111,9 @@ message SecureSettingsProto {
         optional SettingProto autoclick_cursor_area_size = 62 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto autoclick_ignore_minor_cursor_movement = 63 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto autoclick_panel_position = 64 [ (android.privacy).dest = DEST_AUTOMATIC ];
-
+        optional SettingProto autoclick_revert_to_left_click = 65 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        // Setting for accessibility magnification for cursor following mode.
+        optional SettingProto accessibility_magnification_cursor_following_mode = 66 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
     optional Accessibility accessibility = 2;
 
@@ -237,6 +239,10 @@ message SecureSettingsProto {
     repeated SettingProto completed_categories = 15;
     optional SettingProto connectivity_release_pending_intent_delay_ms = 16 [ (android.privacy).dest = DEST_AUTOMATIC ];
     optional SettingProto adaptive_connectivity_enabled = 84 [ (android.privacy).dest = DEST_AUTOMATIC ];
+    optional SettingProto adaptive_connectivity_wifi_enabled = 105 [ (android.privacy).dest =
+        DEST_AUTOMATIC ];
+    optional SettingProto adaptive_connectivity_mobile_network_enabled = 106 [ (android.privacy)
+        .dest = DEST_AUTOMATIC ];
 
     message Controls {
         option (android.msg_privacy).dest = DEST_EXPLICIT;
@@ -293,13 +299,6 @@ message SecureSettingsProto {
     optional EmergencyResponse emergency_response = 83;
 
     optional SettingProto enhanced_voice_privacy_enabled = 23 [ (android.privacy).dest = DEST_AUTOMATIC ];
-
-    message EvenDimmer {
-        optional SettingProto even_dimmer_activated = 1 [ (android.privacy).dest = DEST_AUTOMATIC ];
-        optional SettingProto even_dimmer_min_nits = 2 [ (android.privacy).dest = DEST_AUTOMATIC ];
-    }
-
-    optional EvenDimmer even_dimmer = 98;
 
     optional SettingProto font_weight_adjustment = 85 [ (android.privacy).dest = DEST_AUTOMATIC ];
 
@@ -746,5 +745,5 @@ message SecureSettingsProto {
 
     // Please insert fields in alphabetical order and group them into messages
     // if possible (to avoid reaching the method limit).
-    // Next tag = 105;
+    // Next tag = 107;
 }

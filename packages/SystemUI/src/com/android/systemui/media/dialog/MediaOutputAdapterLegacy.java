@@ -50,9 +50,11 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.media.flags.Flags;
 import com.android.settingslib.media.InputMediaDevice;
 import com.android.settingslib.media.MediaDevice;
-import com.android.settingslib.utils.ThreadUtils;
+import com.android.systemui.dagger.qualifiers.Background;
+import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.res.R;
 
+import java.util.concurrent.Executor;
 /**
  * A RecyclerView adapter for the legacy UI media output dialog device list.
  */
@@ -61,14 +63,20 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private static final int UNMUTE_DEFAULT_VOLUME = 2;
-    private static final float DEVICE_DISABLED_ALPHA = 0.5f;
-    private static final float DEVICE_ACTIVE_ALPHA = 1f;
+    @VisibleForTesting static final float DEVICE_DISABLED_ALPHA = 0.5f;
+    @VisibleForTesting static final float DEVICE_ACTIVE_ALPHA = 1f;
+    private final Executor mMainExecutor;
+    private final Executor mBackgroundExecutor;
     View mHolderView;
-    private boolean mIsInitVolumeFirstTime;
 
-    public MediaOutputAdapterLegacy(MediaSwitchingController controller) {
+    public MediaOutputAdapterLegacy(
+            MediaSwitchingController controller,
+            @Main Executor mainExecutor,
+            @Background Executor backgroundExecutor
+    ) {
         super(controller);
-        mIsInitVolumeFirstTime = true;
+        mMainExecutor = mainExecutor;
+        mBackgroundExecutor = backgroundExecutor;
     }
 
     @Override
@@ -181,27 +189,26 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
             mEndTouchArea.setVisibility(View.GONE);
             mEndClickIcon.setVisibility(View.GONE);
             mContainerLayout.setOnClickListener(null);
-            mTitleText.setTextColor(mController.getColorItemContent());
-            mSubTitleText.setTextColor(mController.getColorItemContent());
-            mVolumeValueText.setTextColor(mController.getColorItemContent());
+            mTitleText.setTextColor(mController.getColorSchemeLegacy().getColorItemContent());
+            mSubTitleText.setTextColor(mController.getColorSchemeLegacy().getColorItemContent());
+            mVolumeValueText.setTextColor(mController.getColorSchemeLegacy().getColorItemContent());
             mIconAreaLayout.setBackground(null);
             updateIconAreaClickListener(null);
-            mSeekBar.setProgressTintList(
-                    ColorStateList.valueOf(mController.getColorSeekbarProgress()));
+            updateSeekBarProgressColor();
             updateContainerContentA11yImportance(true  /* isImportant */);
             renderItem(mediaItem, position);
         }
 
         /** Binds a ViewHolder for a "Connect a device" item. */
         void onBindPairNewDevice() {
-            mTitleText.setTextColor(mController.getColorItemContent());
+            mTitleText.setTextColor(mController.getColorSchemeLegacy().getColorItemContent());
             mCheckBox.setVisibility(View.GONE);
             updateTitle(mContext.getText(R.string.media_output_dialog_pairing_new));
             updateItemBackground(ConnectionState.DISCONNECTED);
             final Drawable addDrawable = mContext.getDrawable(R.drawable.ic_add);
             mTitleIcon.setImageDrawable(addDrawable);
-            mTitleIcon.setImageTintList(
-                    ColorStateList.valueOf(mController.getColorItemContent()));
+            mTitleIcon.setImageTintList(ColorStateList.valueOf(
+                    mController.getColorSchemeLegacy().getColorItemContent()));
             mContainerLayout.setOnClickListener(mController::launchBluetoothPairing);
         }
 
@@ -252,10 +259,9 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
                     updateSeekbarProgressBackground();
                 }
             }
-            boolean isCurrentSeekbarInvisible = mSeekBar.getVisibility() == View.GONE;
             mSeekBar.setVisibility(showSeekBar ? View.VISIBLE : View.GONE);
             if (showSeekBar) {
-                initSeekbar(device, isCurrentSeekbarInvisible);
+                initSeekbar(device);
                 updateContainerContentA11yImportance(false /* isImportant */);
                 mSeekBar.setContentDescription(contentDescription);
             } else {
@@ -265,9 +271,8 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
 
         void updateGroupSeekBar(String contentDescription) {
             updateSeekbarProgressBackground();
-            boolean isCurrentSeekbarInvisible = mSeekBar.getVisibility() == View.GONE;
             mSeekBar.setVisibility(View.VISIBLE);
-            initGroupSeekbar(isCurrentSeekbarInvisible);
+            initGroupSeekbar();
             updateContainerContentA11yImportance(false /* isImportant */);
             mSeekBar.setContentDescription(contentDescription);
         }
@@ -298,8 +303,8 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
         protected void updateLoadingIndicator(ConnectionState connectionState) {
             if (connectionState == ConnectionState.CONNECTING) {
                 mProgressBar.setVisibility(View.VISIBLE);
-                mProgressBar.getIndeterminateDrawable().setTintList(
-                        ColorStateList.valueOf(mController.getColorItemContent()));
+                mProgressBar.getIndeterminateDrawable().setTintList(ColorStateList.valueOf(
+                        mController.getColorSchemeLegacy().getColorItemContent()));
             } else {
                 mProgressBar.setVisibility(View.GONE);
             }
@@ -319,8 +324,8 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
 
             // Connected or connecting state has a darker background.
             int backgroundColor = isConnected || isConnecting
-                    ? mController.getColorConnectedItemBackground()
-                    : mController.getColorItemBackground();
+                    ? mController.getColorSchemeLegacy().getColorConnectedItemBackground()
+                    : mController.getColorSchemeLegacy().getColorItemBackground();
             mItemLayout.setBackgroundTintList(ColorStateList.valueOf(backgroundColor));
         }
 
@@ -330,6 +335,16 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
                 mCheckBox.setVisibility(isCheckbox ? View.VISIBLE : View.GONE);
                 mEndClickIcon.setVisibility(!isCheckbox ? View.VISIBLE : View.GONE);
             }
+        }
+
+        private void updateSeekBarProgressColor() {
+            mSeekBar.setProgressTintList(ColorStateList.valueOf(
+                    mController.getColorSchemeLegacy().getColorSeekbarProgress()));
+            final Drawable contrastDotDrawable =
+                    ((LayerDrawable) mSeekBar.getProgressDrawable()).findDrawableByLayerId(
+                            R.id.contrast_dot);
+            contrastDotDrawable.setTintList(ColorStateList.valueOf(
+                    mController.getColorSchemeLegacy().getColorItemContent()));
         }
 
         void updateSeekbarProgressBackground() {
@@ -345,31 +360,21 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
                             mActiveRadius, 0, 0});
         }
 
-        private void initializeSeekbarVolume(
-                @Nullable MediaDevice device, int currentVolume,
-                boolean isCurrentSeekbarInvisible) {
+        private void initializeSeekbarVolume(@Nullable MediaDevice device, int currentVolume) {
             if (!isDragging()) {
                 if (mSeekBar.getVolume() != currentVolume && (mLatestUpdateVolume == -1
                         || currentVolume == mLatestUpdateVolume)) {
                     // Update only if volume of device and value of volume bar doesn't match.
                     // Check if response volume match with the latest request, to ignore obsolete
                     // response
-                    if (isCurrentSeekbarInvisible && !mIsInitVolumeFirstTime) {
+                    if (!mVolumeAnimator.isStarted()) {
                         if (currentVolume == 0) {
                             updateMutedVolumeIcon(device);
                         } else {
                             updateUnmutedVolumeIcon(device);
                         }
-                    } else {
-                        if (!mVolumeAnimator.isStarted()) {
-                            if (currentVolume == 0) {
-                                updateMutedVolumeIcon(device);
-                            } else {
-                                updateUnmutedVolumeIcon(device);
-                            }
-                            mSeekBar.setVolume(currentVolume);
-                            mLatestUpdateVolume = -1;
-                        }
+                        mSeekBar.setVolume(currentVolume);
+                        mLatestUpdateVolume = -1;
                     }
                 } else if (currentVolume == 0) {
                     mSeekBar.resetVolume();
@@ -379,12 +384,9 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
                     mLatestUpdateVolume = -1;
                 }
             }
-            if (mIsInitVolumeFirstTime) {
-                mIsInitVolumeFirstTime = false;
-            }
         }
 
-        void initSeekbar(@NonNull MediaDevice device, boolean isCurrentSeekbarInvisible) {
+        void initSeekbar(@NonNull MediaDevice device) {
             SeekBarVolumeControl volumeControl = new SeekBarVolumeControl() {
                 @Override
                 public int getVolume() {
@@ -413,7 +415,7 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
             }
             mSeekBar.setMaxVolume(device.getMaxVolume());
             final int currentVolume = device.getCurrentVolume();
-            initializeSeekbarVolume(device, currentVolume, isCurrentSeekbarInvisible);
+            initializeSeekbarVolume(device, currentVolume);
 
             mSeekBar.setOnSeekBarChangeListener(new MediaSeekBarChangedListener(
                     device, volumeControl) {
@@ -426,7 +428,7 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
         }
 
         // Initializes the seekbar for a group of devices.
-        void initGroupSeekbar(boolean isCurrentSeekbarInvisible) {
+        void initGroupSeekbar() {
             SeekBarVolumeControl volumeControl = new SeekBarVolumeControl() {
                 @Override
                 public int getVolume() {
@@ -453,7 +455,7 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
             mSeekBar.setMaxVolume(mController.getSessionVolumeMax());
 
             final int currentVolume = mController.getSessionVolume();
-            initializeSeekbarVolume(null, currentVolume, isCurrentSeekbarInvisible);
+            initializeSeekbarVolume(null, currentVolume);
             mSeekBar.setOnSeekBarChangeListener(new MediaSeekBarChangedListener(
                     null, volumeControl) {
                 @Override
@@ -494,9 +496,10 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
             boolean isInputMediaDevice = device instanceof InputMediaDevice;
             int id = getDrawableId(isInputMediaDevice, isMutedVolumeIcon);
             mTitleIcon.setImageDrawable(mContext.getDrawable(id));
-            mTitleIcon.setImageTintList(ColorStateList.valueOf(mController.getColorItemContent()));
-            mIconAreaLayout.setBackgroundTintList(
-                    ColorStateList.valueOf(mController.getColorSeekbarProgress()));
+            mTitleIcon.setImageTintList(ColorStateList.valueOf(
+                    mController.getColorSchemeLegacy().getColorItemContent()));
+            mIconAreaLayout.setBackgroundTintList(ColorStateList.valueOf(
+                    mController.getColorSchemeLegacy().getColorSeekbarProgress()));
         }
 
         @VisibleForTesting
@@ -525,8 +528,8 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
                 mStatusIcon.setVisibility(View.GONE);
             } else {
                 mStatusIcon.setImageDrawable(deviceStatusIcon);
-                mStatusIcon.setImageTintList(
-                        ColorStateList.valueOf(mController.getColorItemContent()));
+                mStatusIcon.setImageTintList(ColorStateList.valueOf(
+                        mController.getColorSchemeLegacy().getColorItemContent()));
                 if (deviceStatusIcon instanceof AnimatedVectorDrawable) {
                     ((AnimatedVectorDrawable) deviceStatusIcon).start();
                 }
@@ -576,9 +579,10 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
         private void updateEndAreaWithIcon(View.OnClickListener clickListener,
                 @DrawableRes int iconDrawableId,
                 @StringRes int accessibilityStringId) {
-            updateEndAreaColor(mController.getColorSeekbarProgress());
+            updateEndAreaColor(mController.getColorSchemeLegacy().getColorSeekbarProgress());
             mEndClickIcon.setImageTintList(
-                    ColorStateList.valueOf(mController.getColorItemContent()));
+                    ColorStateList.valueOf(
+                            mController.getColorSchemeLegacy().getColorItemContent()));
             mEndClickIcon.setOnClickListener(clickListener);
             Drawable drawable = mContext.getDrawable(iconDrawableId);
             mEndClickIcon.setImageDrawable(drawable);
@@ -591,8 +595,9 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
         private void updateEndAreaForGroupCheckBox(@NonNull MediaDevice device,
                 @NonNull GroupStatus groupStatus) {
             boolean isEnabled = isGroupCheckboxEnabled(groupStatus);
-            updateEndAreaColor(groupStatus.selected() ? mController.getColorSeekbarProgress()
-                    : mController.getColorItemBackground());
+            updateEndAreaColor(groupStatus.selected()
+                    ? mController.getColorSchemeLegacy().getColorSeekbarProgress()
+                    : mController.getColorSchemeLegacy().getColorItemBackground());
             mCheckBox.setContentDescription(mContext.getString(
                     groupStatus.selected() ? R.string.accessibility_remove_device_from_group
                             : R.string.accessibility_add_device_to_group));
@@ -602,7 +607,7 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
                     isEnabled ? (buttonView, isChecked) -> onGroupActionTriggered(
                             !groupStatus.selected(), device) : null);
             mCheckBox.setEnabled(isEnabled);
-            setCheckBoxColor(mCheckBox, mController.getColorItemContent());
+            setCheckBoxColor(mCheckBox, mController.getColorSchemeLegacy().getColorItemContent());
         }
 
         private void setCheckBoxColor(CheckBox checkBox, int color) {
@@ -710,15 +715,15 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
         }
 
         protected void setUpDeviceIcon(@NonNull MediaDevice device) {
-            ThreadUtils.postOnBackgroundThread(() -> {
+            mBackgroundExecutor.execute(() -> {
                 Icon icon = mController.getDeviceIconCompat(device).toIcon(mContext);
-                ThreadUtils.postOnMainThread(() -> {
+                mMainExecutor.execute(() -> {
                     if (!TextUtils.equals(mDeviceId, device.getId())) {
                         return;
                     }
                     mTitleIcon.setImageIcon(icon);
-                    mTitleIcon.setImageTintList(
-                            ColorStateList.valueOf(mController.getColorItemContent()));
+                    mTitleIcon.setImageTintList(ColorStateList.valueOf(
+                            mController.getColorSchemeLegacy().getColorItemContent()));
                 });
             });
         }
@@ -803,7 +808,7 @@ public class MediaOutputAdapterLegacy extends MediaOutputAdapterBase {
         }
 
         void onBind(String groupDividerTitle) {
-            mTitleText.setTextColor(mController.getColorItemContent());
+            mTitleText.setTextColor(mController.getColorSchemeLegacy().getColorItemContent());
             mTitleText.setText(groupDividerTitle);
         }
     }

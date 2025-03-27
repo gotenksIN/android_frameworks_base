@@ -49,6 +49,9 @@ interface NotificationScrollView {
     /** Max alpha for this view */
     fun setMaxAlpha(alpha: Float)
 
+    /** Set whether this view is occluded by something else. */
+    fun setOccluded(isOccluded: Boolean)
+
     /** Sets a clipping shape, which defines the drawable area of this view. */
     fun setClippingShape(shape: ShadeScrimShape?)
 
@@ -103,6 +106,9 @@ interface NotificationScrollView {
 
     /** sets the current expand fraction */
     fun setExpandFraction(expandFraction: Float)
+
+    /** Sets the fraction of the LockScreen -> Shade transition. */
+    fun setFractionToShade(fraction: Float)
 
     /** sets the current QS expand fraction */
     fun setQsExpandFraction(expandFraction: Float)

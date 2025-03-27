@@ -25,6 +25,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
+import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChipsModel
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerViewBinder
@@ -35,19 +36,26 @@ fun OngoingActivityChips(
     iconViewStore: NotificationIconContainerViewBinder.IconViewStore?,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier =
-            modifier
-                .fillMaxHeight()
-                .padding(start = dimensionResource(R.dimen.ongoing_activity_chip_margin_start)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement =
-            Arrangement.spacedBy(dimensionResource(R.dimen.ongoing_activity_chip_margin_start)),
-    ) {
-        chips.active
-            .filter { !it.isHidden }
-            .forEach {
-                key(it.key) { OngoingActivityChip(model = it, iconViewStore = iconViewStore) }
+    val shownChips = chips.active.filter { !it.isHidden }
+    if (shownChips.isNotEmpty()) {
+        Row(
+            modifier =
+                modifier
+                    .fillMaxHeight()
+                    .padding(start = dimensionResource(R.dimen.ongoing_activity_chip_margin_start)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement =
+                Arrangement.spacedBy(dimensionResource(R.dimen.ongoing_activity_chip_margin_start)),
+        ) {
+            shownChips.forEach {
+                key(it.key) {
+                    OngoingActivityChip(
+                        model = it,
+                        iconViewStore = iconViewStore,
+                        modifier = Modifier.sysuiResTag(it.key),
+                    )
+                }
             }
+        }
     }
 }

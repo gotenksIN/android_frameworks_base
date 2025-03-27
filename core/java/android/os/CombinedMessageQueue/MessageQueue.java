@@ -76,8 +76,13 @@ public final class MessageQueue {
     @SuppressWarnings("unused")
     private long mPtr; // used by native code
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(
+            maxTargetSdk = Build.VERSION_CODES.BAKLAVA,
+            publicAlternatives =
+                    "To manipulate the queue in Instrumentation tests, use {@link"
+                        + " android.os.TestLooperManager}")
     Message mMessages;
+
     private Message mLast;
     @UnsupportedAppUsage
     private final ArrayList<IdleHandler> mIdleHandlers = new ArrayList<IdleHandler>();
@@ -139,9 +144,18 @@ public final class MessageQueue {
             return;
         }
 
-        if (RavenwoodEnvironment.getInstance().isRunningOnRavenwood()) {
-            sIsProcessAllowedToUseConcurrent = false;
-            return;
+        if (Flags.forceConcurrentMessageQueue()) {
+            // b/379472827: Robolectric tests use reflection to access MessageQueue.mMessages.
+            // This is a hack to allow Robolectric tests to use the legacy implementation.
+            try {
+                Class.forName("org.robolectric.Robolectric");
+            } catch (ClassNotFoundException e) {
+                // This is not a Robolectric test.
+                sIsProcessAllowedToUseConcurrent = true;
+                return;
+            }
+            // This is a Robolectric test.
+            // Continue to the following checks.
         }
 
         final String processName = Process.myProcessName();
@@ -995,7 +1009,11 @@ public final class MessageQueue {
         }
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(
+            maxTargetSdk = Build.VERSION_CODES.BAKLAVA,
+            publicAlternatives =
+                    "To manipulate the queue in Instrumentation tests, use {@link"
+                        + " android.os.TestLooperManager}")
     Message next() {
         if (mUseConcurrent) {
             return nextConcurrent();

@@ -222,7 +222,9 @@ public class CarrierTextManager {
             CarrierNameCustomization carrierNameCustomization) {
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mContext = context;
-        mIsEmergencyCallCapable = telephonyManager.isVoiceCapable();
+        boolean hasTelephony = mContext.getPackageManager()
+                .hasSystemFeature(PackageManager.FEATURE_TELEPHONY);
+        mIsEmergencyCallCapable = telephonyManager.isVoiceCapable() && hasTelephony;
 
         mShowAirplaneMode = showAirplaneMode;
         mShowMissingSim = showMissingSim;
@@ -240,9 +242,7 @@ public class CarrierTextManager {
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mLogger = logger;
         mBgExecutor.execute(() -> {
-            boolean supported = mContext.getPackageManager()
-                    .hasSystemFeature(PackageManager.FEATURE_TELEPHONY);
-            if (supported && mNetworkSupported.compareAndSet(false, supported)) {
+            if (hasTelephony && mNetworkSupported.compareAndSet(false, hasTelephony)) {
                 // This will set/remove the listeners appropriately. Note that it will never double
                 // add the listeners.
                 handleSetListening(mCarrierTextCallback);

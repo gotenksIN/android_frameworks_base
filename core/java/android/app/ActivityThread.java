@@ -276,6 +276,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.nio.file.DirectoryStream;
@@ -1140,12 +1141,19 @@ public final class ActivityThread extends ClientTransactionHandler
                 CompatibilityInfo compatInfo, int resultCode, String data, Bundle extras,
                 boolean ordered, boolean assumeDelivered, int sendingUser, int processState,
                 int sendingUid, String sendingPackage) {
+            long debugStoreId = -1;
+            if (DEBUG_STORE_ENABLED) {
+                debugStoreId = DebugStore.recordScheduleReceiver();
+            }
             updateProcessState(processState, false);
             ReceiverData r = new ReceiverData(intent, resultCode, data, extras,
                     ordered, false, assumeDelivered, mAppThread.asBinder(), sendingUser,
                     sendingUid, sendingPackage);
             r.info = info;
             sendMessage(H.RECEIVER, r);
+            if (DEBUG_STORE_ENABLED) {
+                DebugStore.recordEventEnd(debugStoreId);
+            }
         }
 
         public final void scheduleReceiverList(List<ReceiverInfo> info) throws RemoteException {
@@ -1493,6 +1501,10 @@ public final class ActivityThread extends ClientTransactionHandler
                 boolean sticky, boolean assumeDelivered, int sendingUser, int processState,
                 int sendingUid, String sendingPackage)
                 throws RemoteException {
+            long debugStoreId = -1;
+            if (DEBUG_STORE_ENABLED) {
+                debugStoreId = DebugStore.recordScheduleRegisteredReceiver();
+            }
             updateProcessState(processState, false);
 
             // We can't modify IIntentReceiver due to UnsupportedAppUsage, so
@@ -1516,6 +1528,9 @@ public final class ActivityThread extends ClientTransactionHandler
                 }
                 receiver.performReceive(intent, resultCode, dataStr, extras, ordered, sticky,
                         sendingUser);
+            }
+            if (DEBUG_STORE_ENABLED) {
+                DebugStore.recordEventEnd(debugStoreId);
             }
         }
 
@@ -2257,10 +2272,16 @@ public final class ActivityThread extends ClientTransactionHandler
         public void getExecutableMethodFileOffsets(
                 @NonNull MethodDescriptor methodDescriptor,
                 @NonNull IOffsetCallback resultCallback) {
-            Method method = MethodDescriptorParser.parseMethodDescriptor(
+            Executable executable = MethodDescriptorParser.parseMethodDescriptor(
                     getClass().getClassLoader(), methodDescriptor);
-            VMDebug.ExecutableMethodFileOffsets location =
-                    VMDebug.getExecutableMethodFileOffsets(method);
+            VMDebug.ExecutableMethodFileOffsets location;
+            if (com.android.art.flags.Flags.executableMethodFileOffsetsV2()) {
+                location = VMDebug.getExecutableMethodFileOffsets(executable);
+            } else if (executable instanceof Method) {
+                location = VMDebug.getExecutableMethodFileOffsets((Method) executable);
+            } else {
+                throw new UnsupportedOperationException();
+            }
             try {
                 if (location == null) {
                     resultCallback.onResult(null);
@@ -2508,8 +2529,15 @@ public final class ActivityThread extends ClientTransactionHandler
             switch (msg.what) {
                 case BIND_APPLICATION:
                     Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "bindApplication");
+                    if (DEBUG_STORE_ENABLED) {
+                        debugStoreId =
+                                DebugStore.recordHandleBindApplication();
+                    }
                     AppBindData data = (AppBindData)msg.obj;
                     handleBindApplication(data);
+                    if (DEBUG_STORE_ENABLED) {
+                        DebugStore.recordEventEnd(debugStoreId);
+                    }
                     Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
                     break;
                 case EXIT_APPLICATION:
@@ -2532,7 +2560,8 @@ public final class ActivityThread extends ClientTransactionHandler
                     ReceiverData receiverData = (ReceiverData) msg.obj;
                     if (DEBUG_STORE_ENABLED) {
                         debugStoreId =
-                                DebugStore.recordBroadcastHandleReceiver(receiverData.intent);
+                            DebugStore.recordBroadcastReceive(
+                                receiverData.intent, System.identityHashCode(receiverData));
                     }
 
                     try {
@@ -3975,6 +4004,10 @@ public final class ActivityThread extends ClientTransactionHandler
                 Slog.i(TAG, "******************* PROCESS STATE CHANGED TO: " + processState
                         + (fromIpc ? " (from ipc" : ""));
             }
+        }
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                    "updateProcessState: processState=" + processState);
         }
     }
 
@@ -7343,16 +7376,6 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         WindowManagerGlobal.getInstance().trimMemory(level);
-
-        if (SystemProperties.getInt("debug.am.run_gc_trim_level", Integer.MAX_VALUE) <= level) {
-            unscheduleGcIdler();
-            doGcIfNeeded("tm");
-        }
-        if (SystemProperties.getInt("debug.am.run_mallopt_trim_level", Integer.MAX_VALUE)
-                <= level) {
-            unschedulePurgeIdler();
-            purgePendingResources();
-        }
     }
 
     private void setupGraphicsSupport(Context context) {

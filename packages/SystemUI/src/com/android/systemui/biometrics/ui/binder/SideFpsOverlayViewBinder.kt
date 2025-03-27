@@ -99,11 +99,6 @@ constructor(
                                     show()
                                 } else if (showIndicatorForDeviceEntry) {
                                     show()
-                                    overlayView?.announceForAccessibility(
-                                        applicationContext.resources.getString(
-                                            R.string.accessibility_side_fingerprint_indicator_label
-                                        )
-                                    )
                                 } else {
                                     hide()
                                 }
@@ -137,6 +132,9 @@ constructor(
             )
         bind(overlayView!!, overlayViewModel, windowManager.get())
         overlayView!!.visibility = View.INVISIBLE
+        overlayView!!.setOnClickListener { v ->
+            v.requireViewById<LottieAnimationView>(R.id.sidefps_animation).toggleAnimation()
+        }
         Log.d(TAG, "show(): adding overlayView $overlayView")
         windowManager.get().addView(overlayView, overlayViewModel.defaultOverlayViewParams)
     }
@@ -179,6 +177,11 @@ constructor(
 
                 overlayShowAnimator.start()
 
+                /**
+                 * Intercepts TYPE_WINDOW_STATE_CHANGED accessibility event, preventing Talkback
+                 * from speaking @string/accessibility_fingerprint_label twice when sensor location
+                 * indicator is in focus
+                 */
                 it.setAccessibilityDelegate(
                     object : View.AccessibilityDelegate() {
                         override fun dispatchPopulateAccessibilityEvent(
@@ -187,8 +190,7 @@ constructor(
                         ): Boolean {
                             return if (
                                 event.getEventType() ===
-                                    android.view.accessibility.AccessibilityEvent
-                                        .TYPE_WINDOW_STATE_CHANGED
+                                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                             ) {
                                 true
                             } else {
@@ -231,6 +233,14 @@ private fun LottieAnimationView.addOverlayDynamicColor(colorCallbacks: List<Lott
                 PorterDuffColorFilter(callback.color, PorterDuff.Mode.SRC_ATOP)
             }
         }
+        resumeAnimation()
+    }
+}
+
+fun LottieAnimationView.toggleAnimation() {
+    if (isAnimating) {
+        pauseAnimation()
+    } else {
         resumeAnimation()
     }
 }

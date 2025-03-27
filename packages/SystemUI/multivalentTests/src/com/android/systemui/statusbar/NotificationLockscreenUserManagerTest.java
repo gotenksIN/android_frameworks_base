@@ -33,7 +33,7 @@ import static android.provider.Settings.Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS;
 
 import static com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_NONE;
 import static com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_PUBLIC;
-import static com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_SENSITIVE_CONTENT;
+import static com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_OTP;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
@@ -82,7 +82,6 @@ import com.android.systemui.flags.DisableSceneContainer;
 import com.android.systemui.flags.EnableSceneContainer;
 import com.android.systemui.flags.FakeFeatureFlagsClassic;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
-import com.android.systemui.log.LogWtfHandlerRule;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.recents.LauncherProxyService;
 import com.android.systemui.settings.UserTracker;
@@ -108,7 +107,6 @@ import kotlinx.coroutines.flow.StateFlow;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -200,13 +198,12 @@ public class NotificationLockscreenUserManagerTest extends SysuiTestCase {
     private NotificationEntry mSecondaryUserNotif;
     private NotificationEntry mWorkProfileNotif;
     private NotificationEntry mSensitiveContentNotif;
+    private NotificationEntry mSensitiveNotifWithOldCreationTime;
     private long mSensitiveNotifPostTime;
     private final FakeFeatureFlagsClassic mFakeFeatureFlags = new FakeFeatureFlagsClassic();
     private final FakeSystemClock mFakeSystemClock = new FakeSystemClock();
     private final FakeExecutor mBackgroundExecutor = new FakeExecutor(mFakeSystemClock);
     private final Executor mMainExecutor = Runnable::run; // Direct executor
-
-    @Rule public final LogWtfHandlerRule wtfHandlerRule = new LogWtfHandlerRule();
 
     @Before
     public void setUp() {
@@ -274,6 +271,20 @@ public class NotificationLockscreenUserManagerTest extends SysuiTestCase {
                 .setSensitiveContent(true)
                 .setVisibilityOverride(VISIBILITY_NO_OVERRIDE).build());
         mSensitiveNotifPostTime = mSensitiveContentNotif.getSbn().getNotification().getWhen();
+
+        mSensitiveNotifWithOldCreationTime = new NotificationEntryBuilder()
+                .setNotification(notifWithPrivateVisibility)
+                .setUser(new UserHandle(mCurrentUser.id))
+                .setPostTime(System.currentTimeMillis())
+                // creation time of at least -2 hours, no matter what the current value of
+                // SystemClock.currentTimeMillis
+                .setCreationTime(-1 * TimeUnit.HOURS.toMillis(2))
+                .build();
+        mSensitiveNotifWithOldCreationTime.setRanking(
+                new RankingBuilder(mCurrentUserNotif.getRanking())
+                .setChannel(channel)
+                .setSensitiveContent(true)
+                .setVisibilityOverride(VISIBILITY_NO_OVERRIDE).build());
         when(mNotifCollection.getEntry(mWorkProfileNotif.getKey())).thenReturn(mWorkProfileNotif);
         when(mKeyguardInteractorLazy.get()).thenReturn(mKeyguardInteractor);
         when(mKeyguardInteractor.isKeyguardDismissible())
@@ -653,6 +664,23 @@ public class NotificationLockscreenUserManagerTest extends SysuiTestCase {
 
     @Test
     @EnableFlags(LockscreenOtpRedaction.FLAG_NAME)
+    public void testNewSensitiveNotification_notRedactedIfOldCreationTime() {
+        // Allow private notifications for this user
+        mSettings.putIntForUser(LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS, 1,
+                mCurrentUser.id);
+        changeSetting(LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS);
+        mLockscreenUserManager.mLocked.set(true);
+        // Claim the device was last unlocked 1 hour ago. Old enough to redact, but newer than the
+        // old creation time in the notification (which is -2 hours)
+        mLockscreenUserManager.mLastLockTime
+                .set(mSensitiveNotifPostTime - TimeUnit.HOURS.toMillis(1));
+        mLockscreenUserManager.mConnectedToWifi.set(false);
+        assertEquals(REDACTION_TYPE_NONE,
+                mLockscreenUserManager.getRedactionType(mSensitiveNotifWithOldCreationTime));
+    }
+
+    @Test
+    @EnableFlags(LockscreenOtpRedaction.FLAG_NAME)
     public void testHasSensitiveContent_redacted() {
         // Allow private notifications for this user
         mSettings.putIntForUser(LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS, 1,
@@ -665,7 +693,7 @@ public class NotificationLockscreenUserManagerTest extends SysuiTestCase {
         mLockscreenUserManager.mConnectedToWifi.set(false);
 
         // Sensitive Content notifications are always redacted
-        assertEquals(REDACTION_TYPE_SENSITIVE_CONTENT,
+        assertEquals(REDACTION_TYPE_OTP,
                 mLockscreenUserManager.getRedactionType(mSensitiveContentNotif));
     }
 

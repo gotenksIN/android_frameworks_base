@@ -44,6 +44,7 @@ import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.util.LruCache;
 import android.util.Pair;
+import android.view.InputDevice;
 
 // QTI_BEGIN: 2018-05-17: Bluetooth: Unpair both earbuds on unpair.
 import android.os.SystemProperties;
@@ -51,6 +52,7 @@ import android.os.SystemProperties;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.annotation.WorkerThread;
 
 import com.android.internal.util.ArrayUtils;
 import com.android.settingslib.R;
@@ -65,6 +67,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -163,6 +166,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     private boolean mIsHearingAidProfileConnectedFail = false;
     private boolean mIsLeAudioProfileConnectedFail = false;
     private boolean mUnpairing;
+    @Nullable
+    private final InputDevice mInputDevice;
+    private final boolean mIsDeviceStylus;
 
     // Group second device for Hearing Aid
     private CachedBluetoothDevice mSubDevice;
@@ -234,6 +240,8 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mTwspBatteryLevel = -1;
 // QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
         mUnpairing = false;
+        mInputDevice = BluetoothUtils.getInputDevice(mContext, getAddress());
+        mIsDeviceStylus = BluetoothUtils.isDeviceStylus(mInputDevice, this);
     }
 
 // QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry
@@ -243,6 +251,8 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mProfileManager = cachedDevice.mProfileManager;
         mDevice = cachedDevice.mDevice;
         fillData();
+        mInputDevice = BluetoothUtils.getInputDevice(mContext, getAddress());
+        mIsDeviceStylus = BluetoothUtils.isDeviceStylus(mInputDevice, this);
 // QTI_END: 2021-02-01: Bluetooth: Add BC profile entry
         initDrawableCache();
         mUnpairing = false;
@@ -1745,6 +1755,86 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         }
     }
 
+    /**
+     * Returns the battery levels of all components of the bluetooth device. If no battery info is
+     * available then returns null.
+     */
+    @WorkerThread
+    @Nullable
+    public BatteryLevelsInfo getBatteryLevelsInfo() {
+        // Try getting the battery information from metadata.
+        BatteryLevelsInfo metadataSourceBattery = getBatteryFromMetadata();
+        if (metadataSourceBattery != null) {
+            return metadataSourceBattery;
+        }
+        // Get the battery information from Bluetooth service.
+        return getBatteryFromBluetoothService();
+    }
+
+    @Nullable
+    private BatteryLevelsInfo getBatteryFromMetadata() {
+        if (BluetoothUtils.getBooleanMetaData(mDevice,
+                BluetoothDevice.METADATA_IS_UNTETHERED_HEADSET)) {
+            // The device is untethered headset, containing both earbuds and case.
+            int leftBattery =
+                    BluetoothUtils.getIntMetaData(
+                            mDevice, BluetoothDevice.METADATA_UNTETHERED_LEFT_BATTERY);
+            int rightBattery =
+                    BluetoothUtils.getIntMetaData(
+                            mDevice, BluetoothDevice.METADATA_UNTETHERED_RIGHT_BATTERY);
+            int caseBattery =
+                    BluetoothUtils.getIntMetaData(
+                            mDevice, BluetoothDevice.METADATA_UNTETHERED_CASE_BATTERY);
+
+            if (leftBattery <= BluetoothDevice.BATTERY_LEVEL_UNKNOWN
+                    && rightBattery <= BluetoothDevice.BATTERY_LEVEL_UNKNOWN
+                    && caseBattery <= BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
+                Log.d(TAG, "No battery info from metadata is available for untethered device "
+                        + mDevice.getAnonymizedAddress());
+                return null;
+            } else {
+                int overallBattery =
+                        Arrays.stream(new int[]{leftBattery, rightBattery, caseBattery})
+                                .filter(battery -> battery > BluetoothDevice.BATTERY_LEVEL_UNKNOWN)
+                                .min()
+                                .orElse(BluetoothDevice.BATTERY_LEVEL_UNKNOWN);
+                Log.d(TAG, "Acquired battery info from metadata for untethered device "
+                        + mDevice.getAnonymizedAddress()
+                        + " left earbud battery: " + leftBattery
+                        + " right earbud battery: " + rightBattery
+                        + " case battery: " + caseBattery
+                        + " overall battery: " + overallBattery);
+                return new BatteryLevelsInfo(
+                        leftBattery, rightBattery, caseBattery, overallBattery);
+            }
+        } else if (mInputDevice != null || mIsDeviceStylus) {
+            // The device is input device, using METADATA_MAIN_BATTERY field to get battery info.
+            int overallBattery = BluetoothUtils.getIntMetaData(
+                    mDevice, BluetoothDevice.METADATA_MAIN_BATTERY);
+            if (overallBattery <= BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
+                Log.d(TAG, "No battery info from metadata is available for input device "
+                        + mDevice.getAnonymizedAddress());
+                return null;
+            } else {
+                Log.d(TAG, "Acquired battery info from metadata for input device "
+                        + mDevice.getAnonymizedAddress()
+                        + " overall battery: " + overallBattery);
+                return new BatteryLevelsInfo(
+                        BluetoothDevice.BATTERY_LEVEL_UNKNOWN,
+                        BluetoothDevice.BATTERY_LEVEL_UNKNOWN,
+                        BluetoothDevice.BATTERY_LEVEL_UNKNOWN,
+                        overallBattery);
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private BatteryLevelsInfo getBatteryFromBluetoothService() {
+        // TODO(b/397847825): Implement the logic to get battery from Bluetooth service.
+        return null;
+    }
+
     private CharSequence getTvBatterySummary(int mainBattery, int leftBattery, int rightBattery,
             int lowBatteryColorRes) {
         // Since there doesn't seem to be a way to use format strings to add the
@@ -1898,10 +1988,31 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 + " mIsLeAudioProfileConnectedFail=" + mIsLeAudioProfileConnectedFail
                 + " mIsHeadsetProfileConnectedFail=" + mIsHeadsetProfileConnectedFail
                 + " isConnectedSapDevice()=" + isConnectedSapDevice());
-
-        return mIsA2dpProfileConnectedFail || mIsHearingAidProfileConnectedFail
-                || (!isConnectedSapDevice() && mIsHeadsetProfileConnectedFail)
-                || mIsLeAudioProfileConnectedFail;
+        if (mIsA2dpProfileConnectedFail) {
+            A2dpProfile a2dpProfile = mProfileManager.getA2dpProfile();
+            if (a2dpProfile != null && a2dpProfile.isEnabled(mDevice)) {
+                return true;
+            }
+        }
+        if (mIsHearingAidProfileConnectedFail) {
+            HearingAidProfile hearingAidProfile = mProfileManager.getHearingAidProfile();
+            if (hearingAidProfile != null && hearingAidProfile.isEnabled(mDevice)) {
+                return true;
+            }
+        }
+        if (!isConnectedSapDevice() && mIsHeadsetProfileConnectedFail) {
+            HeadsetProfile headsetProfile = mProfileManager.getHeadsetProfile();
+            if (headsetProfile != null && headsetProfile.isEnabled(mDevice)) {
+                return true;
+            }
+        }
+        if (mIsLeAudioProfileConnectedFail) {
+            LeAudioProfile leAudioProfile = mProfileManager.getLeAudioProfile();
+            if (leAudioProfile != null && leAudioProfile.isEnabled(mDevice)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

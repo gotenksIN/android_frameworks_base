@@ -19,6 +19,12 @@ package com.android.server.wm;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
+import static android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK;
+import static android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK;
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
+import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE_PER_TASK;
+import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
 
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_ATM;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_WITH_CLASS_NAME;
@@ -107,14 +113,23 @@ class DesktopModeLaunchParamsModifier implements LaunchParamsModifier {
         // Copy over any values
         outParams.set(currentParams);
 
-        // In Proto2, trampoline task launches of an existing background task can result in the
-        // previous windowing mode to be restored even if the desktop mode state has changed.
-        // Let task launches inherit the windowing mode from the source task if available, which
-        // should have the desired windowing mode set by WM Shell. See b/286929122.
         if (source != null && source.getTask() != null) {
             final Task sourceTask = source.getTask();
-            outParams.mWindowingMode = sourceTask.getWindowingMode();
-            appendLog("inherit-from-source=" + outParams.mWindowingMode);
+            if (DesktopModeFlags.DISABLE_DESKTOP_LAUNCH_PARAMS_OUTSIDE_DESKTOP_BUG_FIX.isTrue()
+                    && isEnteringDesktopMode(sourceTask, options, currentParams)) {
+                // If trampoline source is not freeform but we are entering or in desktop mode,
+                // ignore the source windowing mode and set the windowing mode to freeform
+                outParams.mWindowingMode = WINDOWING_MODE_FREEFORM;
+                appendLog("freeform window mode applied to task trampoline");
+            } else {
+                // In Proto2, trampoline task launches of an existing background task can result in
+                // the previous windowing mode to be restored even if the desktop mode state has
+                // changed. Let task launches inherit the windowing mode from the source task if
+                // available, which should have the desired windowing mode set by WM Shell.
+                // See b/286929122.
+                outParams.mWindowingMode = sourceTask.getWindowingMode();
+                appendLog("inherit-from-source=" + outParams.mWindowingMode);
+            }
         }
 
         if (phase == PHASE_WINDOWING_MODE) {
@@ -127,12 +142,29 @@ class DesktopModeLaunchParamsModifier implements LaunchParamsModifier {
         }
 
         if ((options == null || options.getLaunchBounds() == null) && task.hasOverrideBounds()) {
+            if (DesktopModeFlags.DISABLE_DESKTOP_LAUNCH_PARAMS_OUTSIDE_DESKTOP_BUG_FIX.isTrue()) {
+                // We are in desktop, return result done to prevent other modifiers from modifying
+                // exiting task bounds or resolved windowing mode.
+                return RESULT_DONE;
+            }
             appendLog("current task has bounds set, not overriding");
             return RESULT_SKIP;
         }
 
+        if (DesktopModeFlags.INHERIT_TASK_BOUNDS_FOR_TRAMPOLINE_TASK_LAUNCHES.isTrue()) {
+            ActivityRecord topVisibleFreeformActivity =
+                    task.getDisplayContent().getTopMostVisibleFreeformActivity();
+            if (shouldInheritExistingTaskBounds(topVisibleFreeformActivity, activity, task)) {
+                appendLog("inheriting bounds from existing closing instance");
+                outParams.mBounds.set(topVisibleFreeformActivity.getBounds());
+                appendLog("final desktop mode task bounds set to %s", outParams.mBounds);
+                // Return result done to prevent other modifiers from changing or cascading bounds.
+                return RESULT_DONE;
+            }
+        }
+
         DesktopModeBoundsCalculator.updateInitialBounds(task, layout, activity, options,
-                outParams.mBounds, this::appendLog);
+                outParams, this::appendLog);
         appendLog("final desktop mode task bounds set to %s", outParams.mBounds);
         if (options != null && options.getFlexibleLaunchSize()) {
             // Return result done to prevent other modifiers from respecting option bounds and
@@ -159,7 +191,7 @@ class DesktopModeLaunchParamsModifier implements LaunchParamsModifier {
         //  activity will also enter desktop mode. On this same relationship, we can also assume
         //  if there are not visible freeform tasks but a freeform activity is now launching, it
         //  will force the device into desktop mode.
-        return (task.getDisplayContent().getTopMostVisibleFreeformActivity() != null
+        return (task.getDisplayContent().getTopMostFreeformActivity() != null
                     && checkSourceWindowModesCompatible(task, options, currentParams))
                 || isRequestingFreeformWindowMode(task, options, currentParams);
     }
@@ -199,6 +231,40 @@ class DesktopModeLaunchParamsModifier implements LaunchParamsModifier {
                  WINDOWING_MODE_FREEFORM -> true;
             default -> false;
         };
+    }
+
+    /**
+     * Whether the launching task should inherit the task bounds of an existing closing instance.
+     */
+    private boolean shouldInheritExistingTaskBounds(
+            @Nullable ActivityRecord existingTaskActivity,
+            @Nullable ActivityRecord launchingActivity,
+            @NonNull Task launchingTask) {
+        if (existingTaskActivity == null || launchingActivity == null) return false;
+        return (existingTaskActivity.packageName == launchingActivity.packageName)
+                && isLaunchingNewTask(launchingActivity.launchMode,
+                    launchingTask.getBaseIntent().getFlags())
+                && isClosingExitingInstance(launchingTask.getBaseIntent().getFlags());
+    }
+
+    /**
+     * Returns true if the launch mode or intent will result in a new task being created for the
+     * activity.
+     */
+    private boolean isLaunchingNewTask(int launchMode, int intentFlags) {
+        return launchMode == LAUNCH_SINGLE_TASK
+                || launchMode == LAUNCH_SINGLE_INSTANCE
+                || launchMode == LAUNCH_SINGLE_INSTANCE_PER_TASK
+                || (intentFlags & FLAG_ACTIVITY_NEW_TASK) != 0;
+    }
+
+    /**
+     * Returns true if the intent will result in an existing task instance being closed if a new
+     * one appears.
+     */
+    private boolean isClosingExitingInstance(int intentFlags) {
+        return (intentFlags & FLAG_ACTIVITY_CLEAR_TASK) != 0
+            || (intentFlags & FLAG_ACTIVITY_MULTIPLE_TASK) == 0;
     }
 
     private void initLogBuilder(Task task, ActivityRecord activity) {

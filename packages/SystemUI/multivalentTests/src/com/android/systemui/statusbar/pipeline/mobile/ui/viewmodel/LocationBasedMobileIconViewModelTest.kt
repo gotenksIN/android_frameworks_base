@@ -42,7 +42,6 @@ import com.android.systemui.util.CarrierConfigTracker
 import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -117,7 +116,6 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
-                mock(),
             )
 
         interactor =
@@ -133,16 +131,7 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 iconsInteractor.isDefaultConnectionFailed,
                 iconsInteractor.isForceHidden,
                 repository,
-                iconsInteractor.alwaysUseRsrpLevelForLte,
-                iconsInteractor.hideNoInternetState,
-                iconsInteractor.networkTypeIconCustomization,
-                iconsInteractor.showVolteIcon,
-                iconsInteractor.showVowifiIcon,
                 context,
-                MutableStateFlow(0),
-                MutableStateFlow(null),
-                MutableStateFlow(false),
-                mock(),
                 MobileIconCarrierIdOverridesFake(),
             )
 

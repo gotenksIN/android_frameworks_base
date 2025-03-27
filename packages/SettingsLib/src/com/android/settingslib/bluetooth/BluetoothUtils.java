@@ -51,6 +51,8 @@ import com.android.settingslib.widget.AdaptiveOutlineDrawable;
 import com.google.common.collect.ImmutableSet;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -701,18 +703,18 @@ public class BluetoothUtils {
             // However, app layer need to gate the feature based on whether the device has audio
             // sharing capability regardless of the BT state.
             // So here we check the BluetoothProperties when BT off.
-            //
-            // TODO: Also check SystemProperties "persist.bluetooth.leaudio_dynamic_switcher.mode"
-            // and return true if it is in broadcast mode.
-            // Now SystemUI don't have access to read the value.
+            String mode = BluetoothProperties.le_audio_dynamic_switcher_mode().orElse("none");
+            Set<String> disabledModes = ImmutableSet.of("disabled", "unicast");
             int sourceSupportedCode = adapter.isLeAudioBroadcastSourceSupported();
             int assistantSupportedCode = adapter.isLeAudioBroadcastAssistantSupported();
             return (sourceSupportedCode == BluetoothStatusCodes.FEATURE_SUPPORTED
                     || (sourceSupportedCode == BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ENABLED
-                    && BluetoothProperties.isProfileBapBroadcastSourceEnabled().orElse(false)))
+                    && BluetoothProperties.isProfileBapBroadcastSourceEnabled().orElse(false)
+                    && !disabledModes.contains(mode)))
                     && (assistantSupportedCode == BluetoothStatusCodes.FEATURE_SUPPORTED
                     || (assistantSupportedCode == BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ENABLED
-                    && BluetoothProperties.isProfileBapBroadcastAssistEnabled().orElse(false)));
+                    && BluetoothProperties.isProfileBapBroadcastAssistEnabled().orElse(false)
+                    && !disabledModes.contains(mode)));
         } catch (IllegalStateException e) {
             Log.d(TAG, "Fail to check isAudioSharingSupported, e = ", e);
             return false;
@@ -1267,5 +1269,16 @@ public class BluetoothUtils {
         }
 
         return false;
+    }
+
+    /** Gets key missing count of the device. This is a workaround before the API is rolled out. */
+    public static Integer getKeyMissingCount(BluetoothDevice device) {
+        try {
+            Method m = BluetoothDevice.class.getDeclaredMethod("getKeyMissingCount");
+            return (int) m.invoke(device);
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+            Log.w(TAG, "error happens when getKeyMissingCount.");
+            return null;
+        }
     }
 }

@@ -28,6 +28,7 @@ import com.android.systemui.plugins.clocks.AlarmData
 import com.android.systemui.plugins.clocks.ClockAnimations
 import com.android.systemui.plugins.clocks.ClockConfig
 import com.android.systemui.plugins.clocks.ClockController
+import com.android.systemui.plugins.clocks.ClockEventListener
 import com.android.systemui.plugins.clocks.ClockEvents
 import com.android.systemui.plugins.clocks.ClockFaceConfig
 import com.android.systemui.plugins.clocks.ClockFaceController
@@ -97,7 +98,12 @@ class DefaultClockController(
         events.onLocaleChanged(Locale.getDefault())
     }
 
-    override fun initialize(isDarkTheme: Boolean, dozeFraction: Float, foldFraction: Float) {
+    override fun initialize(
+        isDarkTheme: Boolean,
+        dozeFraction: Float,
+        foldFraction: Float,
+        clockListener: ClockEventListener?,
+    ) {
         largeClock.recomputePadding(null)
 
         largeClock.animations = LargeClockAnimations(largeClock.view, dozeFraction, foldFraction)
@@ -143,14 +149,7 @@ class DefaultClockController(
                 override fun onThemeChanged(theme: ThemeConfig) {
                     this@DefaultClockFaceController.theme = theme
 
-                    val color =
-                        when {
-                            theme.seedColor != null -> theme.seedColor!!
-                            theme.isDarkTheme ->
-                                resources.getColor(android.R.color.system_accent1_100)
-                            else -> resources.getColor(android.R.color.system_accent2_600)
-                        }
-
+                    val color = theme.getDefaultColor(ctx)
                     if (currentColor == color) {
                         return
                     }

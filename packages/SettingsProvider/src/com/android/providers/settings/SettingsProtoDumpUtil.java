@@ -1727,6 +1727,9 @@ class SettingsProtoDumpUtil {
                 Settings.Secure.ACCESSIBILITY_AUTOCLICK_IGNORE_MINOR_CURSOR_MOVEMENT,
                 SecureSettingsProto.Accessibility.AUTOCLICK_IGNORE_MINOR_CURSOR_MOVEMENT);
         dumpSetting(s, p,
+                Settings.Secure.ACCESSIBILITY_AUTOCLICK_REVERT_TO_LEFT_CLICK,
+                SecureSettingsProto.Accessibility.AUTOCLICK_REVERT_TO_LEFT_CLICK);
+        dumpSetting(s, p,
                 Settings.Secure.ACCESSIBILITY_AUTOCLICK_ENABLED,
                 SecureSettingsProto.Accessibility.AUTOCLICK_ENABLED);
         dumpSetting(s, p,
@@ -1882,6 +1885,10 @@ class SettingsProtoDumpUtil {
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_JOYSTICK_ENABLED,
                 SecureSettingsProto.Accessibility
                         .ACCESSIBILITY_MAGNIFICATION_JOYSTICK_ENABLED);
+        dumpSetting(s, p,
+                Settings.Secure.ACCESSIBILITY_MAGNIFICATION_CURSOR_FOLLOWING_MODE,
+                SecureSettingsProto.Accessibility
+                        .ACCESSIBILITY_MAGNIFICATION_CURSOR_FOLLOWING_MODE);
         dumpSetting(s, p,
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_TWO_FINGER_TRIPLE_TAP_ENABLED,
                 SecureSettingsProto.Accessibility
@@ -2109,6 +2116,12 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Secure.ADAPTIVE_CONNECTIVITY_ENABLED,
                 SecureSettingsProto.ADAPTIVE_CONNECTIVITY_ENABLED);
+        dumpSetting(s, p,
+                Settings.Secure.ADAPTIVE_CONNECTIVITY_WIFI_ENABLED,
+                SecureSettingsProto.ADAPTIVE_CONNECTIVITY_WIFI_ENABLED);
+        dumpSetting(s, p,
+                Settings.Secure.ADAPTIVE_CONNECTIVITY_MOBILE_NETWORK_ENABLED,
+                SecureSettingsProto.ADAPTIVE_CONNECTIVITY_MOBILE_NETWORK_ENABLED);
 
         final long controlsToken = p.start(SecureSettingsProto.CONTROLS);
         dumpSetting(s, p,
@@ -2190,15 +2203,6 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Secure.ENHANCED_VOICE_PRIVACY_ENABLED,
                 SecureSettingsProto.ENHANCED_VOICE_PRIVACY_ENABLED);
-
-        final long evenDimmerToken = p.start(SecureSettingsProto.EVEN_DIMMER);
-        dumpSetting(s, p,
-                Settings.Secure.EVEN_DIMMER_ACTIVATED,
-                SecureSettingsProto.EvenDimmer.EVEN_DIMMER_ACTIVATED);
-        dumpSetting(s, p,
-                Settings.Secure.EVEN_DIMMER_MIN_NITS,
-                SecureSettingsProto.EvenDimmer.EVEN_DIMMER_MIN_NITS);
-        p.end(evenDimmerToken);
 
         dumpSetting(s, p,
                 Settings.Secure.EM_VALUE,

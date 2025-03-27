@@ -445,6 +445,27 @@ public final class WindowContainerTransaction implements Parcelable {
         return this;
     }
 
+    /**
+     * Sets a given safe region {@code Rect} on the {@code container}. Set {@code null} to reset
+     * safe region bounds. When a safe region is set on a WindowContainer, the activities which
+     * need to be within a safe region will be letterboxed within the set safe region bounds.
+     * <p>Note that if the position of the WindowContainer changes, the caller needs to update the
+     * safe region bounds.
+     *
+     * @param container        The window container that the safe region bounds are set on
+     * @param safeRegionBounds The rect for the safe region bounds which are absolute in nature.
+     * @hide
+     */
+    @NonNull
+    @FlaggedApi(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public WindowContainerTransaction setSafeRegionBounds(
+            @NonNull WindowContainerToken container,
+            @Nullable Rect safeRegionBounds) {
+        mHierarchyOps.add(
+                HierarchyOp.createForSetSafeRegionBounds(container.asBinder(), safeRegionBounds));
+        return this;
+    }
+
     /*
      * ===========================================================================================
      * Hierarchy updates (create/destroy/reorder/reparent containers)
@@ -684,16 +705,13 @@ public final class WindowContainerTransaction implements Parcelable {
      * organizer.
      * @param root1 the first root.
      * @param root2 the second root.
+     * @deprecated replace with {@link #setAdjacentRootSet}
      */
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    @Deprecated
     @NonNull
     public WindowContainerTransaction setAdjacentRoots(
             @NonNull WindowContainerToken root1, @NonNull WindowContainerToken root2) {
-        if (!Flags.allowMultipleAdjacentTaskFragments()) {
-            mHierarchyOps.add(HierarchyOp.createForAdjacentRoots(
-                    root1.asBinder(),
-                    root2.asBinder()));
-            return this;
-        }
         return setAdjacentRootSet(root1, root2);
     }
 
@@ -710,14 +728,10 @@ public final class WindowContainerTransaction implements Parcelable {
      *
      * @param roots the Tasks that should be adjacent to each other.
      * @throws IllegalArgumentException if roots have size < 2.
-     * @hide // TODO(b/373709676) Rename to setAdjacentRoots and update CTS.
+     * @hide // TODO(b/373709676) Rename to setAdjacentRoots and update CTS in 25Q4.
      */
     @NonNull
     public WindowContainerTransaction setAdjacentRootSet(@NonNull WindowContainerToken... roots) {
-        if (!Flags.allowMultipleAdjacentTaskFragments()) {
-            throw new IllegalArgumentException("allowMultipleAdjacentTaskFragments is not enabled."
-                    + " Use #setAdjacentRoots instead.");
-        }
         if (roots.length < 2) {
             throw new IllegalArgumentException("setAdjacentRootSet must have size >= 2");
         }
@@ -1013,7 +1027,7 @@ public final class WindowContainerTransaction implements Parcelable {
     /**
      * Sets to TaskFragments adjacent to each other. Containers below two visible adjacent
      * TaskFragments will be made invisible. This is similar to
-     * {@link #setAdjacentRoots(WindowContainerToken, WindowContainerToken)}, but can be used with
+     * {@link #setAdjacentRootSet(WindowContainerToken...)}, but can be used with
      * fragmentTokens when that TaskFragments haven't been created (but will be created in the same
      * {@link WindowContainerTransaction}).
      * @param fragmentToken1    client assigned unique token to create TaskFragment with specified
@@ -1604,6 +1618,7 @@ public final class WindowContainerTransaction implements Parcelable {
         public static final int HIERARCHY_OP_TYPE_SET_DISABLE_LAUNCH_ADJACENT = 23;
         public static final int HIERARCHY_OP_TYPE_REMOVE_ROOT_TASK = 24;
         public static final int HIERARCHY_OP_TYPE_APP_COMPAT_REACHABILITY = 25;
+        public static final int HIERARCHY_OP_TYPE_SET_SAFE_REGION_BOUNDS = 26;
 
         @IntDef(prefix = {"HIERARCHY_OP_TYPE_"}, value = {
                 HIERARCHY_OP_TYPE_REPARENT,
@@ -1632,6 +1647,7 @@ public final class WindowContainerTransaction implements Parcelable {
                 HIERARCHY_OP_TYPE_SET_DISABLE_LAUNCH_ADJACENT,
                 HIERARCHY_OP_TYPE_REMOVE_ROOT_TASK,
                 HIERARCHY_OP_TYPE_APP_COMPAT_REACHABILITY,
+                HIERARCHY_OP_TYPE_SET_SAFE_REGION_BOUNDS,
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface HierarchyOpType {
@@ -1716,6 +1732,9 @@ public final class WindowContainerTransaction implements Parcelable {
         private @InsetsType int mExcludeInsetsTypes;
 
         private boolean mLaunchAdjacentDisabled;
+
+        @Nullable
+        private Rect mSafeRegionBounds;
 
         /** Creates a hierarchy operation for reparenting a container within the hierarchy. */
         @NonNull
@@ -1880,6 +1899,17 @@ public final class WindowContainerTransaction implements Parcelable {
                     .build();
         }
 
+        /** Creates a hierarchy op for setting the safe region bounds. */
+        @NonNull
+        @FlaggedApi(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+        public static HierarchyOp createForSetSafeRegionBounds(@NonNull IBinder container,
+                @Nullable Rect safeRegionBounds) {
+            return new Builder(HIERARCHY_OP_TYPE_SET_SAFE_REGION_BOUNDS)
+                    .setContainer(container)
+                    .setSafeRegionBounds(safeRegionBounds)
+                    .build();
+        }
+
         /** Only creates through {@link Builder}. */
         private HierarchyOp(@HierarchyOpType int type) {
             mType = type;
@@ -1910,6 +1940,7 @@ public final class WindowContainerTransaction implements Parcelable {
             mIsTrimmableFromRecents = copy.mIsTrimmableFromRecents;
             mExcludeInsetsTypes = copy.mExcludeInsetsTypes;
             mLaunchAdjacentDisabled = copy.mLaunchAdjacentDisabled;
+            mSafeRegionBounds = copy.mSafeRegionBounds;
         }
 
         private HierarchyOp(@NonNull Parcel in) {
@@ -1937,6 +1968,7 @@ public final class WindowContainerTransaction implements Parcelable {
             mIsTrimmableFromRecents = in.readBoolean();
             mExcludeInsetsTypes = in.readInt();
             mLaunchAdjacentDisabled = in.readBoolean();
+            mSafeRegionBounds = in.readTypedObject(Rect.CREATOR);
         }
 
         @HierarchyOpType
@@ -1971,13 +2003,6 @@ public final class WindowContainerTransaction implements Parcelable {
         @NonNull
         public IBinder[] getContainers() {
             return mContainers;
-        }
-
-        /** @deprecated b/373709676 replace with {@link #getContainers()}. */
-        @Deprecated
-        @NonNull
-        public IBinder getAdjacentRoot() {
-            return mReparent;
         }
 
         public boolean getToTop() {
@@ -2065,6 +2090,12 @@ public final class WindowContainerTransaction implements Parcelable {
             return mLaunchAdjacentDisabled;
         }
 
+        /** Denotes the safe region bounds */
+        @Nullable
+        public Rect getSafeRegionBounds() {
+            return mSafeRegionBounds;
+        }
+
         /** Gets a string representation of a hierarchy-op type. */
         public static String hopToString(@HierarchyOpType int type) {
             switch (type) {
@@ -2098,6 +2129,7 @@ public final class WindowContainerTransaction implements Parcelable {
                 case HIERARCHY_OP_TYPE_RESTORE_BACK_NAVIGATION: return "restoreBackNav";
                 case HIERARCHY_OP_TYPE_SET_EXCLUDE_INSETS_TYPES: return "setExcludeInsetsTypes";
                 case HIERARCHY_OP_TYPE_SET_KEYGUARD_STATE: return "setKeyguardState";
+                case HIERARCHY_OP_TYPE_SET_SAFE_REGION_BOUNDS: return "setSafeRegionBounds";
                 default: return "HOP(" + type + ")";
             }
         }
@@ -2127,17 +2159,12 @@ public final class WindowContainerTransaction implements Parcelable {
                     sb.append(mContainer).append(" to ").append(mToTop ? "top" : "bottom");
                     break;
                 case HIERARCHY_OP_TYPE_SET_ADJACENT_ROOTS:
-                    if (Flags.allowMultipleAdjacentTaskFragments()) {
-                        for (IBinder container : mContainers) {
-                            if (container == mContainers[0]) {
-                                sb.append("adjacentRoots=").append(container);
-                            } else {
-                                sb.append(", ").append(container);
-                            }
+                    for (IBinder container : mContainers) {
+                        if (container == mContainers[0]) {
+                            sb.append("adjacentRoots=").append(container);
+                        } else {
+                            sb.append(", ").append(container);
                         }
-                    } else {
-                        sb.append("container=").append(mContainer)
-                                .append(" adjacentRoot=").append(mReparent);
                     }
                     break;
                 case HIERARCHY_OP_TYPE_LAUNCH_TASK:
@@ -2203,6 +2230,11 @@ public final class WindowContainerTransaction implements Parcelable {
                     sb.append("container= ").append(mContainer)
                             .append(" isTrimmable= ")
                             .append(mIsTrimmableFromRecents);
+                    break;
+                case HIERARCHY_OP_TYPE_SET_SAFE_REGION_BOUNDS:
+                    sb.append("container= ").append(mContainer)
+                            .append(" safeRegionBounds= ")
+                            .append(mSafeRegionBounds);
                 default:
                     sb.append("container=").append(mContainer)
                             .append(" reparent=").append(mReparent)
@@ -2239,6 +2271,7 @@ public final class WindowContainerTransaction implements Parcelable {
             dest.writeBoolean(mIsTrimmableFromRecents);
             dest.writeInt(mExcludeInsetsTypes);
             dest.writeBoolean(mLaunchAdjacentDisabled);
+            dest.writeTypedObject(mSafeRegionBounds, flags);
         }
 
         @Override
@@ -2323,6 +2356,9 @@ public final class WindowContainerTransaction implements Parcelable {
             private @InsetsType int mExcludeInsetsTypes;
 
             private boolean mLaunchAdjacentDisabled;
+
+            @Nullable
+            private Rect mSafeRegionBounds;
 
             Builder(@HierarchyOpType int type) {
                 mType = type;
@@ -2445,6 +2481,11 @@ public final class WindowContainerTransaction implements Parcelable {
                 return this;
             }
 
+            Builder setSafeRegionBounds(Rect safeRegionBounds) {
+                mSafeRegionBounds = safeRegionBounds;
+                return this;
+            }
+
             @NonNull
             HierarchyOp build() {
                 final HierarchyOp hierarchyOp = new HierarchyOp(mType);
@@ -2475,7 +2516,7 @@ public final class WindowContainerTransaction implements Parcelable {
                 hierarchyOp.mIsTrimmableFromRecents = mIsTrimmableFromRecents;
                 hierarchyOp.mExcludeInsetsTypes = mExcludeInsetsTypes;
                 hierarchyOp.mLaunchAdjacentDisabled = mLaunchAdjacentDisabled;
-
+                hierarchyOp.mSafeRegionBounds = mSafeRegionBounds;
                 return hierarchyOp;
             }
         }

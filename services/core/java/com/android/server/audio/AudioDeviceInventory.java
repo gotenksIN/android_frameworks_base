@@ -1903,7 +1903,6 @@ public class AudioDeviceInventory {
                         deviceSwitch);
                 // always remove even if disconnection failed
                 mConnectedDevices.remove(deviceKey);
-                mDeviceBroker.postCheckCommunicationDeviceRemoval(attributes);
                 status = true;
             }
             if (status) {
@@ -2470,7 +2469,7 @@ public class AudioDeviceInventory {
         } else {
             AudioService.sDeviceLogger.enqueue((new EventLogger.StringEvent(
                     "A2DP device addr=" + Utils.anonymizeBluetoothAddress(address)
-                            + " made unavailable, deviceSwitch" + deviceSwitch))
+                            + " made unavailable, deviceSwitch: " + deviceSwitch))
                     .printSlog(EventLogger.Event.ALOGI, TAG));
         }
         mApmConnectedDevices.remove(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP);
@@ -2480,7 +2479,6 @@ public class AudioDeviceInventory {
         mmi.record();
         updateBluetoothPreferredModes_l(null /*connectedDevice*/);
         purgeDevicesRoles_l();
-        mDeviceBroker.postCheckCommunicationDeviceRemoval(ada);
     }
 
     @GuardedBy("mDevicesLock")
@@ -2568,13 +2566,12 @@ public class AudioDeviceInventory {
         // always remove regardless of the result
         mConnectedDevices.remove(
                 DeviceInfo.makeDeviceListKey(AudioSystem.DEVICE_IN_BLUETOOTH_A2DP, address));
-        mDeviceBroker.postCheckCommunicationDeviceRemoval(ada);
     }
 
     @GuardedBy("mDevicesLock")
     private void makeHearingAidDeviceAvailable(
             String address, String name, int streamType, String eventSource) {
-        final int hearingAidVolIndex = mDeviceBroker.getVssVolumeForDevice(streamType,
+        final int hearingAidVolIndex = mDeviceBroker.getVolumeForDeviceIgnoreMute(streamType,
                 DEVICE_OUT_HEARING_AID);
         mDeviceBroker.postSetHearingAidVolumeIndex(hearingAidVolIndex, streamType);
 
@@ -2630,7 +2627,6 @@ public class AudioDeviceInventory {
                 .set(MediaMetrics.Property.DEVICE,
                         AudioSystem.getDeviceName(DEVICE_OUT_HEARING_AID))
                 .record();
-        mDeviceBroker.postCheckCommunicationDeviceRemoval(ada);
     }
 
     @GuardedBy("mDevicesLock")
@@ -2658,6 +2654,15 @@ public class AudioDeviceInventory {
     private DeviceInfo getFirstConnectedDeviceOfTypes(Set<Integer> internalTypes) {
         List<DeviceInfo> devices = getConnectedDevicesOfTypes(internalTypes);
         return devices.isEmpty() ? null : devices.get(0);
+    }
+
+    /**
+     * Returns a DeviceInfo for the first connected device matching one of the supplied types
+     */
+    AudioDeviceAttributes getFirstConnectedDeviceAttributesOfTypes(Set<Integer> internalTypes) {
+        DeviceInfo di = getFirstConnectedDeviceOfTypes(internalTypes);
+        return di == null ? null : new AudioDeviceAttributes(
+                di.mDeviceType, di.mDeviceAddress, di.mDeviceName);
     }
 
     /**
@@ -2756,7 +2761,7 @@ public class AudioDeviceInventory {
             }
 
             final int leAudioVolIndex = (volumeIndex == -1)
-                    ? mDeviceBroker.getVssVolumeForDevice(streamType, device)
+                    ? mDeviceBroker.getVolumeForDeviceIgnoreMute(streamType, device)
                     : volumeIndex;
             final int maxIndex = mDeviceBroker.getMaxVssVolumeForStream(streamType);
             mDeviceBroker.postSetLeAudioVolumeIndex(leAudioVolIndex, maxIndex, streamType);
@@ -2778,13 +2783,16 @@ public class AudioDeviceInventory {
 
             if (res != AudioSystem.AUDIO_STATUS_OK) {
                 AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                        "APM failed to make unavailable LE Audio device addr=" + address
-                                + " error=" + res).printSlog(EventLogger.Event.ALOGE, TAG));
+                        "APM failed to make unavailable LE Audio "
+                        + (AudioSystem.isInputDevice(device) ? "source" : "sink")
+                        + " device addr=" + address
+                        + " error=" + res).printSlog(EventLogger.Event.ALOGE, TAG));
                 // not taking further action: proceeding as if disconnection from APM worked
             } else {
                 AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                        "LE Audio device addr=" + Utils.anonymizeBluetoothAddress(address)
-                            + " made unavailable, deviceSwitch" + deviceSwitch)
+                        "LE Audio " + (AudioSystem.isInputDevice(device) ? "source" : "sink")
+                            + "device addr=" + Utils.anonymizeBluetoothAddress(address)
+                            + " made unavailable, deviceSwitch: " + deviceSwitch)
                         .printSlog(EventLogger.Event.ALOGI, TAG));
             }
             mConnectedDevices.remove(DeviceInfo.makeDeviceListKey(device, address));
@@ -2793,9 +2801,6 @@ public class AudioDeviceInventory {
         setCurrentAudioRouteNameIfPossible(null, false /*fromA2dp*/);
         updateBluetoothPreferredModes_l(null /*connectedDevice*/);
         purgeDevicesRoles_l();
-        if (ada != null) {
-            mDeviceBroker.postCheckCommunicationDeviceRemoval(ada);
-        }
     }
 
     @GuardedBy("mDevicesLock")

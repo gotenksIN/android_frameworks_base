@@ -33,6 +33,7 @@ import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.NotificationShelf
+import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
 import com.android.systemui.statusbar.notification.NotificationActivityStarter
 import com.android.systemui.statusbar.notification.collection.render.SectionHeaderController
 import com.android.systemui.statusbar.notification.dagger.SilentHeader
@@ -130,6 +131,14 @@ constructor(
                 launch {
                     viewModel.isImportantForAccessibility.collect { isImportantForAccessibility ->
                         view.setImportantForAccessibilityYesNo(isImportantForAccessibility)
+                    }
+                }
+
+                if (StatusBarNotifChips.isEnabled) {
+                    launch {
+                        viewModel.visibleStatusBarChipKeys.collect { keys ->
+                            viewController.updateStatusBarChipKeys(keys)
+                        }
                     }
                 }
 
@@ -231,7 +240,7 @@ constructor(
         emptyShadeViewModel: EmptyShadeViewModel,
         parentView: NotificationStackScrollLayout,
     ) {
-        ModesEmptyShadeFix.assertInNewMode()
+        ModesEmptyShadeFix.unsafeAssertInNewMode()
         // The empty shade needs to be re-inflated every time the theme or the font size
         // changes.
         configuration
@@ -269,7 +278,7 @@ constructor(
         emptyShadeView: EmptyShadeView,
         emptyShadeViewModel: EmptyShadeViewModel,
     ): Unit = coroutineScope {
-        ModesEmptyShadeFix.assertInNewMode()
+        ModesEmptyShadeFix.unsafeAssertInNewMode()
         launch {
             emptyShadeView.repeatWhenAttachedToWindow {
                 EmptyShadeViewBinder.bind(

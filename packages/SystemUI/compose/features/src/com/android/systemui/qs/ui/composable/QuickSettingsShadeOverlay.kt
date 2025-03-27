@@ -26,16 +26,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onPlaced
@@ -46,7 +49,10 @@ import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
+import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.modifiers.thenIf
 import com.android.systemui.brightness.ui.compose.BrightnessSliderContainer
+import com.android.systemui.brightness.ui.compose.ContainerColors
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.lifecycle.rememberViewModel
@@ -59,6 +65,7 @@ import com.android.systemui.qs.panels.ui.compose.EditMode
 import com.android.systemui.qs.panels.ui.compose.TileDetails
 import com.android.systemui.qs.panels.ui.compose.TileGrid
 import com.android.systemui.qs.panels.ui.compose.toolbar.Toolbar
+import com.android.systemui.qs.ui.composable.QuickSettingsShade.systemGestureExclusionInShade
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsContainerViewModel
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsShadeOverlayActionsViewModel
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsShadeOverlayContentViewModel
@@ -251,13 +258,18 @@ fun ContentScope.QuickSettingsLayout(
                 modifier = Modifier.padding(horizontal = QuickSettingsShade.Dimensions.Padding),
             )
 
-            BrightnessSliderContainer(
-                viewModel = viewModel.brightnessSliderViewModel,
-                containerColor = OverlayShade.Colors.PanelBackground,
-                modifier =
-                    Modifier.fillMaxWidth()
-                        .height(QuickSettingsShade.Dimensions.BrightnessSliderHeight),
-            )
+            Box(
+                Modifier.systemGestureExclusionInShade(
+                    enabled = { layoutState.transitionState is TransitionState.Idle }
+                )
+            ) {
+                BrightnessSliderContainer(
+                    viewModel = viewModel.brightnessSliderViewModel,
+                    containerColors =
+                        ContainerColors.singleColor(OverlayShade.Colors.PanelBackground),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             Box {
                 GridAnchor()
@@ -280,6 +292,27 @@ object QuickSettingsShade {
     object Dimensions {
         val Padding = 16.dp
         val ToolbarHeight = 48.dp
-        val BrightnessSliderHeight = 64.dp
+    }
+
+    /**
+     * Applies system gesture exclusion to a component adding [Dimensions.Padding] to left and
+     * right.
+     */
+    @Composable
+    fun Modifier.systemGestureExclusionInShade(enabled: () -> Boolean): Modifier {
+        val density = LocalDensity.current
+        return thenIf(enabled()) {
+            Modifier.systemGestureExclusion { layoutCoordinates ->
+                val sidePadding = with(density) { Dimensions.Padding.toPx() }
+                Rect(
+                    offset = Offset(x = -sidePadding, y = 0f),
+                    size =
+                        Size(
+                            width = layoutCoordinates.size.width.toFloat() + 2 * sidePadding,
+                            height = layoutCoordinates.size.height.toFloat(),
+                        ),
+                )
+            }
+        }
     }
 }

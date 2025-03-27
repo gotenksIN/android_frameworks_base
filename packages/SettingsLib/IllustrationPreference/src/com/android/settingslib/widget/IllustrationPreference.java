@@ -138,8 +138,12 @@ public class IllustrationPreference extends Preference implements GroupSectionDi
         ImageView backgroundViewTablet =
                 (ImageView) holder.findViewById(R.id.background_view_tablet);
 
-        backgroundView.setVisibility(mIsTablet ? View.GONE : View.VISIBLE);
-        backgroundViewTablet.setVisibility(mIsTablet ? View.VISIBLE : View.GONE);
+        if (backgroundView != null) {
+            backgroundView.setVisibility(mIsTablet ? View.GONE : View.VISIBLE);
+        }
+        if (backgroundViewTablet != null) {
+            backgroundViewTablet.setVisibility(mIsTablet ? View.VISIBLE : View.GONE);
+        }
         if (mIsTablet) {
             backgroundView = backgroundViewTablet;
         }
@@ -183,7 +187,9 @@ public class IllustrationPreference extends Preference implements GroupSectionDi
         if (mLottieDynamicColor) {
             LottieColorUtils.applyDynamicColors(getContext(), illustrationView);
         }
-        LottieColorUtils.applyMaterialColor(getContext(), illustrationView);
+        if (SettingsThemeHelper.isExpressiveTheme(getContext())) {
+            LottieColorUtils.applyMaterialColor(getContext(), illustrationView);
+        }
 
         if (mOnBindListener != null) {
             mOnBindListener.onBind(illustrationView);
@@ -443,6 +449,10 @@ public class IllustrationPreference extends Preference implements GroupSectionDi
         illustrationView.setMaxWidth((int) (restrictedMaxHeight * aspectRatio));
     }
 
+    public boolean isAnimatable() {
+        return mIsAnimatable;
+    }
+
     private void startAnimation(Drawable drawable) {
         if (!(drawable instanceof Animatable)) {
             return;
@@ -464,6 +474,10 @@ public class IllustrationPreference extends Preference implements GroupSectionDi
         if (mIsAnimatable) {
             // TODO(b/397340540): list out pages having illustration without a content description.
             if (TextUtils.isEmpty(mContentDescription)) {
+                // Default content description will be attached if there's no content description.
+                illustrationView.setContentDescription(
+                        getContext().getString(
+                                R.string.settingslib_illustration_content_description));
                 Log.w(TAG, "Illustration should have a content description. preference key = "
                         + getKey());
             }
@@ -483,8 +497,6 @@ public class IllustrationPreference extends Preference implements GroupSectionDi
     }
 
     private void updateAccessibilityAction(ViewGroup container) {
-        // Setting the state of animation
-        container.setStateDescription(getStateDescriptionForAnimation());
         container.setAccessibilityDelegate(new View.AccessibilityDelegate() {
             @Override
             public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
@@ -502,14 +514,6 @@ public class IllustrationPreference extends Preference implements GroupSectionDi
             return getContext().getString(R.string.settingslib_action_label_resume);
         } else {
             return getContext().getString(R.string.settingslib_action_label_pause);
-        }
-    }
-
-    private String getStateDescriptionForAnimation() {
-        if (mIsAnimationPaused) {
-            return getContext().getString(R.string.settingslib_state_animation_paused);
-        } else {
-            return getContext().getString(R.string.settingslib_state_animation_playing);
         }
     }
 

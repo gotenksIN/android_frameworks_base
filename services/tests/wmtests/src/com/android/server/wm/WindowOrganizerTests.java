@@ -61,6 +61,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -910,7 +911,7 @@ public class WindowOrganizerTests extends WindowTestsBase {
         final RunningTaskInfo info2 = task2.getTaskInfo();
 
         WindowContainerTransaction wct = new WindowContainerTransaction();
-        wct.setAdjacentRoots(info1.token, info2.token);
+        wct.setAdjacentRootSet(info1.token, info2.token);
         mWm.mAtmService.mWindowOrganizerController.applyTransaction(wct);
         assertTrue(task1.isAdjacentTo(task2));
         assertTrue(task2.isAdjacentTo(task1));
@@ -929,7 +930,6 @@ public class WindowOrganizerTests extends WindowTestsBase {
         assertEquals(dc.getDefaultTaskDisplayArea().mLaunchAdjacentFlagRootTask, null);
     }
 
-    @EnableFlags(Flags.FLAG_ALLOW_MULTIPLE_ADJACENT_TASK_FRAGMENTS)
     @Test
     public void testSetAdjacentLaunchRootSet() {
         final DisplayContent dc = mWm.mRoot.getDisplayContent(Display.DEFAULT_DISPLAY);
@@ -1566,6 +1566,51 @@ public class WindowOrganizerTests extends WindowTestsBase {
         taskDisplayArea.forAllTasks(daTask -> {
             assertFalse(daTask.isForceHidden());
         });
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testSetSafeRegionBoundsOnRootTask() {
+        Task rootTask = mWm.mAtmService.mTaskOrganizerController.createRootTask(
+                mDisplayContent, WINDOWING_MODE_FULLSCREEN, null);
+        final Task task1 = createRootTask();
+        final Task task2 = createTask(rootTask, false /* fakeDraw */);
+        WindowContainerTransaction wct = new WindowContainerTransaction();
+        Rect safeRegionBounds = new Rect(50, 50, 200, 300);
+
+        wct.setSafeRegionBounds(rootTask.mRemoteToken.toWindowContainerToken(), safeRegionBounds);
+        mWm.mAtmService.mWindowOrganizerController.applyTransaction(wct);
+
+        assertEquals(rootTask.getSafeRegionBounds(), safeRegionBounds);
+        assertEquals(task2.getSafeRegionBounds(), safeRegionBounds);
+        assertNull(task1.getSafeRegionBounds());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testSetSafeRegionBoundsOnRootTask_resetSafeRegionBounds() {
+        Task rootTask = mWm.mAtmService.mTaskOrganizerController.createRootTask(
+                mDisplayContent, WINDOWING_MODE_FULLSCREEN, null);
+        final Task task1 = createRootTask();
+        final Task task2 = createTask(rootTask, false /* fakeDraw */);
+        WindowContainerTransaction wct = new WindowContainerTransaction();
+        Rect safeRegionBounds = new Rect(50, 50, 200, 300);
+
+        wct.setSafeRegionBounds(rootTask.mRemoteToken.toWindowContainerToken(), safeRegionBounds);
+        mWm.mAtmService.mWindowOrganizerController.applyTransaction(wct);
+
+        assertEquals(rootTask.getSafeRegionBounds(), safeRegionBounds);
+        assertEquals(task2.getSafeRegionBounds(), safeRegionBounds);
+        assertNull(task1.getSafeRegionBounds());
+
+        // Reset safe region bounds on the root task
+        wct.setSafeRegionBounds(rootTask.mRemoteToken.toWindowContainerToken(),
+                /* safeRegionBounds */null);
+        mWm.mAtmService.mWindowOrganizerController.applyTransaction(wct);
+
+        assertNull(rootTask.getSafeRegionBounds());
+        assertNull(task2.getSafeRegionBounds());
+        assertNull(task1.getSafeRegionBounds());
     }
 
     @Test

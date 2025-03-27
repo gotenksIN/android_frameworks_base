@@ -86,11 +86,18 @@ constructor(
                     .collectTraced { view.setClippingShape(it) }
             }
 
+            launch { viewModel.isOccluded.collectTraced { view.setOccluded(it) } }
+
             launch { viewModel.maxAlpha.collectTraced { view.setMaxAlpha(it) } }
             launch { viewModel.shadeScrollState.collect { view.setScrollState(it) } }
             launch {
                 viewModel.expandFraction.collectTraced {
                     view.setExpandFraction(it.coerceIn(0f, 1f))
+                }
+            }
+            launch {
+                viewModel.lockScreenToShadeTransitionProgress.collectTraced {
+                    view.setFractionToShade(it.coerceIn(0f, 1f))
                 }
             }
             launch { viewModel.qsExpandFraction.collectTraced { view.setQsExpandFraction(it) } }

@@ -13,12 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
-
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-import android.telephony.SubscriptionManager
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.coroutines.newTracingContext
@@ -29,9 +24,6 @@ import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.Airpla
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.VerboseMobileViewLogger
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernStatusBarMobileView
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import java.util.concurrent.ConcurrentHashMap
@@ -40,9 +32,6 @@ import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
-import kotlinx.coroutines.flow.combine
-// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -50,7 +39,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
-
 /**
  * View model for describing the system's current mobile cellular connections. The result is a list
  * of [MobileIconViewModel]s which describe the individual icons and can be bound to
@@ -69,46 +57,17 @@ constructor(
 ) {
     @VisibleForTesting
     val reuseCache = ConcurrentHashMap<Int, Pair<MobileIconViewModel, CoroutineScope>>()
-
     val activeMobileDataSubscriptionId: StateFlow<Int?> = interactor.activeMobileDataSubscriptionId
-
-// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions
             .mapLatest { subscriptions ->
                 subscriptions.map { subscriptionModel -> subscriptionModel.subscriptionId }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), listOf())
-
-// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-    private val ddsIcon: StateFlow<SignalIconModel?> =
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
-        combine(interactor.defaultDataSubId, subscriptionIdsFlow) {
-                defaultDataSubId, subscriptionIdsFlow ->
-// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
-                if (defaultDataSubId ?: -1 > SubscriptionManager.INVALID_SUBSCRIPTION_ID
-// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
-                    && subscriptionIdsFlow.contains(defaultDataSubId)) {
-// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
-                    commonViewModelForSub(defaultDataSubId ?: -1)
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-                } else {
-                    null
-                }
-            }
-            .flatMapLatest { viewModel ->
-                viewModel?.icon ?: flowOf(null)
-            }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), null)
-
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     val mobileSubViewModels: StateFlow<List<MobileIconViewModelCommon>> =
         subscriptionIdsFlow
             .map { ids -> ids.map { commonViewModelForSub(it) } }
             .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
-
     private val firstMobileSubViewModel: StateFlow<MobileIconViewModelCommon?> =
         mobileSubViewModels
             .map {
@@ -121,7 +80,6 @@ constructor(
                 }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
-
     /**
      * A flow that emits `true` if the mobile sub that's displayed first visually is showing its
      * network type icon and `false` otherwise.
@@ -132,16 +90,10 @@ constructor(
                 firstMobileSubViewModel?.networkTypeIcon?.map { it != null } ?: flowOf(false)
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
-
     val isStackable: StateFlow<Boolean> = interactor.isStackable
-
     init {
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-        interactor.setDdsIconFLow(ddsIcon)
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
         scope.launch { subscriptionIdsFlow.collect { invalidateCaches(it) } }
     }
-
     fun viewModelForSub(subId: Int, location: StatusBarLocation): LocationBasedMobileViewModel {
         val common = commonViewModelForSub(subId)
         return LocationBasedMobileViewModel.viewModelForLocation(
@@ -152,11 +104,9 @@ constructor(
             scope,
         )
     }
-
     private fun commonViewModelForSub(subId: Int): MobileIconViewModelCommon {
         return reuseCache.getOrPut(subId) { createViewModel(subId) }.first
     }
-
     private fun createViewModel(subId: Int): Pair<MobileIconViewModel, CoroutineScope> {
         // Create a child scope so we can cancel it
         val vmScope = scope.createChildScope(newTracingContext("MobileIconViewModel"))
@@ -168,13 +118,10 @@ constructor(
                 constants,
                 vmScope,
             )
-
         return Pair(vm, vmScope)
     }
-
     private fun CoroutineScope.createChildScope(extraContext: CoroutineContext) =
         CoroutineScope(coroutineContext + Job(coroutineContext[Job]) + extraContext)
-
     private fun invalidateCaches(subIds: List<Int>) {
         reuseCache.keys
             .filter { !subIds.contains(it) }

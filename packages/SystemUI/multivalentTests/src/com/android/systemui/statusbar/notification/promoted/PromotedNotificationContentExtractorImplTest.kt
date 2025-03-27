@@ -57,7 +57,8 @@ class PromotedNotificationContentExtractorImplTest : SysuiTestCase() {
 
     private val underTest = kosmos.promotedNotificationContentExtractor
     private val systemClock = kosmos.fakeSystemClock
-    private val rowImageInflater = RowImageInflater.newInstance(previousIndex = null)
+    private val rowImageInflater =
+        RowImageInflater.newInstance(previousIndex = null, reinflating = false)
     private val imageModelProvider by lazy { rowImageInflater.useForContentModel() }
 
     @Test
@@ -375,12 +376,67 @@ class PromotedNotificationContentExtractorImplTest : SysuiTestCase() {
     @Test
     @EnableFlags(PromotedNotificationUi.FLAG_NAME, StatusBarNotifChips.FLAG_NAME)
     fun extractContent_fromBigTextStyle() {
-        val entry = createEntry { setStyle(BigTextStyle()) }
+        val entry = createEntry {
+            setContentTitle(TEST_CONTENT_TITLE)
+            setContentText(TEST_CONTENT_TEXT)
+            setStyle(
+                BigTextStyle()
+                    .bigText(TEST_BIG_TEXT)
+                    .setBigContentTitle(TEST_BIG_CONTENT_TITLE)
+                    .setSummaryText(TEST_SUMMARY_TEXT)
+            )
+        }
 
         val content = extractContent(entry)
 
         assertThat(content).isNotNull()
         assertThat(content?.style).isEqualTo(Style.BigText)
+        assertThat(content?.title).isEqualTo(TEST_BIG_CONTENT_TITLE)
+        assertThat(content?.text).isEqualTo(TEST_BIG_TEXT)
+    }
+
+    @Test
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, StatusBarNotifChips.FLAG_NAME)
+    fun extractContent_fromBigTextStyle_fallbackToContentTitle() {
+        val entry = createEntry {
+            setContentTitle(TEST_CONTENT_TITLE)
+            setContentText(TEST_CONTENT_TEXT)
+            setStyle(
+                BigTextStyle()
+                    .bigText(TEST_BIG_TEXT)
+                    // bigContentTitle unset
+                    .setSummaryText(TEST_SUMMARY_TEXT)
+            )
+        }
+
+        val content = extractContent(entry)
+
+        assertThat(content).isNotNull()
+        assertThat(content?.style).isEqualTo(Style.BigText)
+        assertThat(content?.title).isEqualTo(TEST_CONTENT_TITLE)
+        assertThat(content?.text).isEqualTo(TEST_BIG_TEXT)
+    }
+
+    @Test
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, StatusBarNotifChips.FLAG_NAME)
+    fun extractContent_fromBigTextStyle_fallbackToContentText() {
+        val entry = createEntry {
+            setContentTitle(TEST_CONTENT_TITLE)
+            setContentText(TEST_CONTENT_TEXT)
+            setStyle(
+                BigTextStyle()
+                    // bigText unset
+                    .setBigContentTitle(TEST_BIG_CONTENT_TITLE)
+                    .setSummaryText(TEST_SUMMARY_TEXT)
+            )
+        }
+
+        val content = extractContent(entry)
+
+        assertThat(content).isNotNull()
+        assertThat(content?.style).isEqualTo(Style.BigText)
+        assertThat(content?.title).isEqualTo(TEST_BIG_CONTENT_TITLE)
+        assertThat(content?.text).isEqualTo(TEST_CONTENT_TEXT)
     }
 
     @Test
@@ -496,6 +552,10 @@ class PromotedNotificationContentExtractorImplTest : SysuiTestCase() {
         private const val TEST_CONTENT_TITLE = "content title"
         private const val TEST_CONTENT_TEXT = "content text"
         private const val TEST_SHORT_CRITICAL_TEXT = "short"
+
+        private const val TEST_BIG_CONTENT_TITLE = "big content title"
+        private const val TEST_BIG_TEXT = "big text"
+        private const val TEST_SUMMARY_TEXT = "summary text"
 
         private const val TEST_PROGRESS = 50
         private const val TEST_PROGRESS_MAX = 100

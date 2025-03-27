@@ -218,7 +218,7 @@ constructor(
                     scrollViewContent.layoutParams.height = WRAP_CONTENT
                     lastUiUpdateMs = systemClock.elapsedRealtime()
                     lastItemRow = itemRow
-                    logger.logDeviceUiUpdate(lastUiUpdateMs - start)
+                    logger.logDeviceUiUpdate(lastUiUpdateMs - start, deviceItem)
                 }
             }
         }
@@ -419,6 +419,8 @@ constructor(
                 }
                 nameView.text = item.deviceName
                 summaryView.text = item.connectionSummary
+                // needed for marquee
+                summaryView.isSelected = true
 
                 actionIconView.setOnClickListener {
                     mutableDeviceItemClick.value =

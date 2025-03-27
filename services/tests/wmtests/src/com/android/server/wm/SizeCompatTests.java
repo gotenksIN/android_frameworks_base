@@ -67,6 +67,7 @@ import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_POSITION_MU
 import static com.android.server.wm.AppCompatUtils.computeAspectRatio;
 import static com.android.server.wm.DisplayContent.IME_TARGET_LAYERING;
 import static com.android.server.wm.WindowContainer.POSITION_TOP;
+import static com.android.window.flags.Flags.FLAG_ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -109,6 +110,7 @@ import android.provider.DeviceConfig;
 import android.provider.DeviceConfig.Properties;
 import android.view.DisplayCutout;
 import android.view.DisplayInfo;
+import android.view.InputDevice;
 import android.view.InsetsFrameProvider;
 import android.view.InsetsSource;
 import android.view.InsetsState;
@@ -559,6 +561,42 @@ public class SizeCompatTests extends WindowTestsBase {
         // max aspect ratio.
         assertActivityMaxBoundsSandboxed();
         assertDownScaled();
+    }
+
+    @EnableFlags(FLAG_ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS)
+    @Test
+    public void testFixedMiscConfigurationWhenMovingToDisplay() {
+        setUpDisplaySizeWithApp(1000, 2500);
+
+        final DisplayContent newDisplay =
+                new TestDisplayContent.Builder(mAtm, 1000, 2000).build();
+        final InputDevice device = new InputDevice.Builder()
+                .setAssociatedDisplayId(newDisplay.mDisplayId)
+                .setKeyboardType(InputDevice.KEYBOARD_TYPE_ALPHABETIC)
+                .setSources(InputDevice.SOURCE_TOUCHSCREEN | InputDevice.SOURCE_TRACKBALL)
+                .build();
+        final InputDevice[] devices = {device};
+        doReturn(true).when(newDisplay.mWmService.mInputManager)
+                .canDispatchToDisplay(device.getId(), newDisplay.mDisplayId);
+        doReturn(devices).when(newDisplay.mWmService.mInputManager).getInputDevices();
+        mTask.mWmService.mIsTouchDevice = true;
+        mTask.mWmService.displayReady();
+
+        prepareUnresizable(mActivity, 1.5f /* maxAspect */, SCREEN_ORIENTATION_UNSPECIFIED);
+
+        final Configuration originalConfiguration = mActivity.getConfiguration();
+        final int originalTouchscreen = originalConfiguration.touchscreen;
+        final int originalNavigation = originalConfiguration.navigation;
+        final int originalKeyboard = originalConfiguration.keyboard;
+
+        // Move the non-resizable activity to the new display.
+        mTask.reparent(newDisplay.getDefaultTaskDisplayArea(), true /* onTop */);
+
+        final Configuration newConfiguration = mActivity.getConfiguration();
+        assertEquals(originalTouchscreen, newConfiguration.touchscreen);
+        assertEquals(originalNavigation, newConfiguration.navigation);
+        assertEquals(originalKeyboard, newConfiguration.keyboard);
+        // TODO(b/399749909): assert keyboardHidden, hardkeyboardHidden, and navigationHidden too.
     }
 
     @Test
@@ -4697,6 +4735,213 @@ public class SizeCompatTests extends WindowTestsBase {
         assertTrue(mActivity.areBoundsLetterboxed());
         verifyLogAppCompatState(mActivity,
                 APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_FIXED_ORIENTATION);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testIsLetterboxedForSafeRegionOnlyAllowed_noManifestProperty_returnsTrue() {
+        setUpLandscapeLargeScreenDisplayWithApp();
+
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+
+        setupSafeRegionBoundsParameters(/* dw */ 300, /* dh */ 200);
+
+        // For an activity letterboxed only due to safe region, areBoundsLetterboxed will return
+        // false
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+        // Since no manifest property is defined, the activity is opted in by default
+        assertTrue(mActivity.mAppCompatController.getSafeRegionPolicy()
+                .isLetterboxedForSafeRegionOnlyAllowed());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testIsLetterboxedForSafeRegionOnlyAllowed_allowedForActivity_returnsTrue() {
+        setUpLandscapeLargeScreenDisplayWithApp();
+
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+
+        setupSafeRegionBoundsParameters(/* dw */ 300, /* dh */ 200);
+
+        // Activity can opt-out the safe region letterboxing by component level property.
+        final ComponentName name = getUniqueComponentName(mContext.getPackageName());
+        final PackageManager pm = mContext.getPackageManager();
+        spyOn(pm);
+        updateActivityLevelAllowSafeRegionLetterboxingProperty(name, pm, true /* value */);
+        updateApplicationLevelAllowSafeRegionLetterboxingProperty(name, pm, false /* value */);
+        final ActivityRecord optOutActivity = new ActivityBuilder(mAtm)
+                .setComponent(name).setTask(mTask).build();
+        optOutActivity.mAppCompatController.getSafeRegionPolicy().setNeedsSafeRegionBounds(true);
+
+        // Since activity manifest property is defined as true, the activity can be letterboxed
+        // for safe region
+        assertTrue(optOutActivity.mAppCompatController
+                .getSafeRegionPolicy().isLetterboxedForSafeRegionOnlyAllowed());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testIsLetterboxedForSafeRegionOnlyAllowed_notAllowedForActivity_returnsFalse() {
+        setUpLandscapeLargeScreenDisplayWithApp();
+
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+
+        setupSafeRegionBoundsParameters(/* dw */ 300, /* dh */ 200);
+
+        final ComponentName name = getUniqueComponentName(mContext.getPackageName());
+        final PackageManager pm = mContext.getPackageManager();
+        spyOn(pm);
+        updateActivityLevelAllowSafeRegionLetterboxingProperty(name, pm, false /* value */);
+        updateApplicationLevelAllowSafeRegionLetterboxingProperty(name, pm, false /* value */);
+        final ActivityRecord optOutActivity = new ActivityBuilder(mAtm)
+                .setComponent(name).setTask(mTask).build();
+        optOutActivity.mAppCompatController.getSafeRegionPolicy().setNeedsSafeRegionBounds(true);
+
+        // Since activity manifest property is defined as false, the activity can not be letterboxed
+        // for safe region
+        assertFalse(optOutActivity.mAppCompatController
+                .getSafeRegionPolicy().isLetterboxedForSafeRegionOnlyAllowed());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testIsLetterboxedForSafeRegionOnlyAllowed_notAllowedForApplication_returnsFalse() {
+        setUpLandscapeLargeScreenDisplayWithApp();
+
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+
+        setupSafeRegionBoundsParameters(/* dw */ 300, /* dh */ 200);
+
+        final ComponentName name = getUniqueComponentName(mContext.getPackageName());
+        final PackageManager pm = mContext.getPackageManager();
+        spyOn(pm);
+        updateActivityLevelAllowSafeRegionLetterboxingProperty(name, pm, false /* value */);
+        updateApplicationLevelAllowSafeRegionLetterboxingProperty(name, pm, false /* value */);
+        final ActivityRecord optOutAppActivity = new ActivityBuilder(mAtm)
+                .setComponent(name).setTask(mTask).build();
+        optOutAppActivity.mAppCompatController.getSafeRegionPolicy().setNeedsSafeRegionBounds(true);
+
+        // Since application manifest property is defined as false, the activity can not be
+        // letterboxed for safe region
+        assertFalse(optOutAppActivity.mAppCompatController
+                .getSafeRegionPolicy().isLetterboxedForSafeRegionOnlyAllowed());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testIsLetterboxedForSafeRegionOnlyAllowed_allowedForApplication_returnsTrue() {
+        setUpLandscapeLargeScreenDisplayWithApp();
+
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+
+        setupSafeRegionBoundsParameters(/* dw */ 300, /* dh */ 200);
+
+        final ComponentName name = getUniqueComponentName(mContext.getPackageName());
+        final PackageManager pm = mContext.getPackageManager();
+        spyOn(pm);
+        updateActivityLevelAllowSafeRegionLetterboxingProperty(name, pm, false /* value */);
+        updateApplicationLevelAllowSafeRegionLetterboxingProperty(name, pm, true /* value */);
+        final ActivityRecord optOutAppActivity = new ActivityBuilder(mAtm)
+                .setComponent(name).setTask(mTask).build();
+        optOutAppActivity.mAppCompatController.getSafeRegionPolicy().setNeedsSafeRegionBounds(true);
+
+        // Since application manifest property is defined as true, the activity can be letterboxed
+        // for safe region
+        assertTrue(optOutAppActivity.mAppCompatController
+                .getSafeRegionPolicy().isLetterboxedForSafeRegionOnlyAllowed());
+    }
+
+    private void updateApplicationLevelAllowSafeRegionLetterboxingProperty(ComponentName name,
+            PackageManager pm, boolean propertyValueForApplication) {
+        final PackageManager.Property propertyForApplication = new PackageManager.Property(
+                "propertyName", /* value */ propertyValueForApplication, name.getPackageName(),
+                name.getClassName());
+        try {
+            doReturn(propertyForApplication).when(pm).getPropertyAsUser(
+                    WindowManager.PROPERTY_COMPAT_ALLOW_SAFE_REGION_LETTERBOXING,
+                    name.getPackageName(), /* className */ null, /* userId */ 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void updateActivityLevelAllowSafeRegionLetterboxingProperty(ComponentName name,
+            PackageManager pm, boolean propertyValueForActivity) {
+        final PackageManager.Property propertyForActivity = new PackageManager.Property(
+                "propertyName", /* value */ propertyValueForActivity, name.getPackageName(),
+                name.getClassName());
+        try {
+            doReturn(propertyForActivity).when(pm).getPropertyAsUser(
+                    WindowManager.PROPERTY_COMPAT_ALLOW_SAFE_REGION_LETTERBOXING,
+                    name.getPackageName(), name.getClassName(), /* userId */ 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testAreBoundsLetterboxed_letterboxedForSafeRegionAndFixedOrientation_returnTrue() {
+        setUpLandscapeLargeScreenDisplayWithApp();
+        mActivity.mDisplayContent.setIgnoreOrientationRequest(true /* ignoreOrientationRequest */);
+
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+
+        final Rect safeRegionBounds = setupSafeRegionBoundsParameters(/* dw */ 500, /* dh */ 200);
+
+        prepareUnresizable(mActivity, SCREEN_ORIENTATION_PORTRAIT);
+
+        // Activity is letterboxed due to fixed orientation within the safe region
+        assertTrue(mActivity.mAppCompatController.getAspectRatioPolicy()
+                .isLetterboxedForFixedOrientationAndAspectRatio());
+        assertTrue(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity,
+                APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_FIXED_ORIENTATION);
+        assertFalse(mActivity.mAppCompatController.getSafeRegionPolicy()
+                .isLetterboxedForSafeRegionOnlyAllowed());
+        assertTrue(safeRegionBounds.contains(mActivity.getBounds()));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    public void testAreBoundsLetterboxed_letterboxedForSafeRegionAndAspectRatio_returnTrue() {
+        setUpPortraitLargeScreenDisplayWithApp();
+
+        assertFalse(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity, APP_COMPAT_STATE_CHANGED__STATE__NOT_LETTERBOXED);
+
+        final Rect safeRegionBounds = setupSafeRegionBoundsParameters(/* dw */ 200, /* dh */ 300);
+
+        prepareMinAspectRatio(mActivity, 16 / 9f, SCREEN_ORIENTATION_PORTRAIT);
+
+        // Activity is letterboxed due to min aspect ratio within the safe region
+        assertFalse(mActivity.mAppCompatController.getAspectRatioPolicy()
+                .isLetterboxedForFixedOrientationAndAspectRatio());
+        assertTrue(mActivity.mAppCompatController.getAspectRatioPolicy()
+                .isLetterboxedForAspectRatioOnly());
+        assertFalse(mActivity.inSizeCompatMode());
+        assertTrue(mActivity.areBoundsLetterboxed());
+        verifyLogAppCompatState(mActivity,
+                APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_ASPECT_RATIO);
+        assertTrue(safeRegionBounds.contains(mActivity.getBounds()));
+    }
+
+    private Rect setupSafeRegionBoundsParameters(int dw, int dh) {
+        final AppCompatController appCompatController = mActivity.mAppCompatController;
+        final AppCompatSafeRegionPolicy safeRegionPolicy =
+                appCompatController.getSafeRegionPolicy();
+        safeRegionPolicy.setNeedsSafeRegionBounds(true);
+        spyOn(mTask);
+        final Rect safeRegionBounds = new Rect(100, 200, 100 + dw, 200 + dh);
+        doReturn(safeRegionBounds).when(mTask).getSafeRegionBounds();
+        return safeRegionBounds;
     }
 
     @Test

@@ -37,7 +37,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.eq;
 
 import android.annotation.NonNull;
 import android.app.WindowConfiguration;
@@ -274,7 +274,7 @@ public class DisplayWindowSettingsTests extends WindowTestsBase {
                 mSecondaryDisplay.mBaseDisplayDensity);
     }
 
-    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DENSITY_SCALE_FOR_CONNECTED_DISPLAYS)
+    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testSetForcedDensityRatio() {
         mDisplayWindowSettings.setForcedDensity(mSecondaryDisplay.getDisplayInfo(),

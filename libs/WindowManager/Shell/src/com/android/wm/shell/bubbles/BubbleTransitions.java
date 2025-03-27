@@ -30,6 +30,7 @@ import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.TaskInfo;
 import android.content.Context;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.IBinder;
 import android.util.Slog;
@@ -112,6 +113,11 @@ public class BubbleTransitions {
         return convert;
     }
 
+    /** Starts a transition that converts a dragged bubble icon to a full screen task. */
+    public BubbleTransition startDraggedBubbleIconToFullscreen(Bubble bubble) {
+        return new DraggedBubbleIconToFullscreen(bubble);
+    }
+
     /**
      * Plucks the task-surface out of an ancestor view while making the view invisible. This helper
      * attempts to do this seamlessly (ie. view becomes invisible in sync with task reparent).
@@ -155,28 +161,26 @@ public class BubbleTransitions {
      * Information about the task when it is being dragged to a bubble
      */
     public static class DragData {
-        private final Rect mBounds;
         private final WindowContainerTransaction mPendingWct;
         private final boolean mReleasedOnLeft;
+        private final float mTaskScale;
+        private final float mCornerRadius;
+        private final PointF mDragPosition;
 
         /**
-         * @param bounds bounds of the dragged task when the drag was released
-         * @param wct pending operations to be applied when finishing the drag
          * @param releasedOnLeft true if the bubble was released in the left drop target
+         * @param taskScale      the scale of the task when it was dragged to bubble
+         * @param cornerRadius   the corner radius of the task when it was dragged to bubble
+         * @param dragPosition   the position of the task when it was dragged to bubble
+         * @param wct            pending operations to be applied when finishing the drag
          */
-        public DragData(@Nullable Rect bounds, @Nullable WindowContainerTransaction wct,
-                boolean releasedOnLeft) {
-            mBounds = bounds;
+        public DragData(boolean releasedOnLeft, float taskScale, float cornerRadius,
+                @Nullable PointF dragPosition, @Nullable WindowContainerTransaction wct) {
             mPendingWct = wct;
             mReleasedOnLeft = releasedOnLeft;
-        }
-
-        /**
-         * @return bounds of the dragged task when the drag was released
-         */
-        @Nullable
-        public Rect getBounds() {
-            return mBounds;
+            mTaskScale = taskScale;
+            mCornerRadius = cornerRadius;
+            mDragPosition = dragPosition != null ? dragPosition : new PointF(0, 0);
         }
 
         /**
@@ -192,6 +196,27 @@ public class BubbleTransitions {
          */
         public boolean isReleasedOnLeft() {
             return mReleasedOnLeft;
+        }
+
+        /**
+         * @return the scale of the task when it was dragged to bubble
+         */
+        public float getTaskScale() {
+            return mTaskScale;
+        }
+
+        /**
+         * @return the corner radius of the task when it was dragged to bubble
+         */
+        public float getCornerRadius() {
+            return mCornerRadius;
+        }
+
+        /**
+         * @return position of the task when it was dragged to bubble
+         */
+        public PointF getDragPosition() {
+            return mDragPosition;
         }
     }
 
@@ -347,28 +372,26 @@ public class BubbleTransitions {
             }
             mFinishCb = finishCallback;
 
-            if (mDragData != null && mDragData.getBounds() != null) {
-                // Override start bounds with the dragged task bounds
-                mStartBounds.set(mDragData.getBounds());
+            if (mDragData != null) {
+                mStartBounds.offsetTo((int) mDragData.getDragPosition().x,
+                        (int) mDragData.getDragPosition().y);
+                startTransaction.setScale(mSnapshot, mDragData.getTaskScale(),
+                        mDragData.getTaskScale());
+                startTransaction.setCornerRadius(mSnapshot, mDragData.getCornerRadius());
             }
 
             // Now update state (and talk to launcher) in parallel with snapshot stuff
             mBubbleData.notificationEntryUpdated(mBubble, /* suppressFlyout= */ true,
                     /* showInShade= */ false);
 
+            final int left = mStartBounds.left - info.getRoot(0).getOffset().x;
+            final int top = mStartBounds.top - info.getRoot(0).getOffset().y;
+            startTransaction.setPosition(mTaskLeash, left, top);
             startTransaction.show(mSnapshot);
             // Move snapshot to root so that it remains visible while task is moved to taskview
             startTransaction.reparent(mSnapshot, info.getRoot(0).getLeash());
-            startTransaction.setPosition(mSnapshot,
-                    mStartBounds.left - info.getRoot(0).getOffset().x,
-                    mStartBounds.top - info.getRoot(0).getOffset().y);
+            startTransaction.setPosition(mSnapshot, left, top);
             startTransaction.setLayer(mSnapshot, Integer.MAX_VALUE);
-
-            BubbleBarExpandedView bbev = mBubble.getBubbleBarExpandedView();
-            if (bbev != null) {
-                // Corners get reset during the animation. Add them back
-                startTransaction.setCornerRadius(mSnapshot, bbev.getRestingCornerRadius());
-            }
 
             startTransaction.apply();
 
@@ -416,6 +439,8 @@ public class BubbleTransitions {
         private void playAnimation(boolean animate) {
             final TaskViewTaskController tv = mBubble.getTaskView().getController();
             final SurfaceControl.Transaction startT = new SurfaceControl.Transaction();
+            // Set task position to 0,0 as it will be placed inside the TaskView
+            startT.setPosition(mTaskLeash, 0, 0);
             mTaskViewTransitions.prepareOpenAnimation(tv, true /* new */, startT, mFinishT,
                     (ActivityManager.RunningTaskInfo) mTaskInfo, mTaskLeash, mFinishWct);
 
@@ -424,10 +449,12 @@ public class BubbleTransitions {
             }
 
             if (animate) {
-                mLayerView.animateConvert(startT, mStartBounds, mSnapshot, mTaskLeash, () -> {
-                    mFinishCb.onTransitionFinished(mFinishWct);
-                    mFinishCb = null;
-                });
+                float startScale = mDragData != null ? mDragData.getTaskScale() : 1f;
+                mLayerView.animateConvert(startT, mStartBounds, startScale, mSnapshot, mTaskLeash,
+                        () -> {
+                            mFinishCb.onTransitionFinished(mFinishWct);
+                            mFinishCb = null;
+                        });
             } else {
                 startT.apply();
                 mFinishCb.onTransitionFinished(mFinishWct);
@@ -617,10 +644,121 @@ public class BubbleTransitions {
         @Override
         public void continueCollapse() {
             mBubble.cleanupTaskView();
-            if (mTaskLeash == null) return;
+            if (mTaskLeash == null || !mTaskLeash.isValid()) return;
             SurfaceControl.Transaction t = new SurfaceControl.Transaction();
             t.reparent(mTaskLeash, mRootLeash);
             t.apply();
+        }
+    }
+
+    /**
+     * A transition that converts a dragged bubble icon to a full screen window.
+     *
+     * <p>This transition assumes that the bubble is invisible so it is simply sent to front.
+     */
+    class DraggedBubbleIconToFullscreen implements Transitions.TransitionHandler, BubbleTransition {
+
+        IBinder mTransition;
+        final Bubble mBubble;
+
+        DraggedBubbleIconToFullscreen(Bubble bubble) {
+            mBubble = bubble;
+            bubble.setPreparingTransition(this);
+            WindowContainerToken token = bubble.getTaskView().getTaskInfo().getToken();
+            WindowContainerTransaction wct = new WindowContainerTransaction();
+            wct.setAlwaysOnTop(token, false);
+            wct.setWindowingMode(token, WINDOWING_MODE_UNDEFINED);
+            wct.reorder(token, /* onTop= */ true);
+            wct.setHidden(token, false);
+            mTaskOrganizer.setInterceptBackPressedOnTaskRoot(token, false);
+            mTaskViewTransitions.enqueueExternal(bubble.getTaskView().getController(), () -> {
+                mTransition = mTransitions.startTransition(TRANSIT_TO_FRONT, wct, this);
+                return mTransition;
+            });
+        }
+
+        @Override
+        public void skip() {
+            mBubble.setPreparingTransition(null);
+        }
+
+        @Override
+        public boolean startAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
+                @NonNull SurfaceControl.Transaction startTransaction,
+                @NonNull SurfaceControl.Transaction finishTransaction,
+                @NonNull Transitions.TransitionFinishCallback finishCallback) {
+            if (mTransition != transition) {
+                return false;
+            }
+
+            final TaskViewTaskController taskViewTaskController =
+                    mBubble.getTaskView().getController();
+            if (taskViewTaskController == null) {
+                mTaskViewTransitions.onExternalDone(transition);
+                finishCallback.onTransitionFinished(null);
+                return true;
+            }
+
+            TransitionInfo.Change change = findTransitionChange(info);
+            if (change == null) {
+                Slog.w(TAG, "Expected a TaskView transition to front but didn't find "
+                        + "one, cleaning up the task view");
+                taskViewTaskController.setTaskNotFound();
+                mTaskViewTransitions.onExternalDone(transition);
+                finishCallback.onTransitionFinished(null);
+                return true;
+            }
+            mRepository.remove(taskViewTaskController);
+
+            startTransaction.apply();
+            finishCallback.onTransitionFinished(null);
+            taskViewTaskController.notifyTaskRemovalStarted(mBubble.getTaskView().getTaskInfo());
+            mTaskViewTransitions.onExternalDone(transition);
+            return true;
+        }
+
+        private TransitionInfo.Change findTransitionChange(TransitionInfo info) {
+            TransitionInfo.Change result = null;
+            WindowContainerToken token = mBubble.getTaskView().getTaskInfo().getToken();
+            for (int i = 0; i < info.getChanges().size(); ++i) {
+                final TransitionInfo.Change change = info.getChanges().get(i);
+                if (change.getTaskInfo() == null) {
+                    continue;
+                }
+                if (change.getMode() != TRANSIT_TO_FRONT) {
+                    continue;
+                }
+                if (!token.equals(change.getTaskInfo().token)) {
+                    continue;
+                }
+                result = change;
+                break;
+            }
+            return result;
+        }
+
+        @Override
+        public void mergeAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
+                @NonNull SurfaceControl.Transaction startTransaction,
+                @NonNull SurfaceControl.Transaction finishTransaction,
+                @NonNull IBinder mergeTarget,
+                @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        }
+
+        @Override
+        public WindowContainerTransaction handleRequest(@NonNull IBinder transition,
+                @NonNull TransitionRequestInfo request) {
+            return null;
+        }
+
+        @Override
+        public void onTransitionConsumed(@NonNull IBinder transition, boolean aborted,
+                @Nullable SurfaceControl.Transaction finishTransaction) {
+            if (!aborted) {
+                return;
+            }
+            mTransition = null;
+            mTaskViewTransitions.onExternalDone(transition);
         }
     }
 }

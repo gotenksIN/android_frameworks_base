@@ -116,7 +116,6 @@ class InternetTileViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
-                mock(),
             )
 
         underTest =

@@ -115,6 +115,7 @@ import com.android.wifitrackerlib.MergedCarrierEntry;
 import com.android.wifitrackerlib.WifiEntry;
 
 import com.qti.extphone.ExtTelephonyManager;
+import com.qti.extphone.NrIconType;
 import com.qti.extphone.ServiceCallback;
 
 import java.util.ArrayList;
@@ -794,8 +795,11 @@ public class InternetDetailsContentController implements AccessPointController.A
 
     String getMobileNetworkSummary(int subId) {
         String description = "";
-        if (mCarrierNameCustomization.showCustomizeName()) {
-            description = mCarrierNameCustomization.getNetworkTypeDescription(subId);
+        if (mCarrierNameCustomization.show5GAIcon()) {
+            final FiveGServiceState fiveGState = getFiveGServiceState(subId);
+            if (fiveGState.getNrIconType() == NrIconType.TYPE_5G_UWB) {
+                description = mCarrierNameCustomization.getNetworkTypeDescription(subId);
+            }
         }
         if (TextUtils.isEmpty(description)) {
             description = getNetworkTypeDescription(mContext, mConfig, subId);

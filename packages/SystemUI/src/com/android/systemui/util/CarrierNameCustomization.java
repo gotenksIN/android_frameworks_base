@@ -46,6 +46,7 @@ public class CarrierNameCustomization {
     private String mSeparator;
     private FiveGServiceClient mFiveGServiceClient;
     private boolean mShowCustomizeName;
+    private boolean mShow5GAIcon;
     private final ArrayList<KeyguardUpdateMonitorCallback>
             mCallbacks = Lists.newArrayList();
 
@@ -63,6 +64,8 @@ public class CarrierNameCustomization {
                 com.android.internal.R.string.kg_text_message_separator);
         mShowCustomizeName = context.getResources().getBoolean(
                 com.android.settingslib.R.bool.config_show_customize_carrier_name);
+        mShow5GAIcon = context.getResources().getBoolean(
+                com.android.settingslib.R.bool.config_display_5g_a);
         mTelephonyManager = context.getSystemService(TelephonyManager.class);
         mFiveGServiceClient = fiveGServiceClient;
 
@@ -260,8 +263,7 @@ public class CarrierNameCustomization {
                 && nrIconType != NrIconType.TYPE_NONE
                 && isDataRegisteredOnLte(dataType))) {
             if (nrIconType == NrIconType.TYPE_5G_UWB
-                    && mContext.getResources().getBoolean(
-                    com.android.settingslib.R.bool.config_display_5g_a)) {
+                    && mShow5GAIcon) {
                 return mContext.getResources().getString(
                         com.android.settingslib.R.string.data_connection_5g_a);
             }
@@ -290,5 +292,9 @@ public class CarrierNameCustomization {
 
     public boolean showCustomizeName() {
         return mShowCustomizeName;
+    }
+
+    public boolean show5GAIcon() {
+        return mShow5GAIcon;
     }
 }

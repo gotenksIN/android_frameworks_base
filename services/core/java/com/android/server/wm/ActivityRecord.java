@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 
 package com.android.server.wm;
 
@@ -500,6 +505,7 @@ public final class ActivityRecord extends WindowToken {
     private final int theme;        // resource identifier of activity's theme.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     public int perfActivityBoostHandler = -1; //perflock handler when activity is created.
+    private int mPerfScenarioBoostHandler = -1;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     private Task task;              // the task this is in.
     private long createTime = System.currentTimeMillis();
@@ -6747,6 +6753,9 @@ public final class ActivityRecord extends WindowToken {
 // QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
     protected void acquireActivityBoost() {
         if (mPerf != null) {
+            if (mPerf.isUiPerfEnabled(mWmService.mContext, packageName)) {
+                return;
+            }
             if (mPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                 int pkgType = mPerf.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                         packageName);
@@ -6808,6 +6817,17 @@ public final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are visible. */
     void onWindowsVisible() {
+        /* QTI_BEGIN */
+        if (mPerf != null && mPerf.isUiPerfEnabled(mWmService.mContext, packageName)) {
+            int hint = mPerf.getUiPerfHint(mWmService.mContext, info.name);
+            if (hint != -1) {
+                int timeout_ms = 5 * 60 * 1000;
+                mPerfScenarioBoostHandler = mPerf.perfHintAcqRel(mPerfScenarioBoostHandler,
+                         hint, "android", timeout_ms);
+            }
+        }
+        /* QTI_END */
+
         if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting visible in " + token);
         mTaskSupervisor.stopWaitingForActivityVisible(this);
         if (DEBUG_SWITCH) Log.v(TAG_SWITCH, "windowsVisibleLocked(): " + this);
@@ -6827,6 +6847,12 @@ public final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are no longer visible. */
     void onWindowsGone() {
+        /* QTI_BEGIN */
+        if (mPerfScenarioBoostHandler != -1 && mPerf != null) {
+            mPerf.perfLockReleaseHandler(mPerfScenarioBoostHandler);
+            mPerfScenarioBoostHandler = -1;
+        }
+        /* QTI_END */
         if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting gone in " + token);
         if (DEBUG_SWITCH) Log.v(TAG_SWITCH, "windowsGone(): " + this);
         nowVisible = false;

@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 
 #include "ImageDecoder.h"
 
@@ -47,6 +52,13 @@
 #include "GraphicsJNI.h"
 #include "NinePatchPeeker.h"
 #include "Utils.h"
+
+/* QTI_BEGIN */
+#include <cutils/properties.h>
+extern const char* __progname;
+#define UI_PERFMODE "debug.ui.perfmode.enable"
+#define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
+/* QTI_END */
 
 using namespace android;
 
@@ -291,8 +303,24 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         colorType = decoder->mCodec->computeOutputColorType(colorType);
     }
 
+    /* QTI_BEGIN */
+    bool should_use_sw = false;
+    if (decoder->mCodec->getEncodedFormat() == SkEncodedImageFormat::kHEIF) {
+        char value[PROPERTY_VALUE_MAX];
+        memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
+        property_get(UI_PERFMODE, value, "false");
+        if (strncmp(value, "true", 4) == 0) {
+            memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
+            property_get(UI_PERFMODE_PROCESS, value, "");
+            if (strncmp(__progname, value, 10) == 0) {
+                should_use_sw = true;
+            }
+        }
+    }
+    /* QTI_END */
+
     const bool isHardware = !requireMutable
-        && (allocator == kDefault_Allocator ||
+        && ((allocator == kDefault_Allocator && !should_use_sw) ||
             allocator == kHardware_Allocator)
         && colorType != kGray_8_SkColorType;
 

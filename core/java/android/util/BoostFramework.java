@@ -30,8 +30,11 @@
 package android.util;
 
 import android.content.Context;
+import android.database.ContentObserver;
 import android.graphics.BLASTBufferQueue;
+import android.net.Uri;
 import android.os.SystemProperties;
+import android.provider.Settings;
 import android.util.Log;
 
 import dalvik.system.PathClassLoader;
@@ -54,6 +57,25 @@ public class BoostFramework {
     public static final int VENDOR_V_API_LEVEL = 202404;
     public final int board_first_api_lvl = SystemProperties.getInt("ro.board.first_api_level", 0);
     public final int board_api_lvl = SystemProperties.getInt("ro.board.api_level", 0);
+    //key in privider settings global
+    public static final String KEY_LEGACY_UI_PERF_PKGS = "LEGACY_UI_PERF_PROCS";
+    public static final String KEY_GPU_PREFER = "UI_PERF_GPU_PREFER";
+    public static final String KEY_CPU_PREFER = "UI_PERF_CPU_PREFER";
+    public static final String KEY_CPU_AGGRESSIVE = "UI_PERF_CPU_AGGRESSIVE";
+    public static final String KEY_CPU_GPU = "UI_PERF_CPU_GPU";
+    public static final String KEY_PKGS = "UI_PERF_PKGS";
+    //ui perf mode controller in android space
+    public static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
+    public static final String UI_PERF_PROC_PROP = "debug.ui.perfmode.process";
+
+    private String[] mUIPerfProcs = null;
+    private String[] mLegacyUIPerfProcs = null;
+    private String[] mUIPerfGpuActivities = null;
+    private String[] mUIPerfCpuActivities = null;
+    private String[] mUIPerfCpuGpuActivities = null;
+    private String[] mUIPerfCpuAggressive = null;
+    private UiPerfProcsObserver mContentObserver = null;
+    private boolean mUiPerfInited = false;
 
 /** @hide */
     private static boolean sIsLoaded = false;
@@ -103,6 +125,10 @@ public class BoostFramework {
     public static final int VENDOR_HINT_KILL = 0x00001093;
     public static final int VENDOR_HINT_BOOST_RENDERTHREAD = 0x00001096;
     public static final int VENDOR_HINT_PASS_PID = 0x0000109C;
+    public static final int VENDOR_HINT_SCENARIO_GPU = 0x000010AA;
+    public static final int VENDOR_HINT_SCENARIO_CPU = 0x000010AB;
+    public static final int VENDOR_HINT_SCENARIO_CPU_GPU = 0x000010AC;
+    public static final int VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE = 0x000010AD;
     //perf events
     public static final int VENDOR_HINT_FIRST_DRAW = 0x00001042;
     public static final int VENDOR_HINT_TAP_EVENT = 0x00001043;
@@ -874,6 +900,157 @@ public class BoostFramework {
                 }
             }
             return newFrameTimeNanos;
+        }
+    }
+
+    public boolean isUiPerfEnabled(Context context, String pkgName) {
+        if (pkgName == null || pkgName.isEmpty()) {
+            return false;
+        }
+        uiPerfInit(context);
+        if (SystemProperties.getBoolean(UI_PERF_PROP, false) && mUIPerfProcs != null) {
+            for (int i = 0; i < mUIPerfProcs.length; i++) {
+                if (pkgName.equals(mUIPerfProcs[i])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public synchronized boolean isLegacyUiPerfEnabled(Context context, String pkgName) {
+        if (pkgName == null || pkgName.isEmpty()) {
+            return false;
+        }
+        uiPerfInit(context);
+        legacyUIPerfPkgsObserver(context);
+        if (SystemProperties.getBoolean(UI_PERF_PROP, false) && mLegacyUIPerfProcs != null) {
+            for (int i = 0; i < mLegacyUIPerfProcs.length; i++) {
+                if (pkgName.equals(mLegacyUIPerfProcs[i])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public synchronized int getLegacyUiPerfHint(Context context, String pkgName) {
+        int hint = -1;
+        if (pkgName == null || pkgName.isEmpty()) {
+            return hint;
+        }
+        uiPerfInit(context);
+        legacyUIPerfPkgsObserver(context);
+        if (SystemProperties.getBoolean(UI_PERF_PROP, false)) {
+            if (mLegacyUIPerfProcs != null) {
+                for (int i = 0; i < mLegacyUIPerfProcs.length; i++) {
+                    if (pkgName.equals(mLegacyUIPerfProcs[i])) {
+                        hint = VENDOR_HINT_PERFORMANCE_MODE;
+                        return hint;
+                    }
+                }
+            }
+        }
+        return hint;
+    }
+
+    public int getUiPerfHint(Context context, String activityName) {
+        int hint = -1;
+        if (activityName == null || activityName.isEmpty()) {
+            return hint;
+        }
+        uiPerfInit(context);
+        if (SystemProperties.getBoolean(UI_PERF_PROP, false)) {
+            if (mUIPerfGpuActivities != null) {
+                for (int i = 0; i < mUIPerfGpuActivities.length; i++) {
+                    if (activityName.equals(mUIPerfGpuActivities[i])) {
+                        hint = VENDOR_HINT_SCENARIO_GPU;
+                        return hint;
+                    }
+                }
+            }
+            if (mUIPerfCpuActivities != null) {
+                for (int i = 0; i < mUIPerfCpuActivities.length; i++) {
+                    if (activityName.equals(mUIPerfCpuActivities[i])) {
+                        hint = VENDOR_HINT_SCENARIO_CPU;
+                        return hint;
+                    }
+                }
+            }
+            if (mUIPerfCpuGpuActivities != null) {
+                for (int i = 0; i < mUIPerfCpuGpuActivities.length; i++) {
+                    if (activityName.equals(mUIPerfCpuGpuActivities[i])) {
+                        hint = VENDOR_HINT_SCENARIO_CPU_GPU;
+                        return hint;
+                    }
+                }
+            }
+            if (mUIPerfCpuAggressive != null) {
+                for (int i = 0; i < mUIPerfCpuAggressive.length; i++) {
+                    if (activityName.equals(mUIPerfCpuAggressive[i])) {
+                        hint = VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE;
+                        return hint;
+                    }
+                }
+            }
+        }
+        return hint;
+    }
+
+    private void uiPerfInit(Context context) {
+        if (SystemProperties.getBoolean(UI_PERF_PROP, false) && context != null
+                                                             && !mUiPerfInited) {
+            String str = Settings.Global.getString(context.getContentResolver(),
+                             KEY_PKGS);
+            mUIPerfProcs = str.split(";");
+            str = Settings.Global.getString(context.getContentResolver(),
+                             KEY_GPU_PREFER);
+            mUIPerfGpuActivities = str.split(";");
+            str = Settings.Global.getString(context.getContentResolver(),
+                             KEY_CPU_PREFER);
+            mUIPerfCpuActivities = str.split(";");
+            str = Settings.Global.getString(context.getContentResolver(),
+                             KEY_CPU_GPU);
+            mUIPerfCpuGpuActivities = str.split(";");
+            str = Settings.Global.getString(context.getContentResolver(),
+                             KEY_CPU_AGGRESSIVE);
+            mUIPerfCpuAggressive = str.split(";");
+            str = Settings.Global.getString(context.getContentResolver(),
+                             KEY_LEGACY_UI_PERF_PKGS);
+            mLegacyUIPerfProcs = str.split(";");
+            mUiPerfInited = true;
+        }
+    }
+
+    private void legacyUIPerfPkgsObserver(Context context) {
+        if (context != null && mContentObserver == null && mUiPerfInited) {
+            mContentObserver = new UiPerfProcsObserver(context);
+            mContentObserver.register();
+        }
+    }
+
+    private class UiPerfProcsObserver extends ContentObserver {
+        private Context mContext = null;
+        UiPerfProcsObserver(Context context) {
+            super(null);
+            mContext = context;
+        }
+
+        void register() {
+            if (mContext != null) {
+                mContext.getContentResolver().registerContentObserver(Settings.Global.getUriFor(
+                        KEY_LEGACY_UI_PERF_PKGS), false, this);
+            }
+        }
+
+        public void onChange(boolean selfChange, Uri uri) {
+            if (Settings.Global.getUriFor(KEY_LEGACY_UI_PERF_PKGS).equals(uri)) {
+                synchronized (BoostFramework.this) {
+                    String str = Settings.Global.getString(mContext.getContentResolver(),
+                                            KEY_LEGACY_UI_PERF_PKGS);
+                    mLegacyUIPerfProcs = str.split(";");
+                }
+            }
         }
     }
 };

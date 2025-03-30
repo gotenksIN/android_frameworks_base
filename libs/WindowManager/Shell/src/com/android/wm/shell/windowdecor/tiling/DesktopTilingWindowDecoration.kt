@@ -137,6 +137,7 @@ class DesktopTilingWindowDecoration(
         // Observe drag resizing to break tiling if a task is drag resized.
         desktopModeWindowDecoration.addDragResizeListener(this)
         val callback = { initTilingForDisplayIfNeeded(taskInfo.configuration, isFirstTiledApp) }
+        updateDesktopRepository(taskInfo.taskId, snapPosition = position)
         if (isTiled) {
             val wct = WindowContainerTransaction().setBounds(taskInfo.token, destinationBounds)
             toggleResizeDesktopTaskTransitionHandler.startTransition(wct, currentBounds, callback)
@@ -152,9 +153,19 @@ class DesktopTilingWindowDecoration(
                     endBounds = destinationBounds,
                     callback,
                 )
+            } else {
+                callback.invoke()
             }
         }
         return isTiled
+    }
+
+    private fun updateDesktopRepository(taskId: Int, snapPosition: SnapPosition) {
+        when (snapPosition) {
+            SnapPosition.LEFT -> desktopUserRepositories.current.addLeftTiledTask(displayId, taskId)
+            SnapPosition.RIGHT ->
+                desktopUserRepositories.current.addRightTiledTask(displayId, taskId)
+        }
     }
 
     // If a task is already tiled on the same position, release this task, otherwise if the same
@@ -364,6 +375,7 @@ class DesktopTilingWindowDecoration(
 
     fun onTaskInfoChange(taskInfo: RunningTaskInfo) {
         val isCurrentTaskInDarkMode = isTaskInDarkMode(taskInfo)
+        desktopTilingDividerWindowManager?.onTaskInfoChange()
         if (isCurrentTaskInDarkMode == isDarkMode || !isTilingManagerInitialised) return
         isDarkMode = isCurrentTaskInDarkMode
         desktopTilingDividerWindowManager?.onUiModeChange(isDarkMode)
@@ -421,14 +433,37 @@ class DesktopTilingWindowDecoration(
         startTransaction: Transaction,
         finishTransaction: Transaction,
     ) {
+        var leftTaskBroughtToFront = false
+        var rightTaskBroughtToFront = false
+
         for (change in info.changes) {
             change.taskInfo?.let {
                 if (it.isFullscreen || isMinimized(change.mode, info.type)) {
                     removeTaskIfTiled(it.taskId, /* taskVanished= */ false, it.isFullscreen)
                 } else if (isEnteringPip(change, info.type)) {
                     removeTaskIfTiled(it.taskId, /* taskVanished= */ true, it.isFullscreen)
+                } else if (isTransitionToFront(change.mode, info.type)) {
+                    handleTaskBroughtToFront(it.taskId)
+                    leftTaskBroughtToFront =
+                        leftTaskBroughtToFront ||
+                            it.taskId == leftTaskResizingHelper?.taskInfo?.taskId
+                    rightTaskBroughtToFront =
+                        rightTaskBroughtToFront ||
+                            it.taskId == rightTaskResizingHelper?.taskInfo?.taskId
                 }
             }
+        }
+
+        if (leftTaskBroughtToFront && rightTaskBroughtToFront) {
+            desktopTilingDividerWindowManager?.showDividerBar()
+        }
+    }
+
+    private fun handleTaskBroughtToFront(taskId: Int) {
+        if (taskId == leftTaskResizingHelper?.taskInfo?.taskId) {
+            leftTaskResizingHelper?.onAppBecomingVisible()
+        } else if (taskId == rightTaskResizingHelper?.taskInfo?.taskId) {
+            rightTaskResizingHelper?.onAppBecomingVisible()
         }
     }
 
@@ -460,6 +495,9 @@ class DesktopTilingWindowDecoration(
         return false
     }
 
+    private fun isTransitionToFront(changeMode: Int, transitionType: Int): Boolean =
+        changeMode == TRANSIT_TO_FRONT && transitionType == TRANSIT_TO_FRONT
+
     class AppResizingHelper(
         val taskInfo: RunningTaskInfo,
         val desktopModeWindowDecoration: DesktopModeWindowDecoration,
@@ -473,6 +511,7 @@ class DesktopTilingWindowDecoration(
     ) {
         var isInitialised = false
         var newBounds = Rect(bounds)
+        var visibilityCallback: (() -> Unit)? = null
         private lateinit var resizeVeil: ResizeVeil
         private val displayContext = displayController.getDisplayContext(taskInfo.displayId)
         private val userContext =
@@ -509,6 +548,11 @@ class DesktopTilingWindowDecoration(
             )
 
         fun updateVeil(t: Transaction) = resizeVeil.updateTransactionWithResizeVeil(t, newBounds)
+
+        fun onAppBecomingVisible() {
+            visibilityCallback?.invoke()
+            visibilityCallback = null
+        }
 
         fun hideVeil() = resizeVeil.hideVeil()
 
@@ -578,27 +622,40 @@ class DesktopTilingWindowDecoration(
     ) {
         val taskRepository = desktopUserRepositories.current
         if (taskId == leftTaskResizingHelper?.taskInfo?.taskId) {
+            desktopUserRepositories.current.removeLeftTiledTask(displayId)
             removeTask(leftTaskResizingHelper, taskVanished, shouldDelayUpdate)
             leftTaskResizingHelper = null
             val taskId = rightTaskResizingHelper?.taskInfo?.taskId
-            if (taskId != null && taskRepository.isVisibleTask(taskId)) {
+            val callback: (() -> Unit)? = {
                 rightTaskResizingHelper
                     ?.desktopModeWindowDecoration
                     ?.updateDisabledResizingEdge(NONE, shouldDelayUpdate)
+            }
+            if (taskId != null && taskRepository.isVisibleTask(taskId)) {
+                callback?.invoke()
+            } else if (rightTaskResizingHelper != null) {
+                rightTaskResizingHelper?.visibilityCallback = callback
             }
             tearDownTiling()
             return
         }
 
         if (taskId == rightTaskResizingHelper?.taskInfo?.taskId) {
+            desktopUserRepositories.current.removeRightTiledTask(displayId)
             removeTask(rightTaskResizingHelper, taskVanished, shouldDelayUpdate)
             rightTaskResizingHelper = null
             val taskId = leftTaskResizingHelper?.taskInfo?.taskId
-            if (taskId != null && taskRepository.isVisibleTask(taskId)) {
+            val callback: (() -> Unit)? = {
                 leftTaskResizingHelper
                     ?.desktopModeWindowDecoration
                     ?.updateDisabledResizingEdge(NONE, shouldDelayUpdate)
             }
+            if (taskId != null && taskRepository.isVisibleTask(taskId)) {
+                callback?.invoke()
+            } else if (leftTaskResizingHelper != null) {
+                leftTaskResizingHelper?.visibilityCallback = callback
+            }
+
             tearDownTiling()
         }
     }

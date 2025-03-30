@@ -1219,6 +1219,8 @@
             6 - Lock if keyguard enabled or go to sleep (doze)
             7 - Dream if possible or go to sleep (doze)
             8 - Go to glanceable hub or dream if possible, or sleep if neither is available (doze)
+            9 - Go to dream if device is not dreaming, stop dream if device is dreaming, or sleep if
+                neither is available (doze)
     -->
     <integer name="config_shortPressOnPowerBehavior">1</integer>
 
@@ -2123,14 +2125,27 @@
     <!-- Package name providing fused location support. Used only when
          config_enableFusedLocationOverlay is false. -->
     <string name="config_fusedLocationProviderPackageName" translatable="false">com.android.location.fused</string>
+    <!-- If true, will fallback to use a different app if the chosen overlay app is determined to
+         be unstable. Used only when config_enableFusedLocationOverlay is true. -->
+    <bool name="config_fusedLocationOverlayUnstableFallback" translatable="false">false</bool>
 
     <!-- If true will use the GNSS hardware implementation to service the GPS_PROVIDER. If false
          will allow the GPS_PROVIDER to be replaced by an app at run-time (restricted to the package
          specified by config_gnssLocationProviderPackageName). -->
     <bool name="config_useGnssHardwareProvider" translatable="false">true</bool>
+    <!-- Whether to enable gnss location provider overlay which allows gnss location provider to
+         be replaced by an app at run-time. When disabled, only the
+         config_gnssLocationProviderPackageName package will be searched for gnss location
+         provider, otherwise any system package is eligible. Anyone who wants to disable the overlay
+         mechanism can set it to false. Used only when config_useGnssHardwareProvider is false -->
+    <bool name="config_enableGnssLocationOverlay" translatable="false">true</bool>
     <!-- Package name providing GNSS location support. Used only when
          config_useGnssHardwareProvider is false. -->
     <string name="config_gnssLocationProviderPackageName" translatable="false">@null</string>
+    <!-- If true, will fallback to use a different app if the chosen overlay app is determined to
+         be unstable. Used only when config_useGnssHardwareProvider is false and
+         config_enableGnssLocationOverlay is true. -->
+    <bool name="config_gnssLocationOverlayUnstableFallback" translatable="false">false</bool>
 
     <!-- Default value for the ADAS GNSS Location Enabled setting if this setting has never been
          set before. -->
@@ -2834,6 +2849,10 @@
     <!-- Whether dreams are disabled when ambient mode is suppressed. -->
     <bool name="config_dreamsDisabledByAmbientModeSuppressionConfig">false</bool>
 
+    <!-- The default for the setting that controls when to auto-start hub mode.
+          0 means "never" -->
+    <integer name="config_whenToStartHubModeDefault">0</integer>
+
     <!-- The duration in milliseconds of the dream opening animation.  -->
     <integer name="config_dreamOpenAnimationDuration">250</integer>
     <!-- The duration in milliseconds of the dream closing animation.  -->
@@ -3205,6 +3224,10 @@
          devices, the main user is the system user which is always a permanent admin anyway.
          Note that HSUM devices without this enabled will not automatically have a main user. -->
     <bool name="config_isMainUserPermanentAdmin">true</bool>
+
+    <!-- Whether all secondary users (and the system user) are eligible to have profiles.
+         If false, only the MainUser is eligible to have profiles. -->
+    <bool name="config_supportProfilesOnNonMainUser">false</bool>
 
     <!-- Whether switch to headless system user is allowed. If allowed,
     headless system user can run in the foreground even though it is not a full user. -->
@@ -3816,6 +3839,7 @@
          "lockdown" = Lock down device until the user authenticates
          "logout" =  Logout the current user
          "system_update" = Launch System Update screen
+         "standby" = Bring the device to standby
          -->
     <string-array translatable="false" name="config_globalActionsList">
         <item>emergency</item>
@@ -4072,6 +4096,11 @@
         <item>-98</item>     <!-- SIGNAL_STRENGTH_GREAT -->
         <item>-44</item>
     </integer-array>
+
+    <!-- Provides default value for operator name in status bar option in  setting:
+         0 - Hide operator name in status bar
+         1 - Show operator name in status bar (default) -->
+    <integer name="config_showOperatorNameDefault">1</integer>
 
     <!-- Enabled built-in zen mode condition providers -->
     <string-array translatable="false" name="config_system_condition_providers">
@@ -6130,6 +6159,9 @@
     <!-- Whether to default to an expanded list of users on the lock screen user switcher. -->
     <bool name="config_expandLockScreenUserSwitcher">false</bool>
 
+    <!-- Help URI, action disabled by advanced protection [DO NOT TRANSLATE] -->
+    <string name="config_help_url_action_disabled_by_advanced_protection" translatable="false"></string>
+
     <!-- Toasts posted from these packages will be shown to the current user, regardless of the user
          the process belongs to. This is useful for packages that run under a single user but serve
          multiple users, e.g. the system.
@@ -7463,4 +7495,8 @@
     <!-- By default ActivityOptions#makeScaleUpAnimation is only used between activities. This
          config enables OEMs to support its usage across tasks.-->
     <bool name="config_enableCrossTaskScaleUpAnimation">false</bool>
+
+    <!-- Biometrics fingerprint frr notification target activity component name, it shall be customized by OEMs -->
+    <string translatable="false" name="config_fingerprintFrrTargetComponent"></string>
+
 </resources>

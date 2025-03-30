@@ -56,20 +56,15 @@ constructor(
     val hasAnyMediaOrRecommendations: StateFlow<Boolean> = interactor.hasAnyMediaOrRecommendation
     val hasActiveMediaOrRecommendations: StateFlow<Boolean> =
         interactor.hasActiveMediaOrRecommendation
-    val mediaItems: StateFlow<List<MediaCommonViewModel>> =
+    val mediaItems: StateFlow<List<MediaControlViewModel>> =
         interactor.currentMedia
             .map { sortedItems ->
                 val mediaList = buildList {
                     sortedItems.forEach { commonModel ->
                         // When view is started we should make sure to clean models that are pending
-                        // removal.
-                        // This action should only be triggered once.
+                        // removal. This action should only be triggered once.
                         if (!allowReorder || !modelsPendingRemoval.contains(commonModel)) {
-                            when (commonModel) {
-                                is MediaCommonModel.MediaControl -> add(toViewModel(commonModel))
-                                is MediaCommonModel.MediaRecommendations ->
-                                    return@forEach // TODO(b/382680767): remove
-                            }
+                            add(toViewModel(commonModel))
                         }
                     }
                 }
@@ -91,8 +86,7 @@ constructor(
 
     var updateHostVisibility: () -> Unit = {}
 
-    private val mediaControlByInstanceId =
-        mutableMapOf<InstanceId, MediaCommonViewModel.MediaControl>()
+    private val mediaControlByInstanceId = mutableMapOf<InstanceId, MediaControlViewModel>()
 
     private var modelsPendingRemoval: MutableSet<MediaCommonModel> = mutableSetOf()
 
@@ -108,18 +102,16 @@ constructor(
         interactor.reorderMedia()
     }
 
-    private fun toViewModel(
-        commonModel: MediaCommonModel.MediaControl
-    ): MediaCommonViewModel.MediaControl {
+    private fun toViewModel(commonModel: MediaCommonModel): MediaControlViewModel {
         val instanceId = commonModel.mediaLoadedModel.instanceId
-        return mediaControlByInstanceId[instanceId]?.copy(
-            immediatelyUpdateUi = commonModel.mediaLoadedModel.immediatelyUpdateUi,
-            updateTime = commonModel.updateTime,
-        )
-            ?: MediaCommonViewModel.MediaControl(
+        return mediaControlByInstanceId[instanceId]?.copy(updateTime = commonModel.updateTime)
+            ?: MediaControlViewModel(
+                    applicationContext = applicationContext,
+                    backgroundDispatcher = backgroundDispatcher,
+                    backgroundExecutor = backgroundExecutor,
+                    interactor = controlInteractorFactory.create(instanceId),
+                    logger = logger,
                     instanceId = instanceId,
-                    immediatelyUpdateUi = commonModel.mediaLoadedModel.immediatelyUpdateUi,
-                    controlViewModel = createMediaControlViewModel(instanceId),
                     onAdded = {
                         mediaLogger.logMediaCardAdded(instanceId)
                         onMediaControlAddedOrUpdated(it, commonModel)
@@ -130,31 +122,20 @@ constructor(
                         mediaLogger.logMediaCardRemoved(instanceId)
                     },
                     onUpdated = { onMediaControlAddedOrUpdated(it, commonModel) },
-                    isMediaFromRec = commonModel.isMediaFromRec,
                     updateTime = commonModel.updateTime,
                 )
                 .also { mediaControlByInstanceId[instanceId] = it }
     }
 
-    private fun createMediaControlViewModel(instanceId: InstanceId): MediaControlViewModel {
-        return MediaControlViewModel(
-            applicationContext = applicationContext,
-            backgroundDispatcher = backgroundDispatcher,
-            backgroundExecutor = backgroundExecutor,
-            interactor = controlInteractorFactory.create(instanceId),
-            logger = logger,
-        )
-    }
-
     private fun onMediaControlAddedOrUpdated(
-        commonViewModel: MediaCommonViewModel,
-        commonModel: MediaCommonModel.MediaControl,
+        controlViewModel: MediaControlViewModel,
+        commonModel: MediaCommonModel,
     ) {
         if (commonModel.canBeRemoved && !Utils.useMediaResumption(applicationContext)) {
             // This media control is due for removal as it is now paused + timed out, and resumption
             // setting is off.
             if (isReorderingAllowed()) {
-                commonViewModel.onRemoved(true)
+                controlViewModel.onRemoved(true)
             } else {
                 modelsPendingRemoval.add(commonModel)
             }

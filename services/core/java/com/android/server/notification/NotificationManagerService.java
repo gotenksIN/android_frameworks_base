@@ -764,6 +764,8 @@ public class NotificationManagerService extends SystemService {
     private long mLastOverRateLogTime;
     private float mMaxPackageEnqueueRate = DEFAULT_MAX_NOTIFICATION_ENQUEUE_RATE;
 
+    private boolean mRedactOtpNotifications = true;
+
     private NotificationHistoryManager mHistoryManager;
     protected SnoozeHelper mSnoozeHelper;
     private TimeToLiveHelper mTtlHelper;
@@ -1875,73 +1877,35 @@ public class NotificationManagerService extends SystemService {
         }
     };
 
-    private void unclassifyNotificationsForUser(final int userId) {
-        if (DBG) {
-            Slog.v(TAG, "unclassifyForUser: " + userId);
-        }
-        unclassifyNotificationsFiltered((r) -> r.getUserId() == userId);
+    private void applyNotificationUpdateForUser(final int userId,
+            NotificationUpdate notificationUpdate) {
+        applyUpdateForNotificationsFiltered((r) -> r.getUserId() == userId,
+                notificationUpdate);
     }
 
-    private void unclassifyNotificationsForUid(final int userId, @NonNull final String pkg) {
-        if (DBG) {
-            Slog.v(TAG, "unclassifyForUid userId: " + userId + " pkg: " + pkg);
-        }
-        unclassifyNotificationsFiltered((r) ->
+    private void applyNotificationUpdateForUid(final int userId, @NonNull final String pkg,
+            NotificationUpdate notificationUpdate) {
+        applyUpdateForNotificationsFiltered((r) ->
                 r.getUserId() == userId
-                && Objects.equals(r.getSbn().getPackageName(), pkg));
+                && Objects.equals(r.getSbn().getPackageName(), pkg),
+                notificationUpdate);
     }
 
-    private void unclassifyNotificationsForUserAndType(final int userId,
-            final @Types int bundleType) {
-        if (DBG) {
-            Slog.v(TAG,
-                    "unclassifyForUserAndType userId: " + userId + " bundleType: " + bundleType);
-        }
+    private void applyNotificationUpdateForUserAndChannelType(final int userId,
+            final @Types int bundleType, NotificationUpdate notificationUpdate) {
         final String bundleChannelId = NotificationChannel.getChannelIdForBundleType(bundleType);
-        unclassifyNotificationsFiltered((r) ->
+        applyUpdateForNotificationsFiltered((r) ->
                 r.getUserId() == userId
                 && r.getChannel() != null
-                && Objects.equals(bundleChannelId, r.getChannel().getId()));
+                && Objects.equals(bundleChannelId, r.getChannel().getId()),
+                notificationUpdate);
     }
 
-    private void unclassifyNotificationsFiltered(Predicate<NotificationRecord> filter) {
-        if (!(notificationClassificationUi() && notificationRegroupOnClassification())) {
-            return;
-        }
-        synchronized (mNotificationLock) {
-            for (int i = 0; i < mEnqueuedNotifications.size(); i++) {
-                final NotificationRecord r = mEnqueuedNotifications.get(i);
-                if (filter.test(r)) {
-                    unclassifyNotificationLocked(r);
-                }
-            }
-
-            for (int i = 0; i < mNotificationList.size(); i++) {
-                final NotificationRecord r = mNotificationList.get(i);
-                if (filter.test(r)) {
-                    unclassifyNotificationLocked(r);
-                }
-            }
-        }
-    }
-
-    @GuardedBy("mNotificationLock")
-    private void unclassifyNotificationLocked(@NonNull final NotificationRecord r) {
-        if (DBG) {
-            Slog.v(TAG, "unclassifyNotification: " + r);
-        }
-        // Only NotificationRecord's mChannel is updated when bundled, the Notification
-        // mChannelId will always be the original channel.
-        String origChannelId = r.getNotification().getChannelId();
-        NotificationChannel originalChannel = mPreferencesHelper.getNotificationChannel(
-                r.getSbn().getPackageName(), r.getUid(), origChannelId, false);
-        String currChannelId = r.getChannel().getId();
-        boolean isClassified = NotificationChannel.SYSTEM_RESERVED_IDS.contains(currChannelId);
-        if (originalChannel != null && !origChannelId.equals(currChannelId) && isClassified) {
-            r.updateNotificationChannel(originalChannel);
-            mGroupHelper.onNotificationUnbundled(r,
-                    GroupHelper.isOriginalGroupSummaryPresent(r, mSummaryByGroupKey));
-        }
+    private void applyNotificationUpdateForUserAndType(final int userId,
+            final @Types int bundleType, NotificationUpdate notificationUpdate) {
+        applyUpdateForNotificationsFiltered(
+                (r) -> r.getUserId() == userId && r.getBundleType() == bundleType,
+                notificationUpdate);
     }
 
     @VisibleForTesting
@@ -1954,7 +1918,7 @@ public class NotificationManagerService extends SystemService {
             if (r == null) {
                 return;
             }
-            unclassifyNotificationLocked(r);
+            unclassifyNotificationLocked(r, true);
         }
     }
 
@@ -1972,50 +1936,36 @@ public class NotificationManagerService extends SystemService {
         }
     }
 
-    private void reclassifyNotificationsFiltered(Predicate<NotificationRecord> filter) {
-        if (!(notificationClassificationUi() && notificationRegroupOnClassification())) {
-            return;
+    @GuardedBy("mNotificationLock")
+    private void unclassifyNotificationLocked(@NonNull final NotificationRecord r,
+            boolean isPosted) {
+        if (DBG) {
+            Slog.v(TAG, "unclassifyNotification: " + r);
         }
-        synchronized (mNotificationLock) {
-            for (int i = 0; i < mEnqueuedNotifications.size(); i++) {
-                final NotificationRecord r = mEnqueuedNotifications.get(i);
-                if (filter.test(r)) {
-                    reclassifyNotificationLocked(r, false);
-                }
-            }
-
-            for (int i = 0; i < mNotificationList.size(); i++) {
-                final NotificationRecord r = mNotificationList.get(i);
-                if (filter.test(r)) {
-                    reclassifyNotificationLocked(r, true);
-                }
-            }
+        // Only NotificationRecord's mChannel is updated when bundled, the Notification
+        // mChannelId will always be the original channel.
+        String origChannelId = r.getNotification().getChannelId();
+        NotificationChannel originalChannel = mPreferencesHelper.getNotificationChannel(
+                r.getSbn().getPackageName(), r.getUid(), origChannelId, false);
+        String currChannelId = r.getChannel().getId();
+        boolean isClassified = NotificationChannel.SYSTEM_RESERVED_IDS.contains(currChannelId);
+        if (originalChannel != null && !origChannelId.equals(currChannelId) && isClassified) {
+            r.updateNotificationChannel(originalChannel);
+            mGroupHelper.onNotificationUnbundled(r,
+                    GroupHelper.isOriginalGroupSummaryPresent(r, mSummaryByGroupKey));
         }
     }
 
-    private void reclassifyNotificationsForUserAndType(final int userId,
-            final @Types int bundleType) {
-        if (DBG) {
-            Slog.v(TAG, "reclassifyNotificationsForUserAndType userId: " + userId + " bundleType: "
-                    + bundleType);
-        }
-        reclassifyNotificationsFiltered(
-                (r) -> r.getUserId() == userId && r.getBundleType() == bundleType);
-    }
+    @GuardedBy("mNotificationLock")
+    private void unsummarizeNotificationLocked(@NonNull final NotificationRecord r,
+            boolean isPosted) {
+        Bundle signals = new Bundle();
+        signals.putString(KEY_SUMMARIZATION, null);
+        Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals, "",
+                r.getSbn().getUserId());
+        r.addAdjustment(adjustment);
+        mRankingHandler.requestSort();
 
-    private void reclassifyNotificationsForUid(final int userId, final String pkg) {
-        if (DBG) {
-            Slog.v(TAG, "reclassifyNotificationsForUid userId: " + userId + " pkg: " + pkg);
-        }
-        reclassifyNotificationsFiltered((r) ->
-                r.getUserId() == userId && Objects.equals(r.getSbn().getPackageName(), pkg));
-    }
-
-    private void reclassifyNotificationsForUser(final int userId) {
-        if (DBG) {
-            Slog.v(TAG, "reclassifyAllNotificationsForUser: " + userId);
-        }
-        reclassifyNotificationsFiltered((r) -> r.getUserId() == userId);
     }
 
     @GuardedBy("mNotificationLock")
@@ -2039,6 +1989,33 @@ public class NotificationManagerService extends SystemService {
                 Slog.w(TAG, "Can't reclassify. No valid bundle type or already bundled: " + r);
             }
         }
+    }
+
+    /**
+     * Given a filter and a function to update a notification record, runs that function on all
+     * enqueued and posted notifications that match the filter
+     */
+    private void applyUpdateForNotificationsFiltered(Predicate<NotificationRecord> filter,
+            NotificationUpdate notificationUpdate) {
+        synchronized (mNotificationLock) {
+            for (int i = 0; i < mEnqueuedNotifications.size(); i++) {
+                final NotificationRecord r = mEnqueuedNotifications.get(i);
+                if (filter.test(r)) {
+                    notificationUpdate.apply(r, false);
+                }
+            }
+
+            for (int i = 0; i < mNotificationList.size(); i++) {
+                final NotificationRecord r = mNotificationList.get(i);
+                if (filter.test(r)) {
+                    notificationUpdate.apply(r, true);
+                }
+            }
+        }
+    }
+
+    private interface NotificationUpdate {
+        void apply(NotificationRecord r, boolean isPosted);
     }
 
     NotificationManagerPrivate mNotificationManagerPrivate = new NotificationManagerPrivate() {
@@ -2410,6 +2387,8 @@ public class NotificationManagerService extends SystemService {
                 = Secure.getUriFor(Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS);
         private final Uri SHOW_NOTIFICATION_SNOOZE
                 = Secure.getUriFor(Secure.SHOW_NOTIFICATION_SNOOZE);
+        private final Uri REDACT_OTP_NOTIFICATIONS = Settings.Global.getUriFor(
+                Settings.Global.REDACT_OTP_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS);
 
         SettingsObserver(Handler handler) {
             super(handler);
@@ -2434,6 +2413,8 @@ public class NotificationManagerService extends SystemService {
                     false, this, USER_ALL);
 
             resolver.registerContentObserver(SHOW_NOTIFICATION_SNOOZE,
+                    false, this, USER_ALL);
+            resolver.registerContentObserver(REDACT_OTP_NOTIFICATIONS,
                     false, this, USER_ALL);
 
             update(null);
@@ -2480,6 +2461,10 @@ public class NotificationManagerService extends SystemService {
                 if (!snoozeEnabled) {
                     unsnoozeAll();
                 }
+            }
+            if (REDACT_OTP_NOTIFICATIONS.equals(uri)) {
+                mRedactOtpNotifications = Settings.Global.getInt(resolver,
+                        Settings.Global.REDACT_OTP_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS, 1) != 0;
             }
         }
 
@@ -4465,9 +4450,11 @@ public class NotificationManagerService extends SystemService {
         public void allowAssistantAdjustment(String adjustmentType) {
             checkCallerIsSystemOrSystemUiOrShell();
             mAssistants.allowAdjustmentType(adjustmentType);
+            int userId = UserHandle.getUserId(Binder.getCallingUid());
             if ((notificationClassificationUi() && notificationRegroupOnClassification())) {
                 if (KEY_TYPE.equals(adjustmentType)) {
-                    reclassifyNotificationsForUser(UserHandle.getUserId(Binder.getCallingUid()));
+                    applyNotificationUpdateForUser(userId,
+                            NotificationManagerService.this::reclassifyNotificationLocked);
                 }
             }
             handleSavePolicyFile();
@@ -4478,9 +4465,17 @@ public class NotificationManagerService extends SystemService {
         public void disallowAssistantAdjustment(String adjustmentType) {
             checkCallerIsSystemOrSystemUiOrShell();
             mAssistants.disallowAdjustmentType(adjustmentType);
+            int userId = UserHandle.getUserId(Binder.getCallingUid());
             if ((notificationClassificationUi() && notificationRegroupOnClassification())) {
                 if (KEY_TYPE.equals(adjustmentType)) {
-                    unclassifyNotificationsForUser(UserHandle.getUserId(Binder.getCallingUid()));
+                    applyNotificationUpdateForUser(userId,
+                            NotificationManagerService.this::unclassifyNotificationLocked);
+                }
+            }
+            if (nmSummarizationUi() || nmSummarization()) {
+                if (KEY_SUMMARIZATION.equals(adjustmentType)) {
+                    applyNotificationUpdateForUser(userId,
+                            NotificationManagerService.this::unsummarizeNotificationLocked);
                 }
             }
             handleSavePolicyFile();
@@ -4529,11 +4524,13 @@ public class NotificationManagerService extends SystemService {
             mAssistants.setAssistantAdjustmentKeyTypeState(type, enabled);
             if ((notificationClassificationUi() && notificationRegroupOnClassification())) {
                 if (enabled) {
-                    reclassifyNotificationsForUserAndType(
-                            UserHandle.getUserId(Binder.getCallingUid()), type);
+                    applyNotificationUpdateForUserAndType(
+                            UserHandle.getUserId(Binder.getCallingUid()), type,
+                            NotificationManagerService.this::reclassifyNotificationLocked);
                 } else {
-                    unclassifyNotificationsForUserAndType(
-                            UserHandle.getUserId(Binder.getCallingUid()), type);
+                    applyNotificationUpdateForUserAndChannelType(
+                            UserHandle.getUserId(Binder.getCallingUid()), type,
+                            NotificationManagerService.this::unclassifyNotificationLocked);
                 }
             }
             handleSavePolicyFile();
@@ -4559,11 +4556,17 @@ public class NotificationManagerService extends SystemService {
             if (notificationClassificationUi() && notificationRegroupOnClassification()
                     && key.equals(KEY_TYPE)) {
                 if (enabled) {
-                    reclassifyNotificationsForUid(UserHandle.getUserId(Binder.getCallingUid()),
-                            pkg);
+                    applyNotificationUpdateForUid(UserHandle.getUserId(Binder.getCallingUid()),
+                            pkg, NotificationManagerService.this::reclassifyNotificationLocked);
                 } else {
-                    unclassifyNotificationsForUid(UserHandle.getUserId(Binder.getCallingUid()),
-                            pkg);
+                    applyNotificationUpdateForUid(UserHandle.getUserId(Binder.getCallingUid()),
+                            pkg, NotificationManagerService.this::unclassifyNotificationLocked);
+                }
+            }
+            if (nmSummarization() || nmSummarizationUi()) {
+                if (KEY_SUMMARIZATION.equals(key) && !enabled) {
+                    applyNotificationUpdateForUid(UserHandle.getUserId(Binder.getCallingUid()),
+                            pkg, NotificationManagerService.this::unsummarizeNotificationLocked);
                 }
             }
             handleSavePolicyFile();
@@ -6163,10 +6166,15 @@ public class NotificationManagerService extends SystemService {
         }
 
         @Override
-        public Map<String, AutomaticZenRule> getAutomaticZenRules() {
+        public ParceledListSlice getAutomaticZenRules() {
             int callingUid = Binder.getCallingUid();
             enforcePolicyAccess(callingUid, "getAutomaticZenRules");
-            return mZenModeHelper.getAutomaticZenRules(getCallingZenUser(), callingUid);
+            List<AutomaticZenRule.AzrWithId> ruleList = new ArrayList<>();
+            for (Map.Entry<String, AutomaticZenRule> rule : mZenModeHelper.getAutomaticZenRules(
+                    getCallingZenUser(), callingUid).entrySet()) {
+                ruleList.add(new AutomaticZenRule.AzrWithId(rule.getKey(), rule.getValue()));
+            }
+            return new ParceledListSlice<>(ruleList);
         }
 
         @Override
@@ -7402,6 +7410,10 @@ public class NotificationManagerService extends SystemService {
                         adjustments);
                 if (newChannel == null || newChannel.getId().equals(r.getChannel().getId())) {
                     adjustments.remove(KEY_TYPE);
+                } else if (android.app.Flags.apiRichOngoing() && hasFlag(r.getNotification().flags,
+                        FLAG_PROMOTED_ONGOING)) {
+                    // Don't bundle any promoted ongoing notifications
+                    adjustments.remove(KEY_TYPE);
                 } else {
                     // Save the app-provided type for logging.
                     int classification = adjustments.getInt(KEY_TYPE);
@@ -8198,6 +8210,18 @@ public class NotificationManagerService extends SystemService {
             }
             // This can also throw IllegalStateException if called too late.
             mZenModeHelper.setDeviceEffectsApplier(applier);
+        }
+
+        @Override
+        public void onDisplayRemoveSystemDecorations(int displayId) {
+            synchronized (mToastQueue) {
+                for (int i = mToastQueue.size() - 1; i >= 0; i--) {
+                    final ToastRecord toast = mToastQueue.get(i);
+                    if (toast.displayId == displayId) {
+                        cancelToastLocked(i);
+                    }
+                }
+            }
         }
     };
 
@@ -12665,6 +12689,16 @@ public class NotificationManagerService extends SystemService {
             return Log.isLoggable("notification_assistant", Log.VERBOSE);
         }
 
+        private void addDefaultClassificationTypes() {
+            // Add the default classification types if the list is empty
+            synchronized (mLock) {
+                if (mAllowedClassificationTypes.isEmpty()) {
+                    mAllowedClassificationTypes.addAll(
+                            List.of(DEFAULT_ALLOWED_ADJUSTMENT_KEY_TYPES));
+                }
+            }
+        }
+
         @FlaggedApi(android.service.notification.Flags.FLAG_NOTIFICATION_CLASSIFICATION)
         @GuardedBy("mNotificationLock")
         public void allowAdjustmentType(@Adjustment.Keys String key) {
@@ -12674,6 +12708,9 @@ public class NotificationManagerService extends SystemService {
             mDeniedAdjustments.remove(key);
             for (final ManagedServiceInfo info : NotificationAssistants.this.getServices()) {
                 mHandler.post(() -> notifyCapabilitiesChanged(info));
+            }
+            if (KEY_TYPE.equals(key)) {
+                addDefaultClassificationTypes();
             }
         }
 
@@ -13453,13 +13490,13 @@ public class NotificationManagerService extends SystemService {
                 StatusBarNotification oldRedactedSbn = null;
                 boolean isNewSensitive = hasSensitiveContent(r);
                 boolean isOldSensitive = hasSensitiveContent(old);
+                boolean redactionEnabled = redactSensitiveNotificationsFromUntrustedListeners()
+                        && mRedactOtpNotifications;
 
                 for (final ManagedServiceInfo info : getServices()) {
                     boolean isTrusted = isUidTrusted(info.uid);
-                    boolean sendRedacted = redactSensitiveNotificationsFromUntrustedListeners()
-                            && isNewSensitive && !isTrusted;
-                    boolean sendOldRedacted = redactSensitiveNotificationsFromUntrustedListeners()
-                            && isOldSensitive && !isTrusted;
+                    boolean sendRedacted = redactionEnabled && isNewSensitive && !isTrusted;
+                    boolean sendOldRedacted = redactionEnabled && isOldSensitive && !isTrusted;
                     boolean sbnVisible = isVisibleToListener(sbn, r.getNotificationType(), info);
                     boolean oldSbnVisible = (oldSbn != null)
                             && isVisibleToListener(oldSbn, old.getNotificationType(), info);
@@ -14529,23 +14566,23 @@ public class NotificationManagerService extends SystemService {
      */
     private class NotificationTrampolineCallback implements BackgroundActivityStartCallback {
         @Override
-        public boolean isActivityStartAllowed(Collection<IBinder> tokens, int uid,
-                String packageName) {
+        public BackgroundActivityStartCallbackResult isActivityStartAllowed(
+                Collection<IBinder> tokens, int uid, String packageName) {
             checkArgument(!tokens.isEmpty());
             for (IBinder token : tokens) {
                 if (token != ALLOWLIST_TOKEN) {
                     // We only block or warn if the start is exclusively due to notification
-                    return true;
+                    return RESULT_TRUE;
                 }
             }
             String logcatMessage =
                     "Indirect notification activity start (trampoline) from " + packageName;
             if (blockTrampoline(uid)) {
                 Slog.e(TAG, logcatMessage + " blocked");
-                return false;
+                return RESULT_FALSE;
             } else {
                 Slog.w(TAG, logcatMessage + ", this should be avoided for performance reasons");
-                return true;
+                return new BackgroundActivityStartCallbackResult(true, ALLOWLIST_TOKEN);
             }
         }
 

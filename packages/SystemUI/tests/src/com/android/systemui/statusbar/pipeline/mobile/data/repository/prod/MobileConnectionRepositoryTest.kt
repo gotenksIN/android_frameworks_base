@@ -90,6 +90,7 @@ import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionMod
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SystemUiCarrierConfig
 import com.android.systemui.statusbar.pipeline.mobile.data.model.testCarrierConfig
 import com.android.systemui.statusbar.pipeline.mobile.data.model.testCarrierConfigWithOverride
+import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository.Companion.DEFAULT_NUM_LEVELS
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.prod.MobileTelephonyHelpers.signalStrength
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.prod.MobileTelephonyHelpers.telephonyDisplayInfo
@@ -128,28 +129,55 @@ import org.mockito.kotlin.argumentCaptor
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
 @SmallTest
 @RunWith(AndroidJUnit4::class)
-class MobileConnectionRepositoryTest : SysuiTestCase() {
-    private lateinit var underTest: MobileConnectionRepositoryImpl
+class MobileConnectionRepositoryImplTest : MobileConnectionRepositoryTest() {
+    override fun recreateRepo(): MobileConnectionRepository =
+        MobileConnectionRepositoryImpl(
+            SUB_1_ID,
+            context,
+            subscriptionModel,
+            DEFAULT_NAME_MODEL,
+            SEP,
+            connectivityManager,
+            telephonyManager,
+            systemUiCarrierConfig,
+            fakeBroadcastDispatcher,
+            mobileMappings,
+            testDispatcher,
+            logger,
+            tableLogger,
+            flags,
+            testScope.backgroundScope,
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+	    fiveGServiceClient,
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+        )
+}
 
-    private val flags =
+abstract class MobileConnectionRepositoryTest : SysuiTestCase() {
+
+    abstract fun recreateRepo(): MobileConnectionRepository
+
+    lateinit var underTest: MobileConnectionRepository
+
+    protected val flags =
         FakeFeatureFlagsClassic().also { it.set(ROAMING_INDICATOR_VIA_DISPLAY_INFO, true) }
 
-    @Mock private lateinit var connectivityManager: ConnectivityManager
-    @Mock private lateinit var telephonyManager: TelephonyManager
-    @Mock private lateinit var logger: MobileInputLogger
-    @Mock private lateinit var tableLogger: TableLogBuffer
-    @Mock private lateinit var context: Context
+    @Mock protected lateinit var connectivityManager: ConnectivityManager
+    @Mock protected lateinit var telephonyManager: TelephonyManager
+    @Mock protected lateinit var logger: MobileInputLogger
+    @Mock protected lateinit var tableLogger: TableLogBuffer
+    @Mock protected lateinit var context: Context
 
-    private val mobileMappings = FakeMobileMappingsProxy()
-    private val systemUiCarrierConfig = SystemUiCarrierConfig(SUB_1_ID, testCarrierConfig())
+    protected val mobileMappings = FakeMobileMappingsProxy()
+    protected val systemUiCarrierConfig = SystemUiCarrierConfig(SUB_1_ID, testCarrierConfig())
 // QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-    private val fiveGServiceClient = FiveGServiceClient(mContext)
+    protected val fiveGServiceClient = FiveGServiceClient(mContext)
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 
-    private val testDispatcher = UnconfinedTestDispatcher()
-    private val testScope = TestScope(testDispatcher)
+    protected val testDispatcher = UnconfinedTestDispatcher()
+    protected val testScope = TestScope(testDispatcher)
 
-    private val subscriptionModel: MutableStateFlow<SubscriptionModel?> =
+    protected val subscriptionModel: MutableStateFlow<SubscriptionModel?> =
         MutableStateFlow(
             SubscriptionModel(
                 subscriptionId = SUB_1_ID,
@@ -159,31 +187,11 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
         )
 
     @Before
-    fun setUp() {
+    fun setUpBase() {
         MockitoAnnotations.initMocks(this)
         whenever(telephonyManager.subscriptionId).thenReturn(SUB_1_ID)
 
-        underTest =
-            MobileConnectionRepositoryImpl(
-                SUB_1_ID,
-                mContext,
-                subscriptionModel,
-                DEFAULT_NAME_MODEL,
-                SEP,
-                connectivityManager,
-                telephonyManager,
-                systemUiCarrierConfig,
-                fakeBroadcastDispatcher,
-                mobileMappings,
-                testDispatcher,
-                logger,
-                tableLogger,
-                flags,
-                testScope.backgroundScope,
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-                fiveGServiceClient,
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-            )
+	underTest = recreateRepo()
     }
 
     @Test
@@ -418,6 +426,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
     fun carrierId_initialValueCaptured() =
         testScope.runTest {
             whenever(telephonyManager.simCarrierId).thenReturn(1234)
+            underTest = recreateRepo()
 
             var latest: Int? = null
             val job = underTest.carrierId.onEach { latest = it }.launchIn(this)
@@ -448,6 +457,8 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
     @Test
     fun carrierNetworkChange() =
         testScope.runTest {
+            underTest = recreateRepo()
+
             var latest: Boolean? = null
             val job = underTest.carrierNetworkChangeActive.onEach { latest = it }.launchIn(this)
 
@@ -640,25 +651,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             flags.set(ROAMING_INDICATOR_VIA_DISPLAY_INFO, true)
 
             // Re-create the repository, because the flag is read at init
-            underTest =
-                MobileConnectionRepositoryImpl(
-                    SUB_1_ID,
-                    context,
-                    subscriptionModel,
-                    DEFAULT_NAME_MODEL,
-                    SEP,
-                    connectivityManager,
-                    telephonyManager,
-                    systemUiCarrierConfig,
-                    fakeBroadcastDispatcher,
-                    mobileMappings,
-                    testDispatcher,
-                    logger,
-                    tableLogger,
-                    flags,
-                    testScope.backgroundScope,
-                    fiveGServiceClient,
-                )
+	    underTest = recreateRepo()
 
             var latest: Boolean? = null
             val job = underTest.isRoaming.onEach { latest = it }.launchIn(this)
@@ -690,25 +683,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             flags.set(ROAMING_INDICATOR_VIA_DISPLAY_INFO, false)
 
             // Re-create the repository, because the flag is read at init
-            underTest =
-                MobileConnectionRepositoryImpl(
-                    SUB_1_ID,
-                    context,
-                    subscriptionModel,
-                    DEFAULT_NAME_MODEL,
-                    SEP,
-                    connectivityManager,
-                    telephonyManager,
-                    systemUiCarrierConfig,
-                    fakeBroadcastDispatcher,
-                    mobileMappings,
-                    testDispatcher,
-                    logger,
-                    tableLogger,
-                    flags,
-                    testScope.backgroundScope,
-                    fiveGServiceClient,
-                )
+	    underTest = recreateRepo()
 
             var latest: Boolean? = null
             val job = underTest.isRoaming.onEach { latest = it }.launchIn(this)
@@ -1461,14 +1436,14 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
         }
 
     companion object {
-        private const val SUB_1_ID = 1
+        const val SUB_1_ID = 1
 
-        private const val DEFAULT_NAME = "Fake Mobile Network"
-        private val DEFAULT_NAME_MODEL = NetworkNameModel.Default(DEFAULT_NAME)
-        private const val SEP = "-"
+        const val DEFAULT_NAME = "Fake Mobile Network"
+        val DEFAULT_NAME_MODEL = NetworkNameModel.Default(DEFAULT_NAME)
+        const val SEP = "-"
 
-        private const val SPN = "testSpn"
-        private const val DATA_SPN = "testDataSpn"
-        private const val PLMN = "testPlmn"
+        const val SPN = "testSpn"
+        const val DATA_SPN = "testDataSpn"
+        const val PLMN = "testPlmn"
     }
 }

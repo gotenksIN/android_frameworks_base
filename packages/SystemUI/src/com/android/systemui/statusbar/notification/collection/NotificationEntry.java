@@ -68,6 +68,7 @@ import com.android.systemui.statusbar.notification.collection.notifcollection.No
 import com.android.systemui.statusbar.notification.headsup.PinnedStatus;
 import com.android.systemui.statusbar.notification.icon.IconPack;
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel;
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModels;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRowController;
 import com.android.systemui.statusbar.notification.row.NotificationGuts;
@@ -198,7 +199,7 @@ public final class NotificationEntry extends ListEntry {
 
     // TODO(b/377565433): Move into NotificationContentModel during/after
     //  NotificationRowContentBinderRefactor.
-    private PromotedNotificationContentModel mPromotedNotificationContentModel;
+    private PromotedNotificationContentModels mPromotedNotificationContentModels;
 
     /**
      * True if both
@@ -251,7 +252,7 @@ public final class NotificationEntry extends ListEntry {
     /**
      * @param sbn the StatusBarNotification from system server
      * @param ranking also from system server
-     * @param creationTime SystemClock.uptimeMillis of when we were created
+     * @param creationTime SystemClock.elapsedRealtime of when we were created
      */
     public NotificationEntry(
             @NonNull StatusBarNotification sbn,
@@ -508,7 +509,7 @@ public final class NotificationEntry extends ListEntry {
 
             ArrayList<NotificationEntry> children = new ArrayList<>();
             for (ExpandableNotificationRow child : rowChildren) {
-                children.add(child.getEntry());
+                children.add(child.getEntryLegacy());
             }
 
             return children;
@@ -1029,7 +1030,7 @@ public final class NotificationEntry extends ListEntry {
     }
 
     /**
-     * Mark this entry for movement triggered by a user action (ex: changing the priorirty of a
+     * Mark this entry for movement triggered by a user action (ex: changing the priority of a
      * conversation). This can then be used for custom animations.
      */
     public void markForUserTriggeredMovement(boolean marked) {
@@ -1106,9 +1107,9 @@ public final class NotificationEntry extends ListEntry {
      * Gets the content needed to render this notification as a promoted notification on various
      * surfaces (like status bar chips and AOD).
      */
-    public PromotedNotificationContentModel getPromotedNotificationContentModel() {
+    public PromotedNotificationContentModels getPromotedNotificationContentModels() {
         if (PromotedNotificationContentModel.featureFlagEnabled()) {
-            return mPromotedNotificationContentModel;
+            return mPromotedNotificationContentModels;
         } else {
             Log.wtf(TAG, "getting promoted content without feature flag enabled", new Throwable());
             return null;
@@ -1127,10 +1128,10 @@ public final class NotificationEntry extends ListEntry {
      * Sets the content needed to render this notification as a promoted notification on various
      * surfaces (like status bar chips and AOD).
      */
-    public void setPromotedNotificationContentModel(
-            @Nullable PromotedNotificationContentModel promotedNotificationContentModel) {
+    public void setPromotedNotificationContentModels(
+            @Nullable PromotedNotificationContentModels promotedNotificationContentModels) {
         if (PromotedNotificationContentModel.featureFlagEnabled()) {
-            this.mPromotedNotificationContentModel = promotedNotificationContentModel;
+            this.mPromotedNotificationContentModels = promotedNotificationContentModels;
         } else {
             Log.wtf(TAG, "setting promoted content without feature flag enabled", new Throwable());
         }

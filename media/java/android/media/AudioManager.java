@@ -19,13 +19,15 @@ package android.media;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.content.Context.DEVICE_ID_DEFAULT;
-import static android.media.audio.Flags.autoPublicVolumeApiHardening;
-import static android.media.audio.Flags.cacheGetStreamMinMaxVolume;
-import static android.media.audio.Flags.cacheGetStreamVolume;
 import static android.media.audio.Flags.FLAG_DEPRECATE_STREAM_BT_SCO;
 import static android.media.audio.Flags.FLAG_FOCUS_EXCLUSIVE_WITH_RECORDING;
 import static android.media.audio.Flags.FLAG_FOCUS_FREEZE_TEST_API;
+import static android.media.audio.Flags.FLAG_REGISTER_VOLUME_CALLBACK_API_HARDENING;
 import static android.media.audio.Flags.FLAG_SUPPORTED_DEVICE_TYPES_API;
+import static android.media.audio.Flags.FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT;
+import static android.media.audio.Flags.autoPublicVolumeApiHardening;
+import static android.media.audio.Flags.cacheGetStreamMinMaxVolume;
+import static android.media.audio.Flags.cacheGetStreamVolume;
 import static android.media.audiopolicy.Flags.FLAG_ENABLE_FADE_MANAGER_CONFIGURATION;
 
 import android.Manifest;
@@ -64,7 +66,7 @@ import android.media.audiopolicy.AudioPolicy;
 import android.media.audiopolicy.AudioPolicy.AudioPolicyFocusListener;
 import android.media.audiopolicy.AudioProductStrategy;
 import android.media.audiopolicy.AudioVolumeGroup;
-import android.media.audiopolicy.AudioVolumeGroupChangeHandler;
+import android.media.audiopolicy.IAudioVolumeChangeDispatcher;
 import android.media.projection.MediaProjection;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
@@ -127,8 +129,6 @@ public class AudioManager {
     private static final String TAG = "AudioManager";
     private static final boolean DEBUG = false;
     private static final AudioPortEventHandler sAudioPortEventHandler = new AudioPortEventHandler();
-    private static final AudioVolumeGroupChangeHandler sAudioAudioVolumeGroupChangedHandler =
-            new AudioVolumeGroupChangeHandler();
 
     private static WeakReference<Context> sContext;
 
@@ -6728,24 +6728,30 @@ public class AudioManager {
      * @hide
      * Volume behavior for an audio device where a software attenuation is applied
      * @see #setDeviceVolumeBehavior(AudioDeviceAttributes, int)
+     * @deprecated use {@link AudioDeviceVolumeManager#DEVICE_VOLUME_BEHAVIOR_VARIABLE} instead
      */
     @SystemApi
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public static final int DEVICE_VOLUME_BEHAVIOR_VARIABLE = 0;
     /**
      * @hide
      * Volume behavior for an audio device where the volume is always set to provide no attenuation
      *     nor gain (e.g. unit gain).
      * @see #setDeviceVolumeBehavior(AudioDeviceAttributes, int)
+     * @deprecated use {@link AudioDeviceVolumeManager#DEVICE_VOLUME_BEHAVIOR_FULL} instead
      */
     @SystemApi
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public static final int DEVICE_VOLUME_BEHAVIOR_FULL = 1;
     /**
      * @hide
      * Volume behavior for an audio device where the volume is either set to muted, or to provide
      *     no attenuation nor gain (e.g. unit gain).
      * @see #setDeviceVolumeBehavior(AudioDeviceAttributes, int)
+     * @deprecated use {@link AudioDeviceVolumeManager#DEVICE_VOLUME_BEHAVIOR_FIXED} instead
      */
     @SystemApi
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public static final int DEVICE_VOLUME_BEHAVIOR_FIXED = 2;
     /**
      * @hide
@@ -6753,8 +6759,10 @@ public class AudioManager {
      *     the volume is kept synchronized between the host and the device itself through a
      *     device-specific protocol such as BT AVRCP.
      * @see #setDeviceVolumeBehavior(AudioDeviceAttributes, int)
+     * @deprecated use {@link AudioDeviceVolumeManager#DEVICE_VOLUME_BEHAVIOR_ABSOLUTE} instead
      */
     @SystemApi
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public static final int DEVICE_VOLUME_BEHAVIOR_ABSOLUTE = 3;
     /**
      * @hide
@@ -6764,8 +6772,11 @@ public class AudioManager {
      *     normal vs in phone call).
      * @see #setMode(int)
      * @see #setDeviceVolumeBehavior(AudioDeviceAttributes, int)
+     * @deprecated use {@link AudioDeviceVolumeManager#DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_MULTI_MODE}
+     * instead
      */
     @SystemApi
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public static final int DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_MULTI_MODE = 4;
 
     /**
@@ -6773,8 +6784,11 @@ public class AudioManager {
      * A variant of {@link #DEVICE_VOLUME_BEHAVIOR_ABSOLUTE} where the host cannot reliably set
      * the volume percentage of the audio device. Specifically, {@link #setStreamVolume} will have
      * no effect, or an unreliable effect.
+     * @deprecated use {@link AudioDeviceVolumeManager#DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_ADJUST_ONLY}
+     * instead
      */
     @SystemApi
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public static final int DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_ADJUST_ONLY = 5;
 
     /** @hide */
@@ -6789,49 +6803,6 @@ public class AudioManager {
     @Retention(RetentionPolicy.SOURCE)
     public @interface DeviceVolumeBehavior {}
 
-    /** @hide */
-    @IntDef({
-            DEVICE_VOLUME_BEHAVIOR_UNSET,
-            DEVICE_VOLUME_BEHAVIOR_VARIABLE,
-            DEVICE_VOLUME_BEHAVIOR_FULL,
-            DEVICE_VOLUME_BEHAVIOR_FIXED,
-            DEVICE_VOLUME_BEHAVIOR_ABSOLUTE,
-            DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_MULTI_MODE,
-            DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_ADJUST_ONLY,
-    })
-    @Retention(RetentionPolicy.SOURCE)
-    public @interface DeviceVolumeBehaviorState {}
-
-    /**
-     * Variants of absolute volume behavior that are set in {@link AudioDeviceVolumeManager}.
-     * @hide
-     */
-    @IntDef({
-            DEVICE_VOLUME_BEHAVIOR_ABSOLUTE,
-            DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_ADJUST_ONLY,
-    })
-    @Retention(RetentionPolicy.SOURCE)
-    public @interface AbsoluteDeviceVolumeBehavior {}
-
-    /**
-     * @hide
-     * Throws IAE on an invalid volume behavior value
-     * @param volumeBehavior behavior value to check
-     */
-    public static void enforceValidVolumeBehavior(int volumeBehavior) {
-        switch (volumeBehavior) {
-            case DEVICE_VOLUME_BEHAVIOR_VARIABLE:
-            case DEVICE_VOLUME_BEHAVIOR_FULL:
-            case DEVICE_VOLUME_BEHAVIOR_FIXED:
-            case DEVICE_VOLUME_BEHAVIOR_ABSOLUTE:
-            case DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_MULTI_MODE:
-            case DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_ADJUST_ONLY:
-                return;
-            default:
-                throw new IllegalArgumentException("Illegal volume behavior " + volumeBehavior);
-        }
-    }
-
     /**
      * @hide
      * Sets the volume behavior for an audio output device.
@@ -6842,17 +6813,21 @@ public class AudioManager {
      * @see #DEVICE_VOLUME_BEHAVIOR_ABSOLUTE_MULTI_MODE
      * @param device the device to be affected
      * @param deviceVolumeBehavior one of the device behaviors
+     *
+     * @deprecated use
+     * {@link AudioDeviceVolumeManager#setDeviceVolumeBehavior(AudioDeviceAttributes, int)} instead
      */
     @SystemApi
     @RequiresPermission(anyOf = {
             Manifest.permission.MODIFY_AUDIO_ROUTING,
             Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
     })
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public void setDeviceVolumeBehavior(@NonNull AudioDeviceAttributes device,
             @DeviceVolumeBehavior int deviceVolumeBehavior) {
         // verify arguments (validity of device type is enforced in server)
         Objects.requireNonNull(device);
-        enforceValidVolumeBehavior(deviceVolumeBehavior);
+        AudioDeviceVolumeManager.enforceValidVolumeBehavior(deviceVolumeBehavior);
         // communicate with service
         final IAudioService service = getService();
         try {
@@ -6879,6 +6854,8 @@ public class AudioManager {
      * Returns the volume device behavior for the given audio device
      * @param device the audio device
      * @return the volume behavior for the device
+     * @deprecated use
+     * {@link AudioDeviceVolumeManager#getDeviceVolumeBehavior(AudioDeviceAttributes)} instead
      */
     @SystemApi
     @RequiresPermission(anyOf = {
@@ -6886,6 +6863,7 @@ public class AudioManager {
             Manifest.permission.QUERY_AUDIO_STATE,
             Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
     })
+    @FlaggedApi(FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT)
     public @DeviceVolumeBehavior
     int getDeviceVolumeBehavior(@NonNull AudioDeviceAttributes device) {
         // verify arguments (validity of device type is enforced in server)
@@ -6902,29 +6880,6 @@ public class AudioManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-    }
-
-    /**
-     * @hide
-     * Returns {@code true} if the volume device behavior is {@link #DEVICE_VOLUME_BEHAVIOR_FULL}.
-     */
-    @TestApi
-    @RequiresPermission(anyOf = {
-            Manifest.permission.MODIFY_AUDIO_ROUTING,
-            Manifest.permission.QUERY_AUDIO_STATE,
-            Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
-    })
-    public boolean isFullVolumeDevice() {
-        final AudioAttributes attributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .build();
-        final List<AudioDeviceAttributes> devices = getDevicesForAttributes(attributes);
-        for (AudioDeviceAttributes device : devices) {
-            if (getDeviceVolumeBehavior(device) == DEVICE_VOLUME_BEHAVIOR_FULL) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -8908,9 +8863,13 @@ public class AudioManager {
         }
     }
 
+    //====================================================================
+    // Notification of volume group changes
     /**
+     * Callback to receive updates on volume group changes, register using
+     * {@link AudioManager#registerVolumeGroupCallback(Executor, AudioVolumeCallback)}.
+     *
      * @hide
-     * Callback registered by client to be notified upon volume group change.
      */
     @SystemApi
     public abstract static class VolumeGroupCallback {
@@ -8921,33 +8880,68 @@ public class AudioManager {
         public void onAudioVolumeGroupChanged(int group, int flags) {}
     }
 
-   /**
-    * @hide
-    * Register an audio volume group change listener.
-    * @param callback the {@link VolumeGroupCallback} to register
-    */
+    /**
+     * Register an audio volume group change listener.
+     *
+     * @param executor {@link Executor} to handle the callbacks
+     * @param callback the callback to receive the audio volume group changes
+     * @throws SecurityException if the caller doesn't have the required permission.
+     *
+     * @hide
+     */
     @SystemApi
-    public void registerVolumeGroupCallback(
-            @NonNull Executor executor,
+    @FlaggedApi(FLAG_REGISTER_VOLUME_CALLBACK_API_HARDENING)
+    @RequiresPermission("Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED")
+    public void registerVolumeGroupCallback(@NonNull Executor executor,
             @NonNull VolumeGroupCallback callback) {
-        Preconditions.checkNotNull(executor, "executor must not be null");
-        Preconditions.checkNotNull(callback, "volume group change cb must not be null");
-        sAudioAudioVolumeGroupChangedHandler.init();
-        // TODO: make use of executor
-        sAudioAudioVolumeGroupChangedHandler.registerListener(callback);
+        mVolumeChangedListenerMgr.addListener(executor, callback, "registerVolumeGroupCallback",
+                () -> new AudioVolumeChangeDispatcherStub());
     }
 
-   /**
-    * @hide
-    * Unregister an audio volume group change listener.
-    * @param callback the {@link VolumeGroupCallback} to unregister
-    */
+    /**
+     * Unregister an audio volume group change listener.
+     *
+     * @param callback the {@link VolumeGroupCallback} to unregister
+     *
+     * @hide
+     */
     @SystemApi
-    public void unregisterVolumeGroupCallback(
-            @NonNull VolumeGroupCallback callback) {
-        Preconditions.checkNotNull(callback, "volume group change cb must not be null");
-        sAudioAudioVolumeGroupChangedHandler.unregisterListener(callback);
+    @FlaggedApi(FLAG_REGISTER_VOLUME_CALLBACK_API_HARDENING)
+    @RequiresPermission("Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED")
+    public void unregisterVolumeGroupCallback(@NonNull VolumeGroupCallback callback) {
+        mVolumeChangedListenerMgr.removeListener(callback, "unregisterVolumeGroupCallback");
     }
+
+    /**
+     * Manages the VolumeGroupCallback listeners and the AudioVolumeChangeDispatcherStub
+     */
+    private final CallbackUtil.LazyListenerManager<VolumeGroupCallback> mVolumeChangedListenerMgr =
+            new CallbackUtil.LazyListenerManager();
+
+    final class AudioVolumeChangeDispatcherStub extends IAudioVolumeChangeDispatcher.Stub
+            implements CallbackUtil.DispatcherStub {
+
+        @Override
+        public void register(boolean register) {
+            try {
+                if (register) {
+                    getService().registerAudioVolumeCallback(this);
+                } else {
+                    getService().unregisterAudioVolumeCallback(this);
+                }
+            } catch (RemoteException e) {
+                e.rethrowFromSystemServer();
+            }
+        }
+
+        @Override
+        public void onAudioVolumeGroupChanged(int group, int flags) {
+            mVolumeChangedListenerMgr.callListeners((listener) ->
+                    listener.onAudioVolumeGroupChanged(group, flags));
+        }
+    }
+
+    //====================================================================
 
     /**
      * Return if an asset contains haptic channels or not.

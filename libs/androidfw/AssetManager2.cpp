@@ -82,6 +82,9 @@ struct FindEntryResult {
   // The bitmask of configuration axis with which the resource value varies.
   uint32_t type_flags;
 
+  // The bitmask of ResTable_entry flags
+  uint16_t entry_flags;
+
   // The dynamic package ID map for the package from which this resource came from.
   const DynamicRefTable* dynamic_ref_table;
 
@@ -600,12 +603,12 @@ base::expected<std::set<ResTable_config>, IOError> AssetManager2::GetResourceCon
   return configurations;
 }
 
-std::set<std::string> AssetManager2::GetResourceLocales(bool exclude_system,
-                                                        bool merge_equivalent_languages) const {
+LoadedPackage::Locales AssetManager2::GetResourceLocales(
+    bool exclude_system, bool merge_equivalent_languages) const {
   ATRACE_NAME("AssetManager::GetResourceLocales");
   auto op = StartOperation();
 
-  std::set<std::string> locales;
+  LoadedPackage::Locales locales;
   const auto non_system_overlays =
       exclude_system ? GetNonSystemOverlays() : std::set<ApkAssetsPtr>();
 
@@ -619,8 +622,7 @@ std::set<std::string> AssetManager2::GetResourceLocales(bool exclude_system,
         if (!non_system_overlays.empty()) {
           // Exclude overlays that target only system resources.
           const auto& apk_assets = GetApkAssets(package_group.cookies_[i]);
-          if (apk_assets && apk_assets->IsOverlay() &&
-              non_system_overlays.find(apk_assets) == non_system_overlays.end()) {
+          if (apk_assets && apk_assets->IsOverlay() && !non_system_overlays.contains(apk_assets)) {
             continue;
           }
         }
@@ -879,10 +881,10 @@ base::expected<FindEntryResult, NullOrIOError> AssetManager2::FindEntry(
       // if we don't have a result yet
     if (!final_result ||
         // or this config is better before the locale than the existing result
-        result->config.isBetterThanBeforeLocale(final_result->config, desired_config) ||
+        result->config.isBetterThanBeforeLocale(final_result->config, *desired_config) ||
         // or the existing config isn't better before locale and this one specifies a locale
         // whereas the existing one doesn't
-        (!final_result->config.isBetterThanBeforeLocale(result->config, desired_config)
+        (!final_result->config.isBetterThanBeforeLocale(result->config, *desired_config)
             && has_locale && !final_has_locale)) {
       final_result = result.value();
       final_overlaid = overlaid;
@@ -1031,6 +1033,7 @@ base::expected<FindEntryResult, NullOrIOError> AssetManager2::FindEntryInternal(
     .entry = *entry,
     .config = *best_config,
     .type_flags = type_flags,
+    .entry_flags = (*best_entry_verified)->flags(),
     .dynamic_ref_table = package_group.dynamic_ref_table.get(),
     .package_name = &best_package->GetPackageName(),
     .type_string_ref = StringPoolRef(best_package->GetTypeStringPool(), best_type->id - 1),
@@ -1185,16 +1188,16 @@ base::expected<AssetManager2::SelectedValue, NullOrIOError> AssetManager2::GetRe
     }
 
     // Create a reference since we can't represent this complex type as a Res_value.
-    return SelectedValue(Res_value::TYPE_REFERENCE, resid, result->cookie, result->type_flags,
-                         resid, result->config);
+    return SelectedValue(Res_value::TYPE_REFERENCE, resid, result->cookie, result->entry_flags,
+                         result->type_flags, resid, result->config);
   }
 
   // Convert the package ID to the runtime assigned package ID.
   Res_value value = std::get<Res_value>(result->entry);
   result->dynamic_ref_table->lookupResourceValue(&value);
 
-  return SelectedValue(value.dataType, value.data, result->cookie, result->type_flags,
-                       resid, result->config);
+  return SelectedValue(value.dataType, value.data, result->cookie, result->entry_flags,
+                       result->type_flags, resid, result->config);
 }
 
 base::expected<std::monostate, NullOrIOError> AssetManager2::ResolveReference(
@@ -1851,8 +1854,8 @@ std::optional<AssetManager2::SelectedValue> Theme::GetAttribute(uint32_t resid) 
     }
 
     return AssetManager2::SelectedValue(entry_it->value.dataType, entry_it->value.data,
-                                        entry_it->cookie, type_spec_flags, 0U /* resid */,
-                                        {} /* config */);
+                                        entry_it->cookie, 0U /* entry flags*/, type_spec_flags,
+                                        0U /* resid */, {} /* config */);
   }
   return std::nullopt;
 }

@@ -29,7 +29,6 @@ import com.android.systemui.statusbar.LockscreenShadeTransitionController
 import com.android.systemui.statusbar.StatusBarState.KEYGUARD
 import com.android.systemui.statusbar.SysuiStatusBarStateController
 import com.android.systemui.statusbar.notification.domain.interactor.SeenNotificationsInteractor
-import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUiForceExpanded
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.row.ExpandableView
 import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
@@ -413,7 +412,7 @@ constructor(
                         (currentNotification as? ExpandableNotificationRow)?.entryAdapter
                     counter.incrementForBucket(entryAdapter?.sectionBucket)
                 } else {
-                    val entry = (currentNotification as? ExpandableNotificationRow)?.entry
+                    val entry = (currentNotification as? ExpandableNotificationRow)?.entryLegacy
                     counter.incrementForBucket(entry?.bucket)
                 }
             }
@@ -470,15 +469,13 @@ constructor(
             calculateGapAndDividerHeight(stack, previousView, current = view, visibleIndex)
         val canPeek = view is ExpandableNotificationRow &&
                 if (NotificationBundleUi.isEnabled) view.entryAdapter?.canPeek() == true
-                else view.entry.isStickyAndNotDemoted
+                else view.entryLegacy.isStickyAndNotDemoted
 
         var size =
             if (onLockscreen) {
                 if (
                     view is ExpandableNotificationRow &&
-                        (canPeek ||
-                            (PromotedNotificationUiForceExpanded.isEnabled &&
-                                view.isPromotedOngoing))
+                        (canPeek || view.isPromotedOngoing)
                 ) {
                     height
                 } else {

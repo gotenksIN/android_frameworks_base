@@ -23,7 +23,7 @@ import com.android.systemui.log.core.LogLevel.ERROR
 import com.android.systemui.log.core.LogLevel.INFO
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.logKey
-import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModels
 import javax.inject.Inject
 
 @OptIn(ExperimentalStdlibApi::class)
@@ -56,14 +56,14 @@ constructor(@PromotedNotificationLog private val buffer: LogBuffer) {
 
     fun logExtractionSucceeded(
         entry: NotificationEntry,
-        content: PromotedNotificationContentModel,
+        content: PromotedNotificationContentModels,
     ) {
         buffer.log(
             EXTRACTION_TAG,
             INFO,
             {
                 str1 = entry.logKey
-                str2 = content.toString()
+                str2 = content.toRedactedString()
             },
             { "extraction succeeded: $str2 for $str1" },
         )

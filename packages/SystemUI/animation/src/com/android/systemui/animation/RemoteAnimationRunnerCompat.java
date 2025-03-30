@@ -22,6 +22,7 @@ import static android.view.WindowManager.TRANSIT_OLD_NONE;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
+import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_EXIT_BY_MINIMIZE_TRANSITION_BUGFIX;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS_BUGFIX;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 
@@ -196,6 +197,14 @@ public abstract class RemoteAnimationRunnerCompat extends IRemoteAnimationRunner
                     // Release surface references now. This is apparently to free GPU memory
                     // before GC would.
                     info.releaseAllSurfaces();
+                    // Make sure that the transition leashes created are not leaked.
+                    for (SurfaceControl leash : leashMap.values()) {
+                        try {
+                            finishTransaction.reparent(leash, null);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Failed to reparent leash", e);
+                        }
+                    }
                     // Don't release here since launcher might still be using them. Instead
                     // let launcher release them (eg. via RemoteAnimationTargets)
                     leashMap.clear();
@@ -244,6 +253,17 @@ public abstract class RemoteAnimationRunnerCompat extends IRemoteAnimationRunner
                 runner.onAnimationCancelled();
                 finishRunnable.run();
             }
+
+            @Override
+            public void onTransitionConsumed(IBinder transition, boolean aborted)
+                    throws RemoteException {
+                // Notify the remote runner that the transition has been canceled if the transition
+                // was merged into another transition or aborted
+                synchronized (mFinishRunnables) {
+                    mFinishRunnables.remove(transition);
+                }
+                runner.onAnimationCancelled();
+            }
         };
     }
 
@@ -261,7 +281,8 @@ public abstract class RemoteAnimationRunnerCompat extends IRemoteAnimationRunner
             SurfaceControl.Transaction startTransaction
     ) {
         checkArgument(isOpeningMode(launcherChange.getMode()));
-        if (!isClosingType(info.getType())) {
+        if (!isClosingType(info.getType())
+                && !ENABLE_DESKTOP_WINDOWING_EXIT_BY_MINIMIZE_TRANSITION_BUGFIX.isTrue()) {
             return;
         }
         for (int i = info.getChanges().size() - 1; i >= 0; --i) {

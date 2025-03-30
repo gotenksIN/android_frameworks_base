@@ -23,9 +23,38 @@ import android.app.Notification
 import android.app.Notification.FLAG_PROMOTED_ONGOING
 import androidx.annotation.ColorInt
 import com.android.internal.widget.NotificationProgressModel
+import com.android.systemui.Flags
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
+import com.android.systemui.statusbar.notification.row.ImageResult
+import com.android.systemui.statusbar.notification.row.LazyImage
 import com.android.systemui.statusbar.notification.row.shared.ImageModel
+import com.android.systemui.util.Compile
+
+data class PromotedNotificationContentModels(
+    /** The potentially redacted version of the content that will be exposed to the public */
+    val publicVersion: PromotedNotificationContentModel,
+    /** The unredacted version of the content that will be kept private */
+    val privateVersion: PromotedNotificationContentModel,
+) {
+    val key: String
+        get() = privateVersion.identity.key
+
+    init {
+        check(publicVersion.identity.key == privateVersion.identity.key) {
+            "public and private models must have the same key"
+        }
+    }
+
+    fun toRedactedString(): String {
+        val publicVersionString =
+            "==privateVersion".takeIf { privateVersion === publicVersion }
+                ?: publicVersion.toRedactedString()
+        return ("PromotedNotificationContentModels(" +
+            "privateVersion=${privateVersion.toRedactedString()}, " +
+            "publicVersion=$publicVersionString)")
+    }
+}
 
 /**
  * The content needed to render a promoted notification to surfaces besides the notification stack,
@@ -59,8 +88,6 @@ data class PromotedNotificationContentModel(
     val style: Style,
 
     // for CallStyle:
-    val personIcon: ImageModel?,
-    val personName: CharSequence?,
     val verificationIcon: ImageModel?,
     val verificationText: CharSequence?,
 
@@ -85,8 +112,6 @@ data class PromotedNotificationContentModel(
         var colors: Colors = Colors(backgroundColor = 0, primaryTextColor = 0)
 
         // for CallStyle:
-        var personIcon: ImageModel? = null
-        var personName: CharSequence? = null
         var verificationIcon: ImageModel? = null
         var verificationText: CharSequence? = null
 
@@ -111,8 +136,6 @@ data class PromotedNotificationContentModel(
                 oldProgress = oldProgress,
                 colors = colors,
                 style = style,
-                personIcon = personIcon,
-                personName = personName,
                 verificationIcon = verificationIcon,
                 verificationText = verificationText,
                 newProgress = newProgress,
@@ -145,11 +168,59 @@ data class PromotedNotificationContentModel(
     /** The promotion-eligible style of a notification, or [Style.Ineligible] if not. */
     enum class Style {
         Base, // style == null
+        CollapsedBase, // style == null
         BigPicture,
         BigText,
         Call,
+        CollapsedCall,
         Progress,
         Ineligible,
+    }
+
+    fun toRedactedString(): String {
+        return ("PromotedNotificationContentModel(" +
+            "identity=$identity, " +
+            "wasPromotedAutomatically=$wasPromotedAutomatically, " +
+            "smallIcon=${smallIcon?.toRedactedString()}, " +
+            "appName=$appName, " +
+            "subText=${subText?.toRedactedString()}, " +
+            "shortCriticalText=$shortCriticalText, " +
+            "time=$time, " +
+            "lastAudiblyAlertedMs=$lastAudiblyAlertedMs, " +
+            "profileBadgeResId=$profileBadgeResId, " +
+            "title=${title?.toRedactedString()}, " +
+            "text=${text?.toRedactedString()}, " +
+            "skeletonLargeIcon=${skeletonLargeIcon?.toRedactedString()}, " +
+            "oldProgress=$oldProgress, " +
+            "colors=$colors, " +
+            "style=$style, " +
+            "verificationIcon=$verificationIcon, " +
+            "verificationText=$verificationText, " +
+            "newProgress=$newProgress)")
+    }
+
+    private fun CharSequence.toRedactedString(): String = "[$length]"
+
+    private fun ImageModel.toRedactedString(): String {
+        return when (this) {
+            is LazyImage -> this.toRedactedString()
+            else -> this.toString()
+        }
+    }
+
+    private fun LazyImage.toRedactedString(): String {
+        return ("LazyImage(" +
+            "icon=[${icon.javaClass.simpleName}], " +
+            "sizeClass=$sizeClass, " +
+            "transform=$transform, " +
+            "result=${result?.toRedactedString()})")
+    }
+
+    private fun ImageResult.toRedactedString(): String {
+        return when (this) {
+            is ImageResult.Empty -> this.toString()
+            is ImageResult.Image -> "Image(drawable=[${drawable.javaClass.simpleName}])"
+        }
     }
 
     companion object {
@@ -163,6 +234,10 @@ data class PromotedNotificationContentModel(
          */
         @JvmStatic
         fun isPromotedForStatusBarChip(notification: Notification): Boolean {
+            if (Compile.IS_DEBUG && Flags.debugLiveUpdatesPromoteAll()) {
+                return true
+            }
+
             // Notification.isPromotedOngoing checks the ui_rich_ongoing flag, but we want the
             // status bar chip to be ready before all the features behind the ui_rich_ongoing flag
             // are ready.

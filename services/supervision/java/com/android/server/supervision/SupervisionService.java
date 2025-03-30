@@ -17,6 +17,7 @@
 package com.android.server.supervision;
 
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
+import static android.Manifest.permission.MANAGE_ROLE_HOLDERS;
 import static android.Manifest.permission.MANAGE_USERS;
 import static android.Manifest.permission.QUERY_USERS;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
@@ -27,6 +28,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
+import android.app.KeyguardManager;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.supervision.ISupervisionManager;
@@ -147,14 +149,64 @@ public class SupervisionService extends ISupervisionManager.Stub {
     @Override
     @Nullable
     public Intent createConfirmSupervisionCredentialsIntent() {
-        // TODO(b/392961554): (1) Return null if supervision is not enabled.
-        // (2) check if PIN exists before return a valid intent.
         enforceAnyPermission(QUERY_USERS, MANAGE_USERS);
+        if (!isSupervisionEnabledForUser(mContext.getUserId())) {
+            return null;
+        }
+        // Verify the supervising user profile exists and has a secure credential set.
+        final int supervisingUserId = mInjector.getUserManagerInternal().getSupervisingProfileId();
+        final long token = Binder.clearCallingIdentity();
+        try {
+            if (supervisingUserId == UserHandle.USER_NULL
+                    || !mInjector.getKeyguardManager().isDeviceSecure(supervisingUserId)) {
+                return null;
+            }
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
         final Intent intent = new Intent(ACTION_CONFIRM_SUPERVISION_CREDENTIALS);
         // explicitly set the package for security
         intent.setPackage("com.android.settings");
 
         return intent;
+    }
+
+    @Override
+    public boolean shouldAllowBypassingSupervisionRoleQualification() {
+        enforcePermission(MANAGE_ROLE_HOLDERS);
+
+        if (hasNonTestDefaultUsers()) {
+            return false;
+        }
+
+        synchronized (getLockObject()) {
+            for (int i = 0; i < mUserData.size(); i++) {
+                if (mUserData.valueAt(i).supervisionEnabled) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns true if there are any non-default non-test users.
+     *
+     * This excludes the system and main user(s) as those users are created by default.
+     */
+    private boolean hasNonTestDefaultUsers() {
+        List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(true);
+        for (var user : users) {
+            if (!user.isForTesting() && !user.isMain() && !isSystemUser(user)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSystemUser(UserInfo userInfo) {
+        return (userInfo.flags & UserInfo.FLAG_SYSTEM) == UserInfo.FLAG_SYSTEM;
     }
 
     @Override
@@ -277,6 +329,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     static class Injector {
         private final Context mContext;
         private DevicePolicyManagerInternal mDpmInternal;
+        private KeyguardManager mKeyguardManager;
         private PackageManager mPackageManager;
         private UserManagerInternal mUserManagerInternal;
 
@@ -290,6 +343,13 @@ public class SupervisionService extends ISupervisionManager.Stub {
                 mDpmInternal = LocalServices.getService(DevicePolicyManagerInternal.class);
             }
             return mDpmInternal;
+        }
+
+        KeyguardManager getKeyguardManager() {
+            if (mKeyguardManager == null) {
+                mKeyguardManager = mContext.getSystemService(KeyguardManager.class);
+            }
+            return mKeyguardManager;
         }
 
         PackageManager getPackageManager() {

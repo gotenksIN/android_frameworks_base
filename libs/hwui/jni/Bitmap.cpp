@@ -2,6 +2,9 @@
 #include "Bitmap.h"
 
 #include <android-base/unique_fd.h>
+#ifdef __linux__
+#include <com_android_graphics_hwui_flags.h>
+#endif
 #include <hwui/Bitmap.h>
 #include <hwui/Paint.h>
 #include <inttypes.h>
@@ -28,6 +31,9 @@
 #include "SkRefCnt.h"
 #include "SkStream.h"
 #include "SkTypes.h"
+#ifdef __linux__  // Only Linux support parcel
+#include "android/binder_parcel.h"
+#endif
 #include "android_nio_utils.h"
 
 #define DEBUG_PARCEL 0
@@ -841,6 +847,25 @@ static jobject Bitmap_createFromParcel(JNIEnv* env, jobject, jobject parcel) {
 #endif
 }
 
+#ifdef __linux__  // Only Linux support parcel
+// Returns whether this bitmap should be written to the parcel as mutable.
+static bool shouldParcelAsMutable(SkBitmap& bitmap, AParcel* parcel) {
+    // If the bitmap is immutable, then parcel as immutable.
+    if (bitmap.isImmutable()) {
+        return false;
+    }
+
+    if (!com::android::graphics::hwui::flags::bitmap_parcel_ashmem_as_immutable()) {
+        return true;
+    }
+
+    // If we're going to copy the bitmap to ashmem and write that to the parcel,
+    // then parcel as immutable, since we won't be mutating the bitmap after
+    // writing it to the parcel.
+    return !shouldUseAshmem(parcel, bitmap.computeByteSize());
+}
+#endif
+
 static jboolean Bitmap_writeToParcel(JNIEnv* env, jobject, jlong bitmapHandle, jint density,
                                      jobject parcel) {
 #ifdef __linux__ // Only Linux support parcel
@@ -855,7 +880,7 @@ static jboolean Bitmap_writeToParcel(JNIEnv* env, jobject, jlong bitmapHandle, j
     auto bitmapWrapper = reinterpret_cast<BitmapWrapper*>(bitmapHandle);
     bitmapWrapper->getSkBitmap(&bitmap);
 
-    p.writeInt32(!bitmap.isImmutable());
+    p.writeInt32(shouldParcelAsMutable(bitmap, p.get()));
     p.writeInt32(bitmap.colorType());
     p.writeInt32(bitmap.alphaType());
     SkColorSpace* colorSpace = bitmap.colorSpace();

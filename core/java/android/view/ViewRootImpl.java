@@ -37,8 +37,8 @@ import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH_HINT;
 import static android.view.Surface.FRAME_RATE_CATEGORY_LOW;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NORMAL;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NO_PREFERENCE;
-import static android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
 import static android.view.Surface.FRAME_RATE_COMPATIBILITY_AT_LEAST;
+import static android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
 import static android.view.View.FRAME_RATE_CATEGORY_REASON_BOOST;
 import static android.view.View.FRAME_RATE_CATEGORY_REASON_CONFLICTED;
 import static android.view.View.FRAME_RATE_CATEGORY_REASON_INTERMITTENT;
@@ -138,6 +138,7 @@ import static com.android.window.flags.Flags.enableWindowContextResourcesUpdateO
 import static com.android.window.flags.Flags.predictiveBackSwipeEdgeNoneApi;
 import static com.android.window.flags.Flags.reduceChangedExclusionRectsMsgs;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
+import static com.android.window.flags.Flags.fixViewRootCallTrace;
 
 import android.Manifest;
 import android.accessibilityservice.AccessibilityService;
@@ -189,6 +190,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.RenderNode;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.SyncFence;
@@ -295,6 +297,7 @@ import com.android.internal.os.SomeArgs;
 import com.android.internal.policy.DecorView;
 import com.android.internal.policy.PhoneFallbackEventHandler;
 import com.android.internal.protolog.ProtoLog;
+import com.android.internal.util.ContrastColorUtil;
 import com.android.internal.util.FastPrintWriter;
 import com.android.internal.view.BaseSurfaceHolder;
 import com.android.internal.view.RootViewSurfaceTaker;
@@ -557,8 +560,6 @@ public final class ViewRootImpl implements ViewParent,
     @UnsupportedAppUsage
     @UiContext
     public final Context mContext;
-
-    private UiModeManager mUiModeManager;
 
     @UnsupportedAppUsage
     final IWindowSession mWindowSession;
@@ -1597,7 +1598,9 @@ public final class ViewRootImpl implements ViewParent,
                     mAttachInfo.mPanelParentWindowToken
                             = panelParentView.getApplicationWindowToken();
                 }
-                mAdded = true;
+                if (!fixViewRootCallTrace()) {
+                    mAdded = true;
+                }
                 int res; /* = WindowManagerImpl.ADD_OKAY; */
 
                 // Schedule the first layout -before- adding to the window
@@ -1648,7 +1651,9 @@ public final class ViewRootImpl implements ViewParent,
                     mTmpFrames.compatScale = compatScale[0];
                     mInvCompatScale = 1f / compatScale[0];
                 } catch (RemoteException | RuntimeException e) {
-                    mAdded = false;
+                    if (!fixViewRootCallTrace()) {
+                        mAdded = false;
+                    }
                     mView = null;
                     mAttachInfo.mRootView = null;
                     mFallbackEventHandler.setView(null);
@@ -1679,7 +1684,9 @@ public final class ViewRootImpl implements ViewParent,
                 if (DEBUG_LAYOUT) Log.v(mTag, "Added window " + mWindow);
                 if (res < WindowManagerGlobal.ADD_OKAY) {
                     mAttachInfo.mRootView = null;
-                    mAdded = false;
+                    if (!fixViewRootCallTrace()) {
+                        mAdded = false;
+                    }
                     mFallbackEventHandler.setView(null);
                     unscheduleTraversals();
                     setAccessibilityFocus(null, null);
@@ -1788,6 +1795,9 @@ public final class ViewRootImpl implements ViewParent,
                 mFirstInputStage = nativePreImeStage;
                 mFirstPostImeInputStage = earlyPostImeStage;
                 mPendingInputEventQueueLengthCounterName = "aq:pending:" + counterSuffix;
+                if (fixViewRootCallTrace()) {
+                    mAdded = true;
+                }
 
                 if (!mRemoved || !mAppVisible) {
                     AnimationHandler.requestAnimatorsEnabled(mAppVisible, this);
@@ -2086,14 +2096,22 @@ public final class ViewRootImpl implements ViewParent,
                 // We also ignore dark theme, since the app developer can override the user's
                 // preference for dark mode in configuration.uiMode. Instead, we assume that both
                 // force invert and the system's dark theme are enabled.
-                if (getUiModeManager().getForceInvertState() ==
-                        UiModeManager.FORCE_INVERT_TYPE_DARK) {
-                    final boolean isLightTheme =
-                        a.getBoolean(R.styleable.Theme_isLightTheme, false);
-                    // TODO: b/372558459 - Also check the background ColorDrawable color lightness
+                if (shouldApplyForceInvertDark()) {
                     // TODO: b/368725782 - Use hwui color area detection instead of / in
                     //  addition to these heuristics.
-                    if (isLightTheme) {
+                    final boolean isLightTheme =
+                            a.getBoolean(R.styleable.Theme_isLightTheme, false);
+                    final boolean isBackgroundColorLight;
+                    if (mView != null && mView.getBackground()
+                            instanceof ColorDrawable colorDrawable) {
+                        isBackgroundColorLight =
+                                !ContrastColorUtil.isColorDarkLab(colorDrawable.getColor());
+                    } else {
+                        // Treat unknown as light, so that only isLightTheme is used to determine
+                        // force dark treatment.
+                        isBackgroundColorLight = true;
+                    }
+                    if (isLightTheme && isBackgroundColorLight) {
                         return ForceDarkType.FORCE_INVERT_COLOR_DARK;
                     } else {
                         return ForceDarkType.NONE;
@@ -2113,6 +2131,14 @@ public final class ViewRootImpl implements ViewParent,
         } finally {
             a.recycle();
         }
+    }
+
+    private boolean shouldApplyForceInvertDark() {
+        final UiModeManager uiModeManager = mContext.getSystemService(UiModeManager.class);
+        if (uiModeManager == null) {
+            return false;
+        }
+        return uiModeManager.getForceInvertState() == UiModeManager.FORCE_INVERT_TYPE_DARK;
     }
 
     private void updateForceDarkMode() {
@@ -2557,9 +2583,11 @@ public final class ViewRootImpl implements ViewParent,
 
     /**
      * Notify the when the animating insets types have changed.
+     *
+     * @hide
      */
-    @VisibleForTesting
-    public void updateAnimatingTypes(@InsetsType int animatingTypes) {
+    public void updateAnimatingTypes(@InsetsType int animatingTypes,
+            @Nullable ImeTracker.Token statsToken) {
         if (sToolkitSetFrameRateReadOnlyFlagValue) {
             boolean running = animatingTypes != 0;
             if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
@@ -2569,7 +2597,7 @@ public final class ViewRootImpl implements ViewParent,
             }
             mInsetsAnimationRunning = running;
             try {
-                mWindowSession.updateAnimatingTypes(mWindow, animatingTypes);
+                mWindowSession.updateAnimatingTypes(mWindow, animatingTypes, statsToken);
             } catch (RemoteException e) {
             }
         }
@@ -2683,7 +2711,8 @@ public final class ViewRootImpl implements ViewParent,
             mStopped = stopped;
             final ThreadedRenderer renderer = mAttachInfo.mThreadedRenderer;
             if (renderer != null) {
-                if (DEBUG_DRAW) Log.d(mTag, "WindowStopped on " + getTitle() + " set to " + mStopped);
+                if (DEBUG_DRAW)
+                    Log.d(mTag, "WindowStopped on " + getTitle() + " set to " + mStopped);
                 renderer.setStopped(mStopped);
             }
             if (!mStopped) {
@@ -9431,13 +9460,6 @@ public final class ViewRootImpl implements ViewParent,
         return mAudioManager;
     }
 
-    private UiModeManager getUiModeManager() {
-        if (mUiModeManager == null) {
-            mUiModeManager = mContext.getSystemService(UiModeManager.class);
-        }
-        return mUiModeManager;
-    }
-
     private Vibrator getSystemVibrator() {
         if (mVibrator == null) {
             mVibrator = mContext.getSystemService(Vibrator.class);
@@ -10287,6 +10309,8 @@ public final class ViewRootImpl implements ViewParent,
         try {
             mWindowSession.notifyImeWindowVisibilityChangedFromClient(mWindow, visible, statsToken);
         } catch (RemoteException e) {
+            ImeTracker.forLogging().onFailed(statsToken,
+                    ImeTracker.PHASE_CLIENT_NOTIFY_IME_VISIBILITY_CHANGED);
             e.rethrowFromSystemServer();
         }
     }
@@ -11531,12 +11555,24 @@ public final class ViewRootImpl implements ViewParent,
 
         // Search through View-tree
         View rootView = getView();
-        if (rootView != null) {
-            Point point = new Point();
-            Rect rect = new Rect(0, 0, rootView.getWidth(), rootView.getHeight());
-            getChildVisibleRect(rootView, rect, point);
-            rootView.dispatchScrollCaptureSearch(rect, point, results::addTarget);
+        if (rootView == null) {
+            ScrollCaptureResponse.Builder response = new ScrollCaptureResponse.Builder();
+            response.setWindowTitle(getTitle().toString());
+            response.setPackageName(mContext.getPackageName());
+            response.setDescription("The root view was null");
+            try {
+                listener.onScrollCaptureResponse(response.build());
+            } catch (RemoteException e) {
+                Log.e(TAG, "Failed to send scroll capture search result", e);
+            }
+            return;
         }
+
+        Point point = new Point();
+        Rect rect = new Rect(0, 0, rootView.getWidth(), rootView.getHeight());
+        getChildVisibleRect(rootView, rect, point);
+        rootView.dispatchScrollCaptureSearch(rect, point, results::addTarget);
+
         Runnable onComplete = () -> dispatchScrollCaptureSearchResponse(listener, results);
         results.setOnCompleteListener(onComplete);
         if (!results.isComplete()) {
@@ -11560,6 +11596,16 @@ public final class ViewRootImpl implements ViewParent,
         results.dump(pw);
         pw.flush();
         response.addMessage(writer.toString());
+
+        if (mView == null) {
+            response.setDescription("The root view disappeared!");
+            try {
+                listener.onScrollCaptureResponse(response.build());
+            } catch (RemoteException e) {
+                Log.e(TAG, "Failed to send scroll capture search result", e);
+            }
+            return;
+        }
 
         if (selectedTarget == null) {
             response.setDescription("No scrollable targets found in window");
@@ -11587,6 +11633,7 @@ public final class ViewRootImpl implements ViewParent,
         boundsOnScreen.set(0, 0, mView.getWidth(), mView.getHeight());
         boundsOnScreen.offset(mAttachInfo.mTmpLocation[0], mAttachInfo.mTmpLocation[1]);
         response.setWindowBounds(boundsOnScreen);
+        Log.d(TAG, "ScrollCaptureSearchResponse: " + response);
 
         // Create a connection and return it to the caller
         ScrollCaptureConnection connection = new ScrollCaptureConnection(
@@ -13245,7 +13292,7 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
-    private static String categoryToString(int frameRateCategory) {
+    static String categoryToString(int frameRateCategory) {
         String category;
         switch (frameRateCategory) {
             case FRAME_RATE_CATEGORY_NO_PREFERENCE -> category = "no preference";

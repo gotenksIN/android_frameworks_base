@@ -229,7 +229,7 @@ constructor(
             MutableStateFlow(false)
         }
 
-    val blurRadiusPx: Float = blurConfig.maxBlurRadiusPx / 2.0f
+    val blurRadiusPx: Float = blurConfig.maxBlurRadiusPx
 
     init {
         // Initialize our media host for the UMO. This only needs to happen once and must be done
@@ -385,6 +385,11 @@ constructor(
             inAllowedDeviceState
         }
     }
+
+    val swipeFromHubInLandscape: Flow<Boolean> = communalSceneInteractor.willRotateToPortrait
+
+    fun onOrientationChange(orientation: Int) =
+        communalSceneInteractor.setCommunalContainerOrientation(orientation)
 
     companion object {
         const val POPUP_AUTO_HIDE_TIMEOUT_MS = 12000L

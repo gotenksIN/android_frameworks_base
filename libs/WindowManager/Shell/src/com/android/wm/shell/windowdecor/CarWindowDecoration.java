@@ -27,6 +27,7 @@ import android.view.InsetsState;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.view.WindowInsets;
+import android.window.DesktopModeFlags;
 import android.window.WindowContainerTransaction;
 
 import androidx.annotation.NonNull;
@@ -96,9 +97,22 @@ public class CarWindowDecoration extends WindowDecoration<WindowDecorLinearLayou
             // Nothing is set up in this case including the decoration surface.
             return;
         }
+
         if (mRootView != mResult.mRootView) {
             mRootView = mResult.mRootView;
             setupRootView(mResult.mRootView, mClickListener);
+        }
+
+        if (DesktopModeFlags.ENABLE_DESKTOP_APP_HANDLE_ANIMATION.isTrue()) {
+            setCaptionVisibility(mRootView, mRelayoutParams.mIsCaptionVisible);
+        }
+    }
+
+    private void setCaptionVisibility(@NonNull View rootView, boolean visible) {
+        final int v = visible ? View.VISIBLE : View.GONE;
+        final View captionView = rootView.findViewById(getCaptionViewId());
+        if (captionView != null) {
+            captionView.setVisibility(v);
         }
     }
 

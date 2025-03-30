@@ -26,6 +26,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Rect;
+import android.graphics.drawable.Animatable2;
+import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.graphics.drawable.LayerDrawable;
@@ -66,6 +68,8 @@ public final class NotificationProgressBar extends ProgressBar implements
     private static final boolean DEBUG = false;
     private static final float FADED_OPACITY = 0.5f;
 
+    private Animatable2.AnimationCallback mIndeterminateAnimationCallback = null;
+
     private NotificationProgressDrawable mNotificationProgressDrawable;
     private final Rect mProgressDrawableBounds = new Rect();
 
@@ -77,6 +81,13 @@ public final class NotificationProgressBar extends ProgressBar implements
     // List of drawable parts before segment splitting by process.
     @Nullable
     private List<DrawablePart> mProgressDrawableParts = null;
+
+    /** @see R.styleable#NotificationProgressBar_segMinWidth */
+    private final float mSegMinWidth;
+    /** @see R.styleable#NotificationProgressBar_segSegGap */
+    private final float mSegSegGap;
+    /** @see R.styleable#NotificationProgressBar_segPointGap */
+    private final float mSegPointGap;
 
     @Nullable
     private Drawable mTracker = null;
@@ -128,6 +139,10 @@ public final class NotificationProgressBar extends ProgressBar implements
             Log.e(TAG, "Can't get NotificationProgressDrawable", ex);
         }
 
+        mSegMinWidth = a.getDimension(R.styleable.NotificationProgressBar_segMinWidth, 0f);
+        mSegSegGap = a.getDimension(R.styleable.NotificationProgressBar_segSegGap, 0f);
+        mSegPointGap = a.getDimension(R.styleable.NotificationProgressBar_segPointGap, 0f);
+
         // Supports setting the tracker in xml, but ProgressStyle notifications set/override it
         // via {@code #setProgressTrackerIcon}.
         final Drawable tracker = a.getDrawable(R.styleable.NotificationProgressBar_tracker);
@@ -137,6 +152,38 @@ public final class NotificationProgressBar extends ProgressBar implements
         // ensure its aspect ratio is between 2:1 to 1:2.
         mTrackerHeight = a.getDimensionPixelSize(R.styleable.NotificationProgressBar_trackerHeight,
                 0);
+    }
+
+    @Override
+    public void setIndeterminateDrawable(Drawable d) {
+        final Drawable oldDrawable = getIndeterminateDrawable();
+        if (oldDrawable != d) {
+            if (mIndeterminateAnimationCallback != null) {
+                ((AnimatedVectorDrawable) oldDrawable).unregisterAnimationCallback(
+                        mIndeterminateAnimationCallback);
+                mIndeterminateAnimationCallback = null;
+            }
+            if (d instanceof AnimatedVectorDrawable) {
+                mIndeterminateAnimationCallback = new Animatable2.AnimationCallback() {
+                    @Override
+                    public void onAnimationEnd(Drawable drawable) {
+                        super.onAnimationEnd(drawable);
+
+                        if (shouldLoopIndeterminateAnimation()) {
+                            ((AnimatedVectorDrawable) drawable).start();
+                        }
+                    }
+                };
+                ((AnimatedVectorDrawable) d).registerAnimationCallback(
+                        mIndeterminateAnimationCallback);
+            }
+        }
+
+        super.setIndeterminateDrawable(d);
+    }
+
+    private boolean shouldLoopIndeterminateAnimation() {
+        return isIndeterminate() && isAttachedToWindow() && isAggregatedVisible();
     }
 
     /**
@@ -444,30 +491,26 @@ public final class NotificationProgressBar extends ProgressBar implements
             return;
         }
 
-        final float segSegGap = mNotificationProgressDrawable.getSegSegGap();
-        final float segPointGap = mNotificationProgressDrawable.getSegPointGap();
         final float pointRadius = mNotificationProgressDrawable.getPointRadius();
         mProgressDrawableParts = processPartsAndConvertToDrawableParts(
                 mParts,
                 width,
-                segSegGap,
-                segPointGap,
+                mSegSegGap,
+                mSegPointGap,
                 pointRadius,
                 mHasTrackerIcon,
                 mTrackerDrawWidth
         );
 
-        final float segmentMinWidth = mNotificationProgressDrawable.getSegmentMinWidth();
         final float progressFraction = getProgressFraction();
         final boolean isStyledByProgress = mProgressModel.isStyledByProgress();
-        final float progressGap =
-                mHasTrackerIcon ? 0F : mNotificationProgressDrawable.getSegSegGap();
+        final float progressGap = mHasTrackerIcon ? 0F : mSegSegGap;
         Pair<List<DrawablePart>, Float> p = null;
         try {
             p = maybeStretchAndRescaleSegments(
                     mParts,
                     mProgressDrawableParts,
-                    segmentMinWidth,
+                    mSegMinWidth,
                     pointRadius,
                     progressFraction,
                     isStyledByProgress,
@@ -492,11 +535,11 @@ public final class NotificationProgressBar extends ProgressBar implements
                         mProgressModel.getProgress(),
                         getMax(),
                         width,
-                        segSegGap,
-                        segPointGap,
+                        mSegSegGap,
+                        mSegPointGap,
                         pointRadius,
                         mHasTrackerIcon,
-                        segmentMinWidth,
+                        mSegMinWidth,
                         isStyledByProgress,
                         mTrackerDrawWidth);
             } catch (NotEnoughWidthToFitAllPartsException ex) {
@@ -521,11 +564,11 @@ public final class NotificationProgressBar extends ProgressBar implements
                         mProgressModel.getProgress(),
                         getMax(),
                         width,
-                        segSegGap,
-                        segPointGap,
+                        mSegSegGap,
+                        mSegPointGap,
                         pointRadius,
                         mHasTrackerIcon,
-                        segmentMinWidth,
+                        mSegMinWidth,
                         isStyledByProgress,
                         mTrackerDrawWidth);
             } catch (NotEnoughWidthToFitAllPartsException ex) {

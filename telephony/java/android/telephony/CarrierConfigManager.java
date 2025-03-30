@@ -4010,6 +4010,22 @@ public class CarrierConfigManager {
             "5g_icon_display_secondary_grace_period_string";
 
     /**
+     * When an NR advanced connection is lost and a Physical Cell ID (PCI) change occurs within
+     * the primary timer{@link #KEY_5G_ICON_DISPLAY_GRACE_PERIOD_STRING}, delay updating the network
+     * icon.
+     *
+     * <p>This delay is implemented because a rapid PCI change often indicates the device is
+     * switching to a nearby cell tower to quickly restore the NR advanced connection. Displaying
+     * an intermediate network icon (like 4G/LTE) might be misleading if the 5G connection is
+     * restored shortly after. This value sets the delay in seconds; 0 disables the feature.</p>
+     *
+     * @hide
+     */
+    public static final String KEY_NR_ADVANCED_PCI_CHANGE_SECONDARY_TIMER_SECONDS_INT =
+            "nr_advanced_pci_change_secondary_timer_seconds_int";
+
+
+    /**
      * The secondary grace periods in seconds to use if NR advanced icon was shown due to connecting
      * to bands specified in {@link #KEY_ADDITIONAL_NR_ADVANCED_BANDS_INT_ARRAY}.
      *
@@ -11465,6 +11481,7 @@ public class CarrierConfigManager {
                         + "not_restricted_rrc_con:5G");
         sDefaults.putString(KEY_5G_ICON_DISPLAY_GRACE_PERIOD_STRING, "");
         sDefaults.putString(KEY_5G_ICON_DISPLAY_SECONDARY_GRACE_PERIOD_STRING, "");
+        sDefaults.putInt(KEY_NR_ADVANCED_PCI_CHANGE_SECONDARY_TIMER_SECONDS_INT, 0);
         sDefaults.putInt(KEY_NR_ADVANCED_BANDS_SECONDARY_TIMER_SECONDS_INT, 0);
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_IF_NON_ENDC_AND_RRC_IDLE_BOOL, false);
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_ON_VOICE_QOS_BOOL, false);
@@ -11770,17 +11787,17 @@ public class CarrierConfigManager {
                         + "target=GERAN|UTRAN|EUTRAN|NGRAN|IWLAN, type=allowed"});
         PersistableBundle auto_data_switch_rat_signal_score_string_bundle = new PersistableBundle();
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
-                "NR_SA_MMWAVE", new int[]{10000, 13227, 16000, 18488, 20017});
+                "NR_SA_MMWAVE", new int[]{6300, 10227, 16000, 18488, 19017});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
-                "NR_NSA_MMWAVE", new int[]{8000, 10227, 12488, 15017, 15278});
+                "NR_NSA_MMWAVE", new int[]{5700, 9227, 12488, 13517, 15978});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
                 "LTE", new int[]{3731, 5965, 8618, 11179, 13384});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
-                "LTE_CA", new int[]{3831, 6065, 8718, 11379, 13484});
+                "LTE_CA", new int[]{3831, 6065, 8718, 11379, 14484});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
-                "NR_SA", new int[]{5288, 6795, 6955, 7562, 9713});
+                "NR_SA", new int[]{2288, 6795, 6955, 7562, 15484});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
-                "NR_NSA", new int[]{5463, 6827, 8029, 9007, 9428});
+                "NR_NSA", new int[]{2463, 6827, 8029, 9007, 15884});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
                 "UMTS", new int[]{100, 169, 183, 192, 300});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(

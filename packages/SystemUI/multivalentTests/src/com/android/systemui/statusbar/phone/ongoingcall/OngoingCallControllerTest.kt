@@ -30,7 +30,6 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.concurrency.fakeExecutor
 import com.android.systemui.dump.DumpManager
-import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.log.logcatLogBuffer
 import com.android.systemui.res.R
@@ -41,13 +40,14 @@ import com.android.systemui.statusbar.notification.data.model.activeNotification
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationsStore
 import com.android.systemui.statusbar.notification.data.repository.activeNotificationListRepository
 import com.android.systemui.statusbar.notification.domain.interactor.activeNotificationsInteractor
-import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentBuilder
 import com.android.systemui.statusbar.notification.shared.ActiveNotificationModel
 import com.android.systemui.statusbar.notification.shared.CallType
 import com.android.systemui.statusbar.phone.ongoingcall.data.repository.ongoingCallRepository
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallModel
 import com.android.systemui.statusbar.window.StatusBarWindowController
 import com.android.systemui.statusbar.window.StatusBarWindowControllerStore
+import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -70,7 +70,7 @@ import org.mockito.kotlin.whenever
 @TestableLooper.RunWithLooper
 @DisableFlags(StatusBarChipsModernization.FLAG_NAME)
 class OngoingCallControllerTest : SysuiTestCase() {
-    private val kosmos = Kosmos()
+    private val kosmos = testKosmos()
 
     private val mainExecutor = kosmos.fakeExecutor
     private val testScope = kosmos.testScope
@@ -170,7 +170,7 @@ class OngoingCallControllerTest : SysuiTestCase() {
     @Test
     fun interactorHasOngoingCallNotif_repoHasPromotedContent() =
         testScope.runTest {
-            val promotedContent = PromotedNotificationContentModel.Builder("ongoingNotif").build()
+            val promotedContent = PromotedNotificationContentBuilder("ongoingNotif").build()
             setNotifOnRepo(
                 activeNotificationModel(
                     key = "ongoingNotif",

@@ -16,6 +16,7 @@
 
 package com.android.systemui.communal.widgets
 
+import android.appwidget.AppWidgetProviderInfo
 import com.android.systemui.CoreStartable
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.domain.interactor.CommunalSettingsInteractor
@@ -91,7 +92,17 @@ constructor(
             !glanceableHubMultiUserHelper.glanceableHubHsumFlagEnabled ||
                 !glanceableHubMultiUserHelper.isHeadlessSystemUserMode()
         ) {
-            anyOf(communalInteractor.isCommunalAvailable, communalInteractor.editModeOpen)
+            val isAvailable =
+                if (communalSettingsInteractor.isV2FlagEnabled()) {
+                    allOf(
+                        communalInteractor.isCommunalEnabled,
+                        keyguardInteractor.isKeyguardShowing,
+                    )
+                } else {
+                    communalInteractor.isCommunalAvailable
+                }
+
+            anyOf(isAvailable, communalInteractor.editModeOpen)
                 // Only trigger updates on state changes, ignoring the initial false value.
                 .pairwise(false)
                 .filter { (previous, new) -> previous != new }
@@ -101,6 +112,7 @@ constructor(
                     val (_, isActive) = withPrev
                     // The validation is performed once the hub becomes active.
                     if (isActive) {
+                        removeNotLockscreenWidgets(widgets)
                         validateWidgetsAndDeleteOrphaned(widgets)
                     }
                 }
@@ -144,6 +156,20 @@ constructor(
             }
         }
 
+    private fun removeNotLockscreenWidgets(widgets: List<CommunalWidgetContentModel>) {
+        widgets
+            .filter { widget ->
+                when (widget) {
+                    is CommunalWidgetContentModel.Available ->
+                        widget.providerInfo.widgetCategory and
+                            AppWidgetProviderInfo.WIDGET_CATEGORY_NOT_KEYGUARD != 0
+
+                    else -> false
+                }
+            }
+            .onEach { widget -> communalInteractor.deleteWidget(id = widget.appWidgetId) }
+    }
+
     /**
      * Ensure the existence of all associated users for widgets, and remove widgets belonging to
      * users who have been deleted.
@@ -156,6 +182,7 @@ constructor(
                     when (widget) {
                         is CommunalWidgetContentModel.Available ->
                             widget.providerInfo.profile?.identifier
+
                         is CommunalWidgetContentModel.Pending -> widget.user.identifier
                     }
                 !currentUserIds.contains(uid)

@@ -81,6 +81,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.window.ScreenCapture;
 import android.window.ScreenCapture.SynchronousScreenCaptureListener;
+import android.window.TransitionInfo;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
@@ -120,6 +121,7 @@ import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation.UpdateSource;
 import com.android.wm.shell.shared.bubbles.BubbleBarUpdate;
 import com.android.wm.shell.shared.bubbles.BubbleDropTargetBoundsProvider;
+import com.android.wm.shell.shared.bubbles.ContextUtils;
 import com.android.wm.shell.shared.bubbles.DeviceConfig;
 import com.android.wm.shell.shared.draganddrop.DragAndDropConstants;
 import com.android.wm.shell.sysui.ConfigurationChangeListener;
@@ -155,7 +157,7 @@ import java.util.function.IntConsumer;
  */
 public class BubbleController implements ConfigurationChangeListener,
         RemoteCallable<BubbleController>, Bubbles.SysuiProxy.Provider,
-        BubbleBarDragListener {
+        BubbleBarDragListener, BubbleTaskUnfoldTransitionMerger {
 
     private static final String TAG = TAG_WITH_CLASS_NAME ? "BubbleController" : TAG_BUBBLES;
 
@@ -1303,11 +1305,6 @@ public class BubbleController implements ConfigurationChangeListener,
                         mContext.getResources().getDimensionPixelSize(
                                 com.android.internal.R.dimen.importance_ring_stroke_width));
                 mStackView.onDisplaySizeChanged();
-                // TODO b/392893178: Merge the unfold and the task view transition so that we don't
-                //  have to post a delayed runnable to the looper to update the bounds
-                if (mStackView.isExpanded()) {
-                    mStackView.postDelayed(() -> mStackView.updateExpandedView(), 500);
-                }
             }
             if (newConfig.fontScale != mFontScale) {
                 mFontScale = newConfig.fontScale;
@@ -2170,6 +2167,32 @@ public class BubbleController implements ConfigurationChangeListener,
         });
     }
 
+    @Override
+    public boolean mergeTaskWithUnfold(@NonNull ActivityManager.RunningTaskInfo taskInfo,
+            @NonNull TransitionInfo.Change change,
+            @NonNull SurfaceControl.Transaction startT,
+            @NonNull SurfaceControl.Transaction finishT) {
+        if (!mBubbleTransitions.mTaskViewTransitions.isTaskViewTask(taskInfo)) {
+            // if this task isn't managed by bubble transitions just bail.
+            return false;
+        }
+        if (isShowingAsBubbleBar()) {
+            // if bubble bar is enabled, the task view will switch to a new surface on unfold, so we
+            // should not merge the transition.
+            return false;
+        }
+
+        boolean merged = mBubbleTransitions.mTaskViewTransitions.updateBoundsForUnfold(
+                change.getEndAbsBounds(), startT, finishT, change.getTaskInfo(), change.getLeash());
+        if (merged) {
+            BubbleViewProvider selectedBubble = mBubbleData.getSelectedBubble();
+            if (selectedBubble != null && selectedBubble.getExpandedView() != null) {
+                selectedBubble.getExpandedView().onContainerClipUpdate();
+            }
+        }
+        return merged;
+    }
+
     /** When bubbles are floating, this will be used to notify the floating views. */
     private final BubbleViewCallback mBubbleStackViewCallback = new BubbleViewCallback() {
         @Override
@@ -2643,9 +2666,9 @@ public class BubbleController implements ConfigurationChangeListener,
         mBubbleData.setSelectedBubbleAndExpandStack(bubbleToSelect);
     }
 
-    private void moveBubbleToFullscreen(String key) {
+    private void moveDraggedBubbleToFullscreen(String key, Point dropLocation) {
         Bubble b = mBubbleData.getBubbleInStackWithKey(key);
-        mBubbleTransitions.startDraggedBubbleIconToFullscreen(b);
+        mBubbleTransitions.startDraggedBubbleIconToFullscreen(b, dropLocation);
     }
 
     private boolean isDeviceLocked() {
@@ -2936,8 +2959,9 @@ public class BubbleController implements ConfigurationChangeListener,
         }
 
         @Override
-        public void moveBubbleToFullscreen(String key) {
-            mMainExecutor.execute(() -> mController.moveBubbleToFullscreen(key));
+        public void moveDraggedBubbleToFullscreen(String key, Point dropLocation) {
+            mMainExecutor.execute(
+                    () -> mController.moveDraggedBubbleToFullscreen(key, dropLocation));
         }
     }
 

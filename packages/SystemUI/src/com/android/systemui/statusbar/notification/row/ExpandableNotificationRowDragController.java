@@ -109,7 +109,7 @@ public class ExpandableNotificationRowDragController {
 
         StatusBarNotification sn = NotificationBundleUi.isEnabled()
                 ? enr.getEntryAdapter().getSbn()
-                : enr.getEntry().getSbn();
+                : enr.getEntryLegacy().getSbn();
         Notification notification = sn.getNotification();
         final PendingIntent contentIntent = notification.contentIntent != null
                 ? notification.contentIntent
@@ -145,7 +145,11 @@ public class ExpandableNotificationRowDragController {
                 | View.DRAG_FLAG_REQUEST_SURFACE_FOR_RETURN_ANIMATION);
         if (result) {
             // Log notification drag only if it succeeds
-            mNotificationPanelLogger.logNotificationDrag(enr.getEntry());
+            if (NotificationBundleUi.isEnabled()) {
+                mNotificationPanelLogger.logNotificationDrag(enr.getEntryAdapter());
+            } else {
+                mNotificationPanelLogger.logNotificationDrag(enr.getEntryLegacy());
+            }
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
             if (enr.isPinned()) {
                 mHeadsUpManager.releaseAllImmediately();

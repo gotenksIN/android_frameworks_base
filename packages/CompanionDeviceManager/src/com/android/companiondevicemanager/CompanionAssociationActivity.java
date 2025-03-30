@@ -65,6 +65,7 @@ import android.graphics.drawable.Icon;
 import android.net.MacAddress;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.text.Spanned;
@@ -358,11 +359,7 @@ public class CompanionAssociationActivity extends FragmentActivity implements
                 if (CompanionDeviceDiscoveryService.getScanResult().getValue().isEmpty()) {
                     // If the scan times out, do NOT close the activity automatically and let the
                     // user manually cancel the flow.
-                    synchronized (LOCK) {
-                        if (sDiscoveryStarted) {
-                            stopDiscovery();
-                        }
-                    }
+                    stopDiscovery();
                     mTimeoutMessage.setText(getString(R.string.message_discovery_hard_timeout));
                     mTimeoutMessage.setVisibility(View.VISIBLE);
                 }
@@ -454,8 +451,14 @@ public class CompanionAssociationActivity extends FragmentActivity implements
     }
 
     private void stopDiscovery() {
-        if (mRequest != null && !mRequest.isSelfManaged()) {
-            CompanionDeviceDiscoveryService.stop(this);
+        if (mRequest == null || mRequest.isSelfManaged()) {
+            return;
+        }
+
+        synchronized (LOCK) {
+            if (sDiscoveryStarted) {
+                CompanionDeviceDiscoveryService.stop(this);
+            }
         }
     }
 
@@ -621,8 +624,10 @@ public class CompanionAssociationActivity extends FragmentActivity implements
             Slog.w(TAG, "Already selected.");
             return;
         }
-        // Notify the adapter to highlight the selected item.
-        mDeviceAdapter.setSelectedPosition(position);
+        // Delay highlighting the selected item by posting to the main thread.
+        // This helps avoid flicker in the user consent dialog after device selection.
+        new Handler(
+                Looper.getMainLooper()).post(() -> mDeviceAdapter.setSelectedPosition(position));
 
         mSelectedDevice = requireNonNull(selectedDevice);
 
@@ -662,7 +667,8 @@ public class CompanionAssociationActivity extends FragmentActivity implements
         final int summaryResourceId = PROFILE_SUMMARIES.get(deviceProfile);
         final String remoteDeviceName = mSelectedDevice.getDisplayName();
         final Spanned title = getHtmlFromResources(
-                this, PROFILE_TITLES.get(deviceProfile), mAppLabel, remoteDeviceName);
+                this, PROFILE_TITLES.get(deviceProfile), mAppLabel, remoteDeviceName,
+                getString(R.string.device_type));
         final Spanned summary;
 
         if (deviceProfile == null && mRequest.isSingleDevice()) {
@@ -670,7 +676,8 @@ public class CompanionAssociationActivity extends FragmentActivity implements
             mConstraintList.setVisibility(View.GONE);
         } else {
             summary = getHtmlFromResources(
-                    this, summaryResourceId, getString(R.string.device_type));
+                    this, summaryResourceId, getString(R.string.device_type), mAppLabel,
+                    remoteDeviceName);
             setupPermissionList(deviceProfile);
         }
 

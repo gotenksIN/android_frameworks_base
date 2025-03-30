@@ -40,6 +40,7 @@ import static android.window.ConfigurationHelper.isDifferentDisplay;
 import static android.window.ConfigurationHelper.shouldUpdateResources;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
+import static com.android.internal.annotations.VisibleForTesting.Visibility.PRIVATE;
 import static com.android.internal.os.SafeZipPathValidatorCallback.VALIDATE_ZIP_PATH_FOR_PATH_TRAVERSAL;
 
 import android.annotation.NonNull;
@@ -116,6 +117,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.HardwareRenderer;
 import android.graphics.Typeface;
+import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
 import android.media.MediaFrameworkInitializer;
 import android.media.MediaFrameworkPlatformInitializer;
@@ -866,7 +868,8 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
-    static final class ReceiverData extends BroadcastReceiver.PendingResult {
+    @VisibleForTesting(visibility = PACKAGE)
+    public static final class ReceiverData extends BroadcastReceiver.PendingResult {
         public ReceiverData(Intent intent, int resultCode, String resultData, Bundle resultExtras,
                 boolean ordered, boolean sticky, boolean assumeDelivered, IBinder token,
                 int sendingUser, int sendingUid, String sendingPackage) {
@@ -874,6 +877,11 @@ public final class ActivityThread extends ClientTransactionHandler
                     assumeDelivered, token, sendingUser, intent.getFlags(), sendingUid,
                     sendingPackage);
             this.intent = intent;
+            if (com.android.window.flags.Flags.supportWidgetIntentsOnConnectedDisplay()) {
+                mOptions = ActivityOptions.fromBundle(resultExtras);
+            } else {
+                mOptions = null;
+            }
         }
 
         @UnsupportedAppUsage
@@ -882,12 +890,16 @@ public final class ActivityThread extends ClientTransactionHandler
         ActivityInfo info;
         @UnsupportedAppUsage
         CompatibilityInfo compatInfo;
+        @Nullable
+        final ActivityOptions mOptions;
+
         public String toString() {
             return "ReceiverData{intent=" + intent + " packageName=" +
                     info.packageName + " resultCode=" + getResultCode()
                     + " resultData=" + getResultData() + " resultExtras="
                     + getResultExtras(false) + " sentFromUid="
-                    + getSentFromUid() + " sentFromPackage=" + getSentFromPackage() + "}";
+                    + getSentFromUid() + " sentFromPackage=" + getSentFromPackage()
+                    + " mOptions=" + mOptions + "}";
         }
     }
 
@@ -4017,7 +4029,7 @@ public final class ActivityThread extends ClientTransactionHandler
             return VM_PROCESS_STATE_JANK_PERCEPTIBLE;
         }
 
-        if (Flags.jankPerceptibleNarrow()) {
+        if (Flags.jankPerceptibleNarrow() && !Flags.jankPerceptibleNarrowHoldback()) {
             // Unlike other persistent processes, system server is often on
             // the critical path for application startup. Mark it explicitly
             // as jank perceptible regardless of processState.
@@ -4988,6 +5000,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 final String attributionTag = data.info.attributionTags[0];
                 context = (ContextImpl) context.createAttributionContext(attributionTag);
             }
+            context = (ContextImpl) createDisplayContextIfNeeded(context, data);
             java.lang.ClassLoader cl = context.getClassLoader();
             data.intent.setExtrasClassLoader(cl);
             data.intent.prepareToEnterProcess(
@@ -5034,6 +5047,54 @@ public final class ActivityThread extends ClientTransactionHandler
         if (receiver.getPendingResult() != null) {
             data.finish();
         }
+    }
+
+    /**
+     * Creates a display context if the broadcast was initiated with a launch display ID.
+     *
+     * <p>When a broadcast initiates from a widget on a secondary display, the originating
+     * display ID is included as an extra in the intent. This is accomplished by
+     * {@link PendingIntentRecord#createSafeActivityOptionsBundle}, which transfers the launch
+     * display ID from ActivityOptions into the intent's extras bundle. This method checks for
+     * the presence of that extra and creates a display context associated with the initiated
+     * display if it exists. This ensures that when the {@link BroadcastReceiver} invokes
+     * {@link Context#startActivity(Intent)}, the activity is launched on the correct display.
+     *
+     * @param context The original context of the receiver.
+     * @param data    The {@link ReceiverData} containing optional display information.
+     * @return A display context if applicable; otherwise the original context.
+     */
+    @NonNull
+    @VisibleForTesting(visibility = PRIVATE)
+    public Context createDisplayContextIfNeeded(@NonNull Context context,
+            @NonNull ReceiverData data) {
+        if (!com.android.window.flags.Flags.supportWidgetIntentsOnConnectedDisplay()) {
+            return context;
+        }
+
+        final ActivityOptions options = data.mOptions;
+        if (options == null) {
+            return context;
+        }
+
+        final int launchDisplayId = options.getLaunchDisplayId();
+        if (launchDisplayId == INVALID_DISPLAY) {
+            return context;
+        }
+
+        final DisplayManager dm = context.getSystemService(DisplayManager.class);
+        if (dm == null) {
+            return context;
+        }
+
+        final Display display = dm.getDisplay(launchDisplayId);
+        if (display == null) {
+            Slog.w(TAG, "Unable to create a display context for nonexistent display "
+                    + launchDisplayId);
+            return context;
+        }
+
+        return context.createDisplayContext(display);
     }
 
     // Instantiate a BackupAgent and tell it that it's alive
@@ -7901,9 +7962,10 @@ public final class ActivityThread extends ClientTransactionHandler
 
         // Register callback to report native memory metrics post GC cleanup
         // Note: we do not report memory metrics of isolated processes unless
-        // their native allocations become more significant
-        if (!Process.isIsolated() && Flags.reportPostgcMemoryMetrics() &&
-            com.android.libcore.readonly.Flags.postCleanupApis()) {
+        // their native allocations become more significant. Instrumentation is
+        // also excluded because the metrics from test cases are not meaningful.
+        if (!Process.isIsolated() && ii == null && Flags.reportPostgcMemoryMetrics()
+                && com.android.libcore.readonly.Flags.postCleanupApis()) {
             VMRuntime.addPostCleanupCallback(new Runnable() {
                 @Override public void run() {
                     MetricsLoggerWrapper.logPostGcMemorySnapshot();

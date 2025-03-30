@@ -23,7 +23,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.util.Log
 import com.android.systemui.Dumpable
-import com.android.systemui.lowlightclock.dagger.LowLightModule.LIGHT_SENSOR
+import com.android.systemui.lowlightclock.dagger.LowLightModule.Companion.LIGHT_SENSOR
 import com.android.systemui.util.sensors.AsyncSensorManager
 import java.io.PrintWriter
 import java.util.Optional
@@ -122,7 +122,7 @@ constructor(
         }
 
     /** Interface of the ambient light mode callback, which gets triggered when the mode changes. */
-    interface Callback {
+    fun interface Callback {
         fun onChange(@AmbientLightMode mode: Int)
     }
 

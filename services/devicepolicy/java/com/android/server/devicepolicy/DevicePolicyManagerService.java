@@ -276,6 +276,7 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.server.SystemTimeZone.TIME_ZONE_CONFIDENCE_HIGH;
 import static com.android.server.am.ActivityManagerService.STOCK_PM_FLAGS;
 import static com.android.server.devicepolicy.DevicePolicyEngine.DEFAULT_POLICY_SIZE_LIMIT;
+import static com.android.server.devicepolicy.DevicePolicyEngine.SYSTEM_SUPERVISION_ROLE;
 import static com.android.server.devicepolicy.DevicePolicyStatsLog.DEVICE_POLICY_MANAGEMENT_MODE;
 import static com.android.server.devicepolicy.DevicePolicyStatsLog.DEVICE_POLICY_MANAGEMENT_MODE__MANAGEMENT_MODE__COPE;
 import static com.android.server.devicepolicy.DevicePolicyStatsLog.DEVICE_POLICY_MANAGEMENT_MODE__MANAGEMENT_MODE__DEVICE_OWNER;
@@ -9627,32 +9628,30 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 }
             }
 
-            // TODO: with a quick glance this logic seems incomplete that it doesn't properly handle
-            // the different behaviour between a profile with separate challenge vs a profile with
-            // unified challenge, which was part of getActiveAdminsForLockscreenPoliciesLocked()
-            // before the migration.
             if (Flags.setKeyguardDisabledFeaturesCoexistence()) {
-                Integer features = mDevicePolicyEngine.getResolvedPolicy(
-                        PolicyDefinition.KEYGUARD_DISABLED_FEATURES,
-                        affectedUserId);
-
                 return Binder.withCleanCallingIdentity(() -> {
-                    int combinedFeatures = features == null ? 0 : features;
-                    List<UserInfo> profiles = mUserManager.getProfiles(affectedUserId);
-                    for (UserInfo profile : profiles) {
-                        int profileId = profile.id;
-                        if (profileId == affectedUserId) {
+                    if (!parent && isManagedProfile(userHandle)) {
+                        return mDevicePolicyEngine.getResolvedPolicy(
+                                PolicyDefinition.KEYGUARD_DISABLED_FEATURES, userHandle);
+                    }
+
+                    int targetUserId = getProfileParentUserIfRequested(userHandle, parent);
+
+                    int combinedPolicy = DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE;
+                    for (UserInfo profile : mUserManager.getProfiles(targetUserId)) {
+                        if (mLockPatternUtils.isSeparateProfileChallengeEnabled(profile.id)) {
                             continue;
                         }
-                        Integer profileFeatures = mDevicePolicyEngine.getResolvedPolicy(
-                                PolicyDefinition.KEYGUARD_DISABLED_FEATURES,
-                                profileId);
-                        if (profileFeatures != null) {
-                            combinedFeatures |= (profileFeatures
-                                    & PROFILE_KEYGUARD_FEATURES_AFFECT_OWNER);
+
+                        Integer profilePolicy = mDevicePolicyEngine.getResolvedPolicy(
+                                PolicyDefinition.KEYGUARD_DISABLED_FEATURES, profile.id);
+                        profilePolicy = profilePolicy == null ? 0 : profilePolicy;
+                        if (profile.id != userHandle) {
+                            profilePolicy &= PROFILE_KEYGUARD_FEATURES_AFFECT_OWNER;
                         }
+                        combinedPolicy |= profilePolicy;
                     }
-                    return combinedFeatures;
+                    return combinedPolicy;
                 });
             }
 
@@ -16296,6 +16295,13 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         return null;
     }
 
+    /**
+     * When multiple admins enforce a policy, this method returns an admin according to this order:
+     * 1. Supervision
+     * 2. DPC
+     *
+     * Otherwise, it returns any other admin.
+     */
     private android.app.admin.EnforcingAdmin getEnforcingAdminInternal(int userId,
             String identifier) {
         Objects.requireNonNull(identifier);
@@ -16304,16 +16310,22 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (admins.isEmpty()) {
             return null;
         }
-
-        final EnforcingAdmin admin;
         if (admins.size() == 1) {
-            admin = admins.iterator().next();
-        } else {
-            Optional<EnforcingAdmin> dpc = admins.stream()
-                    .filter(a -> a.hasAuthority(EnforcingAdmin.DPC_AUTHORITY)).findFirst();
-            admin = dpc.orElseGet(() -> admins.stream().findFirst().get());
+            return admins.iterator().next().getParcelableAdmin();
         }
-        return admin == null ? null : admin.getParcelableAdmin();
+        Optional<EnforcingAdmin> supervision = admins.stream()
+                .filter(a -> a.hasAuthority(
+                        EnforcingAdmin.getRoleAuthorityOf(SYSTEM_SUPERVISION_ROLE)))
+                .findFirst();
+        if (supervision.isPresent()) {
+            return supervision.get().getParcelableAdmin();
+        }
+        Optional<EnforcingAdmin> dpc = admins.stream()
+                .filter(a -> a.hasAuthority(EnforcingAdmin.DPC_AUTHORITY)).findFirst();
+        if (dpc.isPresent()) {
+            return dpc.get().getParcelableAdmin();
+        }
+        return admins.iterator().next().getParcelableAdmin();
     }
 
     private <V> Set<EnforcingAdmin> getEnforcingAdminsForIdentifier(int userId, String identifier) {
@@ -23891,10 +23903,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 UserHandle.USER_ALL);
 
         synchronized (getLockObject()) {
-            final EnforcingAdmin admin = enforcePermissionAndGetEnforcingAdmin(null,
-                    MANAGE_DEVICE_POLICY_MTE, callerPackageName, caller.getUserId());
-            final Integer policyFromAdmin = mDevicePolicyEngine.getGlobalPolicySetByAdmin(
-                    PolicyDefinition.MEMORY_TAGGING, admin);
+            final Integer policyFromAdmin = mDevicePolicyEngine.getResolvedPolicy(
+                    PolicyDefinition.MEMORY_TAGGING, UserHandle.USER_ALL);
+
             return (policyFromAdmin != null ? policyFromAdmin
                     : DevicePolicyManager.MTE_NOT_CONTROLLED_BY_POLICY);
         }

@@ -215,8 +215,11 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
          * contain all types, which have an ongoing animation.
          *
          * @param animatingTypes the {@link InsetsType}s that are currently animating
+         * @param statsToken the token tracking the current IME request or {@code null} otherwise.
          */
-        default void updateAnimatingTypes(@InsetsType int animatingTypes) {}
+        default void updateAnimatingTypes(@InsetsType int animatingTypes,
+                @Nullable ImeTracker.Token statsToken) {
+        }
 
         /** @see ViewRootImpl#isHandlingPointerEvent */
         default boolean isHandlingPointerEvent() {
@@ -748,7 +751,9 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
                             mFrame, mFromState, mToState, RESIZE_INTERPOLATOR,
                             ANIMATION_DURATION_RESIZE, mTypes, InsetsController.this);
                     if (mRunningAnimations.isEmpty()) {
-                        mHost.updateAnimatingTypes(runner.getTypes());
+                        mHost.updateAnimatingTypes(runner.getTypes(),
+                                runner.getAnimationType() == ANIMATION_TYPE_HIDE
+                                        ? runner.getStatsToken() : null);
                     }
                     mRunningAnimations.add(new RunningAnimation(runner, runner.getAnimationType()));
                     mAnimatingTypes |= runner.getTypes();
@@ -1025,16 +1030,28 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
                 handlePendingControlRequest(statsToken);
             } else {
                 if (showTypes[0] != 0) {
+                    if ((showTypes[0] & ime()) != 0) {
+                        ImeTracker.forLogging().onProgress(statsToken,
+                                ImeTracker.PHASE_CLIENT_ON_CONTROLS_CHANGED);
+                    }
                     applyAnimation(showTypes[0], true /* show */, false /* fromIme */,
                             false /* skipsCallbacks */, statsToken);
                 }
                 if (hideTypes[0] != 0) {
+                    if ((hideTypes[0] & ime()) != 0) {
+                        ImeTracker.forLogging().onProgress(statsToken,
+                                ImeTracker.PHASE_CLIENT_ON_CONTROLS_CHANGED);
+                    }
                     applyAnimation(hideTypes[0], false /* show */, false /* fromIme */,
                             // The animation of hiding transient types shouldn't be detected by the
                             // app. Otherwise, it might be able to react to the callbacks and cause
                             // flickering.
                             (hideTypes[0] & ~transientTypes[0]) == 0 /* skipsCallbacks */,
                             statsToken);
+                }
+                if ((showTypes[0] & ime()) == 0 && (hideTypes[0] & ime()) == 0) {
+                    ImeTracker.forLogging().onCancelled(statsToken,
+                            ImeTracker.PHASE_CLIENT_ON_CONTROLS_CHANGED);
                 }
             }
         } else {
@@ -1421,6 +1438,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
             if (DEBUG) Log.d(TAG, "no types to animate in controlAnimationUnchecked");
             Trace.asyncTraceEnd(TRACE_TAG_VIEW, "IC.showRequestFromApi", 0);
             Trace.asyncTraceEnd(TRACE_TAG_VIEW, "IC.showRequestFromApiToImeReady", 0);
+            ImeTracker.forLogging().onFailed(statsToken, ImeTracker.PHASE_CLIENT_CONTROL_ANIMATION);
             return;
         }
         if (DEBUG) Log.d(TAG, "controlAnimation types: " + types);
@@ -1569,7 +1587,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         }
         ImeTracker.forLogging().onProgress(statsToken, ImeTracker.PHASE_CLIENT_ANIMATION_RUNNING);
         mAnimatingTypes |= runner.getTypes();
-        mHost.updateAnimatingTypes(mAnimatingTypes);
+        mHost.updateAnimatingTypes(mAnimatingTypes, null /* statsToken */);
         mRunningAnimations.add(new RunningAnimation(runner, animationType));
         if (DEBUG) Log.d(TAG, "Animation added to runner. useInsetsAnimationThread: "
                 + useInsetsAnimationThread);
@@ -1729,9 +1747,9 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         mTypesBeingCancelled |= types;
         try {
             for (int i = mRunningAnimations.size() - 1; i >= 0; i--) {
-                InsetsAnimationControlRunner control = mRunningAnimations.get(i).runner;
-                if ((control.getTypes() & types) != 0) {
-                    cancelAnimation(control, true /* invokeCallback */);
+                final InsetsAnimationControlRunner runner = mRunningAnimations.get(i).runner;
+                if ((runner.getTypes() & types) != 0) {
+                    cancelAnimation(runner, true /* invokeCallback */);
                 }
             }
             if ((types & ime()) != 0) {
@@ -1770,15 +1788,15 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
                     ImeTracker.PHASE_CLIENT_ANIMATION_FINISHED_SHOW);
             ImeTracker.forLogging().onShown(statsToken);
         } else {
-            ImeTracker.forLogging().onProgress(statsToken,
-                    ImeTracker.PHASE_CLIENT_ANIMATION_FINISHED_HIDE);
             // The requestedVisibleTypes are only send at the end of the hide animation.
             // Therefore, the requested is not finished at this point.
             if (!Flags.refactorInsetsController()) {
+                ImeTracker.forLogging().onProgress(statsToken,
+                        ImeTracker.PHASE_CLIENT_ANIMATION_FINISHED_HIDE);
                 ImeTracker.forLogging().onHidden(statsToken);
             }
         }
-        reportRequestedVisibleTypes(shown ? null : runner.getStatsToken());
+        reportRequestedVisibleTypes(null /* statsToken */);
     }
 
     @Override
@@ -1789,10 +1807,10 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
     void notifyControlRevoked(InsetsSourceConsumer consumer) {
         final @InsetsType int type = consumer.getType();
         for (int i = mRunningAnimations.size() - 1; i >= 0; i--) {
-            InsetsAnimationControlRunner control = mRunningAnimations.get(i).runner;
-            control.notifyControlRevoked(type);
-            if (control.getControllingTypes() == 0) {
-                cancelAnimation(control, true /* invokeCallback */);
+            final InsetsAnimationControlRunner runner = mRunningAnimations.get(i).runner;
+            runner.notifyControlRevoked(type);
+            if (runner.getControllingTypes() == 0) {
+                cancelAnimation(runner, true /* invokeCallback */);
             }
         }
         if (type == ime()) {
@@ -1805,37 +1823,38 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         }
     }
 
-    private void cancelAnimation(InsetsAnimationControlRunner control, boolean invokeCallback) {
+    private void cancelAnimation(InsetsAnimationControlRunner runner, boolean invokeCallback) {
         if (invokeCallback) {
-            ImeTracker.forLogging().onCancelled(control.getStatsToken(),
+            ImeTracker.forLogging().onCancelled(runner.getStatsToken(),
                     ImeTracker.PHASE_CLIENT_ANIMATION_CANCEL);
-            control.cancel();
+            runner.cancel();
         } else {
             // Succeeds if invokeCallback is false (i.e. when called from notifyFinished).
-            ImeTracker.forLogging().onProgress(control.getStatsToken(),
+            ImeTracker.forLogging().onProgress(runner.getStatsToken(),
                     ImeTracker.PHASE_CLIENT_ANIMATION_CANCEL);
         }
         if (DEBUG) {
             Log.d(TAG, TextUtils.formatSimple(
                     "cancelAnimation of types: %d, animType: %d, host: %s",
-                    control.getTypes(), control.getAnimationType(), mHost.getRootViewTitle()));
+                    runner.getTypes(), runner.getAnimationType(), mHost.getRootViewTitle()));
         }
         @InsetsType int removedTypes = 0;
         for (int i = mRunningAnimations.size() - 1; i >= 0; i--) {
             RunningAnimation runningAnimation = mRunningAnimations.get(i);
-            if (runningAnimation.runner == control) {
+            if (runningAnimation.runner == runner) {
                 mRunningAnimations.remove(i);
-                removedTypes = control.getTypes();
+                removedTypes = runner.getTypes();
                 if (invokeCallback) {
                     dispatchAnimationEnd(runningAnimation.runner.getAnimation());
                 } else {
                     if (Flags.refactorInsetsController()) {
                         if ((removedTypes & ime()) != 0
-                                && control.getAnimationType() == ANIMATION_TYPE_HIDE) {
+                                && runner.getAnimationType() == ANIMATION_TYPE_HIDE) {
                             if (mHost != null) {
                                 // if the (hide) animation is cancelled, the
                                 // requestedVisibleTypes should be reported at this point.
-                                reportRequestedVisibleTypes(control.getStatsToken());
+                                reportRequestedVisibleTypes(!Flags.reportAnimatingInsetsTypes()
+                                        ? runner.getStatsToken() : null);
                                 mHost.getInputMethodManager().removeImeSurface(
                                         mHost.getWindowToken());
                             }
@@ -1847,7 +1866,13 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         }
         if (removedTypes > 0) {
             mAnimatingTypes &= ~removedTypes;
-            mHost.updateAnimatingTypes(mAnimatingTypes);
+            if (mHost != null) {
+                final boolean dispatchStatsToken =
+                        Flags.reportAnimatingInsetsTypes() && (removedTypes & ime()) != 0
+                                && runner.getAnimationType() == ANIMATION_TYPE_HIDE;
+                mHost.updateAnimatingTypes(mAnimatingTypes,
+                        dispatchStatsToken ? runner.getStatsToken() : null);
+            }
         }
 
         onAnimationStateChanged(removedTypes, false /* running */);
@@ -1934,12 +1959,28 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
     @VisibleForTesting(visibility = PACKAGE)
     public @AnimationType int getAnimationType(@InsetsType int type) {
         for (int i = mRunningAnimations.size() - 1; i >= 0; i--) {
-            InsetsAnimationControlRunner control = mRunningAnimations.get(i).runner;
-            if (control.controlsType(type)) {
+            final InsetsAnimationControlRunner runner = mRunningAnimations.get(i).runner;
+            if (runner.controlsType(type)) {
                 return mRunningAnimations.get(i).type;
             }
         }
         return ANIMATION_TYPE_NONE;
+    }
+
+    /**
+     * Returns {@code true} if there is an animation which controls the given {@link InsetsType} and
+     * the runner is still playing the surface animation.
+     *
+     * @see InsetsAnimationControlRunner#willUpdateSurface()
+     */
+    boolean hasSurfaceAnimation(@InsetsType int type) {
+        for (int i = mRunningAnimations.size() - 1; i >= 0; i--) {
+            final InsetsAnimationControlRunner runner = mRunningAnimations.get(i).runner;
+            if (runner.controlsType(type) && runner.willUpdateSurface()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @VisibleForTesting(visibility = PACKAGE)
@@ -2003,14 +2044,19 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
             if (Flags.refactorInsetsController()) {
                 ImeTracker.forLogging().onProgress(statsToken,
                         ImeTracker.PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES);
+                if (Flags.reportAnimatingInsetsTypes() && (typesToReport & ime()) == 0) {
+                    // The IME hide animating flow should not be followed from here, but after
+                    // the hide animation has finished and Host.updateAnimatingTypes is called.
+                    statsToken = null;
+                }
             }
             mReportedRequestedVisibleTypes = mRequestedVisibleTypes;
             mHost.updateRequestedVisibleTypes(mReportedRequestedVisibleTypes, statsToken);
         } else if (Flags.refactorInsetsController()) {
             if ((typesToReport & ime()) != 0 && mImeSourceConsumer != null) {
                 InsetsSourceControl control = mImeSourceConsumer.getControl();
-                if (control != null && control.getLeash() == null) {
-                    // If the IME was requested twice, and we didn't receive the controls
+                if (control == null || control.getLeash() == null) {
+                    // If the IME was requested to show twice, and we didn't receive the controls
                     // yet, this request will not continue. It should be cancelled here, as
                     // it would time out otherwise.
                     ImeTracker.forLogging().onCancelled(statsToken,

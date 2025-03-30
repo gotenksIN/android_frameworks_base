@@ -171,7 +171,9 @@ public class MediaSwitchingController
     private FeatureFlags mFeatureFlags;
     private UserTracker mUserTracker;
     private VolumePanelGlobalStateInteractor mVolumePanelGlobalStateInteractor;
+    @NonNull private MediaOutputColorScheme mMediaOutputColorScheme;
     @NonNull private MediaOutputColorSchemeLegacy mMediaOutputColorSchemeLegacy;
+    private boolean mIsGroupListCollapsed = true;
 
     public enum BroadcastNotifyDialog {
         ACTION_FIRST_LAUNCH,
@@ -229,6 +231,7 @@ public class MediaSwitchingController
         mOutputMediaItemListProxy = new OutputMediaItemListProxy(context);
         mDialogTransitionAnimator = dialogTransitionAnimator;
         mNearbyMediaDevicesManager = nearbyMediaDevicesManager;
+        mMediaOutputColorScheme = MediaOutputColorScheme.fromSystemColors(mContext);
         mMediaOutputColorSchemeLegacy = MediaOutputColorSchemeLegacy.fromSystemColors(mContext);
 
         if (enableInputRouting()) {
@@ -499,7 +502,7 @@ public class MediaSwitchingController
         return getNotificationIcon();
     }
 
-    IconCompat getDeviceIconCompat(MediaDevice device) {
+    Drawable getDeviceIconDrawable(MediaDevice device) {
         Drawable drawable = device.getIcon();
         if (drawable == null) {
             if (DEBUG) {
@@ -509,7 +512,19 @@ public class MediaSwitchingController
             // Use default Bluetooth device icon to handle getIcon() is null case.
             drawable = mContext.getDrawable(com.android.internal.R.drawable.ic_bt_headphones_a2dp);
         }
-        return BluetoothUtils.createIconWithDrawable(drawable);
+        return drawable;
+    }
+
+    IconCompat getDeviceIconCompat(MediaDevice device) {
+        return BluetoothUtils.createIconWithDrawable(getDeviceIconDrawable(device));
+    }
+
+    public void setGroupListCollapsed(boolean isCollapsed) {
+        mIsGroupListCollapsed = isCollapsed;
+    }
+
+    public boolean isGroupListCollapsed() {
+        return mIsGroupListCollapsed;
     }
 
     boolean isActiveItem(MediaDevice device) {
@@ -560,8 +575,14 @@ public class MediaSwitchingController
     void updateCurrentColorScheme(WallpaperColors wallpaperColors, boolean isDarkTheme) {
         ColorScheme currentColorScheme = new ColorScheme(wallpaperColors,
                 isDarkTheme);
+        mMediaOutputColorScheme = MediaOutputColorScheme.fromDynamicColors(
+                currentColorScheme);
         mMediaOutputColorSchemeLegacy = MediaOutputColorSchemeLegacy.fromDynamicColors(
                 currentColorScheme, isDarkTheme);
+    }
+
+    MediaOutputColorScheme getColorScheme() {
+        return mMediaOutputColorScheme;
     }
 
     MediaOutputColorSchemeLegacy getColorSchemeLegacy() {
@@ -580,7 +601,23 @@ public class MediaSwitchingController
         synchronized (mMediaDevicesLock) {
             if (!mLocalMediaManager.isPreferenceRouteListingExist()) {
                 attachRangeInfo(devices);
-                Collections.sort(devices, Comparator.naturalOrder());
+                if (Flags.enableOutputSwitcherDeviceGrouping()) {
+                    List<MediaDevice> selectedDevices = new ArrayList<>();
+                    Set<String> selectedDeviceIds =
+                            getSelectedMediaDevice().stream()
+                                    .map(MediaDevice::getId)
+                                    .collect(Collectors.toSet());
+                    for (MediaDevice device : devices) {
+                        if (selectedDeviceIds.contains(device.getId())) {
+                            selectedDevices.add(device);
+                        }
+                    }
+                    devices.removeAll(selectedDevices);
+                    Collections.sort(devices, Comparator.naturalOrder());
+                    devices.addAll(0, selectedDevices);
+                } else {
+                    Collections.sort(devices, Comparator.naturalOrder());
+                }
             }
             if (Flags.fixOutputMediaItemListIndexOutOfBoundsException()) {
                 // For the first time building list, to make sure the top device is the connected
@@ -593,8 +630,7 @@ public class MediaSwitchingController
                         devices,
                         getSelectedMediaDevice(),
                         connectedMediaDevice,
-                        needToHandleMutingExpectedDevice,
-                        getConnectNewDeviceItem());
+                        needToHandleMutingExpectedDevice);
             } else {
                 List<MediaItem> updatedMediaItems =
                         buildMediaItems(
@@ -685,7 +721,6 @@ public class MediaSwitchingController
                 }
             }
             dividerItems.forEach(finalMediaItems::add);
-            attachConnectNewDeviceItemIfNeeded(finalMediaItems);
             return finalMediaItems;
         }
     }
@@ -749,7 +784,6 @@ public class MediaSwitchingController
                 finalMediaItems.add(MediaItem.createDeviceMediaItem(device));
             }
         }
-        attachConnectNewDeviceItemIfNeeded(finalMediaItems);
         return finalMediaItems;
     }
 
@@ -773,8 +807,14 @@ public class MediaSwitchingController
         }
     }
 
+    @NonNull
+    MediaItem getConnectedSpeakersExpandableGroupDivider() {
+        return MediaItem.createExpandableGroupDividerMediaItem(
+                mContext.getString(R.string.media_output_group_title_connected_speakers));
+    }
+
     @Nullable
-    private MediaItem getConnectNewDeviceItem() {
+    MediaItem getConnectNewDeviceItem() {
         boolean isSelectedDeviceNotAGroup = getSelectedMediaDevice().size() == 1;
         if (enableInputRouting()) {
             // When input routing is enabled, there are expected to be at least 2 total selected
@@ -863,6 +903,15 @@ public class MediaSwitchingController
         });
     }
 
+    private List<MediaItem> getOutputDeviceList(boolean addConnectDeviceButton) {
+        List<MediaItem> mediaItems = new ArrayList<>(
+                mOutputMediaItemListProxy.getOutputMediaItemList());
+        if (addConnectDeviceButton) {
+            attachConnectNewDeviceItemIfNeeded(mediaItems);
+        }
+        return mediaItems;
+    }
+
     private void addInputDevices(List<MediaItem> mediaItems) {
         mediaItems.add(
                 MediaItem.createGroupDividerMediaItem(
@@ -870,22 +919,34 @@ public class MediaSwitchingController
         mediaItems.addAll(mInputMediaItemList);
     }
 
-    private void addOutputDevices(List<MediaItem> mediaItems) {
+    private void addOutputDevices(List<MediaItem> mediaItems, boolean addConnectDeviceButton) {
         mediaItems.add(
                 MediaItem.createGroupDividerMediaItem(
                         mContext.getString(R.string.media_output_group_title)));
-        mediaItems.addAll(mOutputMediaItemListProxy.getOutputMediaItemList());
+        mediaItems.addAll(getOutputDeviceList(addConnectDeviceButton));
     }
 
+    /**
+     * Returns a list of media items to be rendered in the device list. For backward compatibility
+     * reasons, adds a "Connect a device" button by default.
+     */
     public List<MediaItem> getMediaItemList() {
+        return getMediaItemList(true /* addConnectDeviceButton */);
+    }
+
+    /**
+     * Returns a list of media items to be rendered in the device list.
+     * @param addConnectDeviceButton Whether to add a "Connect a device" button to the list.
+     */
+    public List<MediaItem> getMediaItemList(boolean addConnectDeviceButton) {
         // If input routing is not enabled, only return output media items.
         if (!enableInputRouting()) {
-            return mOutputMediaItemListProxy.getOutputMediaItemList();
+            return getOutputDeviceList(addConnectDeviceButton);
         }
 
         // If input routing is enabled, return both output and input media items.
         List<MediaItem> mediaItems = new ArrayList<>();
-        addOutputDevices(mediaItems);
+        addOutputDevices(mediaItems, addConnectDeviceButton);
         addInputDevices(mediaItems);
         return mediaItems;
     }

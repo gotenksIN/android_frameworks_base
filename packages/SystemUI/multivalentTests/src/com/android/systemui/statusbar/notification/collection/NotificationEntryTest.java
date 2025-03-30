@@ -58,6 +58,7 @@ import com.android.systemui.res.R;
 import com.android.systemui.statusbar.RankingBuilder;
 import com.android.systemui.statusbar.SbnBuilder;
 import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips;
+import com.android.systemui.statusbar.notification.collection.UseElapsedRealtimeForCreationTime;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi;
 import com.android.systemui.util.time.FakeSystemClock;
 
@@ -151,7 +152,8 @@ public class NotificationEntryTest extends SysuiTestCase {
                 .build();
 
         NotificationEntry entry =
-                new NotificationEntry(sbn, ranking, mClock.uptimeMillis());
+                new NotificationEntry(sbn, ranking,
+                        UseElapsedRealtimeForCreationTime.getCurrentTime(mClock));
 
         assertFalse(entry.isBlockable());
     }
@@ -251,7 +253,8 @@ public class NotificationEntryTest extends SysuiTestCase {
                 .build();
 
         NotificationEntry entry =
-                new NotificationEntry(sbn, ranking, mClock.uptimeMillis());
+                new NotificationEntry(sbn, ranking,
+                        UseElapsedRealtimeForCreationTime.getCurrentTime(mClock));
 
         assertEquals(systemGeneratedSmartActions, entry.getSmartActions());
         assertEquals(NOTIFICATION_CHANNEL, entry.getChannel());
@@ -306,24 +309,6 @@ public class NotificationEntryTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
-    @DisableFlags(StatusBarNotifChips.FLAG_NAME)
-    public void isPromotedOngoing_uiFlagOnAndNotifHasFlag_true() {
-        mEntry.getSbn().getNotification().flags |= FLAG_PROMOTED_ONGOING;
-
-        assertTrue(mEntry.isPromotedOngoing());
-    }
-
-    @Test
-    @EnableFlags(StatusBarNotifChips.FLAG_NAME)
-    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
-    public void isPromotedOngoing_statusBarNotifChipsFlagOnAndNotifHasFlag_true() {
-        mEntry.getSbn().getNotification().flags |= FLAG_PROMOTED_ONGOING;
-
-        assertTrue(mEntry.isPromotedOngoing());
-    }
-
-    @Test
     public void testIsNotificationVisibilityPrivate_true() {
         assertTrue(mEntry.isNotificationVisibilityPrivate());
     }
@@ -365,7 +350,8 @@ public class NotificationEntryTest extends SysuiTestCase {
                 .setKey(sbn.getKey())
                 .build();
         NotificationEntry entry =
-                new NotificationEntry(sbn, ranking, mClock.uptimeMillis());
+                new NotificationEntry(sbn, ranking,
+                        UseElapsedRealtimeForCreationTime.getCurrentTime(mClock));
 
         assertFalse(entry.isChannelVisibilityPrivate());
     }
@@ -378,7 +364,8 @@ public class NotificationEntryTest extends SysuiTestCase {
                 .setKey(sbn.getKey())
                 .build();
         NotificationEntry entry =
-                new NotificationEntry(sbn, ranking, mClock.uptimeMillis());
+                new NotificationEntry(sbn, ranking,
+                        UseElapsedRealtimeForCreationTime.getCurrentTime(mClock));
 
         assertFalse(entry.isChannelVisibilityPrivate());
     }

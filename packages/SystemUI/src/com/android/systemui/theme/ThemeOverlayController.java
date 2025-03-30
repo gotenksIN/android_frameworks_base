@@ -536,9 +536,12 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
 
             try {
                 JSONObject object = new JSONObject(overlayPackageJson);
-                String seedColorStr = Integer.toHexString(defaultSettings.seedColor.toArgb());
-                object.put(OVERLAY_CATEGORY_SYSTEM_PALETTE, seedColorStr);
-                object.put(OVERLAY_CATEGORY_ACCENT_COLOR, seedColorStr);
+                int seedColor = defaultSettings.seedColor.toArgb();
+                String seedColorStr = String.format("%06X", 0xFFFFFF & seedColor);
+                if (Objects.equals(defaultSettings.colorSource, COLOR_SOURCE_PRESET)) {
+                    object.put(OVERLAY_CATEGORY_SYSTEM_PALETTE, seedColorStr);
+                    object.put(OVERLAY_CATEGORY_ACCENT_COLOR, seedColorStr);
+                }
                 object.put(OVERLAY_COLOR_SOURCE, defaultSettings.colorSource);
                 object.put(OVERLAY_CATEGORY_THEME_STYLE, Style.toString(mThemeStyle));
 
@@ -988,6 +991,7 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
     public void dump(@NonNull PrintWriter pw, @NonNull String[] args) {
         pw.println("mSystemColors=" + mCurrentColors);
         pw.println("mMainWallpaperColor=" + Integer.toHexString(mMainWallpaperColor));
+        pw.println("mContrast=" + mContrast);
         pw.println("mSecondaryOverlay=" + mSecondaryOverlay);
         pw.println("mNeutralOverlay=" + mNeutralOverlay);
         pw.println("mDynamicOverlay=" + mDynamicOverlay);

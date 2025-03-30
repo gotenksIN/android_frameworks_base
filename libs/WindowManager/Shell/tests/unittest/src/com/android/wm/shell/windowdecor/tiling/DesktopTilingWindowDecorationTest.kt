@@ -587,6 +587,31 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
     }
 
     @Test
+    fun tilingDivider_shouldBeShown_whenTiledTasksBecomeVisible() {
+        val task1 = createVisibleTask()
+        val task2 = createVisibleTask()
+        val additionalTaskHelper: DesktopTilingWindowDecoration.AppResizingHelper = mock()
+        whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
+        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(additionalTaskHelper.taskInfo).thenReturn(task2)
+        whenever(additionalTaskHelper.desktopModeWindowDecoration)
+            .thenReturn(desktopWindowDecoration)
+
+        tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
+        tilingDecoration.rightTaskResizingHelper = additionalTaskHelper
+        tilingDecoration.desktopTilingDividerWindowManager = desktopTilingDividerWindowManager
+        val changeInfo = createTransitFrontTransition(task1, task2)
+        tilingDecoration.onTransitionReady(
+            transition = mock(),
+            info = changeInfo,
+            startTransaction = mock(),
+            finishTransaction = mock(),
+        )
+
+        verify(desktopTilingDividerWindowManager, times(1)).showDividerBar()
+    }
+
+    @Test
     fun taskNotTiled_shouldNotBeRemoved_whenNotTiled() {
         val task1 = createVisibleTask()
         val task2 = createVisibleTask()
@@ -653,6 +678,64 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         verify(context, never()).getApplicationContext()
     }
 
+    @Test
+    fun addLeftTiledTask_updatesTaskRepository_whenLeftTileInitializedOrBroken() {
+        val task1 = createVisibleTask()
+        val stableBounds = STABLE_BOUNDS_MOCK
+        whenever(displayController.getDisplayLayout(any())).thenReturn(displayLayout)
+        whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
+            (i.arguments.first() as Rect).set(stableBounds)
+        }
+        whenever(context.resources).thenReturn(resources)
+        whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
+        whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
+        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+
+        tilingDecoration.onAppTiled(
+            task1,
+            desktopWindowDecoration,
+            DesktopTasksController.SnapPosition.LEFT,
+            BOUNDS,
+        )
+
+        verify(desktopRepository, times(1)).addLeftTiledTask(displayId, task1.taskId)
+        verify(desktopRepository, never()).addRightTiledTask(displayId, task1.taskId)
+
+        tilingDecoration.removeTaskIfTiled(task1.taskId)
+
+        verify(desktopRepository, times(1)).removeLeftTiledTask(displayId)
+        verify(desktopRepository, never()).removeRightTiledTask(displayId)
+    }
+
+    @Test
+    fun addRightTiledTask_updatesTaskRepository_whenRightTileInitializedOrBroken() {
+        val task1 = createVisibleTask()
+        val stableBounds = STABLE_BOUNDS_MOCK
+        whenever(displayController.getDisplayLayout(any())).thenReturn(displayLayout)
+        whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
+            (i.arguments.first() as Rect).set(stableBounds)
+        }
+        whenever(context.resources).thenReturn(resources)
+        whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
+        whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
+        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+
+        tilingDecoration.onAppTiled(
+            task1,
+            desktopWindowDecoration,
+            DesktopTasksController.SnapPosition.RIGHT,
+            BOUNDS,
+        )
+
+        verify(desktopRepository, times(1)).addRightTiledTask(displayId, task1.taskId)
+        verify(desktopRepository, never()).addLeftTiledTask(displayId, task1.taskId)
+
+        tilingDecoration.removeTaskIfTiled(task1.taskId)
+
+        verify(desktopRepository, times(1)).removeRightTiledTask(displayId)
+        verify(desktopRepository, never()).removeLeftTiledTask(displayId)
+    }
+
     private fun initTiledTaskHelperMock(taskInfo: ActivityManager.RunningTaskInfo) {
         whenever(tiledTaskHelper.bounds).thenReturn(BOUNDS)
         whenever(tiledTaskHelper.taskInfo).thenReturn(taskInfo)
@@ -699,6 +782,30 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
                     mode = TRANSIT_PIP
                     parent = null
                     taskInfo = task
+                    flags = flags
+                }
+            )
+        }
+
+    private fun createTransitFrontTransition(
+        task1: RunningTaskInfo?,
+        task2: RunningTaskInfo?,
+        type: Int = TRANSIT_TO_FRONT,
+    ) =
+        TransitionInfo(type, /* flags= */ 0).apply {
+            addChange(
+                Change(mock(), mock()).apply {
+                    mode = TRANSIT_TO_FRONT
+                    parent = null
+                    taskInfo = task1
+                    flags = flags
+                }
+            )
+            addChange(
+                Change(mock(), mock()).apply {
+                    mode = TRANSIT_TO_FRONT
+                    parent = null
+                    taskInfo = task2
                     flags = flags
                 }
             )

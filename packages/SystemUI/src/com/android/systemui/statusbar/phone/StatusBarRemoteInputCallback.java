@@ -156,7 +156,8 @@ public class StatusBarRemoteInputCallback implements Callback, Callbacks,
         if (!row.isPinned()) {
             mStatusBarStateController.setLeaveOpenOnKeyguardHide(true);
         }
-        mStatusBarKeyguardViewManager.showBouncer(true /* scrimmed */);
+        mStatusBarKeyguardViewManager.showBouncer(true /* scrimmed */,
+                "StatusBarRemoteInputCallback#onLockedRemoteInput");
         mPendingRemoteInputView = clicked;
     }
 
@@ -219,7 +220,7 @@ public class StatusBarRemoteInputCallback implements Callback, Callbacks,
                     if (NotificationBundleUi.isEnabled()) {
                         mGroupExpansionManager.toggleGroupExpansion(row.getEntryAdapter());
                     } else {
-                        mGroupExpansionManager.toggleGroupExpansion(row.getEntry());
+                        mGroupExpansionManager.toggleGroupExpansion(row.getEntryLegacy());
                     }
                 } else if (!row.isChildInGroup()) {
                     final boolean expandNotification;
@@ -241,7 +242,7 @@ public class StatusBarRemoteInputCallback implements Callback, Callbacks,
                     if (NotificationBundleUi.isEnabled()) {
                         mGroupExpansionManager.toggleGroupExpansion(row.getEntryAdapter());
                     } else {
-                        mGroupExpansionManager.toggleGroupExpansion(row.getEntry());
+                        mGroupExpansionManager.toggleGroupExpansion(row.getEntryLegacy());
                     }
                 }
 

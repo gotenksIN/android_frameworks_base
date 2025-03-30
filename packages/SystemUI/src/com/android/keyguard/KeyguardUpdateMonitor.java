@@ -124,7 +124,6 @@ import com.android.settingslib.Utils;
 import com.android.settingslib.WirelessUtils;
 import com.android.settingslib.fuelgauge.BatteryStatus;
 import com.android.systemui.CoreStartable;
-import com.android.systemui.Dumpable;
 import com.android.systemui.Flags;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.FingerprintInteractiveToAuthProvider;
@@ -304,7 +303,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private final Provider<SceneInteractor> mSceneInteractor;
     private final Provider<AlternateBouncerInteractor> mAlternateBouncerInteractor;
     private final Provider<CommunalSceneInteractor> mCommunalSceneInteractor;
-    private final KeyguardServiceShowLockscreenInteractor mKeyguardServiceShowLockscreenInteractor;
+    private final Provider<KeyguardServiceShowLockscreenInteractor>
+            mKeyguardServiceShowLockscreenInteractor;
     private final AuthController mAuthController;
     private final UiEventLogger mUiEventLogger;
     private final Set<String> mAllowFingerprintOnOccludingActivitiesFromPackage;
@@ -2235,7 +2235,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
             Provider<JavaAdapter> javaAdapter,
             Provider<SceneInteractor> sceneInteractor,
             Provider<CommunalSceneInteractor> communalSceneInteractor,
-            KeyguardServiceShowLockscreenInteractor keyguardServiceShowLockscreenInteractor) {
+            Provider<KeyguardServiceShowLockscreenInteractor>
+                    keyguardServiceShowLockscreenInteractor) {
         mContext = context;
         mSubscriptionManager = subscriptionManager;
         mUserTracker = userTracker;
@@ -2576,7 +2577,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
 
         if (KeyguardWmStateRefactor.isEnabled()) {
             mJavaAdapter.get().alwaysCollectFlow(
-                    mKeyguardServiceShowLockscreenInteractor.getShowNowEvents(),
+                    mKeyguardServiceShowLockscreenInteractor.get().getShowNowEvents(),
                     this::onKeyguardServiceShowLockscreenNowEvents
             );
         }

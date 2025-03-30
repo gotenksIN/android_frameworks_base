@@ -80,8 +80,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_PLACING_SURFACES;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE_SURFACES;
-import static com.android.server.wm.WindowSurfacePlacer.SET_UPDATE_ROTATION;
-import static com.android.server.wm.WindowSurfacePlacer.SET_WALLPAPER_ACTION_PENDING;
 
 import static java.lang.Integer.MAX_VALUE;
 
@@ -670,9 +668,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         final int count = mChildren.size();
         for (int i = 0; i < count; ++i) {
             final int pendingChanges = mChildren.get(i).pendingLayoutChanges;
-            if ((pendingChanges & FINISH_LAYOUT_REDO_WALLPAPER) != 0) {
-                animator.mBulkUpdateParams |= SET_WALLPAPER_ACTION_PENDING;
-            }
             if (pendingChanges != 0) {
                 hasChanges = true;
             }
@@ -873,7 +868,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         // Post these on a handler such that we don't call into power manager service while
         // holding the window manager lock to avoid lock contention with power manager lock.
-        mHandler.obtainMessage(SET_SCREEN_BRIGHTNESS_OVERRIDE, mDisplayBrightnessOverrides)
+        // Send a copy of the brightness overrides as they may be cleared before being sent out.
+        mHandler.obtainMessage(SET_SCREEN_BRIGHTNESS_OVERRIDE, mDisplayBrightnessOverrides.clone())
                 .sendToTarget();
         mHandler.obtainMessage(SET_USER_ACTIVITY_TIMEOUT, mUserActivityTimeout).sendToTarget();
 
@@ -1037,18 +1033,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             }
         }
         return changed;
-    }
-
-    boolean copyAnimToLayoutParams() {
-        boolean doRequest = false;
-
-        final int bulkUpdateParams = mWmService.mAnimator.mBulkUpdateParams;
-        if ((bulkUpdateParams & SET_UPDATE_ROTATION) != 0) {
-            mUpdateRotation = true;
-            doRequest = true;
-        }
-
-        return doRequest;
     }
 
     private final class MyHandler extends Handler {

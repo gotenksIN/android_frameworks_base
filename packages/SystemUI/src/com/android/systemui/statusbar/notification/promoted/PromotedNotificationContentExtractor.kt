@@ -21,6 +21,7 @@ import android.app.Notification.BigPictureStyle
 import android.app.Notification.BigTextStyle
 import android.app.Notification.CallStyle
 import android.app.Notification.EXTRA_BIG_TEXT
+import android.app.Notification.EXTRA_CALL_PERSON
 import android.app.Notification.EXTRA_CHRONOMETER_COUNT_DOWN
 import android.app.Notification.EXTRA_PROGRESS
 import android.app.Notification.EXTRA_PROGRESS_INDETERMINATE
@@ -33,11 +34,14 @@ import android.app.Notification.EXTRA_VERIFICATION_ICON
 import android.app.Notification.EXTRA_VERIFICATION_TEXT
 import android.app.Notification.InboxStyle
 import android.app.Notification.ProgressStyle
+import android.app.Person
 import android.content.Context
 import android.graphics.drawable.Icon
 import com.android.systemui.Flags
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.shade.ShadeDisplayAware
+import com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_NONE
+import com.android.systemui.statusbar.NotificationLockscreenUserManager.RedactionType
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.promoted.AutomaticPromotionCoordinator.Companion.EXTRA_AUTOMATICALLY_EXTRACTED_SHORT_CRITICAL_TEXT
 import com.android.systemui.statusbar.notification.promoted.AutomaticPromotionCoordinator.Companion.EXTRA_WAS_AUTOMATICALLY_PROMOTED
@@ -46,6 +50,7 @@ import com.android.systemui.statusbar.notification.promoted.shared.model.Promote
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel.OldProgress
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel.Style
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel.When
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModels
 import com.android.systemui.statusbar.notification.row.shared.ImageModel
 import com.android.systemui.statusbar.notification.row.shared.ImageModelProvider
 import com.android.systemui.statusbar.notification.row.shared.ImageModelProvider.ImageSizeClass.MediumSquare
@@ -58,8 +63,9 @@ interface PromotedNotificationContentExtractor {
     fun extractContent(
         entry: NotificationEntry,
         recoveredBuilder: Notification.Builder,
+        @RedactionType redactionType: Int,
         imageModelProvider: ImageModelProvider,
-    ): PromotedNotificationContentModel?
+    ): PromotedNotificationContentModels?
 }
 
 @SysUISingleton
@@ -74,8 +80,9 @@ constructor(
     override fun extractContent(
         entry: NotificationEntry,
         recoveredBuilder: Notification.Builder,
+        @RedactionType redactionType: Int,
         imageModelProvider: ImageModelProvider,
-    ): PromotedNotificationContentModel? {
+    ): PromotedNotificationContentModels? {
         if (!PromotedNotificationContentModel.featureFlagEnabled()) {
             logger.logExtractionSkipped(entry, "feature flags disabled")
             return null
@@ -93,7 +100,96 @@ constructor(
             return null
         }
 
-        val contentBuilder = PromotedNotificationContentModel.Builder(entry.key)
+        val privateVersion =
+            extractPrivateContent(
+                key = entry.key,
+                notification = notification,
+                recoveredBuilder = recoveredBuilder,
+                lastAudiblyAlertedMs = entry.lastAudiblyAlertedMs,
+                imageModelProvider = imageModelProvider,
+            )
+        val publicVersion =
+            if (redactionType == REDACTION_TYPE_NONE) {
+                privateVersion
+            } else {
+                notification.publicVersion?.let { publicNotification ->
+                    createAppDefinedPublicVersion(
+                        privateModel = privateVersion,
+                        publicNotification = publicNotification,
+                        imageModelProvider = imageModelProvider,
+                    )
+                } ?: createDefaultPublicVersion(privateModel = privateVersion)
+            }
+        return PromotedNotificationContentModels(
+                privateVersion = privateVersion,
+                publicVersion = publicVersion,
+            )
+            .also { logger.logExtractionSucceeded(entry, it) }
+    }
+
+    private fun copyNonSensitiveFields(
+        privateModel: PromotedNotificationContentModel,
+        publicBuilder: PromotedNotificationContentModel.Builder,
+    ) {
+        publicBuilder.smallIcon = privateModel.smallIcon
+        publicBuilder.iconLevel = privateModel.iconLevel
+        publicBuilder.appName = privateModel.appName
+        publicBuilder.time = privateModel.time
+        publicBuilder.lastAudiblyAlertedMs = privateModel.lastAudiblyAlertedMs
+        publicBuilder.profileBadgeResId = privateModel.profileBadgeResId
+        publicBuilder.colors = privateModel.colors
+    }
+
+    private fun createDefaultPublicVersion(
+        privateModel: PromotedNotificationContentModel
+    ): PromotedNotificationContentModel =
+        PromotedNotificationContentModel.Builder(key = privateModel.identity.key)
+            .also {
+                it.style =
+                    if (privateModel.style == Style.Ineligible) Style.Ineligible else Style.Base
+                copyNonSensitiveFields(privateModel, it)
+            }
+            .build()
+
+    private fun createAppDefinedPublicVersion(
+        privateModel: PromotedNotificationContentModel,
+        publicNotification: Notification,
+        imageModelProvider: ImageModelProvider,
+    ): PromotedNotificationContentModel =
+        PromotedNotificationContentModel.Builder(key = privateModel.identity.key)
+            .also { publicBuilder ->
+                val notificationStyle = publicNotification.notificationStyle
+                publicBuilder.style =
+                    when {
+                        privateModel.style == Style.Ineligible -> Style.Ineligible
+                        notificationStyle == CallStyle::class.java -> Style.CollapsedCall
+                        else -> Style.CollapsedBase
+                    }
+                copyNonSensitiveFields(privateModel = privateModel, publicBuilder = publicBuilder)
+                publicBuilder.shortCriticalText = publicNotification.shortCriticalText()
+                publicBuilder.subText = publicNotification.subText()
+                // The standard public version is extracted as a collapsed notification,
+                //  so avoid using bigTitle or bigText, and instead get the collapsed versions.
+                publicBuilder.title = publicNotification.title(notificationStyle, expanded = false)
+                publicBuilder.text = publicNotification.text()
+                publicBuilder.skeletonLargeIcon =
+                    publicNotification.skeletonLargeIcon(imageModelProvider)
+                // Only CallStyle has styled content that shows in the collapsed version.
+                if (publicBuilder.style == Style.Call) {
+                    extractCallStyleContent(publicNotification, publicBuilder, imageModelProvider)
+                }
+            }
+            .build()
+
+    private fun extractPrivateContent(
+        key: String,
+        notification: Notification,
+        recoveredBuilder: Notification.Builder,
+        lastAudiblyAlertedMs: Long,
+        imageModelProvider: ImageModelProvider,
+    ): PromotedNotificationContentModel {
+
+        val contentBuilder = PromotedNotificationContentModel.Builder(key)
 
         // TODO: Pitch a fit if style is unsupported or mandatory fields are missing once
         // FLAG_PROMOTED_ONGOING is set reliably and we're not testing status bar chips.
@@ -106,14 +202,14 @@ constructor(
         contentBuilder.subText = notification.subText()
         contentBuilder.time = notification.extractWhen()
         contentBuilder.shortCriticalText = notification.shortCriticalText()
-        contentBuilder.lastAudiblyAlertedMs = entry.lastAudiblyAlertedMs
+        contentBuilder.lastAudiblyAlertedMs = lastAudiblyAlertedMs
         contentBuilder.profileBadgeResId = null // TODO
-        contentBuilder.title = notification.resolveTitle(recoveredBuilder.style)
-        contentBuilder.text = notification.resolveText(recoveredBuilder.style)
+        contentBuilder.title = notification.title(recoveredBuilder.style?.javaClass)
+        contentBuilder.text = notification.text(recoveredBuilder.style?.javaClass)
         contentBuilder.skeletonLargeIcon = notification.skeletonLargeIcon(imageModelProvider)
         contentBuilder.oldProgress = notification.oldProgress()
 
-        val colorsFromNotif = recoveredBuilder.getColors(/* header= */ false)
+        val colorsFromNotif = recoveredBuilder.getColors(/* isHeader= */ false)
         contentBuilder.colors =
             PromotedNotificationContentModel.Colors(
                 backgroundColor = colorsFromNotif.backgroundColor,
@@ -122,58 +218,57 @@ constructor(
 
         recoveredBuilder.extractStyleContent(notification, contentBuilder, imageModelProvider)
 
-        return contentBuilder.build().also { logger.logExtractionSucceeded(entry, it) }
+        return contentBuilder.build()
     }
 
     private fun Notification.smallIconModel(imageModelProvider: ImageModelProvider): ImageModel? =
         imageModelProvider.getImageModel(smallIcon, SmallSquare)
 
-    private fun Notification.title(): CharSequence? = extras?.getCharSequence(EXTRA_TITLE)
+    private fun Notification.title(): CharSequence? = getCharSequenceExtraUnlessEmpty(EXTRA_TITLE)
 
-    private fun Notification.bigTitle(): CharSequence? = extras?.getCharSequence(EXTRA_TITLE_BIG)
+    private fun Notification.bigTitle(): CharSequence? =
+        getCharSequenceExtraUnlessEmpty(EXTRA_TITLE_BIG)
 
-    private fun Notification.Style.bigTitleOverridesTitle(): Boolean {
-        return when (this) {
-            is BigTextStyle,
-            is BigPictureStyle,
-            is InboxStyle -> true
-            else -> false
-        }
-    }
+    private fun Notification.callPerson(): Person? =
+        extras?.getParcelable(EXTRA_CALL_PERSON, Person::class.java)
 
-    private fun Notification.resolveTitle(style: Notification.Style?): CharSequence? {
-        return if (style?.bigTitleOverridesTitle() == true) {
-            bigTitle()
-        } else {
-            null
+    private fun Notification.title(
+        styleClass: Class<out Notification.Style>?,
+        expanded: Boolean = true,
+    ): CharSequence? {
+        // bigTitle is only used in the expanded form of 3 styles.
+        return when (styleClass) {
+            BigTextStyle::class.java,
+            BigPictureStyle::class.java,
+            InboxStyle::class.java -> if (expanded) bigTitle() else null
+            CallStyle::class.java -> callPerson()?.name?.takeUnlessEmpty()
+            else -> null
         } ?: title()
     }
 
-    private fun Notification.text(): CharSequence? = extras?.getCharSequence(EXTRA_TEXT)
+    private fun Notification.text(): CharSequence? = getCharSequenceExtraUnlessEmpty(EXTRA_TEXT)
 
-    private fun Notification.bigText(): CharSequence? = extras?.getCharSequence(EXTRA_BIG_TEXT)
+    private fun Notification.bigText(): CharSequence? =
+        getCharSequenceExtraUnlessEmpty(EXTRA_BIG_TEXT)
 
-    private fun Notification.Style.bigTextOverridesText(): Boolean = this is BigTextStyle
-
-    private fun Notification.resolveText(style: Notification.Style?): CharSequence? {
-        return if (style?.bigTextOverridesText() == true) {
-            bigText()
-        } else {
-            null
+    private fun Notification.text(styleClass: Class<out Notification.Style>?): CharSequence? {
+        return when (styleClass) {
+            BigTextStyle::class.java -> bigText()
+            else -> null
         } ?: text()
     }
 
-    private fun Notification.subText(): String? = extras?.getString(EXTRA_SUB_TEXT)
+    private fun Notification.subText(): String? = getStringExtraUnlessEmpty(EXTRA_SUB_TEXT)
 
     private fun Notification.shortCriticalText(): String? {
         if (!android.app.Flags.apiRichOngoing()) {
             return null
         }
-        if (this.shortCriticalText != null) {
-            return this.shortCriticalText
+        if (shortCriticalText != null) {
+            return shortCriticalText
         }
         if (Flags.promoteNotificationsAutomatically()) {
-            return this.extras?.getString(EXTRA_AUTOMATICALLY_EXTRACTED_SHORT_CRITICAL_TEXT)
+            return getStringExtraUnlessEmpty(EXTRA_AUTOMATICALLY_EXTRACTED_SHORT_CRITICAL_TEXT)
         }
         return null
     }
@@ -204,16 +299,18 @@ constructor(
         extras?.getBoolean(EXTRA_PROGRESS_INDETERMINATE)
 
     private fun Notification.extractWhen(): When? {
+        val whenTime = getWhen()
+
         return when {
             showsChronometer() -> {
                 When.Chronometer(
                     elapsedRealtimeMillis =
-                        `when` + systemClock.elapsedRealtime() - systemClock.currentTimeMillis(),
+                        whenTime + systemClock.elapsedRealtime() - systemClock.currentTimeMillis(),
                     isCountDown = chronometerCountDown(),
                 )
             }
 
-            showsTime() -> When.Time(currentTimeMillis = `when`)
+            showsTime() -> When.Time(currentTimeMillis = whenTime)
 
             else -> null
         }
@@ -227,7 +324,7 @@ constructor(
         }
 
     private fun Notification.verificationText(): CharSequence? =
-        extras.getCharSequence(EXTRA_VERIFICATION_TEXT)
+        getCharSequenceExtraUnlessEmpty(EXTRA_VERIFICATION_TEXT)
 
     private fun Notification.Builder.extractStyleContent(
         notification: Notification,
@@ -241,17 +338,15 @@ constructor(
                 null -> Style.Base
 
                 is BigPictureStyle -> {
-                    style.extractContent(contentBuilder)
                     Style.BigPicture
                 }
 
                 is BigTextStyle -> {
-                    style.extractContent(contentBuilder)
                     Style.BigText
                 }
 
                 is CallStyle -> {
-                    style.extractContent(notification, contentBuilder, imageModelProvider)
+                    extractCallStyleContent(notification, contentBuilder, imageModelProvider)
                     Style.Call
                 }
 
@@ -264,25 +359,11 @@ constructor(
             }
     }
 
-    private fun BigPictureStyle.extractContent(
-        contentBuilder: PromotedNotificationContentModel.Builder
-    ) {
-        // Big title is handled in resolveTitle, and big picture is unsupported.
-    }
-
-    private fun BigTextStyle.extractContent(
-        contentBuilder: PromotedNotificationContentModel.Builder
-    ) {
-        // Big title and big text are handled in resolveTitle and resolveText.
-    }
-
-    private fun CallStyle.extractContent(
+    private fun extractCallStyleContent(
         notification: Notification,
         contentBuilder: PromotedNotificationContentModel.Builder,
         imageModelProvider: ImageModelProvider,
     ) {
-        contentBuilder.personIcon = null // TODO
-        contentBuilder.personName = null // TODO
         contentBuilder.verificationIcon = notification.skeletonVerificationIcon(imageModelProvider)
         contentBuilder.verificationText = notification.verificationText()
     }
@@ -294,3 +375,11 @@ constructor(
         contentBuilder.newProgress = createProgressModel(0xffffffff.toInt(), 0xff000000.toInt())
     }
 }
+
+private fun Notification.getCharSequenceExtraUnlessEmpty(key: String): CharSequence? =
+    extras?.getCharSequence(key)?.takeUnlessEmpty()
+
+private fun Notification.getStringExtraUnlessEmpty(key: String): String? =
+    extras?.getString(key)?.takeUnlessEmpty()
+
+private fun <T : CharSequence> T.takeUnlessEmpty(): T? = takeUnless { it.isEmpty() }

@@ -68,7 +68,6 @@ import android.view.WindowManager;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
-import com.android.app.viewcapture.ViewCaptureAwareWindowManager;
 import com.android.internal.logging.UiEventLogger;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.settingslib.wifi.WifiUtils;
@@ -169,7 +168,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
     @Mock
     InternetDetailsContentController.InternetDialogCallback mInternetDialogCallback;
     @Mock
-    private ViewCaptureAwareWindowManager mWindowManager;
+    private WindowManager mWindowManager;
     @Mock
     private ToastFactory mToastFactory;
     @Mock

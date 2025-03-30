@@ -101,6 +101,7 @@ import android.content.pm.LauncherApps;
 import android.content.pm.ShortcutInfo;
 import android.graphics.Rect;
 import android.hardware.devicestate.DeviceStateManager;
+import android.hardware.display.DisplayManager;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Handler;
@@ -278,6 +279,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     // because we will be posting and removing it from the handler.
     private final Runnable mReEnableLaunchAdjacentOnRoot = () -> setLaunchAdjacentDisabled(false);
 
+    private SplitMultiDisplayHelper mSplitMultiDisplayHelper;
+
     /**
      * Since StageCoordinator only coordinates MainStage and SideStage, it shouldn't support
      * CompatUI layouts. CompatUI is handled separately by MainStage and SideStage.
@@ -392,6 +395,11 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mSplitState = splitState;
         mDesktopTasksController = desktopTasksController;
         mRootTDAOrganizer = rootTDAOrganizer;
+
+        DisplayManager displayManager = context.getSystemService(DisplayManager.class);
+
+        mSplitMultiDisplayHelper = new SplitMultiDisplayHelper(
+                Objects.requireNonNull(displayManager));
 
         taskOrganizer.createRootTask(displayId, WINDOWING_MODE_FULLSCREEN, this /* listener */);
 
@@ -3611,9 +3619,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
         finishEnterSplitScreen(finishT);
         addDividerBarToTransition(info, true /* show */);
-        if (Flags.enableFlexibleTwoAppSplit()) {
-            addAllDimLayersToTransition(info, true /* show */);
-        }
+        addAllDimLayersToTransition(info, true /* show */);
         return true;
     }
 
@@ -3864,9 +3870,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
 
         addDividerBarToTransition(info, false /* show */);
-        if (Flags.enableFlexibleTwoAppSplit()) {
-            addAllDimLayersToTransition(info, false /* show */);
-        }
+        addAllDimLayersToTransition(info, false /* show */);
     }
 
     /** Call this when the recents animation canceled during split-screen. */
@@ -3992,8 +3996,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         info.addChange(barChange);
     }
 
-    /** Add dim layers to the transition, so that they can be hidden/shown when animation starts. */
+    /**
+     * Add dim layers to the transition, so that they can be hidden/shown when animation starts.
+     * They're only added if there is at least one offscreen app.
+     */
     private void addAllDimLayersToTransition(@NonNull TransitionInfo info, boolean show) {
+        if (!mSplitState.currentStateSupportsOffscreenApps()) {
+            return;
+        }
+
         if (Flags.enableFlexibleSplit()) {
             List<StageTaskListener> stages = mStageOrderOperator.getActiveStages();
             for (int i = 0; i < stages.size(); i++) {
@@ -4001,7 +4012,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 mSplitState.getCurrentLayout().get(i).roundOut(mTempRect1);
                 addDimLayerToTransition(info, show, stage, mTempRect1);
             }
-        } else {
+        } else if (enableFlexibleTwoAppSplit()) {
             addDimLayerToTransition(info, show, mMainStage, getMainStageBounds());
             addDimLayerToTransition(info, show, mSideStage, getSideStageBounds());
         }

@@ -38,7 +38,6 @@ import com.android.systemui.display.data.repository.DeviceStateRepository.Device
 import com.android.systemui.display.data.repository.fakeDeviceStateRepository
 import com.android.systemui.foldedDeviceStateList
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
-import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setScreenPowerState
@@ -47,11 +46,13 @@ import com.android.systemui.power.shared.model.ScreenPowerState.SCREEN_OFF
 import com.android.systemui.power.shared.model.ScreenPowerState.SCREEN_ON
 import com.android.systemui.shared.system.SysUiStatsLog
 import com.android.systemui.statusbar.policy.FakeConfigurationController
+import com.android.systemui.testKosmos
 import com.android.systemui.unfold.DisplaySwitchLatencyTracker.Companion.COOL_DOWN_DURATION
 import com.android.systemui.unfold.DisplaySwitchLatencyTracker.Companion.FOLDABLE_DEVICE_STATE_CLOSED
 import com.android.systemui.unfold.DisplaySwitchLatencyTracker.Companion.FOLDABLE_DEVICE_STATE_HALF_OPEN
 import com.android.systemui.unfold.DisplaySwitchLatencyTracker.Companion.SCREEN_EVENT_TIMEOUT
 import com.android.systemui.unfold.DisplaySwitchLatencyTracker.DisplaySwitchLatencyEvent
+import com.android.systemui.unfold.data.repository.ScreenTimeoutPolicyRepository
 import com.android.systemui.unfold.data.repository.UnfoldTransitionRepositoryImpl
 import com.android.systemui.unfold.domain.interactor.UnfoldTransitionInteractor
 import com.android.systemui.unfoldedDeviceState
@@ -89,7 +90,7 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
     private lateinit var displaySwitchLatencyTracker: DisplaySwitchLatencyTracker
     @Captor private lateinit var loggerArgumentCaptor: ArgumentCaptor<DisplaySwitchLatencyEvent>
 
-    private val kosmos = Kosmos()
+    private val kosmos = testKosmos()
     private val mockContext = mock<Context>()
     private val resources = mock<Resources>()
     private val foldStateRepository = kosmos.fakeDeviceStateRepository
@@ -97,6 +98,8 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
     private val animationStatusRepository = kosmos.fakeAnimationStatusRepository
     private val keyguardInteractor = mock<KeyguardInteractor>()
     private val displaySwitchLatencyLogger = mock<DisplaySwitchLatencyLogger>()
+    private val screenTimeoutPolicyRepository = mock<ScreenTimeoutPolicyRepository>()
+    private val screenTimeoutActive = MutableStateFlow(true)
     private val latencyTracker = mock<LatencyTracker>()
 
     private val deviceStateManager = kosmos.deviceStateManager
@@ -136,6 +139,7 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
         whenever(resources.getIntArray(R.array.config_foldedDeviceStates))
             .thenReturn(nonEmptyClosedDeviceStatesArray)
         whenever(keyguardInteractor.isAodAvailable).thenReturn(isAodAvailable)
+        whenever(screenTimeoutPolicyRepository.screenTimeoutActive).thenReturn(screenTimeoutActive)
         animationStatusRepository.onAnimationStatusChanged(true)
         powerInteractor.setAwakeForTest()
         powerInteractor.setScreenPowerState(SCREEN_ON)
@@ -144,6 +148,7 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
                 mockContext,
                 foldStateRepository,
                 powerInteractor,
+                screenTimeoutPolicyRepository,
                 unfoldTransitionInteractor,
                 animationStatusRepository,
                 keyguardInteractor,
@@ -196,6 +201,7 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
                     mockContext,
                     foldStateRepository,
                     powerInteractor,
+                    screenTimeoutPolicyRepository,
                     unfoldTransitionInteractorWithEmptyProgressProvider,
                     animationStatusRepository,
                     keyguardInteractor,
@@ -625,6 +631,44 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
         }
     }
 
+    @Test
+    fun displaySwitch_screenTimeoutActive_logsNoScreenWakelocks() {
+        testScope.runTest {
+            startInFoldedState(displaySwitchLatencyTracker)
+            screenTimeoutActive.value = true
+
+            startUnfolding()
+            advanceTimeBy(100.milliseconds)
+            finishUnfolding()
+
+            val event = capturedLogEvent()
+            assertThat(event.screenWakelockStatus)
+                .isEqualTo(
+                    SysUiStatsLog
+                        .DISPLAY_SWITCH_LATENCY_TRACKED__SCREEN_WAKELOCK_STATUS__SCREEN_WAKELOCK_STATUS_NO_WAKELOCKS
+                )
+        }
+    }
+
+    @Test
+    fun displaySwitch_screenTimeoutNotActive_logsHasScreenWakelocks() {
+        testScope.runTest {
+            startInFoldedState(displaySwitchLatencyTracker)
+            screenTimeoutActive.value = false
+
+            startUnfolding()
+            advanceTimeBy(100.milliseconds)
+            finishUnfolding()
+
+            val event = capturedLogEvent()
+            assertThat(event.screenWakelockStatus)
+                .isEqualTo(
+                    SysUiStatsLog
+                        .DISPLAY_SWITCH_LATENCY_TRACKED__SCREEN_WAKELOCK_STATUS__SCREEN_WAKELOCK_STATUS_HAS_SCREEN_WAKELOCKS
+                )
+        }
+    }
+
     private fun capturedLogEvent(): DisplaySwitchLatencyEvent {
         verify(displaySwitchLatencyLogger).log(capture(loggerArgumentCaptor))
         return loggerArgumentCaptor.value
@@ -662,6 +706,9 @@ class DisplaySwitchLatencyTrackerTest : SysuiTestCase() {
             fromFoldableDeviceState = fromFoldableDeviceState,
             toFoldableDeviceState = toFoldableDeviceState,
             toState = toState,
+            screenWakelockStatus =
+                SysUiStatsLog
+                    .DISPLAY_SWITCH_LATENCY_TRACKED__SCREEN_WAKELOCK_STATUS__SCREEN_WAKELOCK_STATUS_NO_WAKELOCKS,
             trackingResult = SysUiStatsLog.DISPLAY_SWITCH_LATENCY_TRACKED__TRACKING_RESULT__SUCCESS,
         )
     }

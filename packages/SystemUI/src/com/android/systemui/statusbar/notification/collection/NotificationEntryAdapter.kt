@@ -17,10 +17,15 @@
 package com.android.systemui.statusbar.notification.collection
 
 import android.content.Context
+import android.os.SystemClock
+import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.android.internal.logging.MetricsLogger
 import com.android.systemui.statusbar.notification.NotificationActivityStarter
 import com.android.systemui.statusbar.notification.collection.coordinator.VisualStabilityCoordinator
+import com.android.systemui.statusbar.notification.collection.notifcollection.NotifLifetimeExtender
+import com.android.systemui.statusbar.notification.collection.provider.HighPriorityProvider
+import com.android.systemui.statusbar.notification.headsup.HeadsUpManager
 import com.android.systemui.statusbar.notification.icon.IconPack
 import com.android.systemui.statusbar.notification.people.PeopleNotificationIdentifier
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
@@ -35,8 +40,13 @@ class NotificationEntryAdapter(
     private val iconStyleProvider: NotificationIconStyleProvider,
     private val visualStabilityCoordinator: VisualStabilityCoordinator,
     private val notificationActionClickManager: NotificationActionClickManager,
+    private val highPriorityProvider: HighPriorityProvider,
+    private val headsUpManager: HeadsUpManager,
     private val entry: NotificationEntry,
 ) : EntryAdapter {
+    override fun getBackingHashCode(): Int {
+        return entry.hashCode()
+    }
 
     override fun getParent(): PipelineEntry? {
         return entry.parent
@@ -110,6 +120,41 @@ class NotificationEntryAdapter(
         return entry.sbn
     }
 
+    override fun getRanking(): NotificationListenerService.Ranking? {
+        return entry.ranking
+    }
+
+    override fun endLifetimeExtension(
+        callback: NotifLifetimeExtender.OnEndLifetimeExtensionCallback?,
+        extender: NotifLifetimeExtender,
+    ) {
+        callback?.onEndLifetimeExtension(extender, entry)
+    }
+
+    override fun onImportanceChanged() {
+        visualStabilityCoordinator.temporarilyAllowSectionChanges(entry, SystemClock.uptimeMillis())
+    }
+
+    override fun markForUserTriggeredMovement() {
+        entry.markForUserTriggeredMovement(true)
+    }
+
+    override fun isMarkedForUserTriggeredMovement(): Boolean {
+        return entry.isMarkedForUserTriggeredMovement
+    }
+
+    override fun isHighPriority(): Boolean {
+        return highPriorityProvider.isHighPriority(entry)
+    }
+
+    override fun setInlineControlsShown(currentlyVisible: Boolean) {
+        headsUpManager.setGutsShown(entry, currentlyVisible)
+    }
+
+    override fun isBlockable(): Boolean {
+        return entry.isBlockable
+    }
+
     override fun canDragAndDrop(): Boolean {
         val canBubble: Boolean = entry.canBubble()
         val notif = entry.sbn.notification
@@ -121,7 +166,7 @@ class NotificationEntryAdapter(
         return false
     }
 
-    override fun isBubbleCapable(): Boolean {
+    override fun isBubble(): Boolean {
         return entry.isBubble
     }
 
@@ -137,8 +182,20 @@ class NotificationEntryAdapter(
         return entry.ranking.isAmbient
     }
 
+    override fun getPeopleNotificationType(): Int {
+        return peopleNotificationIdentifier.getPeopleNotificationType(entry)
+    }
+
+    override fun isPromotedOngoing(): Boolean {
+        return entry.isPromotedOngoing
+    }
+
     override fun isFullScreenCapable(): Boolean {
         return entry.sbn.notification.fullScreenIntent != null
+    }
+
+    override fun onDragSuccess() {
+        notificationActivityStarter.onDragSuccess(entry)
     }
 
     override fun onNotificationBubbleIconClicked() {
@@ -147,5 +204,13 @@ class NotificationEntryAdapter(
 
     override fun onNotificationActionClicked() {
         notificationActionClickManager.onNotificationActionClicked(entry)
+    }
+
+    override fun getDismissState(): NotificationEntry.DismissState {
+        return entry.dismissState
+    }
+
+    override fun onEntryClicked(row: ExpandableNotificationRow) {
+        notificationActivityStarter.onNotificationClicked(entry, row)
     }
 }

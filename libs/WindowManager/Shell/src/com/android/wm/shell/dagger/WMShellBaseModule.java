@@ -95,6 +95,7 @@ import com.android.wm.shell.compatui.impl.DefaultComponentIdGenerator;
 import com.android.wm.shell.desktopmode.DesktopMode;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
+import com.android.wm.shell.desktopmode.common.DefaultHomePackageSupplier;
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
 import com.android.wm.shell.displayareahelper.DisplayAreaHelper;
 import com.android.wm.shell.displayareahelper.DisplayAreaHelperController;
@@ -260,8 +261,14 @@ public abstract class WMShellBaseModule {
 
     @WMSingleton
     @Provides
-    static DesktopModeCompatPolicy provideDesktopModeCompatPolicy(Context context) {
-        return new DesktopModeCompatPolicy(context);
+    static DesktopModeCompatPolicy provideDesktopModeCompatPolicy(
+            Context context,
+            ShellInit shellInit,
+            @ShellMainThread Handler mainHandler) {
+        final DesktopModeCompatPolicy policy = new DesktopModeCompatPolicy(context);
+        policy.setDefaultHomePackageSupplier(new DefaultHomePackageSupplier(
+                context, shellInit, mainHandler));
+        return policy;
     }
 
     @WMSingleton
@@ -755,9 +762,11 @@ public abstract class WMShellBaseModule {
             ShellTaskOrganizer organizer,
             TransactionPool pool,
             DisplayController displayController,
+            DisplayInsetsController displayInsetsController,
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellMainThread Handler mainHandler,
             @ShellAnimationThread ShellExecutor animExecutor,
+            @ShellAnimationThread Handler animHandler,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             HomeTransitionObserver homeTransitionObserver,
             FocusTransitionObserver focusTransitionObserver) {
@@ -766,15 +775,19 @@ public abstract class WMShellBaseModule {
             shellInit = new ShellInit(mainExecutor);
         }
         return new Transitions(context, shellInit, shellCommandHandler, shellController, organizer,
-                pool, displayController, mainExecutor, mainHandler, animExecutor,
-                rootTaskDisplayAreaOrganizer, homeTransitionObserver, focusTransitionObserver);
+                pool, displayController, displayInsetsController, mainExecutor, mainHandler,
+                animExecutor, animHandler, rootTaskDisplayAreaOrganizer, homeTransitionObserver,
+                focusTransitionObserver);
     }
 
     @WMSingleton
     @Provides
     static HomeTransitionObserver provideHomeTransitionObserver(Context context,
-            @ShellMainThread ShellExecutor mainExecutor) {
-        return new HomeTransitionObserver(context, mainExecutor);
+            @ShellMainThread ShellExecutor mainExecutor,
+            DisplayInsetsController displayInsetsController,
+            ShellInit shellInit) {
+        return new HomeTransitionObserver(context, mainExecutor, displayInsetsController,
+                shellInit);
     }
 
     @WMSingleton

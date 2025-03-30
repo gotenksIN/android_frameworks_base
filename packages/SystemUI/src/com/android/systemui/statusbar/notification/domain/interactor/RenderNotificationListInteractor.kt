@@ -20,21 +20,24 @@ import android.app.Notification.CallStyle.CALL_TYPE_ONGOING
 import android.app.Notification.CallStyle.CALL_TYPE_SCREENING
 import android.app.Notification.CallStyle.CALL_TYPE_UNKNOWN
 import android.app.Notification.EXTRA_CALL_TYPE
+import android.app.Notification.FLAG_ONGOING_EVENT
 import android.app.PendingIntent
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.service.notification.StatusBarNotification
 import android.util.ArrayMap
 import com.android.app.tracing.traceSection
+import com.android.internal.logging.InstanceId
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.notification.collection.GroupEntry
-import com.android.systemui.statusbar.notification.collection.PipelineEntry
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
+import com.android.systemui.statusbar.notification.collection.PipelineEntry
 import com.android.systemui.statusbar.notification.collection.provider.SectionStyleProvider
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationListRepository
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationsStore
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModels
 import com.android.systemui.statusbar.notification.shared.ActiveNotificationEntryModel
 import com.android.systemui.statusbar.notification.shared.ActiveNotificationGroupModel
 import com.android.systemui.statusbar.notification.shared.ActiveNotificationModel
@@ -140,7 +143,7 @@ private class ActiveNotificationsStoreBuilder(
     private fun NotificationEntry.toModel(): ActiveNotificationModel {
         val promotedContent =
             if (PromotedNotificationContentModel.featureFlagEnabled()) {
-                promotedNotificationContentModel
+                promotedNotificationContentModels
             } else {
                 null
             }
@@ -149,6 +152,8 @@ private class ActiveNotificationsStoreBuilder(
             key = key,
             groupKey = sbn.groupKey,
             whenTime = sbn.notification.`when`,
+            isForegroundService = sbn.notification.isForegroundService,
+            isOngoingEvent = (sbn.notification.flags and FLAG_ONGOING_EVENT) != 0,
             isAmbient = sectionStyleProvider.isMinimized(this),
             isRowDismissed = isRowDismissed,
             isSilent = sectionStyleProvider.isSilent(this),
@@ -163,7 +168,7 @@ private class ActiveNotificationsStoreBuilder(
             packageName = sbn.packageName,
             appName = sbn.notification.loadHeaderAppName(context),
             contentIntent = sbn.notification.contentIntent,
-            instanceId = sbn.instanceId?.id,
+            instanceId = sbn.instanceId,
             isGroupSummary = sbn.notification.isGroupSummary,
             bucket = bucket,
             callType = sbn.toCallType(),
@@ -176,6 +181,8 @@ private fun ActiveNotificationsStore.createOrReuse(
     key: String,
     groupKey: String?,
     whenTime: Long,
+    isForegroundService: Boolean,
+    isOngoingEvent: Boolean,
     isAmbient: Boolean,
     isRowDismissed: Boolean,
     isSilent: Boolean,
@@ -190,17 +197,19 @@ private fun ActiveNotificationsStore.createOrReuse(
     packageName: String,
     appName: String,
     contentIntent: PendingIntent?,
-    instanceId: Int?,
+    instanceId: InstanceId?,
     isGroupSummary: Boolean,
     bucket: Int,
     callType: CallType,
-    promotedContent: PromotedNotificationContentModel?,
+    promotedContent: PromotedNotificationContentModels?,
 ): ActiveNotificationModel {
     return individuals[key]?.takeIf {
         it.isCurrent(
             key = key,
             groupKey = groupKey,
             whenTime = whenTime,
+            isForegroundService = isForegroundService,
+            isOngoingEvent = isOngoingEvent,
             isAmbient = isAmbient,
             isRowDismissed = isRowDismissed,
             isSilent = isSilent,
@@ -226,6 +235,8 @@ private fun ActiveNotificationsStore.createOrReuse(
             key = key,
             groupKey = groupKey,
             whenTime = whenTime,
+            isForegroundService = isForegroundService,
+            isOngoingEvent = isOngoingEvent,
             isAmbient = isAmbient,
             isRowDismissed = isRowDismissed,
             isSilent = isSilent,
@@ -252,6 +263,8 @@ private fun ActiveNotificationModel.isCurrent(
     key: String,
     groupKey: String?,
     whenTime: Long,
+    isForegroundService: Boolean,
+    isOngoingEvent: Boolean,
     isAmbient: Boolean,
     isRowDismissed: Boolean,
     isSilent: Boolean,
@@ -266,16 +279,18 @@ private fun ActiveNotificationModel.isCurrent(
     packageName: String,
     appName: String,
     contentIntent: PendingIntent?,
-    instanceId: Int?,
+    instanceId: InstanceId?,
     isGroupSummary: Boolean,
     bucket: Int,
     callType: CallType,
-    promotedContent: PromotedNotificationContentModel?,
+    promotedContent: PromotedNotificationContentModels?,
 ): Boolean {
     return when {
         key != this.key -> false
         groupKey != this.groupKey -> false
         whenTime != this.whenTime -> false
+        isForegroundService != this.isForegroundService -> false
+        isOngoingEvent != this.isOngoingEvent -> false
         isAmbient != this.isAmbient -> false
         isRowDismissed != this.isRowDismissed -> false
         isSilent != this.isSilent -> false

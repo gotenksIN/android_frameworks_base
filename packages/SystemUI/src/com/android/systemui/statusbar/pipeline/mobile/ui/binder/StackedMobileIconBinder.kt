@@ -18,28 +18,39 @@ package com.android.systemui.statusbar.pipeline.mobile.ui.binder
 
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.android.systemui.Flags
+import com.android.systemui.kairos.ExperimentalKairosApi
+import com.android.systemui.kairos.KairosNetwork
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModel
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModelImpl
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModelKairos
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.ModernStatusBarViewBinding
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.StackedMobileIcon
 import com.android.systemui.statusbar.pipeline.shared.ui.view.SingleBindableStatusBarComposeIconView
+import com.android.systemui.util.composable.kairos.rememberKairosActivatable
 
 object StackedMobileIconBinder {
+    @OptIn(ExperimentalKairosApi::class)
     fun bind(
         view: SingleBindableStatusBarComposeIconView,
         mobileIconsViewModel: MobileIconsViewModel,
-        viewModelFactory: StackedMobileIconViewModel.Factory,
+        viewModelFactory: StackedMobileIconViewModelImpl.Factory,
+        kairosViewModelFactory: StackedMobileIconViewModelKairos.Factory,
+        kairosNetwork: KairosNetwork,
     ): ModernStatusBarViewBinding {
         return SingleBindableStatusBarComposeIconView.withDefaultBinding(
             view = view,
             shouldBeVisible = { mobileIconsViewModel.isStackable.value },
-        ) { _, tint ->
+        ) { _, tintFlow ->
             view.repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     view.composeView.apply {
@@ -47,12 +58,19 @@ object StackedMobileIconBinder {
                             ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
                         )
                         setContent {
-                            val viewModel =
-                                rememberViewModel("StackedMobileIconBinder") {
-                                    viewModelFactory.create()
+                            val viewModel: StackedMobileIconViewModel =
+                                if (Flags.statusBarMobileIconKairos()) {
+                                    rememberKairosActivatable(kairosNetwork) {
+                                        kairosViewModelFactory.create()
+                                    }
+                                } else {
+                                    rememberViewModel("StackedMobileIconBinder") {
+                                        viewModelFactory.create()
+                                    }
                                 }
+                            val tint by tintFlow.collectAsStateWithLifecycle()
                             if (viewModel.isIconVisible) {
-                                CompositionLocalProvider(LocalContentColor provides Color(tint())) {
+                                CompositionLocalProvider(LocalContentColor provides Color(tint)) {
                                     StackedMobileIcon(viewModel)
                                 }
                             }

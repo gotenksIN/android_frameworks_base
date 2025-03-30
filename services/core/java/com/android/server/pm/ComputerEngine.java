@@ -1994,6 +1994,9 @@ public class ComputerEngine implements Computer {
         if (Process.isSdkSandboxUid(uid)) {
             uid = getBaseSdkSandboxUid();
         }
+        if(isKnownIsolatedComputeApp(uid)) {
+            uid = getIsolatedOwner(uid);
+        }
         final int appId = UserHandle.getAppId(uid);
         return getPackagesForUidInternalBody(callingUid, userId, appId, isCallerInstantApp);
     }
@@ -5481,6 +5484,9 @@ public class ComputerEngine implements Computer {
         // For update or already installed case, leverage the existing visibility rule.
         if (targetAppId != INVALID_UID) {
             final Object targetSetting = mSettings.getSettingBase(targetAppId);
+            if (targetSetting == null) {
+                return false;
+            }
             if (targetSetting instanceof PackageSetting) {
                 return !shouldFilterApplication(
                         (PackageSetting) targetSetting, callingUid, userId);

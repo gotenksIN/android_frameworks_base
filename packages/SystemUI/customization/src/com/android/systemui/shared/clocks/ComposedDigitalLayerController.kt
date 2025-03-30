@@ -22,10 +22,10 @@ import com.android.app.animation.Interpolators
 import com.android.systemui.log.core.Logger
 import com.android.systemui.plugins.clocks.AlarmData
 import com.android.systemui.plugins.clocks.ClockAnimations
+import com.android.systemui.plugins.clocks.ClockAxisStyle
 import com.android.systemui.plugins.clocks.ClockEvents
 import com.android.systemui.plugins.clocks.ClockFaceConfig
 import com.android.systemui.plugins.clocks.ClockFaceEvents
-import com.android.systemui.plugins.clocks.ClockFontAxisSetting
 import com.android.systemui.plugins.clocks.ThemeConfig
 import com.android.systemui.plugins.clocks.WeatherData
 import com.android.systemui.plugins.clocks.ZenData
@@ -111,10 +111,6 @@ class ComposedDigitalLayerController(private val clockCtx: ClockContext) :
 
             override fun onZenDataChanged(data: ZenData) {}
 
-            override fun onFontAxesChanged(axes: List<ClockFontAxisSetting>) {
-                view.updateAxes(axes)
-            }
-
             override var isReactiveTouchInteractionEnabled
                 get() = view.isReactiveTouchInteractionEnabled
                 set(value) {
@@ -151,6 +147,13 @@ class ComposedDigitalLayerController(private val clockCtx: ClockContext) :
 
             override fun onFidgetTap(x: Float, y: Float) {
                 view.animateFidget(x, y)
+            }
+
+            private var hasFontAxes = false
+
+            override fun onFontAxesChanged(style: ClockAxisStyle) {
+                view.updateAxes(style, isAnimated = hasFontAxes)
+                hasFontAxes = true
             }
         }
 

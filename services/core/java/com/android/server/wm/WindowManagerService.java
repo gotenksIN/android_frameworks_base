@@ -67,7 +67,6 @@ import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED;
 import static android.view.WindowManager.LayoutParams.FLAG_SLIPPERY;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL;
-import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_RECEIVE_POWER_KEY_DOUBLE_PRESS;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SPY;
 import static android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE;
@@ -99,7 +98,6 @@ import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ER
 import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.window.WindowProviderService.isWindowProviderService;
 
-import static com.android.hardware.input.Flags.overridePowerKeyBehaviorInFocusedWindow;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ANIM;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_BOOT;
@@ -198,6 +196,8 @@ import android.graphics.Rect;
 import android.graphics.Region;
 import android.hardware.configstore.V1_0.OptionalBool;
 import android.hardware.configstore.V1_1.ISurfaceFlingerConfigs;
+import android.hardware.devicestate.DeviceState;
+import android.hardware.devicestate.DeviceStateManager;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerInternal;
 import android.hardware.input.InputSettings;
@@ -1047,6 +1047,21 @@ public class WindowManagerService extends IWindowManager.Stub
     PowerManager mPowerManager;
     PowerManagerInternal mPowerManagerInternal;
 
+    private DeviceStateManager mDeviceStateManager;
+    private DeviceStateCallback mDeviceStateCallback;
+    private class DeviceStateCallback implements DeviceStateManager.DeviceStateCallback {
+        private DeviceState mCurrentDeviceState;
+        @Override
+        public void onDeviceStateChanged(@NonNull DeviceState state) {
+            mCurrentDeviceState = state;
+        }
+
+        boolean isInRearDisplayOuterDefaultState() {
+            return mCurrentDeviceState != null && mCurrentDeviceState
+                    .hasProperties(DeviceState.PROPERTY_FEATURE_REAR_DISPLAY_OUTER_DEFAULT);
+        }
+    }
+
     private float mWindowAnimationScaleSetting = 1.0f;
     private float mTransitionAnimationScaleSetting = 1.0f;
     private float mAnimatorDurationScaleSetting = 1.0f;
@@ -1332,6 +1347,10 @@ public class WindowManagerService extends IWindowManager.Stub
         mPowerManager = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mPowerManagerInternal = LocalServices.getService(PowerManagerInternal.class);
 
+        mDeviceStateManager = context.getSystemService(DeviceStateManager.class);
+        mDeviceStateCallback = new DeviceStateCallback();
+        mDeviceStateManager.registerCallback(new HandlerExecutor(mH), mDeviceStateCallback);
+
         if (mPowerManagerInternal != null) {
             mPowerManagerInternal.registerLowPowerModeObserver(
                     new PowerManagerInternal.LowPowerModeListener() {
@@ -1443,7 +1462,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mPresentationController = new PresentationController();
 
         mBlurController = new BlurController(mContext, mPowerManager);
-        mTaskFpsCallbackController = new TaskFpsCallbackController(mContext);
+        mTaskFpsCallbackController = new TaskFpsCallbackController();
         mAccessibilityController = new AccessibilityController(this);
         mScreenRecordingCallbackController = new ScreenRecordingCallbackController(this);
         mSystemPerformanceHinter = new SystemPerformanceHinter(mContext, displayId -> {
@@ -1842,9 +1861,12 @@ public class WindowManagerService extends IWindowManager.Stub
             // Only a presentation window needs a transition because its visibility affets the
             // lifecycle of apps below (b/390481865).
             if (enablePresentationForConnectedDisplays() && win.isPresentation()) {
-                Transition transition = null;
+                final boolean wasTransitionOnDisplay =
+                        win.mTransitionController.isCollectingTransitionOnDisplay(displayContent);
+                Transition newlyCreatedTransition = null;
                 if (!win.mTransitionController.isCollecting()) {
-                    transition = win.mTransitionController.createAndStartCollecting(TRANSIT_OPEN);
+                    newlyCreatedTransition =
+                            win.mTransitionController.createAndStartCollecting(TRANSIT_OPEN);
                 }
                 win.mTransitionController.collect(win.mToken);
                 res |= addWindowInner(win, displayPolicy, activity, displayContent, outInsetsState,
@@ -1853,9 +1875,14 @@ public class WindowManagerService extends IWindowManager.Stub
                 // A presentation hides all activities behind on the same display.
                 win.mDisplayContent.ensureActivitiesVisible(/*starting=*/ null,
                         /*notifyClients=*/ true);
-                win.mTransitionController.getCollectingTransition().setReady(win.mToken, true);
-                if (transition != null) {
-                    win.mTransitionController.requestStartTransition(transition, null,
+                if (!wasTransitionOnDisplay && win.mTransitionController
+                        .isCollectingTransitionOnDisplay(displayContent)) {
+                    // Set the display ready only when the display gets added to the collecting
+                    // transition in this operation.
+                    win.mTransitionController.setReady(win.mToken);
+                }
+                if (newlyCreatedTransition != null) {
+                    win.mTransitionController.requestStartTransition(newlyCreatedTransition, null,
                             null /* remoteTransition */, null /* displayChange */);
                 }
             } else {
@@ -2150,7 +2177,6 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         final DisplayContent dc = win.getDisplayContent();
-        dc.getDisplayRotation().markForSeamlessRotation(win, false /* seamlesslyRotated */);
 
         win.resetAppOpsState();
 
@@ -2599,6 +2625,14 @@ public class WindowManagerService extends IWindowManager.Stub
             // We may be deferring layout passes at the moment, but since the client is interested
             // in the new out values right now we need to force a layout.
             mWindowPlacerLocked.performSurfacePlacement(true /* force */);
+
+            if (!win.mHaveFrame && displayContent.mWaitingForConfig) {
+                // We just forcibly triggered the layout, but this could still be intercepted by
+                // mWaitingForConfig. Here, we are forcefully marking a value for mLayoutSeq to
+                // ensure that the resize can occur properly later. Otherwise, the window's frame
+                // will remain empty forever.
+                win.mLayoutSeq = displayContent.mLayoutSeq;
+            }
 
             if (shouldRelayout) {
                 Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "relayoutWindow: viewVisibility_1");
@@ -3155,6 +3189,11 @@ public class WindowManagerService extends IWindowManager.Stub
                     // Reparent the window created for this window context.
                     dc.reParentWindowToken(token);
                     hideUntilNextDraw(token);
+                    // Prevent a race condition where VRI temporarily reverts the context display ID
+                    // before the onDisplayMoved callback arrives. This caused incorrect display IDs
+                    // during configuration changes, breaking SysUI layouts dependent on it.
+                    // Forcing a resize report ensures VRI has the correct ID before the update.
+                    forceReportResizing(token);
                     // This makes sure there is a traversal scheduled that will eventually report
                     // the window resize to the client.
                     dc.setLayoutNeeded();
@@ -3174,6 +3213,14 @@ public class WindowManagerService extends IWindowManager.Stub
         } finally {
             Binder.restoreCallingIdentity(origId);
         }
+    }
+
+    private void forceReportResizing(@NonNull WindowContainer<?> wc) {
+        wc.forAllWindows(w -> {
+            if (!mResizingWindows.contains(w)) {
+                mResizingWindows.add(w);
+            }
+        }, true /* traverseTopToBottom */);
     }
 
     private void hideUntilNextDraw(@NonNull WindowToken token) {
@@ -4784,7 +4831,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @EnforcePermission(android.Manifest.permission.MANAGE_APP_TOKENS)
     @Override
-    public void updateDisplayWindowAnimatingTypes(int displayId, @InsetsType int animatingTypes) {
+    public void updateDisplayWindowAnimatingTypes(int displayId, @InsetsType int animatingTypes,
+            @Nullable ImeTracker.Token statsToken) {
         updateDisplayWindowAnimatingTypes_enforcePermission();
         if (android.view.inputmethod.Flags.reportAnimatingInsetsTypes()) {
             final long origId = Binder.clearCallingIdentity();
@@ -4792,9 +4840,13 @@ public class WindowManagerService extends IWindowManager.Stub
                 synchronized (mGlobalLock) {
                     final DisplayContent dc = mRoot.getDisplayContent(displayId);
                     if (dc == null || dc.mRemoteInsetsControlTarget == null) {
+                        ImeTracker.forLogging().onFailed(statsToken,
+                                ImeTracker.PHASE_WM_UPDATE_DISPLAY_WINDOW_ANIMATING_TYPES);
                         return;
                     }
-                    dc.mRemoteInsetsControlTarget.setAnimatingTypes(animatingTypes);
+                    ImeTracker.forLogging().onProgress(statsToken,
+                            ImeTracker.PHASE_WM_UPDATE_DISPLAY_WINDOW_ANIMATING_TYPES);
+                    dc.mRemoteInsetsControlTarget.setAnimatingTypes(animatingTypes, statsToken);
                 }
             } finally {
                 Binder.restoreCallingIdentity(origId);
@@ -6242,6 +6294,10 @@ public class WindowManagerService extends IWindowManager.Stub
         final long ident = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
+                // Clear forced display density ratio
+                setForcedDisplayDensityRatioInternal(displayId, 0.0f, userId);
+
+                // Clear forced display density
                 final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
                 if (displayContent != null) {
                     displayContent.setForcedDensity(displayContent.getInitialDisplayDensity(),
@@ -6262,6 +6318,37 @@ public class WindowManagerService extends IWindowManager.Stub
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
+    }
+
+    @EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+    @Override
+    public void setForcedDisplayDensityRatio(int displayId, float ratio, int userId) {
+        setForcedDisplayDensityRatio_enforcePermission();
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                setForcedDisplayDensityRatioInternal(displayId, ratio, userId);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
+    private void setForcedDisplayDensityRatioInternal(
+            int displayId, float ratio, int userId) {
+        final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
+        if (displayContent != null) {
+            displayContent.setForcedDensityRatio(ratio, userId);
+            return;
+        }
+
+        final DisplayInfo info = mDisplayManagerInternal.getDisplayInfo(displayId);
+        if (info == null) {
+            ProtoLog.e(WM_ERROR, "Failed to get information about logical display %d. "
+                    + "Skip setting forced display density.", displayId);
+            return;
+        }
+        mDisplayWindowSettings.setForcedDensityRatio(info, ratio);
     }
 
     @EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
@@ -7644,6 +7731,26 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
+    public boolean isEligibleForDesktopMode(int displayId) {
+        if (!checkCallingPermission(INTERNAL_SYSTEM_WINDOW, "isEligibleForDesktopMode()")) {
+            throw new SecurityException("Requires INTERNAL_SYSTEM_WINDOW permission");
+        }
+
+        synchronized (mGlobalLock) {
+            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
+            if (displayContent == null) {
+                ProtoLog.e(WM_ERROR, "Attempted to check isEligibleForDesktopMode() "
+                        + "for a display that does not exist: %d", displayId);
+                return false;
+            }
+            if (!displayContent.isSystemDecorationsSupported()) {
+                return false;
+            }
+            return displayContent.isDefaultDisplay || displayContent.allowContentModeSwitch();
+        }
+    }
+
+    @Override
     public void setShouldShowSystemDecors(int displayId, boolean shouldShow) {
         if (!checkCallingPermission(INTERNAL_SYSTEM_WINDOW, "setShouldShowSystemDecors()")) {
             throw new SecurityException("Requires INTERNAL_SYSTEM_WINDOW permission");
@@ -8832,48 +8939,45 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     void updateNonSystemOverlayWindowsVisibilityIfNeeded(WindowState win, boolean surfaceShown) {
-        if (!win.hideNonSystemOverlayWindowsWhenVisible()
-                && !mHidingNonSystemOverlayWindows.contains(win)) {
+        final boolean effective = (surfaceShown && win.hideNonSystemOverlayWindowsWhenVisible());
+        if (effective == mHidingNonSystemOverlayWindows.contains(win)) {
             return;
         }
-        final boolean systemAlertWindowsHidden = !mHidingNonSystemOverlayWindows.isEmpty();
-        final int numUIDsRequestHidingPreUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
-        if (surfaceShown && win.hideNonSystemOverlayWindowsWhenVisible()) {
-            if (!mHidingNonSystemOverlayWindows.contains(win)) {
-                mHidingNonSystemOverlayWindows.add(win);
-                int uid = win.getOwningUid();
-                int count = mHidingNonSystemOverlayWindowsCountPerUid.getOrDefault(uid, 0);
-                mHidingNonSystemOverlayWindowsCountPerUid.put(uid, count + 1);
-            }
+
+        if (effective) {
+            mHidingNonSystemOverlayWindows.add(win);
         } else {
             mHidingNonSystemOverlayWindows.remove(win);
-            int uid = win.getOwningUid();
-            int count = mHidingNonSystemOverlayWindowsCountPerUid.getOrDefault(uid, 0);
-            if (count <= 1) {
-                mHidingNonSystemOverlayWindowsCountPerUid.remove(win.getOwningUid());
-            } else {
-                mHidingNonSystemOverlayWindowsCountPerUid.put(uid, count - 1);
-            }
         }
-        final boolean hideSystemAlertWindows = !mHidingNonSystemOverlayWindows.isEmpty();
-        final int numUIDSRequestHidingPostUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
+
+        final boolean changed;
         if (Flags.fixHideOverlayApi()) {
-            if (numUIDSRequestHidingPostUpdate == numUIDsRequestHidingPreUpdate) {
-                return;
+            final int uid = win.getOwningUid();
+            final int numUIDsPreUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
+            final int newCount = mHidingNonSystemOverlayWindowsCountPerUid.getOrDefault(uid, 0)
+                    + (effective ? +1 : -1);
+            if (newCount <= 0) {
+                mHidingNonSystemOverlayWindowsCountPerUid.remove(uid);
+            } else {
+                mHidingNonSystemOverlayWindowsCountPerUid.put(uid, newCount);
             }
-            // The visibility of SAWs needs to be refreshed only when the number of uids that
-            // request hiding SAWs changes 0->1, 1->0, 1->2 or 2->1.
-            if (numUIDSRequestHidingPostUpdate != 1 && numUIDsRequestHidingPreUpdate != 1) {
-                return;
-            }
+            final int numUIDsPostUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
+            // The visibility of SAWs needs to be refreshed when the number of uids that
+            // request hiding SAWs changes between "0", "1", or "2+".
+            changed = (numUIDsPostUpdate != numUIDsPreUpdate)
+                    && (numUIDsPostUpdate <= 1 || numUIDsPreUpdate <= 1);
         } else {
-            if (systemAlertWindowsHidden == hideSystemAlertWindows) {
-                return;
-            }
+            // The visibility of SAWs needs to be refreshed when the number of windows that
+            // request hiding SAWs changes between "0" or "1+".
+            changed = (effective && mHidingNonSystemOverlayWindows.size() == 1)
+                    || (!effective && mHidingNonSystemOverlayWindows.isEmpty());
         }
-        mRoot.forAllWindows((w) -> {
-            w.setForceHideNonSystemOverlayWindowIfNeeded(shouldHideNonSystemOverlayWindow(w));
-        }, false /* traverseTopToBottom */);
+
+        if (changed) {
+            mRoot.forAllWindows((w) -> {
+                w.setForceHideNonSystemOverlayWindowIfNeeded(shouldHideNonSystemOverlayWindow(w));
+            }, false /* traverseTopToBottom */);
+        }
     }
 
     /** Called from Accessibility Controller to apply magnification spec */
@@ -8996,6 +9100,17 @@ public class WindowManagerService extends IWindowManager.Stub
                 // In that case, drop the event to prevent changing focus to a background activity.
                 Slog.w(TAG, "onPointerDownOutsideFocusLocked, drop event because " + touchedApp
                         + " is occluded and should not be focused.");
+                return;
+            }
+        }
+
+        if (mDeviceStateCallback.isInRearDisplayOuterDefaultState()) {
+            final Display[] rearDisplays = mDisplayManager
+                    .getDisplays(DisplayManager.DISPLAY_CATEGORY_REAR);
+            if (rearDisplays.length > 0 && rearDisplays[0].getDisplayId() == t.getDisplayId()) {
+                // Do not change display focus to the inner display if we're in this mode. Note that
+                // in this mode, the inner display is configured as a rear display.
+                Slog.w(TAG, "Ignoring focus change because device is in RDM.");
                 return;
             }
         }
@@ -9222,25 +9337,6 @@ public class WindowManagerService extends IWindowManager.Stub
                     + "' because it isn't a trusted overlay");
             return inputFeatures & ~INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
         }
-
-        // You need OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW permission to be able
-        // to set INPUT_FEATURE_RECEIVE_POWER_KEY_DOUBLE_PRESS.
-        if (overridePowerKeyBehaviorInFocusedWindow()
-                && (inputFeatures
-                & INPUT_FEATURE_RECEIVE_POWER_KEY_DOUBLE_PRESS)
-                != 0) {
-            final int powerPermissionResult =
-                    mContext.checkPermission(
-                            permission.OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW,
-                            callingPid,
-                            callingUid);
-            if (powerPermissionResult != PackageManager.PERMISSION_GRANTED) {
-                throw new IllegalArgumentException(
-                        "Cannot use INPUT_FEATURE_RECEIVE_POWER_KEY_DOUBLE_PRESS from" + windowName
-                                + " because it doesn't have the"
-                                + " OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW permission");
-            }
-        }
         return inputFeatures;
     }
 
@@ -9372,10 +9468,12 @@ public class WindowManagerService extends IWindowManager.Stub
 
     /**
      * Updates the flags on an existing surface's input channel. This assumes the surface provided
-     * is the one associated with the provided input-channel. If this isn't the case, behavior
-     * is undefined.
+     * is the one associated with the provided input-channel. If this isn't the case, behavior is
+     * undefined.
      */
-    void updateInputChannel(IBinder channelToken, int displayId, SurfaceControl surface,
+    void updateInputChannel(IBinder channelToken,
+            @Nullable InputTransferToken hostInputTransferToken, int displayId,
+            SurfaceControl surface,
             int flags, int privateFlags, int inputFeatures, Region region) {
         final InputApplicationHandle applicationHandle;
         final String name;
@@ -9389,6 +9487,11 @@ public class WindowManagerService extends IWindowManager.Stub
             name = win.toString();
             applicationHandle = win.getApplicationHandle();
             win.setIsFocusable((flags & FLAG_NOT_FOCUSABLE) == 0);
+            if (Flags.updateHostInputTransferToken()) {
+                WindowState hostWindowState = hostInputTransferToken != null
+                        ? mInputToWindowMap.get(hostInputTransferToken.getToken()) : null;
+                win.updateHost(hostWindowState);
+            }
         }
 
         updateInputChannel(channelToken, win.mOwnerUid, win.mOwnerPid, displayId, surface, name,

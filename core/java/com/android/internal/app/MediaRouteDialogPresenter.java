@@ -90,8 +90,7 @@ public abstract class MediaRouteDialogPresenter {
 
         MediaRouter.RouteInfo route = router.getSelectedRoute();
 // QTI_BEGIN: 2022-12-06: Android_UI: SystemUI: Check whether the selected WFD route is available
-        if (route.isDefault() || !route.matchesTypes(routeTypes)
-            || route.getStatusCode() == MediaRouter.RouteInfo.STATUS_NOT_AVAILABLE) {
+        if (shouldShowChooserDialog(context, routeTypes) || route.getStatusCode() == MediaRouter.RouteInfo.STATUS_NOT_AVAILABLE) {
 // QTI_END: 2022-12-06: Android_UI: SystemUI: Check whether the selected WFD route is available
             final MediaRouteChooserDialog d = new MediaRouteChooserDialog(context, theme,
                     showProgressBarWhenEmpty);
@@ -101,5 +100,12 @@ public abstract class MediaRouteDialogPresenter {
         } else {
             return new MediaRouteControllerDialog(context, theme);
         }
+    }
+
+    /** Whether we should show the chooser dialog or the controller dialog.. */
+    public static boolean shouldShowChooserDialog(Context context, int routeTypes) {
+        final MediaRouter router = context.getSystemService(MediaRouter.class);
+        MediaRouter.RouteInfo route = router.getSelectedRoute();
+        return route.isDefault() || !route.matchesTypes(routeTypes);
     }
 }

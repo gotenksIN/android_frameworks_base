@@ -41,8 +41,8 @@ public final class GalileoAssistance implements Parcelable {
     /** The Galileo almanac. */
     @Nullable private final GnssAlmanac mAlmanac;
 
-    /** The Klobuchar ionospheric model. */
-    @Nullable private final KlobucharIonosphericModel mIonosphericModel;
+    /** The Galileo ionospheric model. */
+    @Nullable private final GalileoIonosphericModel mIonosphericModel;
 
     /** The UTC model. */
     @Nullable private final UtcModel mUtcModel;
@@ -50,8 +50,8 @@ public final class GalileoAssistance implements Parcelable {
     /** The leap seconds model. */
     @Nullable private final LeapSecondsModel mLeapSecondsModel;
 
-    /** The auxiliary information. */
-    @Nullable private final AuxiliaryInformation mAuxiliaryInformation;
+    /** The list of auxiliary informations. */
+    @NonNull private final List<AuxiliaryInformation> mAuxiliaryInformation;
 
     /** The list of time models. */
     @NonNull private final List<TimeModel> mTimeModels;
@@ -70,7 +70,12 @@ public final class GalileoAssistance implements Parcelable {
         mIonosphericModel = builder.mIonosphericModel;
         mUtcModel = builder.mUtcModel;
         mLeapSecondsModel = builder.mLeapSecondsModel;
-        mAuxiliaryInformation = builder.mAuxiliaryInformation;
+        if (builder.mAuxiliaryInformation != null) {
+            mAuxiliaryInformation =
+                    Collections.unmodifiableList(new ArrayList<>(builder.mAuxiliaryInformation));
+        } else {
+            mAuxiliaryInformation = new ArrayList<>();
+        }
         if (builder.mTimeModels != null) {
             mTimeModels = Collections.unmodifiableList(new ArrayList<>(builder.mTimeModels));
         } else {
@@ -102,9 +107,9 @@ public final class GalileoAssistance implements Parcelable {
         return mAlmanac;
     }
 
-    /** Returns the Klobuchar ionospheric model. */
+    /** Returns the Galileo ionospheric model. */
     @Nullable
-    public KlobucharIonosphericModel getIonosphericModel() {
+    public GalileoIonosphericModel getIonosphericModel() {
         return mIonosphericModel;
     }
 
@@ -120,9 +125,9 @@ public final class GalileoAssistance implements Parcelable {
         return mLeapSecondsModel;
     }
 
-    /** Returns the auxiliary information. */
-    @Nullable
-    public AuxiliaryInformation getAuxiliaryInformation() {
+    /** Returns the list of auxiliary informations. */
+    @NonNull
+    public List<AuxiliaryInformation> getAuxiliaryInformation() {
         return mAuxiliaryInformation;
     }
 
@@ -161,7 +166,7 @@ public final class GalileoAssistance implements Parcelable {
         dest.writeTypedObject(mIonosphericModel, flags);
         dest.writeTypedObject(mUtcModel, flags);
         dest.writeTypedObject(mLeapSecondsModel, flags);
-        dest.writeTypedObject(mAuxiliaryInformation, flags);
+        dest.writeTypedList(mAuxiliaryInformation);
         dest.writeTypedList(mTimeModels);
         dest.writeTypedList(mSatelliteEphemeris);
         dest.writeTypedList(mRealTimeIntegrityModels);
@@ -192,11 +197,11 @@ public final class GalileoAssistance implements Parcelable {
                     return new GalileoAssistance.Builder()
                             .setAlmanac(in.readTypedObject(GnssAlmanac.CREATOR))
                             .setIonosphericModel(
-                                    in.readTypedObject(KlobucharIonosphericModel.CREATOR))
+                                    in.readTypedObject(GalileoIonosphericModel.CREATOR))
                             .setUtcModel(in.readTypedObject(UtcModel.CREATOR))
                             .setLeapSecondsModel(in.readTypedObject(LeapSecondsModel.CREATOR))
                             .setAuxiliaryInformation(
-                                    in.readTypedObject(AuxiliaryInformation.CREATOR))
+                                    in.createTypedArrayList(AuxiliaryInformation.CREATOR))
                             .setTimeModels(in.createTypedArrayList(TimeModel.CREATOR))
                             .setSatelliteEphemeris(
                                     in.createTypedArrayList(GalileoSatelliteEphemeris.CREATOR))
@@ -216,10 +221,10 @@ public final class GalileoAssistance implements Parcelable {
     /** Builder for {@link GalileoAssistance}. */
     public static final class Builder {
         private GnssAlmanac mAlmanac;
-        private KlobucharIonosphericModel mIonosphericModel;
+        private GalileoIonosphericModel mIonosphericModel;
         private UtcModel mUtcModel;
         private LeapSecondsModel mLeapSecondsModel;
-        private AuxiliaryInformation mAuxiliaryInformation;
+        private List<AuxiliaryInformation> mAuxiliaryInformation;
         private List<TimeModel> mTimeModels;
         private List<GalileoSatelliteEphemeris> mSatelliteEphemeris;
         private List<RealTimeIntegrityModel> mRealTimeIntegrityModels;
@@ -232,9 +237,9 @@ public final class GalileoAssistance implements Parcelable {
             return this;
         }
 
-        /** Sets the Klobuchar ionospheric model. */
+        /** Sets the Galileo ionospheric model. */
         @NonNull
-        public Builder setIonosphericModel(@Nullable KlobucharIonosphericModel ionosphericModel) {
+        public Builder setIonosphericModel(@Nullable GalileoIonosphericModel ionosphericModel) {
             mIonosphericModel = ionosphericModel;
             return this;
         }
@@ -253,10 +258,10 @@ public final class GalileoAssistance implements Parcelable {
             return this;
         }
 
-        /** Sets the auxiliary information. */
+        /** Sets the list of auxiliary informations. */
         @NonNull
         public Builder setAuxiliaryInformation(
-                @Nullable AuxiliaryInformation auxiliaryInformation) {
+                @NonNull List<AuxiliaryInformation> auxiliaryInformation) {
             mAuxiliaryInformation = auxiliaryInformation;
             return this;
         }

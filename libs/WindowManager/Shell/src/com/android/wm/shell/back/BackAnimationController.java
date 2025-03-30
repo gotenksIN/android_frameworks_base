@@ -286,6 +286,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                 this::createExternalInterface, this);
         mShellCommandHandler.addDumpCallback(this::dump, this);
         mShellController.addConfigurationChangeListener(this);
+        registerBackGestureDelegate();
     }
 
     public BackAnimation getBackAnimationImpl() {
@@ -332,7 +333,11 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
 
         @Override
         public void onThresholdCrossed() {
-            BackAnimationController.this.onThresholdCrossed();
+            if (predictiveBackDelayWmTransition()) {
+                mShellExecutor.execute(BackAnimationController.this::onThresholdCrossed);
+            } else {
+                BackAnimationController.this.onThresholdCrossed();
+            }
         }
 
         @Override
@@ -504,7 +509,11 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                     }
                     mShouldStartOnNextMoveEvent = false;
                 } else {
-                    mShouldStartOnNextMoveEvent = true;
+                    if (predictiveBackDelayWmTransition()) {
+                        onGestureStarted(touchX, touchY, swipeEdge);
+                    } else {
+                        mShouldStartOnNextMoveEvent = true;
+                    }
                 }
             }
         } else if (keyAction == MotionEvent.ACTION_MOVE) {
@@ -1041,7 +1050,8 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                 () -> mShellExecutor.execute(this::onBackAnimationFinished));
 
         if (mApps.length >= 1) {
-            BackMotionEvent startEvent = mCurrentTracker.createStartEvent(mApps[0]);
+            BackMotionEvent startEvent = mCurrentTracker.createStartEvent(
+                    Flags.removeDepartTargetFromMotion() ? null : mApps[0]);
             dispatchOnBackStarted(mActiveCallback, startEvent);
             if (startEvent.getSwipeEdge() == EDGE_NONE) {
                 // TODO(b/373544911): onBackStarted is dispatched here so that
@@ -1134,6 +1144,32 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                     }
                 };
         mBackAnimationAdapter = new BackAnimationAdapter(runner);
+    }
+
+    private void registerBackGestureDelegate() {
+        if (!Flags.delegateBackGestureToShell()) {
+            return;
+        }
+        final RemoteCallback requestBackMonitor = new RemoteCallback(
+                new RemoteCallback.OnResultListener() {
+                    @Override
+                    public void onResult(@Nullable Bundle result) {
+                            mShellExecutor.execute(() -> {
+                                if (mBackGestureStarted) {
+                                    Log.w(TAG, "Back gesture is running, ignore request");
+                                    return;
+                                }
+                                onMotionEvent(0, 0, KeyEvent.ACTION_DOWN, EDGE_NONE);
+                                setTriggerBack(true);
+                                onMotionEvent(0, 0, KeyEvent.ACTION_UP, EDGE_NONE);
+                            });
+                    }
+                });
+        try {
+            mActivityTaskManager.registerBackGestureDelegate(requestBackMonitor);
+        } catch (RemoteException remoteException) {
+            Log.w(TAG, "Failed register back gesture request ", remoteException);
+        }
     }
 
     /**

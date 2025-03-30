@@ -99,6 +99,14 @@ flag {
 } # ignore_corner_radius_and_shadows
 
 flag {
+  name: "enable_border_settings"
+  namespace: "window_surfaces"
+  description: "Enable SurfaceControl outline settings."
+  bug: "367464660"
+  is_fixed_read_only: true
+}
+
+flag {
     name: "jank_api"
     namespace: "window_surfaces"
     description: "Adds the jank data listener to AttachedSurfaceControl"
@@ -114,6 +122,18 @@ flag {
     is_fixed_read_only: true
     is_exported: true
     bug: "359424300"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "update_host_input_transfer_token"
+    namespace: "window_surfaces"
+    description: "Update host InpuTransferToken on view attach"
+    is_fixed_read_only: true
+    is_exported: true
+    bug: "392965431"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

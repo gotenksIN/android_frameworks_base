@@ -23,9 +23,7 @@ import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.content.withStyledAttributes
-import androidx.core.view.isGone
 import com.android.wm.shell.R
 
 /**
@@ -41,18 +39,17 @@ class HandleMenuActionButton @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
-    private val rootElement: LinearLayout
-    private val iconView: ImageView
-    private val textView: MarqueedTextView
+    val iconView: ImageView
+    val textView: MarqueedTextView
 
     init {
-        val view = LayoutInflater.from(context).inflate(
+        LayoutInflater.from(context).inflate(
             R.layout.desktop_mode_window_decor_handle_menu_action_button, this, true)
-        rootElement = findViewById(R.id.action_button)
         iconView = findViewById(R.id.image)
         textView = findViewById(R.id.label)
 
         context.withStyledAttributes(attrs, R.styleable.HandleMenuActionButton) {
+            contentDescription = getString(R.styleable.HandleMenuActionButton_android_text)
             textView.text = getString(R.styleable.HandleMenuActionButton_android_text)
             textView.setTextColor(getColor(R.styleable.HandleMenuActionButton_android_textColor, 0))
             iconView.setImageResource(getResourceId(
@@ -60,15 +57,6 @@ class HandleMenuActionButton @JvmOverloads constructor(
             iconView.imageTintList = getColorStateList(
                 R.styleable.HandleMenuActionButton_android_drawableTint)
         }
-    }
-
-    /**
-     * Sets a listener to be invoked when this view is clicked.
-     *
-     * @param l the [OnClickListener] that receives click events.
-     */
-    override fun setOnClickListener(l: OnClickListener?) {
-        rootElement.setOnClickListener(l)
     }
 
     /**

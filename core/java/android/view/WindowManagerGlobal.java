@@ -47,7 +47,6 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.view.inputmethod.InputMethodManager;
-import android.view.translation.ListenerGroup;
 import android.window.ITrustedPresentationListener;
 import android.window.InputTransferToken;
 import android.window.TrustedPresentationThresholds;
@@ -157,7 +156,8 @@ public final class WindowManagerGlobal {
      * @hide
      */
     @GuardedBy("mLock")
-    private final ListenerGroup<List<View>> mWindowViewsListenerGroup = new ListenerGroup<>();
+    private final ListenerGroup<List<View>> mWindowViewsListenerGroup =
+            new ListenerGroup<>(new ArrayList<>());
     @UnsupportedAppUsage
     private final ArrayList<ViewRootImpl> mRoots = new ArrayList<ViewRootImpl>();
     @UnsupportedAppUsage
@@ -332,13 +332,16 @@ public final class WindowManagerGlobal {
 
     /**
      * Adds a listener that will be notified whenever {@link #getWindowViews()} changes. The
-     * current value is provided immediately. If it was registered previously then this is ano op.
+     * current value is provided immediately using the provided {@link Executor}. If this
+     * {@link Consumer} was registered previously, then this is a no op.
      */
     public void addWindowViewsListener(@NonNull Executor executor,
             @NonNull Consumer<List<View>> consumer) {
         synchronized (mLock) {
+            if (mWindowViewsListenerGroup.isConsumerPresent(consumer)) {
+                return;
+            }
             mWindowViewsListenerGroup.addListener(executor, consumer);
-            mWindowViewsListenerGroup.accept(getWindowViews());
         }
     }
 

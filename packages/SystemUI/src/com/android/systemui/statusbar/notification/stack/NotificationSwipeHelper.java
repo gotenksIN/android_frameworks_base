@@ -260,7 +260,7 @@ class NotificationSwipeHelper extends SwipeHelper implements NotificationSwipeAc
             // Menu has not been snapped to previously and this is menu revealing gesture
             snapOpen(animView, menuSnapTarget, velocity);
             menuRow.onSnapOpen();
-        } else if (isDismissGesture && !gestureTowardsMenu) {
+        } else if (isDismissGesture && (!gestureTowardsMenu || isSwipeDismissible())) {
             dismiss(animView, velocity);
             menuRow.onDismiss();
         } else {
@@ -280,7 +280,7 @@ class NotificationSwipeHelper extends SwipeHelper implements NotificationSwipeAc
             // Haven't moved enough to unsnap from the menu
             menuRow.onSnapOpen();
             snapOpen(animView, menuRow.getMenuSnapTarget(), velocity);
-        } else if (isDismissGesture && !menuRow.shouldSnapBack()) {
+        } else if (isDismissGesture && (!menuRow.shouldSnapBack() || isSwipeDismissible())) {
             // Only dismiss if we're not moving towards the menu
             dismiss(animView, velocity);
             menuRow.onDismiss();

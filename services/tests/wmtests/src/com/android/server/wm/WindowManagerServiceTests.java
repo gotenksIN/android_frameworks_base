@@ -29,7 +29,6 @@ import static android.view.Display.FLAG_OWN_FOCUS;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
 import static android.view.WindowManager.LayoutParams.FLAG_SECURE;
-import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_RECEIVE_POWER_KEY_DOUBLE_PRESS;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SPY;
 import static android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE;
@@ -49,7 +48,6 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.never;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
-import static com.android.hardware.input.Flags.FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND_FLOATING;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_SOLID_COLOR;
@@ -100,6 +98,8 @@ import android.provider.Settings;
 import android.util.ArraySet;
 import android.util.MergedConfiguration;
 import android.view.ContentRecordingSession;
+import android.view.Display;
+import android.view.DisplayInfo;
 import android.view.IWindow;
 import android.view.InputChannel;
 import android.view.InputDevice;
@@ -1147,56 +1147,10 @@ public class WindowManagerServiceTests extends WindowTestsBase {
                 argThat(h -> (h.inputConfig & InputConfig.SPY) == 0));
 
         assertThrows(IllegalArgumentException.class, () ->
-                mWm.updateInputChannel(inputChannel.getToken(), DEFAULT_DISPLAY, surfaceControl,
+                mWm.updateInputChannel(inputChannel.getToken(), null /* hostInputToken */,
+                        DEFAULT_DISPLAY, surfaceControl,
                         FLAG_NOT_FOCUSABLE, PRIVATE_FLAG_TRUSTED_OVERLAY, INPUT_FEATURE_SPY,
                         null /* region */));
-    }
-
-    @Test
-    @RequiresFlagsEnabled(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testUpdateInputChannel_sanitizeWithoutPermission_ThrowsError() {
-        final Session session = mock(Session.class);
-        final int callingUid = Process.FIRST_APPLICATION_UID;
-        final int callingPid = 1234;
-        final SurfaceControl surfaceControl = mock(SurfaceControl.class);
-        final IBinder window = new Binder();
-        final InputTransferToken inputTransferToken = mock(InputTransferToken.class);
-
-
-        final InputChannel inputChannel = new InputChannel();
-
-        assertThrows(IllegalArgumentException.class, () ->
-                mWm.grantInputChannel(session, callingUid, callingPid, DEFAULT_DISPLAY,
-                        surfaceControl, window, null /* hostInputToken */, FLAG_NOT_FOCUSABLE,
-                        0 /* privateFlags */,
-                        INPUT_FEATURE_RECEIVE_POWER_KEY_DOUBLE_PRESS,
-                        TYPE_APPLICATION, null /* windowToken */, inputTransferToken,
-                        "TestInputChannel", inputChannel));
-    }
-
-
-    @Test
-    @RequiresFlagsEnabled(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testUpdateInputChannel_sanitizeWithPermission_doesNotThrowError() {
-        final Session session = mock(Session.class);
-        final int callingUid = Process.FIRST_APPLICATION_UID;
-        final int callingPid = 1234;
-        final SurfaceControl surfaceControl = mock(SurfaceControl.class);
-        final IBinder window = new Binder();
-        final InputTransferToken inputTransferToken = mock(InputTransferToken.class);
-
-        doReturn(PackageManager.PERMISSION_GRANTED).when(mWm.mContext).checkPermission(
-                android.Manifest.permission.OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW,
-                callingPid,
-                callingUid);
-
-        final InputChannel inputChannel = new InputChannel();
-
-        mWm.grantInputChannel(session, callingUid, callingPid, DEFAULT_DISPLAY, surfaceControl,
-                window, null /* hostInputToken */, FLAG_NOT_FOCUSABLE, 0 /* privateFlags */,
-                INPUT_FEATURE_RECEIVE_POWER_KEY_DOUBLE_PRESS,
-                TYPE_APPLICATION, null /* windowToken */, inputTransferToken, "TestInputChannel",
-                inputChannel);
     }
 
     @Test
@@ -1217,7 +1171,8 @@ public class WindowManagerServiceTests extends WindowTestsBase {
                 eq(surfaceControl),
                 argThat(h -> (h.inputConfig & InputConfig.SPY) == 0));
 
-        mWm.updateInputChannel(inputChannel.getToken(), DEFAULT_DISPLAY, surfaceControl,
+        mWm.updateInputChannel(inputChannel.getToken(), null /* hostInputToken */,
+                DEFAULT_DISPLAY, surfaceControl,
                 FLAG_NOT_FOCUSABLE, PRIVATE_FLAG_TRUSTED_OVERLAY, INPUT_FEATURE_SPY,
                 null /* region */);
         verify(mTransaction).setInputWindowInfo(
@@ -1244,7 +1199,8 @@ public class WindowManagerServiceTests extends WindowTestsBase {
                 eq(surfaceControl),
                 argThat(h -> (h.inputConfig & InputConfig.SENSITIVE_FOR_PRIVACY) == 0));
 
-        mWm.updateInputChannel(inputChannel.getToken(), DEFAULT_DISPLAY, surfaceControl,
+        mWm.updateInputChannel(inputChannel.getToken(), null /* hostInputToken */,
+                DEFAULT_DISPLAY, surfaceControl,
                 FLAG_NOT_FOCUSABLE, PRIVATE_FLAG_TRUSTED_OVERLAY,
                 INPUT_FEATURE_SENSITIVE_FOR_PRIVACY,
                 null /* region */);
@@ -1483,6 +1439,46 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_FIX_HIDE_OVERLAY_API)
+    public void testUpdateOverlayWindows_multipleWindowsFromSameUid_idempotent() {
+        // Deny INTERNAL_SYSTEM_WINDOW permission for WindowSession so that the saw isn't allowed to
+        // show despite hideNonSystemOverlayWindows.
+        doReturn(PackageManager.PERMISSION_DENIED).when(mWm.mContext).checkPermission(
+                eq(android.Manifest.permission.INTERNAL_SYSTEM_WINDOW), anyInt(), anyInt());
+
+        WindowState saw =
+                newWindowBuilder("saw", TYPE_APPLICATION_OVERLAY).setOwnerId(10123).build();
+        saw.mWinAnimator.mDrawState = WindowStateAnimator.HAS_DRAWN;
+        saw.mWinAnimator.mSurfaceControl = mock(SurfaceControl.class);
+        assertThat(saw.mSession.mCanAddInternalSystemWindow).isFalse();
+
+        WindowState app1 = newWindowBuilder("app1", TYPE_APPLICATION).setOwnerId(10456).build();
+        spyOn(app1);
+        doReturn(true).when(app1).hideNonSystemOverlayWindowsWhenVisible();
+
+        WindowState app2 = newWindowBuilder("app2", TYPE_APPLICATION).setOwnerId(10456).build();
+        spyOn(app2);
+        doReturn(true).when(app2).hideNonSystemOverlayWindowsWhenVisible();
+
+        makeWindowVisible(saw, app1, app2);
+        assertThat(saw.isVisibleByPolicy()).isTrue();
+
+        // Two hideNonSystemOverlayWindows windows: SAW is hidden.
+        mWm.updateNonSystemOverlayWindowsVisibilityIfNeeded(app1, true);
+        mWm.updateNonSystemOverlayWindowsVisibilityIfNeeded(app2, true);
+        assertThat(saw.isVisibleByPolicy()).isFalse();
+
+        // Marking the same window hidden twice: SAW is still hidden.
+        mWm.updateNonSystemOverlayWindowsVisibilityIfNeeded(app1, false);
+        mWm.updateNonSystemOverlayWindowsVisibilityIfNeeded(app1, false);
+        assertThat(saw.isVisibleByPolicy()).isFalse();
+
+        // Marking the remaining window hidden: SAW can be shown again.
+        mWm.updateNonSystemOverlayWindowsVisibilityIfNeeded(app2, false);
+        assertThat(saw.isVisibleByPolicy()).isTrue();
+    }
+
+    @Test
     @EnableFlags(Flags.FLAG_REPARENT_WINDOW_TOKEN_API)
     public void reparentWindowContextToDisplayArea_newDisplay_reparented() {
         final WindowToken windowToken = createTestClientWindowToken(TYPE_NOTIFICATION_SHADE,
@@ -1598,6 +1594,60 @@ public class WindowManagerServiceTests extends WindowTestsBase {
         assertThrows(IllegalStateException.class, () -> {
             mWm.setConfigurationChangeSettingsForUser(settings, UserHandle.USER_CURRENT);
         });
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
+    public void setForcedDisplayDensityRatio_forExternalDisplay_setsRatio() {
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.type = Display.TYPE_EXTERNAL;
+        displayInfo.logicalDensityDpi = 100;
+        mDisplayContent = createNewDisplay(displayInfo);
+        final int currentUserId = ActivityManager.getCurrentUser();
+        final float forcedDensityRatio = 2f;
+
+        mWm.setForcedDisplayDensityRatio(displayInfo.displayId, forcedDensityRatio,
+                currentUserId);
+
+        verify(mDisplayContent).setForcedDensityRatio(forcedDensityRatio,
+                currentUserId);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
+    public void setForcedDisplayDensityRatio_forInternalDisplay_setsRatio() {
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.type = Display.TYPE_INTERNAL;
+        mDisplayContent = createNewDisplay(displayInfo);
+        final int currentUserId = ActivityManager.getCurrentUser();
+        final float forcedDensityRatio = 2f;
+
+        mWm.setForcedDisplayDensityRatio(displayInfo.displayId, forcedDensityRatio,
+                currentUserId);
+
+        verify(mDisplayContent).setForcedDensityRatio(forcedDensityRatio,
+                currentUserId);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
+    public void clearForcedDisplayDensityRatio_clearsRatioAndDensity() {
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.type = Display.TYPE_INTERNAL;
+        mDisplayContent = createNewDisplay(displayInfo);
+        final int currentUserId = ActivityManager.getCurrentUser();
+
+        mWm.clearForcedDisplayDensityForUser(displayInfo.displayId, currentUserId);
+
+        verify(mDisplayContent).setForcedDensityRatio(0.0f,
+                currentUserId);
+
+        assertEquals(mDisplayContent.mBaseDisplayDensity,
+                mDisplayContent.getInitialDisplayDensity());
+        assertEquals(mDisplayContent.mForcedDisplayDensityRatio, 0.0f, 0.001);
     }
 
     /**

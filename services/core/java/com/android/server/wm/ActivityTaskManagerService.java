@@ -281,7 +281,6 @@ import com.android.server.sdksandbox.SdkSandboxManagerLocal;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriGrantsManagerInternal;
-import com.android.server.wallpaper.WallpaperManagerInternal;
 import com.android.server.wm.utils.WindowStyleCache;
 import com.android.wm.shell.Flags;
 
@@ -373,7 +372,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private ComponentName mSysUiServiceComponent;
     private PermissionPolicyInternal mPermissionPolicyInternal;
     private StatusBarManagerInternal mStatusBarManagerInternal;
-    private WallpaperManagerInternal mWallpaperManagerInternal;
     private UserManagerInternal mUserManagerInternal;
     @VisibleForTesting
     final ActivityTaskManagerInternal mInternal;
@@ -1893,6 +1891,18 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         final long origId = Binder.clearCallingIdentity();
         try {
             return mBackNavigationController.startBackNavigation(navigationObserver, adapter);
+        } finally {
+            Binder.restoreCallingIdentity(origId);
+        }
+    }
+
+    @Override
+    public void registerBackGestureDelegate(RemoteCallback requestObserver) {
+        mAmInternal.enforceCallingPermission(START_TASKS_FROM_RECENTS,
+                "registerBackGestureDelegate()");
+        final long origId = Binder.clearCallingIdentity();
+        try {
+            mBackNavigationController.registerBackGestureDelegate(requestObserver);
         } finally {
             Binder.restoreCallingIdentity(origId);
         }
@@ -3723,10 +3733,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (isPowerModePreApplied && !foundResumed) {
                     endPowerMode(POWER_MODE_REASON_START_ACTIVITY);
                 }
-            }
-            WallpaperManagerInternal wallpaperManagerInternal = getWallpaperManagerInternal();
-            if (wallpaperManagerInternal != null) {
-                wallpaperManagerInternal.onKeyguardGoingAway();
+
+                mH.post(() -> {
+                    for (int i = mScreenObservers.size() - 1; i >= 0; i--) {
+                        mScreenObservers.get(i).onKeyguardGoingAway();
+                    }
+                });
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -5589,13 +5601,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mStatusBarManagerInternal = LocalServices.getService(StatusBarManagerInternal.class);
         }
         return mStatusBarManagerInternal;
-    }
-
-    WallpaperManagerInternal getWallpaperManagerInternal() {
-        if (mWallpaperManagerInternal == null) {
-            mWallpaperManagerInternal = LocalServices.getService(WallpaperManagerInternal.class);
-        }
-        return mWallpaperManagerInternal;
     }
 
     UserManagerInternal getUserManagerInternal() {
@@ -7595,6 +7600,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public boolean isAssistDataAllowed() {
             return ActivityTaskManagerService.this.isAssistDataAllowed();
+        }
+
+        @Override
+        public boolean requestBackGesture() {
+            return mBackNavigationController.requestBackGesture();
         }
     }
 

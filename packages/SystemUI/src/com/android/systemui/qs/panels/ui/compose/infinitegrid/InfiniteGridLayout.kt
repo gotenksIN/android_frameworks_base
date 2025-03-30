@@ -42,7 +42,6 @@ import com.android.systemui.qs.panels.ui.viewmodel.EditTileViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.IconTilesViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.InfiniteGridViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.TileViewModel
-import com.android.systemui.qs.pipeline.domain.interactor.CurrentTilesInteractor.Companion.POSITION_AT_END
 import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.qs.shared.ui.ElementKeys.toElementKey
 import com.android.systemui.res.R
@@ -78,8 +77,15 @@ constructor(
             }
 
         val columns = columnsWithMediaViewModel.columns
+        val largeTiles by iconTilesViewModel.largeTilesState
         val largeTilesSpan by iconTilesViewModel.largeTilesSpanState
-        val sizedTiles = tiles.map { SizedTileImpl(it, it.spec.width(largeTilesSpan)) }
+        // Tiles or largeTiles may be updated while this is composed, so listen to any changes
+        val sizedTiles =
+            remember(tiles, largeTiles, largeTilesSpan) {
+                tiles.map {
+                    SizedTileImpl(it, if (largeTiles.contains(it.spec)) largeTilesSpan else 1)
+                }
+            }
         val bounceables =
             remember(sizedTiles) { List(sizedTiles.size) { BounceableTileViewModel() } }
         val squishiness by viewModel.squishinessViewModel.squishiness.collectAsStateWithLifecycle()
@@ -112,6 +118,7 @@ constructor(
                             isLastInRow = isLastInColumn,
                         ),
                     detailsViewModel = detailsViewModel,
+                    isVisible = listening,
                 )
             }
         }
@@ -163,7 +170,7 @@ constructor(
             otherTiles = otherTiles,
             columns = columns,
             modifier = modifier,
-            onAddTile = { onAddTile(it, POSITION_AT_END) },
+            onAddTile = onAddTile,
             onRemoveTile = onRemoveTile,
             onSetTiles = onSetTiles,
             onResize = iconTilesViewModel::resize,

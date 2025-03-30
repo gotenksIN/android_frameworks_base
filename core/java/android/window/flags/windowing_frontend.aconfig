@@ -287,6 +287,17 @@ flag {
 }
 
 flag {
+  name: "use_visible_requested_for_process_tracker"
+  namespace: "windowing_frontend"
+  description: "Do not count closing activity as visible process"
+  bug: "396653764"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "ensure_wallpaper_in_transitions"
   namespace: "windowing_frontend"
   description: "Ensure that wallpaper window tokens are always present/available for collection in transitions"
@@ -374,6 +385,17 @@ flag {
     namespace: "systemui"
     description: "Enable Predictive Back Animation for 3-button-nav"
     bug: "373544911"
+}
+
+flag {
+    name: "remove_depart_target_from_motion"
+    namespace: "windowing_frontend"
+    description: "Remove DepartingAnimationTarget from BackMotionEvent"
+    bug: "395035430"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -505,6 +527,17 @@ flag {
 }
 
 flag {
+    name: "safe_release_snapshot_aggressively"
+    namespace: "windowing_frontend"
+    description: "Protect task snapshot memory from premature release, which can occur when a local variable holds a reference while the snapshot is removed from the cache."
+    bug: "238206323"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "scramble_snapshot_file_name"
     namespace: "windowing_frontend"
     description: "Scramble the file name of task snapshot."
@@ -513,4 +546,22 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "delegate_back_gesture_to_shell"
+    namespace: "windowing_frontend"
+    description: "Delegate back gesture event to back animation controller."
+    bug: "394599430"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_multidisplay_trackpad_back_gesture"
+    namespace: "lse_desktop_experience"
+    description: "Adds support for trackpad back gestures on connected displays"
+    bug: "382774299"
 }

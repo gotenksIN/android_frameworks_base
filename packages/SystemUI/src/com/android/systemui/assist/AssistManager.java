@@ -24,8 +24,8 @@ import android.provider.Settings;
 import android.service.voice.VisualQueryAttentionResult;
 import android.service.voice.VoiceInteractionSession;
 import android.util.Log;
+import android.view.WindowManager;
 
-import com.android.app.viewcapture.ViewCaptureAwareWindowManager;
 import com.android.internal.app.AssistUtils;
 import com.android.internal.app.IVisualQueryDetectionAttentionListener;
 import com.android.internal.app.IVisualQueryRecognitionStatusListener;
@@ -130,6 +130,8 @@ public class AssistManager {
             AssistUtils.INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS;
     public static final int INVOCATION_TYPE_NAV_HANDLE_LONG_PRESS =
             AssistUtils.INVOCATION_TYPE_NAV_HANDLE_LONG_PRESS;
+    public static final int INVOCATION_TYPE_LAUNCHER_SYSTEM_SHORTCUT =
+            AssistUtils.INVOCATION_TYPE_LAUNCHER_SYSTEM_SHORTCUT;
 
     public static final int DISMISS_REASON_INVOCATION_CANCELLED = 1;
     public static final int DISMISS_REASON_TAP = 2;
@@ -197,12 +199,12 @@ public class AssistManager {
             SelectedUserInteractor selectedUserInteractor,
             ActivityManager activityManager,
             AssistInteractor interactor,
-            ViewCaptureAwareWindowManager viewCaptureAwareWindowManager) {
+            WindowManager windowManager) {
         mContext = context;
         mDeviceProvisionedController = controller;
         mCommandQueue = commandQueue;
         mAssistUtils = assistUtils;
-        mAssistDisclosure = new AssistDisclosure(context, uiHandler, viewCaptureAwareWindowManager);
+        mAssistDisclosure = new AssistDisclosure(context, uiHandler, windowManager);
         mLauncherProxyService = launcherProxyService;
         mPhoneStateMonitor = phoneStateMonitor;
         mAssistLogger = assistLogger;

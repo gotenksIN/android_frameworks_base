@@ -21,7 +21,7 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
-import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
 import static android.content.pm.ActivityInfo.OVERRIDE_MIN_ASPECT_RATIO_LARGE_VALUE;
 import static android.content.pm.ActivityInfo.OVERRIDE_MIN_ASPECT_RATIO_MEDIUM_VALUE;
 import static android.content.pm.ActivityInfo.OVERRIDE_MIN_ASPECT_RATIO_SMALL_VALUE;
@@ -52,6 +52,7 @@ import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -281,6 +282,7 @@ public class DesktopModeLaunchParamsModifierTests extends
         final DisplayContent dc = spy(createNewDisplay());
         final Task existingFreeformTask = new TaskBuilder(mSupervisor).setCreateActivity(true)
                 .setWindowingMode(WINDOWING_MODE_FREEFORM).setPackage(packageName).build();
+        existingFreeformTask.topRunningActivity().launchMode = LAUNCH_SINGLE_INSTANCE;
         existingFreeformTask.setBounds(
                 /* left */ 0,
                 /* top */ 0,
@@ -292,8 +294,8 @@ public class DesktopModeLaunchParamsModifierTests extends
         // so first instance will close.
         final Task launchingTask = new TaskBuilder(mSupervisor).setPackage(packageName)
                 .setCreateActivity(true).build();
+        launchingTask.topRunningActivity().launchMode = LAUNCH_SINGLE_INSTANCE;
         launchingTask.onDisplayChanged(dc);
-        launchingTask.intent.addFlags(FLAG_ACTIVITY_NEW_TASK);
 
         // New instance should inherit task bounds of old instance.
         assertEquals(RESULT_DONE,
@@ -383,7 +385,7 @@ public class DesktopModeLaunchParamsModifierTests extends
         spyOn(mActivity.mAppCompatController.getAspectRatioOverrides());
         doReturn(true).when(
                         mActivity.mAppCompatController.getAspectRatioOverrides())
-                .isUserFullscreenOverrideEnabled();
+                .hasFullscreenOverride();
 
         final int desiredWidth =
                 (int) (LANDSCAPE_DISPLAY_BOUNDS.width() * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
@@ -411,7 +413,7 @@ public class DesktopModeLaunchParamsModifierTests extends
         spyOn(mActivity.mAppCompatController.getAspectRatioOverrides());
         doReturn(true).when(
                         mActivity.mAppCompatController.getAspectRatioOverrides())
-                .isSystemOverrideToFullscreenEnabled();
+                .hasFullscreenOverride();
 
         final int desiredWidth =
                 (int) (LANDSCAPE_DISPLAY_BOUNDS.width() * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
@@ -437,7 +439,7 @@ public class DesktopModeLaunchParamsModifierTests extends
 
         spyOn(activity.mAppCompatController.getDesktopAspectRatioPolicy());
         doReturn(LETTERBOX_ASPECT_RATIO).when(activity.mAppCompatController
-                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any());
+                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any(), anyBoolean());
 
         final int desiredWidth =
                 (int) ((LANDSCAPE_DISPLAY_BOUNDS.height() / LETTERBOX_ASPECT_RATIO) + 0.5f);
@@ -933,7 +935,7 @@ public class DesktopModeLaunchParamsModifierTests extends
 
         spyOn(activity.mAppCompatController.getDesktopAspectRatioPolicy());
         doReturn(LETTERBOX_ASPECT_RATIO).when(activity.mAppCompatController
-                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any());
+                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any(), anyBoolean());
 
         final int desiredHeight =
                 (int) (LANDSCAPE_DISPLAY_BOUNDS.height() * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
@@ -1060,7 +1062,7 @@ public class DesktopModeLaunchParamsModifierTests extends
 
         spyOn(activity.mAppCompatController.getDesktopAspectRatioPolicy());
         doReturn(LETTERBOX_ASPECT_RATIO).when(activity.mAppCompatController
-                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any());
+                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any(), anyBoolean());
 
         final int desiredWidth = PORTRAIT_DISPLAY_BOUNDS.width()
                 - (DESKTOP_MODE_LANDSCAPE_APP_PADDING * 2);
@@ -1115,7 +1117,7 @@ public class DesktopModeLaunchParamsModifierTests extends
 
         spyOn(activity.mAppCompatController.getDesktopAspectRatioPolicy());
         doReturn(LETTERBOX_ASPECT_RATIO).when(activity.mAppCompatController
-                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any());
+                .getDesktopAspectRatioPolicy()).calculateAspectRatio(any(), anyBoolean());
 
         final int desiredWidth = PORTRAIT_DISPLAY_BOUNDS.width()
                 - (DESKTOP_MODE_LANDSCAPE_APP_PADDING * 2);
@@ -1165,6 +1167,32 @@ public class DesktopModeLaunchParamsModifierTests extends
         assertEquals(RESULT_DONE,
                 new CalculateRequestBuilder().setTask(task).setOptions(options).calculate());
         assertEquals(WINDOWING_MODE_FREEFORM, mResult.mWindowingMode);
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
+            Flags.FLAG_ENABLE_SHELL_INITIAL_BOUNDS_REGRESSION_BUG_FIX})
+    public void testOptionsBoundsSet_flexibleLaunchSizeWithFullscreenOverride_noModifications() {
+        setupDesktopModeLaunchParamsModifier();
+
+        final TestDisplayContent display = createNewDisplayContent(WINDOWING_MODE_FULLSCREEN);
+        final Task task = new TaskBuilder(mSupervisor).setActivityType(
+                ACTIVITY_TYPE_STANDARD).setDisplay(display).build();
+        final ActivityOptions options = ActivityOptions.makeBasic()
+                .setLaunchBounds(new Rect(
+                        DISPLAY_STABLE_BOUNDS.left,
+                        DISPLAY_STABLE_BOUNDS.top,
+                        /* right = */ 500,
+                        /* bottom = */ 500))
+                .setFlexibleLaunchSize(true);
+        spyOn(mActivity.mAppCompatController.getAspectRatioOverrides());
+        doReturn(true).when(
+                        mActivity.mAppCompatController.getAspectRatioOverrides())
+                .hasFullscreenOverride();
+
+        assertEquals(RESULT_DONE,
+                new CalculateRequestBuilder().setTask(task).setOptions(options).calculate());
+        assertEquals(options.getLaunchBounds(), mResult.mBounds);
     }
 
     @Test
@@ -1543,7 +1571,7 @@ public class DesktopModeLaunchParamsModifierTests extends
                 activity.mAppCompatController.getDesktopAspectRatioPolicy();
         spyOn(desktopAppCompatAspectRatioPolicy);
         doReturn(aspectRatio).when(desktopAppCompatAspectRatioPolicy)
-                .getDesiredAspectRatio(any());
+                .getDesiredAspectRatio(any(), anyBoolean());
     }
 
     private void applyUserMinAspectRatioOverride(ActivityRecord activity, int overrideCode,
@@ -1553,7 +1581,7 @@ public class DesktopModeLaunchParamsModifierTests extends
                 activity.mAppCompatController.getDesktopAspectRatioPolicy();
         spyOn(desktopAppCompatAspectRatioPolicy);
         doReturn(1f).when(desktopAppCompatAspectRatioPolicy)
-                .getDesiredAspectRatio(any());
+                .getDesiredAspectRatio(any(), anyBoolean());
 
         // Enable user aspect ratio settings
         final AppCompatConfiguration appCompatConfiguration =

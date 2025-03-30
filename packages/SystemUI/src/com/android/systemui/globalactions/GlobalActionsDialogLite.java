@@ -58,7 +58,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.PowerManager;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -147,13 +149,13 @@ import com.android.systemui.util.RingerModeTracker;
 import com.android.systemui.util.settings.GlobalSettings;
 import com.android.systemui.util.settings.SecureSettings;
 
+import dagger.Lazy;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 
 import javax.inject.Inject;
-
-import dagger.Lazy;
 
 /**
  * Helper to show the global actions dialog.  Each item is an {@link Action} that may show depending
@@ -194,6 +196,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     static final String GLOBAL_ACTION_KEY_EMERGENCY = "emergency";
     static final String GLOBAL_ACTION_KEY_SCREENSHOT = "screenshot";
     static final String GLOBAL_ACTION_KEY_SYSTEM_UPDATE = "system_update";
+    static final String GLOBAL_ACTION_KEY_STANDBY = "standby";
 
     // See NotificationManagerService#scheduleDurationReachedLocked
     private static final long TOAST_FADE_TIME = 333;
@@ -250,6 +253,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     private boolean mHasTelephony;
     private boolean mHasVibrator;
     private final boolean mShowSilentToggle;
+    private final boolean mIsTv;
     private final EmergencyAffordanceManager mEmergencyAffordanceManager;
     private final ScreenshotHelper mScreenshotHelper;
     private final SysuiColorExtractor mSysuiColorExtractor;
@@ -270,6 +274,17 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     private final UserLogoutInteractor mLogoutInteractor;
     private final GlobalActionsInteractor mInteractor;
     private final Lazy<DisplayWindowPropertiesRepository> mDisplayWindowPropertiesRepositoryLazy;
+    private final PowerManager mPowerManager;
+    private final Handler mHandler;
+
+    private final UserTracker.Callback mOnUserSwitched = new UserTracker.Callback() {
+        @Override
+        public void onBeforeUserSwitching(int newUser) {
+            // Dismiss the dialog as soon as we start switching. This will schedule a message
+            // in a handler so it will be pretty quick.
+            dismissDialog();
+        }
+    };
 
     @VisibleForTesting
     public enum GlobalActionsEvent implements UiEventLogger.UiEventEnum {
@@ -331,7 +346,10 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         GA_CLOSE_POWER_VOLUP(811),
 
         @UiEvent(doc = "System Update button was pressed.")
-        GA_SYSTEM_UPDATE_PRESS(1716);
+        GA_SYSTEM_UPDATE_PRESS(1716),
+
+        @UiEvent(doc = "The global actions standby button was pressed.")
+        GA_STANDBY_PRESS(2210);
 
         private final int mId;
 
@@ -386,7 +404,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             SelectedUserInteractor selectedUserInteractor,
             UserLogoutInteractor logoutInteractor,
             GlobalActionsInteractor interactor,
-            Lazy<DisplayWindowPropertiesRepository> displayWindowPropertiesRepository) {
+            Lazy<DisplayWindowPropertiesRepository> displayWindowPropertiesRepository,
+            PowerManager powerManager) {
         mContext = context;
         mWindowManagerFuncs = windowManagerFuncs;
         mAudioManager = audioManager;
@@ -424,6 +443,30 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         mLogoutInteractor = logoutInteractor;
         mInteractor = interactor;
         mDisplayWindowPropertiesRepositoryLazy = displayWindowPropertiesRepository;
+        mPowerManager = powerManager;
+
+        mHandler = new Handler(mMainHandler.getLooper()) {
+            public void handleMessage(Message msg) {
+                switch (msg.what) {
+                    case MESSAGE_DISMISS:
+                        if (mDialog != null) {
+                            if (SYSTEM_DIALOG_REASON_DREAM.equals(msg.obj)) {
+                                // Hide instantly.
+                                mDialog.hide();
+                                mDialog.dismiss();
+                            } else {
+                                mDialog.dismiss();
+                            }
+                            mDialog = null;
+                        }
+                        break;
+                    case MESSAGE_REFRESH:
+                        refreshSilentMode();
+                        mAdapter.notifyDataSetChanged();
+                        break;
+                }
+            }
+        };
 
         // receive broadcasts
         IntentFilter filter = new IntentFilter();
@@ -433,6 +476,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         mBroadcastDispatcher.registerReceiver(mBroadcastReceiver, filter);
 
         mHasTelephony = packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY);
+        mIsTv = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK);
 
         // get notified of phone state changes
         mTelephonyListenerManager.addServiceStateListener(mPhoneStateListener);
@@ -537,6 +581,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                 expandable != null ? expandable.dialogTransitionController(
                         new DialogCuj(InteractionJankMonitor.CUJ_SHADE_DIALOG_OPEN,
                                 INTERACTION_JANK_TAG)) : null;
+        mUserTracker.addCallback(mOnUserSwitched, mBackgroundExecutor);
         if (controller != null) {
             mDialogTransitionAnimator.show(mDialog, controller);
         } else {
@@ -663,6 +708,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                 }
             } else if (GLOBAL_ACTION_KEY_SYSTEM_UPDATE.equals(actionKey)) {
                 addIfShouldShowAction(tempActions, new SystemUpdateAction());
+            } else if (GLOBAL_ACTION_KEY_STANDBY.equals(actionKey)) {
+                addIfShouldShowAction(tempActions, new StandbyAction());
             } else {
                 Log.e(TAG, "Invalid global action key " + actionKey);
             }
@@ -813,6 +860,11 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     @Override
     public void dismissGlobalActionsMenu() {
         dismissDialog();
+    }
+
+    @VisibleForTesting
+    boolean isTv() {
+        return mIsTv;
     }
 
     @VisibleForTesting
@@ -1211,6 +1263,36 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         }
     }
 
+    @VisibleForTesting
+    class StandbyAction extends SinglePressAction {
+        StandbyAction() {
+            super(R.drawable.ic_standby, R.string.global_action_standby);
+        }
+
+        @Override
+        public void onPress() {
+            // Add a little delay before executing, to give the dialog a chance to go away before
+            // going to sleep. Otherwise, we see screen flicker randomly.
+            mHandler.postDelayed(() -> {
+                mUiEventLogger.log(GlobalActionsEvent.GA_STANDBY_PRESS);
+                mBackgroundExecutor.execute(() -> {
+                    mPowerManager.goToSleep(SystemClock.uptimeMillis(),
+                            PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON, 0);
+                });
+            }, mDialogPressDelay);
+        }
+
+        @Override
+        public boolean showDuringKeyguard() {
+            return true;
+        }
+
+        @Override
+        public boolean showBeforeProvisioning() {
+            return true;
+        }
+    }
+
     private Action getSettingsAction() {
         return new SinglePressAction(R.drawable.ic_settings,
                 R.string.global_action_settings) {
@@ -1404,6 +1486,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         mWindowManagerFuncs.onGlobalActionsHidden();
         mLifecycle.setCurrentState(Lifecycle.State.CREATED);
         mInteractor.onDismissed();
+        mUserTracker.removeCallback(mOnUserSwitched);
     }
 
     /**
@@ -1785,17 +1868,20 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
      * A single press action maintains no state, just responds to a press and takes an action.
      */
 
-    private abstract class SinglePressAction implements Action {
+    @VisibleForTesting
+    abstract class SinglePressAction implements Action {
         private final int mIconResId;
         private final Drawable mIcon;
         private final int mMessageResId;
         private final CharSequence mMessage;
+        @VisibleForTesting ImageView mIconView;
 
         protected SinglePressAction(int iconResId, int messageResId) {
             mIconResId = iconResId;
             mMessageResId = messageResId;
             mMessage = null;
             mIcon = null;
+            mIconView = null;
         }
 
         protected SinglePressAction(int iconResId, Drawable icon, CharSequence message) {
@@ -1846,12 +1932,24 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             // ConstraintLayout flow needs an ID to reference
             v.setId(View.generateViewId());
 
-            ImageView icon = v.findViewById(R.id.icon);
+            mIconView = v.findViewById(R.id.icon);
             TextView messageView = v.findViewById(R.id.message);
             messageView.setSelected(true); // necessary for marquee to work
 
-            icon.setImageDrawable(getIcon(context));
-            icon.setScaleType(ScaleType.CENTER_CROP);
+            mIconView.setImageDrawable(getIcon(context));
+            mIconView.setScaleType(ScaleType.CENTER_CROP);
+            if (com.android.systemui.Flags.tvGlobalActionsFocus()) {
+                if (isTv()) {
+                    mIconView.setFocusable(true);
+                    mIconView.setClickable(true);
+                    mIconView.setBackground(mContext.getDrawable(com.android.systemui.res.R.drawable
+                                    .global_actions_lite_button_background));
+                    mIconView.setOnClickListener(i -> onClick());
+                    if (mItems.get(0) == this) {
+                        mIconView.requestFocus();
+                    }
+                }
+            }
 
             if (mMessage != null) {
                 messageView.setText(mMessage);
@@ -1860,6 +1958,22 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             }
 
             return v;
+        }
+
+        private void onClick() {
+            if (mDialog != null) {
+                // don't dismiss the dialog if we're opening the power options menu
+                if (!(this instanceof PowerOptionsAction)) {
+                    // Usually clicking an item shuts down the phone, locks, or starts an
+                    // activity. We don't want to animate back into the power button when that
+                    // happens, so we disable the dialog animation before dismissing.
+                    mDialogTransitionAnimator.disableAllCurrentDialogsExitAnimations();
+                    mDialog.dismiss();
+                }
+            } else {
+                Log.w(TAG, "Action icon clicked while mDialog is null.");
+            }
+            onPress();
         }
     }
 
@@ -2227,29 +2341,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     @VisibleForTesting void setZeroDialogPressDelayForTesting() {
         mDialogPressDelay = 0; // ms
     }
-
-    private Handler mHandler = new Handler() {
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case MESSAGE_DISMISS:
-                    if (mDialog != null) {
-                        if (SYSTEM_DIALOG_REASON_DREAM.equals(msg.obj)) {
-                            // Hide instantly.
-                            mDialog.hide();
-                            mDialog.dismiss();
-                        } else {
-                            mDialog.dismiss();
-                        }
-                        mDialog = null;
-                    }
-                    break;
-                case MESSAGE_REFRESH:
-                    refreshSilentMode();
-                    mAdapter.notifyDataSetChanged();
-                    break;
-            }
-        }
-    };
 
     private void onAirplaneModeChanged() {
         // Let the service state callbacks handle the state.

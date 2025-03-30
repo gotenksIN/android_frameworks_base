@@ -220,6 +220,7 @@ filegroup {
         "tests/src/**/systemui/statusbar/phone/StatusBarBoundsProviderTest.kt",
         "tests/src/**/systemui/statusbar/phone/StatusBarMoveFromCenterAnimationControllerTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/airplane/ui/viewmodel/AirplaneModeViewModelImplTest.kt",
+        "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/prod/MobileConnectionsRepositoryKairosAdapterTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/prod/MobileConnectionsRepositoryTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/ui/view/ModernStatusBarMobileViewTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/wifi/ui/view/ModernStatusBarWifiViewTest.kt",
@@ -356,7 +357,9 @@ filegroup {
         "tests/src/**/systemui/qs/tiles/AlarmTileTest.kt",
         "tests/src/**/systemui/qs/tiles/BluetoothTileTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/prod/FullMobileConnectionRepositoryTest.kt",
+        "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/prod/MobileConnectionRepositoryKairosAdapterTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/prod/MobileConnectionRepositoryTest.kt",
+        "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/prod/MobileConnectionKairosAdapterTelephonySmokeTests.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/prod/MobileConnectionTelephonySmokeTests.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/data/repository/MobileRepositorySwitcherTest.kt",
         "tests/src/**/systemui/statusbar/pipeline/mobile/data/model/SystemUiCarrierConfigTest.kt",
@@ -429,6 +432,7 @@ android_library {
     manifest: "AndroidManifest-res.xml",
     flags_packages: [
         "android.app.flags-aconfig",
+        "com_android_systemui_flags",
     ],
 }
 
@@ -534,6 +538,7 @@ android_library {
         "androidx.compose.animation_animation-graphics",
         "androidx.lifecycle_lifecycle-viewmodel-compose",
         "kairos",
+        "displaylib",
         "aconfig_settings_flags_lib",
     ],
     manifest: "AndroidManifest.xml",
@@ -733,6 +738,7 @@ android_library {
         "Traceur-res",
         "aconfig_settings_flags_lib",
         "kairos",
+        "displaylib",
     ],
 }
 
@@ -775,6 +781,7 @@ android_library {
         "androidx.compose.runtime_runtime",
         "kairos",
         "kosmos",
+        "displaylib",
         "testables",
         "androidx.test.rules",
         "platform-compat-test-rules",

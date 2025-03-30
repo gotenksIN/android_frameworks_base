@@ -17,12 +17,18 @@
 package com.android.systemui.statusbar.chips.call.ui.viewmodel
 
 import android.app.PendingIntent
+import android.content.ComponentName
+import android.content.Intent
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.FlagsParameterization
 import android.view.View
 import androidx.test.filters.SmallTest
+import com.android.internal.logging.InstanceId
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.activity.data.repository.activityManagerRepository
+import com.android.systemui.activity.data.repository.fake
+import com.android.systemui.animation.ActivityTransitionAnimator
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.ContentDescription.Companion.loadContentDescription
 import com.android.systemui.common.shared.model.Icon
@@ -39,7 +45,6 @@ import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.view.ChipBackgroundContainer
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.core.StatusBarRootModernization
-import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 import com.android.systemui.statusbar.phone.ongoingcall.DisableChipsModernization
 import com.android.systemui.statusbar.phone.ongoingcall.EnableChipsModernization
 import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
@@ -51,6 +56,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlin.test.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -92,36 +98,57 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    fun chip_inCall_zeroStartTime_isShownAsIconOnly() =
+    fun chip_inCall_hasKeyWithPrefix() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
             addOngoingCallState(startTimeMs = 0, isAppVisible = false)
 
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).key)
+                .startsWith(CallChipViewModel.KEY_PREFIX)
         }
 
     @Test
-    fun chip_inCall_negativeStartTime_isShownAsIconOnly() =
+    fun chip_inCall_zeroStartTime_isShownAsIconOnly_withData() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
-            addOngoingCallState(startTimeMs = -2, isAppVisible = false)
+            val instanceId = InstanceId.fakeInstanceId(10)
+            addOngoingCallState(startTimeMs = 0, isAppVisible = false, instanceId = instanceId)
 
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
             assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
+            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
         }
 
     @Test
-    fun chip_inCall_positiveStartTime_isShownAsTimer() =
+    fun chip_inCall_negativeStartTime_isShownAsIconOnly_withData() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
-            addOngoingCallState(startTimeMs = 345, isAppVisible = false)
+            val instanceId = InstanceId.fakeInstanceId(10)
+            addOngoingCallState(startTimeMs = -2, isAppVisible = false, instanceId = instanceId)
+
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
+            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
+        }
+
+    @Test
+    fun chip_inCall_positiveStartTime_isShownAsTimer_withData() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            val instanceId = InstanceId.fakeInstanceId(10)
+            addOngoingCallState(startTimeMs = 345, isAppVisible = false, instanceId = instanceId)
 
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
             assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
+            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
         }
 
     @Test
@@ -146,6 +173,7 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
             assertThat((latest as OngoingActivityChipModel.Active).isHidden).isTrue()
+            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
         }
 
     @Test
@@ -170,6 +198,7 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
             assertThat((latest as OngoingActivityChipModel.Active).isHidden).isTrue()
+            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
         }
 
     @Test
@@ -194,6 +223,7 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
             assertThat((latest as OngoingActivityChipModel.Active).isHidden).isTrue()
+            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
         }
 
     @Test
@@ -481,6 +511,303 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             verify(kosmos.activityStarter).postStartActivityDismissingKeyguard(pendingIntent, null)
         }
 
+    @Test
+    @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
+    @EnableChipsModernization
+    fun chipWithReturnAnimation_updatesCorrectly_withStateAndTransitionState() =
+        kosmos.runTest {
+            val pendingIntent = mock<PendingIntent>()
+            val intent = mock<Intent>()
+            whenever(pendingIntent.intent).thenReturn(intent)
+            val component = mock<ComponentName>()
+            whenever(intent.component).thenReturn(component)
+
+            val expandable = mock<Expandable>()
+            val activityController = mock<ActivityTransitionAnimator.Controller>()
+            whenever(
+                    expandable.activityTransitionController(
+                        anyOrNull(),
+                        anyOrNull(),
+                        any(),
+                        anyOrNull(),
+                        any(),
+                    )
+                )
+                .thenReturn(activityController)
+
+            val latest by collectLastValue(underTest.chip)
+
+            // Start off with no call.
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+            assertThat(latest!!.transitionManager!!.controllerFactory).isNull()
+
+            // Call starts [NoCall -> InCall(isAppVisible=true), NoTransition].
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isTrue()
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+            val factory = latest!!.transitionManager!!.controllerFactory
+            assertThat(factory!!.component).isEqualTo(component)
+
+            // Request a return transition [InCall(isAppVisible=true), NoTransition ->
+            // ReturnRequested].
+            factory.onCompose(expandable)
+            var controller = factory.createController(forLaunch = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isTrue()
+
+            // Start the return transition [InCall(isAppVisible=true), ReturnRequested ->
+            // Returning].
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // End the return transition [InCall(isAppVisible=true), Returning -> NoTransition].
+            controller.onTransitionAnimationEnd(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // Settle the return transition [InCall(isAppVisible=true) ->
+            // InCall(isAppVisible=false), NoTransition].
+            kosmos.activityManagerRepository.fake.setIsAppVisible(NOTIFICATION_UID, false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // Trigger a launch transition [InCall(isAppVisible=false) -> InCall(isAppVisible=true),
+            // NoTransition].
+            kosmos.activityManagerRepository.fake.setIsAppVisible(NOTIFICATION_UID, true)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // Request the return transition [InCall(isAppVisible=true), NoTransition ->
+            // LaunchRequested].
+            controller = factory.createController(forLaunch = true)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // Start the return transition [InCall(isAppVisible=true), LaunchRequested ->
+            // Launching].
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // End the return transition [InCall(isAppVisible=true), Launching -> NoTransition].
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // End the call with the app visible [InCall(isAppVisible=true) -> NoCall,
+            // NoTransition].
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+            assertThat(latest!!.transitionManager!!.controllerFactory).isNull()
+
+            // End the call with the app hidden [InCall(isAppVisible=false) -> NoCall,
+            // NoTransition].
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                isAppVisible = false,
+            )
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+            assertThat(latest!!.transitionManager!!.controllerFactory).isNull()
+        }
+
+    @Test
+    @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
+    fun chipLegacy_hasNoTransitionAnimationInformation() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            // NoCall
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest!!.transitionManager).isNull()
+
+            // InCall with visible app
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            assertThat(latest!!.transitionManager).isNull()
+
+            // InCall with hidden app
+            kosmos.activityManagerRepository.fake.setIsAppVisible(NOTIFICATION_UID, false)
+            assertThat(latest!!.transitionManager).isNull()
+        }
+
+    @Test
+    @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
+    @EnableChipsModernization
+    fun chipWithReturnAnimation_chipDataChangesMidTransition() =
+        kosmos.runTest {
+            val pendingIntent = mock<PendingIntent>()
+            val intent = mock<Intent>()
+            whenever(pendingIntent.intent).thenReturn(intent)
+            val component = mock<ComponentName>()
+            whenever(intent.component).thenReturn(component)
+
+            val expandable = mock<Expandable>()
+            val activityController = mock<ActivityTransitionAnimator.Controller>()
+            whenever(
+                    expandable.activityTransitionController(
+                        anyOrNull(),
+                        anyOrNull(),
+                        any(),
+                        anyOrNull(),
+                        any(),
+                    )
+                )
+                .thenReturn(activityController)
+
+            val latest by collectLastValue(underTest.chip)
+
+            // Start with the app visible and trigger a return animation.
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            var factory = latest!!.transitionManager!!.controllerFactory!!
+            factory.onCompose(expandable)
+            var controller = factory.createController(forLaunch = false)
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+
+            // The chip changes state.
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 0,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+
+            // Reset the state and trigger a launch animation.
+            controller.onTransitionAnimationEnd(isExpandingFullyAbove = false)
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            factory = latest!!.transitionManager!!.controllerFactory!!
+            factory.onCompose(expandable)
+            controller = factory.createController(forLaunch = true)
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+
+            // The chip changes state.
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = -2,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.IconOnly::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+        }
+
+    @Test
+    @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
+    @EnableChipsModernization
+    fun chipWithReturnAnimation_chipDisappearsMidTransition() =
+        kosmos.runTest {
+            val pendingIntent = mock<PendingIntent>()
+            val intent = mock<Intent>()
+            whenever(pendingIntent.intent).thenReturn(intent)
+            val component = mock<ComponentName>()
+            whenever(intent.component).thenReturn(component)
+
+            val expandable = mock<Expandable>()
+            val activityController = mock<ActivityTransitionAnimator.Controller>()
+            whenever(
+                    expandable.activityTransitionController(
+                        anyOrNull(),
+                        anyOrNull(),
+                        any(),
+                        anyOrNull(),
+                        any(),
+                    )
+                )
+                .thenReturn(activityController)
+
+            val latest by collectLastValue(underTest.chip)
+
+            // Start with the app visible and trigger a return animation.
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            var factory = latest!!.transitionManager!!.controllerFactory!!
+            factory.onCompose(expandable)
+            var controller = factory.createController(forLaunch = false)
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+
+            // The chip disappears.
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+
+            // Reset the state and trigger a launch animation.
+            controller.onTransitionAnimationEnd(isExpandingFullyAbove = false)
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            factory = latest!!.transitionManager!!.controllerFactory!!
+            factory.onCompose(expandable)
+            controller = factory.createController(forLaunch = true)
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active.Timer::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+
+            // The chip disappears.
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+        }
+
     companion object {
         fun createStatusBarIconViewOrNull(): StatusBarIconView? =
             if (StatusBarConnectedDisplays.isEnabled) {
@@ -489,17 +816,8 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 mock<StatusBarIconView>()
             }
 
-        private val PROMOTED_CONTENT_WITH_COLOR =
-            PromotedNotificationContentModel.Builder("notif")
-                .apply {
-                    this.colors =
-                        PromotedNotificationContentModel.Colors(
-                            backgroundColor = PROMOTED_BACKGROUND_COLOR,
-                            primaryTextColor = PROMOTED_PRIMARY_TEXT_COLOR,
-                        )
-                }
-                .build()
-
+        private const val NOTIFICATION_KEY = "testKey"
+        private const val NOTIFICATION_UID = 12345
         private const val PROMOTED_BACKGROUND_COLOR = 65
         private const val PROMOTED_PRIMARY_TEXT_COLOR = 98
 

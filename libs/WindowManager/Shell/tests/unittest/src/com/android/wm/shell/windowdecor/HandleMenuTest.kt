@@ -43,6 +43,7 @@ import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
+import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_UNDEFINED
@@ -95,10 +96,10 @@ class HandleMenuTest : ShellTestCase() {
     private lateinit var mockTaskResourceLoader: WindowDecorTaskResourceLoader
     @Mock
     private lateinit var mockAppIcon: Bitmap
+    @Mock
+    private lateinit var mockDesktopModeUiEventLogger: DesktopModeUiEventLogger
 
     private lateinit var handleMenu: HandleMenu
-
-    private val menuWidthWithElevation = MENU_WIDTH + MENU_PILL_ELEVATION
 
     @Before
     fun setUp() {
@@ -126,7 +127,6 @@ class HandleMenuTest : ShellTestCase() {
             addOverride(R.dimen.desktop_mode_handle_menu_height, MENU_HEIGHT)
             addOverride(R.dimen.desktop_mode_handle_menu_margin_top, MENU_TOP_MARGIN)
             addOverride(R.dimen.desktop_mode_handle_menu_margin_start, MENU_START_MARGIN)
-            addOverride(R.dimen.desktop_mode_handle_menu_pill_elevation, MENU_PILL_ELEVATION)
             addOverride(
                 R.dimen.desktop_mode_handle_menu_pill_spacing_margin, MENU_PILL_SPACING_MARGIN)
         }
@@ -141,7 +141,7 @@ class HandleMenuTest : ShellTestCase() {
         assertTrue(handleMenu.handleMenuViewContainer is AdditionalSystemViewContainer)
         // Verify menu is created at coordinates that, when added to WindowManager,
         // show at the top-center of display.
-        val expected = Point(DISPLAY_BOUNDS.centerX() - menuWidthWithElevation / 2, MENU_TOP_MARGIN)
+        val expected = Point(DISPLAY_BOUNDS.centerX() - MENU_WIDTH / 2, MENU_TOP_MARGIN)
         assertEquals(expected.toPointF(), handleMenu.handleMenuPosition)
     }
 
@@ -165,7 +165,7 @@ class HandleMenuTest : ShellTestCase() {
         // Verify menu is created at coordinates that, when added to WindowManager,
         // show at the top-center of split left task.
         val expected = Point(
-            SPLIT_LEFT_BOUNDS.centerX() - menuWidthWithElevation / 2,
+            SPLIT_LEFT_BOUNDS.centerX() - MENU_WIDTH / 2,
             MENU_TOP_MARGIN
         )
         assertEquals(expected.toPointF(), handleMenu.handleMenuPosition)
@@ -180,7 +180,7 @@ class HandleMenuTest : ShellTestCase() {
         // Verify menu is created at coordinates that, when added to WindowManager,
         // show at the top-center of split right task.
         val expected = Point(
-            SPLIT_RIGHT_BOUNDS.centerX() - menuWidthWithElevation / 2,
+            SPLIT_RIGHT_BOUNDS.centerX() - MENU_WIDTH / 2,
             MENU_TOP_MARGIN
         )
         assertEquals(expected.toPointF(), handleMenu.handleMenuPosition)
@@ -290,8 +290,10 @@ class HandleMenuTest : ShellTestCase() {
             shouldShowManageWindowsButton = false,
             shouldShowChangeAspectRatioButton = false,
             shouldShowDesktopModeButton = true,
+            shouldShowRestartButton = true,
             isBrowserApp = false,
             null /* openInAppOrBrowserIntent */,
+            mockDesktopModeUiEventLogger,
             captionWidth = HANDLE_WIDTH,
             captionHeight = 50,
             captionX = captionX,
@@ -307,6 +309,7 @@ class HandleMenuTest : ShellTestCase() {
             onChangeAspectRatioClickListener = mock(),
             openInAppOrBrowserClickListener = mock(),
             onOpenByDefaultClickListener = mock(),
+            onRestartClickListener = mock(),
             onCloseMenuClickListener = mock(),
             onOutsideTouchListener = mock(),
             forceShowSystemBars = forceShowSystemBars
@@ -323,7 +326,6 @@ class HandleMenuTest : ShellTestCase() {
         private const val MENU_HEIGHT = 400
         private const val MENU_TOP_MARGIN = 10
         private const val MENU_START_MARGIN = 20
-        private const val MENU_PILL_ELEVATION = 2
         private const val MENU_PILL_SPACING_MARGIN = 4
         private const val HANDLE_WIDTH = 80
         private const val APP_NAME = "Test App"

@@ -31,6 +31,7 @@ cc_library_shared_for_libandroid_runtime {
     name: "libandroid_runtime",
     host_supported: true,
     cflags: [
+        "-Wno-cast-function-type-mismatch",
         "-Wno-unused-parameter",
         "-Wno-non-virtual-dtor",
         "-Wno-maybe-uninitialized",
@@ -211,7 +212,6 @@ cc_library_shared_for_libandroid_runtime {
                 "android_media_AudioAttributes.cpp",
                 "android_media_AudioProductStrategies.cpp",
                 "android_media_AudioVolumeGroups.cpp",
-                "android_media_AudioVolumeGroupCallback.cpp",
                 "android_media_DeviceCallback.cpp",
                 "android_media_MediaMetricsJNI.cpp",
                 "android_media_MicrophoneInfo.cpp",
@@ -312,6 +312,7 @@ cc_library_shared_for_libandroid_runtime {
                 "audioflinger-aidl-cpp",
                 "audiopolicy-types-aidl-cpp",
                 "spatializer-aidl-cpp",
+                "volumegroupcallback-aidl-cpp",
                 "av-types-aidl-cpp",
                 "android.hardware.camera.device@3.2",
                 "camera_platform_flags_c_lib",
@@ -489,6 +490,7 @@ cc_library_shared_for_libandroid_runtime {
                 "libbinder",
                 "libbinder_ndk",
                 "libhidlbase", // libhwbinder is in here
+                "libaconfig_storage_read_api_cc",
             ],
             version_script: "platform/linux/libandroid_runtime_export.txt",
         },

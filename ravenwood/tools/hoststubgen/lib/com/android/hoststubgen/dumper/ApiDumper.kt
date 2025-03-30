@@ -20,14 +20,17 @@ import com.android.hoststubgen.asm.CTOR_NAME
 import com.android.hoststubgen.asm.ClassNodes
 import com.android.hoststubgen.asm.getClassNameFromFullClassName
 import com.android.hoststubgen.asm.getPackageNameFromFullClassName
+import com.android.hoststubgen.asm.isAbstract
+import com.android.hoststubgen.asm.isPublic
 import com.android.hoststubgen.asm.toHumanReadableClassName
 import com.android.hoststubgen.csvEscape
 import com.android.hoststubgen.filters.FilterPolicy
 import com.android.hoststubgen.filters.FilterPolicyWithReason
 import com.android.hoststubgen.filters.OutputFilter
+import com.android.hoststubgen.filters.StatsLabel
 import com.android.hoststubgen.log
-import org.objectweb.asm.Type
 import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.MethodNode
 import java.io.PrintWriter
 
 /**
@@ -44,16 +47,14 @@ class ApiDumper(
         val descriptor: String,
     )
 
-    private val javaStandardApiPolicy = FilterPolicy.Keep.withReason("Java standard API")
-
     private val shownMethods = mutableSetOf<MethodKey>()
 
     /**
      * Do the dump.
      */
     fun dump() {
-        pw.printf("PackageName,ClassName,FromSubclass,DeclareClass,MethodName,MethodDesc" +
-                ",Supported,Policy,Reason\n")
+        pw.printf("PackageName,ClassName,Inherited,DeclareClass,MethodName,MethodDesc" +
+                ",Supported,Policy,Reason,Boring\n")
 
         classes.forEach { classNode ->
             shownMethods.clear()
@@ -68,23 +69,25 @@ class ApiDumper(
         methodClassName: String,
         methodName: String,
         methodDesc: String,
-        policy: FilterPolicyWithReason,
+        computedMethodLabel: StatsLabel,
+        methodPolicy: FilterPolicyWithReason,
     ) {
         pw.printf(
-            "%s,%s,%d,%s,%s,%s,%d,%s,%s\n",
+            "%s,%s,%d,%s,%s,%s,%d,%s,%s,%d\n",
             csvEscape(classPackage),
             csvEscape(className),
             if (isSuperClass) { 1 } else { 0 },
             csvEscape(methodClassName),
             csvEscape(methodName),
-            csvEscape(methodDesc),
-            if (policy.policy.isSupported) { 1 } else { 0 },
-            policy.policy,
-            csvEscape(policy.reason),
+            csvEscape(methodName + methodDesc),
+            if (computedMethodLabel.isSupported) { 1 } else { 0 },
+            methodPolicy.policy,
+            csvEscape(methodPolicy.reason),
+            if (computedMethodLabel == StatsLabel.SupportedButBoring) { 1 } else { 0 },
         )
     }
 
-    private fun isDuplicate(methodName: String, methodDesc: String): Boolean {
+    private fun shownAlready(methodName: String, methodDesc: String): Boolean {
         val methodKey = MethodKey(methodName, methodDesc)
 
         if (shownMethods.contains(methodKey)) {
@@ -94,12 +97,56 @@ class ApiDumper(
         return false
     }
 
+    private fun getClassLabel(cn: ClassNode, classPolicy: FilterPolicyWithReason): StatsLabel {
+        if (!classPolicy.statsLabel.isSupported) {
+            return classPolicy.statsLabel
+        }
+        if (cn.name.endsWith("Proto")
+            || cn.name.endsWith("ProtoEnums")
+            || cn.name.endsWith("LogTags")
+            || cn.name.endsWith("StatsLog")) {
+            return StatsLabel.SupportedButBoring
+        }
+
+        return classPolicy.statsLabel
+    }
+
+    private fun resolveMethodLabel(
+        mn: MethodNode,
+        methodPolicy: FilterPolicyWithReason,
+        classLabel: StatsLabel,
+    ): StatsLabel {
+        // Class label will override the method label
+        if (!classLabel.isSupported) {
+            return classLabel
+        }
+        // If method isn't supported, just use it as-is.
+        if (!methodPolicy.statsLabel.isSupported) {
+            return methodPolicy.statsLabel
+        }
+
+        // Use heuristics to override the label.
+        if (!mn.isPublic() || mn.isAbstract()) {
+            return StatsLabel.SupportedButBoring
+        }
+
+        return methodPolicy.statsLabel
+    }
+
     private fun dump(
         dumpClass: ClassNode,
         methodClass: ClassNode,
         ) {
-        val pkg = getPackageNameFromFullClassName(dumpClass.name).toHumanReadableClassName()
-        val cls = getClassNameFromFullClassName(dumpClass.name).toHumanReadableClassName()
+        val classPolicy = filter.getPolicyForClass(dumpClass.name)
+        if (classPolicy.statsLabel == StatsLabel.Ignored) {
+            return
+        }
+        log.d("Class ${dumpClass.name} -- policy $classPolicy")
+        val classLabel = getClassLabel(dumpClass, classPolicy)
+
+        val humanReadableClassName = dumpClass.name.toHumanReadableClassName()
+        val pkg = getPackageNameFromFullClassName(humanReadableClassName)
+        val cls = getClassNameFromFullClassName(humanReadableClassName)
 
         val isSuperClass = dumpClass != methodClass
 
@@ -112,23 +159,27 @@ class ApiDumper(
                 }
             }
             // If we already printed the method from a subclass, don't print it.
-            if (isDuplicate(method.name, method.desc)) {
+            if (shownAlready(method.name, method.desc)) {
                 return@forEach
             }
 
-            val policy = filter.getPolicyForMethod(methodClass.name, method.name, method.desc)
+            val methodPolicy = filter.getPolicyForMethod(methodClass.name, method.name, method.desc)
 
             // Let's skip "Remove" APIs. Ideally we want to print it, just to make the CSV
             // complete, we still need to hide methods substituted (== @RavenwoodReplace) methods
             // and for now we don't have an easy way to detect it.
-            if (policy.policy == FilterPolicy.Remove) {
+            if (methodPolicy.policy == FilterPolicy.Remove) {
                 return@forEach
             }
 
             val renameTo = filter.getRenameTo(methodClass.name, method.name, method.desc)
 
-            dumpMethod(pkg, cls, isSuperClass, methodClass.name.toHumanReadableClassName(),
-                renameTo ?: method.name, method.desc, policy)
+            val methodLabel = resolveMethodLabel(method, methodPolicy, classLabel)
+
+            if (methodLabel != StatsLabel.Ignored) {
+                dumpMethod(pkg, cls, isSuperClass, methodClass.name.toHumanReadableClassName(),
+                    renameTo ?: method.name, method.desc, methodLabel, methodPolicy)
+            }
        }
 
         // Dump super class methods.
@@ -155,48 +206,6 @@ class ApiDumper(
             dump(dumpClass, methodClass)
             return
         }
-        if (methodClassName.startsWith("java/") ||
-            methodClassName.startsWith("javax/")
-            ) {
-            dumpStandardClass(dumpClass, methodClassName)
-            return
-        }
         log.w("Super class or interface $methodClassName (used by ${dumpClass.name}) not found.")
-    }
-
-    /**
-     * Dump methods from Java standard classes.
-     */
-    private fun dumpStandardClass(
-        dumpClass: ClassNode,
-        methodClassName: String,
-    ) {
-        val pkg = getPackageNameFromFullClassName(dumpClass.name).toHumanReadableClassName()
-        val cls = getClassNameFromFullClassName(dumpClass.name).toHumanReadableClassName()
-
-        val methodClassName = methodClassName.toHumanReadableClassName()
-
-        try {
-            val clazz = Class.forName(methodClassName)
-
-            // Method.getMethods() returns only public methods, but with inherited ones.
-            // Method.getDeclaredMethods() returns private methods too, but no inherited methods.
-            //
-            // Since we're only interested in public ones, just use getMethods().
-            clazz.methods.forEach { method ->
-                val methodName = method.name
-                val methodDesc = Type.getMethodDescriptor(method)
-
-                // If we already printed the method from a subclass, don't print it.
-                if (isDuplicate(methodName, methodDesc)) {
-                    return@forEach
-                }
-
-                dumpMethod(pkg, cls, true, methodClassName,
-                    methodName, methodDesc, javaStandardApiPolicy)
-            }
-        } catch (e: ClassNotFoundException) {
-            log.w("JVM type $methodClassName (used by ${dumpClass.name}) not found.")
-        }
     }
 }

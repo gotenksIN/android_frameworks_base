@@ -15,25 +15,45 @@
  */
 package com.android.server.policy;
 
+import static android.view.Display.DEFAULT_DISPLAY;
+import static android.view.KeyEvent.ACTION_DOWN;
+import static android.view.KeyEvent.ACTION_UP;
+import static android.view.KeyEvent.FLAG_LONG_PRESS;
 import static android.view.KeyEvent.KEYCODE_POWER;
 import static android.view.KeyEvent.KEYCODE_VOLUME_UP;
 
-import static com.android.hardware.input.Flags.FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW;
+import static com.android.cts.input.inputeventmatchers.InputEventMatchersKt.withKeyAction;
+import static com.android.cts.input.inputeventmatchers.InputEventMatchersKt.withKeyCode;
+import static com.android.cts.input.inputeventmatchers.InputEventMatchersKt.withKeyFlags;
 import static com.android.server.policy.PhoneWindowManager.LONG_PRESS_POWER_ASSISTANT;
 import static com.android.server.policy.PhoneWindowManager.LONG_PRESS_POWER_GLOBAL_ACTIONS;
 import static com.android.server.policy.PhoneWindowManager.POWER_MULTI_PRESS_TIMEOUT_MILLIS;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_DREAM_OR_SLEEP;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_GO_TO_SLEEP;
 
-import static org.junit.Assert.assertEquals;
+import static org.hamcrest.Matchers.allOf;
 
+import android.os.RemoteException;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.provider.Settings;
 import android.view.Display;
+import android.view.InputDevice;
+import android.view.InputEvent;
+import android.view.KeyCharacterMap;
+import android.view.KeyEvent;
+
+import androidx.annotation.NonNull;
+
+import com.android.cts.input.BlockingQueueEventVerifier;
+import com.android.systemui.shared.Flags;
 
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Test class for power key gesture.
@@ -154,142 +174,65 @@ public class PowerKeyGestureTests extends ShortcutKeyTestBase {
         mPhoneWindowManager.assertNoPowerSleep();
     }
 
-
-    /**
-     * Double press of power when the window handles the power key events. The
-     * system double power gesture launch should not be performed.
-     */
+    @EnableFlags(Flags.FLAG_ENABLE_LPP_SQUEEZE_EFFECT)
     @Test
-    @EnableFlags(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testPowerDoublePress_windowHasOverridePermissionAndKeysHandled() {
-        mPhoneWindowManager.overrideCanWindowOverridePowerKey(true);
-        setDispatchedKeyHandler(keyEvent -> true);
-
-        sendKey(KEYCODE_POWER);
-        sendKey(KEYCODE_POWER);
-
-        mPhoneWindowManager.assertDidNotLockAfterAppTransitionFinished();
-
-        mPhoneWindowManager.assertNoDoublePowerLaunch();
+    public void testPowerLongPress_flagEnabled_shouldSendSyntheticKeyEvent()
+            throws RemoteException {
+        final BlockingQueue<InputEvent> eventQueue = new LinkedBlockingQueue<>();
+        final BlockingQueueEventVerifier verifier = new BlockingQueueEventVerifier(eventQueue);
+        mPhoneWindowManager.overrideLongPressPowerForSyntheticEvent(LONG_PRESS_POWER_ASSISTANT,
+                eventQueue);
+        sendKeyForTriggeringSyntheticEvent();
+        verifier.assertReceivedKey(allOf(withKeyCode(KEYCODE_POWER), withKeyAction(ACTION_DOWN)));
+        verifier.assertReceivedKey(allOf(withKeyCode(KEYCODE_POWER), withKeyAction(ACTION_DOWN),
+                withKeyFlags(FLAG_LONG_PRESS)));
+        verifier.assertReceivedKey(allOf(withKeyCode(KEYCODE_POWER), withKeyAction(ACTION_UP)));
     }
 
-    /**
-     * Double press of power when the window doesn't handle the power key events.
-     * The system default gesture launch should be performed and the app should receive both events.
-     */
+    @DisableFlags(Flags.FLAG_ENABLE_LPP_SQUEEZE_EFFECT)
     @Test
-    @EnableFlags(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testPowerDoublePress_windowHasOverridePermissionAndKeysUnHandled() {
-        mPhoneWindowManager.overrideCanWindowOverridePowerKey(true);
-        setDispatchedKeyHandler(keyEvent -> false);
-
-        sendKey(KEYCODE_POWER);
-        sendKey(KEYCODE_POWER);
-
-        mPhoneWindowManager.assertDidNotLockAfterAppTransitionFinished();
-        mPhoneWindowManager.assertDoublePowerLaunch();
-        assertEquals(getDownKeysDispatched(), 2);
-        assertEquals(getUpKeysDispatched(), 2);
+    public void testPowerLongPress_flagDisabled_shouldNotSendSyntheticKeyEvent()
+            throws RemoteException {
+        final BlockingQueue<InputEvent> eventQueue = new LinkedBlockingQueue<>();
+        final BlockingQueueEventVerifier verifier = new BlockingQueueEventVerifier(eventQueue);
+        mPhoneWindowManager.overrideLongPressPowerForSyntheticEvent(LONG_PRESS_POWER_ASSISTANT,
+                eventQueue);
+        sendKeyForTriggeringSyntheticEvent();
+        verifier.assertReceivedKey(allOf(withKeyCode(KEYCODE_POWER), withKeyAction(ACTION_DOWN)));
+        verifier.assertReceivedKey(allOf(withKeyCode(KEYCODE_POWER), withKeyAction(ACTION_UP)));
     }
 
-    /**
-     * Triple press of power when the window handles the power key double press gesture.
-     * The system default gesture launch should not be performed, and the app only receives the
-     * first two presses.
-     */
-    @Test
-    @EnableFlags(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testPowerTriplePress_windowHasOverridePermissionAndKeysHandled() {
-        mPhoneWindowManager.overrideCanWindowOverridePowerKey(true);
-        setDispatchedKeyHandler(keyEvent -> true);
+    private void sendKeyForTriggeringSyntheticEvent() {
+        // send power button key down event (without setting long press flag) and move time forward
+        // by long press duration timeout, it should send a synthetic power button down event with
+        // long press flag set
+        final long time = mPhoneWindowManager.getCurrentTime();
+        final KeyEvent downEvent = getPowerButtonKeyEvent(ACTION_DOWN, time);
+        mPhoneWindowManager.interceptKeyBeforeQueueing(downEvent);
+        mPhoneWindowManager.dispatchAllPendingEvents();
+        mPhoneWindowManager.moveTimeForward(SingleKeyGestureDetector.sDefaultLongPressTimeout);
 
-        sendKey(KEYCODE_POWER);
-        sendKey(KEYCODE_POWER);
-        sendKey(KEYCODE_POWER);
-
-        mPhoneWindowManager.assertDidNotLockAfterAppTransitionFinished();
-        mPhoneWindowManager.assertNoDoublePowerLaunch();
-        assertEquals(getDownKeysDispatched(), 2);
-        assertEquals(getUpKeysDispatched(), 2);
+        // send power button key up event to emulate power button has been released
+        final KeyEvent upEvent = getPowerButtonKeyEvent(ACTION_UP, time);
+        mPhoneWindowManager.interceptKeyBeforeQueueing(upEvent);
+        mPhoneWindowManager.dispatchAllPendingEvents();
     }
 
-    /**
-     * Tests a single press, followed by a double press when the window can handle the power key.
-     * The app should receive all 3 events.
-     */
-    @Test
-    @EnableFlags(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testPowerTriplePressWithDelay_windowHasOverridePermissionAndKeysHandled() {
-        mPhoneWindowManager.overrideCanWindowOverridePowerKey(true);
-        setDispatchedKeyHandler(keyEvent -> true);
-
-        sendKey(KEYCODE_POWER);
-        mPhoneWindowManager.moveTimeForward(POWER_MULTI_PRESS_TIMEOUT_MILLIS);
-        sendKey(KEYCODE_POWER);
-        sendKey(KEYCODE_POWER);
-
-        mPhoneWindowManager.assertNoDoublePowerLaunch();
-        assertEquals(getDownKeysDispatched(), 3);
-        assertEquals(getUpKeysDispatched(), 3);
-    }
-
-    /**
-     * Tests single press when window doesn't handle the power key. Phone should go to sleep.
-     */
-    @Test
-    @EnableFlags(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testPowerSinglePress_windowHasOverridePermissionAndKeyUnhandledByApp() {
-        mPhoneWindowManager.overrideCanWindowOverridePowerKey(true);
-        setDispatchedKeyHandler(keyEvent -> false);
-        mPhoneWindowManager.overrideShortPressOnPower(SHORT_PRESS_POWER_GO_TO_SLEEP);
-
-        sendKey(KEYCODE_POWER);
-
-        mPhoneWindowManager.assertPowerSleep();
-    }
-
-    /**
-     * Tests single press when the window handles the power key. Phone should go to sleep after a
-     * delay of {POWER_MULTI_PRESS_TIMEOUT_MILLIS}
-     */
-    @Test
-    @EnableFlags(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testPowerSinglePress_windowHasOverridePermissionAndKeyHandledByApp() {
-        mPhoneWindowManager.overrideCanWindowOverridePowerKey(true);
-        setDispatchedKeyHandler(keyEvent -> true);
-        mPhoneWindowManager.overrideDisplayState(Display.STATE_ON);
-        mPhoneWindowManager.overrideShortPressOnPower(SHORT_PRESS_POWER_GO_TO_SLEEP);
-
-        sendKey(KEYCODE_POWER);
-
-        mPhoneWindowManager.moveTimeForward(POWER_MULTI_PRESS_TIMEOUT_MILLIS);
-
-        mPhoneWindowManager.assertPowerSleep();
-    }
-
-
-    /**
-     * Tests 5x press when the window handles the power key. Emergency gesture should still be
-     * launched.
-     */
-    @Test
-    @EnableFlags(FLAG_OVERRIDE_POWER_KEY_BEHAVIOR_IN_FOCUSED_WINDOW)
-    public void testPowerFiveTimesPress_windowHasOverridePermissionAndKeyHandledByApp() {
-        mPhoneWindowManager.overrideCanWindowOverridePowerKey(true);
-        setDispatchedKeyHandler(keyEvent -> true);
-        mPhoneWindowManager.overrideDisplayState(Display.STATE_ON);
-        mPhoneWindowManager.overrideShortPressOnPower(SHORT_PRESS_POWER_GO_TO_SLEEP);
-
-        int minEmergencyGestureDurationMillis = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_defaultMinEmergencyGestureTapDurationMillis);
-        int durationMillis = minEmergencyGestureDurationMillis / 4;
-        for (int i = 0; i < 5; ++i) {
-            sendKey(KEYCODE_POWER);
-            mPhoneWindowManager.moveTimeForward(durationMillis);
-        }
-
-        mPhoneWindowManager.assertEmergencyLaunch();
-        assertEquals(getDownKeysDispatched(), 2);
-        assertEquals(getUpKeysDispatched(), 2);
+    @NonNull
+    private KeyEvent getPowerButtonKeyEvent(final int action, final long time) {
+        final KeyEvent downEvent = new KeyEvent(
+                /* downTime */ time,
+                /* eventTime */ time,
+                /* action */ action,
+                /* keyCode */ KEYCODE_POWER,
+                /* repeat */ 0,
+                /* metaState */ 0,
+                /* deviceId */ KeyCharacterMap.VIRTUAL_KEYBOARD,
+                /* scanCode */ 0,
+                /* flags */ 0,
+                /* source */ InputDevice.SOURCE_KEYBOARD
+        );
+        downEvent.setDisplayId(DEFAULT_DISPLAY);
+        return downEvent;
     }
 }

@@ -22,7 +22,6 @@ import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_NUMERIC;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_NUMERIC_COMPLEX;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_SOMETHING;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED;
-import static android.security.Flags.reportPrimaryAuthAttempts;
 import static android.security.Flags.shouldTrustManagerListenForPrimaryAuth;
 
 import static com.android.internal.widget.flags.Flags.hideLastCharWithPhysicalInput;
@@ -42,7 +41,6 @@ import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.content.pm.UserInfo;
 import android.hardware.input.InputManagerGlobal;
 import android.os.Build;
@@ -78,7 +76,6 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -241,8 +238,6 @@ public class LockPatternUtils {
     private final SparseLongArray mLockoutDeadlines = new SparseLongArray();
     private Boolean mHasSecureLockScreen;
 
-    private HashMap<UserHandle, UserManager> mUserManagerCache = new HashMap<>();
-
     /**
      * Use {@link TrustManager#isTrustUsuallyManaged(int)}.
      *
@@ -364,22 +359,6 @@ public class LockPatternUtils {
         return mUserManager;
     }
 
-    private UserManager getUserManager(int userId) {
-        UserHandle userHandle = UserHandle.of(userId);
-        if (mUserManagerCache.containsKey(userHandle)) {
-            return mUserManagerCache.get(userHandle);
-        }
-
-        try {
-            Context userContext = mContext.createPackageContextAsUser("system", 0, userHandle);
-            UserManager userManager = userContext.getSystemService(UserManager.class);
-            mUserManagerCache.put(userHandle, userManager);
-            return userManager;
-        } catch (PackageManager.NameNotFoundException e) {
-            throw new RuntimeException("Failed to create context for user " + userHandle, e);
-        }
-    }
-
     private TrustManager getTrustManager() {
         TrustManager trust = (TrustManager) mContext.getSystemService(Context.TRUST_SERVICE);
         if (trust == null) {
@@ -472,7 +451,7 @@ public class LockPatternUtils {
             return;
         }
         getDevicePolicyManager().reportFailedPasswordAttempt(userId);
-        if (!reportPrimaryAuthAttempts() || !shouldTrustManagerListenForPrimaryAuth()) {
+        if (!shouldTrustManagerListenForPrimaryAuth()) {
             getTrustManager().reportUnlockAttempt(/* authenticated= */ false, userId);
         }
     }
@@ -483,7 +462,7 @@ public class LockPatternUtils {
             return;
         }
         getDevicePolicyManager().reportSuccessfulPasswordAttempt(userId);
-        if (!reportPrimaryAuthAttempts() || !shouldTrustManagerListenForPrimaryAuth()) {
+        if (!shouldTrustManagerListenForPrimaryAuth()) {
             getTrustManager().reportUnlockAttempt(/* authenticated= */ true, userId);
         }
     }
@@ -980,7 +959,7 @@ public class LockPatternUtils {
      */
     public void setSeparateProfileChallengeEnabled(int userHandle, boolean enabled,
             LockscreenCredential profilePassword) {
-        if (!isCredentialSharableWithParent(userHandle)) {
+        if (!isCredentialShareableWithParent(userHandle)) {
             return;
         }
         try {
@@ -999,7 +978,7 @@ public class LockPatternUtils {
      * credential is not shareable with its parent, or a non-profile user.
      */
     public boolean isSeparateProfileChallengeEnabled(int userHandle) {
-        return isCredentialSharableWithParent(userHandle) && hasSeparateChallenge(userHandle);
+        return isCredentialShareableWithParent(userHandle) && hasSeparateChallenge(userHandle);
     }
 
     /**
@@ -1009,7 +988,7 @@ public class LockPatternUtils {
      * credential is not shareable with its parent, or a non-profile user.
      */
     public boolean isProfileWithUnifiedChallenge(int userHandle) {
-        return isCredentialSharableWithParent(userHandle) && !hasSeparateChallenge(userHandle);
+        return isCredentialShareableWithParent(userHandle) && !hasSeparateChallenge(userHandle);
     }
 
     /**
@@ -1034,8 +1013,13 @@ public class LockPatternUtils {
         return info != null && info.isManagedProfile();
     }
 
-    private boolean isCredentialSharableWithParent(int userHandle) {
-        return getUserManager(userHandle).isCredentialSharableWithParent();
+    private boolean isCredentialShareableWithParent(int userHandle) {
+        try {
+            return getUserManager().getUserProperties(UserHandle.of(userHandle))
+                    .isCredentialShareableWithParent();
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /**

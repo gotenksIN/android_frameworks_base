@@ -699,8 +699,9 @@ public final class DisplayManagerService extends SystemService {
             final var backupManager = new BackupManager(mContext);
             Consumer<Pair<DisplayTopology, DisplayTopologyGraph>> topologyChangedCallback =
                     update -> {
-                        if (mInputManagerInternal != null) {
-                            mInputManagerInternal.setDisplayTopology(update.second);
+                        DisplayTopologyGraph graph = update.second;
+                        if (mInputManagerInternal != null && graph != null) {
+                            mInputManagerInternal.setDisplayTopology(graph);
                         }
                         deliverTopologyUpdate(update.first);
                     };
@@ -3668,7 +3669,7 @@ public final class DisplayManagerService extends SystemService {
 
     private void deliverTopologyUpdate(DisplayTopology topology) {
         if (DEBUG) {
-            Slog.d(TAG, "Delivering topology update");
+            Slog.d(TAG, "Delivering topology update: " + topology);
         }
         if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
             Trace.instant(Trace.TRACE_TAG_POWER, "deliverTopologyUpdate");
@@ -4245,13 +4246,18 @@ public final class DisplayManagerService extends SystemService {
 
         public boolean mWifiDisplayScanRequested;
 
-        // A single pending event.
+        // A single pending display event.
         private record Event(int displayId, @DisplayEvent int event) { };
 
-        // The list of pending events.  This is null until there is a pending event to be saved.
-        // This is only used if {@link deferDisplayEventsWhenFrozen()} is true.
+        // The list of pending display events. This is null until there is a pending event to be
+        // saved. This is only used if {@link deferDisplayEventsWhenFrozen()} is true.
         @GuardedBy("mCallback")
-        private ArrayList<Event> mPendingEvents;
+        @Nullable
+        private ArrayList<Event> mPendingDisplayEvents;
+
+        @GuardedBy("mCallback")
+        @Nullable
+        private DisplayTopology mPendingTopology;
 
         // Process states: a process is ready to receive events if it is neither cached nor
         // frozen.
@@ -4321,7 +4327,10 @@ public final class DisplayManagerService extends SystemService {
          */
         @GuardedBy("mCallback")
         private boolean hasPendingAndIsReadyLocked() {
-            return isReadyLocked() && mPendingEvents != null && !mPendingEvents.isEmpty() && mAlive;
+            boolean pendingDisplayEvents = mPendingDisplayEvents != null
+                    && !mPendingDisplayEvents.isEmpty();
+            boolean pendingTopology = mPendingTopology != null;
+            return isReadyLocked() && (pendingDisplayEvents || pendingTopology) && mAlive;
         }
 
         /**
@@ -4402,7 +4411,8 @@ public final class DisplayManagerService extends SystemService {
                     // occurs as the client is transitioning to ready but pending events have not
                     // been dispatched.  The new event must be added to the pending list to
                     // preserve event ordering.
-                    if (!isReadyLocked() || (mPendingEvents != null && !mPendingEvents.isEmpty())) {
+                    if (!isReadyLocked() || (mPendingDisplayEvents != null
+                            && !mPendingDisplayEvents.isEmpty())) {
                         // The client is interested in the event but is not ready to receive it.
                         // Put the event on the pending list.
                         addDisplayEvent(displayId, event);
@@ -4489,13 +4499,13 @@ public final class DisplayManagerService extends SystemService {
         // This is only used if {@link deferDisplayEventsWhenFrozen()} is true.
         @GuardedBy("mCallback")
         private void addDisplayEvent(int displayId, int event) {
-            if (mPendingEvents == null) {
-                mPendingEvents = new ArrayList<>();
+            if (mPendingDisplayEvents == null) {
+                mPendingDisplayEvents = new ArrayList<>();
             }
-            if (!mPendingEvents.isEmpty()) {
+            if (!mPendingDisplayEvents.isEmpty()) {
                 // Ignore redundant events. Further optimization is possible by merging adjacent
                 // events.
-                Event last = mPendingEvents.get(mPendingEvents.size() - 1);
+                Event last = mPendingDisplayEvents.get(mPendingDisplayEvents.size() - 1);
                 if (last.displayId == displayId && last.event == event) {
                     if (DEBUG) {
                         Slog.d(TAG, "Ignore redundant display event " + displayId + "/" + event
@@ -4504,12 +4514,13 @@ public final class DisplayManagerService extends SystemService {
                     return;
                 }
             }
-            mPendingEvents.add(new Event(displayId, event));
+            mPendingDisplayEvents.add(new Event(displayId, event));
         }
 
         /**
          * @return {@code false} if RemoteException happens; otherwise {@code true} for
-         * success.
+         * success. This returns true even if the update was deferred because the remote client is
+         * cached or frozen.
          */
         boolean notifyTopologyUpdateAsync(DisplayTopology topology) {
             if ((mInternalEventFlagsMask.get()
@@ -4526,6 +4537,18 @@ public final class DisplayManagerService extends SystemService {
                 // The client is not interested in this event, so do nothing.
                 return true;
             }
+
+            if (deferDisplayEventsWhenFrozen()) {
+                synchronized (mCallback) {
+                    // Save the new update if the client frozen or cached (not ready).
+                    if (!isReadyLocked()) {
+                        // The client is interested in the update but is not ready to receive it.
+                        mPendingTopology = topology;
+                        return true;
+                    }
+                }
+            }
+
             return transmitTopologyUpdate(topology);
         }
 
@@ -4550,37 +4573,54 @@ public final class DisplayManagerService extends SystemService {
         // would be unusual to do so.  The method returns true on success.
         // This is only used if {@link deferDisplayEventsWhenFrozen()} is true.
         public boolean dispatchPending() {
-            Event[] pending;
+            Event[] pendingDisplayEvents = null;
+            DisplayTopology pendingTopology;
             synchronized (mCallback) {
-                if (mPendingEvents == null || mPendingEvents.isEmpty() || !mAlive) {
+                if (!mAlive) {
                     return true;
                 }
                 if (!isReadyLocked()) {
                     return false;
                 }
-                pending = new Event[mPendingEvents.size()];
-                pending = mPendingEvents.toArray(pending);
-                mPendingEvents.clear();
+
+                if (mPendingDisplayEvents != null && !mPendingDisplayEvents.isEmpty()) {
+                    pendingDisplayEvents = new Event[mPendingDisplayEvents.size()];
+                    pendingDisplayEvents = mPendingDisplayEvents.toArray(pendingDisplayEvents);
+                    mPendingDisplayEvents.clear();
+                }
+
+                pendingTopology = mPendingTopology;
+                mPendingTopology = null;
             }
             try {
-                for (int i = 0; i < pending.length; i++) {
-                    Event displayEvent = pending[i];
-                    if (DEBUG) {
-                        Slog.d(TAG, "Send pending display event #" + i + " "
-                                + displayEvent.displayId + "/"
-                                + displayEvent.event + " to " + mUid + "/" + mPid);
-                    }
+                if (pendingDisplayEvents != null) {
+                    for (int i = 0; i < pendingDisplayEvents.length; i++) {
+                        Event displayEvent = pendingDisplayEvents[i];
+                        if (DEBUG) {
+                            Slog.d(TAG, "Send pending display event #" + i + " "
+                                    + displayEvent.displayId + "/"
+                                    + displayEvent.event + " to " + mUid + "/" + mPid);
+                        }
 
-                    if (!shouldReceiveRefreshRateWithChangeUpdate(displayEvent.event)) {
-                        continue;
-                    }
+                        if (!shouldReceiveRefreshRateWithChangeUpdate(displayEvent.event)) {
+                            continue;
+                        }
 
-                    transmitDisplayEvent(displayEvent.displayId, displayEvent.event);
+                        transmitDisplayEvent(displayEvent.displayId, displayEvent.event);
+                    }
                 }
+
+                if (pendingTopology != null) {
+                    if (DEBUG) {
+                        Slog.d(TAG, "Send pending topology: " + pendingTopology
+                                + " to " + mUid + "/" + mPid);
+                    }
+                    mCallback.onTopologyChanged(pendingTopology);
+                }
+
                 return true;
             } catch (RemoteException ex) {
-                Slog.w(TAG, "Failed to notify process "
-                        + mPid + " that display topology changed, assuming it died.", ex);
+                Slog.w(TAG, "Failed to notify process " + mPid + ", assuming it died.", ex);
                 binderDied();
                 return false;
 
@@ -4592,11 +4632,12 @@ public final class DisplayManagerService extends SystemService {
             if (deferDisplayEventsWhenFrozen()) {
                 final String fmt =
                         "mPid=%d mUid=%d mWifiDisplayScanRequested=%s"
-                        + " cached=%s frozen=%s pending=%d";
+                        + " cached=%s frozen=%s pendingDisplayEvents=%d pendingTopology=%b";
                 synchronized (mCallback) {
                     return formatSimple(fmt,
                             mPid, mUid, mWifiDisplayScanRequested, mCached, mFrozen,
-                            (mPendingEvents == null) ? 0 : mPendingEvents.size());
+                            (mPendingDisplayEvents == null) ? 0 : mPendingDisplayEvents.size(),
+                            mPendingTopology != null);
                 }
             } else {
                 final String fmt =

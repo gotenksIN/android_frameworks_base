@@ -30,7 +30,10 @@ import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.os.Build.VERSION_CODES.P;
 import static android.os.Build.VERSION_CODES.Q;
 import static android.view.Display.DEFAULT_DISPLAY;
+import static android.view.Display.FLAG_ALLOWS_CONTENT_MODE_SWITCH;
 import static android.view.Display.FLAG_PRIVATE;
+import static android.view.Display.FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS;
+import static android.view.Display.FLAG_TRUSTED;
 import static android.view.DisplayCutout.BOUNDS_POSITION_TOP;
 import static android.view.DisplayCutout.fromBoundingRect;
 import static android.view.Surface.ROTATION_0;
@@ -1706,8 +1709,6 @@ public class DisplayContentTests extends WindowTestsBase {
         app.setVisible(true);
         doReturn(false).when(app).inTransition();
         mDisplayContent.mFixedRotationTransitionListener.onAppTransitionFinishedLocked(app.token);
-        mStatusBarWindow.finishSeamlessRotation(t);
-        mNavBarWindow.finishSeamlessRotation(t);
 
         // The fixed rotation should be cleared and the new rotation is applied to display.
         assertFalse(app.hasFixedRotationTransform());
@@ -2925,72 +2926,43 @@ public class DisplayContentTests extends WindowTestsBase {
         assertFalse(dc.mWmService.mDisplayWindowSettings.shouldShowSystemDecorsLocked(dc));
     }
 
-    @EnableFlags(FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
     @Test
-    public void testForcedDensityRatioSetForExternalDisplays_persistDensityScaleFlagEnabled() {
+    public void testSetShouldShowSystemDecorations_shouldShowSystemDecorationsDisplay() {
+        // Set up a non-default display with FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS enabled
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
         displayInfo.displayId = DEFAULT_DISPLAY + 1;
-        displayInfo.type = Display.TYPE_EXTERNAL;
-        final DisplayContent displayContent = createNewDisplay(displayInfo);
-        final int baseWidth = 1280;
-        final int baseHeight = 720;
-        final int baseDensity = 320;
-        final float baseXDpi = 60;
-        final float baseYDpi = 60;
+        displayInfo.flags = FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS;
+        final DisplayContent dc = createNewDisplay(displayInfo);
 
-        displayContent.mInitialDisplayWidth = baseWidth;
-        displayContent.mInitialDisplayHeight = baseHeight;
-        displayContent.mInitialDisplayDensity = baseDensity;
-        displayContent.updateBaseDisplayMetrics(baseWidth, baseHeight, baseDensity, baseXDpi,
-                baseYDpi);
-
-        final int forcedDensity = 640;
-
-        // Verify that forcing the density is honored and the size doesn't change.
-        displayContent.setForcedDensity(forcedDensity, 0 /* userId */);
-        verifySizes(displayContent, baseWidth, baseHeight, forcedDensity);
-
-        // Verify that density ratio is set correctly.
-        assertEquals((float) forcedDensity / baseDensity,
-                displayContent.mExternalDisplayForcedDensityRatio, 0.01);
+        dc.onDisplayInfoChangeApplied();
+        assertFalse(dc.mWmService.mDisplayWindowSettings.shouldShowSystemDecorsLocked(dc));
     }
 
-    @EnableFlags(FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
     @Test
-    public void testForcedDensityUpdateForExternalDisplays_persistDensityScaleFlagEnabled() {
+    public void testSetShouldShowSystemDecorations_notAllowContentModeSwitchDisplay() {
+        // Set up a non-default display without FLAG_ALLOWS_CONTENT_MODE_SWITCH enabled
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
         displayInfo.displayId = DEFAULT_DISPLAY + 1;
-        displayInfo.type = Display.TYPE_EXTERNAL;
-        final DisplayContent displayContent = createNewDisplay(displayInfo);
-        final int baseWidth = 1280;
-        final int baseHeight = 720;
-        final int baseDensity = 320;
-        final float baseXDpi = 60;
-        final float baseYDpi = 60;
+        displayInfo.flags = FLAG_TRUSTED;
+        final DisplayContent dc = createNewDisplay(displayInfo);
 
-        displayContent.mInitialDisplayWidth = baseWidth;
-        displayContent.mInitialDisplayHeight = baseHeight;
-        displayContent.mInitialDisplayDensity = baseDensity;
-        displayContent.updateBaseDisplayMetrics(baseWidth, baseHeight, baseDensity, baseXDpi,
-                baseYDpi);
+        dc.onDisplayInfoChangeApplied();
+        assertFalse(dc.mWmService.mDisplayWindowSettings.shouldShowSystemDecorsLocked(dc));
+    }
 
-        final int forcedDensity = 640;
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
+    @Test
+    public void testSetShouldShowSystemDecorations_untrustedDisplay() {
+        // Set up a non-default display without FLAG_TRUSTED enabled
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.flags = FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+        final DisplayContent dc = createNewDisplay(displayInfo);
 
-        // Verify that forcing the density is honored and the size doesn't change.
-        displayContent.setForcedDensity(forcedDensity, 0 /* userId */);
-        verifySizes(displayContent, baseWidth, baseHeight, forcedDensity);
-
-        // Verify that density ratio is set correctly.
-        assertEquals((float) 2.0f,
-                displayContent.mExternalDisplayForcedDensityRatio, 0.001);
-
-
-        displayContent.mInitialDisplayDensity = 160;
-        displayContent.updateBaseDisplayMetrics(baseWidth, baseHeight, baseDensity, baseXDpi,
-                baseYDpi);
-
-        // Verify that forced density is updated based on the ratio.
-        assertEquals(320, displayContent.mBaseDisplayDensity);
+        dc.onDisplayInfoChangeApplied();
+        assertFalse(dc.mWmService.mDisplayWindowSettings.shouldShowSystemDecorsLocked(dc));
     }
 
     @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
@@ -2998,6 +2970,7 @@ public class DisplayContentTests extends WindowTestsBase {
     public void testSetShouldShowSystemDecorations_nonDefaultNonPrivateDisplay() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
         displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.flags = (FLAG_ALLOWS_CONTENT_MODE_SWITCH | FLAG_TRUSTED);
         final DisplayContent dc = createNewDisplay(displayInfo);
 
         spyOn(dc.mDisplay);
@@ -3008,6 +2981,109 @@ public class DisplayContentTests extends WindowTestsBase {
         doReturn(true).when(dc.mDisplay).canHostTasks();
         dc.onDisplayInfoChangeApplied();
         assertTrue(dc.mWmService.mDisplayWindowSettings.shouldShowSystemDecorsLocked(dc));
+    }
+
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
+    @Test
+    public void testRemove_displayWithSystemDecorations_emitRemoveSystemDecorations() {
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.flags = (FLAG_ALLOWS_CONTENT_MODE_SWITCH | FLAG_TRUSTED);
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        spyOn(dc.mDisplay);
+        doReturn(true).when(dc.mDisplay).canHostTasks();
+        dc.onDisplayInfoChangeApplied();
+        final DisplayPolicy displayPolicy = dc.getDisplayPolicy();
+        spyOn(displayPolicy);
+
+        dc.remove();
+
+        verify(displayPolicy).notifyDisplayRemoveSystemDecorations();
+    }
+
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
+    @Test
+    public void testRemove_displayWithoutSystemDecorations_dontEmitRemoveSystemDecorations() {
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.flags = (FLAG_ALLOWS_CONTENT_MODE_SWITCH | FLAG_TRUSTED);
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        spyOn(dc.mDisplay);
+        doReturn(false).when(dc.mDisplay).canHostTasks();
+        dc.onDisplayInfoChangeApplied();
+        final DisplayPolicy displayPolicy = dc.getDisplayPolicy();
+        spyOn(displayPolicy);
+
+        dc.remove();
+
+        verify(displayPolicy, never()).notifyDisplayRemoveSystemDecorations();
+    }
+
+    @EnableFlags(FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
+    @Test
+    public void testForcedDensityRatioSet_persistDensityScaleFlagEnabled() {
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.type = Display.TYPE_EXTERNAL;
+        final DisplayContent displayContent = createNewDisplay(displayInfo);
+        final int baseWidth = 1280;
+        final int baseHeight = 720;
+        final int baseDensity = 320;
+        final float baseXDpi = 60;
+        final float baseYDpi = 60;
+
+        displayContent.mInitialDisplayWidth = baseWidth;
+        displayContent.mInitialDisplayHeight = baseHeight;
+        displayContent.mInitialDisplayDensity = baseDensity;
+        displayContent.updateBaseDisplayMetrics(baseWidth, baseHeight, baseDensity, baseXDpi,
+                baseYDpi);
+
+        final int forcedDensity = 640;
+        displayContent.setForcedDensityRatio(
+                (float) forcedDensity / baseDensity, 0 /* userId */);
+
+        // Verify that density ratio is set correctly.
+        assertEquals((float) forcedDensity / baseDensity,
+                displayContent.mForcedDisplayDensityRatio, 0.01);
+        // Verify that density is set correctly.
+        assertEquals(forcedDensity,
+                displayContent.mBaseDisplayDensity);
+    }
+
+    @EnableFlags(FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
+    @Test
+    public void testForcedDensityUpdateWithRatio_persistDensityScaleFlagEnabled() {
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.displayId = DEFAULT_DISPLAY + 1;
+        displayInfo.type = Display.TYPE_EXTERNAL;
+        final DisplayContent displayContent = createNewDisplay(displayInfo);
+        final int baseWidth = 1280;
+        final int baseHeight = 720;
+        final int baseDensity = 320;
+        final float baseXDpi = 60;
+        final float baseYDpi = 60;
+
+        displayContent.mInitialDisplayWidth = baseWidth;
+        displayContent.mInitialDisplayHeight = baseHeight;
+        displayContent.mInitialDisplayDensity = baseDensity;
+        displayContent.updateBaseDisplayMetrics(baseWidth, baseHeight, baseDensity, baseXDpi,
+                baseYDpi);
+
+        final int forcedDensity = 640;
+        displayContent.setForcedDensityRatio(
+                (float) forcedDensity / baseDensity, 0 /* userId */);
+
+        // Verify that density ratio is set correctly.
+        assertEquals(2.0f,
+                displayContent.mForcedDisplayDensityRatio, 0.001);
+
+
+        displayContent.mInitialDisplayDensity = 160;
+        displayContent.updateBaseDisplayMetrics(baseWidth, baseHeight, baseDensity, baseXDpi,
+                baseYDpi);
+
+        // Verify that forced density is updated based on the ratio.
+        assertEquals(320, displayContent.mBaseDisplayDensity);
     }
 
     private void removeRootTaskTests(Runnable runnable) {

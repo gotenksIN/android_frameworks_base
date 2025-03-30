@@ -77,7 +77,7 @@ interface MobileIconsInteractor {
      */
     val icons: StateFlow<List<MobileIconInteractor>>
     /** Whether the mobile icons can be stacked vertically. */
-    val isStackable: StateFlow<Boolean>
+    val isStackable: Flow<Boolean>
     /**
      * Observable for the subscriptionId of the current mobile data connection. Null if we don't
      * have a valid subscription id
@@ -268,21 +268,21 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
     override val isStackable =
         if (NewStatusBarIcons.isEnabled && StatusBarRootModernization.isEnabled) {
-                icons.flatMapLatest { icons ->
-                    combine(icons.map { it.signalLevelIcon }) { signalLevelIcons ->
-                        // These are only stackable if:
-                        // - They are cellular
-                        // - There's exactly two
-                        // - They have the same number of levels
-                        signalLevelIcons.filterIsInstance<SignalIconModel.Cellular>().let {
-                            it.size == 2 && it[0].numberOfLevels == it[1].numberOfLevels
-                        }
+            icons.flatMapLatest { icons ->
+                combine(icons.map { it.signalLevelIcon }) { signalLevelIcons ->
+                    // These are only stackable if:
+                    // - They are cellular
+                    // - There's exactly two
+                    // - They have the same number of levels
+                    signalLevelIcons.filterIsInstance<SignalIconModel.Cellular>().let {
+                        it.size == 2 && it[0].numberOfLevels == it[1].numberOfLevels
                     }
                 }
-            } else {
-                flowOf(false)
             }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+        } else {
+            flowOf(false)
+        }
+
     /**
      * Copied from the old pipeline. We maintain a 2s period of time where we will keep the
      * validated bit from the old active network (A) while data is changing to the new one (B).

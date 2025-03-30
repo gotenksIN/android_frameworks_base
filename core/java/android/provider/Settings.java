@@ -6499,6 +6499,14 @@ public final class Settings {
         public static final String SCREEN_FLASH_NOTIFICATION = "screen_flash_notification";
 
         /**
+         * Setting to enable CV (proprietary)
+         *
+         * @hide
+         */
+        public static final String CV_ENABLED =
+                "cv_enabled";
+
+        /**
          * Integer property that specifes the color for screen flash notification as a
          * packed 32-bit color.
          *
@@ -13330,10 +13338,18 @@ public final class Settings {
         public static final String CONTEXTUAL_SEARCH_PACKAGE = "contextual_search_package";
 
         /**
-         * Inetger property which determines whether advanced protection is on or not.
+         * Integer property which determines whether advanced protection is on or not.
          * @hide
          */
         public static final String ADVANCED_PROTECTION_MODE = "advanced_protection_mode";
+
+        /**
+         * Integer property which determines whether advanced protection USB data protection
+         * feature is on or not.
+         *
+         * @hide
+         */
+        public static final String AAPM_USB_DATA_PROTECTION = "aapm_usb_data_protection";
     }
 
     /**
@@ -15549,7 +15565,8 @@ public final class Settings {
          * <ul>
          * <li><pre>secure</pre>: creates a secure display</li>
          * <li><pre>own_content_only</pre>: only shows this display's own content</li>
-         * <li><pre>should_show_system_decorations</pre>: supports system decorations</li>
+         * <li><pre>should_show_system_decorations</pre>: always shows system decorations</li>
+         * <li><pre>fixed_content_mode</pre>: does not allow the content mode switch</li>
          * </ul>
          * </p><p>
          * Example:
@@ -19851,6 +19868,14 @@ public final class Settings {
         public static final String REPAIR_MODE_ACTIVE = "repair_mode_active";
 
         /**
+         * Whether the notification manager service should redact notifications that contain otps
+         * from untrusted listeners. Defaults to 1/true.
+         * @hide
+         */
+        public static final String REDACT_OTP_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS =
+                "redact_otp_notifications_from_untrusted_listeners";
+
+        /**
          * Settings migrated from Wear OS settings provider.
          * @hide
          */
@@ -20859,6 +20884,24 @@ public final class Settings {
              */
             @Readable
             public static final String WEAR_LAUNCHER_UI_MODE = "wear_launcher_ui_mode";
+
+            /**
+             * Setting indicating whether the primary gesture input action has been enabled by the
+             * user.
+             *
+             * @hide
+             */
+            public static final String GESTURE_PRIMARY_ACTION_USER_PREFERENCE =
+                    "gesture_primary_action_user_preference";
+
+            /**
+             * Setting indicating whether the dismiss gesture input action has been enabled by the
+             * user.
+             *
+             * @hide
+             */
+            public static final String GESTURE_DISMISS_ACTION_USER_PREFERENCE =
+                    "gesture_dismiss_action_user_preference";
 
             /** Whether Wear Power Anomaly Service is enabled.
              *

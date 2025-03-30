@@ -1037,10 +1037,10 @@ public class NotificationStackScrollLayout
                 }
                 int bucket = NotificationBundleUi.isEnabled()
                         ? row.getEntryAdapter().getSectionBucket()
-                        : row.getEntry().getBucket();
+                        : row.getEntryLegacy().getBucket();
                 boolean isAmbient = NotificationBundleUi.isEnabled()
                         ? row.getEntryAdapter().isAmbient()
-                        : row.getEntry().isAmbient();
+                        : row.getEntryLegacy().isAmbient();
                 currentIndex++;
                 boolean beforeSpeedBump;
                 if (mHighPriorityBeforeSpeedBump) {
@@ -1845,7 +1845,7 @@ public class NotificationStackScrollLayout
         } else {
             if (row.isChildInGroup()) {
                 final NotificationEntry groupSummary =
-                        mGroupMembershipManager.getGroupSummary(row.getEntry());
+                        mGroupMembershipManager.getGroupSummary(row.getEntryLegacy());
                 if (groupSummary != null) {
                     row = groupSummary.getRow();
                 }
@@ -1998,16 +1998,16 @@ public class NotificationStackScrollLayout
             if ((bottom - top >= mMinInteractionHeight || !requireMinHeight)
                     && touchY >= top && touchY <= bottom && touchX >= left && touchX <= right) {
                 if (slidingChild instanceof ExpandableNotificationRow row) {
-                    NotificationEntry entry = row.getEntry();
                     boolean isEntrySummaryForTopHun;
                     if (NotificationBundleUi.isEnabled()) {
                         isEntrySummaryForTopHun = Objects.equals(
                                 ((ExpandableNotificationRow) slidingChild).getNotificationParent(),
                                 mTopHeadsUpRow);
                     } else {
+                        NotificationEntry entry = row.getEntryLegacy();
                         isEntrySummaryForTopHun = mTopHeadsUpRow != null &&
-                                mGroupMembershipManager.getGroupSummary(mTopHeadsUpRow.getEntry())
-                                == entry;
+                                mGroupMembershipManager.getGroupSummary(
+                                        mTopHeadsUpRow.getEntryLegacy()) == entry;
                     }
                     if (!mIsExpanded && row.isHeadsUp() && row.isPinned()
                             && mTopHeadsUpRow != row
@@ -2251,6 +2251,7 @@ public class NotificationStackScrollLayout
     }
 
     public void setFinishScrollingCallback(Runnable runnable) {
+        SceneContainerFlag.assertInLegacyMode();
         mFinishScrollingCallback = runnable;
     }
 
@@ -2761,6 +2762,8 @@ public class NotificationStackScrollLayout
      *                  which means we want to scroll towards the top.
      */
     protected void fling(int velocityY) {
+        // Scrolls and flings are handled by the Composables with SceneContainer enabled
+        SceneContainerFlag.assertInLegacyMode();
         if (getChildCount() > 0) {
             float topAmount = getCurrentOverScrollAmount(true);
             float bottomAmount = getCurrentOverScrollAmount(false);
@@ -3007,7 +3010,7 @@ public class NotificationStackScrollLayout
             ExpandableNotificationRow childRow = (ExpandableNotificationRow) child;
             return NotificationBundleUi.isEnabled()
                     ? mGroupMembershipManager.isChildInGroup(childRow.getEntryAdapter())
-                    : mGroupMembershipManager.isChildInGroup(childRow.getEntry());
+                    : mGroupMembershipManager.isChildInGroup(childRow.getEntryLegacy());
         }
         return false;
     }
@@ -3218,8 +3221,7 @@ public class NotificationStackScrollLayout
         updateAnimationState(child);
         updateChronometerForChild(child);
         if (child instanceof ExpandableNotificationRow row) {
-            row.setDismissUsingRowTranslationX(mDismissUsingRowTranslationX);
-
+            row.setDismissUsingRowTranslationX(mDismissUsingRowTranslationX, /* force= */ true);
         }
     }
 
@@ -3852,13 +3854,14 @@ public class NotificationStackScrollLayout
                         // existing overScroll, we have to scroll the view
                         customOverScrollBy((int) scrollAmount, getOwnScrollY(),
                                 range, getHeight() / 2);
-                        // If we're scrolling, leavebehinds should be dismissed
-                        mController.checkSnoozeLeavebehind();
                     }
                 }
                 break;
             case ACTION_UP:
-                if (mIsBeingDragged) {
+                if (SceneContainerFlag.isEnabled() && mIsBeingDragged) {
+                    mActivePointerId = INVALID_POINTER;
+                    endDrag();
+                } else if (mIsBeingDragged) {
                     final VelocityTracker velocityTracker = mVelocityTracker;
                     velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
                     int initialVelocity = (int) velocityTracker.getYVelocity(mActivePointerId);
@@ -3921,6 +3924,7 @@ public class NotificationStackScrollLayout
     }
 
     boolean isFlingAfterUpEvent() {
+        SceneContainerFlag.assertInLegacyMode();
         return mFlingAfterUpEvent;
     }
 
@@ -6002,7 +6006,6 @@ public class NotificationStackScrollLayout
      *                 LockscreenShadeTransitionController resets fraction to 0
      *                 where it remains until the next lockscreen-to-shade transition.
      */
-    @Override
     public void setFractionToShade(float fraction) {
         mAmbientState.setFractionToShade(fraction);
         updateContentHeight();  // Recompute stack height with different section gap.
@@ -6078,7 +6081,9 @@ public class NotificationStackScrollLayout
         if (mBlurRadius > 0) {
             mBlurEffect =
                     RenderEffect.createBlurEffect(mBlurRadius, mBlurRadius, Shader.TileMode.CLAMP);
+            spewLog("Setting up blur RenderEffect for NotificationStackScrollLayout");
         } else {
+            spewLog("Clearing the blur RenderEffect setup for NotificationStackScrollLayout");
             mBlurEffect = null;
         }
     }
@@ -6158,7 +6163,7 @@ public class NotificationStackScrollLayout
                 View child = getChildAt(i);
                 if (child instanceof ExpandableNotificationRow) {
                     ((ExpandableNotificationRow) child).setDismissUsingRowTranslationX(
-                            dismissUsingRowTranslationX);
+                            dismissUsingRowTranslationX, /* force= */ false);
                 }
             }
         }
@@ -6254,6 +6259,7 @@ public class NotificationStackScrollLayout
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
         if (mBlurEffect != null) {
+            spewLog("Applying blur RenderEffect to NotificationStackScrollLayout");
             // reuse the cached RenderNode to blur
             mBlurNode.setPosition(0, 0, canvas.getWidth(), canvas.getHeight());
             mBlurNode.setRenderEffect(mBlurEffect);
@@ -6474,7 +6480,7 @@ public class NotificationStackScrollLayout
             @SelectedRows int selection) {
         int bucket = NotificationBundleUi.isEnabled()
                 ? row.getEntryAdapter().getSectionBucket()
-                : row.getEntry().getBucket();
+                : row.getEntryLegacy().getBucket();
         switch (selection) {
             case ROWS_ALL:
                 return true;
@@ -7026,5 +7032,11 @@ public class NotificationStackScrollLayout
     public void setMaxTopPadding(int maxTopPadding) {
         SceneContainerFlag.assertInLegacyMode();
         mMaxTopPadding = maxTopPadding;
+    }
+
+    private void spewLog(String logMsg) {
+        if (SPEW) {
+            Log.v(TAG, logMsg);
+        }
     }
 }

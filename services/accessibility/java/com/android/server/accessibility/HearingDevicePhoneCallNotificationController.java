@@ -17,6 +17,7 @@
 package com.android.server.accessibility;
 
 import android.Manifest;
+import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.SuppressLint;
 import android.app.Notification;
@@ -149,11 +150,7 @@ public class HearingDevicePhoneCallNotificationController {
             }
 
             if (state == TelephonyManager.CALL_STATE_IDLE) {
-                if (mIsCommDeviceChangedRegistered) {
-                    mIsCommDeviceChangedRegistered = false;
-                    mAudioManager.removeOnCommunicationDeviceChangedListener(
-                            mCommDeviceChangedListener);
-                }
+                removeOnCommunicationDeviceChangedListenerIfNeeded(mCommDeviceChangedListener);
                 dismissNotificationIfNeeded();
 
                 if (mHearingDevice != null) {
@@ -163,25 +160,39 @@ public class HearingDevicePhoneCallNotificationController {
                 mHearingDevice = null;
             }
             if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
-                if (com.android.server.accessibility.Flags.hearingInputChangeWhenCommDevice()) {
-                    AudioDeviceInfo commDevice = mAudioManager.getCommunicationDevice();
-                    mHearingDevice = getSupportedInputHearingDeviceInfo(List.of(commDevice));
-                    if (mHearingDevice != null) {
-                        showNotificationIfNeeded();
-                    } else {
-                        mAudioManager.addOnCommunicationDeviceChangedListener(
-                                mCommDeviceChangedExecutor,
-                                mCommDeviceChangedListener);
-                        mIsCommDeviceChangedRegistered = true;
-                    }
+                AudioDeviceInfo commDevice = mAudioManager.getCommunicationDevice();
+                if (commDevice == null) {
+                    return;
+                }
+                mHearingDevice = getSupportedInputHearingDeviceInfo(List.of(commDevice));
+                if (mHearingDevice != null) {
+                    showNotificationIfNeeded();
                 } else {
-                    mHearingDevice = getSupportedInputHearingDeviceInfo(
-                            mAudioManager.getAvailableCommunicationDevices());
-                    if (mHearingDevice != null) {
-                        showNotificationIfNeeded();
-                    }
+                    addOnCommunicationDeviceChangedListenerIfNeeded(mCommDeviceChangedExecutor,
+                            mCommDeviceChangedListener);
                 }
             }
+        }
+
+        private void addOnCommunicationDeviceChangedListenerIfNeeded(
+                @NonNull @CallbackExecutor Executor executor,
+                @NonNull AudioManager.OnCommunicationDeviceChangedListener listener) {
+            if (mIsCommDeviceChangedRegistered) {
+                return;
+            }
+
+            mIsCommDeviceChangedRegistered = true;
+            mAudioManager.addOnCommunicationDeviceChangedListener(executor, listener);
+        }
+
+        private void removeOnCommunicationDeviceChangedListenerIfNeeded(
+                @NonNull AudioManager.OnCommunicationDeviceChangedListener listener) {
+            if (!mIsCommDeviceChangedRegistered) {
+                return;
+            }
+
+            mAudioManager.removeOnCommunicationDeviceChangedListener(listener);
+            mIsCommDeviceChangedRegistered = false;
         }
 
         private void showNotificationIfNeeded() {

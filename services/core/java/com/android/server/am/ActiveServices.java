@@ -838,7 +838,7 @@ public final class ActiveServices {
                 "SHORT_FGS_TIMEOUT");
         this.mServiceFGAnrTimer = new ServiceAnrTimer(service,
                 ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG,
-                "SERVICE_FOREGROUND_TIMEOUT");
+                "SERVICE_FOREGROUND_TIMEOUT", new AnrTimer.Args().extend(true));
 // QTI_BEGIN: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
         try {
             if (ServiceManager.isDeclared(AIDL_SERVICE)){
@@ -8137,6 +8137,11 @@ public final class ActiveServices {
 
         ServiceAnrTimer(ActivityManagerService am, int msg, String label) {
             super(Objects.requireNonNull(am).mHandler, msg, label);
+        }
+
+        ServiceAnrTimer(ActivityManagerService am, int msg, String label,
+                @NonNull AnrTimer.Args args) {
+            super(Objects.requireNonNull(am).mHandler, msg, label, args);
         }
 
         @Override

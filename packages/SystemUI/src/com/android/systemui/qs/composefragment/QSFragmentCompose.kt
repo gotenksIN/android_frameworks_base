@@ -19,6 +19,8 @@ package com.android.systemui.qs.composefragment
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Canvas
+import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
@@ -36,6 +38,7 @@ import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,6 +109,7 @@ import com.android.compose.theme.PlatformTheme
 import com.android.mechanics.GestureContext
 import com.android.systemui.Dumpable
 import com.android.systemui.Flags
+import com.android.systemui.Flags.notificationShadeBlur
 import com.android.systemui.brightness.ui.compose.BrightnessSliderContainer
 import com.android.systemui.brightness.ui.compose.ContainerColors
 import com.android.systemui.compose.modifiers.sysuiResTag
@@ -123,7 +127,6 @@ import com.android.systemui.qs.composefragment.SceneKeys.debugName
 import com.android.systemui.qs.composefragment.SceneKeys.toIdleSceneKey
 import com.android.systemui.qs.composefragment.ui.GridAnchor
 import com.android.systemui.qs.composefragment.ui.NotificationScrimClipParams
-import com.android.systemui.qs.composefragment.ui.notificationScrimClip
 import com.android.systemui.qs.composefragment.ui.quickQuickSettingsToQuickSettings
 import com.android.systemui.qs.composefragment.ui.toEditMode
 import com.android.systemui.qs.composefragment.viewmodel.QSFragmentComposeViewModel
@@ -239,7 +242,7 @@ constructor(
             FrameLayoutTouchPassthrough(
                 context,
                 { notificationScrimClippingParams.isEnabled },
-                { notificationScrimClippingParams.params.top },
+                snapshotFlow { notificationScrimClippingParams.params },
                 // Only allow scrolling when we are fully expanded. That way, we don't intercept
                 // swipes in lockscreen (when somehow QS is receiving touches).
                 { (scrollState.canScrollForward && viewModel.isQsFullyExpanded) || isCustomizing },
@@ -255,7 +258,7 @@ constructor(
 
     @Composable
     private fun Content() {
-        PlatformTheme(isDarkTheme = true /* Delete AlwaysDarkMode when removing this */) {
+        PlatformTheme(isDarkTheme = if (notificationShadeBlur()) isSystemInDarkTheme() else true) {
             ProvideShortcutHelperIndication(interactionsConfig = interactionsConfig()) {
                 // TODO(b/389985793): Make sure that there is no coroutine work or recompositions
                 // happening when alwaysCompose is true but isQsVisibleAndAnyShadeExpanded is false.
@@ -274,11 +277,6 @@ constructor(
                                     }
                                 }
                                 .graphicsLayer { alpha = viewModel.viewAlpha }
-                                .thenIf(notificationScrimClippingParams.isEnabled) {
-                                    Modifier.notificationScrimClip {
-                                        notificationScrimClippingParams.params
-                                    }
-                                }
                                 .thenIf(!Flags.notificationShadeBlur()) {
                                     Modifier.offset {
                                         IntOffset(
@@ -747,14 +745,23 @@ constructor(
                         )
                         val BrightnessSlider =
                             @Composable {
-                                AlwaysDarkMode {
-                                    Box(
-                                        Modifier.systemGestureExclusionInShade(
-                                            enabled = {
-                                                layoutState.transitionState is TransitionState.Idle
-                                            }
-                                        )
-                                    ) {
+                                Box(
+                                    Modifier.systemGestureExclusionInShade(
+                                        enabled = {
+                                            /*
+                                             * While we are transitioning into QS (either from QQS
+                                             * or from gone), the global position of the brightness
+                                             * slider will change in every frame. This causes
+                                             * the modifier to send a new gesture exclusion
+                                             * rectangle on every frame. Instead, only apply the
+                                             * modifier when this is settled.
+                                             */
+                                            layoutState.transitionState is TransitionState.Idle &&
+                                                viewModel.isNotTransitioning
+                                        }
+                                    )
+                                ) {
+                                    AlwaysDarkMode {
                                         BrightnessSliderContainer(
                                             viewModel =
                                                 containerViewModel.brightnessSliderViewModel,
@@ -1050,17 +1057,75 @@ private const val EDIT_MODE_TIME_MILLIS = 500
 private class FrameLayoutTouchPassthrough(
     context: Context,
     private val clippingEnabledProvider: () -> Boolean,
-    private val clippingTopProvider: () -> Int,
+    private val clippingParams: Flow<NotificationScrimClipParams>,
     private val canScrollForwardQs: () -> Boolean,
     private val emitMotionEventForFalsing: () -> Unit,
 ) : FrameLayout(context) {
+
+    init {
+        repeatWhenAttached {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                clippingParams.collect { currentClipParams = it }
+            }
+        }
+    }
+
+    private val currentClippingPath = Path()
+    private var lastWidth = -1
+        set(value) {
+            if (field != value) {
+                field = value
+                updateClippingPath()
+            }
+        }
+
+    private var currentClipParams = NotificationScrimClipParams()
+        set(value) {
+            if (field != value) {
+                field = value
+                updateClippingPath()
+            }
+        }
+
+    private fun updateClippingPath() {
+        currentClippingPath.rewind()
+        if (clippingEnabledProvider()) {
+            val right = width + currentClipParams.rightInset
+            val left = -currentClipParams.leftInset
+            val top = currentClipParams.top
+            val bottom = currentClipParams.bottom
+            currentClippingPath.addRoundRect(
+                left.toFloat(),
+                top.toFloat(),
+                right.toFloat(),
+                bottom.toFloat(),
+                currentClipParams.radius.toFloat(),
+                currentClipParams.radius.toFloat(),
+                Path.Direction.CW,
+            )
+        }
+        invalidate()
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        lastWidth = right - left
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        if (!currentClippingPath.isEmpty) {
+            canvas.clipOutPath(currentClippingPath)
+        }
+        super.dispatchDraw(canvas)
+    }
+
     override fun isTransformedTouchPointInView(
         x: Float,
         y: Float,
         child: View?,
         outLocalPoint: PointF?,
     ): Boolean {
-        return if (clippingEnabledProvider() && y + translationY > clippingTopProvider()) {
+        return if (clippingEnabledProvider() && y + translationY > currentClipParams.top) {
             false
         } else {
             super.isTransformedTouchPointInView(x, y, child, outLocalPoint)
@@ -1248,23 +1313,26 @@ private inline val alwaysCompose
  * Forces the configuration and themes to be dark theme. This is needed in order to have
  * [colorResource] retrieve the dark mode colors.
  *
- * This should be removed when we remove the force dark mode in [PlatformTheme] at the root of the
- * compose hierarchy.
+ * This should be removed when [notificationShadeBlur] is removed
  */
 @Composable
 private fun AlwaysDarkMode(content: @Composable () -> Unit) {
-    val currentConfig = LocalConfiguration.current
-    val darkConfig =
-        Configuration(currentConfig).apply {
-            uiMode =
-                (uiMode and (Configuration.UI_MODE_NIGHT_MASK.inv())) or
-                    Configuration.UI_MODE_NIGHT_YES
-        }
-    val newContext = LocalContext.current.createConfigurationContext(darkConfig)
-    CompositionLocalProvider(
-        LocalConfiguration provides darkConfig,
-        LocalContext provides newContext,
-    ) {
+    if (notificationShadeBlur()) {
         content()
+    } else {
+        val currentConfig = LocalConfiguration.current
+        val darkConfig =
+            Configuration(currentConfig).apply {
+                uiMode =
+                    (uiMode and (Configuration.UI_MODE_NIGHT_MASK.inv())) or
+                        Configuration.UI_MODE_NIGHT_YES
+            }
+        val newContext = LocalContext.current.createConfigurationContext(darkConfig)
+        CompositionLocalProvider(
+            LocalConfiguration provides darkConfig,
+            LocalContext provides newContext,
+        ) {
+            content()
+        }
     }
 }

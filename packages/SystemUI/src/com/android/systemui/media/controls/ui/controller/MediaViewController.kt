@@ -229,6 +229,22 @@ constructor(
             }
         }
 
+    private val seekbarDescriptionListener =
+        object : SeekBarViewModel.ContentDescriptionListener {
+            override fun onContentDescriptionChanged(
+                elapsedTimeDescription: CharSequence,
+                durationDescription: CharSequence,
+            ) {
+                if (!SceneContainerFlag.isEnabled) return
+                mainExecutor.execute {
+                    seekBarObserver.updateContentDescription(
+                        elapsedTimeDescription,
+                        durationDescription,
+                    )
+                }
+            }
+        }
+
     /**
      * Sets the listening state of the player.
      *
@@ -350,6 +366,7 @@ constructor(
             }
             seekBarViewModel.removeScrubbingChangeListener(scrubbingChangeListener)
             seekBarViewModel.removeEnabledChangeListener(enabledChangeListener)
+            seekBarViewModel.removeContentDescriptionListener(seekbarDescriptionListener)
             seekBarViewModel.onDestroy()
         }
         mediaHostStatesManager.removeController(this)
@@ -653,6 +670,7 @@ constructor(
         seekBarViewModel.attachTouchHandlers(mediaViewHolder.seekBar)
         seekBarViewModel.setScrubbingChangeListener(scrubbingChangeListener)
         seekBarViewModel.setEnabledChangeListener(enabledChangeListener)
+        seekBarViewModel.setContentDescriptionListener(seekbarDescriptionListener)
 
         val mediaCard = mediaViewHolder.player
         attach(mediaViewHolder.player)

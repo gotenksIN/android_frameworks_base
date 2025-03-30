@@ -213,18 +213,6 @@ flag {
 }
 
 flag {
-    name: "notification_undo_guts_on_config_changed"
-    namespace: "systemui"
-    description: "Fixes a bug where a theme or font change while notification guts were open"
-        " (e.g. the snooze options or notification info) would show an empty notification by"
-        " closing the guts and undoing changes."
-    bug: "379267630"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "pss_app_selector_recents_split_screen"
    namespace: "systemui"
    description: "Allows recent apps selected for partial screenshare to be launched in split screen mode"
@@ -301,6 +289,15 @@ flag {
   }
 }
 
+flag {
+    name: "notification_skip_silent_updates"
+    namespace: "systemui"
+    description: "Do not notify HeadsUpManager for silent updates."
+    bug: "401068530"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
 
 flag {
     name: "scene_container"
@@ -410,13 +407,6 @@ flag {
 }
 
 flag {
-    name: "light_reveal_migration"
-    namespace: "systemui"
-    description: "Move LightRevealScrim to recommended architecture"
-    bug: "281655028"
-}
-
-flag {
    name: "theme_overlay_controller_wakefulness_deprecation"
    namespace: "systemui"
    description: "Replacing WakefulnessLifecycle by KeyguardTransitionInteractor in "
@@ -522,13 +512,6 @@ flag {
 }
 
 flag {
-    name: "status_bar_notification_chips"
-    namespace: "systemui"
-    description: "Show promoted ongoing notifications as chips in the status bar"
-    bug: "364653005"
-}
-
-flag {
     name: "status_bar_popup_chips"
     namespace: "systemui"
     description: "Show rich ongoing processes as chips in the status bar"
@@ -544,12 +527,45 @@ flag {
 }
 
 flag {
+  name: "status_bar_font_updates"
+  namespace: "systemui"
+  description: "Read only flag for using a new font in the status bar"
+  bug: "393609116"
+  is_fixed_read_only: true
+}
+
+flag {
+    name: "status_bar_window_no_custom_touch"
+    namespace: "systemui"
+    description: "Don't have any custom touch handling in StatusBarWindowView"
+    bug: "391894499"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "icon_refresh_2025"
+    namespace: "systemui"
+    description: "Build time flag for 2025 icon refresh"
+    bug: "391605373"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "promote_notifications_automatically"
     namespace: "systemui"
     description: "Flag to automatically turn certain notifications into promoted notifications so "
         " we can test promoted notifications with teamfooders. This flag should *never* be released "
         "to trunkfood or nextfood."
     bug: "367705002"
+}
+
+flag {
+    name: "debug_live_updates_promote_all"
+    namespace: "systemui"
+    description: "Promote all notifications to Live Updates (RONs). (For testing/debugging only, do not promote/release!)"
+    bug: "404838239"
 }
 
 flag {
@@ -578,6 +594,16 @@ flag {
    namespace: "systemui"
    description: "Fix for the face scanning animation NPE"
    bug: "392032258"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "avalanche_replace_hun_when_critical"
+   namespace: "systemui"
+   description: "Fix for replacing a sticky HUN when a critical HUN posted"
+   bug: "403301297"
    metadata {
        purpose: PURPOSE_BUGFIX
    }
@@ -1367,13 +1393,6 @@ flag {
 }
 
 flag {
-  name: "media_controls_posts_optimization"
-  namespace: "systemui"
-  description: "Ignore duplicate media notifications posted"
-  bug: "358645640"
-}
-
-flag {
   name: "media_controls_umo_inflation_in_background"
   namespace: "systemui"
   description: "Inflate UMO in background thread"
@@ -1452,16 +1471,6 @@ flag {
    metadata {
      purpose: PURPOSE_BUGFIX
    }
-}
-
-flag {
-  name: "dozeui_scheduling_alarms_background_execution"
-  namespace: "systemui"
-  description: "Decide whether to execute binder calls to schedule alarms in background thread"
-  bug: "330492575"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -1877,6 +1886,14 @@ flag {
 }
 
 flag {
+  name: "shade_header_font_update"
+  namespace: "systemui"
+  description: "Updates the fonts of the shade header"
+  bug: "393609960"
+  is_fixed_read_only: true
+}
+
+flag {
     name: "keyboard_shortcut_helper_shortcut_customizer"
     namespace: "systemui"
     description: "An implementation of shortcut customizations through shortcut helper."
@@ -1918,13 +1935,6 @@ flag {
     namespace: "systemui"
     description: "Enable Double Tap to Sleep"
     bug: "385194612"
-}
-
-flag {
-    name: "spatial_model_launcher_pushback"
-    namespace: "systemui"
-    description: "Implement the depth push scaling effect on Launcher when users pull down shade."
-    bug: "370562309"
 }
 
 flag {
@@ -1990,9 +2000,9 @@ flag {
 }
 
 flag {
-   name: "notification_magic_actions_treatment"
+   name: "notification_animated_actions_treatment"
    namespace: "systemui"
-   description: "Special UI treatment for magic actions"
+   description: "Special UI treatment for animated actions and replys"
    bug: "383567383"
 }
 
@@ -2024,24 +2034,17 @@ flag {
 }
 
 flag {
-    name: "ui_rich_ongoing_force_expanded"
-    namespace: "systemui"
-    description: "Force promoted notifications to always be expanded"
-    bug: "380901479"
-}
-
-flag {
   name: "permission_helper_ui_rich_ongoing"
   namespace: "systemui"
-  description: "[RONs] Guards inline permission helper for demoting RONs"
+  description: "[RONs] Guards inline permission helper for demoting RONs [Guts/card version]"
   bug: "379186372"
 }
 
 flag {
-    name: "aod_ui_rich_ongoing"
-    namespace: "systemui"
-    description: "Show a rich ongoing notification on the always-on display (depends on ui_rich_ongoing)"
-    bug: "369151941"
+  name: "permission_helper_inline_ui_rich_ongoing"
+  namespace: "systemui"
+  description: "[RONs] Guards inline permission helper for demoting RONs [Inline version]"
+  bug: "379186372"
 }
 
 flag {
@@ -2126,6 +2129,14 @@ flag {
 }
 
 flag {
+    name: "lockscreen_font"
+    namespace: "systemui"
+    description: "Read-only flag for lockscreen font"
+    bug: "393610165"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "always_compose_qs_ui_fragment"
     namespace: "systemui"
     description: "Have QQS and QS scenes in the Compose fragment always composed, not just when it should be visible."
@@ -2147,4 +2158,52 @@ flag {
     namespace: "systemui"
     description: "Enables return animations for status bar chips"
     bug: "202516970"
+}
+
+flag {
+    name: "media_projection_grey_error_text"
+    namespace: "systemui"
+    description: "Set the error text color to grey when app sharing is hidden by the requesting app"
+    bug: "400877402"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+   name: "keyguard_wm_reorder_atms_calls"
+   namespace: "systemui"
+   description: "Calls ATMS#setLockScreenShown before default display callbacks in case they're slow"
+   bug: "399693427"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+    name: "extended_apps_shortcut_category"
+    namespace: "systemui"
+    description: "Allow users to add shortcuts to open apps that are not present in the apps category in shortcut helper by default"
+    bug: "394290928"
+}
+
+flag {
+    name: "use_aad_prox_sensor"
+    namespace: "systemui"
+    description: "Use AAD proximity sensor if flag is enabled and sensor is present"
+    bug: "402534470"
+}
+
+flag {
+    name: "enable_underlay"
+    namespace: "ailabs"
+    description: "Enable the underlay additional layer"
+    bug: "403422950"
+}
+
+flag {
+    name: "tv_global_actions_focus"
+    namespace: "systemui"
+    description: "Enables global actions focus on TV."
+    bug: "402759931"
 }

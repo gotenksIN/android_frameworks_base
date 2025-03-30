@@ -50,6 +50,7 @@ aconfig_declarations_group {
         "android.hardware.devicestate.feature.flags-aconfig-java",
         "android.hardware.flags-aconfig-java",
         "android.hardware.radio.flags-aconfig-java",
+        "android.hardware.serial.flags-aconfig-java",
         "android.hardware.usb.flags-aconfig-java",
         "android.location.flags-aconfig-java",
         "android.media.codec-aconfig-java",
@@ -348,6 +349,7 @@ aconfig_declarations {
     name: "android.location.flags-aconfig",
     package: "android.location.flags",
     container: "system",
+    exportable: true,
     srcs: [
         "location/java/android/location/flags/*.aconfig",
     ],
@@ -588,7 +590,6 @@ aconfig_declarations {
 java_aconfig_library {
     name: "android.view.inputmethod.flags-aconfig-java",
     aconfig_declarations: "android.view.inputmethod.flags-aconfig",
-    host_supported: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -1960,5 +1961,20 @@ aconfig_declarations {
 java_aconfig_library {
     name: "android.service.selinux.flags-aconfig-java",
     aconfig_declarations: "android.service.selinux.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Serial
+aconfig_declarations {
+    name: "android.hardware.serial.flags-aconfig",
+    exportable: true,
+    package: "android.hardware.serial.flags",
+    container: "system",
+    srcs: ["core/java/android/hardware/serial/flags/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.hardware.serial.flags-aconfig-java",
+    aconfig_declarations: "android.hardware.serial.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }

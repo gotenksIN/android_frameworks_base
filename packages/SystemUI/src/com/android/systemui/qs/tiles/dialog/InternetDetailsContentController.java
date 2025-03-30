@@ -76,7 +76,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 
-import com.android.app.viewcapture.ViewCaptureAwareWindowManager;
 import com.android.internal.logging.UiEventLogger;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
@@ -209,7 +208,7 @@ public class InternetDetailsContentController implements AccessPointController.A
     private GlobalSettings mGlobalSettings;
     private int mDefaultDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
     private ConnectivityManager.NetworkCallback mConnectivityManagerNetworkCallback;
-    private ViewCaptureAwareWindowManager mWindowManager;
+    private WindowManager mWindowManager;
     private ToastFactory mToastFactory;
     private SignalDrawable mSignalDrawable;
     private SignalDrawable mSecondarySignalDrawable; // For the secondary mobile data sub in DSDS
@@ -314,7 +313,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             @Main Handler handler, @Main Executor mainExecutor,
             BroadcastDispatcher broadcastDispatcher, KeyguardUpdateMonitor keyguardUpdateMonitor,
             GlobalSettings globalSettings, KeyguardStateController keyguardStateController,
-            ViewCaptureAwareWindowManager viewCaptureAwareWindowManager, ToastFactory toastFactory,
+            @ShadeDisplayAware WindowManager windowManager, ToastFactory toastFactory,
             @Background Handler workerHandler,
             CarrierConfigTracker carrierConfigTracker,
             LocationController locationController,
@@ -347,7 +346,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         mAccessPointController = accessPointController;
         mWifiIconInjector = new WifiUtils.InternetIconInjector(mContext);
         mConnectivityManagerNetworkCallback = new DataConnectivityListener();
-        mWindowManager = viewCaptureAwareWindowManager;
+        mWindowManager = windowManager;
         mToastFactory = toastFactory;
         mSignalDrawable = new SignalDrawable(mContext);
         mSecondarySignalDrawable = new SignalDrawable(mContext);
@@ -898,6 +897,17 @@ public class InternetDetailsContentController implements AccessPointController.A
 
     void startActivityForDialog(Intent intent) {
         mActivityStarter.startActivity(intent, false /* dismissShade */);
+    }
+
+    // Closes the dialog first, as the WEP dialog is in a different process and can have weird
+    // interactions otherwise.
+    void startActivityForDialogDismissDialogFirst(Intent intent, View view) {
+        ActivityTransitionAnimator.Controller controller =
+                mDialogTransitionAnimator.createActivityTransitionController(view);
+        if (mCallback != null) {
+            mCallback.dismissDialog();
+        }
+        mActivityStarter.startActivity(intent, false /* dismissShade */, controller);
     }
 
     void launchNetworkSetting(View view) {

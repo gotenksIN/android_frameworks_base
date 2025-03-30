@@ -22,7 +22,7 @@ import com.android.systemui.communal.data.model.FEATURE_AUTO_OPEN
 import com.android.systemui.communal.data.model.FEATURE_MANUAL_OPEN
 import com.android.systemui.communal.data.model.SuppressionReason
 import com.android.systemui.communal.posturing.domain.interactor.PosturingInteractor
-import com.android.systemui.communal.shared.model.WhenToDream
+import com.android.systemui.communal.shared.model.WhenToStartHub
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dock.DockManager
@@ -49,17 +49,25 @@ constructor(
     @Named(SWIPE_TO_HUB) private val allowSwipeAlways: Boolean,
 ) {
     val shouldAutoOpen: Flow<Boolean> =
-        communalSettingsInteractor.whenToDream
-            .flatMapLatestConflated { whenToDream ->
-                when (whenToDream) {
-                    WhenToDream.WHILE_CHARGING -> batteryInteractor.isDevicePluggedIn
-                    WhenToDream.WHILE_DOCKED -> {
+        communalSettingsInteractor.whenToStartHub
+            .flatMapLatestConflated { whenToStartHub ->
+                when (whenToStartHub) {
+                    WhenToStartHub.WHILE_CHARGING -> batteryInteractor.isDevicePluggedIn
+                    WhenToStartHub.WHILE_DOCKED -> {
                         allOf(batteryInteractor.isDevicePluggedIn, dockManager.retrieveIsDocked())
                     }
-                    WhenToDream.WHILE_POSTURED -> {
-                        allOf(batteryInteractor.isDevicePluggedIn, posturingInteractor.postured)
+                    WhenToStartHub.WHILE_CHARGING_AND_POSTURED -> {
+                        // Only listen to posturing if applicable to avoid running the posturing
+                        // CHRE nanoapp when not needed.
+                        batteryInteractor.isDevicePluggedIn.flatMapLatestConflated { isCharging ->
+                            if (isCharging) {
+                                posturingInteractor.postured
+                            } else {
+                                flowOf(false)
+                            }
+                        }
                     }
-                    WhenToDream.NEVER -> flowOf(false)
+                    WhenToStartHub.NEVER -> flowOf(false)
                 }
             }
             .flowOn(backgroundContext)

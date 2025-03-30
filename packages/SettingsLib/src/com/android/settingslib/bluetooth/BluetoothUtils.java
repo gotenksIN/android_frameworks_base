@@ -703,18 +703,18 @@ public class BluetoothUtils {
             // However, app layer need to gate the feature based on whether the device has audio
             // sharing capability regardless of the BT state.
             // So here we check the BluetoothProperties when BT off.
-            String mode = BluetoothProperties.le_audio_dynamic_switcher_mode().orElse("none");
-            Set<String> disabledModes = ImmutableSet.of("disabled", "unicast");
+            //
+            // TODO: Also check SystemProperties "persist.bluetooth.leaudio_dynamic_switcher.mode"
+            // and return true if it is in broadcast mode.
+            // Now SystemUI don't have access to read the value.
             int sourceSupportedCode = adapter.isLeAudioBroadcastSourceSupported();
             int assistantSupportedCode = adapter.isLeAudioBroadcastAssistantSupported();
             return (sourceSupportedCode == BluetoothStatusCodes.FEATURE_SUPPORTED
                     || (sourceSupportedCode == BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ENABLED
-                    && BluetoothProperties.isProfileBapBroadcastSourceEnabled().orElse(false)
-                    && !disabledModes.contains(mode)))
+                    && BluetoothProperties.isProfileBapBroadcastSourceEnabled().orElse(false)))
                     && (assistantSupportedCode == BluetoothStatusCodes.FEATURE_SUPPORTED
                     || (assistantSupportedCode == BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ENABLED
-                    && BluetoothProperties.isProfileBapBroadcastAssistEnabled().orElse(false)
-                    && !disabledModes.contains(mode)));
+                    && BluetoothProperties.isProfileBapBroadcastAssistEnabled().orElse(false)));
         } catch (IllegalStateException e) {
             Log.d(TAG, "Fail to check isAudioSharingSupported, e = ", e);
             return false;
@@ -1068,16 +1068,40 @@ public class BluetoothUtils {
     /** Get primary device Uri in broadcast. */
     @NonNull
     public static String getPrimaryGroupIdUriForBroadcast() {
+        // TODO: once API is stable, deprecate SettingsProvider solution
         return "bluetooth_le_broadcast_fallback_active_group_id";
     }
 
-    /** Get primary device group id in broadcast. */
+    /** Get primary device group id in broadcast from SettingsProvider. */
     @WorkerThread
     public static int getPrimaryGroupIdForBroadcast(@NonNull ContentResolver contentResolver) {
+        // TODO: once API is stable, deprecate SettingsProvider solution
         return Settings.Secure.getInt(
                 contentResolver,
                 getPrimaryGroupIdUriForBroadcast(),
                 BluetoothCsipSetCoordinator.GROUP_ID_INVALID);
+    }
+
+    /**
+     * Get primary device group id in broadcast.
+     *
+     * If Flags.adoptPrimaryGroupManagementApiV2 is enabled, get group id by API,
+     * Otherwise, still get value from SettingsProvider.
+     */
+    @WorkerThread
+    public static int getPrimaryGroupIdForBroadcast(@NonNull ContentResolver contentResolver,
+            @Nullable LocalBluetoothManager manager) {
+        if (Flags.adoptPrimaryGroupManagementApiV2()) {
+            LeAudioProfile leaProfile = manager == null ? null :
+                    manager.getProfileManager().getLeAudioProfile();
+            if (leaProfile == null) {
+                Log.d(TAG, "getPrimaryGroupIdForBroadcast: profile is null");
+                return BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
+            }
+            return leaProfile.getBroadcastToUnicastFallbackGroup();
+        } else {
+            return getPrimaryGroupIdForBroadcast(contentResolver);
+        }
     }
 
     /** Get develop option value for audio sharing preview. */
@@ -1101,7 +1125,7 @@ public class BluetoothUtils {
         LocalBluetoothLeBroadcast broadcast =
                 localBtManager.getProfileManager().getLeAudioBroadcastProfile();
         if (broadcast == null || !broadcast.isEnabled(null)) return null;
-        int primaryGroupId = getPrimaryGroupIdForBroadcast(contentResolver);
+        int primaryGroupId = getPrimaryGroupIdForBroadcast(contentResolver, localBtManager);
         if (primaryGroupId == BluetoothCsipSetCoordinator.GROUP_ID_INVALID) return null;
         LocalBluetoothLeBroadcastAssistant assistant =
                 localBtManager.getProfileManager().getLeAudioBroadcastAssistantProfile();

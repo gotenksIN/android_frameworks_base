@@ -15,13 +15,20 @@
  */
 package com.android.hoststubgen
 
+import com.android.hoststubgen.asm.ClassNodes
 import com.android.hoststubgen.asm.getOuterClassNameFromFullClassName
 import com.android.hoststubgen.asm.getPackageNameFromFullClassName
 import com.android.hoststubgen.filters.FilterPolicyWithReason
+import com.android.hoststubgen.filters.StatsLabel
 import org.objectweb.asm.Opcodes
 import java.io.PrintWriter
 
-open class HostStubGenStats {
+/**
+ * This class is no longer used. It was used for the old ravenwood dashboard. (b/402797626)
+ *
+ * TODO: Delete the class.
+ */
+open class HostStubGenStats(val classes: ClassNodes) {
     data class Stats(
             var supported: Int = 0,
             var total: Int = 0,
@@ -30,14 +37,6 @@ open class HostStubGenStats {
 
     private val stats = mutableMapOf<String, Stats>()
 
-    data class Api(
-        val fullClassName: String,
-        val methodName: String,
-        val methodDesc: String,
-    )
-
-    private val apis = mutableListOf<Api>()
-
     fun onVisitPolicyForMethod(
         fullClassName: String,
         methodName: String,
@@ -45,16 +44,16 @@ open class HostStubGenStats {
         policy: FilterPolicyWithReason,
         access: Int
     ) {
-        if (policy.policy.isSupported) {
-            apis.add(Api(fullClassName, methodName, descriptor))
-        }
-
         // Ignore methods that aren't public
         if ((access and Opcodes.ACC_PUBLIC) == 0) return
         // Ignore methods that are abstract
         if ((access and Opcodes.ACC_ABSTRACT) != 0) return
+
         // Ignore methods where policy isn't relevant
-        if (policy.isIgnoredForStats) return
+        val statsLabel = policy.statsLabel
+        if (statsLabel == StatsLabel.Ignored) return
+
+        val cn = classes.findClass(fullClassName) ?: return
 
         val packageName = getPackageNameFromFullClassName(fullClassName)
         val className = getOuterClassNameFromFullClassName(fullClassName)
@@ -70,7 +69,7 @@ open class HostStubGenStats {
         val packageStats = stats.getOrPut(packageName) { Stats() }
         val classStats = packageStats.children.getOrPut(className) { Stats() }
 
-        if (policy.policy.isSupported) {
+        if (statsLabel == StatsLabel.Supported) {
             packageStats.supported += 1
             classStats.supported += 1
         }

@@ -60,6 +60,7 @@ import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationContentExtractor;
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel;
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModels;
 import com.android.systemui.statusbar.notification.row.shared.AsyncGroupHeaderViewInflation;
 import com.android.systemui.statusbar.notification.row.shared.AsyncHybridViewInflation;
 import com.android.systemui.statusbar.notification.row.shared.ImageModelProvider;
@@ -473,7 +474,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                     result.newPublicView = createSensitiveContentMessageNotification(
                             NotificationBundleUi.isEnabled()
                                     ? row.getEntryAdapter().getSbn().getNotification()
-                                    : row.getEntry().getSbn().getNotification(),
+                                    : row.getEntryLegacy().getSbn().getNotification(),
                             builder.getStyle(),
                             systemUiContext, packageContext).createContentView();
                 } else {
@@ -814,7 +815,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                     existingWrapper.onReinflated();
                 }
             } catch (Exception e) {
-                handleInflationError(runningInflations, e, row, callback, logger,
+                handleInflationError(runningInflations, e, row, entry, callback, logger,
                         "applying view synchronously");
                 // Add a running inflation to make sure we don't trigger callbacks.
                 // Safe to do because only happens in tests.
@@ -836,7 +837,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                 String invalidReason = isValidView(v, entry, row.getResources());
                 if (invalidReason != null) {
                     handleInflationError(runningInflations, new InflationException(invalidReason),
-                            row, callback, logger, "applied invalid view");
+                            row, entry, callback, logger, "applied invalid view");
                     runningInflations.remove(inflationId);
                     return;
                 }
@@ -873,7 +874,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                     onViewApplied(newView);
                 } catch (Exception anotherException) {
                     runningInflations.remove(inflationId);
-                    handleInflationError(runningInflations, e, row,
+                    handleInflationError(runningInflations, e, row, entry,
                             callback, logger, "applying view");
                 }
             }
@@ -969,13 +970,14 @@ public class NotificationContentInflater implements NotificationRowContentBinder
 
     private static void handleInflationError(
             HashMap<Integer, CancellationSignal> runningInflations, Exception e,
-            ExpandableNotificationRow row, @Nullable InflationCallback callback,
+            ExpandableNotificationRow row, NotificationEntry entry,
+            @Nullable InflationCallback callback,
             NotificationRowContentBinderLogger logger, String logContext) {
         Assert.isMainThread();
         logger.logAsyncTaskException(row.getLoggingKey(), logContext, e);
         runningInflations.values().forEach(CancellationSignal::cancel);
         if (callback != null) {
-            callback.handleInflationException(row.getEntry(), e);
+            callback.handleInflationException(entry, e);
         }
     }
 
@@ -1002,7 +1004,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
         row.mImageModelIndex = result.mRowImageInflater.getNewImageIndex();
 
         if (PromotedNotificationContentModel.featureFlagEnabled()) {
-            entry.setPromotedNotificationContentModel(result.mPromotedContent);
+            entry.setPromotedNotificationContentModels(result.mPromotedContent);
         }
 
         boolean setRepliesAndActions = true;
@@ -1386,11 +1388,11 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                 mLogger.logAsyncTaskProgress(logKey, "extracting promoted notification content");
                 final ImageModelProvider imageModelProvider =
                         result.mRowImageInflater.useForContentModel();
-                final PromotedNotificationContentModel promotedContent =
+                final PromotedNotificationContentModels promotedContent =
                         mPromotedNotificationContentExtractor.extractContent(mEntry,
-                                recoveredBuilder, imageModelProvider);
+                                recoveredBuilder, mBindParams.redactionType, imageModelProvider);
                 mLogger.logAsyncTaskProgress(logKey, "extracted promoted notification content: "
-                        + promotedContent);
+                        + (promotedContent != null ? promotedContent.toRedactedString() : null));
 
                 result.mPromotedContent = promotedContent;
             }
@@ -1443,7 +1445,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                     + Integer.toHexString(sbn.getId());
             Log.e(CentralSurfaces.TAG, "couldn't inflate view for notification " + ident, e);
             if (mCallback != null) {
-                mCallback.handleInflationException(mRow.getEntry(),
+                mCallback.handleInflationException(mEntry,
                         new InflationException("Couldn't inflate contentViews" + e));
             }
 
@@ -1502,7 +1504,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
     static class InflationProgress {
         RowImageInflater mRowImageInflater;
 
-        PromotedNotificationContentModel mPromotedContent;
+        PromotedNotificationContentModels mPromotedContent;
 
         private RemoteViews newContentView;
         private RemoteViews newHeadsUpView;

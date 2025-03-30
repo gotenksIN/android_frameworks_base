@@ -367,6 +367,7 @@
   <java-symbol type="bool" name="config_speed_up_audio_on_mt_calls" />
   <java-symbol type="bool" name="config_useFixedVolume" />
   <java-symbol type="bool" name="config_isMainUserPermanentAdmin"/>
+  <java-symbol type="bool" name="config_supportProfilesOnNonMainUser"/>
   <java-symbol type="bool" name="config_canSwitchToHeadlessSystemUser"/>
   <java-symbol type="bool" name="config_enableMultiUserUI"/>
   <java-symbol type="bool" name="config_enableMultipleAdmins"/>
@@ -1982,6 +1983,7 @@
   <java-symbol type="string" name="global_action_voice_assist" />
   <java-symbol type="string" name="global_action_assist" />
   <java-symbol type="string" name="global_action_screenshot" />
+  <java-symbol type="string" name="global_action_standby" />
   <java-symbol type="string" name="invalidPuk" />
   <java-symbol type="string" name="lockscreen_carrier_default" />
   <java-symbol type="style" name="Animation.LockScreen" />
@@ -2074,6 +2076,9 @@
   <java-symbol type="bool" name="config_enableActivityRecognitionHardwareOverlay" />
   <java-symbol type="bool" name="config_defaultAdasGnssLocationEnabled" />
   <java-symbol type="bool" name="config_enableFusedLocationOverlay" />
+  <java-symbol type="bool" name="config_enableGnssLocationOverlay" />
+  <java-symbol type="bool" name="config_fusedLocationOverlayUnstableFallback" />
+  <java-symbol type="bool" name="config_gnssLocationOverlayUnstableFallback" />
   <java-symbol type="bool" name="config_useGnssHardwareProvider" />
   <java-symbol type="bool" name="config_enableGeocoderOverlay" />
   <java-symbol type="bool" name="config_enableGeofenceOverlay" />
@@ -2097,6 +2102,7 @@
   <java-symbol type="bool" name="config_allowTheaterModeWakeFromWindowLayout" />
   <java-symbol type="bool" name="config_keepDreamingWhenUnplugging" />
   <java-symbol type="bool" name="config_glanceableHubEnabled" />
+  <java-symbol type="integer" name="config_whenToStartHubModeDefault" />
   <java-symbol type="integer" name="config_keyguardDrawnTimeout" />
   <java-symbol type="bool" name="config_goToSleepOnButtonPressTheaterMode" />
   <java-symbol type="bool" name="config_supportLongPressPowerWhenNonInteractive" />
@@ -2739,6 +2745,9 @@
   <java-symbol type="string" name="muted_by" />
   <java-symbol type="string" name="zen_mode_alarm" />
 
+  <!-- For default state of operator name in status bar -->
+  <java-symbol type="integer" name="config_showOperatorNameDefault"/>
+
   <java-symbol type="string" name="select_day" />
   <java-symbol type="string" name="select_year" />
 
@@ -3271,6 +3280,7 @@
   <java-symbol type="id" name="expand_button_pill_colorized_layer" />
   <java-symbol type="id" name="expand_button_number" />
   <java-symbol type="id" name="expand_button_icon" />
+  <java-symbol type="id" name="close_button_pill_colorized_layer" />
   <java-symbol type="id" name="alternate_expand_target" />
   <java-symbol type="id" name="notification_header" />
   <java-symbol type="id" name="notification_top_line" />
@@ -3743,6 +3753,7 @@
   <java-symbol type="drawable" name="ic_screenshot" />
   <java-symbol type="drawable" name="ic_faster_emergency" />
   <java-symbol type="drawable" name="ic_media_seamless" />
+  <java-symbol type="drawable" name="ic_standby" />
   <java-symbol type="drawable" name="emergency_icon" />
 
   <java-symbol type="array" name="config_convert_to_emergency_number_map" />
@@ -5255,6 +5266,7 @@
   <java-symbol type="id" name="remote_views_next_child" />
   <java-symbol type="id" name="remote_views_stable_id" />
   <java-symbol type="id" name="remote_views_override_id" />
+  <java-symbol type="id" name="remoteViewsMetricsId" />
 
   <!-- View and control prompt -->
   <java-symbol type="drawable" name="ic_accessibility_24dp" />
@@ -6001,6 +6013,8 @@
   <!-- Device CMF Theming Settings -->
   <java-symbol type="array" name="theming_defaults" />
 
+  <java-symbol type="string" name="config_help_url_action_disabled_by_advanced_protection" />
+
   <!-- Advanced Protection Service USB feature -->
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_title" />
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_text" />
@@ -6018,4 +6032,10 @@
 
   <!-- Default height of desktop view header for freeform tasks on launch. -->
   <java-symbol type="dimen" name="desktop_view_default_header_height" />
+
+  <!-- Enable OEMs to support different frr notification target component activity -->
+  <java-symbol type="string" name="config_fingerprintFrrTargetComponent" />
+  <java-symbol type="string" name="fingerprint_frr_notification_title" />
+  <java-symbol type="string" name="fingerprint_frr_notification_msg" />
+
 </resources>

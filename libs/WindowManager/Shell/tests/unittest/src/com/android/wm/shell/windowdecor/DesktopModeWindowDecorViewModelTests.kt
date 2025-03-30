@@ -758,20 +758,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    fun testDecor_onClickToSplitScreen_disposesStatusBarInputLayer() {
-        val toSplitScreenListenerCaptor = forClass(Function0::class.java)
-                as ArgumentCaptor<Function0<Unit>>
-        val decor = createOpenTaskDecoration(
-            windowingMode = WINDOWING_MODE_MULTI_WINDOW,
-            onToSplitScreenClickListenerCaptor = toSplitScreenListenerCaptor
-        )
-
-        toSplitScreenListenerCaptor.value.invoke()
-
-        verify(decor).disposeStatusBarInputLayer()
-    }
-
-    @Test
     fun testDecor_onClickToOpenBrowser_closeMenus() {
         val openInBrowserListenerCaptor = forClass(Consumer::class.java)
                 as ArgumentCaptor<Consumer<Intent>>

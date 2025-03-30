@@ -58,6 +58,7 @@ import org.mockito.Mockito.spy
 import org.mockito.kotlin.any
 import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.isNull
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
@@ -275,6 +276,18 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun removeActiveTask_excludingDesk_leavesTaskInDesk() {
+        repo.addDesk(displayId = 2, deskId = 11)
+        repo.addDesk(displayId = 3, deskId = 12)
+        repo.addTaskToDesk(displayId = 3, deskId = 12, taskId = 100, isVisible = true)
+
+        repo.removeActiveTask(taskId = 100, excludedDeskId = 12)
+
+        assertThat(repo.getActiveTaskIdsInDesk(12)).contains(100)
+    }
+
+    @Test
     fun isActiveTask_nonExistingTask_returnsFalse() {
         assertThat(repo.isActiveTask(99)).isFalse()
     }
@@ -319,6 +332,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(arrayOf(1)),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
                 verify(persistentRepository)
                     .addOrUpdateDesktop(
@@ -327,6 +342,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(arrayOf(1, 2)),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
             }
         }
@@ -343,6 +360,52 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         // Not a visible task
         assertThat(repo.isVisibleTask(99)).isFalse()
         assertThat(repo.isOnlyVisibleNonClosingTask(99)).isFalse()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE)
+    fun leftTiledTask_updatedInRepoAndPersisted() {
+        runTest(StandardTestDispatcher()) {
+            repo.addLeftTiledTask(displayId = DEFAULT_DISPLAY, taskId = 1)
+
+            assertThat(repo.getLeftTiledTask(displayId = DEFAULT_DISPLAY)).isEqualTo(1)
+            verify(persistentRepository)
+                .addOrUpdateDesktop(
+                    DEFAULT_USER_ID,
+                    DEFAULT_DESKTOP_ID,
+                    visibleTasks = ArraySet(),
+                    minimizedTasks = ArraySet(),
+                    freeformTasksInZOrder = arrayListOf(),
+                    leftTiledTask = 1,
+                    rightTiledTask = null,
+                )
+
+            repo.removeRightTiledTask(displayId = DEFAULT_DISPLAY)
+            assertThat(repo.getRightTiledTask(displayId = DEFAULT_DISPLAY)).isNull()
+        }
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE)
+    fun rightTiledTask_updatedInRepoAndPersisted() {
+        runTest(StandardTestDispatcher()) {
+            repo.addRightTiledTask(displayId = DEFAULT_DISPLAY, taskId = 1)
+
+            assertThat(repo.getRightTiledTask(displayId = DEFAULT_DISPLAY)).isEqualTo(1)
+            verify(persistentRepository)
+                .addOrUpdateDesktop(
+                    DEFAULT_USER_ID,
+                    DEFAULT_DESKTOP_ID,
+                    visibleTasks = ArraySet(),
+                    minimizedTasks = ArraySet(),
+                    freeformTasksInZOrder = arrayListOf(),
+                    leftTiledTask = null,
+                    rightTiledTask = 1,
+                )
+
+            repo.removeLeftTiledTask(displayId = DEFAULT_DISPLAY)
+            assertThat(repo.getLeftTiledTask(displayId = DEFAULT_DISPLAY)).isNull()
+        }
     }
 
     @Test
@@ -651,6 +714,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(5),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
                 verify(persistentRepository)
                     .addOrUpdateDesktop(
@@ -659,6 +724,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(arrayOf(5)),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(6, 5),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
                 verify(persistentRepository)
                     .addOrUpdateDesktop(
@@ -667,6 +734,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(arrayOf(5, 6)),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(7, 6, 5),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
             }
         }
@@ -717,6 +786,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(5),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
                 verify(persistentRepository)
                     .addOrUpdateDesktop(
@@ -725,6 +796,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(arrayOf(5)),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(6, 5),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
                 verify(persistentRepository)
                     .addOrUpdateDesktop(
@@ -733,6 +806,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(arrayOf(5, 6)),
                         minimizedTasks = ArraySet(),
                         freeformTasksInZOrder = arrayListOf(7, 6, 5),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
                 verify(persistentRepository, times(2))
                     .addOrUpdateDesktop(
@@ -741,6 +816,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                         visibleTasks = ArraySet(arrayOf(5, 7)),
                         minimizedTasks = ArraySet(arrayOf(6)),
                         freeformTasksInZOrder = arrayListOf(7, 6, 5),
+                        leftTiledTask = null,
+                        rightTiledTask = null,
                     )
             }
         }
@@ -781,6 +858,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                     visibleTasks = ArraySet(),
                     minimizedTasks = ArraySet(),
                     freeformTasksInZOrder = arrayListOf(1),
+                    leftTiledTask = null,
+                    rightTiledTask = null,
                 )
             verify(persistentRepository)
                 .addOrUpdateDesktop(
@@ -789,6 +868,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                     visibleTasks = ArraySet(),
                     minimizedTasks = ArraySet(),
                     freeformTasksInZOrder = ArrayList(),
+                    leftTiledTask = null,
+                    rightTiledTask = null,
                 )
         }
     }
@@ -818,6 +899,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                     visibleTasks = ArraySet(),
                     minimizedTasks = ArraySet(),
                     freeformTasksInZOrder = arrayListOf(1),
+                    leftTiledTask = null,
+                    rightTiledTask = null,
                 )
             verify(persistentRepository)
                 .addOrUpdateDesktop(
@@ -826,6 +909,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                     visibleTasks = ArraySet(),
                     minimizedTasks = ArraySet(),
                     freeformTasksInZOrder = ArrayList(),
+                    leftTiledTask = null,
+                    rightTiledTask = null,
                 )
         }
     }
@@ -857,6 +942,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                     visibleTasks = ArraySet(),
                     minimizedTasks = ArraySet(),
                     freeformTasksInZOrder = arrayListOf(1),
+                    leftTiledTask = null,
+                    rightTiledTask = null,
                 )
             verify(persistentRepository, never())
                 .addOrUpdateDesktop(
@@ -865,6 +952,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                     visibleTasks = ArraySet(),
                     minimizedTasks = ArraySet(),
                     freeformTasksInZOrder = ArrayList(),
+                    leftTiledTask = null,
+                    rightTiledTask = null,
                 )
         }
     }
@@ -1191,6 +1280,18 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
 
     @Test
     @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun removeDesk_multipleDesks_active_marksInactiveInDisplay() {
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+        repo.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+
+        repo.removeDesk(deskId = 3)
+
+        assertThat(repo.getActiveDeskId(displayId = DEFAULT_DISPLAY)).isNull()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun removeDesk_multipleDesks_inactive_removes() {
         repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
         repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
@@ -1200,6 +1301,18 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
 
         verify(repo, times(1)).notifyVisibleTaskListeners(DEFAULT_DISPLAY, visibleTasksCount = 0)
         assertThat(repo.getDeskIds(displayId = DEFAULT_DISPLAY)).doesNotContain(2)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun removeDesk_multipleDesks_inactive_keepsOtherDeskActiveInDisplay() {
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
+        repo.addDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+        repo.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 3)
+
+        repo.removeDesk(deskId = 2)
+
+        assertThat(repo.getActiveDeskId(displayId = DEFAULT_DISPLAY)).isEqualTo(3)
     }
 
     @Test
@@ -1379,6 +1492,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                 visibleTasks = any(),
                 minimizedTasks = any(),
                 freeformTasksInZOrder = any(),
+                leftTiledTask = isNull(),
+                rightTiledTask = isNull(),
             )
     }
 

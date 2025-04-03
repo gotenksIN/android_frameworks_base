@@ -13,6 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 import android.content.Context
 import android.telephony.CarrierConfigManager
@@ -32,11 +41,19 @@ import com.android.systemui.statusbar.pipeline.dagger.MobileSummaryLog
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionsRepository
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import com.android.systemui.statusbar.pipeline.shared.data.model.ConnectivitySlot
 import com.android.systemui.statusbar.pipeline.shared.data.repository.ConnectivityRepository
 import com.android.systemui.statusbar.policy.data.repository.UserSetupRepository
 import com.android.systemui.util.CarrierConfigTracker
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+import com.android.systemui.util.CarrierNameCustomization
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 import java.lang.ref.WeakReference
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +71,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+import kotlinx.coroutines.flow.MutableStateFlow
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+
 /**
  * Business layer logic for the set of mobile subscription icons.
  *
@@ -117,6 +138,30 @@ interface MobileIconsInteractor {
      * subId.
      */
     fun getMobileConnectionInteractorForSubId(subId: Int): MobileIconInteractor
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
+
+    /** True if the LTE rsrp should be preferred over the primary level. */
+    val alwaysUseRsrpLevelForLte: StateFlow<Boolean>
+
+    /** True if the no internet icon should be hidden.  */
+    val hideNoInternetState: StateFlow<Boolean>
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+
+    val networkTypeIconCustomization: StateFlow<MobileIconCustomizationMode>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+
+    val showVolteIcon: StateFlow<Boolean>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+
+    val showVowifiIcon: StateFlow<Boolean>
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+
+    fun setDdsIconFLow(iconFlow: StateFlow<SignalIconModel?>) {}
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 }
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
@@ -132,9 +177,21 @@ constructor(
     @Background private val scope: CoroutineScope,
     private val context: Context,
     private val featureFlagsClassic: FeatureFlagsClassic,
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+    val carrierNameCustomization: CarrierNameCustomization,
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 ) : MobileIconsInteractor {
     // Weak reference lookup for created interactors
     private val reuseCache = mutableMapOf<Int, WeakReference<MobileIconInteractor>>()
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+    private var ddsIcon: StateFlow<SignalIconModel?> = MutableStateFlow(null)
+
+    override fun setDdsIconFLow(iconFlow: StateFlow<SignalIconModel?>) {
+        ddsIcon = iconFlow
+    }
+
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+
     override val mobileIsDefault =
         combine(
                 mobileConnectionsRepo.mobileIsDefault,
@@ -373,6 +430,58 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val isDeviceInEmergencyCallsOnlyMode: Flow<Boolean> =
         mobileConnectionsRepo.isDeviceEmergencyCallCapable
+
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
+    override val alwaysUseRsrpLevelForLte: StateFlow<Boolean> =
+        mobileConnectionsRepo.defaultDataSubRatConfig
+            .mapLatest { it.showRsrpSignalLevelforLTE }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
+    override val hideNoInternetState: StateFlow<Boolean> =
+        mobileConnectionsRepo.defaultDataSubRatConfig
+            .mapLatest { it.hideNoInternetState }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+    override val networkTypeIconCustomization: StateFlow<MobileIconCustomizationMode> =
+        mobileConnectionsRepo.defaultDataSubRatConfig
+            .mapLatest { defaultConfig ->
+                val enabled = defaultConfig.alwaysShowNetworkTypeIcon
+                    || defaultConfig.enableDdsRatIconEnhancement
+                    || defaultConfig.enableRatIconEnhancement
+                val state = MobileIconCustomizationMode(
+                    isRatCustomization = enabled,
+                    alwaysShowNetworkTypeIcon = defaultConfig.alwaysShowNetworkTypeIcon,
+                    ddsRatIconEnhancementEnabled = defaultConfig.enableDdsRatIconEnhancement,
+                    nonDdsRatIconEnhancementEnabled = defaultConfig.enableRatIconEnhancement,
+                )
+                state
+            }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), MobileIconCustomizationMode())
+
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+    override val showVolteIcon: StateFlow<Boolean> =
+        mobileConnectionsRepo.defaultDataSubRatConfig
+            .mapLatest { it.showVolteIcon }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+    override val showVowifiIcon: StateFlow<Boolean> =
+        mobileConnectionsRepo.defaultDataSubRatConfig
+            .mapLatest { it.showVowifiIcon }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+    private val crossSimdisplaySingnalLevel: StateFlow<Boolean> =
+        mobileConnectionsRepo.defaultDataSubRatConfig
+            .mapLatest { it.crossSimdisplaySingnalLevel }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     /** Vends out new [MobileIconInteractor] for a particular subId */
     override fun getMobileConnectionInteractorForSubId(subId: Int): MobileIconInteractor =
         reuseCache[subId]?.get() ?: createMobileConnectionInteractorForSubId(subId)
@@ -390,6 +499,19 @@ constructor(
                 isForceHidden,
                 mobileConnectionsRepo.getRepoForSubId(subId),
                 context,
+                alwaysUseRsrpLevelForLte = alwaysUseRsrpLevelForLte,
+                hideNoInternetState = hideNoInternetState,
+                networkTypeIconCustomizationFlow = networkTypeIconCustomization,
+                showVolteIcon = showVolteIcon,
+                showVowifiIcon = showVowifiIcon,
+                defaultDataSubId = mobileConnectionsRepo.defaultDataSubId,
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+                ddsIcon = ddsIcon,
+                crossSimdisplaySingnalLevel = crossSimdisplaySingnalLevel,
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+                carrierNameCustomization = carrierNameCustomization,
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
             )
             .also { reuseCache[subId] = WeakReference(it) }
     companion object {

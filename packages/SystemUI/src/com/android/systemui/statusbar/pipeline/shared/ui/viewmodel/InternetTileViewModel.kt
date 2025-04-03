@@ -105,10 +105,13 @@ constructor(
             if (it == null) {
                 notConnectedFlow
             } else {
-                combine(it.networkName, it.signalLevelIcon, mobileDataContentName) {
-                    networkNameModel,
-                    signalIcon,
-                    dataContentDescription ->
+                combine(
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+                    it.customizedNetworkName,
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+                    it.signalLevelIcon,
+                    mobileDataContentName,
+                ) { networkNameModel, signalIcon, dataContentDescription ->
                     when (signalIcon) {
                         is SignalIconModel.Cellular -> {
                             val secondary =

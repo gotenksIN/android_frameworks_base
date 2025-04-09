@@ -20,12 +20,14 @@ import com.android.systemui.kairos.BuildScope
 import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.toColdConflatedFlow
 import com.android.systemui.log.table.TableLogBuffer
+import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.NetworkTypeIconModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @ExperimentalKairosApi
 fun BuildScope.MobileIconInteractorKairosAdapter(
@@ -75,4 +77,16 @@ private class MobileIconInteractorKairosAdapter(
     override val isForceHidden: Flow<Boolean>,
     override val isAllowedDuringAirplaneMode: StateFlow<Boolean>,
     override val carrierNetworkChangeActive: StateFlow<Boolean>,
-) : MobileIconInteractor
+) : MobileIconInteractor {
+    override val isConnectionFailed = MutableStateFlow(false)
+    override val customizedNetworkName = MutableStateFlow(NetworkNameModel.IntentDerived("demo mode"))
+    override val customizedCarrierName = MutableStateFlow("demo mode")
+    override val customizedIcon = MutableStateFlow(null)
+    override val voWifiAvailable = MutableStateFlow(false)
+    override val showVowifiIcon = MutableStateFlow(false)
+    override val imsInfo = MutableStateFlow(MobileIconCustomizationMode())
+    override val showVolteIcon = MutableStateFlow(false)
+    override val networkTypeIconCustomization = MutableStateFlow(MobileIconCustomizationMode())
+    override val hideNoInternetState = MutableStateFlow(false)
+    override val alwaysUseRsrpLevelForLte = MutableStateFlow(false)
+}

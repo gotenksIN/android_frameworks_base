@@ -32,6 +32,7 @@ import com.android.systemui.kairos.toColdConflatedFlow
 import com.android.systemui.kairosBuilder
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.TableLogBufferFactory
+import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionsRepository
@@ -55,6 +56,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.MutableStateFlow
 @ExperimentalKairosApi
 @SysUISingleton
 class MobileIconsInteractorKairosAdapter
@@ -146,6 +148,13 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val isDeviceInEmergencyCallsOnlyMode: Flow<Boolean>
         get() = repo.isDeviceEmergencyCallCapable
+
+    override val showVowifiIcon = MutableStateFlow(false)
+    override val showVolteIcon = MutableStateFlow(false)
+    override val networkTypeIconCustomization = MutableStateFlow(MobileIconCustomizationMode())
+    override val hideNoInternetState = MutableStateFlow(false)
+    override val alwaysUseRsrpLevelForLte = MutableStateFlow(false)
+
     override fun getMobileConnectionInteractorForSubId(subId: Int): MobileIconInteractor =
         object : MobileIconInteractor {
             override val tableLogBuffer: TableLogBuffer =
@@ -168,6 +177,19 @@ constructor(
             override val isSingleCarrier: Flow<Boolean> = latest { isSingleCarrier }
             override val isRoaming: Flow<Boolean> = latest { isRoaming }
             override val isForceHidden: Flow<Boolean> = latest { isForceHidden }
+
+            override val isConnectionFailed = latest { isConnectionFailed }
+            override val customizedNetworkName = latest { customizedNetworkName }
+            override val customizedCarrierName = latest { customizedCarrierName }
+            override val customizedIcon = latest { customizedIcon }
+            override val voWifiAvailable = latest { voWifiAvailable }
+            override val showVowifiIcon = latest { showVowifiIcon }
+            override val imsInfo = latest { imsInfo }
+            override val showVolteIcon = latest { showVolteIcon }
+            override val networkTypeIconCustomization = latest { networkTypeIconCustomization }
+            override val hideNoInternetState = latest { hideNoInternetState }
+            override val alwaysUseRsrpLevelForLte = latest { alwaysUseRsrpLevelForLte }
+
             override val isAllowedDuringAirplaneMode: Flow<Boolean> = latest {
                 isAllowedDuringAirplaneMode
             }

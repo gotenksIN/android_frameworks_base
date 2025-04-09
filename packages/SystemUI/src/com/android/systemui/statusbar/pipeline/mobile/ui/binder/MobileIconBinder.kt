@@ -13,6 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
 package com.android.systemui.statusbar.pipeline.mobile.ui.binder
 import android.annotation.ColorInt
 import android.content.res.ColorStateList
@@ -36,6 +45,9 @@ import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.StatusBarIconView.STATE_HIDDEN
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+import com.android.systemui.statusbar.phone.StatusBarLocation
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.LocationBasedMobileViewModel
@@ -68,6 +80,9 @@ object MobileIconBinder {
         val roamingView = view.requireViewById<ImageView>(R.id.mobile_roaming)
         val roamingSpace = view.requireViewById<Space>(R.id.mobile_roaming_space)
         val dotView = view.requireViewById<StatusBarIconView>(R.id.status_bar_dot)
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+        val volteView = view.requireViewById<ImageView>(R.id.mobile_volte)
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
         view.isVisible = viewModel.isVisible.value
         iconView.isVisible = true
         // TODO(b/238425913): We should log this visibility state.
@@ -166,7 +181,12 @@ object MobileIconBinder {
                             dataTypeId?.let { IconViewBinder.bind(dataTypeId, networkTypeView) }
                             val prevVis = networkTypeContainer.visibility
                             networkTypeContainer.visibility =
-                                if (dataTypeId != null) VISIBLE else GONE
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+                                if (dataTypeId != null
+                                    && viewModel.location != StatusBarLocation.SHADE_CARRIER_GROUP)
+                                    VISIBLE else GONE
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+
                             if (prevVis != networkTypeContainer.visibility) {
                                 view.requestLayout()
                             }
@@ -238,8 +258,36 @@ object MobileIconBinder {
                             activityIn.imageTintList = tint
                             activityOut.imageTintList = tint
                             dotView.setDecorColor(colors.tint)
+                            volteView.imageTintList = tint
                         }
                     }
+
+                    launch {
+                        viewModel.volteId.distinctUntilChanged().collect { volteId ->
+// QTI_BEGIN: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
+                            val prevVisibility = volteView.visibility;
+// QTI_END: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
+// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+                            if (volteId != 0 &&
+                                viewModel.location != StatusBarLocation.SHADE_CARRIER_GROUP) {
+// QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
+                                volteView.visibility = VISIBLE
+                                volteView.setImageResource(volteId)
+                            } else {
+                                volteView.visibility = GONE
+                            }
+// QTI_BEGIN: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
+                            if (prevVisibility != volteView.visibility) {
+                                view.requestLayout()
+                            }
+// QTI_END: 2024-04-18: Android_UI: SystemUI: Fix HD icon overlap signalStrength icon issue
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+                        }
+                    }
+
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+                    launch { viewModel.showSignalStrengthIcon.collect { iconView.isVisible = it } }
+
                     launch { decorTint.collect { tint -> dotView.setDecorColor(tint) } }
                     try {
                         awaitCancellation()

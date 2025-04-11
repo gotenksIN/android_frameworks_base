@@ -529,10 +529,10 @@ class Task extends TaskFragment {
     private static final int TRANSLUCENT_TIMEOUT_MSG = FIRST_ACTIVITY_TASK_MSG + 1;
 
     private final Handler mHandler;
-
-    private static final ActivityPluginDelegate mActivityPluginDelegate =
+// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+    private static final ActivityPluginDelegate mQtiActivityPluginDelegate =
         new ActivityPluginDelegate();
-
+// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
     private class ActivityTaskHandler extends Handler {
 
         ActivityTaskHandler(Looper looper) {
@@ -1295,15 +1295,13 @@ class Task extends TaskFragment {
                 // Pausing the resumed activity because it is occluded by other task fragment, or
                 // should not be remained in resumed state.
                 if (startPausing(false /* uiSleeping*/, resuming, reason)) {
-// QTI_BEGIN: 2024-05-29: Data: Update pauseActivityIfNeeded to avoid NullPointerException
-                    if (mActivityPluginDelegate != null && top != null && top.info != null
-// QTI_END: 2024-05-29: Data: Update pauseActivityIfNeeded to avoid NullPointerException
-// QTI_BEGIN: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
+// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+                    if (mQtiActivityPluginDelegate != null && top != null && top.info != null
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
-                        mActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
+                        mQtiActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
                     }
-// QTI_END: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
+// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
                     someActivityPaused[0]++;
                 }
             }
@@ -1316,15 +1314,13 @@ class Task extends TaskFragment {
 // QTI_END: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
             if (resumedActivity != null && !taskFrag.canBeResumed(resuming)) {
                 if (taskFrag.startPausing(false /* uiSleeping*/, resuming, reason)) {
-// QTI_BEGIN: 2024-05-29: Data: Update pauseActivityIfNeeded to avoid NullPointerException
-                    if (mActivityPluginDelegate != null && top != null && top.info != null
-// QTI_END: 2024-05-29: Data: Update pauseActivityIfNeeded to avoid NullPointerException
-// QTI_BEGIN: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
+// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+                    if (mQtiActivityPluginDelegate != null && top != null && top.info != null
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
-                        mActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
+                        mQtiActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
                     }
-// QTI_END: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
+// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
                     someActivityPaused[0]++;
                 }
             }
@@ -5257,15 +5253,13 @@ class Task extends TaskFragment {
         }
         final boolean[] resumed = new boolean[1];
         final TaskFragment topFragment = topActivity.getTaskFragment();
-// QTI_BEGIN: 2024-05-29: Data: Update pauseActivityIfNeeded to avoid NullPointerException
-        if (mActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED
+// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+        if (mQtiActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED
                     && topActivity.info != null) {
-// QTI_END: 2024-05-29: Data: Update pauseActivityIfNeeded to avoid NullPointerException
-// QTI_BEGIN: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
-            mActivityPluginDelegate.activityInvokeNotification(
+            mQtiActivityPluginDelegate.activityInvokeNotification(
                     topActivity.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
         }
-// QTI_END: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
+// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
         forAllLeafTaskFragments(f -> {
             if (topFragment == f) {
                 return;
@@ -5332,12 +5326,12 @@ class Task extends TaskFragment {
         ProtoLog.i(WM_DEBUG_ADD_REMOVE, "Adding activity %s to task %s callers: %s", r,
                 activityTask, new RuntimeException("here").fillInStackTrace());
 
-// QTI_BEGIN: 2021-02-05: Data: Update ActivityPluginDelegate notifications for S
-        if (mActivityPluginDelegate != null) {
-            mActivityPluginDelegate.activityInvokeNotification
+// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+        if (mQtiActivityPluginDelegate != null) {
+            mQtiActivityPluginDelegate.activityInvokeNotification
                 (r.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
         }
-// QTI_END: 2021-02-05: Data: Update ActivityPluginDelegate notifications for S
+// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
         if (isActivityTypeHomeOrRecents() && getActivityBelow(r) == null) {
             // If this is the first activity, don't do any fancy animations,
             // because there is nothing for it to animate on top of.
@@ -6341,14 +6335,14 @@ class Task extends TaskFragment {
     public DisplayInfo getDisplayInfo() {
         return mDisplayContent.getDisplayInfo();
     }
-
+// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
     public void onARStopTriggered(ActivityRecord r) {
-        if (mActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
-                            mActivityPluginDelegate.activitySuspendNotification
+        if (mQtiActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
+                            mQtiActivityPluginDelegate.activitySuspendNotification
                                 (r.info.applicationInfo.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN, false);
                         }
     }
-
+// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
     private Rect getRawBounds() {
         return super.getBounds();
     }

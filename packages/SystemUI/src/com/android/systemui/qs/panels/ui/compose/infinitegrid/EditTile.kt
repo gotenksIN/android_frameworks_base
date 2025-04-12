@@ -451,7 +451,7 @@ private fun CurrentTilesGridHeader(
                 }
                 EditModeHeaderState.Idle -> {
                     EditGridCenteredText(
-                        text = stringResource(id = R.string.drag_to_rearrange_tiles)
+                        text = stringResource(id = R.string.select_to_rearrange_tiles)
                     )
                 }
             }
@@ -971,7 +971,7 @@ fun EditTile(
                         }
 
                     layout(constraints.maxWidth, constraints.maxHeight) {
-                        placeable.place(startPadding.roundToInt(), 0)
+                        placeable.placeRelative(startPadding.roundToInt(), 0)
                     }
                 }
                 .largeTilePadding()

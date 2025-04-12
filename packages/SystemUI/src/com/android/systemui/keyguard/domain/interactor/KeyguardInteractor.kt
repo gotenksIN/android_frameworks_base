@@ -153,16 +153,12 @@ constructor(
      * all.
      */
     val dozeAmount: Flow<Float> =
-        if (SceneContainerFlag.isEnabled) {
-            isAodAvailable.flatMapLatest { isAodAvailable ->
-                if (isAodAvailable) {
-                    keyguardTransitionInteractor.transitionValue(AOD)
-                } else {
-                    keyguardTransitionInteractor.transitionValue(DOZING)
-                }
+        isAodAvailable.flatMapLatest { isAodAvailable ->
+            if (isAodAvailable) {
+                keyguardTransitionInteractor.transitionValue(AOD)
+            } else {
+                keyguardTransitionInteractor.transitionValue(DOZING)
             }
-        } else {
-            repository.linearDozeAmount
         }
 
     /** Doze transition information. */
@@ -205,7 +201,7 @@ constructor(
      * same new value.
      */
     @OptIn(FlowPreview::class)
-    val isAbleToDream: Flow<Boolean> =
+    val isAbleToDream: StateFlow<Boolean> =
         dozeTransitionModel
             .flatMapLatest { dozeTransitionModel ->
                 if (isDozeOff(dozeTransitionModel.to)) {
@@ -270,10 +266,8 @@ constructor(
 
     /** Whether the alternate bouncer is showing or not. */
     val alternateBouncerShowing: Flow<Boolean> =
-        bouncerRepository.alternateBouncerVisible.sample(isAbleToDream) {
-            alternateBouncerVisible,
-            isAbleToDream ->
-            if (isAbleToDream) {
+        bouncerRepository.alternateBouncerVisible.map { alternateBouncerVisible ->
+            if (isAbleToDream.value) {
                 // If the alternate bouncer will show over a dream, it is likely that the dream has
                 // requested a dismissal, which will stop the dream. By delaying this slightly, the
                 // DREAMING->LOCKSCREEN transition will now happen first, followed by
@@ -501,11 +495,6 @@ constructor(
     /** Temporary shim, until [KeyguardWmStateRefactor] is enabled */
     fun showKeyguard() {
         fromGoneTransitionInteractor.get().showKeyguard()
-    }
-
-    /** Temporary shim, until [KeyguardWmStateRefactor] is enabled */
-    fun showGlanceableHub(): Boolean {
-        return fromGoneTransitionInteractor.get().showGlanceableHub()
     }
 
     /** Temporary shim, until [KeyguardWmStateRefactor] is enabled */

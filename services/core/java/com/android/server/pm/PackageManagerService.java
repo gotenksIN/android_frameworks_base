@@ -608,7 +608,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     final ProcessLoggingHandler mProcessLoggingHandler;
 
     private final int mSdkVersion;
-    private final int mSdkVersionFull;
     final Context mContext;
     final boolean mFactoryTest;
     final DisplayMetrics mMetrics;
@@ -619,8 +618,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private final boolean mIsPreQUpgrade;
     // If mIsUpgrade == true, contains the prior SDK version, else -1.
     private final int mPriorSdkVersion;
-    // If mIsUpgrade == true, contains the prior full SDK version, else -1.
-    private final int mPriorSdkVersionFull;
 
     // Used for privilege escalation. MUST NOT BE CALLED WITH mPackages
     // LOCK HELD.  Can be called with mInstallLock held.
@@ -1765,12 +1762,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             Slog.w(TAG, "**** ro.build.version.sdk not set!");
         }
 
-        final int sdkVersionFull = android.sdk.Flags.majorMinorVersioningScheme()
-                ? Build.VERSION.SDK_INT_FULL : 0;
         PackageManagerService m = new PackageManagerService(injector, factoryTest,
                 PackagePartitions.FINGERPRINT, Build.IS_ENG, Build.IS_USERDEBUG,
-                Build.VERSION.SDK_INT, Build.VERSION.INCREMENTAL, sdkVersionFull);
-
+                Build.VERSION.SDK_INT, Build.VERSION.INCREMENTAL);
         t.traceEnd(); // "create package manager"
 
         final CompatChange.ChangeListener selinuxChangeListener = packageName -> {
@@ -1913,7 +1907,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mIsPreNMR1Upgrade = testParams.isPreNmr1Upgrade;
         mIsPreQUpgrade = testParams.isPreQupgrade;
         mPriorSdkVersion = testParams.priorSdkVersion;
-        mPriorSdkVersionFull = testParams.priorSdkVersionFull;
         mIsUpgrade = testParams.isUpgrade;
         mMetrics = testParams.Metrics;
         mModuleInfoProvider = testParams.moduleInfoProvider;
@@ -1956,7 +1949,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mPackages.putAll(testParams.packages);
         mFreeStorageHelper = testParams.freeStorageHelper;
         mSdkVersion = testParams.sdkVersion;
-        mSdkVersionFull = testParams.sdkVersionFull;
         mAppInstallDir = testParams.appInstallDir;
         mIsEngBuild = testParams.isEngBuild;
         mIsUserDebugBuild = testParams.isUserDebugBuild;
@@ -1986,12 +1978,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     public PackageManagerService(PackageManagerServiceInjector injector, boolean factoryTest,
             final String partitionsFingerprint, final boolean isEngBuild,
-            final boolean isUserDebugBuild, final int sdkVersion, final String incrementalVersion,
-            final int sdkVersionFull) {
+            final boolean isUserDebugBuild, final int sdkVersion, final String incrementalVersion) {
         mIsEngBuild = isEngBuild;
         mIsUserDebugBuild = isUserDebugBuild;
         mSdkVersion = sdkVersion;
-        mSdkVersionFull = sdkVersionFull;
         mIncrementalVersion = incrementalVersion;
         mInjector = injector;
         mInjector.getSystemWrapper().disablePackageCaches();
@@ -2277,8 +2267,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                                 + PackagePartitions.FINGERPRINT + " (" + Build.FINGERPRINT + ")");
             }
             mPriorSdkVersion = mIsUpgrade ? ver.sdkVersion : -1;
-            mPriorSdkVersionFull = (android.sdk.Flags.majorMinorVersioningScheme() && mIsUpgrade)
-                    ? ver.sdkVersionFull : -1;
             mInitAppsHelper = new InitAppsHelper(this, mApexManager, mInstallPackageHelper,
                     mInjector.getSystemPartitions());
 
@@ -2407,7 +2395,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mPermissionManager.onStorageVolumeMounted(
                     StorageManager.UUID_PRIVATE_INTERNAL, mIsUpgrade);
             ver.sdkVersion = mSdkVersion;
-            ver.sdkVersionFull = mSdkVersionFull;
 
             // If this is the first boot or an update from pre-M, then we need to initialize the
             // default preferred apps across all defined users.
@@ -7359,12 +7346,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             final boolean isUpgrading = mPriorSdkVersion != -1;
             return isUpgrading && mPriorSdkVersion < sdkVersion;
         }
-
-        @Override
-        public boolean isUpgradingFromLowerThanBySdkVersionFull(int sdkVersionFull) {
-            final boolean isUpgrading = mPriorSdkVersionFull != -1;
-            return isUpgrading && (mPriorSdkVersionFull < sdkVersionFull);
-        }
     }
 
     private void setEnabledOverlayPackages(@UserIdInt int userId,
@@ -7935,10 +7916,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     int getSdkVersion() {
         return mSdkVersion;
-    }
-
-    int getSdkVersionFull() {
-        return mSdkVersionFull;
     }
 
     void addAllPackageProperties(@NonNull AndroidPackage pkg) {

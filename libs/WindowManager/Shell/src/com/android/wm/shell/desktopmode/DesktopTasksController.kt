@@ -18,6 +18,7 @@ package com.android.wm.shell.desktopmode
 
 import android.annotation.UserIdInt
 import android.app.ActivityManager
+import android.app.ActivityManager.RecentTaskInfo
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
 import android.app.KeyguardManager
@@ -234,6 +235,7 @@ class DesktopTasksController(
     private var userId: Int
     private val desktopModeShellCommandHandler: DesktopModeShellCommandHandler =
         DesktopModeShellCommandHandler(this, focusTransitionObserver)
+    private val latencyTracker: LatencyTracker
 
     private val mOnAnimationFinishedCallback = { releaseVisualIndicator() }
     private lateinit var snapEventHandler: SnapEventHandler
@@ -283,6 +285,7 @@ class DesktopTasksController(
         }
         userId = ActivityManager.getCurrentUser()
         taskRepository = userRepositories.getProfile(userId)
+        latencyTracker = LatencyTracker.getInstance(context)
 
         if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             desktopRepositoryInitializer.deskRecreationFactory =
@@ -749,8 +752,7 @@ class DesktopTasksController(
                 taskRepository.setActiveDesk(displayId = taskInfo.displayId, deskId = deskId)
             }
         } else {
-            LatencyTracker.getInstance(context)
-                .onActionCancel(LatencyTracker.ACTION_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG)
+            latencyTracker.onActionCancel(LatencyTracker.ACTION_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG)
         }
     }
 
@@ -920,11 +922,28 @@ class DesktopTasksController(
         )
     }
 
-    /** Move a task with given `taskId` to fullscreen */
-    fun moveToFullscreen(taskId: Int, transitionSource: DesktopModeTransitionSource) {
-        shellTaskOrganizer.getRunningTaskInfo(taskId)?.let { task ->
+    /** Move or launch a task with given [taskId] to fullscreen */
+    @JvmOverloads
+    fun moveToFullscreen(
+        taskId: Int,
+        transitionSource: DesktopModeTransitionSource,
+        remoteTransition: RemoteTransition? = null,
+    ) {
+        val taskInfo: TaskInfo? =
+            shellTaskOrganizer.getRunningTaskInfo(taskId)
+                ?: if (com.android.launcher3.Flags.enableAltTabKqsFlatenning()) {
+                    recentTasksController?.findTaskInBackground(taskId)
+                } else {
+                    null
+                }
+        taskInfo?.let { task ->
             snapEventHandler.removeTaskIfTiled(task.displayId, taskId)
-            moveToFullscreenWithAnimation(task, task.positionInParent, transitionSource)
+            moveToFullscreenWithAnimation(
+                task,
+                task.positionInParent,
+                transitionSource,
+                remoteTransition,
+            )
         }
     }
 
@@ -959,28 +978,64 @@ class DesktopTasksController(
     }
 
     private fun moveToFullscreenWithAnimation(
-        task: RunningTaskInfo,
+        task: TaskInfo,
         position: Point,
         transitionSource: DesktopModeTransitionSource,
+        remoteTransition: RemoteTransition? = null,
     ) {
         logV("moveToFullscreenWithAnimation taskId=%d", task.taskId)
+        val displayId =
+            when {
+                task.displayId != INVALID_DISPLAY -> task.displayId
+                focusTransitionObserver.globallyFocusedDisplayId != INVALID_DISPLAY ->
+                    focusTransitionObserver.globallyFocusedDisplayId
+                else -> DEFAULT_DISPLAY
+            }
         val wct = WindowContainerTransaction()
-        val willExitDesktop = willExitDesktop(task.taskId, task.displayId, forceExitDesktop = true)
-        val deactivationRunnable = addMoveToFullscreenChanges(wct, task, willExitDesktop)
+
+        // When a task is background, update wct to start task.
+        if (
+            com.android.launcher3.Flags.enableAltTabKqsFlatenning() &&
+                shellTaskOrganizer.getRunningTaskInfo(task.taskId) == null &&
+                task is RecentTaskInfo
+        ) {
+            wct.startTask(
+                task.taskId,
+                // TODO(b/400817258): Use ActivityOptions Utils when available.
+                ActivityOptions.makeBasic()
+                    .apply {
+                        launchWindowingMode = WINDOWING_MODE_FULLSCREEN
+                        launchDisplayId = displayId
+                        pendingIntentBackgroundActivityStartMode =
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                    }
+                    .toBundle(),
+            )
+        }
+        val willExitDesktop = willExitDesktop(task.taskId, displayId, forceExitDesktop = true)
+        val deactivationRunnable = addMoveToFullscreenChanges(wct, task, willExitDesktop, displayId)
 
         // We are moving a freeform task to fullscreen, put the home task under the fullscreen task.
-        if (!forceEnterDesktop(task.displayId)) {
-            moveHomeTask(task.displayId, wct)
+        if (!forceEnterDesktop(displayId)) {
+            moveHomeTask(displayId, wct)
             wct.reorder(task.token, /* onTop= */ true)
         }
 
         val transition =
-            exitDesktopTaskTransitionHandler.startTransition(
-                transitionSource,
-                wct,
-                position,
-                mOnAnimationFinishedCallback,
-            )
+            if (remoteTransition != null) {
+                val transitionType = transitionType(remoteTransition)
+                val remoteTransitionHandler = OneShotRemoteHandler(mainExecutor, remoteTransition)
+                transitions.startTransition(transitionType, wct, remoteTransitionHandler).also {
+                    remoteTransitionHandler.setTransition(it)
+                }
+            } else {
+                exitDesktopTaskTransitionHandler.startTransition(
+                    transitionSource,
+                    wct,
+                    position,
+                    mOnAnimationFinishedCallback,
+                )
+            }
         deactivationRunnable?.invoke(transition)
 
         // handles case where we are moving to full screen without closing all DW tasks.
@@ -991,7 +1046,8 @@ class DesktopTasksController(
             && !DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue
         ) {
             desktopModeEnterExitTransitionListener?.onExitDesktopModeTransitionStarted(
-                FULLSCREEN_ANIMATION_DURATION
+                FULLSCREEN_ANIMATION_DURATION,
+                shouldEndUpAtHome = false,
             )
         }
     }
@@ -1952,7 +2008,8 @@ class DesktopTasksController(
     ): RunOnTransitStart? {
         if (!willExitDesktop) return null
         desktopModeEnterExitTransitionListener?.onExitDesktopModeTransitionStarted(
-            FULLSCREEN_ANIMATION_DURATION
+            FULLSCREEN_ANIMATION_DURATION,
+            shouldEndUpAtHome,
         )
         // No need to clean up the wallpaper / reorder home when coming from a recents transition.
         if (
@@ -1989,6 +2046,11 @@ class DesktopTasksController(
         return false
     }
 
+    private fun taskDisplaySupportDesktopMode(triggerTask: RunningTaskInfo) =
+        displayController.getDisplay(triggerTask.displayId)?.let { display ->
+            DesktopModeStatus.isDesktopModeSupportedOnDisplay(context, display)
+        } ?: false
+
     override fun handleRequest(
         transition: IBinder,
         request: TransitionRequestInfo,
@@ -1997,13 +2059,22 @@ class DesktopTasksController(
         // Check if we should skip handling this transition
         var reason = ""
         val triggerTask = request.triggerTask
+        // Skipping early if the trigger task is null
+        if (triggerTask == null) {
+            logV("skipping handleRequest reason=triggerTask is null", reason)
+            return null
+        }
         val recentsAnimationRunning =
             RecentsTransitionStateListener.isAnimating(recentsTransitionState)
-        var shouldHandleMidRecentsFreeformLaunch =
+        val shouldHandleMidRecentsFreeformLaunch =
             recentsAnimationRunning && isFreeformRelaunch(triggerTask, request)
         val isDragAndDropFullscreenTransition = taskContainsDragAndDropCookie(triggerTask)
         val shouldHandleRequest =
             when {
+                !taskDisplaySupportDesktopMode(triggerTask) -> {
+                    reason = "triggerTask's display doesn't support desktop mode"
+                    false
+                }
                 // Handle freeform relaunch during recents animation
                 shouldHandleMidRecentsFreeformLaunch -> true
                 recentsAnimationRunning -> {
@@ -2022,11 +2093,6 @@ class DesktopTasksController(
                 // Only handle open or to front transitions
                 request.type != TRANSIT_OPEN && request.type != TRANSIT_TO_FRONT -> {
                     reason = "transition type not handled (${request.type})"
-                    false
-                }
-                // Only handle when it is a task transition
-                triggerTask == null -> {
-                    reason = "triggerTask is null"
                     false
                 }
                 // Only handle standard type tasks
@@ -2049,23 +2115,22 @@ class DesktopTasksController(
         }
 
         val result =
-            triggerTask?.let { task ->
-                when {
-                    // Check if freeform task launch during recents should be handled
-                    shouldHandleMidRecentsFreeformLaunch ->
-                        handleMidRecentsFreeformTaskLaunch(task, transition)
-                    // Check if the closing task needs to be handled
-                    TransitionUtil.isClosingType(request.type) ->
-                        handleTaskClosing(task, transition, request.type)
-                    // Check if the top task shouldn't be allowed to enter desktop mode
-                    isIncompatibleTask(task) -> handleIncompatibleTaskLaunch(task, transition)
-                    // Check if fullscreen task should be updated
-                    task.isFullscreen -> handleFullscreenTaskLaunch(task, transition)
-                    // Check if freeform task should be updated
-                    task.isFreeform -> handleFreeformTaskLaunch(task, transition)
-                    else -> {
-                        null
-                    }
+            when {
+                // Check if freeform task launch during recents should be handled
+                shouldHandleMidRecentsFreeformLaunch ->
+                    handleMidRecentsFreeformTaskLaunch(triggerTask, transition)
+                // Check if the closing task needs to be handled
+                TransitionUtil.isClosingType(request.type) ->
+                    handleTaskClosing(triggerTask, transition, request.type)
+                // Check if the top task shouldn't be allowed to enter desktop mode
+                isIncompatibleTask(triggerTask) ->
+                    handleIncompatibleTaskLaunch(triggerTask, transition)
+                // Check if fullscreen task should be updated
+                triggerTask.isFullscreen -> handleFullscreenTaskLaunch(triggerTask, transition)
+                // Check if freeform task should be updated
+                triggerTask.isFreeform -> handleFreeformTaskLaunch(triggerTask, transition)
+                else -> {
+                    null
                 }
             }
         logV("handleRequest result=%s", result)
@@ -2130,8 +2195,8 @@ class DesktopTasksController(
         )
     }
 
-    private fun taskContainsDragAndDropCookie(taskInfo: RunningTaskInfo?) =
-        taskInfo?.launchCookies?.any { it == dragAndDropFullscreenCookie } ?: false
+    private fun taskContainsDragAndDropCookie(taskInfo: RunningTaskInfo) =
+        taskInfo.launchCookies?.any { it == dragAndDropFullscreenCookie } ?: false
 
     /**
      * Applies the proper surface states (rounded corners) to tasks when desktop mode is active.
@@ -2155,9 +2220,8 @@ class DesktopTasksController(
     }
 
     /** Returns whether an existing desktop task is being relaunched in freeform or not. */
-    private fun isFreeformRelaunch(triggerTask: RunningTaskInfo?, request: TransitionRequestInfo) =
-        (triggerTask != null &&
-            triggerTask.windowingMode == WINDOWING_MODE_FREEFORM &&
+    private fun isFreeformRelaunch(triggerTask: RunningTaskInfo, request: TransitionRequestInfo) =
+        (triggerTask.windowingMode == WINDOWING_MODE_FREEFORM &&
             TransitionUtil.isOpeningType(request.type) &&
             taskRepository.isActiveTask(triggerTask.taskId))
 
@@ -2756,10 +2820,11 @@ class DesktopTasksController(
     /** Applies the changes needed to enter fullscreen and clean up the desktop if needed. */
     private fun addMoveToFullscreenChanges(
         wct: WindowContainerTransaction,
-        taskInfo: RunningTaskInfo,
+        taskInfo: TaskInfo,
         willExitDesktop: Boolean,
+        displayId: Int = taskInfo.displayId,
     ): RunOnTransitStart? {
-        val tdaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(taskInfo.displayId)!!
+        val tdaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(displayId)!!
         val tdaWindowingMode = tdaInfo.configuration.windowConfiguration.windowingMode
         val targetWindowingMode =
             if (tdaWindowingMode == WINDOWING_MODE_FULLSCREEN) {
@@ -2776,11 +2841,19 @@ class DesktopTasksController(
         if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             wct.reparent(taskInfo.token, tdaInfo.token, /* onTop= */ true)
         }
-        val deskId = taskRepository.getDeskIdForTask(taskInfo.taskId)
+
+        val deskId =
+            taskRepository.getDeskIdForTask(taskInfo.taskId)
+                ?: if (com.android.launcher3.Flags.enableAltTabKqsFlatenning()) {
+                    taskRepository.getActiveDeskId(displayId)
+                } else {
+                    null
+                }
+
         return performDesktopExitCleanUp(
             wct = wct,
             deskId = deskId,
-            displayId = taskInfo.displayId,
+            displayId = displayId,
             willExitDesktop = willExitDesktop,
             shouldEndUpAtHome = false,
         )
@@ -3492,8 +3565,9 @@ class DesktopTasksController(
         val indicatorType = indicator.updateIndicatorType(inputCoordinates)
         when (indicatorType) {
             IndicatorType.TO_DESKTOP_INDICATOR -> {
-                LatencyTracker.getInstance(context)
-                    .onActionStart(LatencyTracker.ACTION_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG)
+                latencyTracker.onActionStart(
+                    LatencyTracker.ACTION_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG
+                )
                 // Start a new jank interaction for the drag release to desktop window animation.
                 interactionJankMonitor.begin(
                     taskSurface,
@@ -3872,14 +3946,18 @@ class DesktopTasksController(
                     }
                 }
 
-                override fun onExitDesktopModeTransitionStarted(transitionDuration: Int) {
+                override fun onExitDesktopModeTransitionStarted(
+                    transitionDuration: Int,
+                    shouldEndUpAtHome: Boolean,
+                ) {
                     ProtoLog.v(
                         WM_SHELL_DESKTOP_MODE,
-                        "IDesktopModeImpl: onExitDesktopModeTransitionStarted transitionTime=%s",
+                        "IDesktopModeImpl: onExitDesktopModeTransitionStarted transitionTime=%s shouldEndUpAtHome=%b",
                         transitionDuration,
+                        shouldEndUpAtHome,
                     )
                     remoteListener.call { l ->
-                        l.onExitDesktopModeTransitionStarted(transitionDuration)
+                        l.onExitDesktopModeTransitionStarted(transitionDuration, shouldEndUpAtHome)
                     }
                 }
             }
@@ -3941,6 +4019,16 @@ class DesktopTasksController(
         ) {
             executeRemoteCallWithTaskPermission(controller, "showDesktopApp") { c ->
                 c.moveTaskToFront(taskId, remoteTransition, toFrontReason.toUnminimizeReason())
+            }
+        }
+
+        override fun moveToFullscreen(
+            taskId: Int,
+            transitionSource: DesktopModeTransitionSource,
+            remoteTransition: RemoteTransition?,
+        ) {
+            executeRemoteCallWithTaskPermission(controller, "moveToFullscreen") { c ->
+                c.moveToFullscreen(taskId, transitionSource, remoteTransition)
             }
         }
 
@@ -4084,7 +4172,7 @@ class DesktopTasksController(
         fun onEnterDesktopModeTransitionStarted(transitionDuration: Int)
 
         /** [transitionDuration] time it takes to run exit desktop mode transition */
-        fun onExitDesktopModeTransitionStarted(transitionDuration: Int)
+        fun onExitDesktopModeTransitionStarted(transitionDuration: Int, shouldEndUpAtHome: Boolean)
     }
 
     /** The positions on a screen that a task can snap to. */

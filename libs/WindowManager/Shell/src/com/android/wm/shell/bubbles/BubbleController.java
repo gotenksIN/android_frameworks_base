@@ -310,6 +310,7 @@ public class BubbleController implements ConfigurationChangeListener,
             @Nullable BubbleStackView.SurfaceSynchronizer synchronizer,
             FloatingContentCoordinator floatingContentCoordinator,
             BubbleDataRepository dataRepository,
+            BubbleTransitions bubbleTransitions,
             @Nullable IStatusBarService statusBarService,
             WindowManager windowManager,
             DisplayInsetsController displayInsetsController,
@@ -368,20 +369,18 @@ public class BubbleController implements ConfigurationChangeListener,
         mDisplayController = displayController;
         final TaskViewTransitions tvTransitions;
         if (TaskViewTransitions.useRepo()) {
-            tvTransitions = new TaskViewTransitions(transitions, taskViewRepository, organizer,
-                    syncQueue);
+            tvTransitions = new BubbleTaskViewTransitions(transitions, taskViewRepository,
+                    organizer, syncQueue);
         } else {
             tvTransitions = taskViewTransitions;
         }
         mTaskViewController = new BubbleTaskViewController(tvTransitions);
-        mBubbleTransitions = new BubbleTransitions(transitions, organizer, taskViewRepository, data,
-                tvTransitions, context);
         mTransitions = transitions;
         mOneHandedOptional = oneHandedOptional;
         mDragAndDropController = dragAndDropController;
         mSyncQueue = syncQueue;
         mWmService = wmService;
-        shellInit.addInitCallback(this::onInit, this);
+        mBubbleTransitions = bubbleTransitions;
         mBubbleTaskViewFactory = new BubbleTaskViewFactory() {
             @Override
             public BubbleTaskView create() {
@@ -395,6 +394,7 @@ public class BubbleController implements ConfigurationChangeListener,
         mExpandedViewManager = BubbleExpandedViewManager.fromBubbleController(this);
         mResizabilityChecker = resizabilityChecker;
         mHomeIntentProvider = homeIntentProvider;
+        shellInit.addInitCallback(this::onInit, this);
     }
 
     private void registerOneHandedState(OneHandedController oneHanded) {

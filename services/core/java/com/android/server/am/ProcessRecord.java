@@ -1787,10 +1787,7 @@ class ProcessRecord implements WindowProcessListener {
     }
 
     boolean isFreezable() {
-        return mService.mOomAdjuster.mCachedAppOptimizer.useFreezer()
-                && !mOptRecord.isFreezeExempt()
-                && !mOptRecord.shouldNotFreeze()
-                && mState.getCurAdj() >= mService.mConstants.FREEZER_CUTOFF_ADJ;
+        return OomAdjuster.getFreezePolicy(this);
     }
 
     public void forEachConnectionHost(Consumer<ProcessRecord> consumer) {

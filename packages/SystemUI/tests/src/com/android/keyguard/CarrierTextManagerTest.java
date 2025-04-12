@@ -80,7 +80,6 @@ import com.android.systemui.telephony.TelephonyListenerManager;
 import com.android.systemui.util.CarrierNameCustomization;
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.util.concurrency.FakeExecutor;
-import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.FakeSystemClock;
 
 import kotlinx.coroutines.test.TestScope;
@@ -151,7 +150,6 @@ public class CarrierTextManagerTest extends SysuiTestCase {
 
     private final KosmosJavaAdapter mKosmos = new KosmosJavaAdapter(this);
     private final TestScope mTestScope = mKosmos.getTestScope();
-    private final JavaAdapter mJavaAdapter = new JavaAdapter(mTestScope.getBackgroundScope());
 
     private Void checkMainThread(InvocationOnMock inv) {
         assertThat(mMainExecutor.isExecuting()).isTrue();
@@ -192,7 +190,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                 mContext.getResources(),
                 mWifiRepository,
                 mSatelliteViewModel,
-                mJavaAdapter,
+                mKosmos.getJavaAdapter(),
                 mTelephonyManager,
                 mTelephonyListenerManager,
                 mWakefulnessLifecycle,
@@ -279,7 +277,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                 mContext.getResources(),
                 mWifiRepository,
                 mSatelliteViewModel,
-                mJavaAdapter,
+                mKosmos.getJavaAdapter(),
                 mTelephonyManager,
                 mTelephonyListenerManager,
                 mWakefulnessLifecycle,
@@ -324,7 +322,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                 mContext.getResources(),
                 mWifiRepository,
                 mSatelliteViewModel,
-                mJavaAdapter,
+                mKosmos.getJavaAdapter(),
                 mTelephonyManager,
                 mTelephonyListenerManager,
                 mWakefulnessLifecycle,

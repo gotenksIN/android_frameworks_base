@@ -2689,7 +2689,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         if (enableFlexibleSplit()) {
             // We could migrate to/return the new INDEX enums here since most callers just care that
             // this value isn't SPLIT_POSITION_UNDEFINED, but
-            // ImePositionProcessor#getImeTargetPosition actually uses the leftTop/bottomRight value
+            // ImePositionProcessor#getImeLayeringTargetPosition actually uses the
+            // leftTop/bottomRight value
             StageTaskListener stageForToken = mStageOrderOperator.getAllStages().stream()
                     .filter(stage -> stage.containsToken(token))
                     .findFirst().orElse(null);
@@ -2914,7 +2915,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         final boolean isOpening = isOpeningType(type);
         final boolean inFullscreen = triggerTask.getWindowingMode() == WINDOWING_MODE_FULLSCREEN;
         final boolean inDesktopMode = mDesktopTasksController.isPresent()
-                && mDesktopTasksController.get().isDesktopModeShowing(mDisplayId);
+                && mDesktopTasksController.get().isAnyDeskActive(mDisplayId);
         final boolean isLaunchingDesktopTask = isOpening && DesktopModeStatus.canEnterDesktopMode(
                 mContext) && triggerTask.getWindowingMode() == WINDOWING_MODE_FREEFORM;
         final StageTaskListener stage = getStageOfTask(triggerTask);

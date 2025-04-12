@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
-package com.android.systemui.qs.panels.shared.model
+package com.android.wm.shell.scenarios
 
-import javax.inject.Qualifier
+import android.platform.test.rule.ScreenRecordRule
+import org.junit.Ignore
+import org.junit.Rule
 
-@Qualifier
-@MustBeDocumented
-@Retention(AnnotationRetention.RUNTIME)
-annotation class QSFragmentComposeClippingTableLog
+@Ignore("Base Test Class")
+abstract class TestScenarioBase {
+    @get:Rule val screenRecordRule = ScreenRecordRule(/* keepTestLevelRecordingOnSuccess= */ false)
+}

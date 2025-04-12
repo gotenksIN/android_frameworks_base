@@ -546,7 +546,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
 
     @Override
     public void setFreeformTaskTransitionStarter(FreeformTaskTransitionStarter transitionStarter) {
-        mTaskOperations = new TaskOperations(transitionStarter, mContext, mSyncQueue);
+        mTaskOperations = new TaskOperations(transitionStarter, mContext);
         mDesktopTasksController.setFreeformTaskTransitionStarter(transitionStarter);
     }
 
@@ -951,8 +951,9 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     }
 
     @Override
-    public void onOverviewAnimationStateChange(boolean running) {
-        mDesktopTilingDecorViewModel.onOverviewAnimationStateChange(running);
+    public void onOverviewAnimationStateChange(
+            @RecentsTransitionStateListener.RecentsTransitionState int state) {
+        mDesktopTilingDecorViewModel.onOverviewAnimationStateChange(state);
     }
 
     @Override

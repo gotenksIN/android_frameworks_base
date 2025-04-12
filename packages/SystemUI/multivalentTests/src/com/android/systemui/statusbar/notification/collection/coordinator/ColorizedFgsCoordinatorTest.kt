@@ -38,7 +38,6 @@ import com.android.systemui.mediaprojection.data.repository.fakeMediaProjectionR
 import com.android.systemui.screenrecord.data.model.ScreenRecordModel
 import com.android.systemui.screenrecord.data.repository.screenRecordRepository
 import com.android.systemui.statusbar.chips.notification.domain.interactor.statusBarNotificationChipsInteractor
-import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
 import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.notification.collection.buildEntry
 import com.android.systemui.statusbar.notification.collection.buildNotificationEntry
@@ -297,14 +296,13 @@ class ColorizedFgsCoordinatorTest : SysuiTestCase() {
     @Test
     @EnableFlags(
         PromotedNotificationUi.FLAG_NAME,
-        StatusBarNotifChips.FLAG_NAME,
         StatusBarChipsModernization.FLAG_NAME,
         StatusBarRootModernization.FLAG_NAME,
     )
     fun comparatorPutsCallBeforeOther() =
         kosmos.runTest {
             // GIVEN a call and a promoted ongoing notification
-            val callEntry = buildOngoingCallEntry(promoted = false)
+            val callEntry = buildOngoingCallEntry(promoted = true)
             val ronEntry = buildPromotedOngoingEntry()
             val otherEntry = buildNotificationEntry(tag = "other")
 

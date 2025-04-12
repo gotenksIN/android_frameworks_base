@@ -49,7 +49,6 @@ import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.data.repository.ShadeRepository
-import com.android.systemui.util.kotlin.Utils.Companion.sample as sampleCombine
 import com.android.systemui.util.kotlin.sample
 import com.android.systemui.wallpapers.data.repository.WallpaperFocalAreaRepository
 import javax.inject.Inject
@@ -307,7 +306,7 @@ constructor(
     val isSecureCameraActive: Flow<Boolean> =
         merge(
                 onCameraLaunchDetected
-                    .filter { it.type == CameraLaunchType.POWER_DOUBLE_TAP }
+                    .filter { it.type == CameraLaunchType.POWER_DOUBLE_TAP && it.isSecureCamera }
                     .map { SecureCameraRelatedEventType.SecureCameraLaunched },
                 isKeyguardVisible
                     .filter { it }
@@ -350,20 +349,18 @@ constructor(
      */
     val dismissAlpha: Flow<Float> =
         shadeRepository.legacyShadeExpansion
-            .sampleCombine(
-                keyguardTransitionInteractor.currentKeyguardState,
-                keyguardTransitionInteractor.transitionState,
-                isKeyguardDismissible,
+            .sample(
                 keyguardTransitionInteractor.isFinishedIn(Scenes.Communal, GLANCEABLE_HUB),
+                ::Pair,
             )
-            .filter { (_, _, step, _, _) -> !step.transitionState.isTransitioning() }
-            .transform {
-                (
-                    legacyShadeExpansion,
-                    currentKeyguardState,
-                    step,
-                    isKeyguardDismissible,
-                    onGlanceableHub) ->
+            .filter {
+                !keyguardTransitionInteractor.transitionState.value.transitionState
+                    .isTransitioning()
+            }
+            .transform { (legacyShadeExpansion, onGlanceableHub) ->
+                val currentKeyguardState = keyguardTransitionInteractor.currentKeyguardState.value
+                val isKeyguardDismissible = isKeyguardDismissible.value
+
                 if (
                     statusBarState.value == StatusBarState.KEYGUARD &&
                         isKeyguardDismissible &&
@@ -522,9 +519,12 @@ constructor(
         }
     }
 
-    fun onCameraLaunchDetected(source: Int) {
+    fun onCameraLaunchDetected(source: Int, isSecureCamera: Boolean) {
         repository.onCameraLaunchDetected.value =
-            CameraLaunchSourceModel(type = cameraLaunchSourceIntToType(source))
+            CameraLaunchSourceModel(
+                type = cameraLaunchSourceIntToType(source),
+                isSecureCamera = isSecureCamera,
+            )
     }
 
     fun showDismissibleKeyguard() {

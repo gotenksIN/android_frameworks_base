@@ -53,8 +53,7 @@ class NotificationEntryAdapter(
     }
 
     override fun isTopLevelEntry(): Boolean {
-        return parent != null &&
-            (parent === GroupEntry.ROOT_ENTRY || BundleEntry.ROOT_BUNDLES.contains(parent))
+        return parent != null && (parent === GroupEntry.ROOT_ENTRY || parent is BundleEntry)
     }
 
     override fun getKey(): String {
@@ -113,7 +112,7 @@ class NotificationEntryAdapter(
     }
 
     override fun isColorized(): Boolean {
-        return entry.sbn.notification.isColorized
+        return entry.sbn?.notification?.isColorized ?: false
     }
 
     override fun getSbn(): StatusBarNotification {
@@ -212,5 +211,9 @@ class NotificationEntryAdapter(
 
     override fun onEntryClicked(row: ExpandableNotificationRow) {
         notificationActivityStarter.onNotificationClicked(entry, row)
+    }
+
+    override fun getRemoteInputEntryAdapter(): RemoteInputEntryAdapter {
+        return entry.getRemoteInputEntryAdapter()
     }
 }

@@ -92,7 +92,6 @@ import com.android.systemui.statusbar.NotificationShelf;
 import com.android.systemui.statusbar.RemoteInputController;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
-import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips;
 import com.android.systemui.statusbar.notification.ColorUpdateLogger;
 import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.LaunchAnimationParameters;
@@ -104,6 +103,7 @@ import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.PipelineDumpable;
 import com.android.systemui.statusbar.notification.collection.PipelineDumper;
+import com.android.systemui.statusbar.notification.collection.RemoteInputEntryAdapter;
 import com.android.systemui.statusbar.notification.collection.notifcollection.DismissedByUserStats;
 import com.android.systemui.statusbar.notification.collection.notifcollection.NotifCollectionListener;
 import com.android.systemui.statusbar.notification.collection.provider.NotificationDismissibilityProvider;
@@ -117,6 +117,7 @@ import com.android.systemui.statusbar.notification.headsup.HeadsUpTouchHelper.He
 import com.android.systemui.statusbar.notification.headsup.OnHeadsUpChangedListener;
 import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
+import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
@@ -1570,17 +1571,17 @@ public class NotificationStackScrollLayoutController implements Dumpable {
 
     public RemoteInputController.Delegate createDelegate() {
         return new RemoteInputController.Delegate() {
-            public void setRemoteInputActive(NotificationEntry entry,
+            public void setRemoteInputActive(RemoteInputEntryAdapter entry,
                     boolean remoteInputActive) {
                 if (SceneContainerFlag.isEnabled()) {
                     sendRemoteInputRowBottomBound(entry, remoteInputActive);
                 }
-                mHeadsUpManager.setRemoteInputActive(entry, remoteInputActive);
+                entry.setRemoteInputActive(mHeadsUpManager, remoteInputActive);
                 entry.notifyHeightChanged(true /* needsAnimation */);
             }
 
-            public void lockScrollTo(NotificationEntry entry) {
-                mView.lockScrollTo(entry.getRow());
+            public void lockScrollTo(ExpandableNotificationRow row) {
+                mView.lockScrollTo(row);
             }
 
             public void requestDisallowLongPressAndDismiss() {
@@ -1588,7 +1589,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                 mView.requestDisallowDismiss();
             }
 
-            private void sendRemoteInputRowBottomBound(NotificationEntry entry,
+            private void sendRemoteInputRowBottomBound(RemoteInputEntryAdapter entry,
                     boolean remoteInputActive) {
                 ExpandableNotificationRow row = entry.getRow();
                 float top = row.getTranslationY();
@@ -1619,7 +1620,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
 
     public void generateHeadsUpAnimation(NotificationEntry entry, boolean isHeadsUp) {
         boolean hasStatusBarChip =
-                StatusBarNotifChips.isEnabled()
+                PromotedNotificationUi.isEnabled()
                         && mVisibleStatusBarChipKeys.contains(entry.getKey());
         mView.generateHeadsUpAnimation(entry, isHeadsUp, hasStatusBarChip);
     }

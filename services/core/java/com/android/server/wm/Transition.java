@@ -1871,6 +1871,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 mConfigAtEndActivities = null;
             }
             primaryDisplay.getPendingTransaction().merge(transaction);
+            primaryDisplay.scheduleAnimation();
             mSyncId = -1;
             mOverrideOptions = null;
             cleanUpInternal();

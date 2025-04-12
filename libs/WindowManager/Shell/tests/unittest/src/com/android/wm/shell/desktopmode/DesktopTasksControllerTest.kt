@@ -5698,6 +5698,129 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activatePreviousDesk_activates() {
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = 1)
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
+
+        controller.activatePreviousDesk(DEFAULT_DISPLAY)
+
+        verify(desksOrganizer).activateDesk(any(), eq(1))
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activateNextDesk_activates() {
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = 1)
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = 2)
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 1)
+
+        controller.activateNextDesk(DEFAULT_DISPLAY)
+
+        verify(desksOrganizer).activateDesk(any(), eq(2))
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activatePreviousDesk_deskDoesNotExist_doesNotActivate() {
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 0)
+
+        controller.activatePreviousDesk(DEFAULT_DISPLAY)
+
+        verify(desksOrganizer, never()).activateDesk(any(), any())
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activateNextDesk_deskDoesNotExist_doesNotActivate() {
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = 1)
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 1)
+
+        controller.activateNextDesk(DEFAULT_DISPLAY)
+
+        verify(desksOrganizer, never()).activateDesk(any(), any())
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activatePreviousDesk_noDeskActive_doesNotActivate() {
+        taskRepository.setDeskInactive(deskId = 0)
+
+        controller.activatePreviousDesk(DEFAULT_DISPLAY)
+
+        verify(desksOrganizer, never()).activateDesk(any(), any())
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activateNextDesk_noDeskActive_doesNotActivate() {
+        taskRepository.setDeskInactive(deskId = 0)
+
+        controller.activateNextDesk(DEFAULT_DISPLAY)
+
+        verify(desksOrganizer, never()).activateDesk(any(), any())
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activatePreviousDesk_invalidDisplay_activatesFocusedDisplayDesk() {
+        val focusedDisplayId = 5
+        whenever(focusTransitionObserver.globallyFocusedDisplayId).thenReturn(focusedDisplayId)
+        taskRepository.addDesk(displayId = 5, deskId = 1)
+        taskRepository.addDesk(displayId = 5, deskId = 2)
+        taskRepository.setActiveDesk(displayId = 5, deskId = 2)
+        taskRepository.addDesk(displayId = 6, deskId = 3)
+        taskRepository.addDesk(displayId = 6, deskId = 4)
+        taskRepository.setActiveDesk(displayId = 6, deskId = 4)
+
+        controller.activatePreviousDesk(INVALID_DISPLAY)
+
+        verify(desksOrganizer).activateDesk(any(), eq(1))
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
+    )
+    fun activateNextDesk_invalidDisplay_activatesFocusedDisplayDesk() {
+        val focusedDisplayId = 6
+        whenever(focusTransitionObserver.globallyFocusedDisplayId).thenReturn(focusedDisplayId)
+        taskRepository.addDesk(displayId = 5, deskId = 1)
+        taskRepository.addDesk(displayId = 5, deskId = 2)
+        taskRepository.setActiveDesk(displayId = 5, deskId = 1)
+        taskRepository.addDesk(displayId = 6, deskId = 3)
+        taskRepository.addDesk(displayId = 6, deskId = 4)
+        taskRepository.setActiveDesk(displayId = 6, deskId = 3)
+
+        controller.activateNextDesk(INVALID_DISPLAY)
+
+        verify(desksOrganizer).activateDesk(any(), eq(4))
+    }
+
+    @Test
+    @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION,
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
     )
@@ -6057,6 +6180,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
+    @DisableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun onDesktopDragEnd_noIndicatorAndMoveToNewDisplay_reparent() {
         val task = setUpFreeformTask()
         val spyController = spy(controller)
@@ -6090,6 +6214,41 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 },
                 eq(dragToDisplayTransitionHandler),
             )
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG,
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+    )
+    fun onDesktopDragEnd_noIndicatorAndMoveToNewDisplay_reparentToDesk() {
+        val deskId = 5
+        val task = setUpFreeformTask()
+        val spyController = spy(controller)
+        val mockSurface = mock(SurfaceControl::class.java)
+        val mockDisplayLayout = mock(DisplayLayout::class.java)
+        taskRepository.addDesk(displayId = SECONDARY_DISPLAY_ID, deskId = deskId)
+        whenever(displayController.getDisplayLayout(task.displayId)).thenReturn(mockDisplayLayout)
+        whenever(mockDisplayLayout.stableInsets()).thenReturn(Rect(0, 100, 2000, 2000))
+        spyController.onDragPositioningMove(task, mockSurface, 200f, Rect(100, 200, 500, 1000))
+
+        val currentDragBounds = Rect(100, 200, 500, 1000)
+        whenever(spyController.getVisualIndicator()).thenReturn(desktopModeVisualIndicator)
+        whenever(desktopModeVisualIndicator.updateIndicatorType(anyOrNull()))
+            .thenReturn(DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR)
+        whenever(motionEvent.displayId).thenReturn(SECONDARY_DISPLAY_ID)
+
+        spyController.onDragPositioningEnd(
+            task,
+            mockSurface,
+            inputCoordinate = PointF(200f, 300f),
+            currentDragBounds,
+            validDragArea = Rect(0, 50, 2000, 2000),
+            dragStartBounds = Rect(),
+            motionEvent,
+        )
+
+        verify(desksOrganizer).moveTaskToDesk(any(), eq(deskId), eq(task))
     }
 
     @Test

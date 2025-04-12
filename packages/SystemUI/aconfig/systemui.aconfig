@@ -67,13 +67,6 @@ flag {
 }
 
 flag {
-  name: "notifications_redesign_guts"
-  namespace: "systemui"
-  description: "Notifications Redesign: Update the look of the notification guts (that appear on long press). This includes using the new cache for app icons."
-  bug: "394822197"
-}
-
-flag {
    name: "notification_row_content_binder_refactor"
    namespace: "systemui"
    description: "Convert the NotificationContentInflater to Kotlin and restructure it to support modern views"
@@ -1548,27 +1541,6 @@ flag {
 }
 
 flag {
-  name: "hubmode_fullscreen_vertical_swipe"
-  namespace: "systemui"
-  description: "Enables fullscreen vertical swiping in hub mode to bring up and down the bouncer and shade"
-  bug: "340177049"
-  metadata {
-      purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "hubmode_fullscreen_vertical_swipe_fix"
-  namespace: "systemui"
-  description: "Bug fix that enables fullscreen vertical swiping in hub mode to bring up and down the bouncer and shade"
-  bug: "340177049"
-  metadata {
-      purpose: PURPOSE_BUGFIX
-  }
-}
-
-
-flag {
    namespace: "systemui"
    name: "remove_update_listener_in_qs_icon_view_impl"
    description: "Remove update listeners in QsIconViewImpl class to avoid memory leak."
@@ -1685,16 +1657,6 @@ flag {
     bug: "351863611"
     metadata {
       purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "media_load_metadata_via_media_data_loader"
-    namespace: "systemui"
-    description: "Use MediaDataLoader for loading media metadata with better threading"
-    bug: "358350077"
-    metadata {
-        purpose: PURPOSE_BUGFIX
     }
 }
 

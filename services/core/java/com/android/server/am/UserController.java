@@ -967,6 +967,82 @@ class UserController implements Handler.Callback {
         });
     }
 
+    /**
+     * Initiates the logout process for the specified user.
+     *
+     * <p>The logout process involves two main steps:
+     *
+     * <ol>
+     *   <li>If {@code userId} is the foreground user, first switching to an appropriate, active
+     *       user.
+     *   <li>Stopping the specified {@code userId}.
+     * </ol>
+     *
+     * <p>The logout operation will fail under the following conditions:
+     *
+     * <ul>
+     *   <li>No suitable user can be found to switch to, when user switch is needed.
+     *   <li>The user switch operation fails for any reason.
+     *   <li>The stop user operation fails for any reason.
+     * </ul>
+     *
+     * @see ActivityManager#logoutUser(int)
+     * @param userId The ID of the user to log out.
+     * @return true if logout is successfully initiated.
+     */
+    boolean logoutUser(@UserIdInt int userId) {
+        boolean shouldSwitchUser = false;
+        synchronized (mLock) {
+            if (userId == UserHandle.USER_SYSTEM) {
+                Slogf.e(TAG, "Cannot logout system user %d", userId);
+                return false;
+            }
+            if (userId == mTargetUserId) {
+                // TODO(b/380125011): Properly handle this case, rather than returning failure.
+                Slogf.e(TAG, "Cannot logout user %d as we're in the process of switching to it, and"
+                        + " therefore logout has failed.", userId);
+                return false;
+            }
+            // Since we are logging out of userId, let's not switch to userId (after possible
+            // ongoing user switch).
+            mPendingTargetUserIds.removeIf(id -> id == userId);
+
+            if (userId == getCurrentUserId() && mTargetUserId == UserHandle.USER_NULL) {
+                shouldSwitchUser = true;
+            }
+        }
+        if (shouldSwitchUser) {
+            final int switchToUserId =
+                    mInjector.getUserManagerInternal().getUserToLogoutCurrentUserTo();
+            if (switchToUserId == UserHandle.USER_NULL) {
+                Slogf.w(TAG, "Logout has no suitable user to switch to, to logout user %d.",
+                        userId);
+                return false;
+            }
+            // Due to possible race condition, switchToUserId could be equal to userId. When this is
+            // true:
+            // 1. if they are the current user (due to race condition), then we cannot logout
+            // userId, as we can't switch to another user.
+            // 2. if they are not the current user, we simply need to stop this userId (without
+            // switch user).
+            if (switchToUserId != userId) {
+                if (!switchUser(switchToUserId)) {
+                    Slogf.e(TAG, "Cannot logout user %d; switch to user %d failed", userId,
+                            switchToUserId);
+                    return false;
+                }
+            }
+        }
+        // Now, userId is not current, so we can simply stop it. Attempting to stop system user
+        // will fail.
+        final int result = stopUser(userId, false, null, null);
+        if (result != USER_OP_SUCCESS) {
+            Slogf.e(TAG, "Cannot logout user %d; stop user failed with result %d", userId, result);
+            return false;
+        }
+        return true;
+    }
+
     int restartUser(final int userId, @UserStartMode int userStartMode) {
         return stopUser(userId, /* allowDelayedLocking= */ false,
                 /* stopUserCallback= */ null, new KeyEvictedCallback() {
@@ -1907,8 +1983,56 @@ class UserController implements Handler.Callback {
                 return false;
             }
 
+            boolean needStart = false;
+            boolean updateUmState = false;
+            UserState uss;
+
+            // If the user we are switching to is not currently started, then
+            // we need to start it now.
+            t.traceBegin("updateStartedUserArrayStarting");
+            synchronized (mLock) {
+                uss = mStartedUsers.get(userId);
+                if (uss == null) {
+                    uss = new UserState(UserHandle.of(userId));
+                    uss.mUnlockProgress.addListener(new UserProgressListener());
+                    mStartedUsers.put(userId, uss);
+                    updateStartedUserArrayLU();
+                    needStart = true;
+                    updateUmState = true;
+                } else if (uss.state == UserState.STATE_SHUTDOWN
+                        || mDoNotAbortShutdownUserIds.contains(userId)) {
+                    Slogf.i(TAG, "User #" + userId
+                            + " is shutting down - will start after full shutdown");
+                    mPendingUserStarts.add(new PendingUserStart(userId, userStartMode,
+                            unlockListener));
+                    t.traceEnd(); // updateStartedUserArrayStarting
+                    return true;
+                }
+            }
+
+            // No matter what, the fact that we're requested to start the user (even if it is
+            // already running) puts it towards the end of the mUserLru list.
+            addUserToUserLru(userId);
+            if (android.multiuser.Flags.scheduleStopOfBackgroundUser()) {
+                mHandler.removeEqualMessages(SCHEDULED_STOP_BACKGROUND_USER_MSG,
+                        Integer.valueOf(userId));
+            }
+
+            if (unlockListener != null) {
+                uss.mUnlockProgress.addListener(unlockListener);
+            }
+            t.traceEnd(); // updateStartedUserArrayStarting
+
+            if (updateUmState) {
+                t.traceBegin("setUserState");
+                mInjector.getUserManagerInternal().setUserState(userId, uss.state);
+                t.traceEnd();
+            }
+
+            UserState finalUss = uss;
+            boolean finalNeedStart = needStart;
             final Runnable continueStartUserInternal = () -> continueStartUserInternal(userInfo,
-                    oldUserId, userStartMode, unlockListener, callingUid, callingPid);
+                    oldUserId, userStartMode, finalUss, finalNeedStart, callingUid, callingPid);
             if (foreground) {
                 mHandler.post(() -> dispatchOnBeforeUserSwitching(userId, () ->
                         mHandler.post(continueStartUserInternal)));
@@ -1923,56 +2047,11 @@ class UserController implements Handler.Callback {
     }
 
     private void continueStartUserInternal(UserInfo userInfo, int oldUserId, int userStartMode,
-            IProgressListener unlockListener, int callingUid, int callingPid) {
+            UserState uss, boolean needStart, int callingUid, int callingPid) {
         final TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         final boolean foreground = userStartMode == USER_START_MODE_FOREGROUND;
         final int userId = userInfo.id;
 
-        boolean needStart = false;
-        boolean updateUmState = false;
-        UserState uss;
-
-        // If the user we are switching to is not currently started, then
-        // we need to start it now.
-        t.traceBegin("updateStartedUserArrayStarting");
-        synchronized (mLock) {
-            uss = mStartedUsers.get(userId);
-            if (uss == null) {
-                uss = new UserState(UserHandle.of(userId));
-                uss.mUnlockProgress.addListener(new UserProgressListener());
-                mStartedUsers.put(userId, uss);
-                updateStartedUserArrayLU();
-                needStart = true;
-                updateUmState = true;
-            } else if (uss.state == UserState.STATE_SHUTDOWN
-                    || mDoNotAbortShutdownUserIds.contains(userId)) {
-                Slogf.i(TAG, "User #" + userId
-                        + " is shutting down - will start after full shutdown");
-                mPendingUserStarts.add(new PendingUserStart(userId, userStartMode,
-                        unlockListener));
-                t.traceEnd(); // updateStartedUserArrayStarting
-                return;
-            }
-        }
-
-        // No matter what, the fact that we're requested to start the user (even if it is
-        // already running) puts it towards the end of the mUserLru list.
-        addUserToUserLru(userId);
-        if (android.multiuser.Flags.scheduleStopOfBackgroundUser()) {
-            mHandler.removeEqualMessages(SCHEDULED_STOP_BACKGROUND_USER_MSG,
-                    Integer.valueOf(userId));
-        }
-
-        if (unlockListener != null) {
-            uss.mUnlockProgress.addListener(unlockListener);
-        }
-        t.traceEnd(); // updateStartedUserArrayStarting
-
-        if (updateUmState) {
-            t.traceBegin("setUserState");
-            mInjector.getUserManagerInternal().setUserState(userId, uss.state);
-            t.traceEnd();
-        }
         t.traceBegin("updateConfigurationAndProfileIds");
         if (foreground) {
             // Make sure the old user is no longer considering the display to be on.

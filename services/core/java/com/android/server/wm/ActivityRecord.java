@@ -8833,7 +8833,7 @@ public final class ActivityRecord extends WindowToken {
 
         // Figure out how to handle the changes between the configurations.
         ProtoLog.v(WM_DEBUG_CONFIGURATION, "Checking to restart %s: changed=%s, "
-                + "handles=%s, not-handles=%s, mLastReportedConfiguration=%s", info.name,
+                + "handles=%s, not-handles=%s, mLastReportedConfiguration=%s", this,
                 Configuration.configurationDiffToString(changes),
                 Configuration.configurationDiffToString(info.getRealConfigChanged()),
                 Configuration.configurationDiffToString(changes & ~(info.getRealConfigChanged())),

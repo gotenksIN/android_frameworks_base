@@ -45,6 +45,7 @@ import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.animation.FloatProperties
 import com.android.wm.shell.bubbles.BubbleController
 import com.android.wm.shell.bubbles.BubbleTransitions
+import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_CANCEL_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_END_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_START_DRAG_TO_DESKTOP
@@ -52,6 +53,8 @@ import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.TransitionUtil
 import com.android.wm.shell.shared.animation.Interpolators
 import com.android.wm.shell.shared.animation.PhysicsAnimator
+import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_UNDEFINED
@@ -84,6 +87,7 @@ sealed class DragToDesktopTransitionHandler(
     private val desktopUserRepositories: DesktopUserRepositories,
     protected val interactionJankMonitor: InteractionJankMonitor,
     private val bubbleController: Optional<BubbleController>,
+    private val displayController: DisplayController,
     protected val transactionSupplier: Supplier<SurfaceControl.Transaction>,
 ) : TransitionHandler {
 
@@ -287,10 +291,8 @@ sealed class DragToDesktopTransitionHandler(
                 state.activeCancelAnimation = startCancelAnimation()
             } else {
                 // Animation is handled by BubbleController
-                val wct = WindowContainerTransaction()
-                restoreWindowOrder(wct, state)
                 val onLeft = cancelState == CancelState.CANCEL_BUBBLE_LEFT
-                requestBubbleFromScaledTask(wct, onLeft)
+                requestBubbleFromScaledTask(onLeft)
             }
         } else {
             // There's no dragged task, this can happen when the "cancel" happened too quickly
@@ -350,7 +352,7 @@ sealed class DragToDesktopTransitionHandler(
         splitScreenController.requestEnterSplitSelect(taskInfo, wct, splitPosition, taskBounds)
     }
 
-    private fun requestBubbleFromScaledTask(wct: WindowContainerTransaction, onLeft: Boolean) {
+    private fun requestBubbleFromScaledTask(onLeft: Boolean) {
         // TODO(b/391928049): update density once we can drag from desktop to bubble
         val state = requireTransitionState()
         val taskInfo = state.draggedTaskChange?.taskInfo ?: error("Expected non-null taskInfo")
@@ -358,11 +360,10 @@ sealed class DragToDesktopTransitionHandler(
         val scale = state.dragAnimator.scale
         val cornerRadius = state.dragAnimator.cornerRadius
         state.dragAnimator.cancelAnimator()
-        requestBubble(wct, taskInfo, onLeft, scale, cornerRadius, dragPosition)
+        requestBubble(taskInfo, onLeft, scale, cornerRadius, dragPosition)
     }
 
     private fun requestBubble(
-        wct: WindowContainerTransaction,
         taskInfo: RunningTaskInfo,
         onLeft: Boolean,
         taskScale: Float = 1f,
@@ -373,7 +374,7 @@ sealed class DragToDesktopTransitionHandler(
             bubbleController.orElseThrow { IllegalStateException("BubbleController not set") }
         controller.expandStackAndSelectBubble(
             taskInfo,
-            BubbleTransitions.DragData(onLeft, taskScale, cornerRadius, dragPosition, wct),
+            BubbleTransitions.DragData(onLeft, taskScale, cornerRadius, dragPosition),
         )
     }
 
@@ -406,7 +407,7 @@ sealed class DragToDesktopTransitionHandler(
             return false
         }
 
-        val layers = calculateStartDragToDesktopLayers(info)
+        val layers = calculateStartDragLayers(info)
         val leafTaskFilter = TransitionUtil.LeafTaskFilter()
         info.changes.withIndex().forEach { (i, change) ->
             if (TransitionUtil.isWallpaper(change)) {
@@ -558,10 +559,8 @@ sealed class DragToDesktopTransitionHandler(
             }
             val taskInfo =
                 state.draggedTaskChange?.taskInfo ?: error("Expected non-null task info.")
-            val wct = WindowContainerTransaction()
-            restoreWindowOrder(wct)
             val onLeft = state.cancelState == CancelState.CANCEL_BUBBLE_LEFT
-            requestBubble(wct, taskInfo, onLeft)
+            requestBubble(taskInfo, onLeft)
         }
         return true
     }
@@ -634,13 +633,42 @@ sealed class DragToDesktopTransitionHandler(
     }
 
     /**
-     * Calculates start drag to desktop layers for transition [info]. The leash layer is calculated
-     * based on its change position in the transition, e.g. `appLayer = appLayers - i`, where i is
-     * the change index.
+     * Calculates start drag layers for transition [info]. The leash layer is calculated based on
+     * its change position in the transition, e.g. `appLayer = appLayers - i`, where i is the change
+     * index.
      */
-    protected abstract fun calculateStartDragToDesktopLayers(
+    protected fun calculateStartDragLayers(info: TransitionInfo): DragToDesktopLayers {
+        if (BubbleAnythingFlagHelper.enableBubbleToFullscreen()) {
+            val display = displayController.getDisplay(info.getRoot(0).displayId)
+            if (display != null) {
+                val hasDesktop = DesktopModeStatus.isDesktopModeSupportedOnDisplay(context, display)
+                if (!hasDesktop) {
+                    return calculateStartDragLayersWithoutDesktop(info)
+                }
+            }
+        }
+        return calculateStartDragLayersWithDesktop(info)
+    }
+
+    protected abstract fun calculateStartDragLayersWithDesktop(
         info: TransitionInfo
     ): DragToDesktopLayers
+
+    /**
+     * @return layers in order:
+     * - appLayers - below everything z < 0, effectively hides the leash
+     * - wallpaperLayers - wallpaper on top of apps, z in 0..<size
+     * - homeLayers - home task on top of wallpaper, z in size..<size*2
+     * - dragLayer - the dragged task on top of everything, z == size*2
+     */
+    private fun calculateStartDragLayersWithoutDesktop(info: TransitionInfo): DragToDesktopLayers {
+        return DragToDesktopLayers(
+            topAppLayer = -1,
+            topWallpaperLayer = info.changes.size - 1,
+            topHomeLayer = info.changes.size * 2 - 1,
+            dragLayer = info.changes.size * 2,
+        )
+    }
 
     override fun mergeAnimation(
         transition: IBinder,
@@ -1211,6 +1239,7 @@ constructor(
     desktopUserRepositories: DesktopUserRepositories,
     interactionJankMonitor: InteractionJankMonitor,
     bubbleController: Optional<BubbleController>,
+    displayController: DisplayController,
     transactionSupplier: Supplier<SurfaceControl.Transaction> = Supplier {
         SurfaceControl.Transaction()
     },
@@ -1222,6 +1251,7 @@ constructor(
         desktopUserRepositories,
         interactionJankMonitor,
         bubbleController,
+        displayController,
         transactionSupplier,
     ) {
 
@@ -1232,7 +1262,7 @@ constructor(
      * - wallpaperLayers - wallpaper on top of home
      * - dragLayer - the dragged task on top of everything, there's only 1 dragged task
      */
-    override fun calculateStartDragToDesktopLayers(info: TransitionInfo): DragToDesktopLayers =
+    override fun calculateStartDragLayersWithDesktop(info: TransitionInfo): DragToDesktopLayers =
         DragToDesktopLayers(
             topAppLayer = info.changes.size,
             topHomeLayer = info.changes.size * 2,
@@ -1251,6 +1281,7 @@ constructor(
     desktopUserRepositories: DesktopUserRepositories,
     interactionJankMonitor: InteractionJankMonitor,
     bubbleController: Optional<BubbleController>,
+    displayController: DisplayController,
     transactionSupplier: Supplier<SurfaceControl.Transaction> = Supplier {
         SurfaceControl.Transaction()
     },
@@ -1262,6 +1293,7 @@ constructor(
         desktopUserRepositories,
         interactionJankMonitor,
         bubbleController,
+        displayController,
         transactionSupplier,
     ) {
 
@@ -1278,7 +1310,7 @@ constructor(
      * - wallpaperLayers - wallpaper on top of home, z in size..<size*2
      * - dragLayer - the dragged task on top of everything, z == size*2
      */
-    override fun calculateStartDragToDesktopLayers(info: TransitionInfo): DragToDesktopLayers =
+    override fun calculateStartDragLayersWithDesktop(info: TransitionInfo): DragToDesktopLayers =
         DragToDesktopLayers(
             topAppLayer = -1,
             topHomeLayer = info.changes.size - 1,

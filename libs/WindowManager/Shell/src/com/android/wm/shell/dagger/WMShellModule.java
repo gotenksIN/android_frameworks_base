@@ -281,7 +281,8 @@ public abstract class WMShellModule {
             TaskViewTransitions taskViewTransitions,
             Transitions transitions,
             SyncTransactionQueue syncQueue,
-            IWindowManager wmService) {
+            IWindowManager wmService,
+            HomeIntentProvider homeIntentProvider) {
         return new BubbleController(
                 context,
                 shellInit,
@@ -316,7 +317,8 @@ public abstract class WMShellModule {
                 transitions,
                 syncQueue,
                 wmService,
-                new BubbleResizabilityChecker());
+                new BubbleResizabilityChecker(),
+                homeIntentProvider);
     }
 
     //
@@ -954,14 +956,15 @@ public abstract class WMShellModule {
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             InteractionJankMonitor interactionJankMonitor,
-            Optional<BubbleController> bubbleController) {
+            Optional<BubbleController> bubbleController,
+            DisplayController displayController) {
         return ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX.isTrue()
                 ? new SpringDragToDesktopTransitionHandler(
                 context, transitions, rootTaskDisplayAreaOrganizer, desktopUserRepositories,
-                interactionJankMonitor, bubbleController)
+                interactionJankMonitor, bubbleController, displayController)
                 : new DefaultDragToDesktopTransitionHandler(
                         context, transitions, rootTaskDisplayAreaOrganizer, desktopUserRepositories,
-                        interactionJankMonitor, bubbleController);
+                        interactionJankMonitor, bubbleController, displayController);
     }
 
     @WMSingleton

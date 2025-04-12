@@ -20,11 +20,10 @@ import android.annotation.CurrentTimeMillisLong
 import android.annotation.DrawableRes
 import android.annotation.ElapsedRealtimeLong
 import android.app.Notification
-import android.app.Notification.FLAG_PROMOTED_ONGOING
+import android.graphics.drawable.Drawable
 import androidx.annotation.ColorInt
 import com.android.internal.widget.NotificationProgressModel
 import com.android.systemui.Flags
-import com.android.systemui.statusbar.chips.notification.shared.StatusBarNotifChips
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
 import com.android.systemui.statusbar.notification.row.ImageResult
 import com.android.systemui.statusbar.notification.row.LazyImage
@@ -68,7 +67,7 @@ data class PromotedNotificationContentModel(
      * True if this notification was automatically promoted - see [AutomaticPromotionCoordinator].
      */
     val wasPromotedAutomatically: Boolean,
-    val smallIcon: ImageModel?,
+    val skeletonNotifIcon: NotifIcon?,
     val iconLevel: Int,
     val appName: CharSequence?,
     val subText: CharSequence?,
@@ -96,7 +95,7 @@ data class PromotedNotificationContentModel(
 ) {
     class Builder(val key: String) {
         var wasPromotedAutomatically: Boolean = false
-        var smallIcon: ImageModel? = null
+        var skeletonNotifIcon: NotifIcon? = null
         var iconLevel: Int = 0
         var appName: CharSequence? = null
         var subText: CharSequence? = null
@@ -122,7 +121,7 @@ data class PromotedNotificationContentModel(
             PromotedNotificationContentModel(
                 identity = Identity(key, style),
                 wasPromotedAutomatically = wasPromotedAutomatically,
-                smallIcon = smallIcon,
+                skeletonNotifIcon = skeletonNotifIcon,
                 iconLevel = iconLevel,
                 appName = appName,
                 subText = subText,
@@ -143,6 +142,12 @@ data class PromotedNotificationContentModel(
     }
 
     data class Identity(val key: String, val style: Style)
+
+    sealed class NotifIcon {
+        data class SmallIcon(val imageModel: ImageModel) : NotifIcon()
+
+        data class AppIcon(val drawable: Drawable) : NotifIcon()
+    }
 
     /** The timestamp associated with a notification, along with the mode used to display it. */
     sealed class When {
@@ -181,7 +186,7 @@ data class PromotedNotificationContentModel(
         return ("PromotedNotificationContentModel(" +
             "identity=$identity, " +
             "wasPromotedAutomatically=$wasPromotedAutomatically, " +
-            "smallIcon=${smallIcon?.toRedactedString()}, " +
+            "skeletonNotifIcon=${skeletonNotifIcon?.toRedactedString()}, " +
             "appName=$appName, " +
             "subText=${subText?.toRedactedString()}, " +
             "shortCriticalText=$shortCriticalText, " +
@@ -200,6 +205,12 @@ data class PromotedNotificationContentModel(
     }
 
     private fun CharSequence.toRedactedString(): String = "[$length]"
+
+    private fun NotifIcon.toRedactedString(): String =
+        when (this) {
+            is NotifIcon.SmallIcon -> "SmallIcon(${imageModel.toRedactedString()})"
+            is NotifIcon.AppIcon -> "AppIcon([${drawable.javaClass.simpleName}])"
+        }
 
     private fun ImageModel.toRedactedString(): String {
         return when (this) {
@@ -224,9 +235,7 @@ data class PromotedNotificationContentModel(
     }
 
     companion object {
-        @JvmStatic
-        fun featureFlagEnabled(): Boolean =
-            PromotedNotificationUi.isEnabled || StatusBarNotifChips.isEnabled
+        @JvmStatic fun featureFlagEnabled(): Boolean = PromotedNotificationUi.isEnabled
 
         /**
          * Returns true if the given notification should be considered promoted when deciding
@@ -237,13 +246,7 @@ data class PromotedNotificationContentModel(
             if (Compile.IS_DEBUG && Flags.debugLiveUpdatesPromoteAll()) {
                 return true
             }
-
-            // Notification.isPromotedOngoing checks the ui_rich_ongoing flag, but we want the
-            // status bar chip to be ready before all the features behind the ui_rich_ongoing flag
-            // are ready.
-            val isPromotedForStatusBarChip =
-                StatusBarNotifChips.isEnabled && (notification.flags and FLAG_PROMOTED_ONGOING) != 0
-            return notification.isPromotedOngoing() || isPromotedForStatusBarChip
+            return notification.isPromotedOngoing()
         }
     }
 }

@@ -46,6 +46,7 @@ import android.os.UserManager
 import android.util.Slog
 import android.view.Display
 import android.view.Display.DEFAULT_DISPLAY
+import android.view.Display.INVALID_DISPLAY
 import android.view.DragEvent
 import android.view.MotionEvent
 import android.view.SurfaceControl
@@ -150,6 +151,7 @@ import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.OneShotRemoteHandler
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.transition.Transitions.TransitionFinishCallback
+import com.android.wm.shell.transition.Transitions.TransitionHandler
 import com.android.wm.shell.windowdecor.DragPositioningCallbackUtility
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
 import com.android.wm.shell.windowdecor.OnTaskRepositionAnimationListener
@@ -1283,13 +1285,20 @@ class DesktopTasksController(
     }
 
     /**
-     * Move [task] to display with [displayId].
+     * Move [task] to display with [displayId]. When [bounds] is not null, it will be used as the
+     * bounds on the new display. When [transitionHandler] is not null, it will be used instead of
+     * the default [DesktopModeMoveToDisplayTransitionHandler].
      *
      * No-op if task is already on that display per [RunningTaskInfo.displayId].
      *
      * TODO: b/399411604 - split this up into smaller functions.
      */
-    private fun moveToDisplay(task: RunningTaskInfo, displayId: Int) {
+    private fun moveToDisplay(
+        task: RunningTaskInfo,
+        displayId: Int,
+        bounds: Rect? = null,
+        transitionHandler: TransitionHandler? = null,
+    ) {
         logV("moveToDisplay: taskId=%d displayId=%d", task.taskId, displayId)
         if (task.displayId == displayId) {
             logD("moveToDisplay: task already on display %d", displayId)
@@ -1321,7 +1330,9 @@ class DesktopTasksController(
             if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
                 desksOrganizer.moveTaskToDesk(wct, destinationDeskId, task)
             }
-            if (Flags.enableMoveToNextDisplayShortcut()) {
+            if (bounds != null) {
+                wct.setBounds(task.token, bounds)
+            } else if (Flags.enableMoveToNextDisplayShortcut()) {
                 applyFreeformDisplayChange(wct, task, displayId)
             }
         }
@@ -1362,7 +1373,11 @@ class DesktopTasksController(
                 null
             }
         val transition =
-            transitions.startTransition(TRANSIT_CHANGE, wct, moveToDisplayTransitionHandler)
+            transitions.startTransition(
+                TRANSIT_CHANGE,
+                wct,
+                transitionHandler ?: moveToDisplayTransitionHandler,
+            )
         deactivationRunnable?.invoke(transition)
         activationRunnable?.invoke(transition)
     }
@@ -2978,8 +2993,83 @@ class DesktopTasksController(
         }
     }
 
+    /** Activates the desk at the given index if it exists. */
+    fun activatePreviousDesk(displayId: Int) {
+        if (
+            !DesktopExperienceFlags.ENABLE_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS.isTrue ||
+                !DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue
+        ) {
+            return
+        }
+        val validDisplay =
+            when {
+                displayId != INVALID_DISPLAY -> displayId
+                focusTransitionObserver.globallyFocusedDisplayId != INVALID_DISPLAY ->
+                    focusTransitionObserver.globallyFocusedDisplayId
+                else -> {
+                    logW("activatePreviousDesk no valid display found")
+                    return
+                }
+            }
+        val activeDeskId = taskRepository.getActiveDeskId(validDisplay)
+        if (activeDeskId == null) {
+            logV("activatePreviousDesk no active desk in display=%d", validDisplay)
+            return
+        }
+        val destinationDeskId = taskRepository.getPreviousDeskId(activeDeskId)
+        if (destinationDeskId == null) {
+            logV(
+                "activatePreviousDesk no previous desk before deskId=%d in display=%d",
+                activeDeskId,
+                validDisplay,
+            )
+            // TODO: b/389957556 - add animation.
+            return
+        }
+        logV("activatePreviousDesk from deskId=%d to deskId=%d", activeDeskId, destinationDeskId)
+        activateDesk(destinationDeskId)
+    }
+
+    /** Activates the desk at the given index if it exists. */
+    fun activateNextDesk(displayId: Int) {
+        if (
+            !DesktopExperienceFlags.ENABLE_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS.isTrue ||
+                !DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue
+        ) {
+            return
+        }
+        val validDisplay =
+            when {
+                displayId != INVALID_DISPLAY -> displayId
+                focusTransitionObserver.globallyFocusedDisplayId != INVALID_DISPLAY ->
+                    focusTransitionObserver.globallyFocusedDisplayId
+                else -> {
+                    logW("activateNextDesk no valid display found")
+                    return
+                }
+            }
+        val activeDeskId = taskRepository.getActiveDeskId(validDisplay)
+        if (activeDeskId == null) {
+            logV("activateNextDesk no active desk in display=%d", validDisplay)
+            return
+        }
+        val destinationDeskId = taskRepository.getNextDeskId(activeDeskId)
+        if (destinationDeskId == null) {
+            logV(
+                "activateNextDesk no next desk before deskId=%d in display=%d",
+                activeDeskId,
+                validDisplay,
+            )
+            // TODO: b/389957556 - add animation.
+            return
+        }
+        logV("activateNextDesk from deskId=%d to deskId=%d", activeDeskId, destinationDeskId)
+        activateDesk(destinationDeskId)
+    }
+
     /** Activates the given desk. */
     fun activateDesk(deskId: Int, remoteTransition: RemoteTransition? = null) {
+        logV("activateDesk deskId=%d", deskId)
         val wct = WindowContainerTransaction()
         val runOnTransitStart = addDeskActivationChanges(deskId, wct)
 
@@ -3326,28 +3416,27 @@ class DesktopTasksController(
                     return
                 }
 
-                // Update task bounds so that the task position will match the position of its leash
-                val wct = WindowContainerTransaction()
-                wct.setBounds(taskInfo.token, destinationBounds)
-
                 val newDisplayId = motionEvent.getDisplayId()
                 val displayAreaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(newDisplayId)
                 val isCrossDisplayDrag =
                     Flags.enableConnectedDisplaysWindowDrag() &&
                         newDisplayId != taskInfo.getDisplayId() &&
                         displayAreaInfo != null
-                val handler =
-                    if (isCrossDisplayDrag) {
-                        dragToDisplayTransitionHandler
-                    } else {
-                        null
-                    }
-                if (isCrossDisplayDrag) {
-                    // TODO: b/362720497 - reparent to a specific desk within the target display.
-                    wct.reparent(taskInfo.token, displayAreaInfo.token, /* onTop= */ true)
-                }
 
-                transitions.startTransition(TRANSIT_CHANGE, wct, handler)
+                if (isCrossDisplayDrag) {
+                    moveToDisplay(
+                        taskInfo,
+                        newDisplayId,
+                        destinationBounds,
+                        dragToDisplayTransitionHandler,
+                    )
+                } else {
+                    // Update task bounds so that the task position will match the position of its
+                    // leash
+                    val wct = WindowContainerTransaction()
+                    wct.setBounds(taskInfo.token, destinationBounds)
+                    transitions.startTransition(TRANSIT_CHANGE, wct, /* handler= */ null)
+                }
 
                 releaseVisualIndicator()
             }

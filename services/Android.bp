@@ -134,6 +134,7 @@ filegroup {
         ":services.profcollect-sources",
         ":services.restrictions-sources",
         ":services.searchui-sources",
+        ":services.selectiontoolbar-sources",
         ":services.smartspace-sources",
         ":services.soundtrigger-sources",
         ":services.supervision-sources",
@@ -311,6 +312,7 @@ java_library {
         "services.profcollect",
         "services.restrictions",
         "services.searchui",
+        "services.selectiontoolbar",
         "services.smartspace",
         "services.soundtrigger",
         "services.supervision",
@@ -358,6 +360,9 @@ system_java_library {
         "art_profile_java_defaults",
     ],
     installable: true,
+    optimize: {
+        d8_on_eng: true,
+    },
 
     exclude_kotlinc_generated_files: true,
 

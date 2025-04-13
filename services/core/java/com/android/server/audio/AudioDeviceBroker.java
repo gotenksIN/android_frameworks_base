@@ -110,6 +110,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * @hide
@@ -2475,7 +2476,9 @@ public class AudioDeviceBroker {
 // QTI_END: 2024-05-11: N/A: base: Remove A2DP to A2DP quick SHO changes
                 && AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0)
                 && hasIntersection(mDeviceInventory.DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG_SET,
-                        mAudioService.getDeviceSetForStream(AudioSystem.STREAM_MUSIC))) {
+                mAudioService.getDeviceSetForStream(AudioSystem.STREAM_MUSIC).stream().map(
+                        AudioDeviceAttributes::getInternalType).collect(
+                        Collectors.toSet()))) {
             return false;
         }
         return true;

@@ -573,6 +573,13 @@ flag {
 }
 
 flag {
+    name: "enable_dragging_pip_across_displays"
+    namespace: "lse_desktop_experience"
+    description: "Enables dragging PiP across displays in extended mode."
+    bug: "383403514"
+}
+
+flag {
     name: "reparent_window_token_api"
     namespace: "lse_desktop_experience"
     description: "Allows to reparent a window token to a different display"
@@ -1025,4 +1032,21 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_freeform_box_shadows"
+    namespace: "lse_desktop_experience"
+    description: "Enables box shadows for freeform windows."
+    bug: "367464660"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_key_gesture_handler_for_recents"
+    namespace: "lse_desktop_experience"
+    description: "Enables the key gesture handler for listening to recents related key events, e.g. overview, all apps."
+    bug: "406452076"
 }

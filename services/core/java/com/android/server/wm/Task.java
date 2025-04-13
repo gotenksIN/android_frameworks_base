@@ -309,6 +309,12 @@ class Task extends TaskFragment {
      */
     boolean mIsEffectivelySystemApp;
 
+    /**
+     * Whether the new Tasks that are started from this Task should be a Bubble.
+     * Note: this should be migrated to a more hierarchical approach in the long-term.
+     */
+    boolean mLaunchNextToBubble;
+
     int mCurrentUser;
 
     String affinity;        // The affinity name for this task, or null; may change identity.
@@ -3455,6 +3461,8 @@ class Task extends TaskFragment {
                         : WindowInsets.Type.defaultVisible();
         AppCompatUtils.fillAppCompatTaskInfo(this, info, top);
         info.topActivityMainWindowFrame = calculateTopActivityMainWindowFrameForTaskInfo(top);
+        // If new Tasks launched from this Task should be Bubble, this should also be a Bubble.
+        info.isAppBubble = mLaunchNextToBubble;
     }
 
     /**
@@ -5777,10 +5785,10 @@ class Task extends TaskFragment {
         }
 
         try {
-            // Defer updating the IME target since the new IME target will try to get computed
-            // before updating all closing and opening apps, which can cause the ime target to
-            // get calculated incorrectly.
-            mDisplayContent.deferUpdateImeTarget();
+            // Defer updating the IME layering target since the it will try to get computed before
+            // updating all closing and opening apps, which can cause it to get calculated
+            // incorrectly.
+            mDisplayContent.deferUpdateImeLayeringTarget();
 
             // Don't refocus if invisible to current user
             final ActivityRecord top = tr.getTopNonFinishingActivity();
@@ -5818,7 +5826,7 @@ class Task extends TaskFragment {
                 mRootWindowContainer.resumeFocusedTasksTopActivities();
             }
         } finally {
-            mDisplayContent.continueUpdateImeTarget();
+            mDisplayContent.continueUpdateImeLayeringTarget();
         }
     }
 
@@ -5992,6 +6000,9 @@ class Task extends TaskFragment {
                 pw.println(prefix + "  mOffsetXForInsets=" + mOffsetXForInsets
                         + " mOffsetYForInsets=" + mOffsetYForInsets);
             }
+        }
+        if (mLaunchNextToBubble) {
+            pw.println(prefix + "  mLaunchNextToBubble=true");
         }
         if (mLastNonFullscreenBounds != null) {
             pw.print(prefix); pw.print("  mLastNonFullscreenBounds=");

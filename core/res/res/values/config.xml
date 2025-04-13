@@ -2852,6 +2852,8 @@
     <!-- The default for the setting that controls when to auto-start hub mode.
           0 means "never" -->
     <integer name="config_whenToStartHubModeDefault">0</integer>
+    <!-- Whether to restrict auto-showing glanceable hub to wireless charging. -->
+    <bool name="config_onlyShowGlanceableHubWhenWirelessChargingDefault">false</bool>
 
     <!-- The duration in milliseconds of the dream opening animation.  -->
     <integer name="config_dreamOpenAnimationDuration">250</integer>
@@ -7422,6 +7424,10 @@
     <!-- Whether to show GAIA education screen during account login of private space setup.
          OEM/Partner can explicitly opt to disable the screen. -->
     <bool name="config_enableGaiaEducationInPrivateSpace">true</bool>
+
+    <!-- Default dismiss timeout (in milliseconds) for the power menu (Global Actions) dialog to
+         avoid possible screen burn in issues. Set to '0' to disable timeout -->
+    <integer name="config_globalActionsDialogTimeout">0</integer>
 
     <!-- Whether to enable usb state update via udc sysfs. -->
     <bool name="config_enableUdcSysfsUsbStateUpdate">false</bool>

@@ -25,6 +25,7 @@ import com.android.systemui.KairosBuilder
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.kairos.ExperimentalKairosApi
+import com.android.systemui.kairos.Incremental
 import com.android.systemui.kairos.KairosNetwork
 import com.android.systemui.kairos.buildSpec
 import com.android.systemui.kairos.combine
@@ -82,7 +83,7 @@ constructor(
             .applyLatestSpecForKey<Int, MobileConnectionRepositoryKairosAdapter>()
     }
 
-    private val reposBySubId =
+    private val reposBySubId: StateFlow<Map<Int, MobileConnectionRepositoryKairosAdapter>> =
         reposBySubIdK
             .toColdConflatedFlow(kairosNetwork)
             .stateIn(scope, SharingStarted.Eagerly, emptyMap())

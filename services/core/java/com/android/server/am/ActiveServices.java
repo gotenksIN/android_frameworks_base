@@ -832,7 +832,7 @@ public final class ActiveServices {
         this.mActiveServiceAnrTimer = new ProcessAnrTimer(service,
                 ActivityManagerService.SERVICE_TIMEOUT_MSG,
                 "SERVICE_TIMEOUT",
-                new AnrTimer.Args().freeze(true));
+                new AnrTimer.Args());
         this.mShortFGSAnrTimer = new ServiceAnrTimer(service,
                 ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_MSG,
                 "SHORT_FGS_TIMEOUT");
@@ -1145,8 +1145,9 @@ public final class ActiveServices {
         }
 
         if (fgRequired) {
-            logFgsBackgroundStart(r);
-            if (!r.isFgsAllowedStart() && isBgFgsRestrictionEnabled(r, callingUid)) {
+            boolean isBgFgsRestrictionEnabledForService =  isBgFgsRestrictionEnabled(r, callingUid);
+            logFgsBackgroundStart(r, isBgFgsRestrictionEnabledForService);
+            if (!r.isFgsAllowedStart() && isBgFgsRestrictionEnabledForService) {
                 String msg = "startForegroundService() not allowed due to "
                         + "mAllowStartForeground false: service "
                         + r.shortInstanceName;
@@ -2404,8 +2405,10 @@ public final class ActiveServices {
                 }
 
                 // Whether FGS-BG-start restriction is enabled for this service.
-                final boolean isBgFgsRestrictionEnabledForService = isBgFgsRestrictionEnabled(r,
-                        callingUidIfStart);
+                // Valid only if not system initiated tranistion.
+                final boolean isBgFgsRestrictionEnabledForService =
+                        (!systemRequestedTransition && isBgFgsRestrictionEnabled(r,
+                                callingUidIfStart));
 
                 // Whether to extend the SHORT_SERVICE time out.
                 boolean extendShortServiceTimeout = false;
@@ -2661,7 +2664,7 @@ public final class ActiveServices {
                     }
                     r.maybeLogFgsLogicChange();
                     if (!bypassBfslCheck) {
-                        logFgsBackgroundStart(r);
+                        logFgsBackgroundStart(r, isBgFgsRestrictionEnabledForService);
                         if (!r.isFgsAllowedStart()
                                 && isBgFgsRestrictionEnabledForService) {
                             final String msg = "Service.startForeground() not allowed due to "
@@ -9421,7 +9424,7 @@ public final class ActiveServices {
         return true;
     }
 
-    private void logFgsBackgroundStart(ServiceRecord r) {
+    private void logFgsBackgroundStart(ServiceRecord r, boolean isBgFgsRestrictedForService) {
         /*
         // Only log if FGS is started from background.
         if (!isFgsBgStart(r.mAllowStartForeground)) {
@@ -9430,7 +9433,8 @@ public final class ActiveServices {
         */
         if (!r.mLoggedInfoAllowStartForeground) {
             final String msg = "Background started FGS: "
-                    + (r.isFgsAllowedStart() ? "Allowed " : "Disallowed ")
+                    + (r.isFgsAllowedStart() || !isBgFgsRestrictedForService ? "Allowed "
+                    : "Disallowed ")
                     + r.mInfoAllowStartForeground
                     + (r.isShortFgs() ? " (Called on SHORT_SERVICE)" : "");
             if (r.isFgsAllowedStart()) {
@@ -9440,11 +9444,7 @@ public final class ActiveServices {
                 }
                 Slog.i(TAG, msg);
             } else {
-                //if (ActivityManagerUtils.shouldSamplePackageForAtom(r.packageName,
-                //        mAm.mConstants.mFgsStartDeniedLogSampleRate)) {
-                    Slog.wtfQuiet(TAG, msg);
-                //}
-                Slog.w(TAG, msg);
+                Slog.wtf(TAG, msg);
             }
             r.mLoggedInfoAllowStartForeground = true;
         }

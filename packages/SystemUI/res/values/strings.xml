@@ -4501,6 +4501,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="drag_to_rearrange_tiles">Hold and drag to rearrange tiles</string>
 
+    <!-- Label for header of customize QS to indicate that tiles can be selected to be edited [CHAR LIMIT=60] -->
+    <string name="select_to_rearrange_tiles">Select tiles to rearrange and resize</string>
+
     <!-- Label for placing tiles in edit mode for QS [CHAR LIMIT=60] -->
     <string name="tap_to_position_tile">Tap to position tile</string>
 
@@ -5392,17 +5395,6 @@
     <string name="controls_media_button_next">Next track</string>
     <!-- Description for button in media controls. Used when media is connecting to a remote device (via something like chromecast). Pressing button does nothing [CHAR_LIMIT=NONE] -->
     <string name="controls_media_button_connecting">Connecting</string>
-
-    <!-- Title for Smartspace recommendation card within media controls. The "Play" means the action to play a media [CHAR_LIMIT=10] -->
-    <string name="controls_media_smartspace_rec_title">Play</string>
-    <!-- Description for Smartspace recommendation card within media controls [CHAR_LIMIT=NONE] -->
-    <string name="controls_media_smartspace_rec_description">Open <xliff:g id="app_label" example="Spotify">%1$s</xliff:g></string>
-    <!-- Description for Smartspace recommendation's media item, including information for the media's title, the artist, and source app [CHAR LIMIT=NONE]-->
-    <string name="controls_media_smartspace_rec_item_description">Play <xliff:g id="song_name" example="Daily mix">%1$s</xliff:g> by <xliff:g id="artist_name" example="Various artists">%2$s</xliff:g> from <xliff:g id="app_label" example="Spotify">%3$s</xliff:g></string>
-    <!-- Description for Smartspace recommendation's media item which doesn't have artist info, including information for the media's title and the source app [CHAR LIMIT=NONE]-->
-    <string name="controls_media_smartspace_rec_item_no_artist_description">Play <xliff:g id="song_name" example="Daily mix">%1$s</xliff:g> from <xliff:g id="app_label" example="Spotify">%2$s</xliff:g></string>
-    <!-- Header title for Smartspace recommendation card within media controls. [CHAR_LIMIT=30] -->
-    <string name="controls_media_smartspace_rec_header">For You</string>
 
     <!--- ****** Media tap-to-transfer ****** -->
     <!-- Text for a button to undo the media transfer. [CHAR LIMIT=20] -->

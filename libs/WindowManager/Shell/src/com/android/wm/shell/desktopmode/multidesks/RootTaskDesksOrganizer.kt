@@ -61,6 +61,7 @@ class RootTaskDesksOrganizer(
         mutableListOf<CreateDeskMinimizationRootRequest>()
     @VisibleForTesting
     val deskMinimizationRootsByDeskId: MutableMap<Int, DeskMinimizationRoot> = mutableMapOf()
+    private val removeDeskRootRequests = mutableSetOf<Int>()
     private var onTaskInfoChangedListener: ((RunningTaskInfo) -> Unit)? = null
 
     init {
@@ -80,6 +81,8 @@ class RootTaskDesksOrganizer(
                 .valueIterator()
                 .asSequence()
                 .filterNot { desk -> userId in desk.users }
+                .filterNot { desk -> desk.deskId in removeDeskRootRequests }
+                .filter { desk -> desk.taskInfo.displayId == displayId }
                 .firstOrNull()
         if (unassignedDesk != null) {
             unassignedDesk.users.add(userId)
@@ -112,6 +115,7 @@ class RootTaskDesksOrganizer(
         if (deskRoot.users.isEmpty()) {
             // No longer in use by any users, remove it completely.
             logD("removeDesk %d is no longer used by any users, removing it completely", deskId)
+            removeDeskRootRequests.add(deskId)
             wct.removeRootTask(deskRoot.token)
             deskMinimizationRootsByDeskId[deskId]?.let { root -> wct.removeRootTask(root.token) }
         }
@@ -390,6 +394,7 @@ class RootTaskDesksOrganizer(
             val displayId = deskRoot.taskInfo.displayId
             logV("Desk #$deskId vanished from display #$displayId")
             deskRootsByDeskId.remove(deskId)
+            removeDeskRootRequests.remove(deskId)
             return
         }
         val deskMinimizationRoot =
@@ -530,6 +535,8 @@ class RootTaskDesksOrganizer(
         pw.println(
             "${innerPrefix}launchAdjacentEnabled=" + launchAdjacentController.launchAdjacentEnabled
         )
+        pw.println("${innerPrefix}createDeskRootRequests=$createDeskRootRequests")
+        pw.println("${innerPrefix}removeDeskRootRequests=$removeDeskRootRequests")
         pw.println("${innerPrefix}Desk Roots:")
         deskRootsByDeskId.forEach { deskId, root ->
             val minimizationRoot = deskMinimizationRootsByDeskId[deskId]

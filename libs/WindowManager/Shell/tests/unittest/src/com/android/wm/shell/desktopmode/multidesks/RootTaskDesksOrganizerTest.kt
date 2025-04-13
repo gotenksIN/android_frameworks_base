@@ -92,10 +92,28 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     fun testCreateDesk_rootExistsForOtherUser_reusesRoot() = runTest {
         val desk = createDeskSuspending(userId = PRIMARY_USER_ID)
 
-        val deskId =
-            organizer.createDeskSuspending(displayId = DEFAULT_DISPLAY, userId = SECONDARY_USER_ID)
+        val desk2 = createDeskSuspending(userId = SECONDARY_USER_ID)
 
-        assertThat(deskId).isEqualTo(desk.deskRoot.deskId)
+        assertThat(desk2.deskRoot.deskId).isEqualTo(desk.deskRoot.deskId)
+    }
+
+    @Test
+    fun testCreateDesk_rootExistsForOtherUser_pendingDeletion_doesNotReuseRoot() = runTest {
+        val desk = createDeskSuspending(userId = PRIMARY_USER_ID)
+        organizer.removeDesk(WindowContainerTransaction(), desk.deskRoot.deskId, PRIMARY_USER_ID)
+
+        val desk2 = createDeskSuspending(userId = SECONDARY_USER_ID)
+
+        assertThat(desk2.deskRoot.deskId).isNotEqualTo(desk.deskRoot.deskId)
+    }
+
+    @Test
+    fun testCreateDesk_rootExistsForOtherUser_inOtherDisplay_doesNotReuseRoot() = runTest {
+        val desk = createDeskSuspending(userId = PRIMARY_USER_ID, displayId = DEFAULT_DISPLAY)
+
+        val desk2 = createDeskSuspending(userId = SECONDARY_USER_ID, displayId = SECOND_DISPLAY)
+
+        assertThat(desk2.deskRoot.deskId).isNotEqualTo(desk.deskRoot.deskId)
     }
 
     @Test
@@ -734,18 +752,24 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     private suspend fun createDeskSuspending(
         visible: Boolean = true,
         userId: Int = PRIMARY_USER_ID,
+        displayId: Int = DEFAULT_DISPLAY,
     ): DeskRoots {
         val freeformRootTask =
             createFreeformTask().apply {
                 parentTaskId = -1
                 isVisible = visible
                 isVisibleRequested = visible
+                this.displayId = displayId
             }
-        val minimizationRootTask = createFreeformTask().apply { parentTaskId = -1 }
+        val minimizationRootTask =
+            createFreeformTask().apply {
+                parentTaskId = -1
+                this.displayId = displayId
+            }
         Mockito.reset(mockShellTaskOrganizer)
         whenever(
                 mockShellTaskOrganizer.createRootTask(
-                    DEFAULT_DISPLAY,
+                    displayId,
                     WINDOWING_MODE_FREEFORM,
                     organizer,
                     true,
@@ -759,7 +783,7 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                 val listener = (invocation.arguments[2] as TaskListener)
                 listener.onTaskAppeared(minimizationRootTask, SurfaceControl())
             }
-        val deskId = organizer.createDeskSuspending(DEFAULT_DISPLAY, userId)
+        val deskId = organizer.createDeskSuspending(displayId, userId)
         val deskRoot = assertNotNull(organizer.deskRootsByDeskId.get(deskId))
         val minimizationRoot = assertNotNull(organizer.deskMinimizationRootsByDeskId[deskId])
         return DeskRoots(deskRoot, minimizationRoot)
@@ -795,5 +819,6 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
         private const val PRIMARY_USER_ID = 10
         private const val SECONDARY_USER_ID = 11
         private const val TEST_CHILD_TASK_ID = 100
+        private const val SECOND_DISPLAY = 2
     }
 }

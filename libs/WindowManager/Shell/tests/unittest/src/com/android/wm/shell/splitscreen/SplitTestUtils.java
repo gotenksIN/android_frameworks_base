@@ -30,6 +30,7 @@ import android.os.Handler;
 import android.view.SurfaceControl;
 
 import com.android.dx.mockito.inline.extended.ExtendedMockito;
+import com.android.wm.shell.RootDisplayAreaOrganizer;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.TestRunningTaskInfoBuilder;
@@ -56,6 +57,7 @@ public class SplitTestUtils {
         final Rect dividerBounds = new Rect(48, 0, 52, 100);
         final Rect bounds1 = new Rect(0, 0, 40, 100);
         final Rect bounds2 = new Rect(60, 0, 100, 100);
+        final Rect rootBounds = new Rect(0, 0, 100, 100);
         final SurfaceControl leash = createMockSurface();
         SplitLayout out = mock(SplitLayout.class);
         doReturn(dividerBounds).when(out).getDividerBounds();
@@ -63,6 +65,7 @@ public class SplitTestUtils {
         doReturn(leash).when(out).getDividerLeash();
         doReturn(bounds1).when(out).getTopLeftBounds();
         doReturn(bounds2).when(out).getBottomRightBounds();
+        doReturn(rootBounds).when(out).getRootBounds();
         doReturn(SNAP_TO_2_50_50).when(out).calculateCurrentSnapPosition();
         return out;
     }
@@ -91,12 +94,13 @@ public class SplitTestUtils {
                 LaunchAdjacentController launchAdjacentController,
                 Optional<WindowDecorViewModel> windowDecorViewModel, SplitState splitState,
                 Optional<DesktopTasksController> desktopTasksController,
-                RootTaskDisplayAreaOrganizer rootTDAOrganizer) {
+                RootTaskDisplayAreaOrganizer rootTDAOrganizer,
+                RootDisplayAreaOrganizer rootDisplayAreaOrganizer) {
             super(context, displayId, syncQueue, taskOrganizer, mainStage,
                     sideStage, displayController, imeController, insetsController, splitLayout,
                     transitions, transactionPool, mainExecutor, mainHandler, recentTasks,
                     launchAdjacentController, windowDecorViewModel, splitState,
-                    desktopTasksController, rootTDAOrganizer);
+                    desktopTasksController, rootTDAOrganizer, rootDisplayAreaOrganizer);
 
             // Prepare root task for testing.
             mRootLeash = new SurfaceControl.Builder().setName("test").build();

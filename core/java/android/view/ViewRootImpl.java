@@ -112,6 +112,7 @@ import static android.view.WindowManager.PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_B
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CANCEL_AND_REDRAW;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_SURFACE_CHANGED;
+import static android.view.accessibility.Flags.a11ySequentialFocusStartingPoint;
 import static android.view.accessibility.Flags.forceInvertColor;
 import static android.view.accessibility.Flags.reduceWindowContentChangedEventThrottle;
 import static android.view.flags.Flags.addSchandleToVriSurface;
@@ -1236,8 +1237,6 @@ public final class ViewRootImpl implements ViewParent,
             toolkitFrameRateVelocityMappingReadOnly();
     private static boolean sToolkitEnableInvalidateCheckThreadFlagValue =
             Flags.enableInvalidateCheckThread();
-    private static boolean sSurfaceFlingerBugfixFlagValue =
-            com.android.graphics.surfaceflinger.flags.Flags.vrrBugfix24q4();
     private static final boolean sEnableVrr = ViewProperties.vrr_enabled().orElse(true);
     private static final boolean sToolkitInitialTouchBoostFlagValue = toolkitInitialTouchBoost();
     private static boolean sToolkitFrameRateDebugFlagValue =  toolkitFrameRateDebug();
@@ -4536,7 +4535,7 @@ public final class ViewRootImpl implements ViewParent,
             }
 
             mDrawnThisFrame = false;
-            if (!mInvalidationIdleMessagePosted && sSurfaceFlingerBugfixFlagValue) {
+            if (!mInvalidationIdleMessagePosted) {
                 mInvalidationIdleMessagePosted = true;
                 mHandler.sendEmptyMessageDelayed(MSG_CHECK_INVALIDATION_IDLE, IDLE_TIME_MILLIS);
             }
@@ -8088,6 +8087,11 @@ public final class ViewRootImpl implements ViewParent,
                         return true;
                     }
                 } else {
+                    if (a11ySequentialFocusStartingPoint()
+                            && ViewRootImpl.this.mAccessibilityFocusedHost != null) {
+                        ViewRootImpl.this.mAccessibilityFocusedHost.requestFocus(direction);
+                        return true;
+                    }
                     if (mView.restoreDefaultFocus()) {
                         return true;
                     } else if (moveFocusToAdjacentWindow(direction)) {
@@ -13431,8 +13435,7 @@ public final class ViewRootImpl implements ViewParent,
      */
     public void removeThreadedRendererView(View view) {
         mThreadedRendererViews.remove(view);
-        if (shouldEnableDvrr()
-                && !mInvalidationIdleMessagePosted && sSurfaceFlingerBugfixFlagValue) {
+        if (shouldEnableDvrr() && !mInvalidationIdleMessagePosted) {
             mInvalidationIdleMessagePosted = true;
             mHandler.sendEmptyMessageDelayed(MSG_CHECK_INVALIDATION_IDLE, IDLE_TIME_MILLIS);
         }
@@ -13663,7 +13666,7 @@ public final class ViewRootImpl implements ViewParent,
         mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
         mHandler.removeMessages(MSG_FRAME_RATE_SETTING);
         mHandler.removeMessages(MSG_SURFACE_REPLACED_TIMEOUT);
-        if (mInvalidationIdleMessagePosted && sSurfaceFlingerBugfixFlagValue) {
+        if (mInvalidationIdleMessagePosted) {
             mInvalidationIdleMessagePosted = false;
             mHandler.removeMessages(MSG_CHECK_INVALIDATION_IDLE);
         }

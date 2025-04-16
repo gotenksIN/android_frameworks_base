@@ -117,6 +117,7 @@ import com.android.wm.shell.desktopmode.minimize.DesktopWindowLimitRemoteHandler
 import com.android.wm.shell.desktopmode.multidesks.DeskTransition
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
 import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver
+import com.android.wm.shell.desktopmode.multidesks.OnDeskDisplayChangeListener
 import com.android.wm.shell.desktopmode.multidesks.OnDeskRemovedListener
 import com.android.wm.shell.desktopmode.persistence.DesktopRepositoryInitializer
 import com.android.wm.shell.desktopmode.persistence.DesktopRepositoryInitializer.DeskRecreationFactory
@@ -370,7 +371,11 @@ class DesktopTasksController(
     /** Returns whether the given display has an active desk. */
     fun isAnyDeskActive(displayId: Int): Boolean = taskRepository.isAnyDeskActive(displayId)
 
-    /** Moves focused task to desktop mode for given [displayId]. */
+    /**
+     * Moves focused task to desktop mode for given [displayId].
+     *
+     * TODO(b/405381458): use focusTransitionObserver to get the focused task on a certain display
+     */
     fun moveFocusedTaskToDesktop(displayId: Int, transitionSource: DesktopModeTransitionSource) {
         val allFocusedTasks = getAllFocusedTasks(displayId)
         when (allFocusedTasks.size) {
@@ -464,7 +469,7 @@ class DesktopTasksController(
     }
 
     /** Adds a new desk to the given display for the given user. */
-    fun createDesk(displayId: Int, userId: Int = this.userId) {
+    fun createDesk(displayId: Int, userId: Int = this.userId, activateDesk: Boolean = false) {
         logV("addDesk displayId=%d, userId=%d", displayId, userId)
         val repository = userRepositories.getProfile(userId)
         createDesk(displayId, userId) { deskId ->
@@ -472,6 +477,9 @@ class DesktopTasksController(
                 logW("Failed to add desk in displayId=%d for userId=%d", displayId, userId)
             } else {
                 repository.addDesk(displayId = displayId, deskId = deskId)
+                if (activateDesk) {
+                    activateDesk(deskId)
+                }
             }
         }
     }
@@ -512,6 +520,69 @@ class DesktopTasksController(
             createDesk(displayId, userId) { deskId -> cont.resumeWith(Result.success(deskId)) }
         }
 
+    /**
+     * Handle desk operations resulting from a display disconnect transition. Forks to two separate
+     * methods depending on whether the destination display supports desktop mode.
+     *
+     * @param deskDisconnectChanges the individual changes resulting from the disconnect
+     */
+    fun onDeskDisconnectTransition(
+        deskDisconnectChanges: Set<OnDeskDisplayChangeListener.DeskDisplayChange>
+    ) {
+        val wct = WindowContainerTransaction()
+        // TODO(b/391652399): Remove the wallpaper of the disconnected display.
+        val transitStartRunnables = mutableSetOf<RunOnTransitStart?>()
+        for (change in deskDisconnectChanges) {
+            if (
+                DesktopModeStatus.isDesktopModeSupportedOnDisplay(
+                    context,
+                    displayController.getDisplay(change.destinationDisplayId),
+                )
+            ) {
+                transitStartRunnables.add(
+                    updateDesksActivationOnDisconnection(
+                        disconnectedDisplayActiveDesk = change.deskId,
+                        wct = wct,
+                        change.toTop,
+                    )
+                )
+            } else {
+                // TODO(b/391652399): Implement desktop-not-supported case.
+            }
+        }
+        val transition = transitions.startTransition(TRANSIT_CHANGE, wct, /* handler= */ null)
+        for (transitStartRunnable in transitStartRunnables) {
+            transitStartRunnable?.invoke(transition)
+        }
+    }
+
+    /**
+     * Handle desk operations when disconnecting a display and all desks on that display are moving
+     * to a display that supports desks. The previously focused display will determine which desk
+     * will move to the front.
+     *
+     * @param disconnectedDisplayActiveDesk the id of the active desk on the disconnected display
+     * @param toTop whether this desk was reordered to the top
+     */
+    @VisibleForTesting
+    fun updateDesksActivationOnDisconnection(
+        disconnectedDisplayActiveDesk: Int,
+        wct: WindowContainerTransaction,
+        toTop: Boolean,
+    ): RunOnTransitStart? {
+        val runOnTransitStart =
+            if (toTop) {
+                // The disconnected display's active desk was reparented to the top, activate it
+                // here.
+                addDeskActivationChanges(disconnectedDisplayActiveDesk, wct)
+            } else {
+                // The disconnected display's active desk was reparented to the back, ensure it is
+                // no longer an active launch root.
+                prepareDeskDeactivationIfNeeded(wct, disconnectedDisplayActiveDesk)
+            }
+        return runOnTransitStart
+    }
+
     /** Moves task to desktop mode if task is running, else launches it in desktop mode. */
     @JvmOverloads
     fun moveTaskToDefaultDeskAndActivate(
@@ -547,6 +618,7 @@ class DesktopTasksController(
         remoteTransition: RemoteTransition? = null,
         callback: IMoveToDesktopCallback? = null,
     ): Boolean {
+        logV("moveTaskToDesk taskId=%d deskId=%d source=%s", taskId, deskId, transitionSource)
         val runningTask = shellTaskOrganizer.getRunningTaskInfo(taskId)
         if (runningTask != null) {
             return moveRunningTaskToDesk(
@@ -1236,35 +1308,39 @@ class DesktopTasksController(
     /**
      * Move task to the next display.
      *
-     * Queries all current known display ids and sorts them in ascending order. Then iterates
-     * through the list and looks for the display id that is larger than the display id for the
-     * passed in task. If a display with a higher id is not found, iterates through the list and
-     * finds the first display id that is not the display id for the passed in task.
+     * Queries all currently known display IDs and checks if they match the predicate. The check is
+     * performed in an order such that display IDs greater than the passed task's displayId are
+     * considered before display IDs less than or equal to the passed task's displayID. Within each
+     * of these two groups, the check is performed in ascending order.
      *
-     * If a display matching the above criteria is found, re-parents the task to that display. No-op
-     * if no such display is found.
+     * If a display ID matches predicate is found, re-parents the task to that display. No-op if no
+     * such display is found.
      */
-    fun moveToNextDisplay(taskId: Int) {
+    fun moveToNextDisplay(taskId: Int, predicate: (Int) -> Boolean = { true }) {
         val task = shellTaskOrganizer.getRunningTaskInfo(taskId)
         if (task == null) {
             logW("moveToNextDisplay: taskId=%d not found", taskId)
             return
         }
-        logV("moveToNextDisplay: taskId=%d displayId=%d", taskId, task.displayId)
 
-        val displayIds = rootTaskDisplayAreaOrganizer.displayIds.sorted()
-        // Get the first display id that is higher than current task display id
-        var newDisplayId = displayIds.firstOrNull { displayId -> displayId > task.displayId }
-        if (newDisplayId == null) {
-            // No display with a higher id, get the first display id that is not the task display id
-            newDisplayId = displayIds.firstOrNull { displayId -> displayId < task.displayId }
-        }
+        val newDisplayId =
+            rootTaskDisplayAreaOrganizer.displayIds
+                .sortedBy { (it - task.displayId - 1).mod(Int.MAX_VALUE) }
+                .find(predicate)
         if (newDisplayId == null) {
             logW("moveToNextDisplay: next display not found")
             return
         }
+        // moveToDisplay is no-op if newDisplayId is same with task.displayId.
         moveToDisplay(task, newDisplayId)
     }
+
+    /** Move task to the next display which can host desktop tasks. */
+    fun moveToNextDesktopDisplay(taskId: Int) =
+        moveToNextDisplay(taskId) {
+            val display = displayController.getDisplay(it) ?: return@moveToNextDisplay false
+            DesktopModeStatus.isDesktopModeSupportedOnDisplay(context, display)
+        }
 
     /**
      * Start an intent through a launch transition for starting tasks whose transition does not get
@@ -2714,6 +2790,12 @@ class DesktopTasksController(
     ) {
         val targetDisplayId = taskRepository.getDisplayForDesk(deskId)
         val displayLayout = displayController.getDisplayLayout(targetDisplayId) ?: return
+        logV(
+            "addMoveToDeskTaskChanges taskId=%d deskId=%d displayId=%d",
+            task.taskId,
+            deskId,
+            targetDisplayId,
+        )
         val inheritedTaskBounds =
             getInheritedExistingTaskBounds(taskRepository, shellTaskOrganizer, task, deskId)
         if (inheritedTaskBounds != null) {
@@ -3000,10 +3082,15 @@ class DesktopTasksController(
         // TODO: b/362720497 - should this be true in other places? Can it be calculated locally
         //  without having to specify the value?
         addPendingLaunchTransition: Boolean = false,
-    ): RunOnTransitStart? {
-        logV("addDeskActivationChanges newTaskId=%d deskId=%d", newTask?.taskId, deskId)
+    ): RunOnTransitStart {
         val newTaskIdInFront = newTask?.taskId
         val displayId = taskRepository.getDisplayForDesk(deskId)
+        logV(
+            "addDeskActivationChanges newTaskId=%d deskId=%d displayId=%d",
+            newTask?.taskId,
+            deskId,
+            displayId,
+        )
         if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             val taskIdToMinimize = bringDesktopAppsToFront(displayId, wct, newTask?.taskId)
             return { transition ->
@@ -3056,7 +3143,7 @@ class DesktopTasksController(
         return { transition ->
             val activateDeskTransition =
                 if (newTaskIdInFront != null) {
-                    DeskTransition.ActiveDeskWithTask(
+                    DeskTransition.ActivateDeskWithTask(
                         token = transition,
                         displayId = displayId,
                         deskId = deskId,

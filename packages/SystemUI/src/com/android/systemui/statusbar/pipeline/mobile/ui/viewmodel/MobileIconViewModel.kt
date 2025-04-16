@@ -178,7 +178,7 @@ private class CarrierBasedSatelliteViewModelImpl(
     override val activityOutVisible: Flow<Boolean> = flowOf(false)
     override val activityContainerVisible: Flow<Boolean> = flowOf(false)
     override val volteId: Flow<Int> = flowOf(0)
-    override val showSignalStrengthIcon: Flow<Boolean> = flowOf(false)
+    override val showSignalStrengthIcon: Flow<Boolean> = flowOf(true)
 }
 /** Terrestrial (cellular) icon. */
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")

@@ -36,6 +36,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -551,6 +552,22 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
                 DEFAULT_SHOULD_EXCLUDE_CAPTION_FROM_APP_BOUNDS);
 
         assertThat(relayoutParams.mCornerRadiusId).isEqualTo(Resources.ID_NULL);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS)
+    public void updateRelayoutParams_boxShadowsAndOutlineSetForFreeform() {
+        final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
+        taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FREEFORM);
+        RelayoutParams relayoutParams = new RelayoutParams();
+
+        updateRelayoutParams(relayoutParams, taskInfo);
+
+        assertThat(relayoutParams.mBoxShadowSettingsIds.length).isGreaterThan(0);
+        for (int i = 0; i < relayoutParams.mBoxShadowSettingsIds.length; i++) {
+            assertThat(relayoutParams.mBoxShadowSettingsIds[i]).isNotEqualTo(Resources.ID_NULL);
+        }
+        assertThat(relayoutParams.mBorderSettingsId).isNotEqualTo(Resources.ID_NULL);
     }
 
     @Test
@@ -1751,6 +1768,23 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
         // Verify web uri used for browser applications
         createHandleMenu(decor);
         verifyHandleMenuCreated(TEST_URI3);
+    }
+
+    @Test
+    public void setAnimatingTaskResizeOrReposition_returnsWhenViewHolderIsNull() {
+        final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
+        final DesktopModeWindowDecoration decor =
+                spy(createWindowDecoration(taskInfo, true /* relayout */));
+
+        // Close the decor to close the view holder and set it to null
+        decor.close();
+
+        // Verify returns when view holder is null
+        try {
+            decor.setAnimatingTaskResizeOrReposition(true /* animatingTaskResizeOrReposition */);
+        } catch (NullPointerException e) {
+            fail("Attempted to access view holder after window decor is closed");
+        }
     }
 
 

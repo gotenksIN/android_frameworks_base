@@ -41,7 +41,6 @@ import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 // QTI_END: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
 
 import static com.android.systemui.shared.Flags.returnAnimationFrameworkLongLived;
-import static com.android.window.flags.Flags.ensureWallpaperInTransitions;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_TRANSITIONS;
 import static com.android.wm.shell.shared.TransitionUtil.FLAG_IS_DESKTOP_WALLPAPER_ACTIVITY;
 import static com.android.wm.shell.shared.TransitionUtil.isClosingType;
@@ -177,8 +176,11 @@ public class Transitions implements RemoteCallable<Transitions>,
     /** Transition type for maximize to freeform transition. */
     public static final int TRANSIT_RESTORE_FROM_MAXIMIZE = WindowManager.TRANSIT_FIRST_CUSTOM + 9;
 
-    /** Transition to resize PiP task. */
-    public static final int TRANSIT_RESIZE_PIP = TRANSIT_FIRST_CUSTOM + 16;
+    /**
+     * Transition to change the bounds of a PiP task, either by resizing or moving to another
+     * display.
+     */
+    public static final int TRANSIT_PIP_BOUNDS_CHANGE = TRANSIT_FIRST_CUSTOM + 16;
 
     /**
      * The task fragment drag resize transition used by activity embedding.
@@ -550,11 +552,6 @@ public class Transitions implements RemoteCallable<Transitions>,
                 // This includes IME (associated with app), because there may not be a transition
                 // associated with their visibility changes, and currently they don't need a
                 // transition animation.
-                continue;
-            }
-            if (change.hasFlags(FLAG_IS_WALLPAPER) && !ensureWallpaperInTransitions()) {
-                // Wallpaper is always z-ordered at bottom, and historically is not animated by
-                // transition handlers.
                 continue;
             }
             final SurfaceControl leash = change.getLeash();
@@ -1896,7 +1893,7 @@ public class Transitions implements RemoteCallable<Transitions>,
             case TRANSIT_SPLIT_DISMISS -> "SPLIT_DISMISS";
             case TRANSIT_MAXIMIZE -> "MAXIMIZE";
             case TRANSIT_RESTORE_FROM_MAXIMIZE -> "RESTORE_FROM_MAXIMIZE";
-            case TRANSIT_RESIZE_PIP -> "RESIZE_PIP";
+            case TRANSIT_PIP_BOUNDS_CHANGE -> "PIP_BOUNDS_CHANGE";
             case TRANSIT_TASK_FRAGMENT_DRAG_RESIZE -> "TASK_FRAGMENT_DRAG_RESIZE";
             case TRANSIT_SPLIT_PASSTHROUGH -> "SPLIT_PASSTHROUGH";
             case TRANSIT_CLEANUP_PIP_EXIT -> "CLEANUP_PIP_EXIT";

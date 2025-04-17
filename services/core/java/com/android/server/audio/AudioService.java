@@ -1371,10 +1371,14 @@ public class AudioService extends IAudioService.Stub
         mSystemServer = systemServer;
         mAudioVolumeGroupHelper = audioVolumeGroupHelper;
         mSettings = settings;
+
         mAudioPolicy = audioPolicy;
         mAudioPolicy.registerOnStartTask(() -> {
             mAudioPolicy.setEnableHardening(mShouldEnableAllHardening.get());
         });
+        if (!mAudioPolicy.isServiceAvailable()) {
+            Log.wtf(TAG, "AudioPolicy not available on AudioService start!");
+        }
 
         mPlatformType = AudioSystem.getPlatformType(context);
 
@@ -2698,6 +2702,15 @@ public class AudioService extends IAudioService.Stub
         checkAllAliasStreamVolumes();
         checkMuteAffectedStreams();
         updateDefaultVolumes();
+
+        if (cacheGetStreamVolume()) {
+            if (DEBUG_VOL) {
+                Log.d(TAG, "Clear volume cache after creating the stream states");
+            }
+            AudioManager.clearVolumeCache(AudioManager.VOLUME_CACHING_API);
+            AudioManager.clearVolumeCache(AudioManager.VOLUME_MIN_CACHING_API);
+            AudioManager.clearVolumeCache(AudioManager.VOLUME_MAX_CACHING_API);
+        }
     }
 
     /**

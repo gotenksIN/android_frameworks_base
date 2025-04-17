@@ -195,11 +195,21 @@ public class TextLayout extends LayoutManager implements VariableSupport, Access
 
     @Override
     public void paintingComponent(@NonNull PaintContext context) {
+        Component prev = context.getContext().mLastComponent;
+        RemoteContext remoteContext = context.getContext();
+        remoteContext.mLastComponent = this;
+
         context.save();
         context.translate(mX, mY);
+        if (mGraphicsLayerModifier != null) {
+            context.startGraphicsLayer((int) getWidth(), (int) getHeight());
+            mCachedAttributes.clear();
+            mGraphicsLayerModifier.fillInAttributes(mCachedAttributes);
+            context.setGraphicsLayer(mCachedAttributes);
+        }
         mComponentModifiers.paint(context);
-        float tx = mPaddingLeft;
-        float ty = mPaddingTop;
+        float tx = mPaddingLeft + getScrollX();
+        float ty = mPaddingTop + getScrollY();
         context.translate(tx, ty);
 
         //////////////////////////////////////////////////////////
@@ -226,7 +236,7 @@ public class TextLayout extends LayoutManager implements VariableSupport, Access
                     break;
                 case TEXT_ALIGN_RIGHT:
                 case TEXT_ALIGN_END:
-                    px = (mWidth - mPaddingRight - mTextW);
+                    px = (mWidth - mPaddingLeft - mPaddingRight - mTextW);
                     break;
                 case TEXT_ALIGN_LEFT:
                 case TEXT_ALIGN_START:
@@ -263,8 +273,13 @@ public class TextLayout extends LayoutManager implements VariableSupport, Access
         context.restorePaint();
         //////////////////////////////////////////////////////////
 
+        if (mGraphicsLayerModifier != null) {
+            context.endGraphicsLayer();
+        }
+
         context.translate(-tx, -ty);
         context.restore();
+        context.getContext().mLastComponent = prev;
     }
 
     @NonNull

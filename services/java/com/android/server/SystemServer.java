@@ -1572,8 +1572,6 @@ public final class SystemServer implements Dumpable {
         boolean enableWigig = SystemProperties.getBoolean("persist.vendor.wigig.enable", false);
 // QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 
-        boolean isDesktop = context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_PC);
-
         boolean isWatch = RoSystemFeatures.hasFeatureWatch(context);
 
         boolean isArc = context.getPackageManager().hasSystemFeature(
@@ -1695,7 +1693,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (!isTv && !isDesktop) {
+            if (!isTv) {
                 t.traceBegin("StartVibratorManagerService");
                 mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
                 t.traceEnd();
@@ -1842,7 +1840,7 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(LogcatManagerService.class);
             t.traceEnd();
 
-            if (!isWatch && !isTv && !isAutomotive && !isDesktop
+            if (!isWatch && !isTv && !isAutomotive
                     && android.security.Flags.aflApi()) {
                 t.traceBegin("StartIntrusionDetectionService");
                 mSystemServiceManager.startService(IntrusionDetectionService.class);
@@ -1855,7 +1853,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (!isWatch && !isTv && !isAutomotive && !isDesktop
+            if (!isWatch && !isTv && !isAutomotive
                     && android.security.Flags.aapmApi()) {
                 t.traceBegin("StartAdvancedProtectionService");
                 mSystemServiceManager.startService(AdvancedProtectionService.Lifecycle.class);

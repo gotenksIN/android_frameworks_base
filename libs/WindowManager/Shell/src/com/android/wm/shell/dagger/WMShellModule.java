@@ -23,7 +23,6 @@ import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASK_LIMI
 import static android.window.DesktopModeFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
 
 import static com.android.hardware.input.Flags.manageKeyGestures;
-import static com.android.hardware.input.Flags.useKeyGestureEventHandler;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -48,6 +47,7 @@ import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.util.LatencyTracker;
 import com.android.launcher3.icons.IconProvider;
 import com.android.window.flags.Flags;
+import com.android.wm.shell.RootDisplayAreaOrganizer;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController;
@@ -577,7 +577,8 @@ public abstract class WMShellModule {
             MultiInstanceHelper multiInstanceHelper,
             SplitState splitState,
             @ShellMainThread ShellExecutor mainExecutor,
-            @ShellMainThread Handler mainHandler) {
+            @ShellMainThread Handler mainHandler,
+            RootDisplayAreaOrganizer rootDisplayAreaOrganizer) {
         return new SplitScreenController(
                 context,
                 shellInit,
@@ -601,7 +602,8 @@ public abstract class WMShellModule {
                 multiInstanceHelper,
                 splitState,
                 mainExecutor,
-                mainHandler);
+                mainHandler,
+                rootDisplayAreaOrganizer);
     }
 
     //
@@ -1024,7 +1026,7 @@ public abstract class WMShellModule {
             FocusTransitionObserver focusTransitionObserver,
             @ShellMainThread ShellExecutor mainExecutor,
             DisplayController displayController) {
-        if (DesktopModeStatus.canEnterDesktopMode(context) && useKeyGestureEventHandler()
+        if (DesktopModeStatus.canEnterDesktopMode(context)
                 && manageKeyGestures()
                 && (Flags.enableMoveToNextDisplayShortcut()
                 || DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue())) {
@@ -1370,7 +1372,8 @@ public abstract class WMShellModule {
             Optional<DesktopUserRepositories> desktopUserRepositories,
             Optional<DesktopTasksController> desktopTasksController,
             Optional<DesktopDisplayModeController> desktopDisplayModeController,
-            DesktopRepositoryInitializer desktopRepositoryInitializer
+            DesktopRepositoryInitializer desktopRepositoryInitializer,
+            Optional<DesksTransitionObserver> desksTransitionObserver
     ) {
         if (!DesktopModeStatus.canEnterDesktopMode(context)) {
             return Optional.empty();
@@ -1386,7 +1389,8 @@ public abstract class WMShellModule {
                         desktopRepositoryInitializer,
                         desktopUserRepositories.get(),
                         desktopTasksController.get(),
-                        desktopDisplayModeController.get()));
+                        desktopDisplayModeController.get(),
+                        desksTransitionObserver.get()));
     }
 
     @WMSingleton
@@ -1552,13 +1556,25 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static Optional<DesktopImeHandler> provideDesktopImeHandler(
+            Optional<DesktopTasksController> desktopTasksController,
+            Optional<DesktopUserRepositories> desktopUserRepositories,
+            FocusTransitionObserver focusTransitionObserver,
             DisplayImeController displayImeController,
+            DisplayController displayController,
+            ShellTaskOrganizer shellTaskOrganizer,
+            Transitions transitions,
+            @ShellMainThread ShellExecutor mainExecutor,
+            @ShellAnimationThread ShellExecutor animExecutor,
             Context context,
             ShellInit shellInit) {
         if (!DesktopModeStatus.canEnterDesktopMode(context)) {
             return Optional.empty();
         }
-        return Optional.of(new DesktopImeHandler(displayImeController, shellInit));
+        return Optional.of(
+                new DesktopImeHandler(desktopTasksController.get(), desktopUserRepositories.get(),
+                        focusTransitionObserver, shellTaskOrganizer,
+                        displayImeController, displayController, transitions, mainExecutor,
+                        animExecutor, context, shellInit));
     }
 
     //
@@ -1641,6 +1657,7 @@ public abstract class WMShellModule {
             Optional<DesktopDisplayEventHandler> desktopDisplayEventHandler,
             Optional<DesktopModeKeyGestureHandler> desktopModeKeyGestureHandler,
             Optional<SystemModalsTransitionHandler> systemModalsTransitionHandler,
+            Optional<DesktopImeHandler> desktopImeHandler,
             ShellCrashHandler shellCrashHandler) {
         return new Object();
     }

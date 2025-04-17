@@ -51,6 +51,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 
 /**
@@ -991,6 +993,34 @@ public final class Debug
         }
     }
 
+    /**
+     * This class is used to retrieved process allocated dma buffer
+     * {@hide}
+     */
+    public static class DmaBuffer{
+        public long inode;
+        public long size;
+        public long count;
+        public long totalRefs;
+        public List<Integer> pids;
+        public String exporter;
+        public String name;
+        public Map<Integer, Integer> fdRefs;
+        public Map<Integer, Integer> mapRefs;
+
+        public DmaBuffer() {
+            pids = new ArrayList<>();
+            fdRefs = new HashMap<>();
+            mapRefs = new HashMap<>();
+        }
+
+        public long Pss() {
+            if (pids.size() == 0) {
+                return 0;
+            }
+            return size / pids.size();
+        }
+    }
 
     /**
      * Wait until a debugger attaches. As soon as a debugger attaches,
@@ -2792,5 +2822,20 @@ public final class Debug
      * @hide
      */
     public static native long getKernelCmaUsageKb();
+
+    /**
+     * Retrieves the list of DMA buffers used by all processes that are currently using DMA.
+     * @return true if the DMA buffers were read successfully, false otherwise.
+     *
+     * @hide
+     */
+    public static native boolean getProcfsDmaBuffer(List<DmaBuffer> bufs);
+
+    /**
+     * @return the comm string of the specified pid.
+     *
+     * @hide
+     */
+    public static native String getPidComm(int pid);
 
 }

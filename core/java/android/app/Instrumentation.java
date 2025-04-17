@@ -20,6 +20,7 @@ import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SpecialUsers.CanBeCURRENT;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
@@ -2218,7 +2219,7 @@ public class Instrumentation {
     @UnsupportedAppUsage
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, String resultWho,
-            Intent intent, int requestCode, Bundle options, UserHandle user) {
+            Intent intent, int requestCode, Bundle options, @CanBeCURRENT UserHandle user) {
 // QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(377, intent.toString());
 // QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features

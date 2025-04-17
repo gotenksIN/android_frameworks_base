@@ -202,6 +202,8 @@ import android.annotation.PermissionMethod;
 import android.annotation.PermissionName;
 import android.annotation.RequiresPermission;
 import android.annotation.SpecialUsers.CanBeALL;
+import android.annotation.SpecialUsers.CanBeCURRENT;
+import android.annotation.SpecialUsers.CannotBeSpecialUser;
 import android.annotation.UserIdInt;
 import android.app.Activity;
 import android.app.ActivityClient;
@@ -2474,7 +2476,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         mPhantomProcessList = new PhantomProcessList(this);
         mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
                 .setHandlerThread(handlerThread)
-                .useModernOomAdjuster(mConstants.ENABLE_NEW_OOMADJ)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
 
@@ -2540,7 +2541,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 new LowMemDetector(this));
         mPhantomProcessList = new PhantomProcessList(this);
         mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
-                .useModernOomAdjuster(mConstants.ENABLE_NEW_OOMADJ)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
 
@@ -3204,8 +3204,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     @Override
-    public boolean setProcessMemoryTrimLevel(String process, int userId, int level)
-            throws RemoteException {
+    public boolean setProcessMemoryTrimLevel(String process,
+            @CanBeALL @CanBeCURRENT @UserIdInt int userId, int level) throws RemoteException {
         if (!isCallerShell()) {
             throw new SecurityException("Only shell can call it");
         }
@@ -3297,7 +3297,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public final int startActivityAsUser(IApplicationThread caller, String callingPackage,
             Intent intent, String resolvedType, IBinder resultTo, String resultWho, int requestCode,
-            int startFlags, ProfilerInfo profilerInfo, Bundle bOptions, int userId) {
+            int startFlags, ProfilerInfo profilerInfo, Bundle bOptions,
+            @CanBeCURRENT @UserIdInt int userId) {
         return startActivityAsUserWithFeature(caller, callingPackage, null, intent, resolvedType,
                 resultTo, resultWho, requestCode, startFlags, profilerInfo, bOptions, userId);
     }
@@ -3306,7 +3307,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     public final int startActivityAsUserWithFeature(IApplicationThread caller,
             String callingPackage, String callingFeatureId, Intent intent, String resolvedType,
             IBinder resultTo, String resultWho, int requestCode, int startFlags,
-            ProfilerInfo profilerInfo, Bundle bOptions, int userId) {
+            ProfilerInfo profilerInfo, Bundle bOptions,
+            @CanBeCURRENT @UserIdInt int userId) {
         return mActivityTaskManager.startActivityAsUser(caller, callingPackage,
                     callingFeatureId, intent, resolvedType, resultTo, resultWho, requestCode,
                     startFlags, profilerInfo, bOptions, userId);
@@ -3917,12 +3919,14 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     @Override
-    public void forceStopPackage(final String packageName, int userId) {
+    public void forceStopPackage(
+            final String packageName, @CanBeALL @CanBeCURRENT @UserIdInt int userId) {
         forceStopPackage(packageName, userId, /*flags=*/ 0, null);
     }
 
     @Override
-    public void forceStopPackageEvenWhenStopping(final String packageName, int userId) {
+    public void forceStopPackageEvenWhenStopping(
+            final String packageName, @CanBeALL @CanBeCURRENT @UserIdInt int userId) {
         forceStopPackage(packageName, userId, ActivityManager.FLAG_OR_STOPPED, null);
     }
 
@@ -5530,7 +5534,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      * @hide
      */
     @Override
-    public void setThemeOverlayReady(@UserIdInt int userId) {
+    public void setThemeOverlayReady(@CannotBeSpecialUser @UserIdInt int userId) {
         if (!isHomeLaunchDelayable()) {
             Slog.d(TAG, "ThemeHomeDelay: Home launch is not delayable, "
                     + "ignoring setThemeOverlayReady() call");
@@ -13885,7 +13889,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public ComponentName startService(IApplicationThread caller, Intent service,
             String resolvedType, boolean requireForeground, String callingPackage,
-            String callingFeatureId, int userId)
+            String callingFeatureId, @CanBeCURRENT @UserIdInt int userId)
             throws TransactionTooLargeException {
         return startService(caller, service, resolvedType, requireForeground, callingPackage,
                 callingFeatureId, userId, false /* isSdkSandboxService */, INVALID_UID, null, null);
@@ -13893,8 +13897,9 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     private ComponentName startService(IApplicationThread caller, Intent service,
             String resolvedType, boolean requireForeground, String callingPackage,
-            String callingFeatureId, int userId, boolean isSdkSandboxService,
-            int sdkSandboxClientAppUid, String sdkSandboxClientAppPackage, String instanceName)
+            String callingFeatureId, @CanBeCURRENT @UserIdInt int userId,
+            boolean isSdkSandboxService, int sdkSandboxClientAppUid,
+            String sdkSandboxClientAppPackage, String instanceName)
             throws TransactionTooLargeException {
         enforceNotIsolatedCaller("startService");
         enforceAllowedToStartOrBindServiceIfSdkSandbox(service);
@@ -13962,7 +13967,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @Override
     public int stopService(IApplicationThread caller, Intent service,
-            String resolvedType, int userId) {
+            String resolvedType, @CanBeCURRENT @UserIdInt int userId) {
         return stopService(caller, service, resolvedType, userId, false /* isSdkSandboxService */,
                 INVALID_UID, null, null);
     }
@@ -14126,7 +14131,8 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     public int bindServiceInstance(IApplicationThread caller, IBinder token, Intent service,
             String resolvedType, IServiceConnection connection, long flags, String instanceName,
-            String callingPackage, int userId) throws TransactionTooLargeException {
+            String callingPackage,
+            @CanBeCURRENT @UserIdInt int userId) throws TransactionTooLargeException {
         return bindServiceInstance(caller, token, service, resolvedType, connection, flags,
                 instanceName, false, INVALID_UID, null, null, callingPackage, userId);
     }
@@ -14544,7 +14550,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     public Intent registerReceiverWithFeature(IApplicationThread caller, String callerPackage,
             String callerFeatureId, String receiverId, IIntentReceiver receiver,
-            IntentFilter filter, String permission, int userId, int flags) {
+            IntentFilter filter, String permission,  @CanBeALL @CanBeCURRENT @UserIdInt int userId,
+            int flags) {
         return mBroadcastController.registerReceiverWithFeature(caller, callerPackage,
                 callerFeatureId, receiverId, receiver, filter, permission, userId, flags);
     }
@@ -14581,7 +14588,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             Intent intent, String resolvedType, IIntentReceiver resultTo,
             int resultCode, String resultData, Bundle resultExtras,
             String[] requiredPermissions, int appOp, Bundle bOptions,
-            boolean serialized, boolean sticky, int userId) {
+            boolean serialized, boolean sticky, @CanBeALL @CanBeCURRENT @UserIdInt int userId) {
         return broadcastIntentWithFeature(caller, null, intent, resolvedType, resultTo, resultCode,
                 resultData, resultExtras, requiredPermissions, null, null, appOp, bOptions,
                 serialized, sticky, userId);
@@ -14593,7 +14600,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             int resultCode, String resultData, Bundle resultExtras,
             String[] requiredPermissions, String[] excludedPermissions,
             String[] excludedPackages, int appOp, Bundle bOptions,
-            boolean serialized, boolean sticky, int userId) {
+            boolean serialized, boolean sticky, @CanBeALL @CanBeCURRENT @UserIdInt int userId) {
         return mBroadcastController.broadcastIntentWithFeature(caller, callingFeatureId, intent,
                 resolvedType, resultTo, resultCode, resultData, resultExtras, requiredPermissions,
                 excludedPermissions, excludedPackages, appOp, bOptions, serialized, sticky, userId);
@@ -16382,13 +16389,13 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @Nullable
     @Override
-    public String getSwitchingFromUserMessage(@UserIdInt int userId) {
+    public String getSwitchingFromUserMessage(@CannotBeSpecialUser @UserIdInt int userId) {
         return mUserController.getSwitchingFromUserMessage(userId);
     }
 
     @Nullable
     @Override
-    public String getSwitchingToUserMessage(@UserIdInt int userId) {
+    public String getSwitchingToUserMessage(@CannotBeSpecialUser @UserIdInt int userId) {
         return mUserController.getSwitchingToUserMessage(userId);
     }
 
@@ -17437,8 +17444,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public int broadcastIntent(Intent intent,
                 IIntentReceiver resultTo,
-                String[] requiredPermissions,
-                boolean serialized, int userId, int[] appIdAllowList,
+                String[] requiredPermissions, boolean serialized,
+                @CanBeALL @CanBeCURRENT @UserIdInt int userId, int[] appIdAllowList,
                 @Nullable BiFunction<Integer, Bundle, Bundle> filterExtrasForReceiver,
                 @Nullable Bundle bOptions) {
             synchronized (ActivityManagerService.this) {
@@ -17468,7 +17475,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         public int broadcastIntentWithCallback(Intent intent,
                 IIntentReceiver resultTo,
                 String[] requiredPermissions,
-                int userId, int[] appIdAllowList,
+                @CanBeALL @CanBeCURRENT @UserIdInt int userId, int[] appIdAllowList,
                 @Nullable BiFunction<Integer, Bundle, Bundle> filterExtrasForReceiver,
                 @Nullable Bundle bOptions) {
             return broadcastIntent(intent, resultTo, requiredPermissions, false /* serialized */,

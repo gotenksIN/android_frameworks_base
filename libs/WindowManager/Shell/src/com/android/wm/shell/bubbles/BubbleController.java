@@ -19,6 +19,7 @@ package com.android.wm.shell.bubbles;
 import static android.service.notification.NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_DELETED;
 import static android.service.notification.NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_UPDATED;
 import static android.service.notification.NotificationListenerService.REASON_CANCEL;
+import static android.view.Display.INVALID_DISPLAY;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
@@ -1592,7 +1593,11 @@ public class BubbleController implements ConfigurationChangeListener,
             mBubbleData.setSelectedBubbleAndExpandStack(b, updateLocation);
         } else {
             b.enable(Notification.BubbleMetadata.FLAG_AUTO_EXPAND_BUBBLE);
-            inflateAndAdd(b, /* suppressFlyout= */ true, /* showInShade= */ false, updateLocation);
+
+            ensureBubbleViewsAndWindowCreated();
+            mBubbleTransitions.startLaunchIntoOrConvertToBubble(b, mExpandedViewManager,
+                    mBubbleTaskViewFactory, mBubblePositioner, mStackView, mLayerView,
+                    mBubbleIconFactory, mInflateSynchronously);
         }
     }
 
@@ -2628,6 +2633,23 @@ public class BubbleController implements ConfigurationChangeListener,
     }
 
     /**
+     * Returns the id of the display to which the current Bubble view is attached if it is currently
+     * showing, {@link INVALID_DISPLAY} otherwise.
+     */
+    @VisibleForTesting
+    public int getCurrentViewDisplayId() {
+        if (isShowingAsBubbleBar() && mLayerView != null && mLayerView.getDisplay() != null) {
+            return mLayerView.getDisplay().getDisplayId();
+        }
+
+        if (!isShowingAsBubbleBar() && mStackView != null && mStackView.getDisplay() != null) {
+            return mStackView.getDisplay().getDisplayId();
+        }
+
+        return INVALID_DISPLAY;
+    }
+
+    /**
      * Check if notification panel is in an expanded state.
      * Makes a call to System UI process and delivers the result via {@code callback} on the
      * WM Shell main thread.
@@ -3363,13 +3385,7 @@ public class BubbleController implements ConfigurationChangeListener,
             if (tinfo == null) {
                 return;
             }
-            Bubble bub = null;
-            for (Bubble b : mBubbleData.getBubbles()) {
-                if (b.getTaskId() == tinfo.taskId) {
-                    bub = b;
-                    break;
-                }
-            }
+            Bubble bub = mBubbleData.getBubbleInStackWithTaskId(tinfo.taskId);
             if (bub == null) {
                 return;
             }

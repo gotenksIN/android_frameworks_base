@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package com.android.systemui.scene.domain.model
+package com.android.systemui.lowlight
 
-/** Enumerates the type of tooltip to show. */
-enum class DualShadeEducationalTooltipModel {
-    None,
-    ForNotificationsShade,
-    ForQuickSettingsShade,
-}
+import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.lowlightclock.AmbientLightModeMonitor
+
+val Kosmos.ambientLightModeMonitor: AmbientLightModeMonitor by
+    Kosmos.Fixture { FakeAmbientLightModeMonitor() }

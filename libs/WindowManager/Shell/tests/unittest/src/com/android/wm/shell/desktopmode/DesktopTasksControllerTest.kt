@@ -7532,6 +7532,22 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun moveTaskToDesktop_noDefaultDesktop_createsImmediateDesk() {
+        val task = setUpFreeformTask()
+        val wct = WindowContainerTransaction()
+        taskRepository.removeDesk(deskId = 0) // Remove the default desk.
+
+        controller.moveTaskToDefaultDeskAndActivate(
+            taskId = task.taskId,
+            wct = wct,
+            transitionSource = UNKNOWN,
+        )
+
+        verify(desksOrganizer).createDeskImmediate(eq(DEFAULT_DISPLAY), any())
+    }
+
+    @Test
     fun handleRequest_freeformLaunchToDesktop_attemptsImmersiveExit() {
         markTaskVisible(setUpFreeformTask())
         val task = setUpFreeformTask()
@@ -7554,6 +7570,44 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         verify(mMockDesktopImmersiveController)
             .exitImmersiveIfApplicable(eq(binder), any(), eq(task.displayId), any())
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_homeTask_notHandled() {
+        val home = createHomeTask(DEFAULT_DISPLAY)
+
+        val transition = Binder()
+        val result = controller.handleRequest(transition, createTransition(home))
+
+        assertNull(result)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_homeTask_activeDesk_deactivates() {
+        taskRepository.setActiveDesk(DEFAULT_DISPLAY, deskId = 0)
+        val home = createHomeTask(DEFAULT_DISPLAY)
+
+        val transition = Binder()
+        val result = controller.handleRequest(transition, createTransition(home))
+
+        assertNotNull(result)
+        verify(desksOrganizer).deactivateDesk(result, deskId = 0)
+        verify(desksTransitionsObserver)
+            .addPendingTransition(DeskTransition.DeactivateDesk(token = transition, deskId = 0))
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_homeTask_closing_notHandled() {
+        taskRepository.setActiveDesk(DEFAULT_DISPLAY, deskId = 0)
+        val home = createHomeTask(DEFAULT_DISPLAY)
+
+        val transition = Binder()
+        val result = controller.handleRequest(transition, createTransition(home, TRANSIT_CLOSE))
+
+        assertNull(result)
     }
 
     @Test

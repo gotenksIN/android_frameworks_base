@@ -44,9 +44,6 @@ import java.util.function.BooleanSupplier;
  */
 public enum DesktopExperienceFlags {
     // go/keep-sorted start
-    ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS(
-            Flags::activityEmbeddingSupportForConnectedDisplays, true,
-            Flags.FLAG_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS),
     BASE_DENSITY_FOR_EXTERNAL_DISPLAYS(
             com.android.server.display.feature.flags.Flags::baseDensityForExternalDisplays, true,
             com.android.server.display.feature.flags.Flags.FLAG_BASE_DENSITY_FOR_EXTERNAL_DISPLAYS),
@@ -54,6 +51,9 @@ public enum DesktopExperienceFlags {
             com.android.input.flags.Flags.FLAG_CONNECTED_DISPLAYS_CURSOR),
     DISPLAY_TOPOLOGY(com.android.server.display.feature.flags.Flags::displayTopology, true,
             com.android.server.display.feature.flags.Flags.FLAG_DISPLAY_TOPOLOGY),
+    ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS(
+            Flags::enableActivityEmbeddingSupportForConnectedDisplays, true,
+            Flags.FLAG_ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS),
     ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY(Flags::enableBugFixesForSecondaryDisplay, true,
             Flags.FLAG_ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY),
     ENABLE_CONNECTED_DISPLAYS_DND(Flags::enableConnectedDisplaysDnd, true,
@@ -64,6 +64,8 @@ public enum DesktopExperienceFlags {
             android.app.Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WALLPAPER),
     ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG(Flags::enableConnectedDisplaysWindowDrag, true,
             Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG),
+    ENABLE_DESKTOP_APP_LAUNCH_BUGFIX(Flags::enableDesktopAppLaunchBugfix, false,
+            Flags.FLAG_ENABLE_DESKTOP_APP_LAUNCH_BUGFIX),
     ENABLE_DESKTOP_CLOSE_TASK_ANIMATION_IN_DTC_BUGFIX(
             Flags::enableDesktopCloseTaskAnimationInDtcBugfix, false,
             Flags.FLAG_ENABLE_DESKTOP_CLOSE_TASK_ANIMATION_IN_DTC_BUGFIX),
@@ -93,6 +95,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS),
+    ENABLE_INDEPENDENT_BACK_IN_PROJECTED(Flags::enableIndependentBackInProjected, false,
+            Flags.FLAG_ENABLE_INDEPENDENT_BACK_IN_PROJECTED),
     ENABLE_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS(Flags::keyboardShortcutsToSwitchDesks, false,
             Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS),
     ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT(Flags::enableMoveToNextDisplayShortcut, true,

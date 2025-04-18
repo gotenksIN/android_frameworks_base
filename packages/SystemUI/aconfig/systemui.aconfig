@@ -481,6 +481,13 @@ flag {
 }
 
 flag {
+  name: "status_bar_system_status_icons_in_compose"
+  namespace: "systemui"
+  description: "Use compose for displaying icons in the status bar system status area"
+  bug: "406922954"
+}
+
+flag {
     name: "status_bar_swipe_over_chip"
     namespace: "systemui"
     description: "Allow users to swipe over the status bar chip to open the shade"
@@ -2232,4 +2239,11 @@ flag {
     description: "Use AAD proximity sensor if flag is enabled and sensor is present"
     bug: "402534470"
     is_fixed_read_only: true
+}
+
+flag {
+    name: "qs_wifi_config"
+    namespace: "desktop_connectivity"
+    description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
+    bug: "406548883"
 }

@@ -208,8 +208,8 @@ public class TextLayout extends LayoutManager implements VariableSupport, Access
             context.setGraphicsLayer(mCachedAttributes);
         }
         mComponentModifiers.paint(context);
-        float tx = mPaddingLeft + getScrollX();
-        float ty = mPaddingTop + getScrollY();
+        float tx = mPaddingLeft;
+        float ty = mPaddingTop;
         context.translate(tx, ty);
 
         //////////////////////////////////////////////////////////

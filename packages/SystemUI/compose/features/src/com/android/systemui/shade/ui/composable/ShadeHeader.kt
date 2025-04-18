@@ -608,12 +608,10 @@ private fun ShadeCarrierGroupKairos(
                                 logger = iconsViewModel.logger,
                                 slot = "mobile_carrier_shade_group",
                                 viewModel =
-                                    buildSpec {
-                                        ShadeCarrierGroupMobileIconViewModelKairos(
-                                            icon,
-                                            icon.iconInteractor,
-                                        )
-                                    },
+                                    ShadeCarrierGroupMobileIconViewModelKairos(
+                                        icon,
+                                        icon.iconInteractor,
+                                    ),
                                 scope = scope,
                                 subscriptionId = subId,
                                 location = StatusBarLocation.SHADE_CARRIER_GROUP,
@@ -667,6 +665,7 @@ private fun ContentScope.StatusIcons(
 
     val chipHighlight = viewModel.quickSettingsChipHighlight
 
+    // TODO(408001821): Use composable system status icons here instead.
     AndroidView(
         factory = { context ->
             iconManager.setTint(primaryColor, inverseColor)

@@ -2081,6 +2081,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="media_seamless_other_device">Other device</string>
 
+    <!-- Text on media control when there is a suggested device for playback. [CHAR LIMIT=30] -->
+    <string name="media_suggestion_disconnected_text">Play on <xliff:g id = "device_name" example="Living room speaker">%s</xliff:g></string>
+
+    <!-- Text on media control when connecting to a suggested device. [CHAR LIMIT=30] -->
+    <string name="media_suggestion_failure_text">Can\'t connect. Try again.</string>
+
     <!-- QuickStep: Accessibility to toggle overview [CHAR LIMIT=40] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -6400,4 +6406,16 @@
 
     <!-- Description for the Underlay close button. The Underlay view appears on the bottom of the screen and shows some AI hints. The button will dismiss the underlay view. [CHAR LIMIT=NONE] -->
     <string name="underlay_close_button_content_description">Close</string>
+
+    <!--
+    Content of user education tooltip shown to teach the user that they can swipe down from the top
+    left edge of the display to expand the notification shade panel.
+    -->
+    <string name="dual_shade_educational_tooltip_notifs">Swipe from the top left to open Notifications</string>
+
+    <!--
+    Content of user education tooltip shown to teach the user that they can swipe down from the top
+    right edge of the display to expand the Quick Settings shade panel.
+    -->
+    <string name="dual_shade_educational_tooltip_qs">Swipe from the top right to open Quick Settings</string>
 </resources>

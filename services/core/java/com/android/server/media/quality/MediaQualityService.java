@@ -42,6 +42,7 @@ import android.hardware.tv.mediaquality.SoundParameter;
 import android.hardware.tv.mediaquality.SoundParameters;
 import android.hardware.tv.mediaquality.StreamStatus;
 import android.hardware.tv.mediaquality.VendorParamCapability;
+import android.hardware.tv.mediaquality.VendorParameterIdentifier;
 import android.media.quality.ActiveProcessingPicture;
 import android.media.quality.AmbientBacklightEvent;
 import android.media.quality.AmbientBacklightMetadata;
@@ -1053,10 +1054,45 @@ public class MediaQualityService extends SystemService {
                 Slog.e(TAG, "Failed to get parameter capabilities", e);
             }
 
-            return getListParameterCapability(caps);
+            //Handle vendor parameter capability.
+            MediaQualityUtils.getVendorParamsByRemovePreDefineParams(names);
+            int namesCount = names.size();
+            VendorParamCapability[] vendorParamCapabilities =
+                    new VendorParamCapability[namesCount];
+            if (!names.isEmpty()) {
+                List<VendorParameterIdentifier> vendorParamIdentifiersList = new ArrayList<>();
+                for (String name: names) {
+                    DefaultExtension vendorParamCapDefaultExtension = new DefaultExtension();
+                    Parcel vendorParamCapParcel = Parcel.obtain();
+                    vendorParamCapParcel.writeString(name);
+                    vendorParamCapDefaultExtension.bytes = vendorParamCapParcel.marshall();
+
+                    VendorParameterIdentifier vendorParamIdentifier =
+                            new VendorParameterIdentifier();
+                    vendorParamIdentifier.identifier.setParcelable(vendorParamCapDefaultExtension);
+                    vendorParamIdentifiersList.add(vendorParamIdentifier);
+                    vendorParamCapParcel.recycle();
+                }
+
+                VendorParameterIdentifier[] vendorParamIdentifierArray =
+                        new VendorParameterIdentifier[namesCount];
+                for (int i = 0; i < namesCount; i++) {
+                    vendorParamIdentifierArray[i] = vendorParamIdentifiersList.get(i);
+                }
+
+                try {
+                    mMediaQuality.getVendorParamCaps(
+                            vendorParamIdentifierArray, vendorParamCapabilities);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to get vendor parameter capabilities", e);
+                }
+            }
+
+            return getParameterCapabilityList(caps, vendorParamCapabilities);
         }
 
-        private List<ParameterCapability> getListParameterCapability(ParamCapability[] caps) {
+        private List<ParameterCapability> getParameterCapabilityList(
+                ParamCapability[] caps, VendorParamCapability[] vendorParamCaps) {
             List<ParameterCapability> pcList = new ArrayList<>();
 
             if (caps != null) {
@@ -1068,6 +1104,27 @@ public class MediaQualityService extends SystemService {
                         Bundle bundle = MediaQualityUtils.convertToCaps(type, pcHal.range);
 
                         pcList.add(new ParameterCapability(name, isSupported, type, bundle));
+                    }
+                }
+            }
+
+            if (vendorParamCaps != null) {
+                for (VendorParamCapability vpcHal : vendorParamCaps) {
+                    if (vpcHal != null) {
+                        String name = MediaQualityUtils.getVendorParameterName(vpcHal);
+                        boolean isSupported = vpcHal.isSupported;
+                        // The default value for VendorParamCapability in HAL is IntValue = 0,
+                        // LongValue = 1, DoubleValue = 2, StringValue = 3. The default value for
+                        // ParameterCapability in the framework is None = 0, IntValue = 1,
+                        // LongValue = 2, DoubleValue = 3, StringValue = 4. So +1 here to map the
+                        // default value in HAL with framework.
+                        int type = vpcHal.defaultValue
+                                == null ? 0 : vpcHal.defaultValue.getTag() + 1;
+                        Bundle paramRangeBundle = MediaQualityUtils.convertToCaps(
+                                type, vpcHal.range);
+                        MediaQualityUtils.convertToVendorCaps(vpcHal, paramRangeBundle);
+                        pcList.add(new ParameterCapability(
+                                name, isSupported, type, paramRangeBundle));
                     }
                 }
             }
@@ -1541,17 +1598,8 @@ public class MediaQualityService extends SystemService {
         }
 
         private void notifyOnPictureProfileParameterCapabilitiesChanged(Long profileId,
-                ParamCapability[] caps, int uid, int pid) {
+                List<ParameterCapability> paramCaps, int uid, int pid) {
             String uuid = mPictureProfileTempIdMap.getValue(profileId);
-            List<ParameterCapability> paramCaps = new ArrayList<>();
-            for (ParamCapability cap: caps) {
-                String name = MediaQualityUtils.getParameterName(cap.name);
-                boolean isSupported = cap.isSupported;
-                int type = cap.defaultValue == null ? 0 : cap.defaultValue.getTag() + 1;
-                Bundle bundle = MediaQualityUtils.convertToCaps(type, cap.range);
-
-                paramCaps.add(new ParameterCapability(name, isSupported, type, bundle));
-            }
             notifyPictureProfileHelper(ProfileModes.PARAMETER_CAPABILITY_CHANGED, uuid,
                     null, null, paramCaps , uid, pid);
         }
@@ -1826,14 +1874,41 @@ public class MediaQualityService extends SystemService {
         @Override
         public void onParamCapabilityChanged(long pictureProfileId, ParamCapability[] caps)
                 throws RemoteException {
+            List<ParameterCapability> paramCaps = new ArrayList<>();
+            for (ParamCapability cap: caps) {
+                String name = MediaQualityUtils.getParameterName(cap.name);
+                boolean isSupported = cap.isSupported;
+                //Reason for +1: please see getListParameterCapability()
+                int type = cap.defaultValue == null ? 0 : cap.defaultValue.getTag() + 1;
+                Bundle bundle = MediaQualityUtils.convertToCaps(type, cap.range);
+
+                paramCaps.add(new ParameterCapability(name, isSupported, type, bundle));
+            }
             mMqManagerNotifier.notifyOnPictureProfileParameterCapabilitiesChanged(
-                    pictureProfileId, caps, Binder.getCallingUid(), Binder.getCallingPid());
+                    pictureProfileId, paramCaps, Binder.getCallingUid(), Binder.getCallingPid());
         }
 
         @Override
         public void onVendorParamCapabilityChanged(long pictureProfileId,
                 VendorParamCapability[] caps) throws RemoteException {
-            // TODO
+            List<ParameterCapability> vendorParamCaps = new ArrayList<>();
+            for (VendorParamCapability vpcHal: caps) {
+                String name = MediaQualityUtils.getVendorParameterName(vpcHal);
+                boolean isSupported = vpcHal.isSupported;
+                //Reason for +1: please see getListParameterCapability()
+                int type = vpcHal.defaultValue
+                        == null ? 0 : vpcHal.defaultValue.getTag() + 1;
+                Bundle paramRangeBundle = MediaQualityUtils.convertToCaps(
+                        type, vpcHal.range);
+                MediaQualityUtils.convertToVendorCaps(vpcHal, paramRangeBundle);
+                vendorParamCaps.add(new ParameterCapability(
+                        name, isSupported, type, paramRangeBundle));
+            }
+            mMqManagerNotifier.notifyOnPictureProfileParameterCapabilitiesChanged(
+                    pictureProfileId,
+                    vendorParamCaps,
+                    Binder.getCallingUid(),
+                    Binder.getCallingPid());
         }
 
         @Override

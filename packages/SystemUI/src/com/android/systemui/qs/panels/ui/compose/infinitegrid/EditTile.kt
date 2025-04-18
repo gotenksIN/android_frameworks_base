@@ -58,6 +58,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -120,6 +121,7 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -191,6 +193,7 @@ object TileType
 @Composable
 private fun EditModeTopBar(
     onStopEditing: () -> Unit,
+    modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val surfaceEffect2 = LocalAndroidColorScheme.current.surfaceEffect2
@@ -221,7 +224,8 @@ private fun EditModeTopBar(
             }
         },
         actions = actions,
-        modifier = Modifier.padding(vertical = 8.dp),
+        modifier = modifier.padding(vertical = 8.dp),
+        windowInsets = WindowInsets(0.dp),
     )
 }
 
@@ -263,7 +267,7 @@ fun DefaultEditTileGrid(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            EditModeTopBar(onStopEditing = onStopEditing) {
+            EditModeTopBar(onStopEditing = onStopEditing, modifier = Modifier.statusBarsPadding()) {
                 AnimatedVisibility(snapshotViewModel.canUndo, enter = fadeIn(), exit = fadeOut()) {
                     TextButton(
                         enabled = snapshotViewModel.canUndo,
@@ -834,7 +838,7 @@ private fun TileGridCell(
                 coroutineScope.launch { resizingState.toggleCurrentValue() }
             }
         },
-        onClickLabel = decorationClickLabel,
+        contentDescription = decorationClickLabel,
     ) {
         val placeableColor = MaterialTheme.colorScheme.primary.copy(alpha = .4f)
         val backgroundColor by
@@ -857,7 +861,7 @@ private fun TileGridCell(
 
         Box(
             Modifier.fillMaxSize()
-                .semantics(mergeDescendants = true) {
+                .clearAndSetSemantics {
                     this.stateDescription = stateDescription
                     contentDescription = cell.tile.label.text
                     customActions =
@@ -922,6 +926,10 @@ private fun AvailableTileGridCell(
 
     val alpha by animateFloatAsState(if (cell.isCurrent) .38f else 1f)
     val colors = EditModeTileDefaults.editTileColors()
+    val onClick: () -> Unit = {
+        onAddTile(cell.tileSpec)
+        selectionState.select(cell.tileSpec)
+    }
 
     // Displays the tile as an icon tile with the label underneath
     Column(
@@ -930,9 +938,8 @@ private fun AvailableTileGridCell(
         modifier =
             modifier
                 .graphicsLayer { this.alpha = alpha }
-                .semantics(mergeDescendants = true) {
-                    stateDescription?.let { this.stateDescription = it }
-                },
+                .clickable(enabled = !cell.isCurrent, onClick = onClick)
+                .semantics { stateDescription?.let { this.stateDescription = it } },
     ) {
         Box(Modifier.fillMaxWidth().height(TileHeight)) {
             val draggableModifier =
@@ -947,22 +954,13 @@ private fun AvailableTileGridCell(
                         selectionState.unSelect()
                     }
                 }
-            val onClick: () -> Unit = {
-                onAddTile(cell.tileSpec)
-                selectionState.select(cell.tileSpec)
-            }
-            Box(
-                draggableModifier
-                    .fillMaxSize()
-                    .clickable(enabled = !cell.isCurrent, onClick = onClick)
-                    .tileBackground { colors.background }
-            ) {
+            Box(draggableModifier.fillMaxSize().tileBackground { colors.background }) {
                 // Icon
                 SmallTileContent(
                     iconProvider = { cell.icon },
                     color = colors.icon,
                     animateToEnd = true,
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier.align(Alignment.Center).clearAndSetSemantics {},
                 )
             }
 

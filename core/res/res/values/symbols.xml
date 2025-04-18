@@ -2110,7 +2110,6 @@
   <java-symbol type="bool" name="config_supportLongPressPowerWhenNonInteractive" />
   <java-symbol type="bool" name="config_supportShortPressPowerWhenDefaultDisplayOn" />
   <java-symbol type="bool" name="config_wimaxEnabled" />
-  <java-symbol type="bool" name="show_ongoing_ime_switcher" />
   <java-symbol type="color" name="config_defaultNotificationColor" />
   <java-symbol type="color" name="decor_view_status_guard" />
   <java-symbol type="color" name="decor_view_status_guard_light" />
@@ -5884,6 +5883,9 @@
   <!-- Whether a desktop window should be maximized when it's dragged to the top edge of the
        screen. -->
   <java-symbol type="bool" name="config_dragToMaximizeInDesktopMode" />
+
+  <!-- Whether the home screen should be shown behind freeform tasks in desktop mode. -->
+  <java-symbol type="bool" name="config_showHomeBehindDesktop" />
 
   <!-- Frame rate compatibility value for Wallpaper -->
   <java-symbol type="integer" name="config_wallpaperFrameRateCompatibility" />

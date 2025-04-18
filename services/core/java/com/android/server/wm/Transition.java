@@ -1310,7 +1310,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
         if (!chain.isFinishing()) {
             throw new IllegalStateException("Can't finish on a non-finishing transition "
-                    + chain.mTransition);
+                    + chain.getTransition());
         }
         mLogger.mFinishTimeNs = SystemClock.elapsedRealtimeNanos();
         mController.mLoggerHandler.post(mLogger::logOnFinish);
@@ -2307,6 +2307,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mFinishTransaction.apply();
         }
         mController.finishTransition(mController.mAtm.mChainTracker.startFinish("clean-up", this));
+        mController.mAtm.mChainTracker.endPartial();
     }
 
     private void cleanUpInternal() {

@@ -782,6 +782,11 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             String opPackageName,
             int uid,
             int pid) {
+
+        if (MediaRouter2ServiceImpl.maybeHandleVolumeKeyEvent(TAG, direction, stream)) {
+            return;
+        }
+
         try {
             if (useSuggested) {
                 if (AudioSystem.isStreamActive(stream, 0)) {
@@ -1260,6 +1265,19 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             if (metadata == null) {
                 return null;
             }
+
+            // Check if there are URIs to sanitize
+            boolean hasUris = false;
+            for (String key : ART_URIS) {
+                if (metadata.containsKey(key)) {
+                    hasUris = true;
+                    break;
+                }
+            }
+            if (!hasUris) {
+                return metadata;
+            }
+
             MediaMetadata.Builder metadataBuilder = new MediaMetadata.Builder(metadata);
             for (String key: ART_URIS) {
                 String uriString = metadata.getString(key);

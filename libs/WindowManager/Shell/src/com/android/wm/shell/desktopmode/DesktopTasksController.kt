@@ -683,6 +683,15 @@ class DesktopTasksController(
             return false
         }
         val displayId = getDisplayIdForTaskOrDefault(task)
+        if (
+            DesktopExperienceFlags.ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE.isTrue &&
+                !desktopState.isDesktopModeSupportedOnDisplay(displayId) &&
+                transitionSource != DesktopModeTransitionSource.ADB_COMMAND &&
+                transitionSource != DesktopModeTransitionSource.APP_FROM_OVERVIEW
+        ) {
+            logW("moveTaskToDefaultDeskAndActivate display=$displayId does not support desk")
+            return false
+        }
         if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             val deskId = getOrCreateDefaultDeskId(displayId) ?: return false
             return moveTaskToDesk(
@@ -1016,7 +1025,7 @@ class DesktopTasksController(
                 taskRepository.isOnlyVisibleNonClosingTask(taskId = taskId, displayId = displayId)
             }
         val isMinimizingToPip =
-            DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue &&
+            DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue &&
                 (taskInfo.pictureInPictureParams?.isAutoEnterEnabled ?: false)
 
         // If task is going to PiP, start a PiP transition instead of a minimize transition

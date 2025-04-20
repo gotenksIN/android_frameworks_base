@@ -1001,16 +1001,6 @@ flag {
 }
 
 flag {
-    name: "bind_keyguard_media_visibility"
-    namespace: "systemui"
-    description: "Binds Keyguard Media Controller Visibility to MediaContainerView"
-    bug: "298213983"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "use_notif_inflation_thread_for_footer"
     namespace: "systemui"
     description: "use the @NotifInflation thread for FooterView and EmptyShadeView inflation"
@@ -1351,16 +1341,6 @@ flag {
 }
 
 flag {
-  name: "media_controls_umo_inflation_in_background"
-  namespace: "systemui"
-  description: "Inflate UMO in background thread"
-  bug: "368514198"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "media_controls_ui_update"
   namespace: "systemui"
   description: "Enables media visuals update"
@@ -1599,16 +1579,6 @@ flag {
     bug: "346882515"
     metadata {
         purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "face_message_defer_update"
-    namespace: "systemui"
-    description: "Only analyze the last n frames when determining whether to defer a face auth help message like low light"
-    bug: "351863611"
-    metadata {
-      purpose: PURPOSE_BUGFIX
     }
 }
 

@@ -1546,7 +1546,7 @@ class DesktopTasksController(
 
         val activationRunnable = addDeskActivationChanges(destinationDeskId, wct, task)
 
-        if (Flags.enableDisplayFocusInShellTransitions()) {
+        if (DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue) {
             // Bring the destination display to top with includingParents=true, so that the
             // destination display gains the display focus, which makes the top task in the display
             // gains the global focus.
@@ -3085,6 +3085,10 @@ class DesktopTasksController(
         }
         if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             wct.reparent(taskInfo.token, tdaInfo.token, /* onTop= */ true)
+        } else if (com.android.launcher3.Flags.enableAltTabKqsFlatenning()) {
+            // Until multiple desktops is enabled, we still want to reorder the task to top so that
+            // if the task is not on top we can still switch to it using Alt+Tab.
+            wct.reorder(taskInfo.token, /* onTop= */ true)
         }
 
         val deskId =

@@ -47,8 +47,10 @@ import com.android.wm.shell.desktopmode.DesktopPipTransitionController;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler;
+import com.android.wm.shell.pip2.PipSurfaceTransactionHelper;
 import com.android.wm.shell.pip2.phone.PhonePipMenuController;
 import com.android.wm.shell.pip2.phone.PipController;
+import com.android.wm.shell.pip2.phone.PipDisplayTransferHandler;
 import com.android.wm.shell.pip2.phone.PipInteractionHandler;
 import com.android.wm.shell.pip2.phone.PipMotionHelper;
 import com.android.wm.shell.pip2.phone.PipScheduler;
@@ -133,6 +135,7 @@ public abstract class Pip2Module {
             PipAppOpsListener pipAppOpsListener,
             PhonePipMenuController pipMenuController,
             PipUiEventLogger pipUiEventLogger,
+            PipSurfaceTransactionHelper pipSurfaceTransactionHelper,
             @ShellMainThread ShellExecutor mainExecutor) {
         if (!PipUtils.isPip2ExperimentEnabled()) {
             return Optional.empty();
@@ -142,7 +145,7 @@ public abstract class Pip2Module {
                     displayInsetsController, pipBoundsState, pipBoundsAlgorithm,
                     pipDisplayLayoutState, pipScheduler, taskStackListener, shellTaskOrganizer,
                     pipTransitionState, pipTouchHandler, pipAppOpsListener, pipMenuController,
-                    pipUiEventLogger, mainExecutor));
+                    pipUiEventLogger, pipSurfaceTransactionHelper, mainExecutor));
         }
     }
 
@@ -196,12 +199,24 @@ public abstract class Pip2Module {
             FloatingContentCoordinator floatingContentCoordinator,
             PipUiEventLogger pipUiEventLogger,
             @ShellMainThread ShellExecutor mainExecutor,
-            Optional<PipPerfHintController> pipPerfHintControllerOptional) {
+            Optional<PipPerfHintController> pipPerfHintControllerOptional,
+            PipDisplayTransferHandler pipDisplayTransferHandler) {
         return new PipTouchHandler(context, shellInit, shellCommandHandler, menuPhoneController,
                 pipBoundsAlgorithm, pipBoundsState, pipTransitionState, pipScheduler,
                 sizeSpecSource, pipDisplayLayoutState, pipDesktopState, displayController,
                 pipMotionHelper, floatingContentCoordinator, pipUiEventLogger, mainExecutor,
-                pipPerfHintControllerOptional);
+                pipPerfHintControllerOptional, pipDisplayTransferHandler);
+    }
+
+    @WMSingleton
+    @Provides
+    static PipDisplayTransferHandler providePipDisplayTransferHandler(Context context,
+            PipTransitionState pipTransitionState,
+            PipScheduler pipScheduler, RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
+            PipBoundsState pipBoundsState, DisplayController displayController
+    ) {
+        return new PipDisplayTransferHandler(context, pipTransitionState, pipScheduler,
+                rootTaskDisplayAreaOrganizer, pipBoundsState, displayController);
     }
 
     @WMSingleton
@@ -287,5 +302,11 @@ public abstract class Pip2Module {
     ) {
         return new PipInteractionHandler(context, mainHandler,
                 InteractionJankMonitor.getInstance());
+    }
+
+    @WMSingleton
+    @Provides
+    static PipSurfaceTransactionHelper providePipSurfaceTransactionHelper(Context context) {
+        return new PipSurfaceTransactionHelper(context);
     }
 }

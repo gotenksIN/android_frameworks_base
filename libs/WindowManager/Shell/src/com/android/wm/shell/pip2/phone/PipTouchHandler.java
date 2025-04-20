@@ -23,7 +23,6 @@ import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.PIP_ST
 import static com.android.wm.shell.common.pip.PipBoundsState.STASH_TYPE_LEFT;
 import static com.android.wm.shell.common.pip.PipBoundsState.STASH_TYPE_NONE;
 import static com.android.wm.shell.common.pip.PipBoundsState.STASH_TYPE_RIGHT;
-import static com.android.wm.shell.pip.PipAnimationController.TRANSITION_DIRECTION_TO_PIP;
 import static com.android.wm.shell.pip2.phone.PhonePipMenuController.MENU_STATE_FULL;
 import static com.android.wm.shell.pip2.phone.PhonePipMenuController.MENU_STATE_NONE;
 import static com.android.wm.shell.pip2.phone.PipMenuView.ANIM_TYPE_NONE;
@@ -34,7 +33,6 @@ import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.Bundle;
@@ -50,7 +48,6 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
-import android.window.DesktopExperienceFlags;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
@@ -67,8 +64,6 @@ import com.android.wm.shell.common.pip.PipPerfHintController;
 import com.android.wm.shell.common.pip.PipUiEventLogger;
 import com.android.wm.shell.common.pip.PipUtils;
 import com.android.wm.shell.common.pip.SizeSpecSource;
-import com.android.wm.shell.pip.PipAnimationController;
-import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellInit;
 
@@ -91,6 +86,7 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
     private final Context mContext;
     private final ShellCommandHandler mShellCommandHandler;
     private final PipBoundsAlgorithm mPipBoundsAlgorithm;
+    private final PipDesktopState mPipDesktopState;
     @NonNull private final PipBoundsState mPipBoundsState;
     @NonNull private final PipTransitionState mPipTransitionState;
     @NonNull private final PipScheduler mPipScheduler;
@@ -195,7 +191,8 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
             FloatingContentCoordinator floatingContentCoordinator,
             PipUiEventLogger pipUiEventLogger,
             ShellExecutor mainExecutor,
-            Optional<PipPerfHintController> pipPerfHintControllerOptional) {
+            Optional<PipPerfHintController> pipPerfHintControllerOptional,
+            PipDisplayTransferHandler pipDisplayTransferHandler) {
         mContext = context;
         mShellCommandHandler = shellCommandHandler;
         mMainExecutor = mainExecutor;
@@ -203,6 +200,7 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
         mAccessibilityManager = context.getSystemService(AccessibilityManager.class);
         mPipBoundsAlgorithm = pipBoundsAlgorithm;
         mPipBoundsState = pipBoundsState;
+        mPipDesktopState = pipDesktopState;
 
         mPipTransitionState = pipTransitionState;
         mPipTransitionState.addPipTransitionStateChangedListener(this::onPipTransitionStateChanged);
@@ -215,6 +213,7 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
         mMenuController.addListener(new PipMenuListener());
         mGesture = new DefaultPipTouchGesture();
         mMotionHelper = pipMotionHelper;
+        mPipDisplayTransferHandler = pipDisplayTransferHandler;
         mPipScheduler.setUpdateMovementBoundsRunnable(this::updateMovementBounds);
         mPipDismissTargetHandler = new PipDismissTargetHandler(context, pipUiEventLogger,
                 mMotionHelper, mPipDisplayLayoutState, displayController, mainExecutor);
@@ -231,8 +230,6 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
                 pipBoundsState, mTouchState, mPipScheduler, mPipTransitionState, pipUiEventLogger,
                 menuController, this::getMovementBounds, mPipDisplayLayoutState, pipDesktopState,
                 mainExecutor, mPipPerfHintController);
-        mPipDisplayTransferHandler = new PipDisplayTransferHandler(mPipTransitionState,
-                mPipScheduler);
         mPipBoundsState.addOnAspectRatioChangedCallback(aspectRatio -> onAspectRatioChanged());
 
         mMoveOnShelVisibilityChanged = () -> {
@@ -303,11 +300,6 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
                 });
     }
 
-    public PipTransitionController getTransitionHandler() {
-        // return mPipTaskOrganizer.getTransitionController();
-        return null;
-    }
-
     private void reloadResources() {
         final Resources res = mContext.getResources();
         mBottomOffsetBufferPx = res.getDimensionPixelSize(R.dimen.pip_bottom_offset_buffer);
@@ -356,17 +348,6 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
         mPipInputConsumer.unregisterInputConsumer();
         mPipBoundsState.setHasUserMovedPip(false);
         mPipBoundsState.setHasUserResizedPip(false);
-    }
-
-    void onPinnedStackAnimationEnded(
-            @PipAnimationController.TransitionDirection int direction) {
-        // Always synchronize the motion helper bounds once PiP animations finish
-        mMotionHelper.synchronizePinnedStackBounds();
-        updateMovementBounds();
-        if (direction == TRANSITION_DIRECTION_TO_PIP) {
-            // Set the initial bounds as the user resize bounds.
-            mPipResizeGestureHandler.setUserResizeBounds(mPipBoundsState.getBounds());
-        }
     }
 
     void onConfigurationChanged() {
@@ -814,10 +795,11 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
      * Gesture controlling normal movement of the PIP.
      */
     private class DefaultPipTouchGesture extends PipTouchGesture {
-        private final Point mStartPosition = new Point();
         private final PointF mDelta = new PointF();
+        private final PointF mPointerPositionOnDown = new PointF();
         private int mDisplayIdOnDown;
         private boolean mShouldHideMenuAfterFling;
+        private final Rect mStartBounds = new Rect();
 
         @Nullable private PipPerfHintController.PipHighPerfSession mPipHighPerfSession;
 
@@ -846,9 +828,10 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
 
             Rect bounds = getPossiblyMotionBounds();
             mDelta.set(0f, 0f);
-            mStartPosition.set(bounds.left, bounds.top);
-            mMovementWithinDismiss = touchState.getDownTouchPosition().y
-                    >= mPipBoundsState.getMovementBounds().bottom;
+            mStartBounds.set(bounds);
+            final PointF touchPosition = touchState.getDownTouchPosition();
+            mPointerPositionOnDown.set(touchPosition.x, touchPosition.y);
+            mMovementWithinDismiss = touchPosition.y >= mPipBoundsState.getMovementBounds().bottom;
             mMotionHelper.setSpringingToTouch(false);
             mPipDismissTargetHandler.setTaskLeash(mPipTransitionState.getPinnedTaskLeash());
             mDisplayIdOnDown = touchState.getLastTouchDisplayId();
@@ -875,8 +858,8 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
 
                 // Move the pinned stack freely
                 final PointF lastDelta = touchState.getLastTouchDelta();
-                float lastX = mStartPosition.x + mDelta.x;
-                float lastY = mStartPosition.y + mDelta.y;
+                float lastX = mStartBounds.left + mDelta.x;
+                float lastY = mStartBounds.top + mDelta.y;
                 float left = lastX + lastDelta.x;
                 float top = lastY + lastDelta.y;
 
@@ -889,6 +872,14 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
                 mMotionHelper.movePip(mTmpBounds, true /* isDragging */);
 
                 final PointF curPos = touchState.getLastTouchPosition();
+
+                if (mPipDesktopState.isDraggingPipAcrossDisplaysEnabled()) {
+                    // Create mirrors on connected displays to simulate dragging PiP across displays
+                    mPipDisplayTransferHandler.showDragMirrorOnConnectedDisplays(mDisplayIdOnDown,
+                            touchState.getLastTouchDisplayId(), mPointerPositionOnDown, curPos,
+                            mStartBounds);
+                }
+
                 if (mMovementWithinDismiss) {
                     // Track if movement remains near the bottom edge to identify swipe to dismiss
                     mMovementWithinDismiss = curPos.y >= mPipBoundsState.getMovementBounds().bottom;
@@ -902,6 +893,9 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
         public boolean onUp(PipTouchState touchState) {
             mPipDismissTargetHandler.hideDismissTargetMaybe();
             mPipDismissTargetHandler.setTaskLeash(null);
+            if (mPipDesktopState.isDraggingPipAcrossDisplaysEnabled()) {
+                mPipDisplayTransferHandler.removeMirrors();
+            }
 
             if (!touchState.isUserInteracting()) {
                 return false;
@@ -932,7 +926,7 @@ public class PipTouchHandler implements PipTransitionState.PipTransitionStateCha
                         mPipBoundsState.setStashed(STASH_TYPE_NONE);
                     }
 
-                    if (DesktopExperienceFlags.ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS.isTrue()
+                    if (mPipDesktopState.isDraggingPipAcrossDisplaysEnabled()
                             && mDisplayIdOnDown != displayIdOnUp) {
                         mPipDisplayTransferHandler.scheduleMovePipToDisplay(mDisplayIdOnDown,
                                 displayIdOnUp);

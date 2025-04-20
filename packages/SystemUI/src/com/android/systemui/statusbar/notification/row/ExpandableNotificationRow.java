@@ -116,6 +116,7 @@ import com.android.systemui.statusbar.notification.NotificationFadeAware;
 import com.android.systemui.statusbar.notification.NotificationTransitionAnimatorController;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.SourceType;
+import com.android.systemui.statusbar.notification.collection.BundleEntryAdapter;
 import com.android.systemui.statusbar.notification.collection.EntryAdapter;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.PipelineEntry;
@@ -770,6 +771,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     @VisibleForTesting
     void updateShelfIconColor() {
         StatusBarIconView expandedIcon = getShelfIcon();
+        if (expandedIcon == null) {
+            // TODO(b/399736937) get shelf icon for bundle
+            return;
+        }
         boolean isPreL = Boolean.TRUE.equals(expandedIcon.getTag(R.id.icon_is_pre_L));
         boolean colorize = !isPreL || NotificationUtils.isGrayscale(expandedIcon,
                 ContrastColorUtil.getInstance(mContext));
@@ -1394,8 +1399,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
         if (mExpandedWhenPinned) {
             return Math.max(getMaxExpandHeight(), getHeadsUpHeight());
-        } else if (android.app.Flags.compactHeadsUpNotification()
-                && getShowingLayout().isHUNCompact()) {
+        } else if (getShowingLayout().isHUNCompact()) {
             return getHeadsUpHeight();
         } else if (atLeastMinHeight) {
             return Math.max(getCollapsedHeight(), getHeadsUpHeight());
@@ -1963,14 +1967,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                         mOnUserInteractionCallback, REASON_CANCEL)
                         : mOnUserInteractionCallback.registerFutureDismissal(
                                 getEntryLegacy(), REASON_CANCEL);
-                if (Flags.notificationReentrantDismiss()) {
-                    if (futureDismissal != null) {
-                        post(futureDismissal);
-                    }
-                } else {
-                    if (futureDismissal != null) {
-                        futureDismissal.run();
-                    }
+                if (futureDismissal != null) {
+                    post(futureDismissal);
                 }
             }
         }
@@ -2282,16 +2280,19 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mFalsingManager = falsingManager;
         mStatusBarStateController = statusBarStateController;
         mPeopleNotificationIdentifier = peopleNotificationIdentifier;
-        for (NotificationContentView l : mLayouts) {
-            l.initialize(
-                    mPeopleNotificationIdentifier,
-                    rivSubcomponentFactory,
-                    smartReplyConstants,
-                    smartReplyController,
-                    statusBarService,
-                    uiEventLogger
-            );
+        if (rivSubcomponentFactory != null) {
+            for (NotificationContentView l : mLayouts) {
+                l.initialize(
+                        mPeopleNotificationIdentifier,
+                        rivSubcomponentFactory,
+                        smartReplyConstants,
+                        smartReplyController,
+                        statusBarService,
+                        uiEventLogger
+                );
+            }
         }
+
         mOnUserInteractionCallback = onUserInteractionCallback;
         mNotificationGutsManager = gutsManager;
         mMetricsLogger = metricsLogger;

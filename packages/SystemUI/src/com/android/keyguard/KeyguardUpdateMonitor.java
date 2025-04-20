@@ -44,6 +44,7 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_DPM_LOCK_NOW;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_LOCKOUT;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
+import static com.android.systemui.Flags.fingerprintCancelRaceMitigation;
 import static com.android.systemui.Flags.glanceableHubV2;
 import static com.android.systemui.Flags.simPinBouncerReset;
 import static com.android.systemui.Flags.simPinUseSlotId;
@@ -279,13 +280,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     public static final int BIOMETRIC_HELP_FACE_NOT_RECOGNIZED = -2;
     public static final int BIOMETRIC_HELP_FACE_NOT_AVAILABLE = -3;
 
-    /**
-     * If no cancel signal has been received after this amount of time, set the biometric running
-     * state to stopped to allow Keyguard to retry authentication.
-     */
-    @VisibleForTesting
-    protected static final int DEFAULT_CANCEL_SIGNAL_TIMEOUT = 3000;
-
     private static final ComponentName FALLBACK_HOME_COMPONENT = new ComponentName(
             "com.android.settings", "com.android.settings.FallbackHome");
 
@@ -411,6 +405,12 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     @VisibleForTesting
     @DevicePostureInt
     protected int mConfigFaceAuthSupportedPosture;
+
+    /**
+     * If no cancel signal has been received after this amount of time, set the fingerprint running
+     * state to stopped to allow Keyguard to retry authentication.
+     */
+    private int mDefaultCancelSignalTimeout;
 
     private KeyguardBypassController mKeyguardBypassController;
     private List<SubscriptionInfo> mSubscriptionInfo;
@@ -2270,6 +2270,10 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
         mBiometricManager = biometricManager;
         mConfigFaceAuthSupportedPosture = mContext.getResources().getInteger(
                 R.integer.config_face_auth_supported_posture);
+        mDefaultCancelSignalTimeout = 3000;
+        if (fingerprintCancelRaceMitigation()) {
+            mDefaultCancelSignalTimeout = 5000;
+        }
         mFaceWakeUpTriggersConfig = faceWakeUpTriggersConfig;
         mAllowFingerprintOnOccludingActivitiesFromPackage = Arrays.stream(
                 mContext.getResources().getStringArray(
@@ -3261,7 +3265,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
                 mFingerprintCancelSignal.cancel();
                 mFingerprintCancelSignal = null;
                 mHandler.removeCallbacks(mFpCancelNotReceived);
-                mHandler.postDelayed(mFpCancelNotReceived, DEFAULT_CANCEL_SIGNAL_TIMEOUT);
+                mHandler.postDelayed(mFpCancelNotReceived, mDefaultCancelSignalTimeout);
             }
             setFingerprintRunningState(BIOMETRIC_STATE_CANCELLING);
         }
@@ -4391,6 +4395,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     @Override
     public void dump(@NonNull PrintWriter pw, @NonNull String[] args) {
         pw.println("KeyguardUpdateMonitor state:");
+        pw.println("  mDefaultCancelSignalTimeout=" + mDefaultCancelSignalTimeout);
         pw.println("  forceIsDismissible=" + mForceIsDismissible);
         pw.println("  forceIsDismissibleIsKeepingDeviceUnlocked="
                 + forceIsDismissibleIsKeepingDeviceUnlocked());

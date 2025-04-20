@@ -247,8 +247,10 @@ public class AudioSystem
     public static final int AUDIO_FORMAT_LC3            = 0x2B000000;
     /** @hide */
     public static final int AUDIO_FORMAT_OPUS           = 0x08000000;
-
     /** @hide */
+    public static final int AUDIO_FORMAT_OPUS_HI_RES    = 0x08000001;
+    /** @hide */
+
 // QTI_BEGIN: 2019-04-10: Audio: Add support for audio extended codecs
     public static final int AUDIO_FORMAT_CELT           = 0x26000000;
 // QTI_END: 2019-04-10: Audio: Add support for audio extended codecs
@@ -273,7 +275,8 @@ public class AudioSystem
             AUDIO_FORMAT_APTX_HD,
             AUDIO_FORMAT_LDAC,
             AUDIO_FORMAT_LC3,
-            AUDIO_FORMAT_OPUS
+            AUDIO_FORMAT_OPUS,
+            AUDIO_FORMAT_OPUS_HI_RES,
            }
     )
     @Retention(RetentionPolicy.SOURCE)
@@ -281,7 +284,10 @@ public class AudioSystem
 
     /** @hide */
     @IntDef(flag = false, prefix = "AUDIO_FORMAT_", value = {
-        AUDIO_FORMAT_LC3}
+        AUDIO_FORMAT_LC3,
+        AUDIO_FORMAT_OPUS,
+        AUDIO_FORMAT_OPUS_HI_RES,
+        }
     )
     @Retention(RetentionPolicy.SOURCE)
     public @interface AudioFormatNativeEnumForBtLeAudioCodec {}
@@ -295,6 +301,8 @@ public class AudioSystem
     @Retention(RetentionPolicy.SOURCE)
     public @interface BtOffloadDeviceType {}
 
+    //TODO b/396350294 : remove when BluetoothLeCodecConfig.SOURCE_CODEC_TYPE_OPUS_HI_RES is public
+    private static final int BLUETOOTH_LE_AUDIO_CODEC_CONFIG_SOURCE_CODEC_TYPE_OPUS_HI_RES = 2;
     /**
      * @hide
      * Convert audio format enum values to Bluetooth codec values
@@ -335,6 +343,9 @@ public class AudioSystem
             @AudioFormatNativeEnumForBtLeAudioCodec int audioFormat) {
         switch (audioFormat) {
             case AUDIO_FORMAT_LC3: return BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_LC3;
+            case AUDIO_FORMAT_OPUS: return BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_OPUS;
+            case AUDIO_FORMAT_OPUS_HI_RES:
+                return BLUETOOTH_LE_AUDIO_CODEC_CONFIG_SOURCE_CODEC_TYPE_OPUS_HI_RES;
             case VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA:
                    return BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE_LE;
             default:
@@ -393,6 +404,10 @@ public class AudioSystem
         switch (btCodec) {
             case BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_LC3:
                 return AudioSystem.AUDIO_FORMAT_LC3;
+            case BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_OPUS:
+                return AudioSystem.AUDIO_FORMAT_OPUS;
+            case AudioSystem.BLUETOOTH_LE_AUDIO_CODEC_CONFIG_SOURCE_CODEC_TYPE_OPUS_HI_RES:
+                return AudioSystem.AUDIO_FORMAT_OPUS_HI_RES;
             default:
                 Log.e(TAG, "Unknown LE Audio BT codec 0x" + Integer.toHexString(btCodec)
                         + " for conversion to audio format");
@@ -427,6 +442,8 @@ public class AudioSystem
                 return "AUDIO_FORMAT_VORBIS";
             case /* AUDIO_FORMAT_OPUS            */ 0x08000000:
                 return "AUDIO_FORMAT_OPUS";
+            case /* AUDIO_FORMAT_OPUS_HI_RES     */ 0x08000001:
+                return "AUDIO_FORMAT_OPUS_HI_RES";
             case /* AUDIO_FORMAT_AC3             */ 0x09000000:
                 return "AUDIO_FORMAT_AC3";
             case /* AUDIO_FORMAT_E_AC3           */ 0x0A000000:

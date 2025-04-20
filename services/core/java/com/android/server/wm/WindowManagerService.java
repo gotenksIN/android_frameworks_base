@@ -96,6 +96,7 @@ import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_MISSING_WINDOW;
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_NOT_VISIBLE_ON_SCREEN;
 import static android.view.flags.Flags.sensitiveContentAppProtection;
+import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 import static android.window.WindowProviderService.isWindowProviderService;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
@@ -152,7 +153,6 @@ import static com.android.server.wm.WindowManagerServiceDumpProto.POLICY;
 import static com.android.server.wm.WindowManagerServiceDumpProto.ROOT_WINDOW_CONTAINER;
 import static com.android.server.wm.WindowManagerServiceDumpProto.WINDOW_FRAMES_VALID;
 import static com.android.window.flags.Flags.enableDeviceStateAutoRotateSettingRefactor;
-import static com.android.window.flags.Flags.enableDisplayFocusInShellTransitions;
 import static com.android.window.flags.Flags.enablePresentationForConnectedDisplays;
 import static com.android.window.flags.Flags.multiCrop;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
@@ -3416,7 +3416,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 final ActionChain chain = mAtmService.mChainTracker.startTransit("dispToTop");
                 Transition transition = null;
                 boolean transitionNewlyCreated = false;
-                if (enableDisplayFocusInShellTransitions()) {
+                if (ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()) {
                     transition = mAtmService.getTransitionController().requestTransitionIfNeeded(
                                     TRANSIT_TO_FRONT, 0 /* flags */, null /* trigger */,
                                     displayContent, chain);
@@ -8166,15 +8166,13 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public void updateInputMethodTargetWindow(@NonNull IBinder imeTargetWindowToken) {
+        public void updateImeTargetWindow(@NonNull IBinder windowToken) {
             // TODO (b/34628091): Use this method to address the window animation issue.
             if (DEBUG_INPUT_METHOD) {
-                Slog.w(TAG_WM, "updateInputMethodTargetWindow:"
-                        + " imeTargetWindowToken=" + imeTargetWindowToken);
+                Slog.w(TAG_WM, "updateImeTargetWindow windowToken: " + windowToken);
             }
             synchronized (mGlobalLock) {
-                final InputTarget imeInputTarget =
-                        getInputTargetFromWindowTokenLocked(imeTargetWindowToken);
+                final InputTarget imeInputTarget = getInputTargetFromWindowTokenLocked(windowToken);
                 if (imeInputTarget != null) {
                     imeInputTarget.getDisplayContent()
                             .updateImeInputAndControlTarget(imeInputTarget);
@@ -8303,8 +8301,8 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public @ImeClientFocusResult int hasInputMethodClientFocus(IBinder windowToken,
-                int uid, int pid, int displayId) {
+        @ImeClientFocusResult
+        public int hasInputMethodClientFocus(IBinder windowToken, int uid, int pid, int displayId) {
             if (displayId == Display.INVALID_DISPLAY) {
                 return ImeClientFocusResult.INVALID_DISPLAY_ID;
             }
@@ -10073,9 +10071,15 @@ public class WindowManagerService extends IWindowManager.Stub
             if (imeTargetWindowTask == null) {
                 return false;
             }
-            if (imeTargetWindow.mActivityRecord != null
-                    && imeTargetWindow.mActivityRecord.mLastImeShown) {
-                return true;
+            if (android.view.inputmethod.Flags.disableImeRestoreOnActivityCreate()) {
+                if (imeTargetWindow.isRequestedVisible(WindowInsets.Type.ime())) {
+                    return true;
+                }
+            } else {
+                if (imeTargetWindow.mActivityRecord != null
+                        && imeTargetWindow.mActivityRecord.mLastImeShown) {
+                    return true;
+                }
             }
             final TaskSnapshot snapshot = mTaskSnapshotController.getSnapshot(
                     imeTargetWindowTask.mTaskId, false /* isLowResolution */);

@@ -109,6 +109,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     public static final int BROADCAST_STATE_UNKNOWN = 0;
     public static final int BROADCAST_STATE_ON = 1;
     public static final int BROADCAST_STATE_OFF = 2;
+    private static final String DEFAULT_BROADCAST_NAME_PREFIX = "Broadcast";
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(
@@ -1149,13 +1150,21 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     private String getDefaultValueOfBroadcastName() {
         // set the default value;
         int postfix = ThreadLocalRandom.current().nextInt(DEFAULT_CODE_MIN, DEFAULT_CODE_MAX);
-        return BluetoothAdapter.getDefaultAdapter().getName() + UNDERLINE + postfix;
+        String name = BluetoothAdapter.getDefaultAdapter().getName();
+        if (name == null || name.isEmpty()) {
+            name = DEFAULT_BROADCAST_NAME_PREFIX;
+        }
+        return name + UNDERLINE + postfix;
     }
 
     private String getDefaultValueOfProgramInfo() {
         // set the default value;
         int postfix = ThreadLocalRandom.current().nextInt(DEFAULT_CODE_MIN, DEFAULT_CODE_MAX);
-        return BluetoothAdapter.getDefaultAdapter().getName() + UNDERLINE + postfix;
+        String name = BluetoothAdapter.getDefaultAdapter().getName();
+        if (name == null || name.isEmpty()) {
+            name = DEFAULT_BROADCAST_NAME_PREFIX;
+        }
+        return name + UNDERLINE + postfix;
     }
 
     private byte[] getDefaultValueOfBroadcastCode() {

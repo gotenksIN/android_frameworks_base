@@ -5061,9 +5061,10 @@ class Task extends TaskFragment {
 
     /** Whether this Task is multi window (exclude PiP) and not filling parent. */
     boolean isNonFullscreenMultiWindow() {
-        final int windowingMode = getWindowingMode();
-        return windowingMode != WINDOWING_MODE_FULLSCREEN && windowingMode != WINDOWING_MODE_PINNED
-                && !fillsParent();
+        if (getWindowingMode() == WINDOWING_MODE_PINNED) {
+            return false;
+        }
+        return !fillsParentBounds();
     }
 
     /**
@@ -6144,21 +6145,8 @@ class Task extends TaskFragment {
                     .build();
         }
 
-        if (com.android.window.flags.Flags.fixLayoutExistingTask()) {
-            mTaskSupervisor.getLaunchParamsController()
-                    .layoutTask(task, info.windowLayout, activity, source, options);
-        } else {
-            int displayId = getDisplayId();
-            if (displayId == INVALID_DISPLAY) displayId = DEFAULT_DISPLAY;
-            final boolean isLockscreenShown =
-                    mAtmService.mKeyguardController.isKeyguardOrAodShowing(displayId);
-            if (!mTaskSupervisor.getLaunchParamsController()
-                    .layoutTask(task, info.windowLayout, activity, source, options)
-                    && !getRequestedOverrideBounds().isEmpty()
-                    && task.isResizeable() && !isLockscreenShown) {
-                task.setBounds(getRequestedOverrideBounds());
-            }
-        }
+        mTaskSupervisor.getLaunchParamsController().layoutTask(task, info.windowLayout, activity,
+                source, options);
         return task;
     }
 

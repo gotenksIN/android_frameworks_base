@@ -26,6 +26,16 @@ flag {
 }
 
 flag {
+   name: "fingerprint_cancel_race_mitigation"
+   namespace: "systemui"
+   description: "Mitigate the race condition between KeyguardUpdateMonitor cancelling a fingerprint listening state and FingerprintManager sending the cancellation."
+   bug: "398973663"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
    name: "udfps_view_performance"
    namespace: "systemui"
    description: "Decrease screen off blocking calls by waiting until the device is finished going to sleep before adding the udfps view."
@@ -478,6 +488,13 @@ flag {
    namespace: "systemui"
    description: "Use recommended architecture for ethernet icon in status bar"
    bug: "291321279"
+}
+
+flag {
+  name: "status_bar_system_status_icons_in_compose"
+  namespace: "systemui"
+  description: "Use compose for displaying icons in the status bar system status area"
+  bug: "406922954"
 }
 
 flag {
@@ -1330,16 +1347,6 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-    name: "dream_overlay_updated_font"
-    namespace: "systemui"
-    description: "Flag to enable updated font settings for dream overlay"
-    bug: "349656117"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -2232,4 +2239,21 @@ flag {
     description: "Use AAD proximity sensor if flag is enabled and sensor is present"
     bug: "402534470"
     is_fixed_read_only: true
+}
+
+flag {
+    name: "qs_wifi_config"
+    namespace: "desktop_connectivity"
+    description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
+    bug: "406548883"
+}
+
+flag {
+    name: "spatial_model_bouncer_pushback"
+    namespace: "systemui"
+    description: "Implement the depth push scaling effect in and out of the bouncer."
+    bug: "404243461"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

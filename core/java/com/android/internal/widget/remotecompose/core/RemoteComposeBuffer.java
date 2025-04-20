@@ -117,6 +117,7 @@ import com.android.internal.widget.remotecompose.core.operations.layout.modifier
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.PaddingModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.RippleModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.RoundedClipRectModifierOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.RunActionOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ScrollModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ZIndexModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.paint.PaintBundle;
@@ -2203,6 +2204,11 @@ public class RemoteComposeBuffer {
     /** Add a canvas operations start tag */
     public void addCanvasOperationsStart() {
         CanvasOperations.apply(mBuffer);
+    }
+
+    /** Add container hosting actions */
+    public void addRunActionsStart() {
+        RunActionOperation.apply(mBuffer);
     }
 
     /**

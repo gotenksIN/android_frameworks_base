@@ -2081,6 +2081,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="media_seamless_other_device">Other device</string>
 
+    <!-- Text on media control when there is a suggested device for playback. [CHAR LIMIT=30] -->
+    <string name="media_suggestion_disconnected_text">Play on <xliff:g id = "device_name" example="Living room speaker">%s</xliff:g></string>
+
+    <!-- Text on media control when connecting to a suggested device. [CHAR LIMIT=30] -->
+    <string name="media_suggestion_failure_text">Can\'t connect. Try again.</string>
+
     <!-- QuickStep: Accessibility to toggle overview [CHAR LIMIT=40] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4584,10 +4590,10 @@
     <!-- Accessibility description of action to toggle QS tile size on click. It will read as "Double-tap to toggle the tile's size" in screen readers [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_toggle_tile_size_action">toggle the tile\'s size</string>
 
-    <!-- Accessibility description of action to remove QS tile on click. It will read as "Double-tap to remove tile" in screen readers [CHAR LIMIT=NONE] -->
+    <!-- Accessibility description of action to remove QS tile on click. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="accessibility_qs_edit_remove_tile_action">remove tile</string>
+    <string name="accessibility_qs_edit_remove_tile_action">Remove tile</string>
 
     <!-- Accessibility description of action to select the QS tile to place on click. It will read as "Double-tap to toggle placement mode" in screen readers [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_toggle_placement_mode">toggle placement mode</string>
@@ -4595,10 +4601,10 @@
     <!-- Accessibility description of action to toggle the QS tile selection. It will read as "Double-tap to toggle selection" in screen readers [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_toggle_selection">toggle selection</string>
 
-    <!-- Accessibility action of action to add QS tile to end. It will read as "Double-tap to add tile to the last position" in screen readers [CHAR LIMIT=NONE] -->
+    <!-- Accessibility action of action to add QS tile to end. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="accessibility_qs_edit_tile_add_action">add tile to the last position</string>
+    <string name="accessibility_qs_edit_tile_add_action">Add tile to the last position</string>
 
     <!-- Accessibility action for context menu to move QS tile [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -6400,4 +6406,16 @@
 
     <!-- Description for the Underlay close button. The Underlay view appears on the bottom of the screen and shows some AI hints. The button will dismiss the underlay view. [CHAR LIMIT=NONE] -->
     <string name="underlay_close_button_content_description">Close</string>
+
+    <!--
+    Content of user education tooltip shown to teach the user that they can swipe down from the top
+    left edge of the display to expand the notification shade panel.
+    -->
+    <string name="dual_shade_educational_tooltip_notifs">Swipe from the top left to open notifications</string>
+
+    <!--
+    Content of user education tooltip shown to teach the user that they can swipe down from the top
+    right edge of the display to expand the Quick Settings shade panel.
+    -->
+    <string name="dual_shade_educational_tooltip_qs">Swipe from the top right to open Quick Settings</string>
 </resources>

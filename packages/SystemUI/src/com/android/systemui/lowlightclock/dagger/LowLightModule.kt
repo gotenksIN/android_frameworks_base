@@ -19,51 +19,36 @@ import android.content.res.Resources
 import android.hardware.Sensor
 import com.android.dream.lowlight.dagger.LowLightDreamModule
 import com.android.systemui.CoreStartable
-import com.android.systemui.communal.DeviceInactiveCondition
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.LogBufferFactory
+import com.android.systemui.lowlightclock.AmbientLightModeMonitor
 import com.android.systemui.lowlightclock.AmbientLightModeMonitor.DebounceAlgorithm
-import com.android.systemui.lowlightclock.DirectBootCondition
-import com.android.systemui.lowlightclock.ForceLowLightCondition
-import com.android.systemui.lowlightclock.LowLightCondition
+import com.android.systemui.lowlightclock.AmbientLightModeMonitorImpl
 import com.android.systemui.lowlightclock.LowLightDisplayController
 import com.android.systemui.lowlightclock.LowLightMonitor
-import com.android.systemui.lowlightclock.ScreenSaverEnabledCondition
 import com.android.systemui.res.R
-import com.android.systemui.shared.condition.Condition
 import dagger.Binds
 import dagger.BindsOptionalOf
 import dagger.Module
 import dagger.Provides
 import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
-import dagger.multibindings.IntoSet
 import javax.inject.Named
 
 @Module(includes = [LowLightDreamModule::class])
 abstract class LowLightModule {
-    @Binds
-    @IntoSet
-    @Named(LOW_LIGHT_PRECONDITIONS)
-    abstract fun bindScreenSaverEnabledCondition(condition: ScreenSaverEnabledCondition): Condition
-
-    @Binds
-    @IntoSet
-    @Named(LOW_LIGHT_PRECONDITIONS)
-    abstract fun bindForceLowLightCondition(condition: ForceLowLightCondition): Condition
-
-    @Binds
-    @IntoSet
-    @Named(LOW_LIGHT_PRECONDITIONS)
-    abstract fun bindDeviceInactiveCondition(condition: DeviceInactiveCondition): Condition
-
     @BindsOptionalOf abstract fun bindsLowLightDisplayController(): LowLightDisplayController
 
     @BindsOptionalOf @Named(LIGHT_SENSOR) abstract fun bindsLightSensor(): Sensor
 
     @BindsOptionalOf abstract fun bindsDebounceAlgorithm(): DebounceAlgorithm
+
+    @Binds
+    abstract fun bindAmbientLightModeMonitor(
+        impl: AmbientLightModeMonitorImpl
+    ): AmbientLightModeMonitor
 
     /** Inject into LowLightMonitor. */
     @Binds
@@ -78,7 +63,6 @@ abstract class LowLightModule {
         const val ALPHA_ANIMATION_IN_START_DELAY_MILLIS: String =
             "alpha_animation_in_start_delay_millis"
         const val ALPHA_ANIMATION_DURATION_MILLIS: String = "alpha_animation_duration_millis"
-        const val LOW_LIGHT_PRECONDITIONS: String = "low_light_preconditions"
         const val LIGHT_SENSOR: String = "low_light_monitor_light_sensor"
 
         /** Provides a [LogBuffer] for logs related to low-light features. */
@@ -88,19 +72,6 @@ abstract class LowLightModule {
         @LowLightLog
         fun provideLowLightLogBuffer(factory: LogBufferFactory): LogBuffer {
             return factory.create("LowLightLog", 250)
-        }
-
-        @Provides
-        @IntoSet
-        @Named(LOW_LIGHT_PRECONDITIONS)
-        fun provideLowLightCondition(
-            lowLightCondition: LowLightCondition,
-            directBootCondition: DirectBootCondition,
-        ): Condition {
-            // Start lowlight if we are either in lowlight or in direct boot. The ordering of the
-            // conditions matters here since we don't want to start the lowlight condition if
-            // we are in direct boot mode.
-            return directBootCondition.or(lowLightCondition)
         }
 
         /**  */

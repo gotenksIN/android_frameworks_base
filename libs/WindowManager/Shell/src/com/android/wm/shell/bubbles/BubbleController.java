@@ -19,6 +19,7 @@ package com.android.wm.shell.bubbles;
 import static android.service.notification.NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_DELETED;
 import static android.service.notification.NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_UPDATED;
 import static android.service.notification.NotificationListenerService.REASON_CANCEL;
+import static android.view.Display.INVALID_DISPLAY;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
@@ -63,6 +64,7 @@ import android.graphics.drawable.Icon;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.UserHandle;
@@ -80,6 +82,7 @@ import android.view.ViewGroup;
 import android.view.ViewRootImpl;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.window.IMultitaskingController;
 import android.window.ScreenCapture;
 import android.window.ScreenCapture.SynchronousScreenCaptureListener;
@@ -227,6 +230,7 @@ public class BubbleController implements ConfigurationChangeListener,
 
     private final BubbleLogger mLogger;
     private final BubbleData mBubbleData;
+    private final FrameLayout mBubblesRootView;
     @Nullable private BubbleStackView mStackView;
     @Nullable private BubbleBarLayerView mLayerView;
     private BubbleIconFactory mBubbleIconFactory;
@@ -387,6 +391,7 @@ public class BubbleController implements ConfigurationChangeListener,
         mSyncQueue = syncQueue;
         mWmService = wmService;
         mBubbleTransitions = bubbleTransitions;
+        mBubbleTransitions.setBubbleController(this);
         mBubbleTaskViewFactory = new BubbleTaskViewFactory() {
             @Override
             public BubbleTaskView create() {
@@ -401,6 +406,7 @@ public class BubbleController implements ConfigurationChangeListener,
         mResizabilityChecker = resizabilityChecker;
         mHomeIntentProvider = homeIntentProvider;
         shellInit.addInitCallback(this::onInit, this);
+        mBubblesRootView = new FrameLayout(mContext);
     }
 
     private void registerOneHandedState(OneHandedController oneHanded) {
@@ -1009,6 +1015,9 @@ public class BubbleController implements ConfigurationChangeListener,
                 mLayerView = new BubbleBarLayerView(mContext, this, mBubbleData, mLogger);
                 mLayerView.setUnBubbleConversationCallback(mSysuiProxy::onUnbubbleConversation);
             }
+            if (mLayerView.getParent() == null) {
+                mBubblesRootView.addView(mLayerView);
+            }
         } else {
             if (mStackView == null) {
                 BubbleStackViewManager bubbleStackViewManager =
@@ -1022,11 +1031,14 @@ public class BubbleController implements ConfigurationChangeListener,
                 }
                 mStackView.setUnbubbleConversationCallback(mSysuiProxy::onUnbubbleConversation);
             }
+            if (mStackView.getParent() == null) {
+                mBubblesRootView.addView(mStackView);
+            }
         }
         addToWindowManagerMaybe();
     }
 
-    /** Adds the appropriate view to WindowManager if it's not already there. */
+    /** Adds the root view to WindowManager if it's not already there. */
     private void addToWindowManagerMaybe() {
         // If already added, don't add it.
         if (mAddedToWindowManager) {
@@ -1070,9 +1082,9 @@ public class BubbleController implements ConfigurationChangeListener,
                 mBubbleData.getOverflow().initialize(
                         mExpandedViewManager, mStackView, mBubblePositioner);
             }
+            mWindowManager.addView(mBubblesRootView, mWmLayoutParams);
             // (TODO: b/273314541) some duplication in the inset listener
             if (isShowingAsBubbleBar()) {
-                mWindowManager.addView(mLayerView, mWmLayoutParams);
                 mLayerView.setOnApplyWindowInsetsListener((view, windowInsets) -> {
                     if (!windowInsets.equals(mWindowInsets) && mLayerView != null) {
                         mWindowInsets = windowInsets;
@@ -1082,7 +1094,6 @@ public class BubbleController implements ConfigurationChangeListener,
                     return windowInsets;
                 });
             } else {
-                mWindowManager.addView(mStackView, mWmLayoutParams);
                 mStackView.setOnApplyWindowInsetsListener((view, windowInsets) -> {
                     if (!windowInsets.equals(mWindowInsets) && mStackView != null) {
                         mWindowInsets = windowInsets;
@@ -1113,11 +1124,16 @@ public class BubbleController implements ConfigurationChangeListener,
                     : WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                             | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
             mWmLayoutParams.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
-            if (mStackView != null) {
-                mWindowManager.updateViewLayout(mStackView, mWmLayoutParams);
-            } else if (mLayerView != null) {
-                mWindowManager.updateViewLayout(mLayerView, mWmLayoutParams);
-            }
+            mWindowManager.updateViewLayout(mBubblesRootView, mWmLayoutParams);
+        }
+    }
+
+    private void removeViewsFromRootView() {
+        if (mStackView != null) {
+            mBubblesRootView.removeView(mStackView);
+        }
+        if (mLayerView != null) {
+            mBubblesRootView.removeView(mLayerView);
         }
     }
 
@@ -1139,14 +1155,8 @@ public class BubbleController implements ConfigurationChangeListener,
             }
         });
         try {
-            if (mStackView != null) {
-                mWindowManager.removeView(mStackView);
-                mBubbleData.getOverflow().cleanUpExpandedState();
-            }
-            if (mLayerView != null) {
-                mWindowManager.removeView(mLayerView);
-                mBubbleData.getOverflow().cleanUpExpandedState();
-            }
+            mWindowManager.removeView(mBubblesRootView);
+            mBubbleData.getOverflow().cleanUpExpandedState();
         } catch (IllegalArgumentException e) {
             // This means the stack has already been removed - it shouldn't happen, but ignore if it
             // does, since we wanted it removed anyway.
@@ -1592,7 +1602,16 @@ public class BubbleController implements ConfigurationChangeListener,
             mBubbleData.setSelectedBubbleAndExpandStack(b, updateLocation);
         } else {
             b.enable(Notification.BubbleMetadata.FLAG_AUTO_EXPAND_BUBBLE);
-            inflateAndAdd(b, /* suppressFlyout= */ true, /* showInShade= */ false, updateLocation);
+
+            if (isShowingAsBubbleBar()) {
+                ensureBubbleViewsAndWindowCreated();
+                mBubbleTransitions.startLaunchIntoOrConvertToBubble(b, mExpandedViewManager,
+                        mBubbleTaskViewFactory, mBubblePositioner, mStackView, mLayerView,
+                        mBubbleIconFactory, mInflateSynchronously);
+            } else {
+                inflateAndAdd(b, /* suppressFlyout= */ true, /* showInShade= */ false,
+                        updateLocation);
+            }
         }
     }
 
@@ -1625,6 +1644,39 @@ public class BubbleController implements ConfigurationChangeListener,
                     mBubbleTaskViewFactory, mBubblePositioner, mStackView, mLayerView,
                     mBubbleIconFactory, mHomeIntentProvider, dragData, mInflateSynchronously);
         }
+    }
+
+    /**
+     * Expands and selects a bubble created from a running task in a different mode.
+     *
+     * @param taskInfo the task.
+     */
+    @Nullable
+    public Transitions.TransitionHandler expandStackAndSelectBubbleForExistingTransition(
+            @NonNull ActivityManager.RunningTaskInfo taskInfo,
+            @NonNull IBinder transition,
+            Consumer<Transitions.TransitionHandler> onInflatedCallback) {
+        if (!BubbleAnythingFlagHelper.enableBubbleToFullscreen()) return null;
+        // If there is an existing bubble then just show it
+        final String taskKey = Bubble.getAppBubbleKeyForTask(taskInfo);
+        if (mBubbleData.hasAnyBubbleWithKey(taskKey)) {
+            ProtoLog.v(WM_SHELL_BUBBLES, "expandStackAndSelectBubbleForExistingTransition(): "
+                    + "skipping due to existing bubbled task=%d", taskInfo.taskId);
+            return null;
+        }
+
+        // Otherwise, create a new bubble and show it
+        Bubble b = mBubbleData.getOrCreateBubble(taskInfo); // Removes from overflow
+        ProtoLog.v(WM_SHELL_BUBBLES, "expandStackAndSelectBubbleForExistingTransition() taskId=%s",
+                taskInfo.taskId);
+        b.enable(Notification.BubbleMetadata.FLAG_AUTO_EXPAND_BUBBLE);
+
+        // Lazy init stack view when a bubble is created
+        ensureBubbleViewsAndWindowCreated();
+        return mBubbleTransitions.startLaunchNewTaskBubbleForExistingTransition(b,
+                mExpandedViewManager, mBubbleTaskViewFactory, mBubblePositioner, mStackView,
+                mLayerView, mBubbleIconFactory, mInflateSynchronously, transition,
+                onInflatedCallback);
     }
 
     /**
@@ -1856,9 +1908,8 @@ public class BubbleController implements ConfigurationChangeListener,
         // TaskView.
         mBubbleData.getBubbles().forEach(b -> b.cleanupViews(/* cleanupTaskView= */ false));
 
-        // remove the current bubble container from window manager, null it out, and create a new
-        // container based on the current mode.
-        removeFromWindowManagerMaybe();
+        // replace the current views in the root view based on the mode we're switching to
+        removeViewsFromRootView();
         mLayerView = null;
         mStackView = null;
 
@@ -2628,6 +2679,23 @@ public class BubbleController implements ConfigurationChangeListener,
     }
 
     /**
+     * Returns the id of the display to which the current Bubble view is attached if it is currently
+     * showing, {@link INVALID_DISPLAY} otherwise.
+     */
+    @VisibleForTesting
+    public int getCurrentViewDisplayId() {
+        if (isShowingAsBubbleBar() && mLayerView != null && mLayerView.getDisplay() != null) {
+            return mLayerView.getDisplay().getDisplayId();
+        }
+
+        if (!isShowingAsBubbleBar() && mStackView != null && mStackView.getDisplay() != null) {
+            return mStackView.getDisplay().getDisplayId();
+        }
+
+        return INVALID_DISPLAY;
+    }
+
+    /**
      * Check if notification panel is in an expanded state.
      * Makes a call to System UI process and delivers the result via {@code callback} on the
      * WM Shell main thread.
@@ -3363,13 +3431,7 @@ public class BubbleController implements ConfigurationChangeListener,
             if (tinfo == null) {
                 return;
             }
-            Bubble bub = null;
-            for (Bubble b : mBubbleData.getBubbles()) {
-                if (b.getTaskId() == tinfo.taskId) {
-                    bub = b;
-                    break;
-                }
-            }
+            Bubble bub = mBubbleData.getBubbleInStackWithTaskId(tinfo.taskId);
             if (bub == null) {
                 return;
             }

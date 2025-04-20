@@ -857,7 +857,7 @@ public class Cuj {
             case CUJ_STATUS_BAR_APP_RETURN_TO_CALL_CHIP:
                 return "STATUS_BAR_APP_RETURN_TO_CALL_CHIP";
             case CUJ_NOTIFICATIONS_ANIMATED_ACTION:
-                return "CUJ_NOTIFICATIONS_ANIMATED_ACTION";
+                return "NOTIFICATIONS_ANIMATED_ACTION";
         }
         return "UNKNOWN";
     }

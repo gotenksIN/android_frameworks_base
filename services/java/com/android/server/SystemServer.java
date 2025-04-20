@@ -2054,6 +2054,13 @@ public final class SystemServer implements Dumpable {
             dpms = mSystemServiceManager.startService(DevicePolicyManagerService.Lifecycle.class);
             t.traceEnd();
 
+            // If this flag is disabled, this service is started later.
+            if (android.server.Flags.voiceinteractionmanagerserviceGetResourcesInInitThread()) {
+                t.traceBegin("StartVoiceRecognitionManager");
+                mSystemServiceManager.startService(VoiceInteractionManagerService.class);
+                t.traceEnd();
+            }
+
             t.traceBegin("StartStatusBarManagerService");
             try {
                 statusBar = new StatusBarManagerService(context);
@@ -2607,9 +2614,13 @@ public final class SystemServer implements Dumpable {
             // FEATURE_VOICE_RECOGNIZERS feature is set, because it needs to take care
             // of initializing various settings.  It will internally modify its behavior
             // based on that feature.
-            t.traceBegin("StartVoiceRecognitionManager");
-            mSystemServiceManager.startService(VoiceInteractionManagerService.class);
-            t.traceEnd();
+            //
+            // If this flag is enabled, this service will have begun initializing earlier.
+            if (!android.server.Flags.voiceinteractionmanagerserviceGetResourcesInInitThread()) {
+                t.traceBegin("StartVoiceRecognitionManager");
+                mSystemServiceManager.startService(VoiceInteractionManagerService.class);
+                t.traceEnd();
+            }
 
             if (GestureLauncherService.isGestureLauncherEnabled(context.getResources())) {
                 t.traceBegin("StartGestureLauncher");
@@ -2814,11 +2825,9 @@ public final class SystemServer implements Dumpable {
                     t.traceEnd();
                 }
 
-                if (android.adaptiveauth.Flags.enableAdaptiveAuth()) {
-                    t.traceBegin("StartAuthenticationPolicyService");
-                    mSystemServiceManager.startService(AuthenticationPolicyService.class);
-                    t.traceEnd();
-                }
+                t.traceBegin("StartAuthenticationPolicyService");
+                mSystemServiceManager.startService(AuthenticationPolicyService.class);
+                t.traceEnd();
             }
 
             if (!isWatch) {

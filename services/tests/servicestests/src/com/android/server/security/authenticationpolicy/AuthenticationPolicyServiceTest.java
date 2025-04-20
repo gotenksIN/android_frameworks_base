@@ -16,8 +16,6 @@
 
 package com.android.server.security.authenticationpolicy;
 
-import static android.adaptiveauth.Flags.FLAG_ENABLE_ADAPTIVE_AUTH;
-import static android.adaptiveauth.Flags.FLAG_REPORT_BIOMETRIC_AUTH_ATTEMPTS;
 import static android.security.authenticationpolicy.AuthenticationPolicyManager.ERROR_UNSUPPORTED;
 
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.SOME_AUTH_REQUIRED_AFTER_ADAPTIVE_AUTH_REQUEST;
@@ -109,9 +107,6 @@ public class AuthenticationPolicyServiceTest {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-
-        mSetFlagsRule.enableFlags(FLAG_ENABLE_ADAPTIVE_AUTH);
-        mSetFlagsRule.enableFlags(FLAG_REPORT_BIOMETRIC_AUTH_ATTEMPTS);
 
         mContext = spy(ApplicationProvider.getApplicationContext());
 

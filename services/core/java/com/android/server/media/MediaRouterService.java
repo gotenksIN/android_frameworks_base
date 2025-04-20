@@ -199,6 +199,7 @@ public final class MediaRouterService extends IMediaRouterService.Stub
                         },
                         TAG);
         updateRunningUserAndProfiles(ActivityManager.getCurrentUser());
+        mService2.systemRunning();
     }
 
     @Override
@@ -535,7 +536,7 @@ public final class MediaRouterService extends IMediaRouterService.Stub
 
     // Binder call
     @Override
-    @Nullable
+    @NonNull
     public Map<String, List<SuggestedDeviceInfo>> getDeviceSuggestionsWithRouter2(
             IMediaRouter2 router) {
         return mService2.getDeviceSuggestionsWithRouter2(router);
@@ -693,7 +694,7 @@ public final class MediaRouterService extends IMediaRouterService.Stub
 
     // Binder call
     @Override
-    @Nullable
+    @NonNull
     public Map<String, List<SuggestedDeviceInfo>> getDeviceSuggestionsWithManager(
             IMediaRouter2Manager manager) {
         return mService2.getDeviceSuggestionsWithManager(manager);

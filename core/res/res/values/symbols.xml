@@ -2110,7 +2110,6 @@
   <java-symbol type="bool" name="config_supportLongPressPowerWhenNonInteractive" />
   <java-symbol type="bool" name="config_supportShortPressPowerWhenDefaultDisplayOn" />
   <java-symbol type="bool" name="config_wimaxEnabled" />
-  <java-symbol type="bool" name="show_ongoing_ime_switcher" />
   <java-symbol type="color" name="config_defaultNotificationColor" />
   <java-symbol type="color" name="decor_view_status_guard" />
   <java-symbol type="color" name="decor_view_status_guard_light" />
@@ -2260,6 +2259,7 @@
   <java-symbol type="string" name="car_mode_disable_notification_message" />
   <java-symbol type="string" name="car_mode_disable_notification_title" />
   <java-symbol type="string" name="chooser_wallpaper" />
+  <java-symbol type="string" name="config_preferredSystemImageEditor" />
   <java-symbol type="string" name="config_systemImageEditor" />
   <java-symbol type="string" name="config_datause_iface" />
   <java-symbol type="string" name="config_activityRecognitionHardwarePackageName" />
@@ -5743,6 +5743,12 @@
   <java-symbol type="drawable" name="accessibility_autoclick_scroll_left" />
   <java-symbol type="drawable" name="accessibility_autoclick_scroll_right" />
   <java-symbol type="drawable" name="accessibility_autoclick_scroll_exit" />
+  <java-symbol type="drawable" name="accessibility_autoclick_scroll_up_background" />
+  <java-symbol type="drawable" name="accessibility_autoclick_scroll_down_background" />
+  <java-symbol type="drawable" name="accessibility_autoclick_scroll_left_background" />
+  <java-symbol type="drawable" name="accessibility_autoclick_scroll_right_background" />
+  <java-symbol type="drawable" name="accessibility_autoclick_scroll_exit_background" />
+  <java-symbol type="drawable" name="accessibility_autoclick_scroll_panel_container" />
   <java-symbol type="string" name="accessibility_autoclick_scroll_up" />
   <java-symbol type="string" name="accessibility_autoclick_scroll_down" />
   <java-symbol type="string" name="accessibility_autoclick_scroll_left" />
@@ -5750,11 +5756,6 @@
   <java-symbol type="string" name="accessibility_autoclick_scroll_exit" />
   <java-symbol type="string" name="accessibility_autoclick_scroll_panel_title" />
   <java-symbol type="id" name="accessibility_autoclick_scroll_panel" />
-  <java-symbol type="id" name="scroll_up_layout" />
-  <java-symbol type="id" name="scroll_down_layout" />
-  <java-symbol type="id" name="scroll_left_layout" />
-  <java-symbol type="id" name="scroll_right_layout" />
-  <java-symbol type="id" name="scroll_exit_layout" />
   <java-symbol type="id" name="scroll_up" />
   <java-symbol type="id" name="scroll_down" />
   <java-symbol type="id" name="scroll_left" />
@@ -5882,6 +5883,9 @@
   <!-- Whether a desktop window should be maximized when it's dragged to the top edge of the
        screen. -->
   <java-symbol type="bool" name="config_dragToMaximizeInDesktopMode" />
+
+  <!-- Whether the home screen should be shown behind freeform tasks in desktop mode. -->
+  <java-symbol type="bool" name="config_showHomeBehindDesktop" />
 
   <!-- Frame rate compatibility value for Wallpaper -->
   <java-symbol type="integer" name="config_wallpaperFrameRateCompatibility" />
@@ -6045,5 +6049,8 @@
   <java-symbol type="string" name="config_fingerprintFrrTargetComponent" />
   <java-symbol type="string" name="fingerprint_frr_notification_title" />
   <java-symbol type="string" name="fingerprint_frr_notification_msg" />
+
+  <!-- Default name for newly configured tv profile. -->
+  <java-symbol type="string" name="config_configured_tv_profile_name" />
 
 </resources>

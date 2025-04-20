@@ -563,12 +563,6 @@ public class UserManagerService extends IUserManager.Stub {
 
     private final LocalService mLocalService;
 
-    @GuardedBy("mUsersLock")
-    private boolean mIsDeviceManaged;
-
-    @GuardedBy("mUsersLock")
-    private final SparseBooleanArray mIsUserManaged = new SparseBooleanArray();
-
     @GuardedBy("mUserRestrictionsListeners")
     private final ArrayList<UserRestrictionsListener> mUserRestrictionsListeners =
             new ArrayList<>();
@@ -1554,11 +1548,20 @@ public class UserManagerService extends IUserManager.Stub {
     public @NonNull List<UserInfo> getUsers(boolean excludePartial, boolean excludeDying,
             boolean excludePreCreated) {
         checkCreateUsersPermission("query users");
-        return getUsersInternal(excludePartial, excludeDying, excludePreCreated);
+        return getUsersInternal(excludePartial, excludeDying, excludePreCreated,
+                /* resolveNullNames= */ true);
+    }
+
+    // Used by cmd users
+    @NonNull List<UserInfo> getUsersWithUnresolvedNames(boolean excludePartial,
+            boolean excludeDying, boolean excludePreCreated) {
+        checkCreateUsersPermission("get users with unresolved names");
+        return getUsersInternal(excludePartial, excludeDying, excludePreCreated,
+                /* resolveNullNames= */ false);
     }
 
     private @NonNull List<UserInfo> getUsersInternal(boolean excludePartial, boolean excludeDying,
-            boolean excludePreCreated) {
+            boolean excludePreCreated, boolean resolveNullNames) {
         synchronized (mUsersLock) {
             ArrayList<UserInfo> users = new ArrayList<>(mUsers.size());
             final int userSize = mUsers.size();
@@ -1569,7 +1572,8 @@ public class UserManagerService extends IUserManager.Stub {
                         || (excludePreCreated && ui.preCreated)) {
                     continue;
                 }
-                users.add(userWithName(ui));
+                var user = resolveNullNames ? userWithName(ui) : ui;
+                users.add(user);
             }
             return users;
         }
@@ -2375,29 +2379,47 @@ public class UserManagerService extends IUserManager.Stub {
      * Returns a UserInfo object with the name filled in, for Owner and Guest, or the original
      * if the name is already set.
      *
-     * Note: Currently, the resulting name can be null if a user was truly created with a null name.
+     * <p><b>Note:</b> Currently, the resulting name can be {@code null} if a user was truly created
+     * with a {@code null} name.
      */
-    private UserInfo userWithName(UserInfo orig) {
+    @VisibleForTesting
+    @Nullable
+    UserInfo userWithName(@Nullable UserInfo orig) {
         if (orig != null && orig.name == null) {
-            String name = null;
-            if (orig.id == UserHandle.USER_SYSTEM) {
-                if (DBG_ALLOCATION) {
-                    final int number = mUser0Allocations.incrementAndGet();
-                    Slog.w(LOG_TAG, "System user instantiated at least " + number + " times");
-                }
-                name = getOwnerName();
-            } else if (orig.isMain()) {
-                name = getOwnerName();
-            } else if (orig.isGuest()) {
-                name = getGuestName();
-            }
+            String name = getName(orig, /* logUser0Allocations= */ true);
             if (name != null) {
-                final UserInfo withName = new UserInfo(orig);
+                UserInfo withName = new UserInfo(orig);
                 withName.name = name;
                 return withName;
             }
         }
         return orig;
+    }
+
+    @Nullable
+    String getName(UserInfo user) {
+        return getName(user, /* logUser0Allocations= */ false);
+    }
+
+    @Nullable
+    private String getName(UserInfo user, boolean logUser0Allocations) {
+        if (user.name != null) {
+            return user.name;
+        }
+        if (user.id == UserHandle.USER_SYSTEM) {
+            if (DBG_ALLOCATION && logUser0Allocations) {
+                int number = mUser0Allocations.incrementAndGet();
+                Slog.w(LOG_TAG, "System user instantiated at least " + number + " times");
+            }
+            return getOwnerName();
+        }
+        if (user.isMain()) {
+            return getOwnerName();
+        }
+        if (user.isGuest()) {
+            return getGuestName();
+        }
+        return null;
     }
 
     /** Returns whether the given user type is one of the FULL user types. */
@@ -3100,9 +3122,8 @@ public class UserManagerService extends IUserManager.Stub {
             if (!userInfo.isAdmin()) {
                 return false;
             }
-            // restricted profile can be created if there is no DO set and the admin user has no PO;
-            return !mIsDeviceManaged && !mIsUserManaged.get(userId);
         }
+        return !getDevicePolicyManagerInternal().isUserOrganizationManaged(userId);
     }
 
     @Override
@@ -4985,7 +5006,9 @@ public class UserManagerService extends IUserManager.Stub {
 
     /** Returns the oldest Full Admin user, or null is if there none. */
     private @Nullable UserInfo getEarliestCreatedFullUser() {
-        final List<UserInfo> users = getUsersInternal(true, true, true);
+        List<UserInfo> users = getUsersInternal(/* excludePartial= */ true,
+                /* excludeDying= */ true, /* excludePreCreated= */ true,
+                /* resolveNullNames= */ false);
         UserInfo earliestUser = null;
         long earliestCreationTime = Long.MAX_VALUE;
         for (int i = 0; i < users.size(); i++) {
@@ -5042,11 +5065,13 @@ public class UserManagerService extends IUserManager.Stub {
         writeUserListLP();
     }
 
-    private String getOwnerName() {
+    @VisibleForTesting
+    String getOwnerName() {
         return mOwnerName.get();
     }
 
-    private String getGuestName() {
+    @VisibleForTesting
+    String getGuestName() {
         return mContext.getString(com.android.internal.R.string.guest_name);
     }
 
@@ -6259,7 +6284,9 @@ public class UserManagerService extends IUserManager.Stub {
     /** Writes a UserInfo pulled atom for each user on the device. */
     private int onPullAtom(int atomTag, List<StatsEvent> data) {
         if (atomTag == FrameworkStatsLog.USER_INFO) {
-            final List<UserInfo> users = getUsersInternal(true, true, true);
+            final List<UserInfo> users = getUsersInternal(/* excludePartial= */ true,
+                    /* excludeDying= */ true, /* excludePreCreated= */ true,
+                    /* resolveNullNames= */ false);
             final int size = users.size();
             if (size > 1) {
                 for (int idx = 0; idx < size; idx++) {
@@ -6770,7 +6797,6 @@ public class UserManagerService extends IUserManager.Stub {
         // Remove this user from the list
         synchronized (mUsersLock) {
             removeUserDataLU(userId);
-            mIsUserManaged.delete(userId);
             getActivityManagerInternal().onUserRemoved(userId);
         }
         synchronized (mUserStates) {
@@ -7551,11 +7577,9 @@ public class UserManagerService extends IUserManager.Stub {
             synchronized (mGuestRestrictions) {
                 UserRestrictionsUtils.dumpRestrictions(pw, "    ", mGuestRestrictions);
             }
+            pw.println();
             synchronized (mUsersLock) {
-                pw.println();
-                pw.println("  Device managed: " + mIsDeviceManaged);
                 if (mRemovingUserIds.size() > 0) {
-                    pw.println();
                     pw.println("  Recently removed userIds: " + mRecentlyRemovedIds);
                 }
             }
@@ -7615,6 +7639,7 @@ public class UserManagerService extends IUserManager.Stub {
         }
         pw.println("  User version: " + mUserVersion);
         pw.println("  Owner name: " + getOwnerName());
+        pw.println("  Guest name: " + getGuestName());
         if (DBG_ALLOCATION) {
             pw.println("  System user allocations: " + mUser0Allocations.get());
         }
@@ -7729,8 +7754,9 @@ public class UserManagerService extends IUserManager.Stub {
         pw.print("    Last entered foreground: ");
         dumpTimeAgo(pw, tempStringBuilder, now, userData.mLastEnteredForegroundTimeMillis);
 
-        pw.print("    Has profile owner: ");
-        pw.println(mIsUserManaged.get(userId));
+        // bedstead relies on this being here, even though since Android 14 this has always been
+        // false. TODO(b/258213147) update bedstead and remove this.
+        pw.println("    Has profile owner: false");
 
         pw.println("    Restrictions:");
         synchronized (mRestrictionsLock) {
@@ -7870,38 +7896,6 @@ public class UserManagerService extends IUserManager.Stub {
             }
         }
 
-        // TODO(b/258213147): Remove
-        @Override
-        public void setDeviceManaged(boolean isManaged) {
-            synchronized (mUsersLock) {
-                mIsDeviceManaged = isManaged;
-            }
-        }
-
-        // TODO(b/258213147): Remove
-        @Override
-        public boolean isDeviceManaged() {
-            synchronized (mUsersLock) {
-                return mIsDeviceManaged;
-            }
-        }
-
-        // TODO(b/258213147): Remove
-        @Override
-        public void setUserManaged(@UserIdInt int userId, boolean isManaged) {
-            synchronized (mUsersLock) {
-                mIsUserManaged.put(userId, isManaged);
-            }
-        }
-
-        // TODO(b/258213147): Remove
-        @Override
-        public boolean isUserManaged(@UserIdInt int userId) {
-            synchronized (mUsersLock) {
-                return mIsUserManaged.get(userId);
-            }
-        }
-
         @Override
         public void setUserIcon(@UserIdInt int userId, Bitmap bitmap) {
             final long ident = Binder.clearCallingIdentity();
@@ -8030,7 +8024,7 @@ public class UserManagerService extends IUserManager.Stub {
         public @NonNull List<UserInfo> getUsers(boolean excludePartial, boolean excludeDying,
                 boolean excludePreCreated) {
             return UserManagerService.this.getUsersInternal(excludePartial, excludeDying,
-                    excludePreCreated);
+                    excludePreCreated, /* resolveNullNames= */ true);
         }
 
         @Override

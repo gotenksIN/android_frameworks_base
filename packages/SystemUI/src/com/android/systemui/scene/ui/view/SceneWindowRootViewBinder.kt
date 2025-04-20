@@ -21,9 +21,11 @@ import android.graphics.Point
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.widget.FrameLayout
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -36,6 +38,7 @@ import com.android.internal.policy.ScreenDecorationsUtils
 import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
 import com.android.systemui.common.ui.compose.windowinsets.DisplayCutout
 import com.android.systemui.common.ui.compose.windowinsets.ScreenDecorProvider
+import com.android.systemui.compose.modifiers.sysUiResTagContainer
 import com.android.systemui.lifecycle.WindowLifecycleState
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.lifecycle.setSnapshotBinding
@@ -44,9 +47,11 @@ import com.android.systemui.qs.ui.adapter.QSSceneAdapter
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
+import com.android.systemui.scene.ui.composable.DualShadeEducationalTooltips
 import com.android.systemui.scene.ui.composable.Overlay
 import com.android.systemui.scene.ui.composable.Scene
 import com.android.systemui.scene.ui.composable.SceneContainer
+import com.android.systemui.scene.ui.viewmodel.DualShadeEducationalTooltipsViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
 import javax.inject.Provider
@@ -149,6 +154,16 @@ object SceneWindowRootViewBinder {
                     )
                     view.addView(sharedNotificationContainer)
 
+                    view.addView(
+                        createDualShadeEducationalTooltipsView(
+                            scope = this,
+                            context = view.context,
+                            viewModelFactory =
+                                viewModel.dualShadeEducationalTooltipsViewModelFactory,
+                            windowInsets = windowInsets,
+                        )
+                    )
+
                     view.setSnapshotBinding { onVisibilityChangedInternal(viewModel.isVisible) }
                     awaitCancellation()
                 } finally {
@@ -187,7 +202,33 @@ object SceneWindowRootViewBinder {
                             dataSourceDelegator = dataSourceDelegator,
                             qsSceneAdapter = qsSceneAdapter,
                             sceneJankMonitorFactory = sceneJankMonitorFactory,
+                            modifier = Modifier.sysUiResTagContainer(),
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createDualShadeEducationalTooltipsView(
+        scope: CoroutineScope,
+        context: Context,
+        viewModelFactory: DualShadeEducationalTooltipsViewModel.Factory,
+        windowInsets: StateFlow<WindowInsets?>,
+    ): View {
+        return ComposeView(context).apply {
+            layoutParams =
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                )
+            setContent {
+                PlatformTheme {
+                    ScreenDecorProvider(
+                        displayCutout = displayCutoutFromWindowInsets(scope, context, windowInsets),
+                        screenCornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(context),
+                    ) {
+                        DualShadeEducationalTooltips(viewModelFactory = viewModelFactory)
                     }
                 }
             }

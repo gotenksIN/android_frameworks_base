@@ -22,9 +22,11 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,10 +34,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.theme.PlatformTheme
 import com.android.keyguard.AlphaOptimizedLinearLayout
+import com.android.systemui.compose.modifiers.sysUiResTagContainer
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
 import com.android.systemui.media.controls.ui.view.MediaHost
@@ -71,6 +75,8 @@ import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.view.SystemStatusIconsLayoutHelper
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel.HomeStatusBarViewModelFactory
+import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
+import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIcons
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -110,6 +116,7 @@ constructor(
                     mediaHierarchyManager = mediaHierarchyManager,
                     mediaHost = mediaHost,
                     onViewCreated = andThen,
+                    modifier = Modifier.sysUiResTagContainer(),
                 )
             }
         }
@@ -143,6 +150,7 @@ fun StatusBarRoot(
     mediaHierarchyManager: MediaHierarchyManager,
     mediaHost: MediaHost,
     onViewCreated: (ViewGroup) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val displayId = parent.context.displayId
     val statusBarViewModel =
@@ -156,7 +164,7 @@ fun StatusBarRoot(
             null
         }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize()) {
         // TODO(b/364360986): remove this before rolling the flag forward
         if (StatusBarRootModernization.SHOW_DISAMBIGUATION) {
             Disambiguation(viewModel = statusBarViewModel)
@@ -290,9 +298,11 @@ fun StatusBarRoot(
                         endSideContent.addView(composeView, 0)
                     }
 
-                    // If the flag is enabled, create and add a compose battery view to the end
+                    // If the flag is enabled, create and add a compose section to the end
                     // of the system_icons container
-                    if (NewStatusBarIcons.isEnabled) {
+                    if (SystemStatusIconsInCompose.isEnabled) {
+                        addSystemStatusIconsComposable(phoneStatusBarView, statusBarViewModel)
+                    } else if (NewStatusBarIcons.isEnabled) {
                         addBatteryComposable(phoneStatusBarView, statusBarViewModel)
                         // Also adjust the paddings :)
                         SystemStatusIconsLayoutHelper.configurePaddingForNewStatusBarIcons(
@@ -340,6 +350,40 @@ private fun addBatteryComposable(
         }
     phoneStatusBarView.findViewById<ViewGroup>(R.id.system_icons).apply {
         addView(batteryComposeView, -1)
+    }
+}
+
+/**
+ * Create a composable that will replace the existing system_icons view. This is added to the end of
+ * the status_bar_end_side_container container
+ */
+private fun addSystemStatusIconsComposable(
+    phoneStatusBarView: PhoneStatusBarView,
+    statusBarViewModel: HomeStatusBarViewModel,
+) {
+    val systemStatusIconsComposeView =
+        ComposeView(phoneStatusBarView.context).apply {
+            setContent {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SystemStatusIcons(
+                        viewModelFactory = statusBarViewModel.systemStatusIconsViewModelFactory,
+                        isDark = statusBarViewModel.areaDark,
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    val height = with(LocalDensity.current) { STATUS_BAR_BATTERY_HEIGHT.toDp() }
+                    UnifiedBattery(
+                        modifier =
+                            Modifier.height(height).aspectRatio(BatteryViewModel.ASPECT_RATIO),
+                        viewModelFactory = statusBarViewModel.batteryViewModelFactory,
+                        isDark = statusBarViewModel.areaDark,
+                    )
+                }
+            }
+        }
+    phoneStatusBarView.findViewById<ViewGroup>(R.id.status_bar_end_side_container).apply {
+        addView(systemStatusIconsComposeView, -1)
     }
 }
 

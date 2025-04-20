@@ -273,9 +273,9 @@ public class AutoclickScrollPanelTest {
 
     @Test
     public void showPanel_normalCase() {
-        // Normal case - in the middle of the screen.
-        int cursorX = mScreenWidth / 2;
-        int cursorY = mScreenHeight / 2;
+        // Normal case, position at (10, 10).
+        int cursorX = 10;
+        int cursorY = 10;
 
         // Capture the current layout params before positioning.
         WindowManager.LayoutParams params = mScrollPanel.getLayoutParamsForTesting();
@@ -333,6 +333,21 @@ public class AutoclickScrollPanelTest {
         // Panel should be left of and above cursor.
         assertThat(params.x).isLessThan(cursorX);
         assertThat(params.y).isLessThan(cursorY);
+    }
+
+    @Test
+    public void exitButton_click_hidesPanel() {
+        float cursorX = 300;
+        float cursorY = 300;
+
+        mScrollPanel.show(cursorX, cursorY);
+        assertThat(mScrollPanel.isVisible()).isTrue();
+
+        // Simulate clicking the exit button.
+        mExitButton.performClick();
+
+        // Verify the panel is hidden.
+        assertThat(mScrollPanel.isVisible()).isFalse();
     }
 
     // Helper method to simulate a hover event on a view.

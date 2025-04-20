@@ -388,9 +388,9 @@ public abstract class LayoutManager extends LayoutComponent implements Measurabl
                 } else {
                     computeSize(
                             context,
-                            minWidth,
+                            0f,
                             Math.min(measuredWidth, insetMaxWidth),
-                            minHeight,
+                            0f,
                             Math.min(measuredHeight, insetMaxHeight),
                             measure);
                 }
@@ -406,16 +406,16 @@ public abstract class LayoutManager extends LayoutComponent implements Measurabl
                 } else {
                     computeSize(
                             context,
-                            minWidth,
+                            0f,
                             Math.min(measuredWidth, insetMaxWidth),
-                            minHeight,
+                            0f,
                             Math.min(measuredHeight, insetMaxHeight),
                             measure);
                 }
             } else {
                 float maxChildWidth = measuredWidth - mPaddingLeft - mPaddingRight;
                 float maxChildHeight = measuredHeight - mPaddingTop - mPaddingBottom;
-                computeSize(context, minWidth, maxChildWidth, minHeight, maxChildHeight, measure);
+                computeSize(context, 0, maxChildWidth, 0, maxChildHeight, measure);
             }
         }
 

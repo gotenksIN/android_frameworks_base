@@ -974,11 +974,7 @@ public class InfoMediaManagerTest {
     @Test
     public void onSuggestionUpdated_listenersNotified() {
         SuggestedDeviceInfo suggestedDeviceInfo =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
         RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
         setAvailableRoutesList(TEST_PACKAGE_NAME);
         mediaManager.registerCallback(mCallback);
@@ -999,13 +995,30 @@ public class InfoMediaManagerTest {
 
     @EnableFlags(Flags.FLAG_ENABLE_SUGGESTED_DEVICE_API)
     @Test
+    public void onSuggestionUpdated_routesNotSet_listenersNotified() {
+        SuggestedDeviceInfo suggestedDeviceInfo =
+                new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
+        RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
+        mediaManager.registerCallback(mCallback);
+        clearInvocations(mCallback);
+        verify(mRouter2)
+                .registerDeviceSuggestionsCallback(
+                        any(), mDeviceSuggestionsCallbackCaptor.capture());
+
+        mDeviceSuggestionsCallbackCaptor
+                .getValue()
+                .onSuggestionUpdated("random_package_name", List.of(suggestedDeviceInfo));
+
+        verify(mCallback).onSuggestedDeviceUpdated(mSuggestedDeviceStateCaptor.capture());
+        assertThat(mSuggestedDeviceStateCaptor.getValue().getSuggestedDeviceInfo())
+                .isEqualTo(suggestedDeviceInfo);
+    }
+
+    @EnableFlags(Flags.FLAG_ENABLE_SUGGESTED_DEVICE_API)
+    @Test
     public void onSuggestionUpdated_mediaDeviceIsSuggested() {
         SuggestedDeviceInfo suggestedDeviceInfo =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
         RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
         setAvailableRoutesList(TEST_PACKAGE_NAME);
         mediaManager.registerCallback(mCallback);
@@ -1027,11 +1040,7 @@ public class InfoMediaManagerTest {
     @Test
     public void onSuggestionUpdated_noSuggestedDevices_noSuggestedMediaDevices() {
         SuggestedDeviceInfo suggestedDeviceInfo =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
         RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
         setAvailableRoutesList(TEST_PACKAGE_NAME);
         mediaManager.registerCallback(mCallback);
@@ -1056,17 +1065,9 @@ public class InfoMediaManagerTest {
     @Test
     public void onSuggestionUpdated_multipleProviders_noSuggestedMediaDevices() {
         SuggestedDeviceInfo suggestedDeviceInfo1 =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name_1", TEST_ID_3, 0).build();
         SuggestedDeviceInfo suggestedDeviceInfo2 =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name_2")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name_2", TEST_ID_3, 0).build();
         RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
         setAvailableRoutesList(TEST_PACKAGE_NAME);
         mediaManager.registerCallback(mCallback);
@@ -1091,11 +1092,7 @@ public class InfoMediaManagerTest {
     @Test
     public void onSuggestionUpdated_firstSuggestionFromSamePackage_suggestionIsFromSamePackage() {
         SuggestedDeviceInfo suggestedDeviceInfo =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
         RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
         setAvailableRoutesList(TEST_PACKAGE_NAME);
         mediaManager.registerCallback(mCallback);
@@ -1120,11 +1117,7 @@ public class InfoMediaManagerTest {
     @Test
     public void onSuggestionUpdated_laterSuggestionFromSamePackage_suggestionIsFromSamePackage() {
         SuggestedDeviceInfo suggestedDeviceInfo =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
         RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
         setAvailableRoutesList(TEST_PACKAGE_NAME);
         mediaManager.registerCallback(mCallback);
@@ -1149,11 +1142,7 @@ public class InfoMediaManagerTest {
     @Test
     public void setDeviceState_suggestionListenerNotified() {
         SuggestedDeviceInfo suggestedDeviceInfo =
-                new SuggestedDeviceInfo.Builder()
-                        .setDeviceDisplayName("device_name")
-                        .setRouteId(TEST_ID_3)
-                        .setType(0)
-                        .build();
+                new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
         RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
         setAvailableRoutesList(TEST_PACKAGE_NAME);
         mediaManager.registerCallback(mCallback);

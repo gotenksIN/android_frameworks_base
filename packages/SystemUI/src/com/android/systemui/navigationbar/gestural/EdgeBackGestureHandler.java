@@ -79,6 +79,7 @@ import androidx.annotation.DimenRes;
 
 import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
 import com.android.internal.policy.GestureNavigationSettingsObserver;
+import com.android.systemui.LauncherProxyService;
 import com.android.systemui.contextualeducation.GestureType;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.model.SysUiState;
@@ -87,7 +88,6 @@ import com.android.systemui.navigationbar.gestural.domain.GestureInteractor;
 import com.android.systemui.navigationbar.gestural.domain.TaskMatcher;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.NavigationEdgeBackPlugin;
-import com.android.systemui.recents.LauncherProxyService;
 import com.android.systemui.res.R;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -691,9 +691,18 @@ public class EdgeBackGestureHandler {
     public void onDisplayAddSystemDecorations(int displayId) {
         if (enableMultidisplayTrackpadBackGesture() && mIsEnabled) {
             mUiThreadContext.runWithScissors(() -> {
+                if (displayId == Display.DEFAULT_DISPLAY) {
+                    Log.w(TAG, "onDisplayAddSystemDecorations called for main display");
+                    return;
+                }
+                Display display = mDisplayManager.getDisplay(displayId);
+                if (display == null) {
+                    Log.w(TAG, "createDisplayBackGestureHandler: can't find display");
+                    return;
+                }
                 removeAndDisposeDisplayResource(displayId);
                 mDisplayBackGestureHandlers.put(displayId,
-                        createDisplayBackGestureHandler(displayId));
+                        createDisplayBackGestureHandler(display));
             });
         }
     }
@@ -709,12 +718,11 @@ public class EdgeBackGestureHandler {
         }
     }
 
-    private DisplayBackGestureHandler createDisplayBackGestureHandler(int displayId) {
-        Display display = mDisplayManager.getDisplay(displayId);
+    private DisplayBackGestureHandler createDisplayBackGestureHandler(Display display) {
         Context windowContext = mContext.createWindowContext(display,
                 WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL, null);
         WindowManager displayWindowManager = mDefaultWindowManager;
-        if (displayId != mMainDisplayId) {
+        if (display.getDisplayId() != mMainDisplayId) {
             displayWindowManager = windowContext.getSystemService(WindowManager.class);
             if (displayWindowManager == null) {
                 displayWindowManager = mDefaultWindowManager;
@@ -815,9 +823,8 @@ public class EdgeBackGestureHandler {
                 if (enableMultidisplayTrackpadBackGesture()) {
                     // Registers input event receiver and adds a nav bar panel window
                     for (Display display : mDisplayManager.getDisplays()) {
-                        int displayId = display.getDisplayId();
-                        mDisplayBackGestureHandlers.put(displayId,
-                                createDisplayBackGestureHandler(displayId));
+                        mDisplayBackGestureHandlers.put(display.getDisplayId(),
+                                createDisplayBackGestureHandler(display));
                     }
                 } else {
                     // Register input event receiver

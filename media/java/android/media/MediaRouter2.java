@@ -771,9 +771,8 @@ public final class MediaRouter2 {
      * router changes.
      *
      * <p>Calls using a previously registered callback will overwrite the previous executor.
-     *
-     * @hide
      */
+    @FlaggedApi(FLAG_ENABLE_SUGGESTED_DEVICE_API)
     public void registerDeviceSuggestionsCallback(
             @NonNull @CallbackExecutor Executor executor,
             @NonNull DeviceSuggestionsCallback deviceSuggestionsCallback) {
@@ -810,8 +809,8 @@ public final class MediaRouter2 {
      * Unregisters the given callback to not receive {@link SuggestedDeviceInfo} change events.
      *
      * @see #registerDeviceSuggestionsCallback(Executor, DeviceSuggestionsCallback)
-     * @hide
      */
+    @FlaggedApi(FLAG_ENABLE_SUGGESTED_DEVICE_API)
     public void unregisterDeviceSuggestionsCallback(@NonNull DeviceSuggestionsCallback callback) {
         Objects.requireNonNull(callback, "callback must not be null");
 
@@ -875,20 +874,20 @@ public final class MediaRouter2 {
     }
 
     /**
-     * Sets the suggested devices.
+     * Sets a list of {@link SuggestedDeviceInfo device suggestions}.
      *
-     * <p>Use this method to inform the system UI that this device is suggested in the Output
-     * Switcher and media controls.
+     * <p>Use this method to tell the system about device suggestions for the current router. The
+     * system may use these suggestions to populate system UI such as Output Switcher and media
+     * controls.
      *
-     * <p>You should pass null to this method to clear a previously set suggestion without setting a
-     * new one.
+     * <p>Suggestions will be expired automatically by the system, at which point you should call
+     * this method again if the suggestion is still relevant and should still be surfaced.
      *
      * @param suggestedDeviceInfo The {@link SuggestedDeviceInfo} the router suggests should be
      *     provided to the user.
-     * @hide
      */
     @FlaggedApi(FLAG_ENABLE_SUGGESTED_DEVICE_API)
-    public void setDeviceSuggestions(@Nullable List<SuggestedDeviceInfo> suggestedDeviceInfo) {
+    public void setDeviceSuggestions(@NonNull List<SuggestedDeviceInfo> suggestedDeviceInfo) {
         mImpl.setDeviceSuggestions(suggestedDeviceInfo);
     }
 
@@ -896,10 +895,9 @@ public final class MediaRouter2 {
      * Gets the current suggested devices.
      *
      * @return the suggested devices, keyed by the package name providing each suggestion list.
-     * @hide
      */
     @FlaggedApi(FLAG_ENABLE_SUGGESTED_DEVICE_API)
-    @Nullable
+    @NonNull
     public Map<String, List<SuggestedDeviceInfo>> getDeviceSuggestions() {
         return mImpl.getDeviceSuggestions();
     }
@@ -1092,6 +1090,12 @@ public final class MediaRouter2 {
             @NonNull RoutingController controller,
             @NonNull MediaRoute2Info route,
             long managerRequestId) {
+
+        if (Flags.fixTransferFromUserRouteToUnselectedSystemRoute() && route.isSystemRoute()) {
+            notifyTransfer(controller, getSystemController());
+            controller.release();
+            return;
+        }
 
         final int requestId = mNextRequestId.getAndIncrement();
 
@@ -1670,23 +1674,19 @@ public final class MediaRouter2 {
                 .build();
     }
 
-    /**
-     * Callback for receiving events about device suggestions
-     *
-     * @hide
-     */
+    /** Callback for receiving events about device suggestions */
+    @FlaggedApi(FLAG_ENABLE_SUGGESTED_DEVICE_API)
     public interface DeviceSuggestionsCallback {
 
         /**
-         * Called when suggestions are updated. Whenever you register a callback, this will be
-         * invoked with the current suggestions.
+         * Called when suggestions are updated.
          *
          * @param suggestingPackageName the package that provided the suggestions.
          * @param suggestedDeviceInfo the suggestions provided by the package.
          */
         void onSuggestionUpdated(
                 @NonNull String suggestingPackageName,
-                @Nullable List<SuggestedDeviceInfo> suggestedDeviceInfo);
+                @NonNull List<SuggestedDeviceInfo> suggestedDeviceInfo);
 
         /** Called when a router requests a suggestion from suggestion providers. */
         void onSuggestionRequested();
@@ -2985,9 +2985,9 @@ public final class MediaRouter2 {
                 return;
             }
 
-            // If this call is trying to transfer to a selected system route, we let them
-            // through as a provider driven transfer in order to update the transfer reason and
-            // initiator data.
+            // If this call is trying to transfer from an existing system route to a selected system
+            // route, we will handle the transfer through as a provider driven transfer in order to
+            // update the transfer reason and initiator data.
             boolean isSystemRouteReselection =
                     Flags.enableBuiltInSpeakerRouteSuitabilityStatuses()
                             && sessionInfo.isSystemSession()
@@ -2997,6 +2997,19 @@ public final class MediaRouter2 {
                     || isSystemRouteReselection) {
                 transferToRoute(sessionInfo, route, mClientUser, mClientPackageName);
             } else {
+                RoutingSessionInfo systemSessionInfo = mSystemController.getRoutingSessionInfo();
+                boolean isTransferFromUserRouteToUnselectedSystemRoute =
+                        Flags.fixTransferFromUserRouteToUnselectedSystemRoute()
+                                && !sessionInfo.isSystemSession()
+                                && route.isSystemRoute()
+                                && !systemSessionInfo.getSelectedRoutes().contains(route.getId());
+                if (isTransferFromUserRouteToUnselectedSystemRoute) {
+                    // During a transfer from a user route to an unselected system route, the system
+                    // session must first be transferred to the target system route. Subsequently,
+                    // the user route to system route transfer is processed by releasing the user
+                    // route.
+                    transferToRoute(systemSessionInfo, route, mClientUser, mClientPackageName);
+                }
                 requestCreateSession(sessionInfo, route);
             }
         }

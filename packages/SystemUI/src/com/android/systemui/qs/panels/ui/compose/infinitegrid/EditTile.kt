@@ -58,6 +58,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -106,6 +107,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.MeasureScope
@@ -118,6 +121,7 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -148,6 +152,7 @@ import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.ToggleTargetSize
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.EditModeTileDefaults.AUTO_SCROLL_DISTANCE
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.EditModeTileDefaults.AUTO_SCROLL_SPEED
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.EditModeTileDefaults.AVAILABLE_TILES_GRID_ALPHA
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.EditModeTileDefaults.AvailableTilesGridMinHeight
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.EditModeTileDefaults.CurrentTilesGridPadding
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.EditModeTileDefaults.GridBackgroundCornerRadius
@@ -188,6 +193,7 @@ object TileType
 @Composable
 private fun EditModeTopBar(
     onStopEditing: () -> Unit,
+    modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val surfaceEffect2 = LocalAndroidColorScheme.current.surfaceEffect2
@@ -218,7 +224,8 @@ private fun EditModeTopBar(
             }
         },
         actions = actions,
-        modifier = Modifier.padding(vertical = 8.dp),
+        modifier = modifier.padding(vertical = 8.dp),
+        windowInsets = WindowInsets(0.dp),
     )
 }
 
@@ -240,10 +247,11 @@ sealed interface EditAction {
 fun DefaultEditTileGrid(
     listState: EditTileListState,
     allTiles: List<EditTileViewModel>,
-    modifier: Modifier,
     snapshotViewModel: InfiniteGridSnapshotViewModel,
-    onStopEditing: () -> Unit,
-    onEditAction: (EditAction) -> Unit,
+    modifier: Modifier = Modifier,
+    scrollState: ScrollState = rememberScrollState(),
+    onStopEditing: () -> Unit = {},
+    onEditAction: (EditAction) -> Unit = {},
 ) {
     val selectionState = rememberSelectionState()
 
@@ -259,7 +267,7 @@ fun DefaultEditTileGrid(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            EditModeTopBar(onStopEditing = onStopEditing) {
+            EditModeTopBar(onStopEditing = onStopEditing, modifier = Modifier.statusBarsPadding()) {
                 AnimatedVisibility(snapshotViewModel.canUndo, enter = fadeIn(), exit = fadeOut()) {
                     TextButton(
                         enabled = snapshotViewModel.canUndo,
@@ -290,8 +298,6 @@ fun DefaultEditTileGrid(
         CompositionLocalProvider(
             LocalOverscrollFactory provides rememberOffsetOverscrollEffectFactory()
         ) {
-            val scrollState = rememberScrollState()
-
             AutoScrollGrid(listState, scrollState, innerPadding)
 
             LaunchedEffect(listState.dragType) {
@@ -385,6 +391,8 @@ fun DefaultEditTileGrid(
                         }
                     }
                 }
+
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.systemBars))
             }
         }
     }
@@ -593,24 +601,35 @@ private fun AvailableTileGrid(
 
     // Available tiles
     Column(
-        verticalArrangement = spacedBy(TileArrangementPadding),
+        verticalArrangement = spacedBy(2.dp),
         horizontalAlignment = Alignment.Start,
         modifier =
             Modifier.fillMaxWidth().wrapContentHeight().testTag(AVAILABLE_TILES_GRID_TEST_TAG),
     ) {
-        groupedTileSpecs.forEach { (category, tileSpecs) ->
+        groupedTileSpecs.entries.forEachIndexed { index, (category, tileSpecs) ->
             key(category) {
-                val surfaceColor = MaterialTheme.colorScheme.surface
+                val shape =
+                    when (index) {
+                        0 ->
+                            RoundedCornerShape(
+                                topStart = GridBackgroundCornerRadius,
+                                topEnd = GridBackgroundCornerRadius,
+                            )
+                        groupedTileSpecs.size - 1 ->
+                            RoundedCornerShape(
+                                bottomStart = GridBackgroundCornerRadius,
+                                bottomEnd = GridBackgroundCornerRadius,
+                            )
+                        else -> RectangleShape
+                    }
                 Column(
                     verticalArrangement = spacedBy(16.dp),
                     modifier =
-                        Modifier.drawBehind {
-                                drawRoundRect(
-                                    surfaceColor,
-                                    cornerRadius = CornerRadius(GridBackgroundCornerRadius.toPx()),
-                                    alpha = .32f,
-                                )
-                            }
+                        Modifier.background(
+                                brush = SolidColor(MaterialTheme.colorScheme.surface),
+                                shape = shape,
+                                alpha = AVAILABLE_TILES_GRID_ALPHA,
+                            )
                             .padding(16.dp),
                 ) {
                     CategoryHeader(
@@ -642,11 +661,10 @@ private fun AvailableTileGrid(
                 }
             }
         }
-        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.systemBars))
     }
 }
 
-fun gridHeight(rows: Int, tileHeight: Dp, tilePadding: Dp, gridPadding: Dp): Dp {
+private fun gridHeight(rows: Int, tileHeight: Dp, tilePadding: Dp, gridPadding: Dp): Dp {
     return ((tileHeight + tilePadding) * rows) + gridPadding * 2
 }
 
@@ -820,7 +838,7 @@ private fun TileGridCell(
                 coroutineScope.launch { resizingState.toggleCurrentValue() }
             }
         },
-        onClickLabel = decorationClickLabel,
+        contentDescription = decorationClickLabel,
     ) {
         val placeableColor = MaterialTheme.colorScheme.primary.copy(alpha = .4f)
         val backgroundColor by
@@ -843,7 +861,7 @@ private fun TileGridCell(
 
         Box(
             Modifier.fillMaxSize()
-                .semantics(mergeDescendants = true) {
+                .clearAndSetSemantics {
                     this.stateDescription = stateDescription
                     contentDescription = cell.tile.label.text
                     customActions =
@@ -908,6 +926,10 @@ private fun AvailableTileGridCell(
 
     val alpha by animateFloatAsState(if (cell.isCurrent) .38f else 1f)
     val colors = EditModeTileDefaults.editTileColors()
+    val onClick: () -> Unit = {
+        onAddTile(cell.tileSpec)
+        selectionState.select(cell.tileSpec)
+    }
 
     // Displays the tile as an icon tile with the label underneath
     Column(
@@ -916,9 +938,8 @@ private fun AvailableTileGridCell(
         modifier =
             modifier
                 .graphicsLayer { this.alpha = alpha }
-                .semantics(mergeDescendants = true) {
-                    stateDescription?.let { this.stateDescription = it }
-                },
+                .clickable(enabled = !cell.isCurrent, onClick = onClick)
+                .semantics { stateDescription?.let { this.stateDescription = it } },
     ) {
         Box(Modifier.fillMaxWidth().height(TileHeight)) {
             val draggableModifier =
@@ -933,22 +954,13 @@ private fun AvailableTileGridCell(
                         selectionState.unSelect()
                     }
                 }
-            val onClick: () -> Unit = {
-                onAddTile(cell.tileSpec)
-                selectionState.select(cell.tileSpec)
-            }
-            Box(
-                draggableModifier
-                    .fillMaxSize()
-                    .clickable(enabled = !cell.isCurrent, onClick = onClick)
-                    .tileBackground { colors.background }
-            ) {
+            Box(draggableModifier.fillMaxSize().tileBackground { colors.background }) {
                 // Icon
                 SmallTileContent(
                     iconProvider = { cell.icon },
                     color = colors.icon,
                     animateToEnd = true,
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier.align(Alignment.Center).clearAndSetSemantics {},
                 )
             }
 
@@ -1060,14 +1072,15 @@ private object EditModeTileDefaults {
     const val PLACEHOLDER_ALPHA = .3f
     const val AUTO_SCROLL_DISTANCE = 100
     const val AUTO_SCROLL_SPEED = 2 // 2ms per pixel
+    const val AVAILABLE_TILES_GRID_ALPHA = .32f
     val CurrentTilesGridPadding = 10.dp
     val AvailableTilesGridMinHeight = 200.dp
-    val GridBackgroundCornerRadius = 42.dp
+    val GridBackgroundCornerRadius = 28.dp
 
     @Composable
     fun editTileColors(): TileColors =
         TileColors(
-            background = LocalAndroidColorScheme.current.surfaceEffect2,
+            background = LocalAndroidColorScheme.current.surfaceEffect1,
             iconBackground = Color.Transparent,
             label = MaterialTheme.colorScheme.onSurface,
             secondaryLabel = MaterialTheme.colorScheme.onSurface,

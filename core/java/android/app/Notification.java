@@ -17,6 +17,7 @@
 package android.app;
 
 import static android.annotation.Dimension.DP;
+import static android.app.Flags.FLAG_NM_SUMMARIZATION;
 import static android.app.Flags.evenlyDividedCallStyleActionLayout;
 import static android.app.Flags.notificationsRedesignTemplates;
 import static android.app.admin.DevicePolicyResources.Drawables.Source.NOTIFICATION;
@@ -1240,6 +1241,12 @@ public class Notification implements Parcelable
      * @hide
      */
     static public IBinder processAllowlistToken;
+
+    /**
+     * @hide
+     */
+    public static final String EXTRA_CONTAINS_SUMMARIZATION
+            = "android.app.extra.contains_summarization";
 
     /**
      * {@link #extras} key: this is the title of the notification,
@@ -4647,6 +4654,18 @@ public class Notification implements Parcelable
             }
         }
 
+        /**
+         * Sets whether this notification contains text that was computationally summarized from
+         * other sources. The OS may choose to display this notification with different styling or
+         * choose not to summarize this content if this is true.
+         */
+        @FlaggedApi(Flags.FLAG_NM_SUMMARIZATION)
+        @NonNull
+        public Builder setHasSummarizedContent(boolean hasSummarizedContent) {
+            mN.extras.putBoolean(EXTRA_CONTAINS_SUMMARIZATION, hasSummarizedContent);
+            return this;
+        }
+
         private ContrastColorUtil getColorUtil() {
             if (mColorUtil == null) {
                 mColorUtil = ContrastColorUtil.getInstance(mContext);
@@ -6249,6 +6268,12 @@ public class Notification implements Parcelable
             final float extraMarginEndDpIfVisible = viewWidthDp + iconMarginDp;
             result.setRightIconState(rightIcon != null /* visible */, viewWidthDp,
                     viewHeightDp, extraMarginEndDpIfVisible, spaceForExpanderDp);
+
+            if (mN.isPromotedOngoing() && !mParams.mHeaderless) {
+                result.mHeadingExtraMarginSet.setValues(
+                        /* valueIfGone = */ contentMarginDp,
+                        /* valueIfVisible = */ extraMarginEndDpIfVisible + contentMarginDp);
+            }
         }
 
         /**
@@ -8179,6 +8204,14 @@ public class Notification implements Parcelable
 
     private boolean hasLargeIcon() {
         return mLargeIcon != null || largeIcon != null;
+    }
+
+    /**
+     * Returns whether this notification contains computationally summarized text.
+     */
+    @FlaggedApi(FLAG_NM_SUMMARIZATION)
+    public boolean hasSummarizedContent() {
+        return extras != null && extras.getBoolean(EXTRA_CONTAINS_SUMMARIZATION);
     }
 
     /**

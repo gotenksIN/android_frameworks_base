@@ -2101,9 +2101,15 @@ public final class DisplayManagerService extends SystemService {
                             : projection.getLaunchCookie().binder;
                     int taskId = projection.getTaskId();
                     if (taskWindowContainerToken == null) {
-                        // Record a particular display.
-                        session = ContentRecordingSession.createDisplaySession(
-                                virtualDisplayConfig.getDisplayIdToMirror());
+                        if (projection.isRecordingOverlay()) {
+                            // Record an overlay session.
+                            session = ContentRecordingSession.createOverlaySession(
+                                    virtualDisplayConfig.getDisplayIdToMirror(), callingUid);
+                        } else {
+                            // Record a particular display.
+                            session = ContentRecordingSession.createDisplaySession(
+                                    virtualDisplayConfig.getDisplayIdToMirror());
+                        }
                     } else {
                         // Record a single task indicated by the launch cookie.
                         session = ContentRecordingSession.createTaskSession(

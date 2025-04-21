@@ -2662,10 +2662,15 @@
          If false, Content-disposition fragments are ignored -->
     <bool name="config_mms_content_disposition_support">true</bool>
 
-    <!-- MMS user agent string -->
+    <!-- MMS user agent string, for example OemNameDeviceName
+         If the string contains a '%s' format string then that substring will be replaced
+         with the value of Build.MODEL , ie
+         <string name="config_mms_user_agent">OemName%s</string> -->
     <string name="config_mms_user_agent" translatable="false"></string>
 
-    <!-- MMS user agent prolfile url -->
+    <!-- MMS user agent prolfile url, for example https://uaprof.oem_name.com/DeviceName.xml
+         if the string contains a '%s' format string then that substring will be replaced
+         with the value of Build.MODEL , ie https://uaprof.oem_name.com/%s.xml -->
     <string name="config_mms_user_agent_profile_url" translatable="false"></string>
 
     <!-- The default list of possible CMF Names|Style|ColorSource. This array can be
@@ -6215,6 +6220,11 @@
 
     <!-- If true, multiuser switcher would be automatically enabled when second user is created on the device. -->
     <bool name="config_enableUserSwitcherUponUserCreation">true</bool>
+
+    <!--
+    Whether the user switching can only happen by logging out and going through the system user (login screen).
+    -->
+    <bool name="config_userSwitchingMustGoThroughLoginScreen">false</bool>
 
     <!-- Set to true to make assistant show in front of the dream/screensaver. -->
     <bool name="config_assistantOnTopOfDream">false</bool>

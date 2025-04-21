@@ -86,7 +86,6 @@ import static android.view.contentprotection.flags.Flags.createAccessibilityOver
 import static com.android.hardware.input.Flags.enableNew25q2Keycodes;
 import static com.android.hardware.input.Flags.enableTalkbackAndMagnifierKeyGestures;
 import static com.android.hardware.input.Flags.enableVoiceAccessKeyGestures;
-import static com.android.hardware.input.Flags.inputManagerLifecycleSupport;
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.SCREENSHOT_KEYCHORD_DELAY;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.CAMERA_LENS_COVERED;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.CAMERA_LENS_COVER_ABSENT;
@@ -3655,7 +3654,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_UP,
                 KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_DOWN,
                 KeyGestureEvent.KEY_GESTURE_TYPE_RECENT_APPS_SWITCHER,
-                KeyGestureEvent.KEY_GESTURE_TYPE_ALL_APPS,
                 KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_SEARCH,
                 KeyGestureEvent.KEY_GESTURE_TYPE_LANGUAGE_SWITCH,
                 KeyGestureEvent.KEY_GESTURE_TYPE_ACCESSIBILITY_SHORTCUT,
@@ -3672,6 +3670,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
         if (enableVoiceAccessKeyGestures()) {
             supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS);
+        }
+        if (!com.android.window.flags.Flags.enableKeyGestureHandlerForRecents()) {
+            // When enableKeyGestureHandlerForRecents is enabled, the event is handled in the
+            // recents app.
+            supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_ALL_APPS);
         }
         mInputManager.registerKeyGestureEventHandler(supportedGestures,
                 PhoneWindowManager.this::handleKeyGestureEvent);
@@ -6545,9 +6548,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             statusBar.setCurrentUser(newUserId);
         }
         mModifierShortcutManager.setCurrentUser(UserHandle.of(newUserId));
-        if (!inputManagerLifecycleSupport()) {
-            mInputManagerInternal.setCurrentUser(newUserId);
-        }
     }
 
     @Override

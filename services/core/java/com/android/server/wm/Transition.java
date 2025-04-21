@@ -45,6 +45,7 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.TransitionFlags;
 import static android.view.WindowManager.TransitionType;
 import static android.view.WindowManager.transitTypeToString;
+import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 import static android.window.TaskFragmentAnimationParams.DEFAULT_ANIMATION_BACKGROUND_COLOR;
 import static android.window.TransitionInfo.AnimationOptions;
 import static android.window.TransitionInfo.FLAGS_IS_OCCLUDED_NO_ANIMATION;
@@ -76,7 +77,6 @@ import static com.android.server.wm.StartingData.AFTER_TRANSITION_FINISH;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_PREDICT_BACK;
 import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
 import static com.android.server.wm.WindowState.BLAST_TIMEOUT_DURATION;
-import static com.android.window.flags.Flags.enableDisplayFocusInShellTransitions;
 
 import android.annotation.ColorInt;
 import android.annotation.IntDef;
@@ -2200,7 +2200,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 return true;
             }
         }
-        if (enableDisplayFocusInShellTransitions() && mOnTopDisplayStart
+        if (ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue() && mOnTopDisplayStart
                 != mController.mAtm.mRootWindowContainer.getTopFocusedDisplayContent()) {
             return true;
         }
@@ -2235,7 +2235,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             includesOrderChange = true;
             break;
         }
-        includesOrderChange |= enableDisplayFocusInShellTransitions()
+        includesOrderChange |= ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
                 && mOnTopDisplayStart != mOnTopDisplayAtReady;
         if (!includesOrderChange && !reportCurrent) {
             // This transition doesn't include an order change, so if it isn't required to report
@@ -2268,7 +2268,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             onTopTasksEnd = reportedOnTop != null ? reportedOnTop : new ArrayList<>();
             onTopTasksEnd.clear();
 
-            if (enableDisplayFocusInShellTransitions()
+            if (ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
                     && mOnTopDisplayStart != onTopDisplayEnd
                     && displayId == onTopDisplayEnd.mDisplayId) {
                 addToTopChange(onTopDisplayEnd);
@@ -4018,7 +4018,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (mReadyGroups.containsKey(wc)) {
                 return;
             }
-            mReadyGroups.put(wc, false);
+            mReadyGroups.put(wc, mReadyOverride);
         }
 
         /**
@@ -4039,11 +4039,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             }
         }
 
-        /** Marks this as ready regardless of individual groups. */
+        /** Marks everything as ready by default. */
         void setAllReady() {
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, " Setting allReady override");
             mUsed = true;
             mReadyOverride = true;
+            for (int i = 0; i < mReadyGroups.size(); ++i) {
+                mReadyGroups.setValueAt(i, true);
+            }
         }
 
         /** @return true if all tracked subtrees are ready. */
@@ -4056,9 +4059,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (!mUsed) return false;
             // If we are deferring readiness, we never report ready. This is usually temporary.
             if (mDeferReadyDepth > 0) return false;
-            // Next check all the ready groups to see if they are ready. We can short-cut this if
-            // ready-override is set (which is treated as "everything is marked ready").
-            if (mReadyOverride) return true;
+            // Next check all the ready groups to see if they are ready.
             for (int i = mReadyGroups.size() - 1; i >= 0; --i) {
                 final WindowContainer wc = mReadyGroups.keyAt(i);
                 if (!wc.isAttached() || !wc.isVisibleRequested()) continue;

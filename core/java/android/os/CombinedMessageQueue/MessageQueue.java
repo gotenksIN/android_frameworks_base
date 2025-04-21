@@ -130,6 +130,7 @@ public final class MessageQueue {
     // Not @FastNative since significant time is spent in the native code as it may invoke
     // application callbacks.
     private native void nativePollOnce(long ptr, int timeoutMillis); /*non-static for callbacks*/
+
     @RavenwoodRedirect
     @CriticalNative
     private native static void nativeWake(long ptr);
@@ -2700,8 +2701,16 @@ public final class MessageQueue {
             return false;
         }
         mLooperThread = Thread.currentThread();
-        while ((mQuittingRefCountValue & ~QUITTING_MASK) != 0) {
-            LockSupport.park();
+        boolean wasInterrupted = false;
+        try {
+            while ((mQuittingRefCountValue & ~QUITTING_MASK) != 0) {
+                LockSupport.park();
+                wasInterrupted |= Thread.interrupted();
+            }
+        } finally {
+            if (wasInterrupted) {
+                mLooperThread.interrupt();
+            }
         }
         return true;
     }

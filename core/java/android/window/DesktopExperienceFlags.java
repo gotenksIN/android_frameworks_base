@@ -77,6 +77,14 @@ public enum DesktopExperienceFlags {
     ENABLE_DESKTOP_SWIPE_BACK_MINIMIZE_ANIMATION_BUGFIX(
             Flags::enableDesktopSwipeBackMinimizeAnimationBugfix, false,
             Flags.FLAG_ENABLE_DESKTOP_SWIPE_BACK_MINIMIZE_ANIMATION_BUGFIX),
+    ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION(
+            Flags::enableDesktopTabTearingLaunchAnimation, false,
+            Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION),
+    ENABLE_DESKTOP_TASK_LIMIT_SEPARATE_TRANSITION(
+            Flags::enableDesktopTaskLimitSeparateTransition, false,
+            Flags.FLAG_ENABLE_DESKTOP_TASK_LIMIT_SEPARATE_TRANSITION),
+    ENABLE_DESKTOP_WINDOWING_PIP(Flags::enableDesktopWindowingPip, false,
+            Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP),
     ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT(
             com.android.server.display.feature.flags.Flags::enableDisplayContentModeManagement,
             true, FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT),
@@ -117,6 +125,8 @@ public enum DesktopExperienceFlags {
             false, Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY),
     ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE(Flags::enableProjectedDisplayDesktopMode, false,
             Flags.FLAG_ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE),
+    ENABLE_SEE_THROUGH_TASK_FRAGMENTS(Flags::enableSeeThroughTaskFragments,
+            false, Flags.FLAG_ENABLE_SEE_THROUGH_TASK_FRAGMENTS),
     ENABLE_TASKBAR_CONNECTED_DISPLAYS(Flags::enableTaskbarConnectedDisplays, true,
             Flags.FLAG_ENABLE_TASKBAR_CONNECTED_DISPLAYS),
     ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS(Flags::enterDesktopByDefaultOnFreeformDisplays,
@@ -198,12 +208,7 @@ public enum DesktopExperienceFlags {
 
     private static boolean checkIfFlagShouldBeOverridden(@Nullable String flagName,
             boolean defaultValue) {
-        if (!Flags.showDesktopWindowingDevOption()) return false;
-        if (flagName == null || flagName.isEmpty()) return defaultValue;
-        int lastDot = flagName.lastIndexOf('.');
-        String baseName = lastDot >= 0 ? flagName.substring(lastDot + 1) : flagName;
-        return SystemProperties.getBoolean(SYSTEM_PROPERTY_OVERRIDE_PREFIX + baseName,
-                defaultValue);
+        return defaultValue;
     }
 
     private static boolean getToggleOverride() {

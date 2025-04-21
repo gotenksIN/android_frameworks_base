@@ -29,6 +29,7 @@ import static com.android.server.accessibility.autoclick.AutoclickScrollPanel.DI
 import static com.android.server.accessibility.autoclick.AutoclickTypePanel.AUTOCLICK_TYPE_DOUBLE_CLICK;
 import static com.android.server.accessibility.autoclick.AutoclickTypePanel.AUTOCLICK_TYPE_DRAG;
 import static com.android.server.accessibility.autoclick.AutoclickTypePanel.AUTOCLICK_TYPE_LEFT_CLICK;
+import static com.android.server.accessibility.autoclick.AutoclickTypePanel.AUTOCLICK_TYPE_LONG_PRESS;
 import static com.android.server.accessibility.autoclick.AutoclickTypePanel.AUTOCLICK_TYPE_RIGHT_CLICK;
 import static com.android.server.accessibility.autoclick.AutoclickTypePanel.AUTOCLICK_TYPE_SCROLL;
 import static com.android.server.accessibility.autoclick.AutoclickTypePanel.AutoclickType;
@@ -85,9 +86,16 @@ public class AutoclickController extends BaseEventStreamTransformation {
     public static final int DEFAULT_AUTOCLICK_DELAY_TIME = Flags.enableAutoclickIndicator()
             ? AUTOCLICK_DELAY_WITH_INDICATOR_DEFAULT : AUTOCLICK_DELAY_DEFAULT;
 
+    // Duration before a press turns into a long press.
+    // Factor 1.5 is needed, otherwise a long press is not safely detected.
+    public static final long LONG_PRESS_TIMEOUT =
+            (long) (ViewConfiguration.getLongPressTimeout() * 1.5f);
+
     private static final String LOG_TAG = AutoclickController.class.getSimpleName();
-    // TODO(b/393559560): Finalize scroll amount.
-    private static final float SCROLL_AMOUNT = 1.0f;
+    private static final float SCROLL_AMOUNT = 0.5f;
+    protected static final long CONTINUOUS_SCROLL_INTERVAL = 30;
+    private Handler mContinuousScrollHandler;
+    private Runnable mContinuousScrollRunnable;
 
     private final AccessibilityTraceManager mTrace;
     private final Context mContext;
@@ -117,13 +125,20 @@ public class AutoclickController extends BaseEventStreamTransformation {
     private @AutoclickType int mActiveClickType = AUTOCLICK_TYPE_LEFT_CLICK;
 
     // Default scroll direction is DIRECTION_NONE.
-    private @AutoclickScrollPanel.ScrollDirection int mHoveredDirection = DIRECTION_NONE;
+    @VisibleForTesting
+    protected @AutoclickScrollPanel.ScrollDirection int mHoveredDirection = DIRECTION_NONE;
 
     // True during the duration of a dragging event.
     private boolean mDragModeIsDragging = false;
     // The MotionEvent downTime attribute associated with the originating click for a dragging
     // move.
     private long mDragModeClickDownTime;
+
+    // True during the duration of a long press event.
+    private boolean mHasOngoingLongPress = false;
+    // The MotionEvent downTime attribute associated with the originating click for a long press
+    // move.
+    private long mLongPressDownTime;
 
     @VisibleForTesting
     final ClickPanelControllerInterface clickPanelController =
@@ -169,31 +184,22 @@ public class AutoclickController extends BaseEventStreamTransformation {
                     // Update the hover direction.
                     if (hovered) {
                         mHoveredDirection = direction;
-                    } else if (mHoveredDirection == direction) {
-                        // Safety check: Only clear hover tracking if this is the same button
-                        // we're currently tracking.
-                        mHoveredDirection = AutoclickScrollPanel.DIRECTION_NONE;
-                    }
 
-                    // For exit button, we only trigger hover state changes, the autoclick system
-                    // will handle the countdown.
-                    if (direction == AutoclickScrollPanel.DIRECTION_EXIT) {
-                        return;
-                    }
-
-                    // Handle all non-exit buttons when hovered.
-                    if (hovered) {
-                        // Clear the indicator.
-                        if (mAutoclickIndicatorScheduler != null) {
-                            mAutoclickIndicatorScheduler.cancel();
-                            if (mAutoclickIndicatorView != null) {
-                                mAutoclickIndicatorView.clearIndicator();
-                            }
+                        // For exit button, return early and the autoclick system will handle the
+                        // countdown then exit scroll mode.
+                        if (direction == AutoclickScrollPanel.DIRECTION_EXIT) {
+                            return;
                         }
-                        // Perform scroll action.
+
+                        // For scroll directions, start continuous scrolling.
                         if (direction != DIRECTION_NONE) {
-                            handleScroll(direction);
+                            startContinuousScroll(direction);
                         }
+                    } else if (mHoveredDirection == direction) {
+                        // If not hovered, stop scrolling — but only if the mouse leaves the same
+                        // button that started it. This avoids stopping the scroll when the mouse
+                        // briefly moves over other buttons.
+                        stopContinuousScroll();
                     }
                 }
             };
@@ -255,6 +261,16 @@ public class AutoclickController extends BaseEventStreamTransformation {
         mAutoclickScrollPanel = new AutoclickScrollPanel(mContext, mWindowManager,
                 mScrollPanelController);
 
+        // Initialize continuous scroll handler and runnable.
+        mContinuousScrollHandler = new Handler(handler.getLooper());
+        mContinuousScrollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                handleScroll(mHoveredDirection);
+                mContinuousScrollHandler.postDelayed(this, CONTINUOUS_SCROLL_INTERVAL);
+            }
+        };
+
         mAutoclickTypePanel.show();
         mWindowManager.addView(mAutoclickIndicatorView, mAutoclickIndicatorView.getLayoutParams());
     }
@@ -311,6 +327,11 @@ public class AutoclickController extends BaseEventStreamTransformation {
             mAutoclickScrollPanel.hide();
             mAutoclickScrollPanel = null;
         }
+
+        if (mContinuousScrollHandler != null) {
+            mContinuousScrollHandler.removeCallbacks(mContinuousScrollRunnable);
+            mContinuousScrollHandler = null;
+        }
     }
 
     private void scheduleClick(MotionEvent event, int policyFlags) {
@@ -354,6 +375,14 @@ public class AutoclickController extends BaseEventStreamTransformation {
      * Handles scroll operations in the specified direction.
      */
     private void handleScroll(@AutoclickScrollPanel.ScrollDirection int direction) {
+        // Remove the autoclick indicator view when hovering on directional buttons.
+        if (mAutoclickIndicatorScheduler != null) {
+            mAutoclickIndicatorScheduler.cancel();
+            if (mAutoclickIndicatorView != null) {
+                mAutoclickIndicatorView.clearIndicator();
+            }
+        }
+
         final long now = SystemClock.uptimeMillis();
 
         // Create pointer properties.
@@ -414,7 +443,24 @@ public class AutoclickController extends BaseEventStreamTransformation {
         if (mAutoclickScrollPanel != null) {
             mAutoclickScrollPanel.hide();
         }
+        stopContinuousScroll();
     }
+
+    private void startContinuousScroll(@AutoclickScrollPanel.ScrollDirection int direction) {
+        if (mContinuousScrollHandler != null) {
+            handleScroll(direction);
+            mContinuousScrollHandler.postDelayed(mContinuousScrollRunnable,
+                    CONTINUOUS_SCROLL_INTERVAL);
+        }
+    }
+
+    private void stopContinuousScroll() {
+        if (mContinuousScrollHandler != null) {
+            mContinuousScrollHandler.removeCallbacks(mContinuousScrollRunnable);
+        }
+        mHoveredDirection = DIRECTION_NONE;
+    }
+
 
     @VisibleForTesting
     void onChangeForTesting(boolean selfChange, Uri uri) {
@@ -424,6 +470,11 @@ public class AutoclickController extends BaseEventStreamTransformation {
     @VisibleForTesting
     boolean isDraggingForTesting() {
         return mDragModeIsDragging;
+    }
+
+    @VisibleForTesting
+    boolean hasOngoingLongPressForTesting() {
+        return mHasOngoingLongPress;
     }
 
     /**
@@ -622,6 +673,8 @@ public class AutoclickController extends BaseEventStreamTransformation {
             // update scheduled time.
             if (mIndicatorCallbackActive
                     && scheduledShowIndicatorTime > mScheduledShowIndicatorTime) {
+                // Clear any existing indicator.
+                mAutoclickIndicatorView.clearIndicator();
                 mScheduledShowIndicatorTime = scheduledShowIndicatorTime;
                 return;
             }
@@ -768,6 +821,11 @@ public class AutoclickController extends BaseEventStreamTransformation {
             if (mDragModeIsDragging) {
                 clearDraggingState();
             }
+
+            if (mHasOngoingLongPress) {
+                clearLongPressState();
+            }
+
             resetInternalState();
             mHandler.removeCallbacks(this);
         }
@@ -787,6 +845,23 @@ public class AutoclickController extends BaseEventStreamTransformation {
 
             resetSelectedClickTypeIfNecessary();
             mDragModeIsDragging = false;
+        }
+
+        // Cancel the pending long press to avoid potential side effects from
+        // leaving it in an inconsistent state.
+        private void clearLongPressState() {
+            if (mLastMotionEvent != null) {
+                // A final ACTION_CANCEL event needs to be sent to alert the system that long press
+                // has ended.
+                MotionEvent cancelEvent = MotionEvent.obtain(mLastMotionEvent);
+                cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
+                cancelEvent.setDownTime(mLongPressDownTime);
+                AutoclickController.super.onMotionEvent(cancelEvent, cancelEvent,
+                        mEventPolicyFlags);
+            }
+
+            resetSelectedClickTypeIfNecessary();
+            mHasOngoingLongPress = false;
         }
 
         /**
@@ -943,6 +1018,12 @@ public class AutoclickController extends BaseEventStreamTransformation {
                 return;
             }
 
+            // Clear pending long press in case another click action jumps between long pressing
+            // down and up events.
+            if (mHasOngoingLongPress) {
+                clearLongPressState();
+            }
+
             // Always triggers left-click when the cursor hovers over the autoclick type panel, to
             // always allow users to change a different click type. Otherwise, if one chooses the
             // right-click, this user won't be able to rely on autoclick to select other click
@@ -983,12 +1064,16 @@ public class AutoclickController extends BaseEventStreamTransformation {
                     sendMotionEvent(actionButton, now + doubleTapMinimumTimeout);
                     return;
                 case AUTOCLICK_TYPE_DRAG:
-                        if (mDragModeIsDragging) {
-                            endDragEvent();
-                        } else {
-                            startDragEvent();
-                        }
-                        return;
+                    if (mDragModeIsDragging) {
+                        endDragEvent();
+                    } else {
+                        startDragEvent();
+                    }
+                    return;
+                case AUTOCLICK_TYPE_LONG_PRESS:
+                    actionButton = BUTTON_PRIMARY;
+                    sendLongPress();
+                    return;
                 default:
                     break;
             }
@@ -1043,22 +1128,8 @@ public class AutoclickController extends BaseEventStreamTransformation {
         }
 
         private void sendMotionEvent(int actionButton, long eventTime) {
-            MotionEvent downEvent =
-                    MotionEvent.obtain(
-                            /* downTime= */ eventTime,
-                            /* eventTime= */ eventTime,
-                            MotionEvent.ACTION_DOWN,
-                            /* pointerCount= */ 1,
-                            mTempPointerProperties,
-                            mTempPointerCoords,
-                            mMetaState,
-                            actionButton,
-                            /* xPrecision= */ 1.0f,
-                            /* yPrecision= */ 1.0f,
-                            mLastMotionEvent.getDeviceId(),
-                            /* edgeFlags= */ 0,
-                            mLastMotionEvent.getSource(),
-                            mLastMotionEvent.getFlags());
+            MotionEvent downEvent = buildMotionEvent(
+                    eventTime, eventTime, actionButton, mLastMotionEvent);
 
             MotionEvent pressEvent = MotionEvent.obtain(downEvent);
             pressEvent.setAction(MotionEvent.ACTION_BUTTON_PRESS);
@@ -1084,6 +1155,66 @@ public class AutoclickController extends BaseEventStreamTransformation {
 
             AutoclickController.super.onMotionEvent(upEvent, upEvent, mEventPolicyFlags);
             upEvent.recycle();
+        }
+
+        // TODO(b/400744833): Reset Autoclick type to left click whenever a long press happens.
+        private void sendLongPress() {
+            mHasOngoingLongPress = true;
+            mLongPressDownTime = SystemClock.uptimeMillis();
+            MotionEvent downEvent = buildMotionEvent(
+                    mLongPressDownTime, mLongPressDownTime, BUTTON_PRIMARY, mLastMotionEvent);
+
+            MotionEvent pressEvent = MotionEvent.obtain(downEvent);
+            pressEvent.setAction(MotionEvent.ACTION_BUTTON_PRESS);
+
+            AutoclickController.super.onMotionEvent(downEvent, downEvent, mEventPolicyFlags);
+            AutoclickController.super.onMotionEvent(pressEvent, pressEvent, mEventPolicyFlags);
+
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    long upTime = SystemClock.uptimeMillis();
+                    MotionEvent releaseEvent = buildMotionEvent(
+                            mLongPressDownTime, upTime, BUTTON_PRIMARY, downEvent);
+                    releaseEvent.setAction(MotionEvent.ACTION_BUTTON_RELEASE);
+                    releaseEvent.setButtonState(0);
+
+                    MotionEvent upEvent = MotionEvent.obtain(releaseEvent);
+                    upEvent.setAction(MotionEvent.ACTION_UP);
+                    upEvent.setButtonState(0);
+
+                    AutoclickController.super.onMotionEvent(
+                            releaseEvent, releaseEvent, mEventPolicyFlags);
+                    AutoclickController.super.onMotionEvent(
+                            upEvent, upEvent, mEventPolicyFlags);
+
+                    downEvent.recycle();
+                    pressEvent.recycle();
+                    releaseEvent.recycle();
+                    upEvent.recycle();
+                    mHasOngoingLongPress = false;
+                }
+            }, LONG_PRESS_TIMEOUT);
+        }
+
+        private @NonNull MotionEvent buildMotionEvent(
+                long downTime, long eventTime, int actionButton,
+                @NonNull MotionEvent lastMotionEvent) {
+            return MotionEvent.obtain(
+                            /* downTime= */ downTime,
+                            /* eventTime= */ eventTime,
+                            MotionEvent.ACTION_DOWN,
+                            /* pointerCount= */ 1,
+                            mTempPointerProperties,
+                            mTempPointerCoords,
+                            mMetaState,
+                            actionButton,
+                            /* xPrecision= */ 1.0f,
+                            /* yPrecision= */ 1.0f,
+                            lastMotionEvent.getDeviceId(),
+                            /* edgeFlags= */ 0,
+                            lastMotionEvent.getSource(),
+                            lastMotionEvent.getFlags());
         }
 
         // To start a drag event, only send the DOWN and BUTTON_PRESS events.

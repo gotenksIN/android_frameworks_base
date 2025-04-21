@@ -82,7 +82,6 @@ import android.view.ViewGroup;
 import android.view.ViewRootImpl;
 import android.view.WindowInsets;
 import android.view.WindowManager;
-import android.widget.FrameLayout;
 import android.window.IMultitaskingController;
 import android.window.ScreenCapture;
 import android.window.ScreenCapture.SynchronousScreenCaptureListener;
@@ -230,7 +229,6 @@ public class BubbleController implements ConfigurationChangeListener,
 
     private final BubbleLogger mLogger;
     private final BubbleData mBubbleData;
-    private final FrameLayout mBubblesRootView;
     @Nullable private BubbleStackView mStackView;
     @Nullable private BubbleBarLayerView mLayerView;
     private BubbleIconFactory mBubbleIconFactory;
@@ -379,8 +377,8 @@ public class BubbleController implements ConfigurationChangeListener,
         mDisplayController = displayController;
         final TaskViewTransitions tvTransitions;
         if (TaskViewTransitions.useRepo()) {
-            tvTransitions = new BubbleTaskViewTransitions(transitions, taskViewRepository,
-                    organizer, syncQueue);
+            tvTransitions = new TaskViewTransitions(transitions, taskViewRepository, organizer,
+                    syncQueue);
         } else {
             tvTransitions = taskViewTransitions;
         }
@@ -406,7 +404,6 @@ public class BubbleController implements ConfigurationChangeListener,
         mResizabilityChecker = resizabilityChecker;
         mHomeIntentProvider = homeIntentProvider;
         shellInit.addInitCallback(this::onInit, this);
-        mBubblesRootView = new FrameLayout(mContext);
     }
 
     private void registerOneHandedState(OneHandedController oneHanded) {
@@ -1015,9 +1012,6 @@ public class BubbleController implements ConfigurationChangeListener,
                 mLayerView = new BubbleBarLayerView(mContext, this, mBubbleData, mLogger);
                 mLayerView.setUnBubbleConversationCallback(mSysuiProxy::onUnbubbleConversation);
             }
-            if (mLayerView.getParent() == null) {
-                mBubblesRootView.addView(mLayerView);
-            }
         } else {
             if (mStackView == null) {
                 BubbleStackViewManager bubbleStackViewManager =
@@ -1031,14 +1025,11 @@ public class BubbleController implements ConfigurationChangeListener,
                 }
                 mStackView.setUnbubbleConversationCallback(mSysuiProxy::onUnbubbleConversation);
             }
-            if (mStackView.getParent() == null) {
-                mBubblesRootView.addView(mStackView);
-            }
         }
         addToWindowManagerMaybe();
     }
 
-    /** Adds the root view to WindowManager if it's not already there. */
+    /** Adds the appropriate view to WindowManager if it's not already there. */
     private void addToWindowManagerMaybe() {
         // If already added, don't add it.
         if (mAddedToWindowManager) {
@@ -1082,9 +1073,9 @@ public class BubbleController implements ConfigurationChangeListener,
                 mBubbleData.getOverflow().initialize(
                         mExpandedViewManager, mStackView, mBubblePositioner);
             }
-            mWindowManager.addView(mBubblesRootView, mWmLayoutParams);
             // (TODO: b/273314541) some duplication in the inset listener
             if (isShowingAsBubbleBar()) {
+                mWindowManager.addView(mLayerView, mWmLayoutParams);
                 mLayerView.setOnApplyWindowInsetsListener((view, windowInsets) -> {
                     if (!windowInsets.equals(mWindowInsets) && mLayerView != null) {
                         mWindowInsets = windowInsets;
@@ -1094,6 +1085,7 @@ public class BubbleController implements ConfigurationChangeListener,
                     return windowInsets;
                 });
             } else {
+                mWindowManager.addView(mStackView, mWmLayoutParams);
                 mStackView.setOnApplyWindowInsetsListener((view, windowInsets) -> {
                     if (!windowInsets.equals(mWindowInsets) && mStackView != null) {
                         mWindowInsets = windowInsets;
@@ -1124,16 +1116,11 @@ public class BubbleController implements ConfigurationChangeListener,
                     : WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                             | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
             mWmLayoutParams.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
-            mWindowManager.updateViewLayout(mBubblesRootView, mWmLayoutParams);
-        }
-    }
-
-    private void removeViewsFromRootView() {
-        if (mStackView != null) {
-            mBubblesRootView.removeView(mStackView);
-        }
-        if (mLayerView != null) {
-            mBubblesRootView.removeView(mLayerView);
+            if (mStackView != null) {
+                mWindowManager.updateViewLayout(mStackView, mWmLayoutParams);
+            } else if (mLayerView != null) {
+                mWindowManager.updateViewLayout(mLayerView, mWmLayoutParams);
+            }
         }
     }
 
@@ -1155,8 +1142,14 @@ public class BubbleController implements ConfigurationChangeListener,
             }
         });
         try {
-            mWindowManager.removeView(mBubblesRootView);
-            mBubbleData.getOverflow().cleanUpExpandedState();
+            if (mStackView != null) {
+                mWindowManager.removeView(mStackView);
+                mBubbleData.getOverflow().cleanUpExpandedState();
+            }
+            if (mLayerView != null) {
+                mWindowManager.removeView(mLayerView);
+                mBubbleData.getOverflow().cleanUpExpandedState();
+            }
         } catch (IllegalArgumentException e) {
             // This means the stack has already been removed - it shouldn't happen, but ignore if it
             // does, since we wanted it removed anyway.
@@ -1596,9 +1589,11 @@ public class BubbleController implements ConfigurationChangeListener,
         if (!BubbleAnythingFlagHelper.enableCreateAnyBubble()) return;
         BubbleBarLocation updateLocation = isShowingAsBubbleBar() ? bubbleBarLocation : null;
         if (updateLocation != null) {
+            // does not update the bubble bar location of the bubble bar, just expanded view
             updateExpandedViewForBubbleBarLocation(updateLocation, source);
         }
         if (b.isInflated()) {
+            // mBubbleData should be updated with the new location to update the bubble bar location
             mBubbleData.setSelectedBubbleAndExpandStack(b, updateLocation);
         } else {
             b.enable(Notification.BubbleMetadata.FLAG_AUTO_EXPAND_BUBBLE);
@@ -1607,7 +1602,7 @@ public class BubbleController implements ConfigurationChangeListener,
                 ensureBubbleViewsAndWindowCreated();
                 mBubbleTransitions.startLaunchIntoOrConvertToBubble(b, mExpandedViewManager,
                         mBubbleTaskViewFactory, mBubblePositioner, mStackView, mLayerView,
-                        mBubbleIconFactory, mInflateSynchronously);
+                        mBubbleIconFactory, mInflateSynchronously, bubbleBarLocation);
             } else {
                 inflateAndAdd(b, /* suppressFlyout= */ true, /* showInShade= */ false,
                         updateLocation);
@@ -1908,8 +1903,9 @@ public class BubbleController implements ConfigurationChangeListener,
         // TaskView.
         mBubbleData.getBubbles().forEach(b -> b.cleanupViews(/* cleanupTaskView= */ false));
 
-        // replace the current views in the root view based on the mode we're switching to
-        removeViewsFromRootView();
+        // remove the current bubble container from window manager, null it out, and create a new
+        // container based on the current mode.
+        removeFromWindowManagerMaybe();
         mLayerView = null;
         mStackView = null;
 
@@ -2504,6 +2500,16 @@ public class BubbleController implements ConfigurationChangeListener,
             if (update.expandedChanged && update.expanded) {
                 mBubbleViewCallback.expansionChanged(/* expanded= */ true);
                 mSysuiProxy.requestNotificationShadeTopUi(true, TAG);
+            }
+
+            if (Flags.enableBubbleSwipeUpCleanup() && !update.removedBubbles.isEmpty()
+                    && !mBubbleData.hasBubbles()) {
+                // This update removed all the bubbles. Send an update to SystemUI to mark the stack
+                // collapsed. This should be sent by the UI classes (BubbleStackView or
+                // BubbleBarLayerView), but if we fail to send this, home gesture stops working.
+                // To avoid leaving the device in a bad state, add a failsafe call here to clean
+                // up the state.
+                mSysuiProxy.onStackExpandChanged(false);
             }
 
             mSysuiProxy.notifyInvalidateNotifications("BubbleData.Listener.applyUpdate");

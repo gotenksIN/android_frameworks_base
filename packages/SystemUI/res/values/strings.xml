@@ -3638,6 +3638,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="rotation_lock_camera_rotation_on">On - Face-based</string>
 
+    <!-- [CHAR LIMIT=100] Notification bundle inline settings title -->
+    <string name="notification_guts_bundle_title">Use Notification Organizer</string>
+
+    <!-- [CHAR LIMIT=100] Notification bundle inline settings summary -->
+    <string name="notification_guts_bundle_summary">For <xliff:g id="app_name" example="YouTube">%1$s</xliff:g></string>
+
     <!-- Notification Inline controls: button to dismiss the blocking helper [CHAR_LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -5088,7 +5094,7 @@
     <string name="ongoing_privacy_dialog_a11y_title">In use</string>
 
     <!-- Content description for ongoing privacy chip. Use with multiple apps [CHAR LIMIT=NONE]-->
-    <string name="ongoing_privacy_chip_content_multiple_apps">Applications are using your <xliff:g id="types_list" example="camera, location">%s</xliff:g>.</string>
+    <string name="ongoing_privacy_chip_content_multiple_apps"><xliff:g id="types_list" example="camera, location">%s</xliff:g> in use.</string>
 
     <!-- Separator for types. Include spaces before and after if needed [CHAR LIMIT=10] -->
     <string name="ongoing_privacy_dialog_separator">,\u0020</string>
@@ -6212,7 +6218,7 @@
     <!-- Notification title for launching keyboard tutorial [CHAR_LIMIT=100] -->
     <string name="launch_keyboard_tutorial_notification_title">Navigate using your keyboard</string>
     <!-- Notification text for launching keyboard tutorial [CHAR_LIMIT=100] -->
-    <string name="launch_keyboard_tutorial_notification_content">Learn keyboards shortcuts</string>
+    <string name="launch_keyboard_tutorial_notification_content">Learn keyboard shortcuts</string>
 
     <!-- Notification title for launching touchpad tutorial [CHAR_LIMIT=100] -->
     <string name="launch_touchpad_tutorial_notification_title">Navigate using your touchpad</string>
@@ -6222,7 +6228,7 @@
     <!-- Notification title for launching keyboard tutorial [CHAR_LIMIT=100] -->
     <string name="launch_keyboard_touchpad_tutorial_notification_title">Navigate using your keyboard and touchpad</string>
     <!-- Notification text for launching keyboard tutorial [CHAR_LIMIT=100] -->
-    <string name="launch_keyboard_touchpad_tutorial_notification_content">Learn touchpad gestures, keyboards shortcuts, and more</string>
+    <string name="launch_keyboard_touchpad_tutorial_notification_content">Learn touchpad gestures, keyboard shortcuts, and more</string>
 
     <!-- TOUCHPAD TUTORIAL-->
     <!-- Label for button opening tutorial for back gesture on touchpad [CHAR LIMIT=NONE] -->

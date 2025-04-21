@@ -241,6 +241,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IVoiceInteractor;
 import com.android.internal.content.ReferrerIntent;
 import com.android.internal.os.ApplicationSharedMemory;
+import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.BinderCallsStats;
 import com.android.internal.os.BinderInternal;
 import com.android.internal.os.DebugStore;
@@ -1362,17 +1363,15 @@ public final class ActivityThread extends ClientTransactionHandler
 
             // This must be initialized as early as possible to ensure availability for any
             // downstream callers.
-            if (com.android.internal.os.Flags.applicationSharedMemoryEnabled()) {
-                ApplicationSharedMemory instance =
-                        ApplicationSharedMemory.fromFileDescriptor(
-                                applicationSharedMemoryFd, /* mutable= */ false);
-                if (android.content.pm.Flags.cacheSdkSystemFeatures()) {
-                    SystemFeaturesCache.setInstance(
-                            new SystemFeaturesCache(instance.readSystemFeaturesCache()));
-                }
-                instance.closeFileDescriptor();
-                ApplicationSharedMemory.setInstance(instance);
+            ApplicationSharedMemory instance =
+                    ApplicationSharedMemory.fromFileDescriptor(
+                            applicationSharedMemoryFd, /* mutable= */ false);
+            if (android.content.pm.Flags.cacheSdkSystemFeatures()) {
+                SystemFeaturesCache.setInstance(
+                        new SystemFeaturesCache(instance.readSystemFeaturesCache()));
             }
+            instance.closeFileDescriptor();
+            ApplicationSharedMemory.setInstance(instance);
 
             setCoreSettings(coreSettings);
 
@@ -7831,6 +7830,16 @@ public final class ActivityThread extends ClientTransactionHandler
 
             // Propagate Content Capture options
             app.setContentCaptureOptions(data.contentCaptureOptions);
+            if (android.view.contentcapture.flags.Flags.warmUpBackgroundThreadForContentCapture()
+                    && data.contentCaptureOptions != null) {
+                if (data.contentCaptureOptions.enableReceiver
+                        && !data.contentCaptureOptions.lite) {
+                    // Warm up the background thread when:
+                    // 1) app is launched with content capture enabled, and
+                    // 2) the app is NOT launched with content capture lite enabled.
+                    BackgroundThread.startIfNeeded();
+                }
+            }
             sendMessage(H.SET_CONTENT_CAPTURE_OPTIONS_CALLBACK, data.appInfo.packageName);
 
             mInitialApplication = app;

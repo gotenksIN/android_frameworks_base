@@ -1428,7 +1428,7 @@ public class InputManagerService extends IInputManager.Stub
         mNative.setPointerSpeed(speed);
     }
 
-    private void setMouseScalingEnabled(boolean enabled, int displayId) {
+    private void setMouseScalingEnabledInternal(boolean enabled, int displayId) {
         updateAdditionalDisplayInputProperties(displayId,
                 properties -> properties.mouseScalingEnabled = enabled);
     }
@@ -3241,6 +3241,19 @@ public class InputManagerService extends IInputManager.Stub
         mNative.resetLockedModifierState();
     }
 
+    @Override // Binder call
+    public void setMouseScalingEnabled(boolean enabled, int displayId) {
+        if (!checkCallingPermission(
+                Manifest.permission.SET_POINTER_SPEED,
+                "setMouseScalingEnabled()",
+                true /*checkInstrumentationSource*/)) {
+            throw new SecurityException(
+                    "The SET_POINTER_SPEED permission is required to override mouse scaling.");
+        }
+
+        setMouseScalingEnabledInternal(enabled, displayId);
+    }
+
     private void onUserSwitching(@NonNull SystemService.TargetUser from,
             @NonNull SystemService.TargetUser to) {
         if (DEBUG) {
@@ -3719,11 +3732,6 @@ public class InputManagerService extends IInputManager.Stub
         }
 
         @Override
-        public void setMouseScalingEnabled(boolean enabled, int displayId) {
-            InputManagerService.this.setMouseScalingEnabled(enabled, displayId);
-        }
-
-        @Override
         public void setDisplayEligibilityForPointerCapture(int displayId, boolean isEligible) {
             InputManagerService.this.setDisplayEligibilityForPointerCapture(displayId, isEligible);
         }
@@ -3832,11 +3840,6 @@ public class InputManagerService extends IInputManager.Stub
         @Override
         public void setAccessibilityPointerIconScaleFactor(int displayId, float scaleFactor) {
             InputManagerService.this.setAccessibilityPointerIconScaleFactor(displayId, scaleFactor);
-        }
-
-        @Override
-        public void setCurrentUser(@UserIdInt int newUserId) {
-            mHandler.obtainMessage(MSG_CURRENT_USER_CHANGED, newUserId).sendToTarget();
         }
 
         @Override

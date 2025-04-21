@@ -98,6 +98,9 @@ import android.os.IBinder;
 import android.os.Trace;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+import android.util.BoostFramework;
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
@@ -184,6 +187,20 @@ public class OomAdjusterImpl extends OomAdjuster {
         CACHED_APP_MIN_ADJ,
         UNKNOWN_ADJ,
     };
+
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+    //Per Task Boost of top-app renderThread
+    public static BoostFramework mPerfBoost = new BoostFramework();
+    public static int mPerfHandle = -1;
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+// QTI_BEGIN: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
+    public static int mCurAppPid = -1;
+    public static int mCurRenderTid = -1;
+// QTI_END: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+    public static int mCurRenderThreadTid = -1;
+    public static boolean mIsTopAppRenderThreadBoostEnabled = false;
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
 
     /**
      * Note: Always use the raw adj to call this API.
@@ -797,6 +814,12 @@ public class OomAdjusterImpl extends OomAdjuster {
             CachedAppOptimizer cachedAppOptimizer, Injector injector) {
         super(service, processList, activeUids, adjusterThread, globalState, cachedAppOptimizer,
                 injector);
+
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+        if(mPerfBoost != null) {
+            mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerfBoost.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
+        }
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
     }
 
     private final ProcessRecordNodes mProcessRecordProcStateNodes = new ProcessRecordNodes(
@@ -1453,6 +1476,50 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
             hasVisibleActivities = true;
             procState = PROCESS_STATE_TOP;
+
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+            if(mIsTopAppRenderThreadBoostEnabled) {
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+                if(mCurRenderThreadTid != app.getRenderThreadTid() && app.getRenderThreadTid() > 0) {
+                    mCurRenderThreadTid = app.getRenderThreadTid();
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+                    if (mPerfBoost != null) {
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+                        Slog.d(TAG, "TOP-APP: pid:" + app.getPid() + ", processName: "
+                               + app.processName + ", renderThreadTid: " + app.getRenderThreadTid());
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+                        if (mPerfHandle >= 0) {
+                            mPerfBoost.perfLockReleaseHandler(mPerfHandle);
+                            mPerfHandle = -1;
+                        }
+                        mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_BOOST_RENDERTHREAD,
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+                                                          app.processName, app.getRenderThreadTid(), 1);
+// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+                        Slog.d(TAG, "VENDOR_HINT_BOOST_RENDERTHREAD perfHint was called. mPerfHandle: "
+                               + mPerfHandle);
+                    }
+                }
+            }
+// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
+// QTI_BEGIN: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
+            if (mCurAppPid != app.getPid() && app.getPid() > 0) {
+                mCurAppPid = app.getPid();
+                if (mPerfBoost != null) {
+                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_PASS_PID, app.processName,
+                                        mCurAppPid, BoostFramework.PassPid.APP_PID);
+                }
+            }
+            if (mCurRenderTid != app.getRenderThreadTid() && app.getRenderThreadTid() > 0) {
+                mCurRenderTid = app.getRenderThreadTid();
+                if (mPerfBoost != null) {
+                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_PASS_PID, app.processName,
+                                        mCurRenderTid, BoostFramework.PassPid.RENDER_TID);
+                }
+            }
+
+// QTI_END: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
+
             if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, "Making top: " + app);
             }

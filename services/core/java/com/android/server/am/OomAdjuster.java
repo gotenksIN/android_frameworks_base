@@ -410,20 +410,6 @@ public abstract class OomAdjuster {
     private int mLegacyUiPerfHandler = -1;
 // QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
 
-// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
-    //Per Task Boost of top-app renderThread
-    public static BoostFramework mPerfBoost = new BoostFramework();
-    public static int mPerfHandle = -1;
-// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
-// QTI_BEGIN: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
-    public static int mCurAppPid = -1;
-    public static int mCurRenderTid = -1;
-// QTI_END: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
-// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
-    public static int mCurRenderThreadTid = -1;
-    public static boolean mIsTopAppRenderThreadBoostEnabled = false;
-
-// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
     private final int mNumSlots;
     protected final ArrayList<ProcessRecord> mTmpProcessList = new ArrayList<ProcessRecord>();
     protected final ArrayList<ProcessRecord> mTmpProcessList2 = new ArrayList<ProcessRecord>();
@@ -569,9 +555,6 @@ public abstract class OomAdjuster {
             mEnableProcessGroupCgroupFollow = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.enable", "false"));
             mProcessGroupCgroupFollowDex2oatOnly = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.dex2oat_only", "false"));
 // QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
-// QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
-            mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
-// QTI_END: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
 // QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
             mEnableBgt = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.bgt.enable","false"));
 // QTI_END: 2020-07-09: Performance: Hooks for background apps transition

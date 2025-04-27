@@ -154,6 +154,7 @@ import com.android.server.broadcastradio.BroadcastRadioService;
 import com.android.server.camera.CameraServiceProxy;
 import com.android.server.clipboard.ClipboardService;
 import com.android.server.companion.CompanionDeviceManagerService;
+import com.android.server.companion.datatransfer.continuity.TaskContinuityManagerService;
 import com.android.server.companion.virtual.VirtualDeviceManagerService;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.compat.PlatformCompatNative;
@@ -1622,6 +1623,7 @@ public final class SystemServer implements Dumpable {
             ServiceManager.addService("scheduling_policy", new SchedulingPolicyService());
             t.traceEnd();
 
+
             // TelecomLoader hooks into classes with defined HFP logic,
             // so check for either telephony or microphone.
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)
@@ -2706,6 +2708,12 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
+            if (android.companion.Flags.enableTaskContinuity()) {
+                t.traceBegin("StartTaskContinuityService");
+                mSystemServiceManager.startService(TaskContinuityManagerService.class);
+                t.traceEnd();
+            }
+
             if (context.getResources().getBoolean(R.bool.config_enableVirtualDeviceManager)) {
                 t.traceBegin("StartVirtualDeviceManager");
                 mSystemServiceManager.startService(VirtualDeviceManagerService.class);
@@ -2872,9 +2880,8 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(MediaMetricsManagerService.class);
             t.traceEnd();
 
-            if (!com.android.server.flags.Flags.optionalBackgroundInstallControl()
-                    || SystemProperties.getBoolean(
-                            "ro.system_settings.service.backgound_install_control_enabled", true)) {
+            if (SystemProperties.getBoolean(
+                    "ro.system_settings.service.backgound_install_control_enabled", true)) {
                 t.traceBegin("StartBackgroundInstallControlService");
                 mSystemServiceManager.startService(BackgroundInstallControlService.class);
                 t.traceEnd();
@@ -3046,8 +3053,7 @@ public final class SystemServer implements Dumpable {
         t.traceEnd();
 
         // OnDevicePersonalizationSystemService
-        if (!com.android.server.flags.Flags.enableOdpFeatureGuard()
-                || SystemProperties.getBoolean("ro.system_settings.service.odp_enabled", true)) {
+        if (SystemProperties.getBoolean("ro.system_settings.service.odp_enabled", true)) {
             t.traceBegin("StartOnDevicePersonalizationSystemService");
             mSystemServiceManager.startService(ON_DEVICE_PERSONALIZATION_SYSTEM_SERVICE_CLASS);
             t.traceEnd();

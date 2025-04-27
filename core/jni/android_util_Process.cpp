@@ -33,6 +33,7 @@
 #include <processgroup/sched_policy.h>
 #include <android-base/logging.h>
 #include <android-base/unique_fd.h>
+#include <cutils/misc.h>
 
 #include <algorithm>
 #include <array>
@@ -460,6 +461,27 @@ void android_os_Process_setProcessFrozen(
 }
 
 // QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
+jboolean android_os_Process_isProcessFrozen(JNIEnv *env, jobject, jint pid, jint uid)
+{
+    if (uid < 0) {
+        jniThrowExceptionFmt(env, "java/lang/IllegalArgumentException", "uid is negative: %d", uid);
+        return false;
+    }
+
+    char const* type = (uid < FIRST_APPLICATION_UID) ? "system" : "apps";
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "/sys/fs/cgroup/%s/uid_%d/pid_%d/cgroup.freeze", type, uid, pid);
+
+    int fd = ::open(path, O_RDONLY);
+    if (fd >= 0) {
+      char flag = 0;
+      ::read(fd, &flag, 1);
+      ::close(fd);
+      return flag == '1';
+    }
+    return false;
+}
+
 jint android_os_Process_getProcessGroup(JNIEnv* env, jobject clazz, jint pid)
 {
     SchedPolicy sp;
@@ -1549,6 +1571,7 @@ static const JNINativeMethod methods[] = {
         {"sendSignalThrows", "(II)V", (void*)android_os_Process_sendSignalThrows},
         {"sendTgSignalThrows", "(III)V", (void*)android_os_Process_sendTgSignalThrows},
         {"setProcessFrozen", "(IIZ)V", (void*)android_os_Process_setProcessFrozen},
+        {"isProcessFrozen", "(II)Z", (void*)android_os_Process_isProcessFrozen},
         {"getFreeMemory", "()J", (void*)android_os_Process_getFreeMemory},
         {"getTotalMemory", "()J", (void*)android_os_Process_getTotalMemory},
         {"readProcLines", "(Ljava/lang/String;[Ljava/lang/String;[J)V",

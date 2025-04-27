@@ -2882,4 +2882,10 @@ public class AudioSystem
      */
     public static native int unregisterAudioVolumeGroupCallback(
             INativeAudioVolumeGroupCallback callback);
+
+    /**
+     * Enable or disable device connection simulation at the HAL level.
+     * @hide
+     */
+    public static native int setSimulateDeviceConnections(boolean enabled);
 }

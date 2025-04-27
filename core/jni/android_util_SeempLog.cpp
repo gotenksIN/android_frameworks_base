@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <cutils/properties.h>
+#include <cutils/memory.h>
 #include <utils/String8.h>
 #include <android_runtime/Log.h>
 #include <utils/Log.h>

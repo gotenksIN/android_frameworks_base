@@ -191,7 +191,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
     private static final long SLEEP_TRANSITION_WAIT_MILLIS = 1000L;
 
-    private Object mLastWindowFreezeSource = null;
     // Per-display WindowManager overrides that are passed on.
     private final SparseArray<DisplayBrightnessOverrideRequest> mDisplayBrightnessOverrides =
             new SparseArray<>();
@@ -2935,11 +2934,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             }
 
             if (ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                if (display.allowContentModeSwitch()) {
-                    mWindowManager.mDisplayWindowSettings
-                            .setShouldShowSystemDecorsInternalLocked(display,
-                                    display.mDisplay.canHostTasks());
-                }
+                display.updateShouldShowSystemDecorations();
 
                 final boolean inTopology = mWindowManager.mDisplayWindowSettings
                         .shouldShowSystemDecorsLocked(display);
@@ -3159,9 +3154,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
     /** This method is called for visible freeform task from top to bottom. */
     private void computeNonOccludedFreeformAreaRatio(@NonNull Task task) {
-        if (!com.android.window.flags.Flags.processPriorityPolicyForMultiWindowMode()) {
-            return;
-        }
         if (mTmpOccludingRegion == null) {
             mTmpOccludingRegion = new Region();
             mTmpTaskRegion = new Region();

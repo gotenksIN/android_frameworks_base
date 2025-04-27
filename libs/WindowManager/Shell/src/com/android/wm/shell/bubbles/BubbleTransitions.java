@@ -130,6 +130,13 @@ public class BubbleTransitions {
     }
 
     /**
+     * Returns whether bubbles are showing as the bubble bar.
+     */
+    public boolean isShowingAsBubbleBar() {
+        return mBubbleController.isShowingAsBubbleBar();
+    }
+
+    /**
      * Returns whether there is a pending transition for the given request.
      */
     public boolean hasPendingEnterTransition(@NonNull TransitionRequestInfo info) {
@@ -138,6 +145,13 @@ public class BubbleTransitions {
         }
         for (IBinder cookie : info.getTriggerTask().launchCookies) {
             if (mPendingEnterTransitions.containsKey(cookie)) {
+                if (mBubbleData.hasAnyBubbleWithKey(Bubble.getAppBubbleKeyForTask(
+                        info.getTriggerTask()))) {
+                    // We'll let this transition fall through and let the normal TaskViewTransitions
+                    // play it
+                    mPendingEnterTransitions.remove(cookie);
+                    return false;
+                }
                 return true;
             }
         }
@@ -295,6 +309,9 @@ public class BubbleTransitions {
         }
         if (com.android.window.flags.Flags.disallowBubbleToEnterPip()) {
             wct.setDisablePip(token, toBubble /* disablePip */);
+        }
+        if (BubbleAnythingFlagHelper.enableBubbleAnything()) {
+            wct.setDisableLaunchAdjacent(token, toBubble /* disableLaunchAdjacent */);
         }
         return wct;
     }
@@ -520,6 +537,10 @@ public class BubbleTransitions {
             mTransition = null;
         }
 
+        /**
+         * @return true As DefaultMixedTransition assumes that this transition will be handled by
+         * this handler in all cases.
+         */
         @Override
         public boolean startAnimation(@NonNull IBinder transition,
                 @NonNull TransitionInfo info,
@@ -560,7 +581,8 @@ public class BubbleTransitions {
                         + "one, cleaning up the task view");
                 mBubble.getTaskView().getController().setTaskNotFound();
                 mTaskViewTransitions.onExternalDone(mTransition);
-                return false;
+                finishCallback.onTransitionFinished(null /* finishWct */);
+                return true;
             }
             mFinishCb = finishCallback;
 
@@ -761,6 +783,8 @@ public class BubbleTransitions {
                         intent = mBubble.getPendingIntent();
                         sendOptsBundle.putAll(opts.toBundle());
                     } else {
+                        opts.setPendingIntentCreatorBackgroundActivityStartMode(
+                                MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
                         intent = PendingIntent.getActivityAsUser(mContext, 0,
                                 mBubble.getIntent(), FLAG_IMMUTABLE | FLAG_ONE_SHOT,
                                 opts.toBundle(), mBubble.getUser());
@@ -817,6 +841,10 @@ public class BubbleTransitions {
             mEnterTransitions.remove(transition);
         }
 
+        /**
+         * @return true As DefaultMixedTransition assumes that this transition will be handled by
+         * this handler in all cases.
+         */
         @Override
         public boolean startAnimation(@NonNull IBinder transition,
                 @NonNull TransitionInfo info,
@@ -857,7 +885,8 @@ public class BubbleTransitions {
                         + "one, cleaning up the task view");
                 mBubble.getTaskView().getController().setTaskNotFound();
                 mTaskViewTransitions.onExternalDone(mTransition);
-                return false;
+                finishCallback.onTransitionFinished(null /* finishWct */);
+                return true;
             }
             mFinishCb = finishCallback;
 

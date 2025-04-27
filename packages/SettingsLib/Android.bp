@@ -72,6 +72,7 @@ android_library {
         "SettingsLibButtonPreference",
         "SettingsLibDeviceStateRotationLock",
         "SettingsLibProfileSelector",
+        "SettingsLibValuePreference",
         "SettingsLibZeroStatePreference",
         "settingslib_media_flags_lib",
     ],

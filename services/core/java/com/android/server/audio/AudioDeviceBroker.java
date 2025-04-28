@@ -2146,7 +2146,7 @@ public class AudioDeviceBroker {
                             Log.e(TAG, "mCommunicationDeviceUpdateCount already 0 in"
                                     + " MSG_L_SET_COMMUNICATION_DEVICE_FOR_CLIENT");
                         }
-                        mCommunicationDeviceLock.notify();
+                        mCommunicationDeviceLock.notifyAll();
                     }
                     break;
 

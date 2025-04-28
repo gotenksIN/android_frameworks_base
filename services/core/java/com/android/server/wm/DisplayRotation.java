@@ -64,6 +64,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.devicestate.DeviceState;
 import android.hardware.power.Boost;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -936,6 +937,11 @@ public class DisplayRotation {
                 Settings.System.ACCELEROMETER_ROTATION, 0, UserHandle.USER_CURRENT) == 0;
     }
 
+    void setRotationAtAngleIfLocked(int rotation, String caller) {
+        if (mUserRotationMode == WindowManagerPolicy.USER_ROTATION_FREE) return;
+        freezeRotation(rotation, caller);
+    }
+
     boolean isFixedToUserRotation() {
         switch (mFixedToUserRotation) {
             case IWindowManager.FIXED_TO_USER_ROTATION_DISABLED:
@@ -1717,12 +1723,14 @@ public class DisplayRotation {
      * that in case of physical display change the {@link DisplayRotation#physicalDisplayChanged}
      * method will be invoked *after* this one.
      */
-    void foldStateChanged(DeviceStateController.DeviceStateEnum deviceStateEnum) {
+    // TODO(b/409761673) Migrate to only using android.hardware.devicestate.DeviceState
+    void foldStateChanged(DeviceStateController.DeviceStateEnum deviceStateEnum,
+            DeviceState deviceState) {
         if (mFoldController != null) {
             synchronized (mLock) {
                 mFoldController.foldStateChanged(deviceStateEnum);
                 if (mDeviceStateAutoRotateSettingController != null) {
-                    mDeviceStateAutoRotateSettingController.onDeviceStateChange(deviceStateEnum);
+                    mDeviceStateAutoRotateSettingController.onDeviceStateChange(deviceState);
                 }
             }
         }
@@ -1779,6 +1787,9 @@ public class DisplayRotation {
         private final boolean mPauseAutorotationDuringUnfolding;
         @Surface.Rotation
         private int mHalfFoldSavedRotation = -1; // No saved rotation
+
+        // TODO(b/409761673) Migrate DeviceStateController.DeviceStateEnum to
+        //  android.hardware.devicestate.DeviceState
         private DeviceStateController.DeviceStateEnum mDeviceStateEnum =
                 DeviceStateController.DeviceStateEnum.UNKNOWN;
         private long mLastHingeAngleEventTime = 0;

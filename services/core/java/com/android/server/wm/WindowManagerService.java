@@ -152,6 +152,7 @@ import static com.android.server.wm.WindowManagerServiceDumpProto.INPUT_METHOD_W
 import static com.android.server.wm.WindowManagerServiceDumpProto.POLICY;
 import static com.android.server.wm.WindowManagerServiceDumpProto.ROOT_WINDOW_CONTAINER;
 import static com.android.server.wm.WindowManagerServiceDumpProto.WINDOW_FRAMES_VALID;
+import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
 import static com.android.window.flags.Flags.enableDeviceStateAutoRotateSettingRefactor;
 import static com.android.window.flags.Flags.enablePresentationForConnectedDisplays;
 import static com.android.window.flags.Flags.multiCrop;
@@ -311,6 +312,7 @@ import android.window.ActivityWindowInfo;
 import android.window.AddToSurfaceSyncGroupResult;
 import android.window.ClientWindowFrames;
 import android.window.ConfigurationChangeSetting;
+import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
 import android.window.IGlobalDragListener;
 import android.window.IScreenRecordingCallback;
@@ -453,11 +455,6 @@ public class WindowManagerService extends IWindowManager.Stub
     static final int MY_UID = myUid();
 
     static final int LOGTAG_INPUT_FOCUS = 62001;
-
-    /**
-     * Use WMShell for app transition.
-     */
-    public static final boolean sEnableShellTransitions = getShellTransitEnabled();
 
     /**
      * Allows a fullscreen windowing mode activity to launch in its desired orientation directly
@@ -716,6 +713,9 @@ public class WindowManagerService extends IWindowManager.Stub
     boolean mBootAnimationStopped = false;
     long mBootWaitForWindowsStartTime = -1;
 
+    // Cache whether to Magnify the Navigation Bar and IME.
+    private boolean mMagnifyNavAndIme = false;
+
     /** Dump of the windows and app tokens at the time of the last ANR. Cleared after
      * LAST_ANR_LIFETIME_DURATION_MSECS */
     String mLastANRState;
@@ -834,6 +834,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 Settings.Secure.getUriFor(Settings.Secure.IMMERSIVE_MODE_CONFIRMATIONS);
         private final Uri mDisableSecureWindowsUri =
                 Settings.Secure.getUriFor(Settings.Secure.DISABLE_SECURE_WINDOWS);
+        private final Uri mMagnifyNavAndImeEnabledUri = Settings.Secure.getUriFor(
+                Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME);
         private final Uri mPolicyControlUri =
                 Settings.Global.getUriFor(Settings.Global.POLICY_CONTROL);
         private final Uri mForceDesktopModeOnExternalDisplaysUri = Settings.Global.getUriFor(
@@ -866,6 +868,10 @@ public class WindowManagerService extends IWindowManager.Stub
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(mDisableSecureWindowsUri, false, this,
                     UserHandle.USER_ALL);
+            if (com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
+                resolver.registerContentObserver(mMagnifyNavAndImeEnabledUri, false, this,
+                        UserHandle.USER_ALL);
+            }
             resolver.registerContentObserver(mPolicyControlUri, false, this, UserHandle.USER_ALL);
             resolver.registerContentObserver(mForceDesktopModeOnExternalDisplaysUri, false, this,
                     UserHandle.USER_ALL);
@@ -922,6 +928,10 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
 
+            if (mMagnifyNavAndImeEnabledUri.equals(uri)) {
+                updateMagnifyNavAndIme();
+            }
+
             if (mDevelopmentOverrideDesktopExperienceUri.equals(uri)) {
                 updateDevelopmentOverrideDesktopExperience();
                 return;
@@ -946,6 +956,7 @@ public class WindowManagerService extends IWindowManager.Stub
         void loadSettings() {
             updateMaximumObscuringOpacityForTouch();
             updateDisableSecureWindows();
+            updateMagnifyNavAndIme();
         }
 
         void updateMaximumObscuringOpacityForTouch() {
@@ -1043,6 +1054,25 @@ public class WindowManagerService extends IWindowManager.Stub
             synchronized (mGlobalLock) {
                 mDisableSecureWindows = disableSecureWindows;
                 mRoot.refreshSecureSurfaceState();
+            }
+        }
+
+        void updateMagnifyNavAndIme() {
+            if (!com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
+                mMagnifyNavAndIme = false;
+                return;
+            }
+
+            boolean enabledMagnifyNavAndIme = Settings.Secure.getIntForUser(
+                        mContext.getContentResolver(),
+                        Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME,
+                    0, mCurrentUserId) == 1;
+            if (mMagnifyNavAndIme == enabledMagnifyNavAndIme) {
+                return;
+            }
+
+            synchronized (mGlobalLock) {
+                mMagnifyNavAndIme = enabledMagnifyNavAndIme;
             }
         }
     }
@@ -1479,6 +1509,11 @@ public class WindowManagerService extends IWindowManager.Stub
         LocalServices.addService(
                 ConfigurationChangeSetting.ConfigurationChangeSettingInternal.class,
                 new ConfigurationChangeSettingInternalImpl());
+    }
+
+    @VisibleForTesting
+    boolean isMagnifyNavAndImeEnabled() {
+        return mMagnifyNavAndIme;
     }
 
     DisplayAreaPolicy.Provider getDisplayAreaPolicyProvider() {
@@ -2314,7 +2349,11 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    public void onRectangleOnScreenRequested(IBinder token, Rect rectangle) {
+    /**
+     * Called when a rectangle of a view is requested to be visible on the screen.
+     */
+    public void onRectangleOnScreenRequested(IBinder token, Rect rectangle,
+            @View.RectangleOnScreenRequestSource int source) {
         final AccessibilityController.AccessibilityControllerInternalImpl a11yControllerInternal =
                 AccessibilityController.getAccessibilityControllerInternal(this);
         synchronized (mGlobalLock) {
@@ -2322,7 +2361,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 WindowState window = mWindowMap.get(token);
                 if (window != null) {
                     a11yControllerInternal.onRectangleOnScreenRequested(
-                            window.getDisplayId(), rectangle);
+                            window.getDisplayId(), rectangle, source);
                 }
             }
         }
@@ -3867,13 +3906,24 @@ public class WindowManagerService extends IWindowManager.Stub
             // Notify whether the root docked task exists for the current user
             final DisplayContent displayContent = getDefaultDisplayContentLocked();
 
-            // If the display is already prepared, update the density.
-            // Otherwise, we'll update it when it's prepared.
             if (mDisplayReady) {
+                // If the display is already prepared, update the density.
+                // Otherwise, we'll update it when it's prepared.
                 final int forcedDensity = getForcedDisplayDensityForUserLocked(newUserId);
                 final int targetDensity = forcedDensity != 0
                         ? forcedDensity : displayContent.getInitialDisplayDensity();
                 displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
+
+                // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for the
+                // new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors to
+                // ensure it reflects the latest value.
+                if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+                    final int displayCount = mRoot.mChildren.size();
+                    for (int i = 0; i < displayCount; ++i) {
+                        final DisplayContent dc = mRoot.mChildren.get(i);
+                        dc.updateShouldShowSystemDecorations();
+                    }
+                }
             }
             mAtmService.mChainTracker.end();
         }
@@ -4316,7 +4366,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 captureArgs = null;
             } else {
-                captureArgs = displayContent.getLayerCaptureArgs(predicate);
+                captureArgs = displayContent.getLayerCaptureArgs(predicate,
+                        /*useWindowingLayerAsScreenshotRoot*/ enableLppAssistInvocationEffect());
             }
         }
 
@@ -4340,12 +4391,16 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     /**
-     * Takes a snapshot of the screen.  In landscape mode this grabs the whole screen.
-     * In portrait mode, it grabs the upper region of the screen based on the vertical dimension
-     * of the target image.
+     * Requests a screenshot to be taken for Assist purposes.
+     *
+     * This method initiates the process of capturing the current screen content and delivering it
+     * to the provided {@link IAssistDataReceiver}.
+     *
+     * @param receiver The {@link IAssistDataReceiver} that will receive the screenshot bitmap. Must
+     * not be null.
      */
     @Override
-    public boolean requestAssistScreenshot(final IAssistDataReceiver receiver) {
+    public void requestAssistScreenshot(final IAssistDataReceiver receiver) {
         final ScreenshotHardwareBuffer shb = takeAssistScreenshot(/* predicate= */ null);
         final Bitmap bm = shb != null ? shb.asBitmap() : null;
         FgThread.getHandler().post(() -> {
@@ -4354,8 +4409,6 @@ public class WindowManagerService extends IWindowManager.Stub
             } catch (RemoteException e) {
             }
         });
-
-        return true;
     }
 
     /**
@@ -4564,7 +4617,9 @@ public class WindowManagerService extends IWindowManager.Stub
             throw new SecurityException("Requires SET_ORIENTATION permission");
         }
         if (!enableDeviceStateAutoRotateSettingRefactor()) {
-            return;
+            throw new UnsupportedOperationException(
+                    "API setDeviceStateAutoRotateSetting should not be used when "
+                            + "enableDeviceStateAutoRotateSettingRefactor is disabled");
         }
         synchronized (mGlobalLock) {
             final DisplayContent display = mRoot.getDefaultDisplay();
@@ -4666,6 +4721,23 @@ public class WindowManagerService extends IWindowManager.Stub
                 return false;
             }
             return display.getDisplayRotation().isRotationFrozen();
+        }
+    }
+
+    @Override
+    public void setRotationAtAngleIfLocked(int rotation, String caller) {
+        if (!checkCallingPermission(android.Manifest.permission.SET_ORIENTATION,
+                "setRotationAtAngleIfLocked()")) {
+            throw new SecurityException("Requires SET_ORIENTATION permission");
+        }
+        if (!enableDeviceStateAutoRotateSettingRefactor()) {
+            throw new UnsupportedOperationException(
+                    "API setRotationAtAngleIfLocked should not be used when "
+                            + "enableDeviceStateAutoRotateSettingRefactor is disabled");
+        }
+        synchronized (mGlobalLock) {
+            final DisplayContent display = mRoot.getDefaultDisplay();
+            display.getDisplayRotation().setRotationAtAngleIfLocked(rotation, caller);
         }
     }
 
@@ -8926,7 +8998,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 final DisplayContent dc = mRoot.getDisplayContent(displayId);
                 if (dc == null) {
-                    Slog.w(TAG, "Invalid displayId:" + displayId + ", fail to show ime screenshot");
+                    Slog.w(TAG, "Invalid displayId:" + displayId + ", fail to show IME screenshot");
                     return false;
                 }
 
@@ -8940,12 +9012,12 @@ public class WindowManagerService extends IWindowManager.Stub
                 final DisplayContent dc = mRoot.getDisplayContent(displayId);
                 if (dc == null) {
                     Slog.w(TAG, "Invalid displayId:" + displayId
-                            + ", fail to remove ime screenshot");
+                            + ", fail to remove IME screenshot");
                     return false;
                 }
-                dc.removeImeSurfaceImmediately();
+                dc.removeImeScreenshotImmediately();
+                return true;
             }
-            return true;
         }
     }
 
@@ -10504,10 +10576,6 @@ public class WindowManagerService extends IWindowManager.Stub
                         uid);
             }
         }
-    }
-
-    private static boolean getShellTransitEnabled() {
-        return true;
     }
 
     /**

@@ -762,7 +762,9 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
     public boolean requestHasBubbleEnter(TransitionRequestInfo request) {
         return BubbleAnythingFlagHelper.enableCreateAnyBubble()
                 && request.getTriggerTask() != null
-                && mBubbleTransitions.hasPendingEnterTransition(request);
+                && mBubbleTransitions.hasPendingEnterTransition(request)
+                // TODO(b/408453889): To be removed once we handle transitions with stack view
+                && mBubbleTransitions.isShowingAsBubbleBar();
     }
 
     /**
@@ -772,7 +774,9 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
     public boolean requestHasBubbleEnterFromAppBubble(TransitionRequestInfo request) {
         return BubbleAnythingFlagHelper.enableCreateAnyBubble()
                 && request.getTriggerTask() != null
-                && request.getTriggerTask().isAppBubble;
+                && request.getTriggerTask().isAppBubble
+                // TODO(b/408453889): To be removed once we handle transitions with stack view
+                && mBubbleTransitions.isShowingAsBubbleBar();
     }
 
     @Override

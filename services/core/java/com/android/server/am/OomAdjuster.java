@@ -347,7 +347,6 @@ public abstract class OomAdjuster {
     boolean mLazyLmkKillMainProc = false;
 
     public static BoostFramework mPerf = new BoostFramework();
-    private int mLegacyUiPerfHandler = -1;
 
     private final int mNumSlots;
     protected final ArrayList<ProcessRecordInternal> mTmpProcessList = new ArrayList<>();
@@ -2309,21 +2308,6 @@ public abstract class OomAdjuster {
             try {
                 final int renderThreadTid = state.getRenderThreadTid();
                 if (curSchedGroup == SCHED_GROUP_TOP_APP) {
-                    if (mLegacyUiPerfHandler == -1) {
-                        int hint = mPerf.getLegacyUiPerfHint(mService.mContext,
-                                                             state.getPackageName());
-                        if (hint != -1) {
-                            mLegacyUiPerfHandler = mPerf.perfHint(hint, "android",
-                                                        Integer.MAX_VALUE, -1);
-                        }
-                    } else {
-                        int hint = mPerf.getLegacyUiPerfHint(mService.mContext,
-                                                             state.getPackageName());
-                        if (hint == -1) {
-                            mPerf.perfLockReleaseHandler(mLegacyUiPerfHandler);
-                            mLegacyUiPerfHandler = -1;
-                        }
-                    }
                     // do nothing if we already switched to RT
                     if (oldSchedGroup != SCHED_GROUP_TOP_APP) {
                         state.notifyTopProcChanged();

@@ -431,7 +431,6 @@ public class OomAdjuster {
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
 
     public static BoostFramework mPerf = new BoostFramework();
-    private int mLegacyUiPerfHandler = -1;
 // QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
 
 // QTI_BEGIN: 2020-06-16: Performance: Send top-app's render thread tid to perf HAL
@@ -3896,23 +3895,6 @@ public class OomAdjuster {
             try {
                 final int renderThreadTid = app.getRenderThreadTid();
                 if (curSchedGroup == SCHED_GROUP_TOP_APP) {
-                    /* QTI_BEGIN */
-                    if (mLegacyUiPerfHandler == -1) {
-                        int hint = mPerf.getLegacyUiPerfHint(mService.mContext,
-                                                             app.info.packageName);
-                        if (hint != -1) {
-                            mLegacyUiPerfHandler = mPerf.perfHint(hint, "android",
-                                                        Integer.MAX_VALUE, -1);
-                        }
-                    } else {
-                        int hint = mPerf.getLegacyUiPerfHint(mService.mContext,
-                                                             app.info.packageName);
-                        if (hint == -1) {
-                            mPerf.perfLockReleaseHandler(mLegacyUiPerfHandler);
-                            mLegacyUiPerfHandler = -1;
-                        }
-                    }
-                    /* QTI_END */
                     // do nothing if we already switched to RT
                     if (oldSchedGroup != SCHED_GROUP_TOP_APP) {
                         app.getWindowProcessController().onTopProcChanged();

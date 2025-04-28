@@ -78,9 +78,9 @@ constexpr bool bitmap_ashmem_long_name() { return false; }
 
 /* QTI_BEGIN */
 #include <cutils/properties.h>
-extern const char* __progname;
+#include <sys/types.h>
+#include <unistd.h>
 #define UI_PERFMODE "debug.ui.perfmode.enable"
-#define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
 /* QTI_END */
 
 namespace android {
@@ -637,15 +637,9 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
 
     /* QTI_BEGIN */
     bool ui_perf_enabled = false;
-    char value[PROPERTY_VALUE_MAX];
-    memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
-    property_get(UI_PERFMODE, value, "false");
-    if (strncmp(value, "true", 4) == 0) {
-        memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
-        property_get(UI_PERFMODE_PROCESS, value, "");
-        if (strncmp(__progname, value, 10) == 0) {
-            ui_perf_enabled = true;
-        }
+    int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
+    if (ui_perfmode > 0 && ui_perfmode == getpid()) {
+        ui_perf_enabled = true;
     }
     /* QTI_END */
 
@@ -657,10 +651,12 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
         }
         case JavaCompressFormat::Png: {
             /* QTI_BEGIN */
-            if (ui_perf_enabled) {
+            if (ui_perf_enabled && bitmap.width() >= 1280
+                                && bitmap.height() >= 720) {
                 SkPngEncoder::Options options;
                 options.fZLibLevel = 0;
-                options.fFilterFlags = SkPngEncoder::FilterFlag::kNone;
+                options.fFilterFlags = SkPngEncoder::FilterFlag::kNone |
+                                       SkPngEncoder::FilterFlag::kAvg;
                 return SkPngEncoder::Encode(stream, bitmap.pixmap(), options);
             }
             /* QTI_END */

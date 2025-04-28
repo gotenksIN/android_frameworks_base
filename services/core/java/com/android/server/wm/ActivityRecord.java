@@ -6750,7 +6750,7 @@ public final class ActivityRecord extends WindowToken {
 // QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
     protected void acquireActivityBoost() {
         if (mPerf != null) {
-            if (mPerf.isUiPerfEnabled(mWmService.mContext, packageName)) {
+            if (mPerf.shouldUseUiPerf(mWmService.mContext, packageName)) {
                 return;
             }
             if (mPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
@@ -6815,7 +6815,7 @@ public final class ActivityRecord extends WindowToken {
     /** Called when the windows associated app window container are visible. */
     void onWindowsVisible() {
         /* QTI_BEGIN */
-        if (mPerf != null && mPerf.isUiPerfEnabled(mWmService.mContext, packageName)) {
+        if (mPerf != null && mPerf.shouldUseUiPerf(mWmService.mContext, packageName)) {
             int hint = mPerf.getUiPerfHint(mWmService.mContext, info.name);
             if (hint != -1) {
                 int timeout_ms = 5 * 60 * 1000;

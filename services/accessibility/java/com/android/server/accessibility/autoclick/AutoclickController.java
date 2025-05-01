@@ -90,6 +90,9 @@ public class AutoclickController extends BaseEventStreamTransformation {
     public static final int DEFAULT_AUTOCLICK_DELAY_TIME = Flags.enableAutoclickIndicator()
             ? AUTOCLICK_DELAY_WITH_INDICATOR_DEFAULT : AUTOCLICK_DELAY_DEFAULT;
 
+    // Time interval between two left click events are considered as a double click.
+    public static long DOUBLE_CLICK_MINIMUM_TIMEOUT = ViewConfiguration.getDoubleTapMinTime();
+
     // Duration before a press turns into a long press.
     // Factor 1.5 is needed, otherwise a long press is not safely detected.
     public static final long LONG_PRESS_TIMEOUT =
@@ -103,6 +106,8 @@ public class AutoclickController extends BaseEventStreamTransformation {
     // further fine tuned based on user feedback.
     private static final float SCROLL_AMOUNT = 0.5f;
     protected static final long CONTINUOUS_SCROLL_INTERVAL = 30;
+    // Timestamp when autoclick was enabled, used to calculate session duration.
+    private final long mAutoclickEnabledTimestamp;
     private Handler mContinuousScrollHandler;
     private Runnable mContinuousScrollRunnable;
 
@@ -151,6 +156,8 @@ public class AutoclickController extends BaseEventStreamTransformation {
     // The MotionEvent downTime attribute associated with the originating click for a long press
     // event.
     private long mLongPressDownTime;
+
+    private boolean mHasOngoingDoubleClick = false;
 
     /**
      * Controller for the auto click type UI panel, allowing users to 1) select what type of auto
@@ -229,6 +236,10 @@ public class AutoclickController extends BaseEventStreamTransformation {
         mTrace = trace;
         mContext = context;
         mUserId = userId;
+
+        // Record when autoclick is enabled, and store the enabled timestamp.
+        mAutoclickEnabledTimestamp = SystemClock.elapsedRealtime();
+        AutoclickLogger.logAutoclickEnabled();
     }
 
     @Override
@@ -357,6 +368,13 @@ public class AutoclickController extends BaseEventStreamTransformation {
             mContinuousScrollHandler.removeCallbacks(mContinuousScrollRunnable);
             mContinuousScrollHandler = null;
         }
+
+        // Calculate session duration and log when autoclick is disabled.
+        if (mAutoclickEnabledTimestamp > 0) {
+            int sessionDurationSeconds =
+                    (int) ((SystemClock.elapsedRealtime() - mAutoclickEnabledTimestamp) / 1000);
+            AutoclickLogger.logAutoclickSessionDuration(sessionDurationSeconds);
+        }
     }
 
     private void scheduleClick(MotionEvent event, int policyFlags) {
@@ -478,6 +496,11 @@ public class AutoclickController extends BaseEventStreamTransformation {
             mAutoclickScrollPanel.hide();
         }
         stopContinuousScroll();
+
+        // Reset click type to left click if necessary.
+        if (mClickScheduler != null) {
+            mClickScheduler.resetSelectedClickTypeIfNecessary();
+        }
     }
 
     private void startContinuousScroll(@AutoclickScrollPanel.ScrollDirection int direction) {
@@ -844,12 +867,19 @@ public class AutoclickController extends BaseEventStreamTransformation {
             }
 
             sendClick();
-            resetInternalState();
+            // Hold off resetting internal state until double click complete.
+            if (!mHasOngoingDoubleClick) {
+                resetInternalState();
+            }
 
-            // If the user is currently dragging, do not reset their click type.
+
             boolean stillDragging = mActiveClickType == AUTOCLICK_TYPE_DRAG
                     && mDragModeIsDragging;
-            if (!stillDragging) {
+            boolean inScrollMode =
+                    mActiveClickType == AUTOCLICK_TYPE_SCROLL && mAutoclickScrollPanel != null
+                            && mAutoclickScrollPanel.isVisible();
+            // Only reset if the user is not dragging and is not in scroll mode.
+            if (!stillDragging && !inScrollMode) {
                 resetSelectedClickTypeIfNecessary();
             }
         }
@@ -1106,6 +1136,8 @@ public class AutoclickController extends BaseEventStreamTransformation {
             // types.
             int selectedClickType = mHoveredState ? AUTOCLICK_TYPE_LEFT_CLICK : mActiveClickType;
 
+            AutoclickLogger.logSelectedClickType(selectedClickType);
+
             // Handle scroll-specific click behavior.
             if (handleScrollClick()) {
                 return;
@@ -1126,8 +1158,6 @@ public class AutoclickController extends BaseEventStreamTransformation {
             }
             mLastMotionEvent.getPointerCoords(pointerIndex, mTempPointerCoords[0]);
 
-            final long now = SystemClock.uptimeMillis();
-
             int actionButton = BUTTON_PRIMARY;
             switch (selectedClickType) {
                 case AUTOCLICK_TYPE_RIGHT_CLICK:
@@ -1135,9 +1165,7 @@ public class AutoclickController extends BaseEventStreamTransformation {
                     break;
                 case AUTOCLICK_TYPE_DOUBLE_CLICK:
                     actionButton = BUTTON_PRIMARY;
-                    long doubleTapMinimumTimeout = ViewConfiguration.getDoubleTapMinTime();
-                    sendMotionEvent(actionButton, now);
-                    sendMotionEvent(actionButton, now + doubleTapMinimumTimeout);
+                    sendDoubleClickEvent();
                     return;
                 case AUTOCLICK_TYPE_DRAG:
                     if (mDragModeIsDragging) {
@@ -1153,7 +1181,7 @@ public class AutoclickController extends BaseEventStreamTransformation {
                 default:
                     break;
             }
-            sendMotionEvent(actionButton, now);
+            sendMotionEvent(actionButton);
         }
 
         /**
@@ -1203,9 +1231,10 @@ public class AutoclickController extends BaseEventStreamTransformation {
             return true;
         }
 
-        private void sendMotionEvent(int actionButton, long eventTime) {
+        private void sendMotionEvent(int actionButton) {
+            final long now = SystemClock.uptimeMillis();
             MotionEvent downEvent = buildMotionEvent(
-                    eventTime, eventTime, actionButton, mLastMotionEvent);
+                    now, now, actionButton, mLastMotionEvent);
 
             MotionEvent pressEvent = MotionEvent.obtain(downEvent);
             pressEvent.setAction(MotionEvent.ACTION_BUTTON_PRESS);
@@ -1231,6 +1260,19 @@ public class AutoclickController extends BaseEventStreamTransformation {
 
             AutoclickController.super.onMotionEvent(upEvent, upEvent, mEventPolicyFlags);
             upEvent.recycle();
+        }
+
+        private void sendDoubleClickEvent() {
+            mHasOngoingDoubleClick = true;
+            sendMotionEvent(BUTTON_PRIMARY);
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    sendMotionEvent(BUTTON_PRIMARY);
+                    mHasOngoingDoubleClick = false;
+                    resetInternalState();
+                }
+            }, DOUBLE_CLICK_MINIMUM_TIMEOUT);
         }
 
         private void sendLongPress() {
@@ -1268,6 +1310,7 @@ public class AutoclickController extends BaseEventStreamTransformation {
                     releaseEvent.recycle();
                     upEvent.recycle();
                     mHasOngoingLongPress = false;
+                    resetInternalState();
                 }
             }, LONG_PRESS_TIMEOUT);
         }

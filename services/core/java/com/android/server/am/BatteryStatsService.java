@@ -467,12 +467,8 @@ public final class BatteryStatsService extends IBatteryStats.Stub
     }
 
     public void systemServicesReady() {
-        mStats.setBatteryHistoryCompressionEnabled(
-                Flags.extendedBatteryHistoryCompressionEnabled());
         mStats.saveBatteryUsageStatsOnNewSession(mBatteryUsageStatsProvider, mPowerStatsStore,
                 true);
-        mStats.resetBatteryHistoryOnNewSession(
-                !Flags.extendedBatteryHistoryContinuousCollectionEnabled());
 
         MultiStatePowerAttributor attributor = (MultiStatePowerAttributor) mPowerAttributor;
 
@@ -3110,6 +3106,7 @@ public final class BatteryStatsService extends IBatteryStats.Stub
         boolean noOutput = false;
         boolean writeData = false;
         long historyStart = -1;
+        long monotonicClockStartTime = 0;
         int reqUid = -1;
         if (args != null) {
             for (int i=0; i<args.length; i++) {
@@ -3253,6 +3250,14 @@ public final class BatteryStatsService extends IBatteryStats.Stub
                     return;
                 } else if ("-a".equals(arg)) {
                     flags |= BatteryStats.DUMP_VERBOSE;
+                    monotonicClockStartTime =
+                        mMonotonicClock.monotonicTime() - mContext.getResources().getInteger(
+                            com.android.internal.R.integer.config_batteryHistoryDumpWindowSize);
+                    if (monotonicClockStartTime < 0) {
+                        monotonicClockStartTime = 0;
+                    }
+                } else if ("-v".equals(arg)) {
+                    flags |= BatteryStats.DUMP_VERBOSE;
                 } else if ("--sync".equals(arg)) {
                     finishDelayedOperations(pw);
                     return;
@@ -3392,8 +3397,8 @@ public final class BatteryStatsService extends IBatteryStats.Stub
         } else {
             if (DBG) Slog.d(TAG, "begin dump from UID " + Binder.getCallingUid());
             awaitCompletion();
-
-            mStats.dump(mContext, pw, flags, reqUid, historyStart, mDumpHelper);
+            mStats.dump(mContext, pw, flags, reqUid, historyStart, mDumpHelper,
+                    monotonicClockStartTime);
             if (writeData) {
                 mStats.writeAsyncLocked();
             }

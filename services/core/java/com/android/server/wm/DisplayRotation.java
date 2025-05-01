@@ -64,7 +64,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.hardware.devicestate.DeviceState;
+import android.hardware.devicestate.DeviceStateManager;
 import android.hardware.power.Boost;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -87,10 +87,16 @@ import android.window.WindowContainerTransaction;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.os.BackgroundThread;
 import com.android.internal.protolog.ProtoLog;
 import com.android.server.UiThread;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.statusbar.StatusBarManagerInternal;
+import com.android.settingslib.devicestate.AndroidSecureSettings;
+import com.android.settingslib.devicestate.DeviceStateAutoRotateSettingManager;
+import com.android.settingslib.devicestate.DeviceStateAutoRotateSettingManagerImpl;
+import com.android.settingslib.devicestate.PostureDeviceStateConverter;
+import com.android.settingslib.devicestate.SecureSettings;
 import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
@@ -129,8 +135,6 @@ public class DisplayRotation {
 // QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
     @Nullable
     private final DisplayRotationImmersiveAppCompatPolicy mCompatPolicyForImmersiveApps;
-    @Nullable
-    private DeviceStateAutoRotateSettingController mDeviceStateAutoRotateSettingController;
 
     public final boolean isDefaultDisplay;
     private final boolean mSupportAutoRotation;
@@ -299,8 +303,7 @@ public class DisplayRotation {
         isDefaultDisplay = displayContent.isDefaultDisplay;
         mCompatPolicyForImmersiveApps = initImmersiveAppCompatPolicy(service, displayContent);
 
-        mSupportAutoRotation =
-                mContext.getResources().getBoolean(R.bool.config_supportAutoRotation);
+        mSupportAutoRotation = isAutoRotateSupported(mContext);
         mAllowRotationResolver =
                 mContext.getResources().getBoolean(R.bool.config_allowRotationResolver);
         mLidOpenRotation = readRotation(R.integer.config_lidOpenRotation);
@@ -411,17 +414,14 @@ public class DisplayRotation {
 // QTI_END: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
 // QTI_BEGIN: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
 // QTI_END: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
-        if (mFoldController != null && (Flags.enableDeviceStateAutoRotateSettingLogging()
-                || Flags.enableDeviceStateAutoRotateSettingRefactor())) {
-            mDeviceStateAutoRotateSettingController =
-                    new DeviceStateAutoRotateSettingController(mContext,
-                            new DeviceStateAutoRotateSettingIssueLogger(
-                                    SystemClock::elapsedRealtime), mService.mH);
-        }
     }
 
     private static boolean isFoldable(Context context) {
         return context.getResources().getIntArray(R.array.config_foldedDeviceStates).length > 0;
+    }
+
+    private static boolean isAutoRotateSupported(@NonNull Context context) {
+        return context.getResources().getBoolean(R.bool.config_supportAutoRotation);
     }
 
     @VisibleForTesting
@@ -1724,14 +1724,10 @@ public class DisplayRotation {
      * method will be invoked *after* this one.
      */
     // TODO(b/409761673) Migrate to only using android.hardware.devicestate.DeviceState
-    void foldStateChanged(DeviceStateController.DeviceStateEnum deviceStateEnum,
-            DeviceState deviceState) {
+    void foldStateChanged(DeviceStateController.DeviceStateEnum deviceStateEnum) {
         if (mFoldController != null) {
             synchronized (mLock) {
                 mFoldController.foldStateChanged(deviceStateEnum);
-                if (mDeviceStateAutoRotateSettingController != null) {
-                    mDeviceStateAutoRotateSettingController.onDeviceStateChange(deviceState);
-                }
             }
         }
     }
@@ -1781,6 +1777,49 @@ public class DisplayRotation {
     @VisibleForTesting
     long uptimeMillis() {
         return SystemClock.uptimeMillis();
+    }
+
+    /**
+     * Initialize dependencies related to Device state auto-rotate setting.
+     * <p>
+     * Set of dependencies initialized here is:
+     * <ul>
+     * <li>{@link DeviceStateAutoRotateSettingController}</li>
+     * <li>{@link DeviceStateAutoRotateSettingIssueLogger}</li>
+     * <li>{@link DeviceStateAutoRotateSettingManager}</li>
+     * </ul>
+     * @return an instance of {@link DeviceStateAutoRotateSettingController}
+     */
+    @Nullable
+    static DeviceStateAutoRotateSettingController createDeviceStateAutoRotateDependencies(
+            Context context, DeviceStateController deviceStateController, Handler handler) {
+        if (!isFoldable(context) || !isAutoRotateSupported(context)) return null;
+        if (!Flags.enableDeviceStateAutoRotateSettingLogging()
+                && !Flags.enableDeviceStateAutoRotateSettingRefactor()) {
+            return null;
+        }
+
+        DeviceStateAutoRotateSettingController deviceStateAutoRotateSettingController = null;
+
+        final SecureSettings secureSettings = new AndroidSecureSettings(
+                context.getContentResolver());
+
+        if (Flags.enableDeviceStateAutoRotateSettingLogging()) {
+            new DeviceStateAutoRotateSettingIssueLogger(SystemClock::elapsedRealtime,
+                    secureSettings, deviceStateController, handler);
+        }
+
+        if (Flags.enableDeviceStateAutoRotateSettingRefactor()) {
+            final DeviceStateAutoRotateSettingManager deviceStateAutoRotateSettingManager =
+                    new DeviceStateAutoRotateSettingManagerImpl(
+                            context, BackgroundThread.getExecutor(), secureSettings, handler,
+                            new PostureDeviceStateConverter(context, new DeviceStateManager()));
+            // TODO(b/406444989): Manager created in previous line will be passed into controller
+            deviceStateAutoRotateSettingController =
+                    new DeviceStateAutoRotateSettingController();
+        }
+
+        return deviceStateAutoRotateSettingController;
     }
 
     class FoldController {

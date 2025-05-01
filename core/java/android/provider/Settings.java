@@ -8756,8 +8756,8 @@ public final class Settings {
          * Setting to indicate that content filters should be enabled on web browsers.
          *
          * <ul>
-         *   <li>0 = Allow all sites
-         *   <li>1 = Try to block explicit sites
+         *   <li> non-positive (less or equal to 0) = Allow all sites
+         *   <li> positive (greater than 0) = Try to block explicit sites
          * </ul>
          *
          * @hide
@@ -8770,8 +8770,8 @@ public final class Settings {
          * Setting to indicate that content filters should be enabled in web search engines.
          *
          * <ul>
-         *   <li>0 = Off
-         *   <li>1 = Filter
+         *   <li> non-positive (less or equal to 0) = Off
+         *   <li> positive (greater than 0) = Filter
          * </ul>
          *
          * @hide

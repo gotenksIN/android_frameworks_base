@@ -2183,12 +2183,13 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         });
     }
 
-    private void sendSplitVisibilityChanged() {
+    /** Notify external parties when split is visible or not. NOT related to split activation. */
+    private void sendSplitVisibilityChanged(boolean visible) {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "sendSplitVisibilityChanged: dividerVisible=%b",
                 mDividerVisible);
         for (int i = mListeners.size() - 1; i >= 0; --i) {
             final SplitScreen.SplitScreenListener l = mListeners.get(i);
-            l.onSplitVisibilityChanged(mDividerVisible);
+            l.onSplitVisibilityChanged(visible);
         }
         sendOnBoundsChanged();
     }
@@ -2429,7 +2430,6 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
 
         mDividerVisible = visible;
-        sendSplitVisibilityChanged();
 
         if (mIsDividerRemoteAnimating) {
             ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
@@ -4263,6 +4263,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
 
         mStatusBarHider.onSplitVisibilityChanged(visible);
+        sendSplitVisibilityChanged(visible);
     }
 
     /**

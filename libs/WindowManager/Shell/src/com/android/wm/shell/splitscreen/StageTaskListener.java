@@ -80,14 +80,17 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
     @StageType private final int mId;
     /** Callback interface for listening to changes in a split-screen stage. */
     public interface StageListenerCallbacks {
-        void onRootTaskAppeared();
+        /** Called when the root task on current display appears. */
+        void onRootTaskAppeared(ActivityManager.RunningTaskInfo taskInfo);
 
         void onStageVisibilityChanged(StageTaskListener stageTaskListener);
 
         void onChildTaskStatusChanged(StageTaskListener stage, int taskId, boolean present,
                 boolean visible);
 
-        void onRootTaskVanished();
+
+        /** Called when the root task on current display vanishes. */
+        void onRootTaskVanished(ActivityManager.RunningTaskInfo taskInfo);
 
         void onNoLongerSupportMultiWindow(StageTaskListener stageTaskListener,
                 ActivityManager.RunningTaskInfo taskInfo);
@@ -193,6 +196,14 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
         return mSplitDecorManager;
     }
 
+    /**
+     * Gets the leash for this task's dim layer. We manipulate this surface's alpha to dim the app
+     * when it's moving offscreen or toward dismissal.
+     */
+    public SurfaceControl getDimLayer() {
+        return mDimLayer;
+    }
+
     @Nullable
     private ActivityManager.RunningTaskInfo getChildTaskInfo(
             Predicate<ActivityManager.RunningTaskInfo> predicate) {
@@ -220,7 +231,7 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
                     mRootTaskInfo.configuration,
                     mIconProvider);
             mHasRootTask = true;
-            mCallbacks.onRootTaskAppeared();
+            mCallbacks.onRootTaskAppeared(taskInfo);
             if (mVisible != mRootTaskInfo.isVisible) {
                 mVisible = mRootTaskInfo.isVisible;
                 mCallbacks.onStageVisibilityChanged(this);
@@ -281,7 +292,7 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
             mHasRootTask = false;
             mVisible = false;
             mHasChildren = false;
-            mCallbacks.onRootTaskVanished();
+            mCallbacks.onRootTaskVanished(taskInfo);
             mRootTaskInfo = null;
             mRootLeash = null;
             mSyncQueue.runInSync(t -> {

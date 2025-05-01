@@ -2151,6 +2151,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     </string>
 
+    <!-- Modes: title for when multiple modes are active.[CHAR LIMIT=20] -->
+    <string name="zen_modes_multiple_on_title">%s Modes</string>
+
+    <!-- Modes: subtitle for when multiple modes are active. Plural. [CHAR LIMIT=20] -->
+    <string name="zen_modes_multiple_on_status">On</string>
+
     <!-- Zen mode: Priority only introduction message on first use -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

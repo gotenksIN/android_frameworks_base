@@ -1320,16 +1320,6 @@ flag {
 }
 
 flag {
-  name: "qs_custom_tile_click_guaranteed_bug_fix"
-  namespace: "systemui"
-  description: "Guarantee that clicks on a tile always happen by postponing onStopListening until after the click."
-  bug: "339290820"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "media_controls_button_media3"
   namespace: "systemui"
   description: "Enable media action buttons updates using media3"
@@ -2101,4 +2091,11 @@ flag {
     namespace: "systemui"
     description: "Overall changes on Sytem UI when current user is the Headless System User"
     bug: "408066623"
+}
+
+flag {
+    name: "enable_suggested_device_ui"
+    namespace: "systemui"
+    description: "Enables the UI for the suggested devices feature."
+    bug: "411452237"
 }

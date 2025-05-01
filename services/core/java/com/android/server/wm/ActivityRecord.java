@@ -1344,7 +1344,7 @@ public final class ActivityRecord extends WindowToken {
      * activity, this will return false.
      * @return if the entire task will be recreated when handing off this activity.
      */
-    boolean allowFullTaskRecreation() {
+    boolean isHandoffFullTaskRecreationAllowed() {
         if (!isHandoffEnabled()) {
             return false;
         }
@@ -2814,10 +2814,12 @@ public final class ActivityRecord extends WindowToken {
         final boolean animate;
         final boolean hasImeSurface;
         if (mStartingData != null) {
-            if (getSyncTransactionCommitCallbackDepth() > 0 || mSyncState != SYNC_STATE_NONE) {
-                mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
-                mStartingData.mPrepareRemoveAnimation = prepareAnimation;
-                return;
+            if (!Flags.removeStartingInTransition()) {
+                if (getSyncTransactionCommitCallbackDepth() > 0 || mSyncState != SYNC_STATE_NONE) {
+                    mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
+                    mStartingData.mPrepareRemoveAnimation = prepareAnimation;
+                    return;
+                }
             }
             animate = prepareAnimation && mStartingData.needRevealAnimation()
                     && mStartingWindow.isVisibleByPolicy();

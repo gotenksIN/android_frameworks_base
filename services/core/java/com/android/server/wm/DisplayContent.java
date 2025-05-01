@@ -1627,7 +1627,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if (displayConfig != null) {
             mTransitionController.waitFor(displayConfig);
         } else if (mTransitionController.isShellTransitionsEnabled() && mLastHasContent) {
-            Slog.e(TAG, "Display reconfigured outside of a transition: " + this);
+            Slog.d(TAG, "Direct invocation of sendNewConfiguration: " + this);
         }
         final boolean configUpdated = updateDisplayOverrideConfigurationLocked();
         if (displayConfig != null) {
@@ -2834,7 +2834,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         // If the transition finished callback cannot match the token for some reason, make sure the
         // rotated state is cleared if it is already invisible.
         if (mFixedRotationLaunchingApp != null && !mFixedRotationLaunchingApp.isVisibleRequested()
-                && !mFixedRotationLaunchingApp.isVisible()) {
+                && !mFixedRotationLaunchingApp.isVisible()
+                // In case the next transition still needs the existing transform.
+                && !mTransitionController.isCollecting()) {
             clearFixedRotationLaunchingApp();
         }
         // If there won't be a transition to notify the launch is done, then it should be ready to
@@ -3256,6 +3258,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         if (!shouldShowContent) {
             clearAllTasksOnDisplay(null /* clearTasksCallback */, false /* isRemovingDisplay */);
+
+            // Move the app error dialogs (such as app crash dialog, anr dialog, etc) to the default
+            // display.
+            mWmService.mAmInternal.moveErrorDialogsToDefaultDisplay(mDisplayId);
         }
 
         // If the display is allowed to show content, then it belongs to the display topology;

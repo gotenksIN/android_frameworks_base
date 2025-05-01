@@ -197,7 +197,6 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     boolean mDrawFinished = false;
 
     final Rect mScreenRect = new Rect();
-    private final boolean mLimitedHdrEnabled = Flags.limitedHdr();
 
     SurfaceControl mSurfaceControl;
     SurfaceControl mBackgroundControl;
@@ -998,7 +997,6 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
      *                        chosen value.
      * @see Display#getHdrSdrRatio()
      */
-    @FlaggedApi(com.android.graphics.hwui.flags.Flags.FLAG_LIMITED_HDR)
     public void setDesiredHdrHeadroom(
             @FloatRange(from = 0.0f, to = 10000.0) float desiredHeadroom) {
         if (!Float.isFinite(desiredHeadroom)) {
@@ -1152,7 +1150,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
             updateBackgroundVisibility(surfaceUpdateTransaction);
             updateBackgroundColor(surfaceUpdateTransaction);
-            if (mLimitedHdrEnabled && (hdrHeadroomChanged || creating)) {
+            if (hdrHeadroomChanged || creating) {
                 surfaceUpdateTransaction.setDesiredHdrHeadroom(
                         mBlastSurfaceControl, mHdrHeadroom);
             }

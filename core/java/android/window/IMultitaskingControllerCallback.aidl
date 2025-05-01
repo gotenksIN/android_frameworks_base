@@ -1,11 +1,11 @@
-/*
- * Copyright (C) 2019 The Android Open Source Project
+/**
+ * Copyright (c) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package android.debug;
+package android.window;
 
-/*
- * Must be in sync with framewroks/native/libs/adbd_auth/include/adbd_auth.h
+import android.os.IBinder;
+import android.content.Intent;
+
+/**
+ * System private callback for notifying the registered clients about the updates related to
+ * multitasking features they requested to control.
+ * @hide
  */
-
-/** @hide */
-@Backing(type="byte")
-enum AdbTransportType {
-    USB,
-    WIFI,
+interface IMultitaskingControllerCallback {
+    oneway void onBubbleRemoved(in IBinder token);
 }
-

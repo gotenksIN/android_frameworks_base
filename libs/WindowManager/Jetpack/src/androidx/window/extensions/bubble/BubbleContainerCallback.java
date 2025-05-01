@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package android.debug;
+package androidx.window.extensions.bubble;
 
-/*
- * Must be in sync with framewroks/native/libs/adbd_auth/include/adbd_auth.h
+import android.os.IBinder;
+
+/**
+ * Public interface used to notify applications about the changes to the bubble containers they
+ * manage.
  */
-
-/** @hide */
-@Backing(type="byte")
-enum AdbTransportType {
-    USB,
-    WIFI,
+public interface BubbleContainerCallback {
+    /** Notifies about removal of a Bubble that was previously opened by the client. */
+    void onBubbleRemoved(IBinder token);
 }
-

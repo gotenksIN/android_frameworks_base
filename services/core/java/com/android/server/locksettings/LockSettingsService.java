@@ -437,9 +437,9 @@ public class LockSettingsService extends ILockSettings.Stub {
         }
         LockscreenCredential credential =
                 LockscreenCredential.createUnifiedProfilePassword(newPassword);
-        LockPatternUtils.zeroize(newPasswordChars);
-        LockPatternUtils.zeroize(newPassword);
-        LockPatternUtils.zeroize(randomLockSeed);
+        ArrayUtils.zeroize(newPasswordChars);
+        ArrayUtils.zeroize(newPassword);
+        ArrayUtils.zeroize(randomLockSeed);
         return credential;
     }
 
@@ -1565,7 +1565,7 @@ public class LockSettingsService extends ILockSettings.Stub {
                         + userId);
             }
         } finally {
-            LockPatternUtils.zeroize(password);
+            ArrayUtils.zeroize(password);
         }
     }
 
@@ -1598,7 +1598,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         decryptionResult = cipher.doFinal(encryptedPassword);
         LockscreenCredential credential = LockscreenCredential.createUnifiedProfilePassword(
                 decryptionResult);
-        LockPatternUtils.zeroize(decryptionResult);
+        ArrayUtils.zeroize(decryptionResult);
         try {
             long parentSid = getGateKeeperService().getSecureUserId(
                     mUserManager.getProfileParent(userId).id);
@@ -2284,7 +2284,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         } catch (RemoteException e) {
             Slogf.wtf(TAG, e, "Failed to unlock CE storage for %s user %d", userType, userId);
         } finally {
-            LockPatternUtils.zeroize(secret);
+            ArrayUtils.zeroize(secret);
         }
     }
 

@@ -1704,7 +1704,6 @@ public abstract class CameraDevice implements AutoCloseable {
      * @see CameraManager#isCameraDeviceSetupSupported(String)
      * @see CameraManager#getCameraDeviceSetup(String)
      */
-    @FlaggedApi(Flags.FLAG_CAMERA_DEVICE_SETUP)
     public abstract static class CameraDeviceSetup {
         /**
          * Create a {@link CaptureRequest.Builder} for new capture requests,
@@ -1732,7 +1731,6 @@ public abstract class CameraDevice implements AutoCloseable {
          * @throws IllegalArgumentException if the templateType is not supported by this device
          */
         @NonNull
-        @FlaggedApi(Flags.FLAG_CAMERA_DEVICE_SETUP)
         public abstract CaptureRequest.Builder createCaptureRequest(
                 @RequestTemplate int templateType) throws CameraAccessException;
 
@@ -1814,7 +1812,6 @@ public abstract class CameraDevice implements AutoCloseable {
          * @see SessionConfiguration
          * @see android.media.ImageReader
          */
-        @FlaggedApi(Flags.FLAG_CAMERA_DEVICE_SETUP)
         public abstract boolean isSessionConfigurationSupported(
                 @NonNull SessionConfiguration config) throws CameraAccessException;
 
@@ -1862,7 +1859,6 @@ public abstract class CameraDevice implements AutoCloseable {
          * @see CameraCharacteristics#getAvailableSessionCharacteristicsKeys
          */
         @NonNull
-        @FlaggedApi(Flags.FLAG_CAMERA_DEVICE_SETUP)
         public abstract CameraCharacteristics getSessionCharacteristics(
                 @NonNull SessionConfiguration sessionConfig) throws CameraAccessException;
 
@@ -1887,7 +1883,6 @@ public abstract class CameraDevice implements AutoCloseable {
          *
          * @see CameraManager#openCamera(String, Executor, StateCallback)
          */
-        @FlaggedApi(Flags.FLAG_CAMERA_DEVICE_SETUP)
         @RequiresPermission(android.Manifest.permission.CAMERA)
         public abstract void openCamera(@NonNull @CallbackExecutor Executor executor,
                 @NonNull StateCallback callback) throws CameraAccessException;
@@ -1903,7 +1898,6 @@ public abstract class CameraDevice implements AutoCloseable {
          * @see CameraManager#getCameraIdList
          */
         @NonNull
-        @FlaggedApi(Flags.FLAG_CAMERA_DEVICE_SETUP)
         public abstract String getId();
 
         /**

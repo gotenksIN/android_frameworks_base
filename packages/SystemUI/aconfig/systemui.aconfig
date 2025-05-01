@@ -26,6 +26,16 @@ flag {
 }
 
 flag {
+    name: "remove_aod_car_mode"
+    namespace: "systemui"
+    description: "Remove functionality of car mode disabling AOD."
+    bug: "297462331"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+ }
+
+flag {
    name: "fingerprint_cancel_race_mitigation"
    namespace: "systemui"
    description: "Mitigate the race condition between KeyguardUpdateMonitor cancelling a fingerprint listening state and FingerprintManager sending the cancellation."
@@ -721,6 +731,16 @@ flag {
 }
 
 flag {
+    name: "clipboard_announce_live_region"
+    namespace: "systemui"
+    description: "Use live region for clipboard status announcement"
+    bug: "378856296"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "screen_reactions"
     namespace: "systemui"
     description: "Enables the new screen recording UX"
@@ -742,16 +762,6 @@ flag {
     namespace: "systemui"
     description: "Show shared transitions from clipboard"
     bug: "360843770"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "clipboard_image_timeout"
-    namespace: "systemui"
-    description: "Wait for clipboard image to load before showing UI"
-    bug: "359864629"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -941,17 +951,6 @@ flag {
     namespace: "systemui"
     description: "Show a dialog when clicking on hearing aids quick settings tile."
     bug: "291423171"
-}
-
-flag {
-    name: "notification_row_user_context"
-    namespace: "systemui"
-    description: "Create a user-specific Context for the ImageResolver in ExpandableNotificationRow"
-        " (based on the NotificationEntry's user)."
-    bug: "317503801"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1595,16 +1594,6 @@ flag {
    namespace: "systemui"
    description: "Ensure MediaProjection Dialog appears behind the lockscreen"
    bug: "351409536"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
-   name: "check_lockscreen_gone_transition"
-   namespace: "systemui"
-   description: "Run notification pipeline when the lockscreen is not in gone transition for avoiding janky frames during unlocking animation"
-   bug: "358301118"
    metadata {
        purpose: PURPOSE_BUGFIX
    }

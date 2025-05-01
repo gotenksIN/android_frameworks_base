@@ -50,7 +50,6 @@ class MultiDisplayVeiledResizeTaskPositioner(
     private val taskOrganizer: ShellTaskOrganizer,
     private val desktopWindowDecoration: DesktopModeWindowDecoration,
     private val displayController: DisplayController,
-    dragEventListener: DragPositioningCallbackUtility.DragEventListener,
     private val transactionSupplier: () -> SurfaceControl.Transaction,
     private val transitions: Transitions,
     private val interactionJankMonitor: InteractionJankMonitor,
@@ -82,7 +81,6 @@ class MultiDisplayVeiledResizeTaskPositioner(
         taskOrganizer: ShellTaskOrganizer,
         windowDecoration: DesktopModeWindowDecoration,
         displayController: DisplayController,
-        dragEventListener: DragPositioningCallbackUtility.DragEventListener,
         transitions: Transitions,
         interactionJankMonitor: InteractionJankMonitor,
         @ShellMainThread handler: Handler,
@@ -92,7 +90,6 @@ class MultiDisplayVeiledResizeTaskPositioner(
         taskOrganizer,
         windowDecoration,
         displayController,
-        dragEventListener,
         { SurfaceControl.Transaction() },
         transitions,
         interactionJankMonitor,
@@ -102,7 +99,6 @@ class MultiDisplayVeiledResizeTaskPositioner(
     )
 
     init {
-        dragEventListeners.add(dragEventListener)
         displayController.addDisplayWindowListener(this)
     }
 
@@ -127,9 +123,6 @@ class MultiDisplayVeiledResizeTaskPositioner(
                 )
                 taskOrganizer.applyTransaction(wct)
             }
-        }
-        for (dragEventListener in dragEventListeners) {
-            dragEventListener.onDragStart(desktopWindowDecoration.mTaskInfo.taskId)
         }
         repositionTaskBounds.set(taskBoundsAtDragStart)
         val rotation =
@@ -210,6 +203,7 @@ class MultiDisplayVeiledResizeTaskPositioner(
 
                 multiDisplayDragMoveIndicatorController.onDragMove(
                     boundsDp,
+                    displayId,
                     startDisplayId,
                     desktopWindowDecoration.mTaskInfo,
                     displayIds,
@@ -332,6 +326,10 @@ class MultiDisplayVeiledResizeTaskPositioner(
         finishCallback: Transitions.TransitionFinishCallback,
     ): Boolean {
         for (change in info.changes) {
+            if (change.taskInfo == null) {
+                // Ignore non-task (e.g., display, activity) changes.
+                continue
+            }
             val sc = change.leash
             val endBounds = change.endAbsBounds
             val endPosition = change.endRelOffset

@@ -1059,7 +1059,6 @@ public class CameraDeviceImpl extends CameraDevice
         synchronized (mInterfaceLock) {
             checkIfCameraClosedOrInError();
             if (CompatChanges.isChangeEnabled(CHECK_PARAMS_IN_IS_SESSION_CONFIGURATION_SUPPORTED)
-                    && Flags.cameraDeviceSetup()
                     && mCameraDeviceSetup != null) {
                 return mCameraDeviceSetup.isSessionConfigurationSupported(sessionConfig);
             }

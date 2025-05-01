@@ -12698,9 +12698,9 @@ package android.security.authenticationpolicy {
     field @FlaggedApi("android.security.secure_lockdown") public static final int ERROR_INSUFFICIENT_BIOMETRICS = 5; // 0x5
     field @FlaggedApi("android.security.secure_lockdown") public static final int ERROR_INVALID_PARAMS = 3; // 0x3
     field @FlaggedApi("android.security.secure_lockdown") public static final int ERROR_NO_BIOMETRICS_ENROLLED = 4; // 0x4
-    field @FlaggedApi("android.security.secure_lockdown") public static final int ERROR_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("android.security.secure_lockdown") public static final int ERROR_UNKNOWN = 1; // 0x1
     field @FlaggedApi("android.security.secure_lockdown") public static final int ERROR_UNSUPPORTED = 2; // 0x2
-    field @FlaggedApi("android.security.secure_lockdown") public static final int SUCCESS = 1; // 0x1
+    field @FlaggedApi("android.security.secure_lockdown") public static final int SUCCESS = 0; // 0x0
   }
 
   @FlaggedApi("android.security.secure_lockdown") public final class DisableSecureLockDeviceParams implements android.os.Parcelable {
@@ -14466,6 +14466,10 @@ package android.telecom {
     method public void exitBackgroundAudioProcessing(boolean);
     method @Deprecated public void removeListener(android.telecom.Call.Listener);
     field @Deprecated public static final int STATE_PRE_DIAL_WAIT = 8; // 0x8
+  }
+
+  public static class Call.Details {
+    method @FlaggedApi("com.android.server.telecom.flags.call_details_get_associated_user_api") @NonNull public android.os.UserHandle getAssociatedUser();
   }
 
   @Deprecated public abstract static class Call.Listener extends android.telecom.Call.Callback {

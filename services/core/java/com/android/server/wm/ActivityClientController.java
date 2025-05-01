@@ -1132,14 +1132,7 @@ class ActivityClientController extends IActivityClientController.Stub {
         }
 
         final EnterPipRequestedItem item = new EnterPipRequestedItem(r.token);
-        try {
-            return mService.getLifecycleManager().scheduleTransactionItem(r.app.getThread(), item);
-        } catch (RemoteException e) {
-            // TODO(b/323801078): remove Exception when cleanup
-            Slog.w(TAG, "Failed to send enter pip requested item: "
-                    + r.intent.getComponent(), e);
-            return false;
-        }
+        return mService.getLifecycleManager().scheduleTransactionItem(r.app.getThread(), item);
     }
 
     /**
@@ -1148,13 +1141,7 @@ class ActivityClientController extends IActivityClientController.Stub {
     void onPictureInPictureUiStateChanged(@NonNull ActivityRecord r,
             PictureInPictureUiState pipState) {
         final PipStateTransactionItem item = new PipStateTransactionItem(r.token, pipState);
-        try {
-            mService.getLifecycleManager().scheduleTransactionItem(r.app.getThread(), item);
-        } catch (RemoteException e) {
-            // TODO(b/323801078): remove Exception when cleanup
-            Slog.w(TAG, "Failed to send pip state transaction item: "
-                    + r.intent.getComponent(), e);
-        }
+        mService.getLifecycleManager().scheduleTransactionItem(r.app.getThread(), item);
     }
 
     @Override

@@ -1696,11 +1696,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
                 //  freeform tasks.
                 task.reparent(toDisplayArea, getReparentPosition(task));
                 lastReparentedRootTask = task;
-            } else if (destroyContentOnRemoval
-                    || !task.isActivityTypeStandardOrUndefined()
-                    || task.mCreatedByOrganizer) {
-                // Always finish non-standard type root tasks and root tasks created by a
-                // organizer.
+            } else if (destroyContentOnRemoval || !task.shouldReparentOnDisplayRemoval()) {
                 // TODO: For root tasks created by organizer, consider reparenting children tasks
                 //  if the use case arises in the future.
                 task.remove(false /* withTransition */, "removeTaskDisplayArea");

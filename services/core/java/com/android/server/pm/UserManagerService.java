@@ -5681,8 +5681,8 @@ public class UserManagerService extends IUserManager.Stub {
         checkCreateUsersPermission(flags);
 
         Preconditions.checkArgument(isUserTypeEligibleForPreCreation(userTypeDetails),
-                "cannot pre-create user of type " + userType);
-        Slog.i(LOG_TAG, "Pre-creating user of type " + userType);
+                "cannot pre-create user of type %s", userType);
+        Slogf.i(LOG_TAG, "Pre-creating user of type %s", userType);
 
         try {
             return createUserInternalUnchecked(/* name= */ null, userType, flags,
@@ -8531,22 +8531,8 @@ public class UserManagerService extends IUserManager.Stub {
      * @deprecated
      */
     boolean hasProfile(@UserIdInt int userId) {
-        if (!android.content.pm.Flags.removeCrossUserPermissionHack()) {
-            synchronized (mUsersLock) {
-                UserInfo userInfo = getUserInfoLU(userId);
-                final int userSize = mUsers.size();
-                for (int i = 0; i < userSize; i++) {
-                    UserInfo profile = mUsers.valueAt(i).info;
-                    if (userId != profile.id && isSameProfileGroup(userInfo, profile)) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        } else {
-            // TODO(b/332664521): Remove this method entirely. It is no longer used.
-            throw new UnsupportedOperationException();
-        }
+        // TODO(b/332664521): Remove this method entirely. It is no longer used.
+        throw new UnsupportedOperationException();
     }
 
     /**

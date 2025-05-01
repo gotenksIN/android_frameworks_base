@@ -805,7 +805,6 @@ public class WindowManagerService extends IWindowManager.Stub
     volatile float mMaximumObscuringOpacityForTouch =
             InputSettings.DEFAULT_MAXIMUM_OBSCURING_OPACITY_FOR_TOUCH;
 
-    @VisibleForTesting
     final WindowContextListenerController mWindowContextListenerController =
             new WindowContextListenerController();
 
@@ -3057,7 +3056,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 final DisplayArea<?> da = dc.findAreaForWindowType(type, options,
                         callerCanManageAppTokens, false /* roundedCornerOverlay */);
                 mWindowContextListenerController.registerWindowContainerListener(wpc, clientToken,
-                        da, type, options, false /* shouldDispatchConfigWhenRegistering */);
+                        da, type, callerCanManageAppTokens, options,
+                        false /* shouldDispatchConfigWhenRegistering */);
                 return new WindowContextInfo(da.getConfiguration(), displayId);
             }
         } finally {
@@ -3097,10 +3097,9 @@ public class WindowManagerService extends IWindowManager.Stub
                     // See above comments for more detail.
                     return null;
                 }
-
                 mWindowContextListenerController.registerWindowContainerListener(wpc, clientToken,
-                        dc, INVALID_WINDOW_TYPE, null /* options */,
-                        false /* shouldDispatchConfigWhenRegistering */);
+                        dc, INVALID_WINDOW_TYPE, false /* callerCanManageAppTokens */,
+                        null /* options */, false /* shouldDispatchConfigWhenRegistering */);
                 return new WindowContextInfo(dc.getConfiguration(), displayId);
             }
         } finally {
@@ -3149,8 +3148,8 @@ public class WindowManagerService extends IWindowManager.Stub
                     return null;
                 }
                 mWindowContextListenerController.registerWindowContainerListener(wpc, clientToken,
-                        windowToken, windowToken.windowType, windowToken.mOptions,
-                                               false /* shouldDispatchConfigWhenRegistering */);
+                        windowToken, windowToken.windowType, callerCanManageAppTokens,
+                        windowToken.mOptions, false /* shouldDispatchConfigWhenRegistering */);
                 return new WindowContextInfo(windowToken.getConfiguration(),
                         windowToken.getDisplayContent().getDisplayId());
             }
@@ -3219,40 +3218,68 @@ public class WindowManagerService extends IWindowManager.Stub
                         callerCanManageAppTokens, callingUid, displayId)) {
                     return false;
                 }
-                final WindowContainer<?> container = mWindowContextListenerController.getContainer(
-                                clientToken);
-
-                final WindowToken token = container != null ? container.asWindowToken() : null;
-                if (token != null && token.isFromClient()) {
-                    ProtoLog.d(WM_DEBUG_ADD_REMOVE, "Reparenting from dc to displayId=%d",
-                            displayId);
-                    // Reparent the window created for this window context.
-                    dc.reParentWindowToken(token);
-                    hideUntilNextDraw(token);
-                    // Prevent a race condition where VRI temporarily reverts the context display ID
-                    // before the onDisplayMoved callback arrives. This caused incorrect display IDs
-                    // during configuration changes, breaking SysUI layouts dependent on it.
-                    // Forcing a resize report ensures VRI has the correct ID before the update.
-                    forceReportResizing(token);
-                    // This makes sure there is a traversal scheduled that will eventually report
-                    // the window resize to the client.
-                    dc.setLayoutNeeded();
-                    requestTraversal();
-                    return true;
-                }
-
-                final int type = mWindowContextListenerController.getWindowType(clientToken);
-                final Bundle options = mWindowContextListenerController.getOptions(clientToken);
-                // No window yet, switch listening DA.
-                final DisplayArea<?> da = dc.findAreaForWindowType(type, options,
-                        callerCanManageAppTokens, false /* roundedCornerOverlay */);
-                mWindowContextListenerController.registerWindowContainerListener(wpc, clientToken,
-                        da, type, options, true /* shouldDispatchConfigWhenRegistering */);
-                return true;
+                return reparentWindowContextToDisplay(clientToken, dc, callingPid, callingUid);
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
         }
+    }
+
+    /**
+     * Reparents the {@link android.window.WindowContext} specified with {@code clientCode} to
+     * the {@link WindowContainer} on {@code display}.
+     *
+     * @param clientToken the {@link android.window.WindowContext}'s token
+     * @param display the {@link DisplayContent} to reparent
+     * @return {@code true} if the reparent operation is successful. Otherwise, {@code false}
+     */
+    boolean reparentWindowContextToDisplay(
+            @NonNull IBinder clientToken,
+            @NonNull DisplayContent display,
+            int callingPid,
+            int callingUid) {
+        if (!Flags.reparentWindowTokenApi()) {
+            return false;
+        }
+        final WindowContainer<?> container = mWindowContextListenerController.getContainer(
+                clientToken);
+
+        // If the WindowContext associate a WindowToken created by the WindowContext, reparent the
+        // WindowToken as well.
+        final WindowToken token = container != null ? container.asWindowToken() : null;
+        // TODO(b/404532651): Checks if we should reparent system managed WindowToken as well.
+        if (token != null && token.isFromClient()) {
+            final int displayId = display.getDisplayId();
+            ProtoLog.d(WM_DEBUG_ADD_REMOVE, "Reparenting to displayId=%d", displayId);
+
+            final String systemUiPermission = isCallerVirtualDeviceOwner(displayId, callingUid)
+                    && display.isTrusted()
+                    // Virtual device owners can add system windows on their trusted displays.
+                    ? android.Manifest.permission.CREATE_VIRTUAL_DEVICE
+                    : android.Manifest.permission.STATUS_BAR_SERVICE;
+
+            if (display.getDisplayPolicy().assertDisplaySingletonPolicy(
+                    token.getWindowType(), systemUiPermission, callingPid, callingUid)) {
+                ProtoLog.e(WM_DEBUG_ADD_REMOVE, "Fail to reparent windowToken since"
+                        + " there's a window with windowType=%d on displayId=%d",
+                        token.getWindowType(), display.getDisplayId());
+                return false;
+            }
+            // Reparent the window created for this window context.
+            display.reParentWindowToken(token);
+            hideUntilNextDraw(token);
+            // Prevent a race condition where VRI temporarily reverts the context display ID
+            // before the onDisplayMoved callback arrives. This caused incorrect display IDs
+            // during configuration changes, breaking SysUI layouts dependent on it.
+            // Forcing a resize report ensures VRI has the correct ID before the update.
+            forceReportResizing(token);
+            // This makes sure there is a traversal scheduled that will eventually report
+            // the window resize to the client.
+            display.setLayoutNeeded();
+            requestTraversal();
+            return true;
+        }
+        return mWindowContextListenerController.reparentToDisplayArea(clientToken, display);
     }
 
     private void forceReportResizing(@NonNull WindowContainer<?> wc) {
@@ -9577,10 +9604,12 @@ public class WindowManagerService extends IWindowManager.Stub
 
     /**
      * Updates the flags on an existing surface's input channel. This assumes the surface provided
-     * is the one associated with the provided input-channel. If this isn't the case, behavior
-     * is undefined.
+     * is the one associated with the provided input-channel. If this isn't the case, behavior is
+     * undefined.
      */
-    void updateInputChannel(IBinder channelToken, int displayId, SurfaceControl surface,
+    void updateInputChannel(IBinder channelToken,
+            @Nullable InputTransferToken hostInputTransferToken, int displayId,
+            SurfaceControl surface,
             int flags, int privateFlags, int inputFeatures, Region region) {
         final InputApplicationHandle applicationHandle;
         final String name;
@@ -9594,6 +9623,11 @@ public class WindowManagerService extends IWindowManager.Stub
             name = win.toString();
             applicationHandle = win.getApplicationHandle();
             win.setIsFocusable((flags & FLAG_NOT_FOCUSABLE) == 0);
+            if (Flags.updateHostInputTransferToken()) {
+                WindowState hostWindowState = hostInputTransferToken != null
+                        ? mInputToWindowMap.get(hostInputTransferToken.getToken()) : null;
+                win.updateHost(hostWindowState);
+            }
         }
 
         updateInputChannel(channelToken, win.mOwnerUid, win.mOwnerPid, displayId, surface, name,

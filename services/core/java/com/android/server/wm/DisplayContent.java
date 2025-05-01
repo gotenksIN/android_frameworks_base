@@ -2798,9 +2798,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         final int lastOrientation = getConfiguration().orientation;
         final int lastWindowingMode = getWindowingMode();
         super.onConfigurationChanged(newParentConfig);
-        if (!Flags.trackSystemUiContextBeforeWms()) {
-            mSysUiContextConfigCallback.onConfigurationChanged(newParentConfig);
-        }
         mPinnedTaskController.onPostDisplayConfigurationChanged();
         // Update IME parent if needed.
         updateImeParent();
@@ -3437,9 +3434,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                     .getKeyguardController().onDisplayRemoved(mDisplayId);
             mWallpaperController.resetLargestDisplay(mDisplay);
             mWmService.mDisplayWindowSettings.onDisplayRemoved(this);
-            if (Flags.trackSystemUiContextBeforeWms()) {
-                getDisplayUiContext().unregisterComponentCallbacks(mSysUiContextConfigCallback);
-            }
+            getDisplayUiContext().unregisterComponentCallbacks(mSysUiContextConfigCallback);
         } finally {
             mDisplayReady = false;
         }
@@ -5541,10 +5536,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 systemUiContext.getIApplicationThread());
         mWmService.mWindowContextListenerController.registerWindowContainerListener(
                 wpc, systemUiContext.getWindowContextToken(), this,
-                INVALID_WINDOW_TYPE, null /* options */);
-        if (Flags.trackSystemUiContextBeforeWms()) {
-            systemUiContext.registerComponentCallbacks(mSysUiContextConfigCallback);
-        }
+                INVALID_WINDOW_TYPE, true /* callerCanManageAppTokens */, null /* options */);
+        systemUiContext.registerComponentCallbacks(mSysUiContextConfigCallback);
     }
 
     @Override
@@ -6466,6 +6459,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mContentRecorder.stopRecording();
             }
         }, true /* isRemovingDisplay */);
+        mWmService.mWindowContextListenerController.dispatchDisplayRemoval(mDisplayId);
 
         releaseSelfIfNeeded();
         mDisplayPolicy.release();

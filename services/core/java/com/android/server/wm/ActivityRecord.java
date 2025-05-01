@@ -1561,9 +1561,7 @@ public final class ActivityRecord extends WindowToken {
             // First time we are adding the activity to the system.
             mVoiceInteraction = newTask.voiceSession != null;
 
-            // TODO(b/36505427): Maybe this call should be moved inside
-            // updateOverrideConfiguration()
-            newTask.updateOverrideConfigurationFromLaunchBounds();
+            newTask.setInitialBoundsIfNeeded();
             // When an activity is started directly into a split-screen fullscreen root task, we
             // need to update the initial multi-window modes so that the callbacks are scheduled
             // correctly when the user leaves that mode.
@@ -1763,7 +1761,7 @@ public final class ActivityRecord extends WindowToken {
         }
 
         mAppCompatController.getLetterboxPolicy().onMovedToDisplay(mDisplayContent.getDisplayId());
-        mAppCompatController.getDisplayCompatModePolicy().onMovedToDisplay();
+        mAppCompatController.getDisplayCompatModePolicy().onMovedToDisplay(prevDc, dc);
     }
 
     void layoutLetterboxIfNeeded(WindowState winHint) {
@@ -8873,6 +8871,10 @@ public final class ActivityRecord extends WindowToken {
                 && !hasDeskResources()) {
             configChanged |= CONFIG_UI_MODE;
         }
+
+        // Some apps relaunch unexpectedly with display move and crash.
+        configChanged |= mAppCompatController.getDisplayCompatModePolicy()
+                .getDisplayCompatModeConfigMask();
 
         return (changes & (~configChanged)) != 0;
     }

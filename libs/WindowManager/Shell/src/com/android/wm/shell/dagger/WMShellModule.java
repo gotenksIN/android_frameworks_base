@@ -84,8 +84,8 @@ import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.common.UserProfileContexts;
 import com.android.wm.shell.common.split.SplitState;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
+import com.android.wm.shell.compatui.letterbox.DelegateLetterboxTransitionObserver;
 import com.android.wm.shell.compatui.letterbox.LetterboxCommandHandler;
-import com.android.wm.shell.compatui.letterbox.LetterboxTransitionObserver;
 import com.android.wm.shell.crashhandling.ShellCrashHandler;
 import com.android.wm.shell.dagger.back.ShellBackAnimationModule;
 import com.android.wm.shell.dagger.pip.PipModule;
@@ -265,10 +265,25 @@ public abstract class WMShellModule {
             @NonNull ShellTaskOrganizer organizer,
             @NonNull TaskViewRepository repository,
             @NonNull BubbleData bubbleData,
-            @NonNull TaskViewTransitions taskViewTransitions
+            @NonNull @Bubbles TaskViewTransitions taskViewTransitions
     ) {
         return new BubbleTransitions(context, transitions, organizer, repository,
                 bubbleData, taskViewTransitions);
+    }
+
+    @WMSingleton
+    @Provides
+    @Bubbles
+    static TaskViewTransitions provideBubblesTaskViewTransitions(
+            @NonNull TaskViewTransitions taskViewTransitions,
+            @NonNull Transitions transitions,
+            @NonNull TaskViewRepository repository,
+            @NonNull ShellTaskOrganizer organizer,
+            SyncTransactionQueue syncQueue
+    ) {
+        return TaskViewTransitions.useRepo()
+                ? new TaskViewTransitions(transitions, repository, organizer, syncQueue)
+                : taskViewTransitions;
     }
 
     // Note: Handler needed for LauncherApps.register
@@ -298,8 +313,7 @@ public abstract class WMShellModule {
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellMainThread Handler mainHandler,
             @ShellBackgroundThread ShellExecutor bgExecutor,
-            TaskViewRepository taskViewRepository,
-            TaskViewTransitions taskViewTransitions,
+            @Bubbles TaskViewTransitions taskViewTransitions,
             Transitions transitions,
             SyncTransactionQueue syncQueue,
             IWindowManager wmService,
@@ -337,7 +351,6 @@ public abstract class WMShellModule {
                 mainExecutor,
                 mainHandler,
                 bgExecutor,
-                taskViewRepository,
                 taskViewTransitions,
                 transitions,
                 syncQueue,
@@ -1168,9 +1181,10 @@ public abstract class WMShellModule {
     static AppHandleAndHeaderVisibilityHelper provideAppHandleAndHeaderVisibilityHelper(
             @NonNull DisplayController displayController,
             @NonNull DesktopModeCompatPolicy desktopModeCompatPolicy,
-            @NonNull DesktopState desktopState) {
+            @NonNull DesktopState desktopState,
+            Optional<BubbleController> bubbleController) {
         return new AppHandleAndHeaderVisibilityHelper(displayController,
-                desktopModeCompatPolicy, desktopState);
+                desktopModeCompatPolicy, desktopState, bubbleController);
     }
 
     @WMSingleton
@@ -1723,7 +1737,7 @@ public abstract class WMShellModule {
     @Provides
     static Object provideIndependentShellComponentsToCreate(
             DragAndDropController dragAndDropController,
-            @NonNull LetterboxTransitionObserver letterboxTransitionObserver,
+            @NonNull DelegateLetterboxTransitionObserver letterboxTransitionObserver,
             @NonNull LetterboxCommandHandler letterboxCommandHandler,
             Optional<DesktopTasksTransitionObserver> desktopTasksTransitionObserverOptional,
             Optional<DesktopDisplayEventHandler> desktopDisplayEventHandler,

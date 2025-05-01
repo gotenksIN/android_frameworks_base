@@ -714,16 +714,6 @@ flag {
 }
 
 flag {
-    name: "use_volume_controller"
-    namespace: "systemui"
-    description: "Adds Volume Controller signals to the AudioRepository to update volume"
-    bug: "349348461"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "volume_redesign"
     namespace: "systemui"
     description: "Enables Volume visuals update"
@@ -772,6 +762,16 @@ flag {
     namespace: "systemui"
     description: "Read item mimetype from description rather than checking URI"
     bug: "357197236"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "screenshot_announce_live_region"
+    namespace: "systemui"
+    description: "Use live region for screenshot saving announcement"
+    bug: "383642111"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1145,16 +1145,6 @@ flag {
 }
 
 flag {
-    name: "slice_broadcast_relay_in_background"
-    namespace: "systemui"
-    description: "Move handling of slice broadcast relay broadcasts to background threads"
-    bug: "334767208"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "register_battery_controller_receivers_in_corestartable"
     namespace: "systemui"
     description: "Decide whether to register the receivers in battery controller impl in the BatteryControllerStartable corestartable."
@@ -1402,16 +1392,6 @@ flag {
    metadata {
      purpose: PURPOSE_BUGFIX
    }
-}
-
-flag {
-    name: "media_lockscreen_launch_animation"
-    namespace : "systemui"
-    description : "Enable the origin launch animation for UMO when opening on top of lockscreen."
-    bug : "346865769"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1895,16 +1875,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "shade_launch_accessibility"
-   namespace: "systemui"
-   description: "Intercept accessibility focus events for the Shade during launch animations to avoid stray TalkBack events."
-   bug: "379222226"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {

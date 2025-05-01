@@ -368,6 +368,7 @@
   <java-symbol type="bool" name="config_useFixedVolume" />
   <java-symbol type="bool" name="config_isMainUserPermanentAdmin"/>
   <java-symbol type="bool" name="config_supportProfilesOnNonMainUser"/>
+  <java-symbol type="bool" name="config_createInitialUser"/>
   <java-symbol type="bool" name="config_canSwitchToHeadlessSystemUser"/>
   <java-symbol type="bool" name="config_enableMultiUserUI"/>
   <java-symbol type="bool" name="config_enableMultipleAdmins"/>
@@ -5879,6 +5880,7 @@
   <java-symbol type="string" name="accessibility_autoclick_scroll" />
   <java-symbol type="string" name="accessibility_autoclick_long_press" />
   <java-symbol type="string" name="accessibility_autoclick_pause" />
+  <java-symbol type="string" name="accessibility_autoclick_resume" />
   <java-symbol type="string" name="accessibility_autoclick_position" />
   <java-symbol type="dimen" name="accessibility_autoclick_type_panel_button_spacing" />
   <java-symbol type="dimen" name="accessibility_autoclick_type_panel_button_size" />
@@ -6046,6 +6048,9 @@
 
   <!-- Maximum number of active tasks on a given Desktop Windowing session. Set to 0 for unlimited. -->
   <java-symbol type="integer" name="config_maxDesktopWindowingActiveTasks"/>
+
+  <!-- Maximum number desks on a device running Desktop Windowing. Set to 0 for unlimited. -->
+  <java-symbol type="integer" name="config_maxDesktopWindowingDesks"/>
 
   <!-- Whether a display enters desktop mode by default when the windowing mode of the display's
        root TaskDisplayArea is set to WINDOWING_MODE_FREEFORM. -->

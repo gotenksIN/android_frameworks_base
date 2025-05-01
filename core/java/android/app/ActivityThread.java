@@ -256,6 +256,7 @@ import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.TrustedCertificateStore;
 import com.android.server.am.MemInfoDumpProto;
+import com.android.server.am.BitmapDumpProto;
 
 import dalvik.annotation.optimization.NeverCompile;
 import dalvik.system.AppSpecializationHooks;
@@ -2012,6 +2013,21 @@ public final class ActivityThread extends ClientTransactionHandler
                 sendMessage(H.DUMP_GFXINFO, data, 0, 0, true /*async*/);
             } catch (IOException e) {
                 Slog.w(TAG, "dumpGfxInfo failed", e);
+            } finally {
+                IoUtils.closeQuietly(pfd);
+            }
+        }
+
+        @Override
+        @NeverCompile
+        public void dumpBitmapsProto(ParcelFileDescriptor pfd, String dumpFormat) {
+            try {
+                int pid = Process.myPid();
+                String processName = (mBoundApplication != null)
+                    ? mBoundApplication.processName
+                    : Process.myProcessName();
+                ActivityThread.dumpBitmapsProto(new ProtoOutputStream(pfd.getFileDescriptor()),
+                    pid, processName, dumpFormat);
             } finally {
                 IoUtils.closeQuietly(pfd);
             }
@@ -3909,6 +3925,18 @@ public final class ActivityThread extends ClientTransactionHandler
         proto.end(asToken);
     }
 
+    @NeverCompile
+    public static void dumpBitmapsProto(ProtoOutputStream proto, int pid,
+                String processName, String dumpFormat) {
+        try {
+            proto.write(BitmapDumpProto.AppBitmapInfo.PID, pid);
+            proto.write(BitmapDumpProto.AppBitmapInfo.PROCESS_NAME, processName);
+            Bitmap.dumpAll(proto, dumpFormat);
+        } finally {
+            proto.flush();
+        }
+    }
+
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void registerOnActivityPausedListener(Activity activity,
             OnActivityPausedListener listener) {
@@ -4383,13 +4411,11 @@ public final class ActivityThread extends ClientTransactionHandler
                     ActivityManager.getService().waitForNetworkStateUpdate(mNetworkBlockSeq);
                     mNetworkBlockSeq = INVALID_PROC_STATE_SEQ;
                 } catch (RemoteException ignored) {}
-                if (Flags.clearDnsCacheOnNetworkRulesUpdate()) {
-                    // InetAddress will cache UnknownHostException failures. If the rules got
-                    // updated and the app has network access now, we need to clear the negative
-                    // cache to ensure valid dns queries can work immediately.
-                    // TODO: b/329133769 - Clear only the negative cache once it is available.
-                    InetAddress.clearDnsCache();
-                }
+                // InetAddress will cache UnknownHostException failures. If the rules got
+                // updated and the app has network access now, we need to clear the negative
+                // cache to ensure valid dns queries can work immediately.
+                // TODO: b/329133769 - Clear only the negative cache once it is available.
+                InetAddress.clearDnsCache();
             }
         }
     }

@@ -296,7 +296,8 @@ class ActivityStarter {
     private IVoiceInteractor mVoiceInteractor;
 
     // Last activity record we attempted to start
-    private ActivityRecord mLastStartActivityRecord;
+    @VisibleForTesting
+    ActivityRecord mLastStartActivityRecord;
     // The result of the last activity we attempted to start.
     private int mLastStartActivityResult;
     // Time in milli seconds we attempted to start the last activity.
@@ -2016,9 +2017,6 @@ class ActivityStarter {
                     activity.destroyIfPossible("Removes redundant singleInstance");
                 }
             }
-            if (mLastStartActivityRecord != null) {
-                targetTaskTop.mLaunchSourceType = mLastStartActivityRecord.mLaunchSourceType;
-            }
             recordTransientLaunchIfNeeded(targetTaskTop);
             // Recycle the target task for this launch.
             startResult =
@@ -2457,6 +2455,11 @@ class ActivityStarter {
                 ? targetTask.getTopNonFinishingActivity()
                 : targetTaskTop;
 
+        // The mLastStartActivityRecord isn't added to task, update latest launch source to top
+        // activity before creating starting window.
+        if (mLastStartActivityRecord != null && targetTaskTop != mLastStartActivityRecord) {
+            targetTaskTop.mLaunchSourceType = mLastStartActivityRecord.mLaunchSourceType;
+        }
         if (mMovedToFront) {
             // We moved the task to front, use starting window to hide initial drawn delay.
             targetTaskTop.showStartingWindow(true /* taskSwitch */);

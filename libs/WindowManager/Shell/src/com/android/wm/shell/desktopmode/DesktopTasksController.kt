@@ -63,6 +63,7 @@ import android.view.WindowManager.TRANSIT_PIP
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.widget.Toast
 import android.window.DesktopExperienceFlags
+import android.window.DesktopExperienceFlags.DesktopExperienceFlag
 import android.window.DesktopExperienceFlags.ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY
 import android.window.DesktopExperienceFlags.ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY
 import android.window.DesktopModeFlags
@@ -514,6 +515,12 @@ class DesktopTasksController(
         runOnTransitStart?.invoke(transition)
     }
 
+    /** Returns whether a new desk can be created. */
+    fun canCreateDesks(repository: DesktopRepository = this.taskRepository): Boolean {
+        val deskLimit = desktopConfig.maxDeskLimit
+        return deskLimit == 0 || repository.getNumberOfDesks() < deskLimit
+    }
+
     /**
      * Adds a new desk to the given display for the given user and invokes [onResult] once the desk
      * is created, but necessarily activated.
@@ -521,11 +528,22 @@ class DesktopTasksController(
     fun createDesk(
         displayId: Int,
         userId: Int = this.userId,
+        enforceDeskLimit: Boolean = true,
         activateDesk: Boolean = false,
         onResult: ((Int) -> Unit) = {},
     ) {
-        logV("addDesk displayId=%d, userId=%d", displayId, userId)
+        logV(
+            "createDesk displayId=%d, userId=%d enforceDeskLimit=%b",
+            displayId,
+            userId,
+            enforceDeskLimit,
+        )
         val repository = userRepositories.getProfile(userId)
+        if (enforceDeskLimit && !canCreateDesks(repository)) {
+            // At the limit, no-op.
+            logW("createDesk already at desk-limit, ignoring request")
+            return
+        }
         createDeskRoot(displayId, userId) { deskId ->
             if (deskId == null) {
                 logW("Failed to add desk in displayId=%d for userId=%d", displayId, userId)
@@ -552,10 +570,16 @@ class DesktopTasksController(
         return deskId
     }
 
-    private suspend fun createDeskSuspending(displayId: Int, userId: Int): Int =
-        suspendCoroutine { cont ->
-            createDesk(displayId, userId) { deskId -> cont.resumeWith(Result.success(deskId)) }
+    private suspend fun createDeskSuspending(
+        displayId: Int,
+        userId: Int,
+        enforceDeskLimit: Boolean,
+    ): Int = suspendCoroutine { cont ->
+        createDesk(displayId = displayId, userId = userId, enforceDeskLimit = enforceDeskLimit) {
+            deskId ->
+            cont.resumeWith(Result.success(deskId))
         }
+    }
 
     private fun createDeskRoot(
         displayId: Int,
@@ -1223,7 +1247,7 @@ class DesktopTasksController(
     ) {
         val taskInfo: TaskInfo? =
             shellTaskOrganizer.getRunningTaskInfo(taskId)
-                ?: if (com.android.launcher3.Flags.enableAltTabKqsFlatenning()) {
+                ?: if (enableAltTabKqsFlatenning.isTrue) {
                     recentTasksController?.findTaskInBackground(taskId)
                 } else {
                     null
@@ -1287,7 +1311,7 @@ class DesktopTasksController(
 
         // When a task is background, update wct to start task.
         if (
-            com.android.launcher3.Flags.enableAltTabKqsFlatenning() &&
+            enableAltTabKqsFlatenning.isTrue &&
                 shellTaskOrganizer.getRunningTaskInfo(task.taskId) == null &&
                 task is RecentTaskInfo
         ) {
@@ -3288,7 +3312,7 @@ class DesktopTasksController(
         }
         if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             wct.reparent(taskInfo.token, tdaInfo.token, /* onTop= */ true)
-        } else if (com.android.launcher3.Flags.enableAltTabKqsFlatenning()) {
+        } else if (enableAltTabKqsFlatenning.isTrue) {
             // Until multiple desktops is enabled, we still want to reorder the task to top so that
             // if the task is not on top we can still switch to it using Alt+Tab.
             wct.reorder(taskInfo.token, /* onTop= */ true)
@@ -3296,7 +3320,7 @@ class DesktopTasksController(
 
         val deskId =
             taskRepository.getDeskIdForTask(taskInfo.taskId)
-                ?: if (com.android.launcher3.Flags.enableAltTabKqsFlatenning()) {
+                ?: if (enableAltTabKqsFlatenning.isTrue) {
                     taskRepository.getActiveDeskId(displayId)
                 } else {
                     null
@@ -3702,7 +3726,8 @@ class DesktopTasksController(
     }
 
     private suspend fun getOrCreateDefaultDeskIdSuspending(displayId: Int): Int =
-        taskRepository.getDefaultDeskId(displayId) ?: createDeskSuspending(displayId, userId)
+        taskRepository.getDefaultDeskId(displayId)
+            ?: createDeskSuspending(displayId, userId, enforceDeskLimit = false)
 
     /** Removes the given desk. */
     fun removeDesk(deskId: Int, desktopRepository: DesktopRepository = taskRepository) {
@@ -4448,6 +4473,15 @@ class DesktopTasksController(
                         l.onActiveDeskChanged(displayId, newActiveDeskId, oldActiveDeskId)
                     }
                 }
+
+                override fun onCanCreateDesksChanged(canCreateDesks: Boolean) {
+                    ProtoLog.v(
+                        WM_SHELL_DESKTOP_MODE,
+                        "IDesktopModeImpl: onCanCreateDesksChanged canCreateDesks=%b",
+                        canCreateDesks,
+                    )
+                    remoteListener.call { l -> l.onCanCreateDesksChanged(canCreateDesks) }
+                }
             }
 
         private val visibleTasksListener: VisibleTasksListener =
@@ -4643,11 +4677,9 @@ class DesktopTasksController(
 
         private fun syncInitialState(c: DesktopTasksController) {
             remoteListener.call { l ->
-                // TODO: b/393962589 - implement desks limit.
-                val canCreateDesks = true
                 l.onListenerConnected(
                     c.taskRepository.getDeskDisplayStateForRemote(),
-                    canCreateDesks,
+                    c.canCreateDesks(),
                 )
             }
         }
@@ -4712,6 +4744,13 @@ class DesktopTasksController(
          * A placeholder for a synthetic transition that isn't backed by a true system transition.
          */
         val SYNTHETIC_TRANSITION: IBinder = Binder()
+
+        private val enableAltTabKqsFlatenning: DesktopExperienceFlag =
+            DesktopExperienceFlag(
+                com.android.launcher3.Flags::enableAltTabKqsFlatenning,
+                /* shouldOverrideByDevOption= */ false,
+                com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
+            )
     }
 
     /** Defines interface for classes that can listen to changes for task resize. */

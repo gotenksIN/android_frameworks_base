@@ -570,20 +570,22 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         relayout(mRelayoutParams, startT, finishT, wct, oldRootView, mResult);
         // After this line, mTaskInfo is up-to-date and should be used instead of taskInfo
 
-        if (DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue()
-                && mRelayoutParams.mShouldSetAppBounds) {
-            // When expanding from PiP to freeform, we need to start a Transition for applying the
-            // inset changes so that PiP receives the insets for the final bounds. This is because
-            // |mShouldSetAppBounds| applies the insets by modifying app bounds, which can cause a
-            // bounds offset that needs to be reported to transition handlers.
-            Trace.beginSection("DesktopModeWindowDecoration#relayout-startTransition");
-            mHandler.post(
-                    () -> mTransitions.startTransition(TRANSIT_CHANGE, wct, /* handler= */ null));
-        } else {
-            Trace.beginSection("DesktopModeWindowDecoration#relayout-applyWCT");
-            mBgExecutor.execute(() -> mTaskOrganizer.applyTransaction(wct));
+        if (!wct.isEmpty()) {
+            if (DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue()
+                    && mRelayoutParams.mShouldSetAppBounds) {
+                // When expanding from PiP to freeform, we need to start a Transition for applying
+                // the inset changes so that PiP receives the insets for the final bounds. This is
+                // because |mShouldSetAppBounds| applies the insets by modifying app bounds, which
+                // can cause a bounds offset that needs to be reported to transition handlers.
+                Trace.beginSection("DesktopModeWindowDecoration#relayout-startTransition");
+                mHandler.post(() -> mTransitions.startTransition(TRANSIT_CHANGE, wct,
+                        /* handler= */ null));
+            } else {
+                Trace.beginSection("DesktopModeWindowDecoration#relayout-applyWCT");
+                mBgExecutor.execute(() -> mTaskOrganizer.applyTransaction(wct));
+            }
+            Trace.endSection();
         }
-        Trace.endSection();
 
         if (mResult.mRootView == null) {
             // This means something blocks the window decor from showing, e.g. the task is hidden.
@@ -663,6 +665,14 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             mMainExecutor.execute(mSetAppInfoRunnable);
         };
         mBgExecutor.execute(mLoadAppInfoRunnable);
+    }
+
+    /**
+     * Does a relayout without any new changes.
+     * This is used if other states have changed (e.g. {@link mIsRecentsTransitionRunning}.
+     */
+    private void relayout() {
+        relayout(mTaskInfo, mHasGlobalFocus, mExclusionRegion);
     }
 
     private boolean showInputLayer() {
@@ -1956,6 +1966,11 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
      */
     void setIsRecentsTransitionRunning(boolean isRecentsTransitionRunning) {
         mIsRecentsTransitionRunning = isRecentsTransitionRunning;
+        // TODO (b/394791828): Remove this once we can remove the input layer.
+        if (DesktopModeFlags.ENABLE_INPUT_LAYER_TRANSITION_FIX.isTrue()
+                && !isRecentsTransitionRunning) {
+            relayout();
+        }
     }
 
     /**

@@ -785,10 +785,11 @@ public abstract class WMShellModule {
             @NonNull ShellInit shellInit,
             @NonNull ShellCommandHandler shellCommandHandler,
             @NonNull ShellTaskOrganizer shellTaskOrganizer,
-            @NonNull LaunchAdjacentController launchAdjacentController
+            @NonNull LaunchAdjacentController launchAdjacentController,
+            @NonNull RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer
     ) {
         return new RootTaskDesksOrganizer(shellInit, shellCommandHandler, shellTaskOrganizer,
-                launchAdjacentController);
+                launchAdjacentController, rootTaskDisplayAreaOrganizer);
     }
 
     @WMSingleton
@@ -1153,8 +1154,13 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static MultiDisplayDragMoveIndicatorSurface.Factory
-            providesMultiDisplayDragMoveIndicatorSurfaceFactory() {
-        return new MultiDisplayDragMoveIndicatorSurface.Factory();
+            providesMultiDisplayDragMoveIndicatorSurfaceFactory(
+                    WindowDecorTaskResourceLoader windowDecorTaskResourceLoader,
+                    @ShellDesktopThread MainCoroutineDispatcher desktopDispatcher,
+                    @ShellBackgroundThread CoroutineScope bgScope) {
+        return new MultiDisplayDragMoveIndicatorSurface.Factory(
+                windowDecorTaskResourceLoader, desktopDispatcher, bgScope
+        );
     }
 
     @WMSingleton

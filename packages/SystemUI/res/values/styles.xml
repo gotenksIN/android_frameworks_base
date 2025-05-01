@@ -196,7 +196,8 @@
     <style name="TextAppearance.QS.Status">
         <item name="android:fontFamily" android:featureFlag="!com.android.systemui.shade_header_font_update">@*android:string/config_headlineFontFamily</item>
         <item name="android:fontFamily" android:featureFlag="com.android.systemui.shade_header_font_update">variable-body-medium-emphasized</item>
-        <item name="android:textColor">@color/shade_header_text_color</item>
+        <item name="android:textColor" android:featureFlag="!com.android.systemui.shade_header_font_update">@color/shade_header_text_color</item>
+        <item name="android:textColor" android:featureFlag="com.android.systemui.shade_header_font_update">@androidprv:color/materialColorOnSurface</item>
         <item name="android:textSize">14sp</item>
         <item name="android:letterSpacing">0.01</item>
     </style>
@@ -724,13 +725,10 @@
     <style name="MediaOutput.Dialog" />
     <style name="MediaOutput.Dialog.QuickAccessButton" parent="@style/Widget.Material3.Button.OutlinedButton.Icon">
         <item name="theme">@style/Theme.Material3.DynamicColors.DayNight</item>
-        <item name="android:paddingTop">6dp</item>
-        <item name="android:minHeight">32dp</item>
-        <item name="android:paddingBottom">6dp</item>
         <item name="android:paddingStart">8dp</item>
         <item name="android:paddingEnd">12dp</item>
-        <item name="android:insetTop">0dp</item>
-        <item name="android:insetBottom">0dp</item>
+        <item name="android:insetTop">8dp</item>
+        <item name="android:insetBottom">8dp</item>
         <item name="android:textColor">@color/media_dialog_on_surface_variant</item>
         <item name="iconSize">18dp</item>
         <item name="iconTint">@color/media_dialog_primary</item>

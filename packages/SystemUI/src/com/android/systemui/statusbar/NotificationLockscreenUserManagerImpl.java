@@ -60,7 +60,6 @@ import androidx.annotation.WorkerThread;
 import com.android.internal.statusbar.NotificationVisibility;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.systemui.Dumpable;
-import com.android.systemui.Flags;
 import com.android.systemui.LauncherProxyService;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.dagger.SysUISingleton;
@@ -765,57 +764,6 @@ public class NotificationLockscreenUserManagerImpl implements
     /*
      * We show the sensitive content redaction view if
      * 1. The feature is enabled
-     * 2. The device is locked
-     * 3. The device is NOT connected to Wifi
-     * 4. The notification has the `hasSensitiveContent` ranking variable set to true
-     * 5. The device has not connected to Wifi since receiving the notification
-     * 6. The notification arrived at least LOCK_TIME_FOR_SENSITIVE_REDACTION_MS before the last
-     *    lock time.
-     */
-    private boolean shouldShowSensitiveContentRedactedView(NotificationEntry ent) {
-        if (android.app.Flags.redactionOnLockscreenMetrics()) {
-            return shouldShowSensitiveContentRedactedViewWithLog(ent);
-        }
-
-        if (!LockscreenOtpRedaction.isEnabled()) {
-            return false;
-        }
-
-        if (!mLocked.get()) {
-            return false;
-        }
-
-        long notificationTime = getEarliestNotificationTime(ent);
-        if (!mRedactOtpOnWifi.get()) {
-            if (mConnectedToWifi.get()) {
-                return false;
-            }
-
-            long lastWifiConnectTime = mLastWifiConnectionTime.get();
-            // If the device has connected to wifi since receiving the notification, do not redact
-            if (notificationTime < lastWifiConnectTime) {
-                return false;
-            }
-        }
-
-        if (ent.getRanking() == null || !ent.getRanking().hasSensitiveContent()) {
-            return false;
-        }
-
-        // If the lock screen was not already locked for at least mOtpRedactionRequiredLockTimeMs
-        // when this notification arrived, do not redact
-        long latestTimeForRedaction = mLastLockTime.get() + mOtpRedactionRequiredLockTimeMs.get();
-
-        if (notificationTime < latestTimeForRedaction) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /*
-     * We show the sensitive content redaction view if
-     * 1. The feature is enabled
      * 2. The notification has the `hasSensitiveContent` ranking variable set to true
      * 3. The device is locked
      * 4. The device is NOT connected to Wifi
@@ -825,7 +773,7 @@ public class NotificationLockscreenUserManagerImpl implements
      *
      * This version of the method logs a metric about the request.
      */
-    private boolean shouldShowSensitiveContentRedactedViewWithLog(NotificationEntry ent) {
+    private boolean shouldShowSensitiveContentRedactedView(NotificationEntry ent) {
         if (!LockscreenOtpRedaction.isEnabled()) {
             return false;
         }
@@ -1019,16 +967,8 @@ public class NotificationLockscreenUserManagerImpl implements
 
     private void notifyNotificationStateChanged() {
         if (!Looper.getMainLooper().isCurrentThread()) {
-            if (Flags.checkLockscreenGoneTransition()) {
-                for (NotificationStateChangedListener listener : mNotifStateChangedListeners) {
-                    mMainExecutor.execute(listener::onNotificationStateChanged);
-                }
-            } else {
-                mMainExecutor.execute(() -> {
-                    for (NotificationStateChangedListener listener : mNotifStateChangedListeners) {
-                        listener.onNotificationStateChanged();
-                    }
-                });
+            for (NotificationStateChangedListener listener : mNotifStateChangedListeners) {
+                mMainExecutor.execute(listener::onNotificationStateChanged);
             }
         } else {
             for (NotificationStateChangedListener listener : mNotifStateChangedListeners) {

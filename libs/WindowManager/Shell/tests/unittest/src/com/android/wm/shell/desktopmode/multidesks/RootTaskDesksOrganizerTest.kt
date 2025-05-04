@@ -22,6 +22,8 @@ import android.testing.AndroidTestingRunner
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_TO_FRONT
+import android.window.DesktopExperienceFlags
+import android.window.DisplayAreaInfo
 import android.window.TransitionInfo
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
@@ -31,6 +33,8 @@ import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_R
 import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_LAUNCH_ROOT
 import androidx.core.util.valueIterator
 import androidx.test.filters.SmallTest
+import com.android.wm.shell.MockToken
+import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTaskOrganizer.TaskListener
 import com.android.wm.shell.ShellTestCase
@@ -71,6 +75,8 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     private val testShellInit = ShellInit(testExecutor)
     private val mockShellCommandHandler = mock<ShellCommandHandler>()
     private val mockShellTaskOrganizer = mock<ShellTaskOrganizer>()
+    private val mockTDAOrganizer = mock<RootTaskDisplayAreaOrganizer>()
+
     private val launchAdjacentController = LaunchAdjacentController(mock())
     private val taskInfoChangedListener = mock<(ActivityManager.RunningTaskInfo) -> Unit>()
 
@@ -84,8 +90,12 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                 mockShellCommandHandler,
                 mockShellTaskOrganizer,
                 launchAdjacentController,
+                mockTDAOrganizer,
             )
         organizer.setOnDesktopTaskInfoChangedListener(taskInfoChangedListener)
+
+        val tda = DisplayAreaInfo(MockToken().token(), DEFAULT_DISPLAY, 0)
+        whenever(mockTDAOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)).thenReturn(tda)
     }
 
     @Test fun testCreateDesk_createsDeskAndMinimizationRoots() = runTest { createDeskSuspending() }
@@ -226,7 +236,13 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
 
         // Only one desk attempt.
         verify(mockShellTaskOrganizer, times(1))
-            .createRootTask(displayId, WINDOWING_MODE_FREEFORM, organizer, true)
+            .createRootTask(
+                displayId,
+                WINDOWING_MODE_FREEFORM,
+                organizer,
+                true,
+                DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue,
+            )
     }
 
     @Test
@@ -239,7 +255,13 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
 
         // One for the warmup/first desk and one for the second desk.
         verify(mockShellTaskOrganizer, times(2))
-            .createRootTask(displayId, WINDOWING_MODE_FREEFORM, organizer, true)
+            .createRootTask(
+                displayId,
+                WINDOWING_MODE_FREEFORM,
+                organizer,
+                true,
+                DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue,
+            )
     }
 
     @Test
@@ -888,6 +910,18 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
         verify(taskInfoChangedListener, never()).invoke(any())
     }
 
+    @Test
+    fun moveDeskToDisplay_movesOnTop() = runTest {
+        createDeskSuspending(userId = PRIMARY_USER_ID, displayId = DEFAULT_DISPLAY)
+        val desk2 = createDeskSuspending(userId = PRIMARY_USER_ID, displayId = SECOND_DISPLAY)
+        val wct = WindowContainerTransaction()
+        val tda = mockTDAOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
+
+        organizer.moveDeskToDisplay(wct, desk2.deskRoot.deskId, DEFAULT_DISPLAY, onTop = true)
+
+        assertThat(wct.hasDeskReparentHops(desk2, tda.token, toTop = true)).isTrue()
+    }
+
     private data class DeskRoots(
         val deskRoot: DeskRoot,
         val minimizationRoot: DeskMinimizationRoot,
@@ -917,6 +951,7 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                     WINDOWING_MODE_FREEFORM,
                     organizer,
                     true,
+                    DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue,
                 )
             )
             .thenAnswer { invocation ->
@@ -951,6 +986,7 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                     WINDOWING_MODE_FREEFORM,
                     organizer,
                     true,
+                    DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue,
                 )
             )
             .thenAnswer { invocation ->
@@ -984,6 +1020,25 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                 hop.newParent == desk.deskRoot.token.asBinder() &&
                 hop.toTop
         }
+
+    private fun WindowContainerTransaction.hasDeskReparentHops(
+        desk: DeskRoots,
+        newParent: WindowContainerToken,
+        toTop: Boolean,
+    ): Boolean {
+        return hierarchyOps.any { hop ->
+            hop.isReparent &&
+                hop.container == desk.deskRoot.token.asBinder() &&
+                hop.newParent == newParent.asBinder() &&
+                hop.toTop == toTop
+        } &&
+            hierarchyOps.any { hop ->
+                hop.isReparent &&
+                    hop.container == desk.minimizationRoot.token.asBinder() &&
+                    hop.newParent == newParent.asBinder() &&
+                    !hop.toTop
+            }
+    }
 
     private suspend fun DesksOrganizer.createDeskSuspending(displayId: Int, userId: Int): Int =
         suspendCoroutine { cont ->

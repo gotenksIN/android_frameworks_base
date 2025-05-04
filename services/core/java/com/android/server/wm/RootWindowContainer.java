@@ -31,7 +31,7 @@ import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_SUSTAINED_PERFORMANCE_MODE;
 import static android.view.WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_NOTIFICATION_SHADE;
-import static android.view.WindowManager.TRANSIT_CHANGE;
+import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_FLAG_KEYGUARD_OCCLUDING;
 import static android.view.WindowManager.TRANSIT_NONE;
 import static android.view.WindowManager.TRANSIT_PIP;
@@ -142,6 +142,7 @@ import android.view.WindowManager;
 import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
 import android.window.TaskFragmentAnimationParams;
+import android.window.TransitionRequestInfo;
 import android.window.WindowContainerToken;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -269,6 +270,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     /** Root task id of the front root task when user switched, indexed by userId. */
     SparseIntArray mUserRootTaskInFront = new SparseIntArray(2);
     SparseArray<IntArray> mUserVisibleRootTasks = new SparseArray<>();
+    @Nullable
+    DeviceStateAutoRotateSettingController mDeviceStateAutoRotateSettingController;
 
     /**
      * A list of tokens that cause the top activity to be put to sleep.
@@ -467,6 +470,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         mDisplayOffTokenAcquirer = mService.new SleepTokenAcquirer(DISPLAY_OFF_SLEEP_TOKEN_TAG);
         mDeviceStateController = new DeviceStateController(service.mContext, service.mGlobalLock);
         mDisplayRotationCoordinator = new DisplayRotationCoordinator();
+        mDeviceStateAutoRotateSettingController =
+                DisplayRotation.createDeviceStateAutoRotateDependencies(mService.mContext,
+                        mDeviceStateController, mService.mH);
     }
 
     /**
@@ -2669,7 +2675,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     // Kick off any lingering app transitions form the MoveTaskToFront operation,
                     // but only consider the top activity on that display.
                     rootTask.executeAppTransition(targetOptions);
-                } else {
+                } else if (topRunningActivity.attachedToProcess()) {
                     resumedOnDisplay[0] |= topRunningActivity.makeActiveIfNeeded(target);
                 }
             });
@@ -2975,14 +2981,19 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 return;
             }
             if (DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) {
-                final Transition transition = new Transition(TRANSIT_CHANGE, 0 /* flags */,
+                final Transition transition = new Transition(TRANSIT_CLOSE, 0 /* flags */,
                         mTransitionController, mWmService.mSyncEngine);
                 mTransitionController.startCollectOrQueue(transition, (deferred) -> {
-                    displayContent.remove();
-                    mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
+                    transition.collect(displayContent);
                     transition.setAllReady();
+                    TransitionRequestInfo.DisplayChange displayChange =
+                            new TransitionRequestInfo.DisplayChange(displayId);
+                    displayChange.setDisconnectReparentDisplay(
+                            mWindowManager.mUmInternal.getMainDisplayAssignedToUser(mCurrentUser)
+                    );
+
                     mTransitionController.requestStartTransition(transition, null /* startTask */,
-                            null /* remoteTransition */, null /* displayChange */);
+                            null /* remoteTransition */, displayChange);
                 });
             } else {
                 displayContent.remove();

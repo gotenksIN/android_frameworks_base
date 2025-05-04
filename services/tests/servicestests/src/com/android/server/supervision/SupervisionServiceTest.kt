@@ -21,6 +21,7 @@ import android.app.KeyguardManager
 import android.app.admin.DevicePolicyManager
 import android.app.admin.DevicePolicyManagerInternal
 import android.app.supervision.SupervisionRecoveryInfo
+import android.app.supervision.SupervisionRecoveryInfo.STATE_PENDING
 import android.app.supervision.flags.Flags
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -41,6 +42,9 @@ import android.os.UserHandle.MIN_SECONDARY_USER_ID
 import android.os.UserHandle.USER_SYSTEM
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
+import android.provider.Settings
+import android.provider.Settings.Secure.BROWSER_CONTENT_FILTERS_ENABLED
+import android.provider.Settings.Secure.SEARCH_CONTENT_FILTERS_ENABLED
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.internal.R
@@ -223,23 +227,91 @@ class SupervisionServiceTest {
     @Test
     fun setSupervisionEnabledForUser() {
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        Settings.Secure.putInt(context.getContentResolver(), BROWSER_CONTENT_FILTERS_ENABLED, 1)
+        Settings.Secure.putInt(context.getContentResolver(), SEARCH_CONTENT_FILTERS_ENABLED, 1)
 
         service.setSupervisionEnabledForUser(USER_ID, true)
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isTrue()
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    BROWSER_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(1)
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    SEARCH_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(1)
 
         service.setSupervisionEnabledForUser(USER_ID, false)
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    BROWSER_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(-1)
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    SEARCH_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(-1)
     }
 
     @Test
     fun setSupervisionEnabledForUser_internal() {
+        Settings.Secure.putInt(context.getContentResolver(), BROWSER_CONTENT_FILTERS_ENABLED, 1)
+        Settings.Secure.putInt(context.getContentResolver(), SEARCH_CONTENT_FILTERS_ENABLED, 0)
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
 
         service.mInternal.setSupervisionEnabledForUser(USER_ID, true)
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isTrue()
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    BROWSER_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(1)
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    SEARCH_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(0)
 
         service.mInternal.setSupervisionEnabledForUser(USER_ID, false)
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    BROWSER_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(-1)
+        assertThat(
+                Settings.Secure.getIntForUser(
+                    context.getContentResolver(),
+                    SEARCH_CONTENT_FILTERS_ENABLED,
+                    USER_ID,
+                )
+            )
+            .isEqualTo(0)
     }
 
     @Test
@@ -332,15 +404,20 @@ class SupervisionServiceTest {
         assertThat(service.supervisionRecoveryInfo).isNull()
 
         val recoveryInfo =
-            SupervisionRecoveryInfo().apply {
-                email = "test_email"
-                id = "test_id"
-            }
+            SupervisionRecoveryInfo(
+                "email",
+                "default",
+                STATE_PENDING,
+                PersistableBundle().apply { putString("id", "id") },
+            )
         service.setSupervisionRecoveryInfo(recoveryInfo)
 
         assertThat(service.supervisionRecoveryInfo).isNotNull()
-        assertThat(service.supervisionRecoveryInfo.email).isEqualTo(recoveryInfo.email)
-        assertThat(service.supervisionRecoveryInfo.id).isEqualTo(recoveryInfo.id)
+        assertThat(service.supervisionRecoveryInfo.accountType).isEqualTo(recoveryInfo.accountType)
+        assertThat(service.supervisionRecoveryInfo.accountName).isEqualTo(recoveryInfo.accountName)
+        assertThat(service.supervisionRecoveryInfo.accountData.getString("id"))
+            .isEqualTo(recoveryInfo.accountData.getString("id"))
+        assertThat(service.supervisionRecoveryInfo.state).isEqualTo(recoveryInfo.state)
     }
 
     private val systemSupervisionPackage: String

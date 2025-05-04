@@ -32,6 +32,7 @@ import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.desktopmode.DesktopRepository
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
+import com.android.wm.shell.shared.desktopmode.FakeDesktopConfig
 import com.android.wm.shell.shared.desktopmode.FakeDesktopState
 import com.android.wm.shell.sysui.ShellInit
 import com.google.common.truth.Truth.assertThat
@@ -41,10 +42,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
-import org.mockito.kotlin.any
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
@@ -60,12 +57,12 @@ class DesksTransitionObserverTest : ShellTestCase() {
     @JvmField @Rule val setFlagsRule = SetFlagsRule()
 
     private val mockDesksOrganizer = mock<DesksOrganizer>()
-    private val mockDeskDisplayChangeListener = mock<OnDeskDisplayChangeListener>()
     val testScope = TestScope()
 
     private lateinit var desktopUserRepositories: DesktopUserRepositories
     private lateinit var observer: DesksTransitionObserver
     private lateinit var desktopState: FakeDesktopState
+    private lateinit var desktopConfig: FakeDesktopConfig
 
     private val repository: DesktopRepository
         get() = desktopUserRepositories.current
@@ -73,6 +70,7 @@ class DesksTransitionObserverTest : ShellTestCase() {
     @Before
     fun setUp() {
         desktopState = FakeDesktopState()
+        desktopConfig = FakeDesktopConfig()
         desktopUserRepositories =
             DesktopUserRepositories(
                 ShellInit(TestShellExecutor()),
@@ -82,9 +80,9 @@ class DesksTransitionObserverTest : ShellTestCase() {
                 testScope,
                 /* userManager= */ mock(),
                 desktopState,
+                desktopConfig,
             )
         observer = DesksTransitionObserver(desktopUserRepositories, mockDesksOrganizer)
-        observer.deskDisplayChangeListener = mockDeskDisplayChangeListener
     }
 
     @Test
@@ -158,73 +156,6 @@ class DesksTransitionObserverTest : ShellTestCase() {
         )
 
         assertThat(repository.getActiveDeskId(DEFAULT_DISPLAY)).isEqualTo(5)
-    }
-
-    @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION,
-    )
-    fun onTransitionReady_disconnectsDisplay_updatesRepositoryAndCallsListener() {
-        val transition = Binder()
-        val change =
-            Change(mock(), mock()).apply {
-                setDisplayId(SECOND_DISPLAY_ID, DEFAULT_DISPLAY)
-                taskInfo =
-                    createFreeformTask(SECOND_DISPLAY_ID).apply {
-                        taskId = 5
-                        userId = repository.userId
-                    }
-                mode = TRANSIT_CHANGE
-            }
-        whenever(mockDesksOrganizer.isDeskChange(change)).thenReturn(true)
-        whenever(mockDesksOrganizer.getDeskIdFromChange(change)).thenReturn(5)
-        repository.addDesk(displayId = SECOND_DISPLAY_ID, deskId = 5)
-        repository.setActiveDesk(displayId = SECOND_DISPLAY_ID, deskId = 5)
-
-        observer.onTransitionReady(
-            transition = transition,
-            info = TransitionInfo(TRANSIT_CHANGE, /* flags= */ 0).apply { addChange(change) },
-        )
-
-        assertThat(repository.getDisplayForDesk(deskId = 5)).isEqualTo(DEFAULT_DISPLAY)
-        verify(mockDeskDisplayChangeListener)
-            .onDeskDisplayChange(
-                eq(
-                    setOf(
-                        OnDeskDisplayChangeListener.DeskDisplayChange(
-                            destinationDisplayId = DEFAULT_DISPLAY,
-                            deskId = 5,
-                            toTop = true,
-                        )
-                    )
-                )
-            )
-    }
-
-    @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION,
-    )
-    fun onTransitionReady_nonDisconnectTransition_doesNotUpdateRepositoryOrCallListener() {
-        val transition = Binder()
-        val change =
-            Change(mock(), mock()).apply {
-                setDisplayId(DEFAULT_DISPLAY, DEFAULT_DISPLAY)
-                taskInfo = createFreeformTask(DEFAULT_DISPLAY).apply { taskId = 5 }
-            }
-        repository.addDesk(DEFAULT_DISPLAY, deskId = 5)
-        repository.addDesk(SECOND_DISPLAY_ID, deskId = 10)
-        whenever(mockDesksOrganizer.isDeskChange(change)).thenReturn(true)
-
-        observer.onTransitionReady(
-            transition = transition,
-            info = TransitionInfo(TRANSIT_CHANGE, /* flags= */ 0).apply { addChange(change) },
-        )
-
-        assertThat(repository.getDisplayForDesk(deskId = 10)).isEqualTo(SECOND_DISPLAY_ID)
-        verify(mockDeskDisplayChangeListener, never()).onDeskDisplayChange(any())
     }
 
     @Test
@@ -392,7 +323,77 @@ class DesksTransitionObserverTest : ShellTestCase() {
         assertThat(repository.getActiveDeskId(displayId = 1)).isEqualTo(2)
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun onTransitionReady_changeDeskDisplay_updatesRepository() {
+        val transition = Binder()
+        val deskChange = Change(mock(), mock())
+        val changeDisplayTransition =
+            DeskTransition.ChangeDeskDisplay(transition, deskId = 5, displayId = DEFAULT_DISPLAY)
+        repository.addDesk(SECOND_DISPLAY_ID, deskId = 5)
+        repository.setActiveDesk(SECOND_DISPLAY_ID, deskId = 5)
+        whenever(mockDesksOrganizer.isDeskChange(deskChange, deskId = 5)).thenReturn(true)
+
+        observer.addPendingTransition(changeDisplayTransition)
+        observer.onTransitionReady(
+            transition = transition,
+            info = TransitionInfo(TRANSIT_CHANGE, /* flags= */ 0).apply { addChange(deskChange) },
+        )
+
+        assertThat(repository.getDeskIds(SECOND_DISPLAY_ID)).isEmpty()
+        assertThat(repository.getDeskIds(DEFAULT_DISPLAY)).containsExactly(5)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun onTransitionReady_changeDeskDisplay_updatesAllRepositories() {
+        desktopUserRepositories.onUserChanged(USER_ID_1, mock())
+        desktopUserRepositories.getProfile(USER_ID_1)
+        repository.addDesk(SECOND_DISPLAY_ID, deskId = 5)
+        desktopUserRepositories.onUserChanged(USER_ID_2, mock())
+        desktopUserRepositories.getProfile(USER_ID_2)
+        repository.addDesk(SECOND_DISPLAY_ID, deskId = 5)
+        val transition = Binder()
+        val deskChange = Change(mock(), mock())
+        val firstRepository = desktopUserRepositories.getProfile(USER_ID_1)
+        val secondRepository = desktopUserRepositories.getProfile(USER_ID_2)
+        val changeDisplayTransition =
+            DeskTransition.ChangeDeskDisplay(transition, deskId = 5, displayId = DEFAULT_DISPLAY)
+        observer.addPendingTransition(changeDisplayTransition)
+        whenever(mockDesksOrganizer.isDeskChange(deskChange, deskId = 5)).thenReturn(true)
+
+        observer.onTransitionReady(
+            transition = transition,
+            info = TransitionInfo(TRANSIT_CHANGE, /* flags= */ 0).apply { addChange(deskChange) },
+        )
+
+        assertThat(firstRepository.getDeskIds(SECOND_DISPLAY_ID)).isEmpty()
+        assertThat(firstRepository.getDeskIds(DEFAULT_DISPLAY)).containsExactly(5)
+        assertThat(secondRepository.getDeskIds(SECOND_DISPLAY_ID)).isEmpty()
+        assertThat(secondRepository.getDeskIds(DEFAULT_DISPLAY)).containsExactly(5)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun onTransitionReady_removeDisplay_updatesRepository() {
+        val transition = Binder()
+        val changeDisplayTransition =
+            DeskTransition.RemoveDisplay(transition, displayId = SECOND_DISPLAY_ID)
+        repository.addDesk(SECOND_DISPLAY_ID, deskId = 5)
+        repository.setActiveDesk(SECOND_DISPLAY_ID, deskId = 5)
+
+        observer.addPendingTransition(changeDisplayTransition)
+        observer.onTransitionReady(
+            transition = transition,
+            info = TransitionInfo(TRANSIT_CHANGE, /* flags= */ 0),
+        )
+
+        assertThat(repository.getDeskIds(SECOND_DISPLAY_ID)).isEmpty()
+    }
+
     companion object {
         private const val SECOND_DISPLAY_ID = 1
+        private const val USER_ID_1 = 6
+        private const val USER_ID_2 = 7
     }
 }

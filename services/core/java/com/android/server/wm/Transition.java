@@ -45,6 +45,7 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.TransitionFlags;
 import static android.view.WindowManager.TransitionType;
 import static android.view.WindowManager.transitTypeToString;
+import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 import static android.window.TaskFragmentAnimationParams.DEFAULT_ANIMATION_BACKGROUND_COLOR;
 import static android.window.TransitionInfo.AnimationOptions;
@@ -357,6 +358,13 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
     /** The current head of the chain of actions related to this transition. */
     ActionChain mChainHead = null;
+
+    /**
+     * List of activities which have initiated actions in this transition. For now, assume that
+     * if an activity has initiated at-least one action in this transition, any following actions
+     * initiated by that activity (during collection) are intentionally in the same transition.
+     */
+    ArrayList<ActivityRecord> mSourceActivities = null;
 
     @VisibleForTesting
     Transition(@TransitionType int type, @TransitionFlags int flags,
@@ -723,6 +731,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         return mState == STATE_STARTED;
     }
 
+    boolean hasStarted() {
+        return mState >= STATE_STARTED;
+    }
+
     boolean isPlaying() {
         return mState == STATE_PLAYING;
     }
@@ -999,6 +1011,26 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     }
 
     /**
+     * Record an activity as being a source of actions in this transition.
+     */
+    void addSourceActivity(ActivityRecord r) {
+        if (mSourceActivities == null) {
+            mSourceActivities = new ArrayList<>();
+        } else if (mSourceActivities.contains(r)) {
+            return;
+        }
+        mSourceActivities.add(r);
+    }
+
+    /**
+     * @return whether {@param r} is a source of actions in this transition.
+     */
+    boolean isSourceActivity(ActivityRecord r) {
+        if (mSourceActivities == null) return false;
+        return mSourceActivities.contains(r);
+    }
+
+    /**
      * @return {@code true} if `wc` is a participant or is a descendant of one.
      */
     boolean isInTransition(WindowContainer wc) {
@@ -1240,6 +1272,30 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         return false;
     }
 
+    /** Returns {@code true} if the end state of a transient launch is visible. */
+    private boolean handleVisibleTransientLaunchOnFinish() {
+        if (mTransientLaunches == null) return false;
+        boolean found = false;
+        for (int i = mTransientLaunches.size() - 1; i >= 0; --i) {
+            final ActivityRecord ar = mTransientLaunches.keyAt(i);
+            final Task task = ar.getTask();
+            if (task == null || !ar.isVisible()) {
+                continue;
+            }
+            // Because transient launches don't automatically take focus, make sure it is focused
+            // since the launch is committed.
+            if (!task.isFocused() && ar.isTopRunningActivity()) {
+                mController.mAtm.setLastResumedActivityUncheckLocked(ar, "transitionFinished");
+            }
+            // Prevent spurious background app switches.
+            if (ar.mDisplayContent.mFocusedApp == ar) {
+                mController.mAtm.stopAppSwitches();
+            }
+            found = true;
+        }
+        return found;
+    }
+
     /**
      * Check if pip-entry is possible after finishing and enter-pip if it is.
      *
@@ -1360,7 +1416,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         boolean hasParticipatedDisplay = false;
-        boolean hasVisibleTransientLaunch = false;
         boolean enterAutoPip = false;
         boolean committedSomeInvisible = false;
         // Commit all going-invisible containers
@@ -1439,19 +1494,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         && ar.isVisible()) {
                     // Transient launch was committed, so report enteringAnimation
                     ar.mEnteringAnimation = true;
-                    hasVisibleTransientLaunch = true;
-
-                    // Since transient launches don't automatically take focus, make sure we
-                    // synchronize focus since we committed to the launch.
-                    if (!task.isFocused() && ar.isTopRunningActivity()) {
-                        mController.mAtm.setLastResumedActivityUncheckLocked(ar,
-                                "transitionFinished");
-                    }
-
-                    // Prevent spurious background app switches.
-                    if (ar.mDisplayContent.mFocusedApp == ar) {
-                        mController.mAtm.stopAppSwitches();
-                    }
                 }
                 continue;
             }
@@ -1503,6 +1545,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mController.onCommittedInvisibles();
         }
 
+        final boolean hasVisibleTransientLaunch = handleVisibleTransientLaunchOnFinish();
         if (hasVisibleTransientLaunch) {
             // Notify the change about the transient-below task if entering auto-pip.
             if (enterAutoPip) {
@@ -3433,13 +3476,22 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
     /**
      * Applies the new configuration for the changed displays. Returns the activities that should
-     * check whether to deliver the new configuration to clients.
+     * check whether to deliver the new configuration to clients and whether the changes will
+     * potentially affect lifecycles.
      */
-    void applyDisplayChangeIfNeeded(@NonNull ArraySet<WindowContainer<?>> activitiesMayChange) {
+    boolean applyDisplayChangeIfNeeded(@NonNull ArraySet<WindowContainer<?>> activitiesMayChange) {
+        boolean affectsLifecycle = false;
         for (int i = mParticipants.size() - 1; i >= 0; --i) {
             final WindowContainer<?> wc = mParticipants.valueAt(i);
             final DisplayContent dc = wc.asDisplayContent();
             if (dc == null || !mChanges.get(dc).hasChanged()) continue;
+            if (ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()
+                    && mChanges.get(dc) != null && mChanges.get(dc).mExistenceChanged) {
+                dc.remove();
+                affectsLifecycle = true;
+                mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(dc.mDisplayId);
+                continue;
+            }
             final boolean changed = dc.sendNewConfiguration();
             // Set to ready if no other change controls the ready state. But if there is, such as
             // if an activity is pausing, it will call setReady(ar, false) and wait for the next
@@ -3459,6 +3511,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 });
             }
         }
+        return affectsLifecycle;
     }
 
     boolean getLegacyIsReady() {
@@ -3638,6 +3691,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         boolean hasChanged() {
+            if (mExistenceChanged && ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) return true;
             final boolean currVisible = mContainer.isVisibleRequested();
             // the task including transient launch must promote to root task
             if (currVisible && ((mFlags & ChangeInfo.FLAG_TRANSIENT_LAUNCH) != 0

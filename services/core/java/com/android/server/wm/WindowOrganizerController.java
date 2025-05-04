@@ -363,6 +363,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                             new Transition.ReadyCondition("start WCT applied");
                     nextTransition.mReadyTracker.add(wctApplied);
                     nextTransition.calcParallelCollectType(wct);
+                    nextTransition.mLogger.mFromPlayer = true;
                     mTransitionController.startCollectOrQueue(nextTransition,
                             (deferred) -> {
                                 final ActionChain chain = mService.mChainTracker.start(
@@ -649,7 +650,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         try {
             final ArraySet<WindowContainer<?>> haveConfigChanges = new ArraySet<>();
             if (transition != null) {
-                transition.applyDisplayChangeIfNeeded(haveConfigChanges);
+                if (transition.applyDisplayChangeIfNeeded(haveConfigChanges)) {
+                    effects |= TRANSACT_EFFECTS_LIFECYCLE;
+                }
                 if (!haveConfigChanges.isEmpty()) {
                     effects |= TRANSACT_EFFECTS_CLIENT_CONFIG;
                 }

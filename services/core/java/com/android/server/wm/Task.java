@@ -627,6 +627,9 @@ class Task extends TaskFragment {
     // The task will be removed when TaskOrganizer, which is managing the task, is destroyed.
     boolean mRemoveWithTaskOrganizer;
 
+    // The task will be reparented to another display when its display is removed.
+    boolean mReparentOnDisplayRemoval;
+
     /**
      * Reference to the pinned activity that is logically parented to this task, ie.
      * the previous top activity within this task is put into pinned mode.
@@ -1196,10 +1199,7 @@ class Task extends TaskFragment {
 
         // First time we are adding the task to the system.
         if (oldParent == null && newParent != null) {
-
-            // TODO: Super random place to be doing this, but aligns with what used to be done
-            // before we unified Task level. Look into if this can be done in a better place.
-            updateOverrideConfigurationFromLaunchBounds();
+            setInitialBoundsIfNeeded();
         }
 
         mRootWindowContainer.updateUIDsPresentOnDisplay();
@@ -2427,7 +2427,22 @@ class Task extends TaskFragment {
         mTaskSupervisor.mLaunchParamsPersister.saveTask(this, display);
     }
 
-    void updateOverrideConfigurationFromLaunchBounds() {
+    /**
+     * Called when the Task is newly added to the hierarchy. Updates the Task bounds from the
+     * persist task bounds if needed.
+     */
+    void setInitialBoundsIfNeeded() {
+        if (!com.android.window.flags.Flags.respectLeafTaskBounds()) {
+            updateOverrideConfigurationFromLaunchBounds();
+        } else if (persistTaskBounds(getWindowConfiguration())
+                && getRequestedOverrideBounds().isEmpty()) {
+            // Sets the Task bounds to the non-fullscreen bounds persisted last time if the Task
+            // has no override bounds set.
+            setBounds(mLastNonFullscreenBounds);
+        }
+    }
+
+    private void updateOverrideConfigurationFromLaunchBounds() {
         final Task rootTask = getRootTask();
         final boolean hasParentTask = rootTask != this;
         final int windowingMode = getWindowingMode();
@@ -4301,6 +4316,16 @@ class Task extends TaskFragment {
         return false;
     }
 
+    boolean shouldReparentOnDisplayRemoval() {
+        // Always finish non-standard type root tasks.
+        if (!isActivityTypeStandardOrUndefined()) return false;
+        if (!DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) {
+            return !mCreatedByOrganizer;
+        }
+        // Organizer-created tasks should not be reparented unless the task explicitly requests it.
+        return mReparentOnDisplayRemoval || !mCreatedByOrganizer;
+    }
+
     @Override
     protected void reparentSurfaceControl(SurfaceControl.Transaction t, SurfaceControl newParent) {
         /**
@@ -4797,6 +4822,12 @@ class Task extends TaskFragment {
                     mTransitionController.collect(topActivity);
 
                     final Task lastParentBeforePip = topActivity.getLastParentBeforePip();
+                    // Collect the last parent before moving it to front to make sure we have the
+                    // latest view hierarchy information
+                    if (isPip2ExperimentEnabled) {
+                        mTransitionController.collect(lastParentBeforePip);
+                    }
+
                     // Reset the activity windowing mode to match the parent.
                     topActivity.getRequestedOverrideConfiguration()
                             .windowConfiguration.setWindowingMode(WINDOWING_MODE_UNDEFINED);
@@ -6500,6 +6531,7 @@ class Task extends TaskFragment {
         private boolean mOnTop;
         private boolean mHasBeenVisible;
         private boolean mRemoveWithTaskOrganizer;
+        private boolean mReparentOnDisplayRemoval;
 
         /**
          * Records the source task that requesting to build a new task, used to determine which of
@@ -6625,6 +6657,11 @@ class Task extends TaskFragment {
 
         Builder setRemoveWithTaskOrganizer(boolean removeWithTaskOrganizer) {
             mRemoveWithTaskOrganizer = removeWithTaskOrganizer;
+            return this;
+        }
+
+        Builder setReparentOnDisplayRemoval(boolean reparentOnDisplayRemoval) {
+            mReparentOnDisplayRemoval = reparentOnDisplayRemoval;
             return this;
         }
 
@@ -6842,6 +6879,7 @@ class Task extends TaskFragment {
             if (mWindowingMode != WINDOWING_MODE_UNDEFINED) {
                 task.setWindowingModeInner(mWindowingMode, true /* creating */);
             }
+            task.mReparentOnDisplayRemoval = mReparentOnDisplayRemoval;
             return task;
         }
 

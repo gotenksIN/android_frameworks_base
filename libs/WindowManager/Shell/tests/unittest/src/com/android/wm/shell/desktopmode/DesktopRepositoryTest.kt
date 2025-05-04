@@ -26,6 +26,7 @@ import android.view.Display.INVALID_DISPLAY
 import androidx.test.filters.SmallTest
 import com.android.window.flags.Flags
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE
+import com.android.window.flags.Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION
 import com.android.window.flags.Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
@@ -33,6 +34,7 @@ import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.desktopmode.DesktopRepository.Companion.INVALID_DESK_ID
 import com.android.wm.shell.desktopmode.persistence.Desktop
 import com.android.wm.shell.desktopmode.persistence.DesktopPersistentRepository
+import com.android.wm.shell.shared.desktopmode.FakeDesktopConfig
 import com.android.wm.shell.sysui.ShellInit
 import com.google.common.truth.Truth.assertThat
 import junit.framework.Assert.fail
@@ -83,6 +85,8 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     @Mock private lateinit var testExecutor: ShellExecutor
     @Mock private lateinit var persistentRepository: DesktopPersistentRepository
 
+    private val desktopConfig = FakeDesktopConfig()
+
     init {
         mSetFlagsRule.setFlagsParameterization(flags)
     }
@@ -93,7 +97,15 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         datastoreScope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
         shellInit = spy(ShellInit(testExecutor))
 
-        repo = spy(DesktopRepository(persistentRepository, datastoreScope, DEFAULT_USER_ID))
+        repo =
+            spy(
+                DesktopRepository(
+                    persistentRepository,
+                    datastoreScope,
+                    DEFAULT_USER_ID,
+                    desktopConfig,
+                )
+            )
         whenever(runBlocking { persistentRepository.readDesktop(any(), any()) })
             .thenReturn(Desktop.getDefaultInstance())
         shellInit.init()
@@ -1372,6 +1384,76 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    @EnableFlags(FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION)
+    fun testRemoveDisplay_singleDesk_removesDesk() {
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        repo.addDeskChangeListener(listener, executor)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = DEFAULT_DISPLAY)
+        repo.addDesk(SECOND_DISPLAY, deskId = SECOND_DISPLAY)
+
+        repo.removeDisplay(SECOND_DISPLAY)
+        executor.flushAll()
+
+        assertEquals(repo.getDeskIds(SECOND_DISPLAY), emptySet())
+        assertEquals(repo.getDeskIds(DEFAULT_DISPLAY), setOf(DEFAULT_DISPLAY))
+        verify(repo, times(1)).notifyVisibleTaskListeners(SECOND_DISPLAY, visibleTasksCount = 0)
+        val lastRemoval = assertNotNull(listener.lastRemoval)
+        assertThat(lastRemoval.displayId).isEqualTo(SECOND_DISPLAY)
+        assertThat(lastRemoval.deskId).isEqualTo(SECOND_DISPLAY)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND, FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION)
+    fun testRemoveDisplay_multiDesk_removesAllDesksOnDisplay() {
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        repo.addDeskChangeListener(listener, executor)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 6)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 7)
+        repo.addDesk(SECOND_DISPLAY, deskId = 8)
+        repo.addDesk(SECOND_DISPLAY, deskId = 9)
+
+        repo.removeDisplay(SECOND_DISPLAY)
+        executor.flushAll()
+
+        assertEquals(repo.getDeskIds(SECOND_DISPLAY), emptySet())
+        assertEquals(repo.getDeskIds(DEFAULT_DISPLAY), setOf(0, 6, 7))
+        verify(repo, times(2)).notifyVisibleTaskListeners(SECOND_DISPLAY, visibleTasksCount = 0)
+        val lastRemoval = assertNotNull(listener.lastRemoval)
+        assertThat(lastRemoval.displayId).isEqualTo(SECOND_DISPLAY)
+        assertThat(lastRemoval.deskId).isEqualTo(9)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND, FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION)
+    fun testOnDeskDisplayChanged_movesDeskToNewDisplay_invokesCallbacks() {
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        repo.addDeskChangeListener(listener, executor)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 6)
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 7)
+        repo.addDesk(SECOND_DISPLAY, deskId = 8)
+        repo.addDesk(SECOND_DISPLAY, deskId = 9)
+
+        repo.onDeskDisplayChanged(deskId = 8, newDisplayId = DEFAULT_DISPLAY)
+        executor.flushAll()
+
+        assertThat(repo.getDeskIds(DEFAULT_DISPLAY)).containsExactly(0, 6, 7, 8)
+        assertThat(repo.getDeskIds(SECOND_DISPLAY)).containsExactly(9)
+        // Assert listeners invoked for desk removal from old display.
+        verify(repo, times(1)).notifyVisibleTaskListeners(SECOND_DISPLAY, visibleTasksCount = 0)
+        val lastRemoval = assertNotNull(listener.lastRemoval)
+        assertThat(lastRemoval.displayId).isEqualTo(SECOND_DISPLAY)
+        assertThat(lastRemoval.deskId).isEqualTo(8)
+        // Assert listeners invoked for desk addition to new display.
+        val lastAddition = assertNotNull(listener.lastAddition)
+        assertThat(lastAddition.displayId).isEqualTo(DEFAULT_DISPLAY)
+        assertThat(lastAddition.deskId).isEqualTo(8)
+    }
+
+    @Test
     @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun setDeskActive() {
         repo.addDesk(DEFAULT_DISPLAY, deskId = 6)
@@ -1520,6 +1602,24 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
 
     @Test
     @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun addDesk_atDeskLimit_updatesCanCreateDeskListener() {
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        desktopConfig.maxDeskLimit = 3
+        repo.addDeskChangeListener(listener, executor)
+
+        repo.addDesk(displayId = 0, deskId = 1) // Second desk.
+        executor.flushAll()
+        assertThat(listener.lastCanCreateDesks).isNull()
+
+        repo.addDesk(displayId = 0, deskId = 2) // Third desk.
+        executor.flushAll()
+        val lastCanCreateDesks = assertNotNull(listener.lastCanCreateDesks)
+        assertThat(lastCanCreateDesks).isFalse()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun removeDesk_updatesListener() {
         val listener = TestDeskChangeListener()
         val executor = TestShellExecutor()
@@ -1533,6 +1633,26 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         val lastRemoval = assertNotNull(listener.lastRemoval)
         assertThat(lastRemoval.displayId).isEqualTo(0)
         assertThat(lastRemoval.deskId).isEqualTo(1)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun removeDesk_belowDeskLimit_updatesCanCreateDeskListener() {
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        desktopConfig.maxDeskLimit = 3
+        repo.addDeskChangeListener(listener, executor)
+
+        repo.addDesk(displayId = 0, deskId = 1) // Second desk.
+        repo.addDesk(displayId = 0, deskId = 2) // Third desk.
+        executor.flushAll()
+        val lastCanCreateDesks1 = assertNotNull(listener.lastCanCreateDesks)
+        assertThat(lastCanCreateDesks1).isFalse()
+
+        repo.removeDesk(deskId = 1) // Back to two desks.
+        executor.flushAll()
+        val lastCanCreateDesks2 = assertNotNull(listener.lastCanCreateDesks)
+        assertThat(lastCanCreateDesks2).isTrue()
     }
 
     @Test
@@ -1657,6 +1777,9 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         var lastActivationChange: LastActivationChange? = null
             private set
 
+        var lastCanCreateDesks: Boolean? = null
+            private set
+
         override fun onDeskAdded(displayId: Int, deskId: Int) {
             lastAddition = LastAddition(displayId, deskId)
         }
@@ -1676,6 +1799,10 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                     oldActive = oldActiveDeskId,
                     newActive = newActiveDeskId,
                 )
+        }
+
+        override fun onCanCreateDesksChanged(canCreateDesks: Boolean) {
+            lastCanCreateDesks = canCreateDesks
         }
 
         data class LastAddition(val displayId: Int, val deskId: Int)

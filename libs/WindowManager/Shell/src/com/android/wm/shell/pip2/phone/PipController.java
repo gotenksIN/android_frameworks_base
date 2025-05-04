@@ -29,6 +29,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
+import android.graphics.Insets;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.util.Log;
@@ -43,6 +45,7 @@ import androidx.annotation.Nullable;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.Preconditions;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.common.DisplayChangeController;
@@ -51,9 +54,11 @@ import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.DisplayLayout;
 import com.android.wm.shell.common.ExternalInterfaceBinder;
 import com.android.wm.shell.common.ImeListener;
+import com.android.wm.shell.common.NavigationBarsListener;
 import com.android.wm.shell.common.RemoteCallable;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SingleInstanceRemoteListener;
+import com.android.wm.shell.common.TabletopModeController;
 import com.android.wm.shell.common.TaskStackListenerCallback;
 import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.common.pip.IPip;
@@ -62,6 +67,7 @@ import com.android.wm.shell.common.pip.PipAppOpsListener;
 import com.android.wm.shell.common.pip.PipBoundsAlgorithm;
 import com.android.wm.shell.common.pip.PipBoundsState;
 import com.android.wm.shell.common.pip.PipDisplayLayoutState;
+import com.android.wm.shell.common.pip.PipKeepClearAlgorithmInterface;
 import com.android.wm.shell.common.pip.PipMediaController;
 import com.android.wm.shell.common.pip.PipUiEventLogger;
 import com.android.wm.shell.common.pip.PipUtils;
@@ -106,6 +112,8 @@ public class PipController implements ConfigurationChangeListener,
     private final PipTouchHandler mPipTouchHandler;
     private final PipAppOpsListener mPipAppOpsListener;
     private final PhonePipMenuController mPipMenuController;
+    private final TabletopModeController mTabletopModeController;
+    private final PipKeepClearAlgorithmInterface mPipKeepClearAlgorithm;
     private final PipUiEventLogger mPipUiEventLogger;
     private final ShellExecutor mMainExecutor;
     private final PipImpl mImpl;
@@ -115,6 +123,8 @@ public class PipController implements ConfigurationChangeListener,
     // Wrapper for making Binder calls into PiP animation listener hosted in launcher's Recents.
     @Nullable private PipAnimationListener mPipRecentsAnimationListener;
 
+    private final PipSurfaceTransactionHelper.SurfaceControlTransactionFactory
+            mSurfaceControlTransactionFactory;
     private final PipSurfaceTransactionHelper mPipSurfaceTransactionHelper;
 
     private boolean mWaitingToPlayDisplayChangeBoundsUpdate;
@@ -159,6 +169,8 @@ public class PipController implements ConfigurationChangeListener,
             PhonePipMenuController pipMenuController,
             PipUiEventLogger pipUiEventLogger,
             PipMediaController pipMediaController,
+            TabletopModeController tabletopModeController,
+            PipKeepClearAlgorithmInterface pipKeepClearAlgorithm,
             PipSurfaceTransactionHelper pipSurfaceTransactionHelper,
             ShellExecutor mainExecutor) {
         mContext = context;
@@ -179,9 +191,13 @@ public class PipController implements ConfigurationChangeListener,
         mPipMenuController = pipMenuController;
         mPipUiEventLogger = pipUiEventLogger;
         mMediaController = pipMediaController;
+        mTabletopModeController = tabletopModeController;
+        mPipKeepClearAlgorithm = pipKeepClearAlgorithm;
         mPipSurfaceTransactionHelper = pipSurfaceTransactionHelper;
         mMainExecutor = mainExecutor;
         mImpl = new PipImpl();
+        mSurfaceControlTransactionFactory =
+                new PipSurfaceTransactionHelper.VsyncSurfaceControlTransactionFactory();
 
         if (PipUtils.isPip2ExperimentEnabled()) {
             shellInit.addInitCallback(this::onInit, this);
@@ -209,6 +225,8 @@ public class PipController implements ConfigurationChangeListener,
             PhonePipMenuController pipMenuController,
             PipUiEventLogger pipUiEventLogger,
             PipMediaController pipMediaController,
+            TabletopModeController tabletopModeController,
+            PipKeepClearAlgorithmInterface pipKeepClearAlgorithm,
             PipSurfaceTransactionHelper pipSurfaceTransactionHelper,
             ShellExecutor mainExecutor) {
         if (!context.getPackageManager().hasSystemFeature(FEATURE_PICTURE_IN_PICTURE)) {
@@ -220,8 +238,8 @@ public class PipController implements ConfigurationChangeListener,
                 displayController, displayInsetsController, pipBoundsState, pipBoundsAlgorithm,
                 pipDisplayLayoutState, pipScheduler, taskStackListener, shellTaskOrganizer,
                 pipTransitionState, pipTouchHandler, pipAppOpsListener, pipMenuController,
-                pipUiEventLogger, pipMediaController, pipSurfaceTransactionHelper,
-                mainExecutor);
+                pipUiEventLogger, pipMediaController, tabletopModeController,
+                pipKeepClearAlgorithm, pipSurfaceTransactionHelper, mainExecutor);
     }
 
     public PipImpl getPipImpl() {
@@ -245,6 +263,15 @@ public class PipController implements ConfigurationChangeListener,
                         mPipTouchHandler.onImeVisibilityChanged(imeVisible, imeHeight);
                     }
                 });
+        mDisplayInsetsController.addInsetsChangedListener(mPipDisplayLayoutState.getDisplayId(),
+                new NavigationBarsListener(mDisplayController,
+                        mPipDisplayLayoutState.getDisplayId()) {
+                    @Override
+                    protected void onNavigationBarsVisibilityChanged(
+                            @NonNull Insets insets) {
+                        mPipDisplayLayoutState.setNavigationBarsInsets(insets);
+                    }
+                });
 
         // Allow other outside processes to bind to PiP controller using the key below.
         mShellController.addExternalInterface(IPip.DESCRIPTOR,
@@ -262,6 +289,50 @@ public class PipController implements ConfigurationChangeListener,
                     return;
                 }
                 mPipScheduler.scheduleExitPipViaExpand();
+            }
+        });
+
+        mTabletopModeController.registerOnTabletopModeChangedListener((isInTabletopMode) -> {
+            if (!isInTabletopMode) {
+                mPipBoundsState.setNamedUnrestrictedKeepClearArea(
+                        PipBoundsState.NAMED_KCA_TABLETOP_MODE, null);
+                return;
+            }
+
+            // To prepare for the entry bounds.
+            final Rect displayBounds = mPipBoundsState.getDisplayBounds();
+            if (mTabletopModeController.getPreferredHalfInTabletopMode()
+                    == TabletopModeController.PREFERRED_TABLETOP_HALF_TOP) {
+                // Prefer top, avoid the bottom half of the display.
+                mPipBoundsState.setNamedUnrestrictedKeepClearArea(
+                        PipBoundsState.NAMED_KCA_TABLETOP_MODE, new Rect(
+                                displayBounds.left, displayBounds.centerY(),
+                                displayBounds.right, displayBounds.bottom));
+            } else {
+                // Prefer bottom, avoid the top half of the display.
+                mPipBoundsState.setNamedUnrestrictedKeepClearArea(
+                        PipBoundsState.NAMED_KCA_TABLETOP_MODE, new Rect(
+                                displayBounds.left, displayBounds.top,
+                                displayBounds.right, displayBounds.centerY()));
+            }
+
+            // Try to move the PiP window if we have entered PiP mode.
+            if (mPipTransitionState.isInPip()) {
+                final Rect pipBounds = mPipBoundsState.getBounds();
+                final Point edgeInsets = mPipDisplayLayoutState.getScreenEdgeInsets();
+                if ((pipBounds.height() + 2 * edgeInsets.y) > (displayBounds.height() / 2)) {
+                    // PiP bounds is too big to fit either half, bail early.
+                    return;
+                }
+                Rect destBounds = mPipKeepClearAlgorithm.adjust(mPipBoundsState,
+                        mPipBoundsAlgorithm);
+                // only move if the bounds are actually different
+                if (!destBounds.equals(mPipBoundsState.getBounds())) {
+                    ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
+                            "Move PiP from %s to %s on tabletop mode change",
+                            mPipBoundsState.getBounds(), destBounds);
+                    mPipTouchHandler.getMotionHelper().moveToBounds(destBounds);
+                }
             }
         });
 
@@ -304,6 +375,15 @@ public class PipController implements ConfigurationChangeListener,
     @Override
     public void onThemeChanged() {
         setDisplayLayout(new DisplayLayout(mContext, mContext.getDisplay()));
+        if (Flags.enablePipBoxShadows()) {
+            if (mPipTransitionState.isInPip()) {
+                SurfaceControl pipLeash = mPipTransitionState.getPinnedTaskLeash();
+                mPipSurfaceTransactionHelper.onThemeChanged(mContext);
+                SurfaceControl.Transaction tx = mSurfaceControlTransactionFactory.getTransaction();
+                mPipSurfaceTransactionHelper.shadow(tx, pipLeash, true /* applyShadowRadius */);
+                tx.apply();
+            }
+        }
     }
 
     //
@@ -604,6 +684,7 @@ public class PipController implements ConfigurationChangeListener,
     private void dump(PrintWriter pw, String prefix) {
         final String innerPrefix = "  ";
         pw.println(TAG);
+        PipUtils.dump(pw, innerPrefix);
         mPipBoundsAlgorithm.dump(pw, innerPrefix);
         mPipBoundsState.dump(pw, innerPrefix);
         mPipDisplayLayoutState.dump(pw, innerPrefix);

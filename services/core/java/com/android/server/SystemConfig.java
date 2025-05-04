@@ -364,8 +364,8 @@ public class SystemConfig {
     private final ArrayList<String> mPreventUserDisablePackages = new ArrayList<>();
 
     // Map of packagesNames to userTypes. Stored temporarily until cleared by UserManagerService().
-    private ArrayMap<String, Set<String>> mPackageToUserTypeWhitelist = new ArrayMap<>();
-    private ArrayMap<String, Set<String>> mPackageToUserTypeBlacklist = new ArrayMap<>();
+    private ArrayMap<String, Set<String>> mPackageToUserTypeAllowlist = new ArrayMap<>();
+    private ArrayMap<String, Set<String>> mPackageToUserTypeDenylist = new ArrayMap<>();
 
     // Map of intent actions to the list of packages that want to receive those broadcast actions
     private ArrayMap<String, Set<String>> mQtiAllowImplicitBroadcasts = new ArrayMap<>();
@@ -580,9 +580,9 @@ public class SystemConfig {
      * initially installed, and then removes this map from SystemConfig.
      * Called by UserManagerService when it is constructed.
      */
-    public ArrayMap<String, Set<String>> getAndClearPackageToUserTypeWhitelist() {
-        ArrayMap<String, Set<String>> r = mPackageToUserTypeWhitelist;
-        mPackageToUserTypeWhitelist = new ArrayMap<>(0);
+    public ArrayMap<String, Set<String>> getAndClearPackageToUserTypeAllowlist() {
+        ArrayMap<String, Set<String>> r = mPackageToUserTypeAllowlist;
+        mPackageToUserTypeAllowlist = new ArrayMap<>(0);
         return r;
     }
 
@@ -597,13 +597,13 @@ public class SystemConfig {
 
     /**
      * Gets map of packagesNames to userTypes, dictating on which user types each package should NOT
-     * be initially installed, even if they are whitelisted, and then removes this map from
+     * be initially installed, even if they are allowlisted, and then removes this map from
      * SystemConfig.
      * Called by UserManagerService when it is constructed.
      */
-    public ArrayMap<String, Set<String>> getAndClearPackageToUserTypeBlacklist() {
-        ArrayMap<String, Set<String>> r = mPackageToUserTypeBlacklist;
-        mPackageToUserTypeBlacklist = new ArrayMap<>(0);
+    public ArrayMap<String, Set<String>> getAndClearPackageToUserTypeDenylist() {
+        ArrayMap<String, Set<String>> r = mPackageToUserTypeDenylist;
+        mPackageToUserTypeDenylist = new ArrayMap<>(0);
         return r;
     }
 
@@ -1550,7 +1550,7 @@ public class SystemConfig {
                     case "install-in-user-type": {
                         // NB: We allow any directory permission to declare install-in-user-type.
                         readInstallInUserType(parser,
-                                mPackageToUserTypeWhitelist, mPackageToUserTypeBlacklist);
+                                mPackageToUserTypeAllowlist, mPackageToUserTypeDenylist);
                     } break;
                     case "qti-allow-implicit-broadcast": {
                         MapOfImplicitBroadcastToPackageNames(parser,

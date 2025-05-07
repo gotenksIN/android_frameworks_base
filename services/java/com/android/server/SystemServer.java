@@ -122,7 +122,6 @@ import com.android.internal.util.ConcurrentUtils;
 import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.widget.ILockSettings;
-import com.android.internal.widget.LockSettingsInternal;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.accessibility.AccessibilityManagerService;
 import com.android.server.accounts.AccountManagerService;
@@ -192,6 +191,7 @@ import com.android.server.lights.LightsService;
 import com.android.server.locales.LocaleManagerService;
 import com.android.server.location.LocationManagerService;
 import com.android.server.location.altitude.AltitudeService;
+import com.android.server.locksettings.LockSettingsInternal;
 import com.android.server.locksettings.LockSettingsService;
 import com.android.server.logcat.LogcatManagerService;
 import com.android.server.media.MediaResourceMonitorService;
@@ -1577,8 +1577,7 @@ public final class SystemServer implements Dumpable {
         boolean isArc = context.getPackageManager().hasSystemFeature(
                 "org.chromium.arc");
 
-        boolean isTv = context.getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_LEANBACK);
+        boolean isTv = RoSystemFeatures.hasFeatureLeanback(context);
 
         boolean isAutomotive = RoSystemFeatures.hasFeatureAutomotive(context);
 
@@ -2730,15 +2729,13 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)
-                    || mPackageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV) || isTv) {
                 t.traceBegin("StartTvInteractiveAppManager");
                 mSystemServiceManager.startService(TvInteractiveAppManagerService.class);
                 t.traceEnd();
             }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)
-                    || mPackageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV) || isTv) {
                 t.traceBegin("StartTvInputManager");
                 mSystemServiceManager.startService(TvInputManagerService.class);
                 t.traceEnd();
@@ -2762,7 +2759,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
+            if (isTv) {
                 t.traceBegin("StartTvRemoteService");
                 mSystemServiceManager.startService(TvRemoteService.class);
                 t.traceEnd();
@@ -3156,7 +3153,9 @@ public final class SystemServer implements Dumpable {
         final HsumBootUserInitializer hsumBootUserInitializer =
                 HsumBootUserInitializer.createInstance(
                         mActivityManagerService, mPackageManagerService, mContentResolver,
-                        context.getResources().getBoolean(R.bool.config_isMainUserPermanentAdmin));
+                        context.getResources().getBoolean(R.bool.config_isMainUserPermanentAdmin),
+                        context.getResources().getBoolean(R.bool.config_createInitialUser)
+                        );
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);

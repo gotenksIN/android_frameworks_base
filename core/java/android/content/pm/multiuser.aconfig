@@ -53,12 +53,23 @@ flag {
     bug: "298008926"
 }
 
+# Begin Multiuser Widget flags #
+
 flag {
     name: "multiuser_widget"
     namespace: "multiuser"
     description: "Implement the Multiuser Widget"
     bug: "365748524"
 }
+
+flag {
+    name: "widget_current_user_view"
+    namespace: "multiuser"
+    description: "When flag is enabled, widget shows the current user only"
+    bug: "409327566"
+}
+
+# End Multiuser Widget flags #
 
 flag {
     name: "enable_biometrics_to_unlock_private_space"
@@ -494,4 +505,14 @@ flag {
      namespace: "multiuser"
      description: "Creates a non-main user on boot when device is HSUM and doesn't support main user"
      bug: "409650316"
+}
+
+flag {
+    name: "setupwizard_username_population"
+    namespace: "multiuser"
+    description: "Ensures the user's account name is correctly populated and persisted during the Android Setup Wizard across all flows."
+    bug: "389209342"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

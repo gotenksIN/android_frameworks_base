@@ -2874,6 +2874,12 @@
     <!-- Whether to restrict auto-showing glanceable hub to wireless charging. -->
     <bool name="config_onlyShowGlanceableHubWhenWirelessChargingDefault">false</bool>
 
+    <!-- Whether or not low light display behavior is enabled -->
+    <bool name="config_lowLightDisplayBehaviorEnabledDefault">false</bool>
+
+    <!-- The default low light display behavior. 0 represents no behavior -->
+    <integer name="config_lowLightDisplayBehaviorDefault">0</integer>
+
     <!-- The duration in milliseconds of the dream opening animation.  -->
     <integer name="config_dreamOpenAnimationDuration">250</integer>
     <!-- The duration in milliseconds of the dream closing animation.  -->
@@ -3806,9 +3812,7 @@
     <string name="config_screenshotAppClipsServiceComponent" translatable="false"
             >com.android.systemui/com.android.systemui.screenshot.appclips.AppClipsService</string>
 
-    <!-- The component name of a special dock app that merely launches a dream.
-         We don't want to launch this app when docked because it causes an unnecessary
-         activity transition.  We just want to start the dream.. -->
+    <!-- The component name for the service which handles taking a screenshot. -->
     <string name="config_screenshotServiceComponent" translatable="false"
             >com.android.systemui/com.android.systemui.screenshot.TakeScreenshotService</string>
 
@@ -4827,6 +4831,11 @@
          enabled by the accessibility keyboard shortcut. If the service with the specified component
          name is not preinstalled then this shortcut will do nothing. -->
     <string name="config_defaultSelectToSpeakService" translatable="false"></string>
+
+    <!-- The component name, flattened to a string, for the default voice access service to be
+     enabled by the accessibility keyboard shortcut. If the service with the specified component
+     name is not preinstalled then this shortcut will do nothing. -->
+    <string name="config_defaultVoiceAccessService" translatable="false"></string>
 
     <!-- URI for default Accessibility notification sound when to enable accessibility shortcut. -->
     <string name="config_defaultAccessibilityNotificationSound" translatable="false"></string>
@@ -7259,6 +7268,12 @@
     <!-- Maximum time in millisecs for telephony should wait to deactivate data call
          when user turned off mobile data or data roaming during CIWLAN -->
     <integer name="config_maximumDelayTimeToDeactivateDataCall">7000</integer>
+
+    <!-- Certificate digests for trusted apps that will be allowed to obtain the knownSigner
+         permission for computer control access. The digest should be computed over the
+         DER encoding of the trusted certificate using the SHA-256 digest algorithm. -->
+    <string-array name="config_computerControlAccessKnownSigners">
+    </string-array>
 
     <!-- Certificate digests for trusted apps that will be allowed to obtain the knownSigner
          permission for staging HealthConnect's remote data. The digest should be computed over the

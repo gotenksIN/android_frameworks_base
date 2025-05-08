@@ -339,17 +339,27 @@ final class WifiDisplayController implements DumpUtils.Dump {
     }
 
     private void updateWfdEnableState() {
+        WifiP2pWfdInfo wfdInfo = new WifiP2pWfdInfo();
+        int WFDR2Info = SystemProperties.getInt("persist.vendor.setWFDInfo.R2",0);
+        Slog.i(TAG, "WFDR2info is: " + WFDR2Info);
+       /*R1 source - R1 sink ->0
+        *R1 source - R2 sink ->1
+        *R2 source - R1 sink ->2
+        *R2 source - R2 sink ->3*/
+
         if (mWifiDisplayOnSetting && mWifiP2pEnabled) {
             // WFD should be enabled.
             if (!mWfdEnabled && !mWfdEnabling) {
                 mWfdEnabling = true;
 
-                WifiP2pWfdInfo wfdInfo = new WifiP2pWfdInfo();
                 wfdInfo.setEnabled(true);
                 wfdInfo.setDeviceType(WifiP2pWfdInfo.DEVICE_TYPE_WFD_SOURCE);
                 wfdInfo.setSessionAvailable(true);
                 wfdInfo.setControlPort(DEFAULT_CONTROL_PORT);
                 wfdInfo.setMaxThroughput(MAX_THROUGHPUT);
+                if(WFDR2Info==2 || WFDR2Info==3)
+                    wfdInfo.setR2DeviceType(WifiP2pWfdInfo.DEVICE_TYPE_WFD_SOURCE);
+
 // QTI_BEGIN: 2020-04-27: WLAN: Revert 'WiFiDisplayController: Defer the P2P Initialization from its constructor.'
                 mWifiP2pManager.setWfdInfo(mWifiP2pChannel, wfdInfo, new ActionListener() {
 // QTI_END: 2020-04-27: WLAN: Revert 'WiFiDisplayController: Defer the P2P Initialization from its constructor.'
@@ -378,7 +388,6 @@ final class WifiDisplayController implements DumpUtils.Dump {
         } else {
             // WFD should be disabled.
             if (mWfdEnabled || mWfdEnabling) {
-                WifiP2pWfdInfo wfdInfo = new WifiP2pWfdInfo();
                 wfdInfo.setEnabled(false);
 // QTI_BEGIN: 2020-04-27: WLAN: Revert 'WiFiDisplayController: Defer the P2P Initialization from its constructor.'
                 mWifiP2pManager.setWfdInfo(mWifiP2pChannel, wfdInfo, new ActionListener() {

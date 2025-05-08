@@ -226,13 +226,6 @@ flag {
 }
 
 flag {
-    name: "refactor_get_current_user"
-    namespace: "systemui"
-    description: "KeyguardUpdateMonitor.getCurrentUser() was providing outdated results."
-    bug: "305984787"
-}
-
-flag {
     name: "notification_avalanche_throttle_hun"
     namespace: "systemui"
     description: "During notification avalanche, throttle HUNs showing in fast succession."
@@ -526,13 +519,6 @@ flag {
         " we can test promoted notifications with teamfooders. This flag should *never* be released "
         "to trunkfood or nextfood."
     bug: "367705002"
-}
-
-flag {
-    name: "debug_live_updates_promote_all"
-    namespace: "systemui"
-    description: "Promote all notifications to Live Updates (RONs). (For testing/debugging only, do not promote/release!)"
-    bug: "404838239"
 }
 
 flag {
@@ -1293,6 +1279,16 @@ flag {
 }
 
 flag {
+  name: "dream_biometric_prompt_fixes"
+  namespace: "systemui"
+  description: "Flags the behavior of  turning off dream back gesture disablement and gesture handling when the biometric prompt is showing"
+  bug: "413511537"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "app_clips_backlinks"
   namespace: "systemui"
   description: "Enables Backlinks improvement feature in App Clips"
@@ -1449,30 +1445,10 @@ flag {
 }
 
 flag {
-   name: "sim_pin_race_condition_on_restart"
-   namespace: "systemui"
-   description: "The SIM PIN screen may be shown incorrectly on reboot"
-   bug: "351426938"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "sim_pin_bouncer_reset"
    namespace: "systemui"
    description: "The SIM PIN bouncer does not close after unlocking"
    bug: "297461589"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
-   name: "sim_pin_use_slot_id"
-   namespace: "systemui"
-   description: "Reorient SIM data processing around slotId instead of subId"
-   bug: "376173142"
    metadata {
         purpose: PURPOSE_BUGFIX
    }
@@ -2069,4 +2045,14 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+   name: "hub_edit_mode_transition"
+   namespace: "systemui"
+   description: "Fix hub to edit mode transition issues"
+   bug: "411422599"
+   metadata {
+     purpose: PURPOSE_BUGFIX
+   }
 }

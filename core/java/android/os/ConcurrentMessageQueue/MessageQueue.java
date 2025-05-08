@@ -32,8 +32,6 @@ import android.util.proto.ProtoOutputStream;
 
 import com.android.internal.annotations.GuardedBy;
 
-import dalvik.annotation.optimization.CriticalNative;
-import dalvik.annotation.optimization.FastNative;
 import dalvik.annotation.optimization.NeverCompile;
 
 import java.io.FileDescriptor;
@@ -438,35 +436,22 @@ public final class MessageQueue {
     private final Object mFileDescriptorRecordsLock = new Object();
     @GuardedBy("mFileDescriptorRecordsLock")
     private SparseArray<FileDescriptorRecord> mFileDescriptorRecords;
-    private volatile boolean mHasFileDescriptorRecords;
 
     // The next barrier token.
     // Barriers are indicated by messages with a null target whose arg1 field carries the token.
     private final AtomicInteger mNextBarrierToken = new AtomicInteger(1);
 
     @RavenwoodRedirect
-    @FastNative
     private static native long nativeInit();
-
     @RavenwoodRedirect
-    @FastNative
     private static native void nativeDestroy(long ptr);
-
     @RavenwoodRedirect
-    // Not @FastNative since significant time is spent in the native code as it may invoke
-    // application callbacks.
     private native void nativePollOnce(long ptr, int timeoutMillis); /*non-static for callbacks*/
-
     @RavenwoodRedirect
-    @CriticalNative
     private static native void nativeWake(long ptr);
-
     @RavenwoodRedirect
-    @CriticalNative
     private static native boolean nativeIsPolling(long ptr);
-
     @RavenwoodRedirect
-    @CriticalNative
     private static native void nativeSetFileDescriptorEvents(long ptr, int fd, int events);
 
     MessageQueue(boolean quitAllowed) {
@@ -886,16 +871,6 @@ public final class MessageQueue {
         }
     }
 
-    private void maybePollOnce(int nextPollTimeoutMillis) {
-        if (!Flags.messageQueueNativePollOnceAndForAll()) {
-            // If nativePollOnce optimization is not in effect, poll unconditionally.
-            nativePollOnce(mPtr, nextPollTimeoutMillis);
-        } else if (nextPollTimeoutMillis != 0 || mHasFileDescriptorRecords || getQuitting()) {
-            // We need to wait for the next message, or we need to poll for file descriptor events.
-            nativePollOnce(mPtr, nextPollTimeoutMillis);
-        }
-    }
-
     Message next() {
         final long ptr = mPtr;
         if (ptr == 0) {
@@ -910,7 +885,7 @@ public final class MessageQueue {
             }
 
             mMessageDirectlyQueued = false;
-            maybePollOnce(mNextPollTimeoutMillis);
+            nativePollOnce(ptr, mNextPollTimeoutMillis);
 
             Message msg = nextMessage(false, false);
             if (msg != null) {
@@ -1761,17 +1736,6 @@ public final class MessageQueue {
             mFileDescriptorRecords.removeAt(index);
             setFileDescriptorEvents(fdNum, 0);
         }
-
-        // Indicate to maybePollOnce() if we have file descriptor records that
-        // need to be polled for events.
-        // We write this volatile field here and read it from the worker thread.
-        // Adding an FD on a client thread and polling for events on the worker thread are
-        // inherently racy. If the worker thread skips polling because it thinks there are
-        // no FDs to watch and there is a Message to handle, then the worker will still
-        // poll for the same events the next time. Events won't be missed, they'll just be
-        // interleaved with Message handling in undefined ways.
-        mHasFileDescriptorRecords = mFileDescriptorRecords != null
-                && (mFileDescriptorRecords.size() > 0);
     }
 
     // Called from native code.

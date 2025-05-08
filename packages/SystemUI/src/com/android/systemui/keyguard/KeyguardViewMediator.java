@@ -2465,10 +2465,14 @@ public class KeyguardViewMediator implements CoreStartable,
         }
     }
 
+    private void doKeyguardLocked(Bundle options) {
+        doKeyguardLocked(options, true /* resetState */);
+    }
+
     /**
      * Enable the keyguard if the settings are appropriate.
      */
-    private void doKeyguardLocked(Bundle options) {
+    private void doKeyguardLocked(Bundle options, boolean resetState) {
         // If the power button behavior requests to open the glanceable hub.
         if (options != null && options.getBoolean(EXTRA_TRIGGER_HUB)) {
             if (mCommunalSettingsInteractor.get().getAutoOpenEnabled().getValue()) {
@@ -2531,7 +2535,9 @@ public class KeyguardViewMediator implements CoreStartable,
                                     + "already showing, we're interactive, we were not "
                                     + "previously hiding. It should be safe to short-circuit "
                                     + "here.");
-                    resetStateLocked(/* hideBouncer= */ false);
+                    if (resetState) {
+                        resetStateLocked(/* hideBouncer= */ false);
+                    }
                     notifyLockNowCallback();
                     return;
                 }
@@ -2741,14 +2747,8 @@ public class KeyguardViewMediator implements CoreStartable,
         @Override
         public void onReceive(Context context, Intent intent) {
             if (DELAYED_KEYGUARD_ACTION.equals(intent.getAction())) {
-                final int sequence = intent.getIntExtra("seq", 0);
-                if (DEBUG) Log.d(TAG, "received DELAYED_KEYGUARD_ACTION with seq = "
-                        + sequence + ", mDelayedShowingSequence = " + mDelayedShowingSequence);
-                synchronized (KeyguardViewMediator.this) {
-                    if (mDelayedShowingSequence == sequence) {
-                        doKeyguardLocked(null);
-                    }
-                }
+                doDelayedKeyguardAction(intent.getIntExtra("seq", 0));
+
             } else if (DELAYED_LOCK_PROFILE_ACTION.equals(intent.getAction())) {
                 final int sequence = intent.getIntExtra("seq", 0);
                 int userId = intent.getIntExtra(Intent.EXTRA_USER_ID, 0);
@@ -2762,6 +2762,20 @@ public class KeyguardViewMediator implements CoreStartable,
             }
         }
     };
+
+    @VisibleForTesting
+    void doDelayedKeyguardAction(int sequence) {
+        if (DEBUG) {
+            Log.d(TAG, "received DELAYED_KEYGUARD_ACTION with seq = "
+                    + sequence + ", mDelayedShowingSequence = " + mDelayedShowingSequence);
+        }
+
+        synchronized (KeyguardViewMediator.this) {
+            if (mDelayedShowingSequence == sequence) {
+                doKeyguardLocked(null, !mUpdateMonitor.isDreaming());
+            }
+        }
+    }
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override

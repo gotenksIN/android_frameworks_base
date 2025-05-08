@@ -1084,6 +1084,7 @@ public class NotificationManagerService extends SystemService {
         }
 
         int oldFlags = summary.getSbn().getNotification().flags;
+        int newFlags = summaryAttr.flags != GroupHelper.FLAG_INVALID ? summaryAttr.flags : oldFlags;
 
         boolean attributesUpdated =
                 !summaryAttr.icon.sameAs(summary.getSbn().getNotification().getSmallIcon())
@@ -1093,7 +1094,7 @@ public class NotificationManagerService extends SystemService {
                         summary.getSbn().getNotification().getGroupAlertBehavior();
 
         if (notificationForceGrouping()) {
-            summary.getNotification().flags |= Notification.FLAG_SILENT;
+            newFlags |= Notification.FLAG_SILENT;
             if (!summary.getChannel().getId().equals(summaryAttr.channelId)) {
                 NotificationChannel newChannel = mPreferencesHelper.getNotificationChannel(pkg,
                         summary.getUid(), summaryAttr.channelId, false);
@@ -1104,9 +1105,8 @@ public class NotificationManagerService extends SystemService {
             }
         }
 
-        if (oldFlags != summaryAttr.flags || attributesUpdated) {
-            summary.getSbn().getNotification().flags =
-                    summaryAttr.flags != GroupHelper.FLAG_INVALID ? summaryAttr.flags : oldFlags;
+        if (oldFlags != newFlags || attributesUpdated) {
+            summary.getSbn().getNotification().flags = newFlags;
             summary.getSbn().getNotification().setSmallIcon(summaryAttr.icon);
             summary.getSbn().getNotification().color = summaryAttr.iconColor;
             summary.getSbn().getNotification().visibility = summaryAttr.visibility;
@@ -2835,6 +2835,7 @@ public class NotificationManagerService extends SystemService {
                 mNotificationChannelLogger,
                 mAppOps,
                 mUserProfiles,
+                mUgmInternal,
                 mShowReviewPermissionsNotification,
                 Clock.systemUTC());
         mRankingHelper = new RankingHelper(getContext(), mRankingHandler, mPreferencesHelper,
@@ -3590,15 +3591,17 @@ public class NotificationManagerService extends SystemService {
         }
 
         if (notificationForceGrouping()) {
-            final NotificationChannel updatedChannel = mPreferencesHelper.getNotificationChannel(
-                    pkg, uid, channel.getId(), false);
-            mHandler.postDelayed(() -> {
-                synchronized (mNotificationLock) {
-                    mGroupHelper.onChannelUpdated(
-                            UserHandle.getUserHandleForUid(uid).getIdentifier(), pkg,
-                            updatedChannel, mNotificationList, mSummaryByGroupKey);
-                }
-            }, DELAY_FORCE_REGROUP_TIME);
+                mHandler.postDelayed(() -> {
+                    final NotificationChannel updatedChannel = mPreferencesHelper
+                            .getNotificationChannel(pkg, uid, channel.getId(), false);
+                    synchronized (mNotificationLock) {
+                        if (updatedChannel != null) {
+                            mGroupHelper.onChannelUpdated(
+                                    UserHandle.getUserHandleForUid(uid).getIdentifier(), pkg,
+                                    updatedChannel, mNotificationList, mSummaryByGroupKey);
+                        }
+                    }
+                }, DELAY_FORCE_REGROUP_TIME);
         }
 
         handleSavePolicyFile();
@@ -7339,13 +7342,7 @@ public class NotificationManagerService extends SystemService {
             final Uri originalSoundUri =
                     (originalChannel != null) ? originalChannel.getSound() : null;
             if (soundUri != null && !Objects.equals(originalSoundUri, soundUri)) {
-                Binder.withCleanCallingIdentity(() -> {
-                    mUgmInternal.checkGrantUriPermission(sourceUid, null,
-                            ContentProvider.getUriWithoutUserId(soundUri),
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                            ContentProvider.getUserIdFromUri(soundUri,
-                            UserHandle.getUserId(sourceUid)));
-                });
+                PermissionHelper.grantUriPermission(mUgmInternal, soundUri, sourceUid);
             }
         }
 
@@ -7585,8 +7582,8 @@ public class NotificationManagerService extends SystemService {
                 if (r.getSbn().isAppGroup()) {
                     // Override group key early for forced grouped notifications
                     r.setOverrideGroupKey(groupName);
+                    r.getNotification().flags |= Notification.FLAG_SILENT;
                 }
-                r.getNotification().flags |= Notification.FLAG_SILENT;
             }
 
             addAutoGroupAdjustment(r, groupName);
@@ -13064,7 +13061,7 @@ public class NotificationManagerService extends SystemService {
                     NOTIFICATION_ADJUSTMENT_PREFERENCES,
                     /* optional int32 event_id = 1 */
                     NotificationPullStatsEvent.NOTIFICATION_BUNDLE_PREFERENCES_PULLED.getId(),
-                    /* optional bool bundles_allowed = 2 */ bundlesAllowed,
+                    /* optional bool adjustment_allowed = 2 */ bundlesAllowed,
                     /* repeated android.stats.notification.BundleTypes allowed_bundle_types = 3 */
                     allowedBundleTypes,
                     /* optional android.stats.notification.AdjustmentKey key = 4 */

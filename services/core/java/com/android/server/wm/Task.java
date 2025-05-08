@@ -4859,7 +4859,7 @@ class Task extends TaskFragment {
                         if (topActivity.mTransitionController.inFinishingTransition(topActivity)) {
                             final SurfaceControl.Transaction tx =
                                     taskDisplayArea.getPendingTransaction();
-                            Transition.assignLayers(taskDisplayArea, tx);
+                            Transition.assignLayersForStartTransaction(taskDisplayArea, tx);
                             final SurfaceControl leash = topActivity.getFixedRotationLeash();
                             if (leash != null) {
                                 tx.setLayer(leash, topActivity.getLastLayer());

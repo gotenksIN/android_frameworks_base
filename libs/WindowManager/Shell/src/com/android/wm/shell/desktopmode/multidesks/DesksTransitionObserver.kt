@@ -101,6 +101,7 @@ class DesksTransitionObserver(
                 //  visible, such as when dismissing from Overview.
                 val deskId = deskTransition.deskId
                 val displayId = deskTransition.displayId
+                deskTransition.runOnTransitEnd?.invoke()
                 desktopRepository.removeDesk(deskTransition.deskId)
                 deskTransition.onDeskRemovedListener?.onDeskRemoved(displayId, deskId)
             }
@@ -181,16 +182,6 @@ class DesksTransitionObserver(
             if (isDeskChange) {
                 deskChangeFound = true
                 continue
-            }
-            val taskId = change.taskInfo?.taskId ?: continue
-            val removedFromDesk =
-                desktopRepository.getDeskIdForTask(taskId) == deskTransition.deskId &&
-                    desksOrganizer.getDeskAtEnd(change) == null
-            if (removedFromDesk) {
-                desktopRepository.removeTaskFromDesk(
-                    deskId = deskTransition.deskId,
-                    taskId = taskId,
-                )
             }
         }
         // Always deactivate even if there's no change that confirms the desk was

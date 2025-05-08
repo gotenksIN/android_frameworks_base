@@ -1215,7 +1215,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // Need to update layers on involved displays since they were all paused while
         // the animation played. This puts the layers back into the correct order.
         for (int i = participantDisplays.length - 1; i >= 0; --i) {
-            assignLayers(participantDisplays[i], t);
+            assignLayersForFinishTransaction(participantDisplays[i], t);
         }
 
         for (int i = 0; i < info.getRootCount(); ++i) {
@@ -1223,13 +1223,27 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
     }
 
-    /** Assigns the layers for the start or end state of transition. */
-    static void assignLayers(WindowContainer<?> wc, SurfaceControl.Transaction t) {
+    /** Assigns the layers for the start state of the transition. */
+    static void assignLayersForStartTransaction(WindowContainer<?> wc,
+            SurfaceControl.Transaction t) {
+        wc.mTransitionController.mBuildingTransitionLayers = true;
+        try {
+            wc.assignChildLayers(t);
+        } finally {
+            wc.mTransitionController.mBuildingTransitionLayers = false;
+        }
+    }
+
+    /** Assigns the layers for the end state of transition. */
+    static void assignLayersForFinishTransaction(WindowContainer<?> wc,
+            SurfaceControl.Transaction t) {
+        wc.mTransitionController.mBuildingTransitionLayers = true;
         wc.mTransitionController.mBuildingFinishLayers = true;
         try {
             wc.assignChildLayers(t);
         } finally {
             wc.mTransitionController.mBuildingFinishLayers = false;
+            wc.mTransitionController.mBuildingTransitionLayers = false;
         }
     }
 
@@ -3017,7 +3031,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             rootLeash.setUnreleasedWarningCallSite("Transition.calculateTransitionRoots");
             // Update layers to start transaction because we prevent assignment during collect, so
             // the layer of transition root can be correct.
-            assignLayers(dc, startT);
+            assignLayersForStartTransaction(dc, startT);
             startT.setLayer(rootLeash, leashReference.getLastLayer());
             outInfo.addRootLeash(endDisplayId, rootLeash,
                     ancestor.getBounds().left, ancestor.getBounds().top);
@@ -3898,7 +3912,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (!mController.useFullReadyTracking()) {
             Slog.e(TAG, "#" + mSyncId + " readiness timeout, used=" + mReadyTrackerOld.mUsed
                     + " deferReadyDepth=" + mReadyTrackerOld.mDeferReadyDepth
-                    + " group=" + mReadyTrackerOld.mReadyGroups);
+                    + " group=" + mReadyTrackerOld.mReadyGroups
+                    + " state=" + mState);
         } else {
             Slog.e(TAG, "#" + mSyncId + " met conditions: " + mReadyTracker.mMet);
             Slog.e(TAG, "#" + mSyncId + " unmet conditions: " + mReadyTracker.mConditions);

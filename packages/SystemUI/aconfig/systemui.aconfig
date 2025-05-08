@@ -216,16 +216,6 @@ flag {
 }
 
 flag {
-   name: "pss_app_selector_recents_split_screen"
-   namespace: "systemui"
-   description: "Allows recent apps selected for partial screenshare to be launched in split screen mode"
-   bug: "320449039"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
     name: "notifications_background_icons"
     namespace: "systemui"
     description: "Moves part of the notification icon updates to the background."
@@ -357,16 +347,6 @@ flag {
    namespace: "systemui"
    description: "Use the new tiles in the Quick Settings that are still under development. This flag will not be used to gate release but to prevent tiles under development from reaching teamfood."
    bug: "311147395"
-}
-
-flag {
-  name: "qs_quick_rebind_active_tiles"
-  namespace: "systemui"
-  description: "Rebind active custom tiles quickly."
-  bug: "362526228"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -1624,16 +1604,6 @@ flag {
 }
 
 flag {
-   name: "show_toast_when_app_control_brightness"
-   namespace: "systemui"
-   description: "Showing the warning toast if the current running app window has controlled the brightness value."
-   bug: "363225340"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
   name: "home_controls_dream_hsum"
   namespace: "systemui"
   description: "Enables the home controls dream in HSUM"
@@ -1711,6 +1681,17 @@ flag {
   description: "Updates the fonts of the shade header"
   bug: "393609960"
   is_fixed_read_only: true
+}
+
+flag {
+  name: "shade_header_blur_font_color"
+  namespace: "systemui"
+  description: "Updates the font colors of the shade header for blur"
+  bug: "393609960"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -2002,16 +1983,6 @@ flag {
 }
 
 flag {
-    name: "app_shortcut_removal_fix"
-    namespace: "systemui"
-    description: "During custom app shortcut removal, use custom shortcut command as key to find the right InputGestureData to be deleted"
-    bug: "405058325"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "skip_cancelling_huns_for_guts"
    namespace: "systemui"
    description: "Do not cancel HUNs when GUTs are exposed"
@@ -2078,4 +2049,24 @@ flag {
     namespace: "systemui"
     description: "Enables the UI for the suggested devices feature."
     bug: "411452237"
+}
+
+flag {
+    name: "enable_top_ui_controller"
+    namespace: "systemui"
+    description: "Extracts top ui requests into TopUiController"
+    bug: "411061512"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "qs_tile_transition_interaction_refinement"
+    namespace: "systemui"
+    description: "Allowing Click Events for Quick Setting Tile while QS dialog is collapsing. This Flag also prevents QS Tile from Dismissal when it is tapped during launch "
+    bug: "358291064"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

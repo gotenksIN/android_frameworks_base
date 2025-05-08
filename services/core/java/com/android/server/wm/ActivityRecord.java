@@ -725,7 +725,7 @@ public final class ActivityRecord extends WindowToken {
     long mInputDispatchingTimeoutMillis = DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 
     private boolean mShowWhenLocked;
-    private boolean mInheritShownWhenLocked;
+    private boolean mInheritShowWhenLocked;
     private boolean mTurnScreenOn;
 
     /**
@@ -1920,7 +1920,7 @@ public final class ActivityRecord extends WindowToken {
         mRotationAnimationHint = info.rotationAnimation;
 
         mShowWhenLocked = (aInfo.flags & ActivityInfo.FLAG_SHOW_WHEN_LOCKED) != 0;
-        mInheritShownWhenLocked = (aInfo.privateFlags & FLAG_INHERIT_SHOW_WHEN_LOCKED) != 0;
+        mInheritShowWhenLocked = (aInfo.privateFlags & FLAG_INHERIT_SHOW_WHEN_LOCKED) != 0;
         mTurnScreenOn = (aInfo.flags & FLAG_TURN_SCREEN_ON) != 0;
 
         int realTheme = info.getThemeResource();
@@ -2658,7 +2658,6 @@ public final class ActivityRecord extends WindowToken {
         removeTransferSplashScreenTimeout();
         // Client has draw the splash screen, so we can remove the starting window.
         if (mStartingWindow != null) {
-            mStartingWindow.cancelAnimation();
             mStartingWindow.hide(false, false);
         }
         // no matter what, remove the starting window.
@@ -4565,6 +4564,10 @@ public final class ActivityRecord extends WindowToken {
                 return false;
             }
 
+            if (fromActivity.mTransferringSplashScreenState != TRANSFER_SPLASH_SCREEN_IDLE) {
+                return false;
+            }
+
             // If another activity above the activity which has starting window, allows to steal the
             // starting window if the above activity isn't drawn.
             if (task.getChildCount() >= 3
@@ -4765,13 +4768,25 @@ public final class ActivityRecord extends WindowToken {
     }
 
     void setShowWhenLocked(boolean showWhenLocked) {
+        final boolean changed = (mShowWhenLocked != showWhenLocked);
         mShowWhenLocked = showWhenLocked;
-        mAtmService.mRootWindowContainer.ensureActivitiesVisible();
+
+        if (!Flags.fixShowWhenLockedSyncTimeout()) {
+            mAtmService.mRootWindowContainer.ensureActivitiesVisible();
+        } else if (changed) {
+            mDisplayContent.notifyKeyguardFlagsChanged();
+        }
     }
 
     void setInheritShowWhenLocked(boolean inheritShowWhenLocked) {
-        mInheritShownWhenLocked = inheritShowWhenLocked;
-        mAtmService.mRootWindowContainer.ensureActivitiesVisible();
+        final boolean changed = (mInheritShowWhenLocked != inheritShowWhenLocked);
+        mInheritShowWhenLocked = inheritShowWhenLocked;
+
+        if (!Flags.fixShowWhenLockedSyncTimeout()) {
+            mAtmService.mRootWindowContainer.ensureActivitiesVisible();
+        } else if (changed) {
+            mDisplayContent.notifyKeyguardFlagsChanged();
+        }
     }
 
     /**
@@ -4780,7 +4795,7 @@ public final class ActivityRecord extends WindowToken {
      *         contains windows that have {@link LayoutParams#FLAG_SHOW_WHEN_LOCKED} set or if the
      *         activity has set {@link #mShowWhenLocked}, or if its user
      *         is {@link #mIsUserAlwaysVisible always-visible} or b) if the activity has set
-     *         {@link #mInheritShownWhenLocked} and the activity behind this satisfies the
+     *         {@link #mInheritShowWhenLocked} and the activity behind this satisfies the
      *         conditions a) above.
      *         Multi-windowing mode will be exited if {@code true} is returned.
      */
@@ -4790,7 +4805,7 @@ public final class ActivityRecord extends WindowToken {
         }
         if (canShowWhenLockedInner(r)) {
             return true;
-        } else if (r.mInheritShownWhenLocked) {
+        } else if (r.mInheritShowWhenLocked) {
             final ActivityRecord activity = r.getTaskFragment().getActivityBelow(r);
             return activity != null && canShowWhenLockedInner(activity);
         } else {
@@ -7933,6 +7948,15 @@ public final class ActivityRecord extends WindowToken {
     }
 
     /**
+     * Return {@code true} always since the activity is always filling parent bounds. The override
+     * is done because if the activity is letterboxed, the bounds may exclude the letterbox size.
+     */
+    @Override
+    boolean fillsParentBounds() {
+        return true;
+    }
+
+     /**
      * Returns whether activity bounds are letterboxed and are sandboxed to within the safe region
      * bounds.
      */

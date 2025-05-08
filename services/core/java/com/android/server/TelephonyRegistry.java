@@ -4589,10 +4589,6 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
      * TODO: b/337878785 for longterm fix
      */
     boolean idMatchRelaxed(Record r, int subId, int phoneId) {
-        if (!Flags.useRelaxedIdMatch()) {
-            return idMatch(r, subId, phoneId);
-        }
-
         if (subId < 0) {
             // Invalid case, we need compare phoneId.
             // If the record does not have a valid phone Id send phone 0 notifications.

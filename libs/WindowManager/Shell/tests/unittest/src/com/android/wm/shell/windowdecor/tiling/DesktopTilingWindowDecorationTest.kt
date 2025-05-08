@@ -83,7 +83,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
     private val displayController: DisplayController = mock()
     private val displayId: Int = 0
-
+    private val deskId: Int = 0
     private val rootTdaOrganizer: RootTaskDisplayAreaOrganizer = mock()
 
     private val transitions: Transitions = mock()
@@ -137,6 +137,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
                 displayController,
                 taskResourceLoader,
                 displayId,
+                deskId,
                 rootTdaOrganizer,
                 transitions,
                 shellTaskOrganizer,
@@ -161,6 +162,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             (i.arguments.first() as Rect).set(stableBounds)
         }
         whenever(context.resources).thenReturn(resources)
+        whenever(displayController.getDisplayContext(any())).thenReturn(context)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
 
         tilingDecoration.onAppTiled(
@@ -168,6 +170,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
 
         verify(toggleResizeDesktopTaskTransitionHandler)
@@ -189,6 +192,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             (i.arguments.first() as Rect).set(stableBounds)
         }
         whenever(context.resources).thenReturn(resources)
+        whenever(displayController.getDisplayContext(any())).thenReturn(context)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
 
         tilingDecoration.onAppTiled(
@@ -196,6 +200,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
 
         verify(toggleResizeDesktopTaskTransitionHandler)
@@ -212,6 +217,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         val task1 = createVisibleTask()
         val stableBounds = STABLE_BOUNDS_MOCK
         whenever(displayController.getDisplayLayout(any())).thenReturn(displayLayout)
+        whenever(displayController.getDisplayContext(any())).thenReturn(context)
         whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
             (i.arguments.first() as Rect).set(stableBounds)
         }
@@ -224,6 +230,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         task1.configuration.windowConfiguration.setBounds(getLeftTaskBounds())
         tilingDecoration.onAppTiled(
@@ -231,6 +238,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             NON_STABLE_BOUNDS_MOCK,
+            destinationBoundsOverride = null,
         )
 
         verify(toggleResizeDesktopTaskTransitionHandler, times(1))
@@ -260,6 +268,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
 
         assertThat(tilingDecoration.moveTiledPairToFront(task2.taskId, false)).isFalse()
@@ -284,12 +293,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
 
         assertThat(tilingDecoration.moveTiledPairToFront(task3.taskId, false)).isFalse()
@@ -315,12 +326,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         verify(toggleResizeDesktopTaskTransitionHandler, times(2))
             .startTransition(capture(wctCaptor), any(), capture(callbackCaptor))
@@ -350,12 +363,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         task1.isFocused = true
         task3.isFocused = true
@@ -386,12 +401,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         verify(toggleResizeDesktopTaskTransitionHandler, times(2))
             .startTransition(capture(wctCaptor), any(), capture(callbackCaptor))
@@ -429,12 +446,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
 
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
@@ -496,12 +515,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
         tilingDecoration.rightTaskResizingHelper = tiledTaskHelper
@@ -550,6 +571,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
 
@@ -579,6 +601,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
         val changeInfo = createPipChangeTransition(task1)
@@ -670,6 +693,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
 
@@ -699,12 +723,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
         tilingDecoration.rightTaskResizingHelper = tiledTaskHelper
@@ -731,21 +757,21 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
         whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
-
         tilingDecoration.onAppTiled(
             task1,
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
 
-        verify(desktopRepository, times(1)).addLeftTiledTask(displayId, task1.taskId)
-        verify(desktopRepository, never()).addRightTiledTask(displayId, task1.taskId)
+        verify(desktopRepository, times(1)).addLeftTiledTaskToDesk(displayId, task1.taskId, deskId)
+        verify(desktopRepository, never()).addRightTiledTaskToDesk(displayId, task1.taskId, deskId)
 
         tilingDecoration.removeTaskIfTiled(task1.taskId)
 
-        verify(desktopRepository, times(1)).removeLeftTiledTask(displayId)
-        verify(desktopRepository, never()).removeRightTiledTask(displayId)
+        verify(desktopRepository, times(1)).removeLeftTiledTaskFromDesk(displayId, deskId)
+        verify(desktopRepository, never()).removeRightTiledTaskFromDesk(displayId, deskId)
     }
 
     @Test
@@ -766,15 +792,16 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             desktopWindowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
+            destinationBoundsOverride = null,
         )
 
-        verify(desktopRepository, times(1)).addRightTiledTask(displayId, task1.taskId)
-        verify(desktopRepository, never()).addLeftTiledTask(displayId, task1.taskId)
+        verify(desktopRepository, times(1)).addRightTiledTaskToDesk(displayId, task1.taskId, deskId)
+        verify(desktopRepository, never()).addLeftTiledTaskToDesk(displayId, task1.taskId, deskId)
 
         tilingDecoration.removeTaskIfTiled(task1.taskId)
 
-        verify(desktopRepository, times(1)).removeRightTiledTask(displayId)
-        verify(desktopRepository, never()).removeLeftTiledTask(displayId)
+        verify(desktopRepository, times(1)).removeRightTiledTaskFromDesk(displayId, deskId)
+        verify(desktopRepository, never()).removeLeftTiledTaskFromDesk(displayId, deskId)
     }
 
     private fun initTiledTaskHelperMock(taskInfo: ActivityManager.RunningTaskInfo) {

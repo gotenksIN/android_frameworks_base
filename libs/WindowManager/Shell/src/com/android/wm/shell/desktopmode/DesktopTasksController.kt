@@ -335,7 +335,6 @@ class DesktopTasksController(
                         RecentsTransitionStateListener.stateToString(state),
                     )
                     recentsTransitionState = state
-                    snapEventHandler.onOverviewAnimationStateChange(state)
                 }
             }
         )
@@ -498,8 +497,11 @@ class DesktopTasksController(
             returnToApp,
             activeDeskIdOnRecentsStart,
         )
+
         if (returnToApp) {
-            // Returning to the same desk, nothing to do.
+            // Returning to the same desk, notify the snap event handler of recents animation
+            // ending to the same desk.
+            snapEventHandler.onRecentsAnimationEndedToSameDesk()
             return
         }
         if (
@@ -692,6 +694,7 @@ class DesktopTasksController(
                                 deskId = deskId,
                                 tasks = emptySet(),
                                 onDeskRemovedListener = onDeskRemovedListener,
+                                runOnTransitEnd = { snapEventHandler.onDeskRemoved(deskId) },
                             )
                         )
                     } else {
@@ -739,6 +742,7 @@ class DesktopTasksController(
                             deskId = deskId,
                             tasks = emptySet(),
                             onDeskRemovedListener = onDeskRemovedListener,
+                            runOnTransitEnd = { snapEventHandler.onDeskRemoved(deskId) },
                         )
                     )
                     desksTransitionObserver.addPendingTransition(
@@ -1676,14 +1680,15 @@ class DesktopTasksController(
         val bounds = calculateDefaultDesktopTaskBounds(displayLayout)
         val deskId = getOrCreateDefaultDeskId(displayId) ?: return
         if (DesktopModeFlags.ENABLE_CASCADING_WINDOWS.isTrue) {
-            cascadeWindow(bounds, displayLayout, deskId)
+            val stableBounds = Rect().apply { displayLayout.getStableBounds(this) }
+            cascadeWindow(bounds, displayLayout, deskId, stableBounds)
         }
         val pendingIntent =
             PendingIntent.getActivityAsUser(
                 context,
                 /* requestCode= */ 0,
                 intent,
-                PendingIntent.FLAG_IMMUTABLE,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT,
                 /* options= */ null,
                 UserHandle.of(userId),
             )
@@ -2740,7 +2745,7 @@ class DesktopTasksController(
                 context,
                 /* requestCode= */ 0,
                 fillIn,
-                PendingIntent.FLAG_IMMUTABLE,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT,
                 /* options= */ null,
                 userHandle,
             )
@@ -2949,8 +2954,9 @@ class DesktopTasksController(
         ) {
             val displayLayout = displayController.getDisplayLayout(task.displayId)
             if (displayLayout != null) {
+                val stableBounds = Rect().apply { displayLayout.getStableBounds(this) }
                 val initialBounds = Rect(task.configuration.windowConfiguration.bounds)
-                cascadeWindow(initialBounds, displayLayout, deskId)
+                cascadeWindow(initialBounds, displayLayout, deskId, stableBounds)
                 wct.setBounds(task.token, initialBounds)
             }
         }
@@ -3430,9 +3436,15 @@ class DesktopTasksController(
         )
     }
 
-    private fun cascadeWindow(bounds: Rect, displayLayout: DisplayLayout, deskId: Int) {
-        val stableBounds = Rect()
-        displayLayout.getStableBoundsForDesktopMode(stableBounds)
+    private fun cascadeWindow(
+        bounds: Rect,
+        displayLayout: DisplayLayout,
+        deskId: Int,
+        stableBounds: Rect = Rect(),
+    ) {
+        if (stableBounds.isEmpty) {
+            displayLayout.getStableBoundsForDesktopMode(stableBounds)
+        }
 
         val activeTasks = taskRepository.getExpandedTasksIdsInDeskOrdered(deskId)
         activeTasks
@@ -3948,6 +3960,7 @@ class DesktopTasksController(
                     deskId = deskId,
                     tasks = tasksToRemove,
                     onDeskRemovedListener = onDeskRemovedListener,
+                    runOnTransitEnd = { snapEventHandler.onDeskRemoved(deskId) },
                 )
             )
         }

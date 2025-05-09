@@ -24,7 +24,6 @@
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 package com.android.keyguard;
 
-import static com.android.systemui.Flags.simPinUseSlotId;
 import static com.android.keyguard.logging.CarrierTextManagerLogger.REASON_ACTIVE_DATA_SUB_CHANGED;
 import static com.android.keyguard.logging.CarrierTextManagerLogger.REASON_ON_TELEPHONY_CAPABLE;
 import static com.android.keyguard.logging.CarrierTextManagerLogger.REASON_REFRESH_CARRIER_INFO;
@@ -407,8 +406,7 @@ public class CarrierTextManager {
             carrierNames[i] = "";
             subsIds[i] = subId;
             subOrderBySlot[slotId] = i;
-            int simState = simPinUseSlotId() ? mKeyguardUpdateMonitor.getSimStateForSlotId(slotId)
-                    :  mKeyguardUpdateMonitor.getSimState(subId);
+            int simState = mKeyguardUpdateMonitor.getSimStateForSlotId(slotId);
             CharSequence carrierName = subs.get(i).getCarrierName();
 // QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
             if (showCustomizeName) {

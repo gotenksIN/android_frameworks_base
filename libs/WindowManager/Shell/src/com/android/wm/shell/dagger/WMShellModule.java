@@ -1182,11 +1182,12 @@ public abstract class WMShellModule {
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             MultiDisplayDragMoveIndicatorSurface.Factory
                 multiDisplayDragMoveIndicatorSurfaceFactory,
-            @ShellDesktopThread ShellExecutor desktopExecutor
+            @ShellDesktopThread ShellExecutor desktopExecutor,
+            DesktopState desktopState
     ) {
         return new MultiDisplayDragMoveIndicatorController(
                 displayController, rootTaskDisplayAreaOrganizer,
-                multiDisplayDragMoveIndicatorSurfaceFactory, desktopExecutor);
+                multiDisplayDragMoveIndicatorSurfaceFactory, desktopExecutor, desktopState);
     }
 
     @WMSingleton
@@ -1386,6 +1387,7 @@ public abstract class WMShellModule {
             Optional<DesktopMixedTransitionHandler> desktopMixedTransitionHandler,
             Optional<BackAnimationController> backAnimationController,
             DesksOrganizer desksOrganizer,
+            Transitions transitions,
             DesktopState desktopState,
             ShellInit shellInit) {
         return desktopUserRepositories.flatMap(
@@ -1396,6 +1398,7 @@ public abstract class WMShellModule {
                                         desktopMixedTransitionHandler.get(),
                                         backAnimationController.get(),
                                         desksOrganizer,
+                                        transitions,
                                         desktopState,
                                         shellInit)));
     }

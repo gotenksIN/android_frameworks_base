@@ -213,10 +213,16 @@ class TransitionController {
     final SparseArray<ArrayList<Task>> mLatestOnTopTasksReported = new SparseArray<>();
 
     /**
-     * `true` when building surface layer order for the finish transaction. We want to prevent
+     * `true` when building surface layer order for the start/finish transaction. We want to prevent
      * wm from touching z-order of surfaces during transitions, but we still need to be able to
-     * calculate the layers for the finishTransaction. So, when assigning layers into the finish
-     * transaction, set this to true so that the {@link canAssignLayers} will allow it.
+     * calculate the layers. So, when assigning layers into the start/finish transaction, set this
+     * to true so that the {@link canAssignLayers} will allow it.
+     */
+    boolean mBuildingTransitionLayers = false;
+
+    /**
+     * `true` when building surface layer order for the finish transaction. We use this to
+     * force-assign layers to the finish transaction {@link WindowContainer#assignLayer()}.
      */
     boolean mBuildingFinishLayers = false;
 
@@ -686,7 +692,7 @@ class TransitionController {
     boolean canAssignLayers(@NonNull WindowContainer wc) {
         // Don't build window state into finish transaction in case another window is added or
         // removed during transition playing.
-        if (mBuildingFinishLayers) {
+        if (mBuildingTransitionLayers) {
             return wc.asWindowState() == null;
         }
         // Always allow WindowState to assign layers since it won't affect transition.
@@ -1180,7 +1186,7 @@ class TransitionController {
             // to report it as a no-op.
             ProtoLog.w(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN,
                     "Formerly queued #%d force-reported as no-op", queued.mTransition.getSyncId());
-            queued.mTransition.setAllReady();
+            queued.mTransition.playNow();
         } else {
             // Post this so that the now-playing transition logic isn't interrupted.
             mAtm.mH.post(() -> {

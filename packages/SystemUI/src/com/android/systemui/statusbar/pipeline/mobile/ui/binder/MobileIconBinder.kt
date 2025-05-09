@@ -45,6 +45,7 @@ import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.StatusBarIconView.STATE_HIDDEN
+import com.android.systemui.statusbar.core.NewStatusBarIcons
 // QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 import com.android.systemui.statusbar.phone.StatusBarLocation
 // QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
@@ -79,6 +80,7 @@ object MobileIconBinder {
         val mobileDrawable = SignalDrawable(view.context)
         val roamingView = view.requireViewById<ImageView>(R.id.mobile_roaming)
         val roamingSpace = view.requireViewById<Space>(R.id.mobile_roaming_space)
+        val endSideRoamingView = view.requireViewById<ImageView>(R.id.mobile_roaming_updated)
         val dotView = view.requireViewById<StatusBarIconView>(R.id.status_bar_dot)
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
         val volteView = view.requireViewById<ImageView>(R.id.mobile_volte)
@@ -211,8 +213,12 @@ object MobileIconBinder {
                     // Set the roaming indicator
                     launch {
                         viewModel.roaming.distinctUntilChanged().collect { isRoaming ->
-                            roamingView.isVisible = isRoaming
-                            roamingSpace.isVisible = isRoaming
+                            if (NewStatusBarIcons.isEnabled) {
+                                endSideRoamingView.isVisible = isRoaming
+                            } else {
+                                roamingView.isVisible = isRoaming
+                                roamingSpace.isVisible = isRoaming
+                            }
                         }
                     }
                     if (statusBarStaticInoutIndicators()) {
@@ -255,6 +261,7 @@ object MobileIconBinder {
                                 networkTypeView.imageTintList = tint
                             }
                             roamingView.imageTintList = tint
+                            endSideRoamingView.imageTintList = tint
                             activityIn.imageTintList = tint
                             activityOut.imageTintList = tint
                             dotView.setDecorColor(colors.tint)

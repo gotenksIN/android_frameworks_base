@@ -265,18 +265,13 @@ public abstract class InfoMediaManager {
             userHandle = android.os.Process.myUserHandle();
         }
 
-        if (Flags.useMediaRouter2ForInfoMediaManager()) {
-            try {
-                return new RouterInfoMediaManager(
-                        context, packageName, userHandle, localBluetoothManager, mediaController);
-            } catch (PackageNotAvailableException ex) {
-                // TODO: b/293578081 - Propagate this exception to callers for proper handling.
-                Log.w(TAG, "Returning a no-op InfoMediaManager for package " + packageName);
-                return new NoOpInfoMediaManager(
-                        context, packageName, userHandle, localBluetoothManager, mediaController);
-            }
-        } else {
-            return new ManagerInfoMediaManager(
+        try {
+            return new RouterInfoMediaManager(
+                    context, packageName, userHandle, localBluetoothManager, mediaController);
+        } catch (PackageNotAvailableException ex) {
+            // TODO: b/293578081 - Propagate this exception to callers for proper handling.
+            Log.w(TAG, "Returning a no-op InfoMediaManager for package " + packageName);
+            return new NoOpInfoMediaManager(
                     context, packageName, userHandle, localBluetoothManager, mediaController);
         }
     }
@@ -592,9 +587,13 @@ public abstract class InfoMediaManager {
 
         final List<MediaDevice> deviceList = new ArrayList<>();
         for (MediaRoute2Info route : getSelectableRoutes(info)) {
-            deviceList.add(
-                    new InfoMediaDevice(
-                            mContext, route, mPreferenceItemMap.get(route.getId())));
+            if (com.android.media.flags.Flags.enableOutputSwitcherPersonalAudioSharing()) {
+                deviceList.add(createMediaDeviceFromRoute(route));
+            } else {
+                deviceList.add(
+                        new InfoMediaDevice(
+                                mContext, route, mPreferenceItemMap.get(route.getId())));
+            }
         }
         return deviceList;
     }
@@ -609,8 +608,13 @@ public abstract class InfoMediaManager {
 
         final List<MediaDevice> deviceList = new ArrayList<>();
         for (MediaRoute2Info route : getTransferableRoutes(info)) {
-            deviceList.add(
-                    new InfoMediaDevice(mContext, route, mPreferenceItemMap.get(route.getId())));
+            if (com.android.media.flags.Flags.enableOutputSwitcherPersonalAudioSharing()) {
+                deviceList.add(createMediaDeviceFromRoute(route));
+            } else {
+                deviceList.add(
+                        new InfoMediaDevice(
+                                mContext, route, mPreferenceItemMap.get(route.getId())));
+            }
         }
         return deviceList;
     }
@@ -625,9 +629,13 @@ public abstract class InfoMediaManager {
 
         final List<MediaDevice> deviceList = new ArrayList<>();
         for (MediaRoute2Info route : getDeselectableRoutes(info)) {
-            deviceList.add(
-                    new InfoMediaDevice(
-                            mContext, route, mPreferenceItemMap.get(route.getId())));
+            if (com.android.media.flags.Flags.enableOutputSwitcherPersonalAudioSharing()) {
+                deviceList.add(createMediaDeviceFromRoute(route));
+            } else {
+                deviceList.add(
+                        new InfoMediaDevice(
+                                mContext, route, mPreferenceItemMap.get(route.getId())));
+            }
             Log.d(TAG, route.getName() + " is deselectable for " + mPackageName);
         }
         return deviceList;
@@ -643,9 +651,13 @@ public abstract class InfoMediaManager {
 
         final List<MediaDevice> deviceList = new ArrayList<>();
         for (MediaRoute2Info route : getSelectedRoutes(info)) {
-            deviceList.add(
-                    new InfoMediaDevice(
-                            mContext, route, mPreferenceItemMap.get(route.getId())));
+            if (com.android.media.flags.Flags.enableOutputSwitcherPersonalAudioSharing()) {
+                deviceList.add(createMediaDeviceFromRoute(route));
+            } else {
+                deviceList.add(
+                        new InfoMediaDevice(
+                                mContext, route, mPreferenceItemMap.get(route.getId())));
+            }
         }
         return deviceList;
     }
@@ -906,6 +918,17 @@ public abstract class InfoMediaManager {
     @SuppressWarnings("NewApi")
     @VisibleForTesting
     void addMediaDevice(@NonNull MediaRoute2Info route, @NonNull RoutingSessionInfo activeSession) {
+        MediaDevice mediaDevice = createMediaDeviceFromRoute(route);
+        if (mediaDevice != null) {
+            if (activeSession.getSelectedRoutes().contains(route.getId())) {
+                setDeviceState(mediaDevice, STATE_SELECTED);
+            }
+            mMediaDevices.add(mediaDevice);
+        }
+    }
+
+    @Nullable
+    private MediaDevice createMediaDeviceFromRoute(@NonNull MediaRoute2Info route) {
         final int deviceType = route.getType();
         MediaDevice mediaDevice = null;
         if (isInfoMediaDevice(deviceType)) {
@@ -939,14 +962,10 @@ public abstract class InfoMediaManager {
                     new ComplexMediaDevice(mContext, route, mPreferenceItemMap.get(route.getId()));
 
         } else {
-            Log.w(TAG, "addMediaDevice() unknown device type : " + deviceType);
+            Log.w(TAG, "createRouteToMediaDevice() unknown device type : " + deviceType);
         }
-        if (mediaDevice != null) {
-            if (activeSession.getSelectedRoutes().contains(route.getId())) {
-                setDeviceState(mediaDevice, STATE_SELECTED);
-            }
-            mMediaDevices.add(mediaDevice);
-        }
+
+        return mediaDevice;
     }
 
     /** Updates the state of the device and updates liteners of the updated device state. */

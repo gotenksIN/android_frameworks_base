@@ -2388,6 +2388,7 @@
   <java-symbol type="string" name="config_dreamsDefaultComponent" />
   <java-symbol type="bool" name="config_dreamsDisabledByAmbientModeSuppressionConfig" />
   <java-symbol type="bool" name="config_dreamsOnlyEnabledForDockUser" />
+  <java-symbol type="bool" name="config_onlyDreamWhenWirelessChargingDefault" />
   <java-symbol type="integer" name="config_dreamOpenAnimationDuration" />
   <java-symbol type="integer" name="config_dreamCloseAnimationDuration" />
   <java-symbol type="array" name="config_supportedDreamComplications" />
@@ -5495,6 +5496,7 @@
 
   <java-symbol type="integer" name="config_maximumDelayTimeToDeactivateDataCall" />
   <java-symbol type="bool" name="config_batteryStatsResetOnUnplugHighBatteryLevel" />
+  <java-symbol type="integer" name="config_batteryStatsHighBatteryLevelAfterCharge" />
   <java-symbol type="bool" name="config_batteryStatsResetOnUnplugAfterSignificantCharge" />
   <java-symbol type="string" name="config_powerStatsThrottlePeriods" />
   <java-symbol type="integer" name="config_powerStatsAggregationPeriod" />
@@ -5502,6 +5504,8 @@
   <java-symbol type="integer" name="config_accumulatedBatteryUsageStatsSpanSize" />
   <java-symbol type="integer" name="config_batteryHistoryStorageSize" />
   <java-symbol type="integer" name="config_batteryHistoryDumpWindowSize" />
+  <java-symbol type="integer" name="config_batteryHistoryDumpCheckinWindowSize" />
+  <java-symbol type="integer" name="config_batteryHistoryDumpRealCheckinWindowSize" />
 
   <!--Dynamic Tokens-->
   <java-symbol name="system_accent1_0_light" type="color"/>

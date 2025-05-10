@@ -655,6 +655,9 @@ public class CameraDeviceImpl extends CameraDevice
                     "any output streams");
         }
 
+        if (!checkSurfaceSizesCompatible(outputs)) {
+            return false;
+        }
         checkInputConfiguration(inputConfig);
 
         boolean success = false;
@@ -1922,6 +1925,22 @@ public class CameraDeviceImpl extends CameraDevice
     }
 
 // QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
+    private boolean checkSurfaceSizesCompatible(List<OutputConfiguration> outputConfigs) {
+        for (OutputConfiguration outputConfig : outputConfigs) {
+            Size configuredSize = outputConfig.getConfiguredSize();
+            for (Surface surface : outputConfig.getSurfaces()) {
+                Size surfaceSize = SurfaceUtils.getSurfaceSize(surface);
+                if (!surfaceSize.equals(configuredSize)) {
+                    Log.e(TAG, "Surface size not compatible with " +
+                            " outputConfiguration, configured size " + configuredSize +
+                            " surface size " + surfaceSize);
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private void checkInputConfiguration(InputConfiguration inputConfig) {
         if (inputConfig == null) {
             return;

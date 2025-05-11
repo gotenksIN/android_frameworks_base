@@ -246,6 +246,20 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     }
 
     @Test
+    fun testCreateDesk_warmUpInProgress_appliesCallback() = runTest {
+        val freeformRoot = createFreeformTask().apply { parentTaskId = -1 }
+        var callbackApplied = false
+
+        organizer.warmUpDefaultDesk(userId = PRIMARY_USER_ID, displayId = DEFAULT_DISPLAY)
+        organizer.createDesk(userId = PRIMARY_USER_ID, displayId = DEFAULT_DISPLAY) { _ ->
+            callbackApplied = true
+        }
+        organizer.onTaskAppeared(freeformRoot, SurfaceControl())
+
+        assertThat(callbackApplied).isTrue()
+    }
+
+    @Test
     fun testCreateDesk_twice_warmUpInProgress_usesWarmedUpDeskAndCreatesOne() = runTest {
         val displayId = DEFAULT_DISPLAY
         organizer.warmUpDefaultDesk(userId = PRIMARY_USER_ID, displayId = DEFAULT_DISPLAY)
@@ -477,6 +491,23 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     }
 
     @Test
+    fun testActivateDesk_skipReorder() = runTest {
+        val desk = createDeskSuspending()
+
+        val wct = WindowContainerTransaction()
+        organizer.activateDesk(wct, desk.deskRoot.deskId, skipReorder = true)
+
+        assertThat(
+                wct.hierarchyOps.any { hop ->
+                    hop.type == HierarchyOp.HIERARCHY_OP_TYPE_REORDER &&
+                        hop.toTop &&
+                        hop.container == desk.deskRoot.taskInfo.token.asBinder()
+                }
+            )
+            .isFalse()
+    }
+
+    @Test
     fun testMoveTaskToDesk() = runTest {
         val desk = createDeskSuspending()
 
@@ -630,6 +661,24 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                 }
             )
             .isTrue()
+    }
+
+    @Test
+    fun deactivateDesk_skipReorder() = runTest {
+        val wct = WindowContainerTransaction()
+        val desk = createDeskSuspending()
+        organizer.activateDesk(wct, desk.deskRoot.deskId)
+
+        organizer.deactivateDesk(wct, desk.deskRoot.deskId, skipReorder = true)
+
+        assertThat(
+                wct.hierarchyOps.any { hop ->
+                    hop.type == HIERARCHY_OP_TYPE_REORDER &&
+                        !hop.toTop &&
+                        hop.container == desk.deskRoot.taskInfo.token.asBinder()
+                }
+            )
+            .isFalse()
     }
 
     @Test

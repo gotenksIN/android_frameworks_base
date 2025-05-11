@@ -1615,7 +1615,7 @@ public class DisplayRotation {
     void removeDefaultDisplayRotationChangedCallback() {
         if (DisplayRotationCoordinator.isSecondaryInternalDisplay(mDisplayContent)) {
             mDisplayRotationCoordinator.removeDefaultDisplayRotationChangedCallback(
-                    mDefaultDisplayRotationChangedCallback);
+                    mDisplayContent.getDisplayId(), mDefaultDisplayRotationChangedCallback);
         }
     }
 

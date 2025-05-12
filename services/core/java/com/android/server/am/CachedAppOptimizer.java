@@ -985,7 +985,9 @@ public class CachedAppOptimizer {
 
                     final ProcessCachedOptimizerRecord opt = process.mOptRecord;
                     if (enable && opt.hasFreezerOverride()) {
-                        freezeAppAsyncLSP(process);
+                        if (process.mState.getCurAdj() >= mAm.mConstants.FREEZER_CUTOFF_ADJ) {
+                            freezeAppAsyncLSP(process);
+                        }
                         opt.setFreezerOverride(false);
                     }
 

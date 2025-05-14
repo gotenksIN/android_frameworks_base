@@ -131,7 +131,7 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS),
-    ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS(Flags::enableFreeformDisplayLaunchParams, false,
+    ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS(Flags::enableFreeformDisplayLaunchParams, true,
             Flags.FLAG_ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS),
     ENABLE_INDEPENDENT_BACK_IN_PROJECTED(Flags::enableIndependentBackInProjected, true,
             Flags.FLAG_ENABLE_INDEPENDENT_BACK_IN_PROJECTED),
@@ -145,14 +145,14 @@ public enum DesktopExperienceFlags {
     ENABLE_MULTIDISPLAY_TRACKPAD_BACK_GESTURE(Flags::enableMultidisplayTrackpadBackGesture, true,
             Flags.FLAG_ENABLE_MULTIDISPLAY_TRACKPAD_BACK_GESTURE),
     ENABLE_MULTIPLE_DESKTOPS_ACTIVATION_IN_DESKTOP_FIRST_DISPLAYS(
-            Flags::enableMultipleDesktopsDefaultActivationInDesktopFirstDisplays, true,
+            Flags::enableMultipleDesktopsDefaultActivationInDesktopFirstDisplays, false,
             Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_DEFAULT_ACTIVATION_IN_DESKTOP_FIRST_DISPLAYS),
     ENABLE_MULTIPLE_DESKTOPS_BACKEND(Flags::enableMultipleDesktopsBackend, true,
             Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND),
     ENABLE_MULTIPLE_DESKTOPS_FRONTEND(Flags::enableMultipleDesktopsFrontend, true,
             Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_FRONTEND),
     ENABLE_NESTED_TASKS_WITH_INDEPENDENT_BOUNDS_BUGFIX(
-            Flags::nestedTasksWithIndependentBoundsBugfix, false,
+            Flags::nestedTasksWithIndependentBoundsBugfix, true,
             Flags.FLAG_NESTED_TASKS_WITH_INDEPENDENT_BOUNDS_BUGFIX),
     ENABLE_NON_DEFAULT_DISPLAY_SPLIT(Flags::enableNonDefaultDisplaySplit, true,
             Flags.FLAG_ENABLE_NON_DEFAULT_DISPLAY_SPLIT),
@@ -168,10 +168,13 @@ public enum DesktopExperienceFlags {
     ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE(Flags::enableProjectedDisplayDesktopMode, true,
             Flags.FLAG_ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE),
     ENABLE_REJECT_HOME_TRANSITION(
-            Flags::enableRejectHomeTransition, false,
+            Flags::enableRejectHomeTransition, true,
             Flags.FLAG_ENABLE_REJECT_HOME_TRANSITION),
     ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS(Flags::enableRestartMenuForConnectedDisplays, true,
             Flags.FLAG_ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS),
+    ENABLE_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS(
+            Flags::restrictFreeformHiddenSystemBarsToFillingTasks, false,
+            Flags.FLAG_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS),
     ENABLE_SEE_THROUGH_TASK_FRAGMENTS(Flags::enableSeeThroughTaskFragments,
             true, Flags.FLAG_ENABLE_SEE_THROUGH_TASK_FRAGMENTS),
     ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS(

@@ -288,6 +288,8 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         } else if ((NotificationClassificationUiFlag.isEnabled()
                 || NotificationBundleUi.isEnabled()) && isBundled) {
             mInfoItem = createBundledInfoItem(mContext);
+        } else if (mParent.isBundle()) {
+            mInfoItem = createBundleHeaderInfoItem(mContext);
         } else {
             mInfoItem = createInfoItem(mContext);
         }
@@ -773,6 +775,15 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
                 NotificationMenuItem.OMIT_FROM_SWIPE_MENU);
     }
 
+    static NotificationMenuItem createBundleHeaderInfoItem(Context context) {
+        BundleHeaderGutsContent infoContent = new BundleHeaderGutsContent(context);
+        // TODO(b/409748420): correct infoDescription?
+        String infoDescription =
+                context.getResources().getString(R.string.notification_menu_gear_description);
+        return new NotificationMenuItem(context, infoDescription, infoContent,
+                NotificationMenuItem.OMIT_FROM_SWIPE_MENU);
+    }
+
     static NotificationMenuItem createInfoItem(Context context) {
         Resources res = context.getResources();
         String infoDescription = res.getString(R.string.notification_menu_gear_description);
@@ -923,8 +934,8 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         }
 
         @Override
-        public View getGutsView() {
-            return mGutsContent.getContentView();
+        public GutsContent getGutsContent() {
+            return mGutsContent;
         }
 
         @Override

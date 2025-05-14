@@ -87,16 +87,6 @@ flag {
 }
 
 flag {
-   name: "notification_over_expansion_clipping_fix"
-   namespace: "systemui"
-   description: "Fix NSSL clipping when over-expanding; fixes split shade bug."
-   bug: "288553572"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
     name: "notification_add_x_on_hover_to_dismiss"
     namespace: "systemui"
     description: "Adds an x to notifications which shows up on mouse hover, allowing the user to "
@@ -559,16 +549,6 @@ flag {
 }
 
 flag {
-   name: "faster_unlock_transition"
-   namespace: "systemui"
-   description: "Faster wallpaper unlock transition"
-   bug: "298186160"
-   metadata {
-     purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "confine_notification_touch_to_view_width"
    namespace: "systemui"
    description: "Use notification view width when detecting gestures."
@@ -768,16 +748,6 @@ flag {
    namespace: "systemui"
    description: "Relocate Smartspace to bottom of the Lock Screen"
    bug: "316212788"
-}
-
-flag {
-   name: "smartspace_remoteviews_rendering_fix"
-   namespace: "systemui"
-   description: "Indicate Smartspace RemoteViews rendering"
-   bug: "326292691"
-   metadata {
-     purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1239,6 +1209,16 @@ flag {
 }
 
 flag {
+  name: "dream_transition_fixes"
+  namespace: "systemui"
+  description: "Flags some minor transition fixes for opening the dream"
+  bug: "409720192"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
     name: "dream_overlay_updated_ui"
     namespace: "systemui"
     description: "Flag to enable updated UI for dream overlay"
@@ -1282,16 +1262,6 @@ flag {
   namespace: "systemui"
   description: "Enables media visuals update"
   bug: "379044958"
-}
-
-flag {
-    name: "media_controls_device_manager_background_execution"
-    namespace: "systemui"
-    description: "Sends some instances creation to background thread"
-    bug: "400200474"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

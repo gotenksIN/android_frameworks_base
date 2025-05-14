@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package com.android.wm.shell.functional
+package com.android.systemui.statusbar.chips.ui.viewmodel
 
-import android.platform.test.annotations.Postsubmit
-import android.platform.test.rule.ScreenRecordRule
-import com.android.wm.shell.scenarios.TabTearingDragAndDrop
-import org.junit.runner.RunWith
-import org.junit.runners.BlockJUnit4ClassRunner
+import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChipsModel
 
-/* Functional test for [TabTearingDragAndDrop]. */
-@RunWith(BlockJUnit4ClassRunner::class)
-@Postsubmit
-@ScreenRecordRule.ScreenRecord
-class TabTearingDragAndDropTest : TabTearingDragAndDrop()
+/**
+ * An [OngoingActivityChipsRefiner] takes the entire set of chips produced by the
+ * [OngoingActivityChipsViewModel] and can apply a transform on them to produce a modified set of
+ * chips.
+ */
+interface OngoingActivityChipsRefiner {
+    fun transform(input: MultipleOngoingActivityChipsModel): MultipleOngoingActivityChipsModel
+}

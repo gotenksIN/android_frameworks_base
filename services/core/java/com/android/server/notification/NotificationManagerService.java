@@ -30,7 +30,6 @@ import static android.app.Flags.lifetimeExtensionRefactor;
 import static android.app.Flags.nmSummarization;
 import static android.app.Flags.nmSummarizationUi;
 import static android.app.Flags.notificationClassificationUi;
-import static android.app.Flags.sortSectionByTime;
 import static android.app.Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION;
 import static android.app.Notification.EXTRA_BUILDER_APPLICATION_INFO;
 import static android.app.Notification.EXTRA_LARGE_ICON_BIG;
@@ -9953,10 +9952,8 @@ public class NotificationManagerService extends SystemService {
                         r.isUpdate = true;
                         final boolean isInterruptive = isVisuallyInterruptive(old, r);
                         r.setTextChanged(isInterruptive);
-                        if (sortSectionByTime()) {
-                            if (isInterruptive) {
-                                r.resetRankingTime();
-                            }
+                        if (isInterruptive) {
+                            r.resetRankingTime();
                         }
                     }
 
@@ -10138,26 +10135,14 @@ public class NotificationManagerService extends SystemService {
             return false;
         }
 
-        if (sortSectionByTime()) {
-            // Ignore visual interruptions from FGS/UIJs because users
-            // consider them one 'session'. Count them for everything else.
-            if (r.getSbn().getNotification().isFgsOrUij()) {
-                if (DEBUG_INTERRUPTIVENESS) {
-                    Slog.v(TAG, "INTERRUPTIVENESS: "
-                            + r.getKey() + " is not interruptive: FGS/UIJ");
-                }
-                return false;
+        // Ignore visual interruptions from FGS/UIJs because users
+        // consider them one 'session'. Count them for everything else.
+        if (r.getSbn().getNotification().isFgsOrUij()) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Slog.v(TAG, "INTERRUPTIVENESS: "
+                        + r.getKey() + " is not interruptive: FGS/UIJ");
             }
-        } else {
-            // Ignore visual interruptions from foreground services because users
-            // consider them one 'session'. Count them for everything else.
-            if ((r.getSbn().getNotification().flags & FLAG_FOREGROUND_SERVICE) != 0) {
-                if (DEBUG_INTERRUPTIVENESS) {
-                    Slog.v(TAG, "INTERRUPTIVENESS: "
-                            + r.getKey() + " is not interruptive: foreground service");
-                }
-                return false;
-            }
+            return false;
         }
 
         final String oldTitle = String.valueOf(oldN.extras.get(EXTRA_TITLE));
@@ -13055,32 +13040,56 @@ public class NotificationManagerService extends SystemService {
         }
 
         /**
-         * Fills out {@link BundlePreferences} proto and wraps it in a {@link StatsEvent}.
+         * Fills out {@link NotificationAdjustmentPreferences} proto and wraps it in a
+         * {@link StatsEvent}.
          */
         @FlaggedApi(android.service.notification.Flags.FLAG_NOTIFICATION_CLASSIFICATION)
         protected void pullAdjustmentPreferencesStats(List<StatsEvent> events) {
-            boolean bundlesAllowed = true;
-            synchronized (mLock) {
-                List<String> unsupportedAdjustments = new ArrayList(
-                        mNasUnsupported.getOrDefault(
-                                UserHandle.getUserId(Binder.getCallingUid()),
-                                new HashSet(List.of(mDefaultUnsupportedAdjustments)))
-                );
-                bundlesAllowed = !unsupportedAdjustments.contains(Adjustment.KEY_TYPE);
+            final List<UserInfo> allUsers = mUm.getUsers();
+            for (UserInfo ui : allUsers) {
+                int userId = ui.getUserHandle().getIdentifier();
+
+                boolean bundlesSupported, summariesSupported;
+                synchronized (mLock) {
+                    List<String> unsupportedAdjustments = new ArrayList(
+                            mNasUnsupported.getOrDefault(userId,
+                                    new HashSet(List.of(mDefaultUnsupportedAdjustments)))
+                    );
+                    bundlesSupported = !unsupportedAdjustments.contains(Adjustment.KEY_TYPE);
+                    summariesSupported = !unsupportedAdjustments.contains(
+                            Adjustment.KEY_SUMMARIZATION);
+                }
+
+                if (notificationClassificationUi() && bundlesSupported) {
+                    boolean bundlesAllowed = isAdjustmentAllowed(userId, KEY_TYPE);
+                    int[] allowedBundleTypes = getAllowedClassificationTypes(userId);
+
+                    events.add(FrameworkStatsLog.buildStatsEvent(
+                            NOTIFICATION_ADJUSTMENT_PREFERENCES,
+                            /* optional int32 event_id = 1 */
+                            NotificationPullStatsEvent.NOTIFICATION_BUNDLE_PREFERENCES_PULLED
+                                    .getId(),
+                            /* optional bool adjustment_allowed = 2 */ bundlesAllowed,
+                            /* repeated BundleTypes allowed_bundle_types = 3 */ allowedBundleTypes,
+                            /* optional android.stats.notification.AdjustmentKey key = 4 */
+                            NotificationPullStatsEvent.adjustmentKeyEnum(KEY_TYPE),
+                            /* optional int32 user_id = 5 */ userId));
+                }
+
+                if ((nmSummarization() || nmSummarizationUi()) && summariesSupported) {
+                    boolean summariesAllowed = isAdjustmentAllowed(userId, KEY_SUMMARIZATION);
+                    events.add(FrameworkStatsLog.buildStatsEvent(
+                            NOTIFICATION_ADJUSTMENT_PREFERENCES,
+                            /* optional int32 event_id = 1 */
+                            NotificationPullStatsEvent.NOTIFICATION_SUMMARIZATION_PREFERENCES_PULLED
+                                    .getId(),
+                            /* optional bool adjustment_allowed = 2 */ summariesAllowed,
+                            /* repeated BundleTypes allowed_bundle_types = 3 */ new int[]{},
+                            /* optional android.stats.notification.AdjustmentKey key = 4 */
+                            NotificationPullStatsEvent.adjustmentKeyEnum(KEY_SUMMARIZATION),
+                            /* optional int32 user_id = 5 */ userId));
+                }
             }
-
-            // TODO: b/411465430 - pull info for all users
-            int[] allowedBundleTypes = getAllowedClassificationTypes(UserHandle.getCallingUserId());
-
-            events.add(FrameworkStatsLog.buildStatsEvent(
-                    NOTIFICATION_ADJUSTMENT_PREFERENCES,
-                    /* optional int32 event_id = 1 */
-                    NotificationPullStatsEvent.NOTIFICATION_BUNDLE_PREFERENCES_PULLED.getId(),
-                    /* optional bool adjustment_allowed = 2 */ bundlesAllowed,
-                    /* repeated android.stats.notification.BundleTypes allowed_bundle_types = 3 */
-                    allowedBundleTypes,
-                    /* optional android.stats.notification.AdjustmentKey key = 4 */
-                    NotificationPullStatsEvent.adjustmentKeyEnum(KEY_TYPE)));
         }
     }
 

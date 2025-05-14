@@ -24,7 +24,7 @@ object AmbientCueUtils {
         return LayoutParams(
                 LayoutParams.MATCH_PARENT,
                 LayoutParams.MATCH_PARENT,
-                LayoutParams.TYPE_DRAG,
+                LayoutParams.TYPE_NAVIGATION_BAR_PANEL,
                 LayoutParams.FLAG_NOT_FOCUSABLE or LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT,
             )
@@ -37,6 +37,7 @@ object AmbientCueUtils {
                 if (spyTouches) {
                     inputFeatures = inputFeatures or LayoutParams.INPUT_FEATURE_SPY
                 }
+                receiveInsetsIgnoringZOrder = true
             }
     }
 }

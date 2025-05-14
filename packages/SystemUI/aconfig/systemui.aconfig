@@ -1966,10 +1966,27 @@ flag {
 }
 
 flag {
+    name: "desktop_screen_capture"
+    namespace: "systemui"
+    description: "Enables the pre and post capture UI and the Quick Settings button for the desktop screen capture feature."
+    bug: "412421893"
+}
+
+flag {
     name: "fix_dialog_launch_animation_jank_logging"
     namespace: "systemui"
     description: "Adjust timing of jank logging for dialog launch animations, and attach it to the dialog window instead of the origin view window."
     bug: "409008342"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "animation_library_delay_leash_cleanup"
+    namespace: "systemui"
+    description: "Clean up the transition leash with a delay to ensure that the finish callback happens first, avoiding flickers"
+    bug: "356065603"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

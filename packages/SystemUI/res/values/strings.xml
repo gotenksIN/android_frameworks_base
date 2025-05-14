@@ -3936,6 +3936,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     }</string>
+    <!-- Notification: Promoted Ongoing specific long click [CHAR LIMIT=NONE] -->
+    <string name="notification_promoted_ongoing_long_click">to open demotion menu</string>
 
     <!-- Summary of battery saver not available [CHAR LIMIT=NONE] -->
 
@@ -5526,6 +5528,8 @@
     <string name="media_output_group_title_connected_speakers">Connected speakers</string>
     <!-- Title for Speakers and Displays group. [CHAR LIMIT=NONE] -->
     <string name="media_output_group_title_speakers_and_displays">Speakers &amp; Displays</string>
+    <!-- Title for the Suggested section in the Output Switcher device list. [CHAR LIMIT=NONE] -->
+    <string name="media_output_group_title_suggested">Suggested</string>
     <!-- Title for Suggested Devices group. [CHAR LIMIT=NONE] -->
     <string name="media_output_group_title_suggested_device">Suggested Devices</string>
     <!-- Title for input device group. [CHAR LIMIT=NONE] -->

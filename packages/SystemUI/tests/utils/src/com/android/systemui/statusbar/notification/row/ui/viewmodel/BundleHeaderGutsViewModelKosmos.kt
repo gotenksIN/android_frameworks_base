@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
-package com.android.systemui.topwindoweffects.qualifiers
+package com.android.systemui.statusbar.notification.row.ui.viewmodel
 
-import javax.inject.Qualifier
+import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.statusbar.notification.row.data.repository.TEST_BUNDLE_SPEC
 
-@Qualifier
-@MustBeDocumented
-@Retention(AnnotationRetention.RUNTIME)
-annotation class TopLevelWindowEffectsThread
+val Kosmos.bundleHeaderGutsViewModel by
+    Kosmos.Fixture {
+        BundleHeaderGutsViewModel(
+            titleText = TEST_BUNDLE_SPEC.titleText,
+            summaryText = TEST_BUNDLE_SPEC.summaryText,
+            bundleIcon = TEST_BUNDLE_SPEC.icon,
+        )
+    }

@@ -16,9 +16,6 @@
 
 package com.android.systemui.shade;
 
-import static android.view.Display.TYPE_INTERNAL;
-
-import static com.android.systemui.display.data.repository.FakeDisplayRepositoryKt.display;
 import static com.android.systemui.statusbar.StatusBarState.KEYGUARD;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -60,6 +57,7 @@ import org.junit.runner.RunWith;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 @TestableLooper.RunWithLooper(setAsMainLooper = true)
+@DisableSceneContainer
 public class NotificationPanelViewControllerTest extends NotificationPanelViewControllerBaseTest {
 
     @Before

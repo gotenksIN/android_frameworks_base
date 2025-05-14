@@ -130,6 +130,16 @@ flag {
 }
 
 flag {
+    name: "virtual_power_group_sleep_no_doze"
+    namespace: "virtual_devices"
+    description: "Sleep non-default power groups directly, skipping doze"
+    bug: "416220040"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "vdm_settings"
     namespace: "virtual_devices"
     description: "Show virtual devices in Settings"
@@ -187,3 +197,12 @@ flag {
     description: "Enable VDM access for computer control"
     bug: "410570802"
 }
+
+flag {
+    name: "virtual_camera_on_open"
+    namespace: "virtual_devices"
+    description: "Callback called when the virtual camera device is requested to be opened"
+    bug: "409241122"
+    is_exported: true
+}
+

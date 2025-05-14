@@ -24,14 +24,19 @@ import androidx.core.animation.ValueAnimator
 import com.android.app.animation.InterpolatorsAndroidX
 import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyevent.domain.interactor.KeyEventInteractor
+import com.android.systemui.statusbar.NotificationShadeWindowController
+import com.android.systemui.topui.TopUiController
+import com.android.systemui.topui.TopUiControllerRefactor
 import com.android.systemui.topwindoweffects.domain.interactor.SqueezeEffectInteractor
-import com.android.systemui.topwindoweffects.qualifiers.TopLevelWindowEffectsThread
 import com.android.systemui.topwindoweffects.ui.viewmodel.SqueezeEffectConfig
 import com.android.systemui.topwindoweffects.ui.viewmodel.SqueezeEffectHapticPlayer
 import com.android.wm.shell.appzoomout.AppZoomOut
 import java.io.PrintWriter
 import java.util.Optional
+import java.util.concurrent.Executor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -42,12 +47,17 @@ import kotlinx.coroutines.launch
 class TopLevelWindowEffects
 @Inject
 constructor(
-    @TopLevelWindowEffectsThread private val topLevelWindowEffectsScope: CoroutineScope,
+    @Application private val applicationScope: CoroutineScope,
     private val squeezeEffectInteractor: SqueezeEffectInteractor,
     private val keyEventInteractor: KeyEventInteractor,
     // TODO(b/409930584): make AppZoomOut non-optional
     private val appZoomOutOptional: Optional<AppZoomOut>,
     squeezeEffectHapticPlayerFactory: SqueezeEffectHapticPlayer.Factory,
+    private val topUiController: TopUiController,
+    // TODO(b/411061512): Remove notificationShadeWindowController and mainExecutor once
+    // TopUiControllerRefactor made it to nextfood
+    private val notificationShadeWindowController: NotificationShadeWindowController,
+    @Main private val mainExecutor: Executor,
 ) : CoreStartable {
 
     // The main animation is interruptible until power button long press has been detected. At this
@@ -68,7 +78,7 @@ constructor(
     }
 
     override fun start() {
-        topLevelWindowEffectsScope.launch {
+        applicationScope.launch {
             squeezeEffectInteractor.isSqueezeEffectEnabled.collectLatest { enabled ->
                 if (enabled) {
                     squeezeEffectInteractor.isPowerButtonDownAsSingleKeyGesture.collectLatest { down
@@ -86,6 +96,7 @@ constructor(
 
     private suspend fun startSqueeze() {
         delay(squeezeEffectInteractor.getInvocationEffectInitialDelayMs())
+        setRequestTopUi(true)
         animateSqueezeProgressTo(
             targetProgress = 1f,
             duration = SqueezeEffectConfig.INWARD_EFFECT_DURATION.toLong(),
@@ -108,7 +119,7 @@ constructor(
     }
 
     private fun cancelSqueeze() {
-        if (isAnimationInterruptible && squeezeProgress != 0f) {
+        if (isAnimationInterruptible && animator != null) {
             hapticPlayer?.cancel()
             animateSqueezeProgressTo(
                 targetProgress = 0f,
@@ -141,7 +152,19 @@ constructor(
     }
 
     private fun finishAnimation() {
+        animator = null
         isAnimationInterruptible = true
+        setRequestTopUi(false)
+    }
+
+    private fun setRequestTopUi(requestTopUi: Boolean) {
+        if (TopUiControllerRefactor.isEnabled) {
+            topUiController.setRequestTopUi(requestTopUi, TAG)
+        } else {
+            mainExecutor.execute {
+                notificationShadeWindowController.setRequestTopUi(requestTopUi, TAG)
+            }
+        }
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {

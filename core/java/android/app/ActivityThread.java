@@ -257,8 +257,8 @@ import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.TrustedCertificateStore;
-import com.android.server.am.MemInfoDumpProto;
 import com.android.server.am.BitmapDumpProto;
+import com.android.server.am.MemInfoDumpProto;
 
 import dalvik.annotation.optimization.NeverCompile;
 import dalvik.system.AppSpecializationHooks;
@@ -884,11 +884,7 @@ public final class ActivityThread extends ClientTransactionHandler
                     assumeDelivered, token, sendingUser, intent.getFlags(), sendingUid,
                     sendingPackage);
             this.intent = intent;
-            if (com.android.window.flags.Flags.supportWidgetIntentsOnConnectedDisplay()) {
-                mOptions = ActivityOptions.fromBundle(resultExtras);
-            } else {
-                mOptions = null;
-            }
+            mOptions = ActivityOptions.fromBundle(resultExtras);
         }
 
         @UnsupportedAppUsage
@@ -5148,10 +5144,6 @@ public final class ActivityThread extends ClientTransactionHandler
     @VisibleForTesting(visibility = PRIVATE)
     public Context createDisplayContextIfNeeded(@NonNull Context context,
             @NonNull ReceiverData data) {
-        if (!com.android.window.flags.Flags.supportWidgetIntentsOnConnectedDisplay()) {
-            return context;
-        }
-
         final ActivityOptions options = data.mOptions;
         if (options == null) {
             return context;

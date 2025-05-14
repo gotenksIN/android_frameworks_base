@@ -458,7 +458,12 @@ class DesktopTasksController(
     private fun getSplitFocusedTask(task1: RunningTaskInfo, task2: RunningTaskInfo) =
         if (task1.taskId == task2.parentTaskId) task2 else task1
 
+    @Deprecated("Use isDisplayDesktopFirst() instead.", ReplaceWith("isDisplayDesktopFirst()"))
     private fun forceEnterDesktop(displayId: Int): Boolean {
+        if (DesktopExperienceFlags.ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX.isTrue) {
+            return rootTaskDisplayAreaOrganizer.isDisplayDesktopFirst(displayId)
+        }
+
         if (!desktopState.enterDesktopByDefaultOnFreeformDisplay) {
             return false
         }
@@ -1774,13 +1779,6 @@ class DesktopTasksController(
 
         val activationRunnable = addDeskActivationChanges(destinationDeskId, wct, task)
 
-        if (DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue) {
-            // Bring the destination display to top with includingParents=true, so that the
-            // destination display gains the display focus, which makes the top task in the display
-            // gains the global focus.
-            wct.reorder(task.token, /* onTop= */ true, /* includingParents= */ true)
-        }
-
         val sourceDisplayId = task.displayId
         val sourceDeskId = taskRepository.getDeskIdForTask(task.taskId)
         val shouldExitDesktopIfNeeded =
@@ -1794,15 +1792,20 @@ class DesktopTasksController(
                     displayId = sourceDisplayId,
                     wct = wct,
                     forceToFullscreen = false,
-                    // TODO: b/371096166 - Temporary turing home relaunch off to prevent home
-                    // stealing
-                    // display focus. Remove shouldEndUpAtHome = false when home focus handling
-                    // with connected display is implemented in wm core.
-                    shouldEndUpAtHome = false,
                 )
             } else {
                 null
             }
+        if (DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue) {
+            // Bring the destination display to top with includingParents=true, so that the
+            // destination display gains the display focus, which makes the top task in the display
+            // gains the global focus. This must be done after performDesktopExitCleanupIfNeeded.
+            // The method launches Launcher on the source display when the last task is moved, which
+            // brings the source display to the top. Calling reorder after
+            // performDesktopExitCleanupIfNeeded ensures that the destination display becomes the
+            // top (focused) display.
+            wct.reorder(task.token, /* onTop= */ true, /* includingParents= */ true)
+        }
         val transition =
             transitions.startTransition(
                 TRANSIT_CHANGE,
@@ -2410,7 +2413,6 @@ class DesktopTasksController(
         displayId: Int,
         wct: WindowContainerTransaction,
         forceToFullscreen: Boolean,
-        shouldEndUpAtHome: Boolean = true,
     ): RunOnTransitStart? {
         if (!willExitDesktop(taskId, displayId, forceToFullscreen)) {
             return null
@@ -2422,7 +2424,7 @@ class DesktopTasksController(
             deskId = deskId,
             displayId = displayId,
             willExitDesktop = true,
-            shouldEndUpAtHome = shouldEndUpAtHome,
+            shouldEndUpAtHome = true,
         )
     }
 
@@ -2827,10 +2829,20 @@ class DesktopTasksController(
         task: RunningTaskInfo,
         transition: IBinder,
     ): WindowContainerTransaction? {
-        logV("DesktopTasksController: handleHomeTaskLaunch")
-        val activeDeskId = taskRepository.getActiveDeskId(task.displayId) ?: return null
+        logV(
+            "DesktopTasksController: handleHomeTaskLaunch taskId=%s userId=%s currentUserId=%d",
+            task.taskId,
+            task.userId,
+            userId,
+        )
+        // On user-switches, the home task is launched and the request is dispatched before the
+        // user-switch is known by SysUI/Shell, so don't use the "current" repository.
+        val repository = userRepositories.getProfile(task.userId)
+        val activeDeskId = repository.getActiveDeskId(task.displayId) ?: return null
         val wct = WindowContainerTransaction()
         // TODO: b/393978539 - desktop-first displays may need to keep the desk active.
+        // TODO: b/415381304 - pass in the correct |userId| to |performDesktopExitCleanUp| to
+        //  ensure desk deactivation updates are applied to the right repository.
         val runOnTransitStart =
             performDesktopExitCleanUp(
                 wct = wct,
@@ -3222,15 +3234,22 @@ class DesktopTasksController(
                 task = task,
             )
         }
-        val deactivationRunnable =
-            performDesktopExitCleanupIfNeeded(
-                taskId = task.taskId,
-                deskId = deskId,
-                displayId = task.displayId,
-                wct = wct,
-                forceToFullscreen = false,
-            )
-        deactivationRunnable?.invoke(transition)
+
+        // TODO(b/416014060): Check if task is really receiving a back gesture
+        if (
+            !(DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue &&
+                DesktopExperienceFlags.ENABLE_EMPTY_DESK_ON_MINIMIZE.isTrue)
+        ) {
+            val deactivationRunnable =
+                performDesktopExitCleanupIfNeeded(
+                    taskId = task.taskId,
+                    deskId = deskId,
+                    displayId = task.displayId,
+                    wct = wct,
+                    forceToFullscreen = false,
+                )
+            deactivationRunnable?.invoke(transition)
+        }
 
         if (!DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION.isTrue()) {
             taskRepository.addClosingTask(

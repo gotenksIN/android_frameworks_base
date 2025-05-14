@@ -1113,6 +1113,7 @@
   <java-symbol type="string" name="media_route_status_in_use" />
   <java-symbol type="string" name="owner_name" />
   <java-symbol type="string" name="guest_name" />
+  <java-symbol type="string" name="headless_system_user_name" />
   <java-symbol type="string" name="config_chooseAccountActivity" />
   <java-symbol type="string" name="config_chooseTypeAndAccountActivity" />
   <java-symbol type="string" name="config_chooserActivity" />
@@ -1717,7 +1718,6 @@
   <java-symbol type="xml" name="sms_short_codes" />
   <java-symbol type="xml" name="audio_assets" />
   <java-symbol type="xml" name="global_keys" />
-  <java-symbol type="xml" name="default_zen_mode_config" />
   <java-symbol type="xml" name="sms_7bit_translation_table" />
   <java-symbol type="xml" name="color_extraction" />
 

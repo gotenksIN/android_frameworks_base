@@ -231,7 +231,6 @@ import static com.android.server.wm.TaskPersister.DEBUG;
 import static com.android.server.wm.TaskPersister.IMAGE_EXTENSION;
 import static com.android.server.wm.WindowContainer.AnimationFlags.CHILDREN;
 import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
-import static com.android.server.wm.WindowContainer.AnimationFlags.TRANSITION;
 import static com.android.server.wm.WindowContainerChildProto.ACTIVITY;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_CONFIGURATION;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW_VERBOSE;
@@ -4426,8 +4425,7 @@ public final class ActivityRecord extends WindowToken {
 
         ProtoLog.v(WM_DEBUG_APP_TRANSITIONS,
                 "Removing app %s delayed=%b animation=%s animating=%b", this, delayed,
-                getAnimation(),
-                isAnimating(TRANSITION | PARENTS, ANIMATION_TYPE_APP_TRANSITION));
+                getAnimation(), inTransition());
 
         ProtoLog.v(WM_DEBUG_ADD_REMOVE, "removeAppToken: %s"
                 + " delayed=%b Callers=%s", this, delayed, Debug.getCallers(4));
@@ -6848,16 +6846,12 @@ public final class ActivityRecord extends WindowToken {
 
         if (!allDrawn && w.mightAffectAllDrawn()) {
             if (DEBUG_VISIBILITY || WM_DEBUG_ORIENTATION.isLogToLogcat()) {
-                final boolean isAnimationSet = isAnimating(TRANSITION | PARENTS,
-                        ANIMATION_TYPE_APP_TRANSITION);
-                Slog.v(TAG, "Eval win " + w + ": isDrawn=" + w.isDrawn()
-                        + ", isAnimationSet=" + isAnimationSet);
+                Slog.v(TAG, "Eval win " + w + ": isDrawn=" + w.isDrawn());
                 if (!w.isDrawn()) {
                     Slog.v(TAG, "Not displayed: s=" + winAnimator.mSurfaceControl
                             + " pv=" + w.isVisibleByPolicy()
                             + " mDrawState=" + winAnimator.drawStateToString()
-                            + " ph=" + w.isParentWindowHidden() + " th=" + mVisibleRequested
-                            + " a=" + isAnimationSet);
+                            + " ph=" + w.isParentWindowHidden() + " th=" + mVisibleRequested);
                 }
             }
 
@@ -8665,8 +8659,7 @@ public final class ActivityRecord extends WindowToken {
         if (isConfigurationDispatchPaused()) {
             Slog.wtf(TAG, "trying to update reported(client) config while dispatch is paused");
         }
-        ProtoLog.v(WM_DEBUG_CONFIGURATION, "Ensuring correct "
-                + "configuration: %s", this);
+        ProtoLog.v(WM_DEBUG_CONFIGURATION, "Ensuring correct configuration: %s", this);
 
         final int newDisplayId = getDisplayId();
         final boolean displayChanged = mLastReportedDisplayId != newDisplayId;
@@ -8696,8 +8689,7 @@ public final class ActivityRecord extends WindowToken {
                 !mLastReportedActivityWindowInfo.equals(newActivityWindowInfo);
         if (!displayChanged && !isActivityWindowInfoChanged
                 && getConfiguration().equals(mTmpConfig)) {
-            ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration & display "
-                    + "unchanged in %s", this);
+            ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration & display unchanged in %s", this);
             return true;
         }
 
@@ -8710,6 +8702,11 @@ public final class ActivityRecord extends WindowToken {
 
         // Update last reported values.
         final Configuration newMergedOverrideConfig = getMergedOverrideConfiguration();
+
+        if (changes != 0) {
+            ProtoLog.v(WM_DEBUG_CONFIGURATION, "Last reported config=%s",
+                    mLastReportedConfiguration);
+        }
 
         setLastReportedConfiguration(getProcessGlobalConfiguration(), newMergedOverrideConfig);
         setLastReportedActivityWindowInfo(newActivityWindowInfo);
@@ -8724,8 +8721,7 @@ public final class ActivityRecord extends WindowToken {
         }
 
         if (changes == 0) {
-            ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration no differences in %s",
-                    this);
+            ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration no differences in %s", this);
             // There are no significant differences, so we won't relaunch but should still deliver
             // the new configuration to the client process.
             if (displayChanged) {
@@ -8739,9 +8735,6 @@ public final class ActivityRecord extends WindowToken {
             return true;
         }
 
-        ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration changes for %s, "
-                + "allChanges=%s", this, Configuration.configurationDiffToString(changes));
-
         // If the activity isn't currently running, just leave the new configuration and it will
         // pick that up next time it starts.
         if (!attachedToProcess()) {
@@ -8751,7 +8744,7 @@ public final class ActivityRecord extends WindowToken {
 
         // Figure out how to handle the changes between the configurations.
         ProtoLog.v(WM_DEBUG_CONFIGURATION, "Checking to restart %s: changed=%s, "
-                + "handles=%s, not-handles=%s, mLastReportedConfiguration=%s", this,
+                + "handles=%s, not-handles=%s, new config=%s", this,
                 Configuration.configurationDiffToString(changes),
                 Configuration.configurationDiffToString(info.getRealConfigChanged()),
                 Configuration.configurationDiffToString(changes & ~(info.getRealConfigChanged())),
@@ -9415,7 +9408,7 @@ public final class ActivityRecord extends WindowToken {
         writeNameToProto(proto, NAME);
         super.dumpDebug(proto, WINDOW_TOKEN, logLevel);
         proto.write(LAST_SURFACE_SHOWING, mLastSurfaceShowing);
-        proto.write(IS_ANIMATING, isAnimating(TRANSITION | PARENTS | CHILDREN,
+        proto.write(IS_ANIMATING, isAnimating(PARENTS | CHILDREN,
                 ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_WINDOW_ANIMATION));
         proto.write(FILLS_PARENT, fillsParent());
         proto.write(APP_STOPPED, mAppStopped);

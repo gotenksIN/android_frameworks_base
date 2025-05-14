@@ -7588,4 +7588,10 @@
     <string-array name="config_privateSpaceBootCompletedImmediateReceivers" translatable="false">
         <item>com.android.privatespace</item>
     </string-array>
+
+    <!-- Whether Sys UI reboot UI is prioritized for reocvery triggered UI. -->
+    <bool name="config_prioritizeSysUiForRecoveryRebootUi">false</bool>
+
+    <!-- Maximum number of devices that allows for audio sharing. -->
+    <integer name="config_audio_sharing_maximum_sinks">2</integer>
 </resources>

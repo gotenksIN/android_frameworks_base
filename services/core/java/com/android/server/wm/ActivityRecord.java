@@ -8067,6 +8067,7 @@ public final class ActivityRecord extends WindowToken {
             navBarInsets = mDisplayContent.getInsetsStateController()
                     .getRawInsetsState().calculateInsets(
                             parentBounds,
+                            parentBounds,
                             WindowInsets.Type.navigationBars(),
                             true /* ignoreVisibility */);
         } else {
@@ -8144,8 +8145,10 @@ public final class ActivityRecord extends WindowToken {
         final Insets navBarInsets = mDisplayContent.getInsetsStateController()
                 .getRawInsetsState().calculateInsets(
                         parentBounds,
+                        parentBounds,
                         WindowInsets.Type.navigationBars(),
-                        false /* ignoreVisibility */);
+                        false /* ignoreVisibility */
+                );
         return Insets.NONE.equals(navBarInsets);
     }
 
@@ -8585,6 +8588,12 @@ public final class ActivityRecord extends WindowToken {
         }
         for (int i = getChildCount() - 1; i >= 0; --i) {
             dispatchConfigurationToChild(getChildAt(i), getConfiguration());
+            final WindowState ws = getChildAt(i).asWindowState();
+            if (ws != null) {
+                getDisplayContent().getDisplayPolicy().layoutWindowLw(ws, null /* attached */,
+                        getDisplayContent().mDisplayFrames);
+                ws.updateSurfacePositionNonOrganized();
+            }
         }
         updateReportedConfigurationAndSend();
         return true;

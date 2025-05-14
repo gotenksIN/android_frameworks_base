@@ -1225,7 +1225,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     boolean skipLayout() {
         // Skip layout of the window when in transition to pip mode.
-        return mActivityRecord != null && mActivityRecord.mWaitForEnteringPinnedMode;
+        return mActivityRecord != null && (mActivityRecord.mWaitForEnteringPinnedMode
+                || mActivityRecord.isConfigurationDispatchPaused());
     }
 
     void setFrames(ClientWindowFrames clientWindowFrames, int requestedWidth, int requestedHeight) {
@@ -1601,7 +1602,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
         bounds.set(mWindowFrames.mFrame);
         bounds.inset(getInsetsStateWithVisibilityOverride().calculateVisibleInsets(
-                bounds, mAttrs.type, getActivityType(), mAttrs.softInputMode, mAttrs.flags));
+                bounds, bounds, mAttrs.type, getActivityType(), mAttrs.softInputMode, mAttrs.flags
+        ));
         if (intersectWithRootTaskBounds) {
             bounds.intersect(mTmpRect);
         }
@@ -5300,6 +5302,18 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
+    @Override
+    public void onAnimationLeashLost(Transaction t) {
+        if (!mSurfacePlacementNeeded && mActivityRecord != null
+                && !mActivityRecord.isVisibleRequested() && mActivityRecord.isVisible()
+                && !mLastSurfacePosition.equals(mSurfacePosition)) {
+            // The activity is closing but still visible. Make sure updateSurfacePosition() is not
+            // skipped due to isGoneForLayout().
+            mSurfacePlacementNeeded = true;
+        }
+        super.onAnimationLeashLost(t);
+    }
+
     // TODO(b/70040778): We should aim to eliminate the last user of TYPE_APPLICATION_MEDIA
     // then we can drop all negative layering on the windowing side and simply inherit
     // the default implementation here.
@@ -5486,11 +5500,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         } else {
             outFrame.set(getParentFrame());
         }
+        final Task task = getTask();
+        final Rect bounds = task == null ? getBounds() : task.getBounds();
         outSurfaceInsets.set(mAttrs.surfaceInsets);
         final InsetsState state = getInsetsStateWithVisibilityOverride();
-        outInsets.set(state.calculateInsets(outFrame, systemBars(),
+        outInsets.set(state.calculateInsets(outFrame, bounds, systemBars(),
                 false /* ignoreVisibility */).toRect());
-        outStableInsets.set(state.calculateInsets(outFrame, systemBars(),
+        outStableInsets.set(state.calculateInsets(outFrame, bounds, systemBars(),
                 true /* ignoreVisibility */).toRect());
     }
 

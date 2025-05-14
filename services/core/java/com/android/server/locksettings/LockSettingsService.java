@@ -1566,7 +1566,12 @@ public class LockSettingsService extends ILockSettings.Stub {
     }
 
     private void unlockKeystore(int userId, SyntheticPassword sp) {
-        mKeyStoreAuthorization.onDeviceUnlocked(userId, sp.deriveKeyStorePassword());
+        final byte[] password = sp.deriveKeyStorePassword();
+        try {
+            mKeyStoreAuthorization.onDeviceUnlocked(userId, password);
+        } finally {
+            ArrayUtils.zeroize(password);
+        }
     }
 
     @VisibleForTesting /** Note: this method is overridden in unit tests */
@@ -2248,6 +2253,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 // QTI_BEGIN: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
         } finally {
             Binder.restoreCallingIdentity(callingId);
+            ArrayUtils.zeroize(secret);
         }
     }
 

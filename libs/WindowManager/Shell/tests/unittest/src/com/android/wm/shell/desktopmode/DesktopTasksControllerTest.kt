@@ -3158,6 +3158,43 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY,
+    )
+    fun moveTaskToFront_backgroundTask_launchesTask_launchesToExistingDisplay() {
+        val deskId = 2
+        val taskId = 1
+        val task = createRecentTaskInfo(taskId, displayId = SECOND_DISPLAY)
+        taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = deskId)
+        taskRepository.setActiveDesk(displayId = SECOND_DISPLAY, deskId = deskId)
+        taskRepository.addTaskToDesk(
+            displayId = SECOND_DISPLAY,
+            deskId = deskId,
+            taskId = task.taskId,
+            isVisible = true,
+        )
+        whenever(shellTaskOrganizer.getRunningTaskInfo(anyInt())).thenReturn(null)
+        whenever(
+                desktopMixedTransitionHandler.startLaunchTransition(
+                    eq(TRANSIT_OPEN),
+                    any(),
+                    anyOrNull(),
+                    anyOrNull(),
+                    anyOrNull(),
+                    anyOrNull(),
+                    anyOrNull(),
+                )
+            )
+            .thenReturn(Binder())
+
+        controller.moveTaskToFront(task.taskId, unminimizeReason = UnminimizeReason.UNKNOWN)
+
+        val wct = getLatestDesktopMixedTaskWct(type = TRANSIT_OPEN)
+        wct.assertLaunchTaskOnDisplay(SECOND_DISPLAY)
+    }
+
+    @Test
     @DisableFlags(
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
         Flags.FLAG_ENABLE_DESKTOP_TASK_LIMIT_SEPARATE_TRANSITION,
@@ -8009,6 +8046,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 anyOrNull(),
                 eq(true),
                 eq(SPLIT_INDEX_UNDEFINED),
+                eq(DEFAULT_DISPLAY),
             )
         assertThat(ActivityOptions.fromBundle(optionsCaptor.firstValue).launchWindowingMode)
             .isEqualTo(WINDOWING_MODE_MULTI_WINDOW)
@@ -8031,6 +8069,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 anyOrNull(),
                 eq(true),
                 eq(SPLIT_INDEX_UNDEFINED),
+                eq(DEFAULT_DISPLAY),
             )
         assertThat(ActivityOptions.fromBundle(optionsCaptor.firstValue).launchWindowingMode)
             .isEqualTo(WINDOWING_MODE_MULTI_WINDOW)
@@ -8082,6 +8121,57 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                     .launchWindowingMode
             )
             .isEqualTo(WINDOWING_MODE_FREEFORM)
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MULTI_INSTANCE_FEATURES,
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY,
+    )
+    fun newWindow_fromFreeformAddsNewWindow_launchesToCallingDisplay() {
+        setUpLandscapeDisplay()
+        val deskId = 2
+        taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = deskId)
+        taskRepository.setActiveDesk(displayId = SECOND_DISPLAY, deskId = deskId)
+        val task = setUpFreeformTask(displayId = SECOND_DISPLAY, deskId = deskId)
+        val wctCaptor = argumentCaptor<WindowContainerTransaction>()
+        val transition = Binder()
+        whenever(
+                mMockDesktopImmersiveController.exitImmersiveIfApplicable(
+                    any(),
+                    anyInt(),
+                    anyOrNull(),
+                    any(),
+                )
+            )
+            .thenReturn(ExitResult.NoExit)
+        whenever(
+                desktopMixedTransitionHandler.startLaunchTransition(
+                    anyInt(),
+                    any(),
+                    anyOrNull(),
+                    anyOrNull(),
+                    anyOrNull(),
+                    anyOrNull(),
+                    anyOrNull(),
+                )
+            )
+            .thenReturn(transition)
+
+        runOpenNewWindow(task)
+
+        verify(desktopMixedTransitionHandler)
+            .startLaunchTransition(
+                anyInt(),
+                wctCaptor.capture(),
+                anyOrNull(),
+                anyOrNull(),
+                anyOrNull(),
+                anyOrNull(),
+                anyOrNull(),
+            )
+        wctCaptor.firstValue.assertLaunchTaskOnDisplay(SECOND_DISPLAY)
     }
 
     @Test
@@ -10652,6 +10742,13 @@ private fun WindowContainerTransaction.assertLaunchTask(taskId: Int, windowingMo
             hop.launchOptions?.getInt(keyLaunchWindowingMode, WINDOWING_MODE_UNDEFINED) ==
                 windowingMode
     }
+}
+
+private fun WindowContainerTransaction.assertLaunchTaskOnDisplay(displayId: Int) {
+    val keyLaunchWindowingMode = "android.activity.windowingMode"
+    val keyLaunchDisplayId = "android.activity.launchDisplayId"
+
+    assertHop { hop -> hop.launchOptions?.getInt(keyLaunchDisplayId, DEFAULT_DISPLAY) == displayId }
 }
 
 private fun WindowContainerTransaction.assertLaunchTaskAt(

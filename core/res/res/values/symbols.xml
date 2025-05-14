@@ -6247,4 +6247,10 @@
 
   <!-- The selection toolbar render service component name -->
   <java-symbol type="string" name="config_systemUiSelectionToolbarRenderService" />
+
+  <!-- Whether Sys UI reboot UI is prioritized for reocvery triggered UI. -->
+  <java-symbol type="bool" name="config_prioritizeSysUiForRecoveryRebootUi" />
+
+  <!-- Maximum number of devices that allows for audio sharing. -->
+  <java-symbol type="integer" name="config_audio_sharing_maximum_sinks" />
 </resources>

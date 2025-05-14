@@ -68,6 +68,7 @@ import android.widget.Toast
 import android.window.DesktopExperienceFlags
 import android.window.DesktopExperienceFlags.DesktopExperienceFlag
 import android.window.DesktopExperienceFlags.ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY
+import android.window.DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT
 import android.window.DesktopExperienceFlags.ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY
 import android.window.DesktopModeFlags
 import android.window.DesktopModeFlags.DISABLE_NON_RESIZABLE_APP_SNAP_RESIZE
@@ -1457,22 +1458,30 @@ class DesktopTasksController(
     ) {
         logV("moveBackgroundTaskToFront taskId=%s", taskId)
         val wct = WindowContainerTransaction()
-        wct.startTask(
-            taskId,
-            ActivityOptions.makeBasic()
-                .apply { launchWindowingMode = WINDOWING_MODE_FREEFORM }
-                .toBundle(),
-        )
+
         val deskId =
             taskRepository.getDeskIdForTask(taskId)
                 ?: getOrCreateDefaultDeskId(DEFAULT_DISPLAY)
                 ?: return
+        val displayId =
+            if (ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY.isTrue)
+                taskRepository.getDisplayForDesk(deskId)
+            else DEFAULT_DISPLAY
+        wct.startTask(
+            taskId,
+            ActivityOptions.makeBasic()
+                .apply {
+                    launchWindowingMode = WINDOWING_MODE_FREEFORM
+                    launchDisplayId = displayId
+                }
+                .toBundle(),
+        )
         startLaunchTransition(
             TRANSIT_OPEN,
             wct,
             taskId,
             deskId = deskId,
-            displayId = DEFAULT_DISPLAY,
+            displayId = displayId,
             remoteTransition = remoteTransition,
             unminimizeReason = unminimizeReason,
         )
@@ -1833,7 +1842,7 @@ class DesktopTasksController(
         }
 
         if (
-            !DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT.isTrue ||
+            !ENABLE_NON_DEFAULT_DISPLAY_SPLIT.isTrue ||
                 !DesktopExperienceFlags.ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT.isTrue
         ) {
             return
@@ -2780,6 +2789,8 @@ class DesktopTasksController(
                     /* hideTaskToken= */ null,
                     /* forceLaunchNewTask= */ true,
                     splitIndex,
+                    if (ENABLE_NON_DEFAULT_DISPLAY_SPLIT.isTrue) callingTaskInfo.displayId
+                    else DEFAULT_DISPLAY,
                 )
             }
             WINDOWING_MODE_FREEFORM -> {
@@ -2823,11 +2834,16 @@ class DesktopTasksController(
                     error("Invalid windowing mode: $newTaskWindowingMode")
                 }
             }
+        val displayId =
+            if (ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY.isTrue)
+                taskRepository.getDisplayForDesk(deskId)
+            else DEFAULT_DISPLAY
         return ActivityOptions.makeBasic().apply {
             launchWindowingMode = newTaskWindowingMode
             pendingIntentBackgroundActivityStartMode =
                 ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
             launchBounds = bounds
+            launchDisplayId = displayId
         }
     }
 

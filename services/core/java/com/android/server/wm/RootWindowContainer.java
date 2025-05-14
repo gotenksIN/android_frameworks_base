@@ -1218,6 +1218,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             addChild(displayContent, POSITION_BOTTOM);
             if (displayContent.mDisplayId == DEFAULT_DISPLAY) {
                 mDefaultDisplay = displayContent;
+            } else {
+                setShouldShowSystemDecorationsForNewDisplay(displayContent);
             }
         }
 
@@ -2949,20 +2951,23 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 return;
             }
 
-            if (ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                display.updateShouldShowSystemDecorations();
-
-                final boolean inTopology = mWindowManager.mDisplayWindowSettings
-                        .shouldShowSystemDecorsLocked(display);
-                mWmService.mDisplayManagerInternal.onDisplayBelongToTopologyChanged(displayId,
-                        inTopology);
-            }
+            setShouldShowSystemDecorationsForNewDisplay(display);
 
             startSystemDecorations(display, "displayAdded");
 
             // Drop any cached DisplayInfos associated with this display id - the values are now
             // out of date given this display added event.
             mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
+        }
+    }
+
+    private void setShouldShowSystemDecorationsForNewDisplay(DisplayContent displayContent) {
+        if (ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+            displayContent.updateShouldShowSystemDecorations();
+            final boolean inTopology = mWindowManager.mDisplayWindowSettings
+                    .shouldShowSystemDecorsLocked(displayContent);
+            mWmService.mDisplayManagerInternal.onDisplayBelongToTopologyChanged(
+                    displayContent.mDisplayId, inTopology);
         }
     }
 

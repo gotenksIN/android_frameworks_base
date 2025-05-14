@@ -3869,23 +3869,30 @@ public class NotificationManagerService extends SystemService {
     @GuardedBy("mNotificationLock")
     protected void maybeRecordInterruptionLocked(NotificationRecord r) {
         if (r.isInterruptive() && !r.hasRecordedInterruption()) {
+            String channelId = r.getChannel().getId();
+            if (android.app.Flags.notificationClassificationUi()) {
+                channelId = r.getNotification().getChannelId();
+            }
             mAppUsageStats.reportInterruptiveNotification(r.getSbn().getPackageName(),
-                    r.getChannel().getId(),
+                    channelId,
                     getRealUserId(r.getSbn().getUserId()));
             Trace.traceBegin(Trace.TRACE_TAG_SYSTEM_SERVER, "notifHistoryAddItem");
             try {
                 if (r.getNotification().getSmallIcon() != null) {
-                    mHistoryManager.addNotification(new HistoricalNotification.Builder()
+                    final HistoricalNotification.Builder builder
+                            = new HistoricalNotification.Builder()
                             .setPackage(r.getSbn().getPackageName())
                             .setUid(r.getSbn().getUid())
                             .setUserId(r.getSbn().getNormalizedUserId())
-                            .setChannelId(r.getChannel().getId())
-                            .setChannelName(r.getChannel().getName().toString())
+                            .setChannelId(channelId)
                             .setPostedTimeMs(System.currentTimeMillis())
                             .setTitle(getHistoryTitle(r.getNotification()))
                             .setText(getHistoryText(r.getNotification()))
-                            .setIcon(r.getNotification().getSmallIcon())
-                            .build());
+                            .setIcon(r.getNotification().getSmallIcon());
+                    if (android.app.Flags.notificationClassificationUi()) {
+                        builder.setChannelName(r.getChannel().getName().toString());
+                    }
+                    mHistoryManager.addNotification(builder.build());
                 }
             } finally {
                 Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
@@ -12320,13 +12327,33 @@ public class NotificationManagerService extends SystemService {
                     : new ArraySet<>(DEFAULT_ALLOWED_ADJUSTMENT_KEY_TYPES);
         }
 
+        // Convenience method to return the effective list of denied adjustments for the given user.
+        // For full users, this is just the list of denied adjustments contained in
+        // mDeniedAdjustments for that user.
+        // For profile users, this method checks additional criteria that may cause an adjustment to
+        // be effectively denied for that user. In particular:
+        // - if an adjustment is denied for that profile user's parent, then it is also effectively
+        //   denied for that profile regardless of what the profile's current setting is.
+        @GuardedBy("mLock")
+        private @NonNull Set<String> deniedAdjustmentsForUser(@UserIdInt int userId) {
+            Set<String> denied = new HashSet<>();
+            if (mDeniedAdjustments.containsKey(userId)) {
+                denied.addAll(mDeniedAdjustments.get(userId));
+            }
+            final @UserIdInt int parentId = mUmInternal.getProfileParentId(userId);
+            if ((parentId != userId) && mDeniedAdjustments.containsKey(parentId)) {
+                denied.addAll(mDeniedAdjustments.get(parentId));
+            }
+            // TODO: b/415768865 - add any cases where a (work/managed) profile should default to
+            //                     off unless explicitly turned on
+            return denied;
+        }
+
         protected Set<String> getAllowedAssistantAdjustments(@UserIdInt int userId) {
             synchronized (mLock) {
                 if (notificationClassification()) {
                     Set<String> types = new HashSet<>(Set.of(DEFAULT_ALLOWED_ADJUSTMENTS));
-                    if (mDeniedAdjustments.containsKey(userId)) {
-                        types.removeAll(mDeniedAdjustments.get(userId));
-                    }
+                    types.removeAll(deniedAdjustmentsForUser(userId));
                     return types;
                 } else {
                     Set<String> types = new HashSet<>();
@@ -12340,8 +12367,7 @@ public class NotificationManagerService extends SystemService {
             synchronized (mLock) {
                 if (notificationClassification()) {
                     return List.of(DEFAULT_ALLOWED_ADJUSTMENTS).contains(type)
-                            && !(mDeniedAdjustments.containsKey(userId)
-                                    && mDeniedAdjustments.get(userId).contains(type));
+                            && !(deniedAdjustmentsForUser(userId).contains(type));
                 } else {
                     return mAllowedAdjustments.contains(type);
                 }

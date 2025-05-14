@@ -37,10 +37,11 @@ import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP
 
 import static com.android.window.flags.Flags.enableFullScreenWindowOnRemovingSplitScreenStageBugfix;
 import static com.android.window.flags.Flags.enableMultiDisplaySplit;
+import static com.android.window.flags.Flags.enableNonDefaultDisplaySplit;
 import static com.android.wm.shell.Flags.enableFlexibleSplit;
 import static com.android.wm.shell.Flags.enableFlexibleTwoAppSplit;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_ALIGN_CENTER;
-import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX;
+import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX_HYBRID;
 import static com.android.wm.shell.common.split.SplitLayout.RESTING_DIM_LAYER;
 import static com.android.wm.shell.common.split.SplitScreenUtils.reverseSplitPosition;
 import static com.android.wm.shell.common.split.SplitScreenUtils.splitFailureMessage;
@@ -822,7 +823,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
      */
     void startIntent(PendingIntent intent, Intent fillInIntent, @SplitPosition int position,
             @Nullable Bundle options, @Nullable WindowContainerToken hideTaskToken,
-            @SplitIndex int index) {
+            @SplitIndex int index, int displayId) {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "startIntent: intent=%s position=%d", intent.getIntent(),
                 position);
         mSplitRequest = new SplitRequest(intent.getIntent(), position);
@@ -834,6 +835,10 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         if (hideTaskToken != null) {
             ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "Reordering hide-task to bottom");
             wct.reorder(hideTaskToken, false /* onTop */);
+        }
+        // For now, the only CUJ that can use this is LaunchAdjacent while on non-default displays.
+        if (enableNonDefaultDisplaySplit()) {
+            prepareMovingSplitscreenRoot(wct, displayId);
         }
         wct.sendPendingIntent(intent, fillInIntent, options);
 
@@ -1925,6 +1930,16 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         setRootForceTranslucent(false, wct);
     }
 
+    private void prepareMovingSplitscreenRoot(WindowContainerTransaction wct, int displayId) {
+        if (!enableMultiDisplaySplit()) {
+            final DisplayAreaInfo displayAreaInfo = mRootTDAOrganizer.getDisplayAreaInfo(displayId);
+            final WindowContainerToken token = getDisplayRootForDisplayId(DEFAULT_DISPLAY);
+            if (token != null && displayAreaInfo != null) {
+                wct.reparent(token, displayAreaInfo.token, true /* onTop */);
+            }
+        }
+    }
+
     void finishEnterSplitScreen(SurfaceControl.Transaction finishT) {
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "finishEnterSplitScreen");
         mSplitLayout.updateStateWithCurrentPosition();
@@ -2235,7 +2250,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mSplitMultiDisplayHelper.setDisplayRootTaskLeash(taskInfo.displayId, leash);
 
         if (mSplitLayout == null) {
-            int parallaxType = enableFlexibleTwoAppSplit() ? PARALLAX_FLEX : PARALLAX_ALIGN_CENTER;
+            int parallaxType =
+                    enableFlexibleTwoAppSplit() ? PARALLAX_FLEX_HYBRID : PARALLAX_ALIGN_CENTER;
             mSplitLayout = new SplitLayout(TAG + "SplitDivider", mContext,
                     taskInfo.configuration, this, mParentContainerCallbacks,
                     mDisplayController, mDisplayImeController, mTaskOrganizer, parallaxType,
@@ -4222,7 +4238,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
      * They're only added if there is at least one offscreen app.
      */
     private void addAllDimLayersToTransition(@NonNull TransitionInfo info, boolean show) {
-        if (!mSplitState.currentStateSupportsOffscreenApps()) {
+        if (!mSplitState.currentStateHasOffscreenApps()) {
             return;
         }
         int displayId = SplitMultiDisplayHelper.getTransitionDisplayId(info);

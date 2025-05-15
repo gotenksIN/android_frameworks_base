@@ -20,6 +20,7 @@ import android.annotation.SuppressLint
 import android.app.role.OnRoleHoldersChangedListener
 import android.app.role.RoleManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.database.ContentObserver
 import android.hardware.input.InputManager
 import android.hardware.input.KeyGestureEvent
@@ -28,11 +29,7 @@ import android.os.Handler
 import android.os.UserHandle
 import android.provider.Settings.Global.POWER_BUTTON_LONG_PRESS
 import android.provider.Settings.Global.POWER_BUTTON_LONG_PRESS_DURATION_MS
-import android.util.DisplayUtils
-import android.view.DisplayInfo
 import android.view.KeyEvent
-import androidx.annotation.ArrayRes
-import androidx.annotation.DrawableRes
 import androidx.core.content.edit
 import com.android.internal.annotations.VisibleForTesting
 import com.android.systemui.assist.AssistManager
@@ -40,9 +37,7 @@ import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLoggin
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.res.R
 import com.android.systemui.shared.Flags
-import com.android.systemui.topwindoweffects.data.entity.SqueezeEffectCornersInfo
 import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.util.settings.GlobalSettings
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
@@ -52,7 +47,6 @@ import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -79,7 +73,6 @@ constructor(
     private val sharedPreferences by lazy {
         context.getSharedPreferences(SHARED_PREFERENCES_FILE_NAME, Context.MODE_PRIVATE)
     }
-    private val isInvocationEffectEnabledByAssistantFlow = MutableStateFlow<Boolean?>(null)
 
     private val selectedAssistantName: StateFlow<String> =
         conflatedCallbackFlow {
@@ -119,20 +112,45 @@ constructor(
                 initialValue = roleManager.getCurrentAssistantFor(userRepository.selectedUserHandle),
             )
 
-    private val selectedAssistantNameAndUserFlow =
-        selectedAssistantName
-            .combine(userRepository.selectedUser) { a, b -> Pair(a, b) }
-            .distinctUntilChanged()
+    private val isInvocationEffectEnabledByAssistantFlow: Flow<Boolean> =
+        conflatedCallbackFlow {
+                val listener =
+                    SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                        if (key == IS_INVOCATION_EFFECT_ENABLED_BY_ASSISTANT_PREFERENCE) {
+                            trySendWithFailureLogging(
+                                loadIsInvocationEffectEnabledByAssistant(),
+                                TAG,
+                                "updated isInvocationEffectEnabledByAssistantFlow due to enabled status change",
+                            )
+                        }
+                    }
+                sharedPreferences.registerOnSharedPreferenceChangeListener(listener)
 
-    init {
-        coroutineScope.launch {
-            selectedAssistantNameAndUserFlow.collect {
-                // Assistant or user changed, reload enabled state
-                isInvocationEffectEnabledByAssistantFlow.value =
-                    loadIsInvocationEffectEnabledByAssistant()
+                coroutineScope.launch {
+                    userRepository.selectedUser.collect {
+                        trySendWithFailureLogging(
+                            loadIsInvocationEffectEnabledByAssistant(),
+                            TAG,
+                            "updated isInvocationEffectEnabledByAssistantFlow due to user change",
+                        )
+                    }
+                }
+
+                coroutineScope.launch {
+                    selectedAssistantName.collect {
+                        trySendWithFailureLogging(
+                            loadIsInvocationEffectEnabledByAssistant(),
+                            TAG,
+                            "updated isInvocationEffectEnabledByAssistantFlow due to assistant change",
+                        )
+                    }
+                }
+
+                awaitClose {
+                    sharedPreferences.unregisterOnSharedPreferenceChangeListener(listener)
+                }
             }
-        }
-    }
+            .flowOn(coroutineContext)
 
     private val isPowerButtonLongPressConfiguredToLaunchAssistantFlow: Flow<Boolean> =
         conflatedCallbackFlow {
@@ -192,60 +210,6 @@ constructor(
         }
     }
 
-    override suspend fun getRoundedCornersInfo(): SqueezeEffectCornersInfo {
-        val displayInfo = DisplayInfo()
-        context.display.getDisplayInfo(displayInfo)
-        val displayIndex =
-            DisplayUtils.getDisplayUniqueIdConfigIndex(context.resources, displayInfo.uniqueId)
-        val maxResDisplayMode =
-            DisplayUtils.getMaximumResolutionDisplayMode(displayInfo.supportedModes)
-        val ratio =
-            if (maxResDisplayMode == null) {
-                1f
-            } else {
-                DisplayUtils.getPhysicalPixelDisplaySizeRatio(
-                    /*physicalWidth = */ maxResDisplayMode.physicalWidth,
-                    /*physicalHeight = */ maxResDisplayMode.physicalHeight,
-                    /*currentWidth = */ displayInfo.naturalWidth,
-                    /*currentHeight = */ displayInfo.naturalHeight,
-                )
-            }
-        return SqueezeEffectCornersInfo(
-            topResourceId =
-                getDrawableResource(
-                    displayIndex = displayIndex,
-                    arrayResId = R.array.config_roundedCornerTopDrawableArray,
-                    backupDrawableId = R.drawable.rounded_corner_top,
-                ),
-            bottomResourceId =
-                getDrawableResource(
-                    displayIndex = displayIndex,
-                    arrayResId = R.array.config_roundedCornerBottomDrawableArray,
-                    backupDrawableId = R.drawable.rounded_corner_bottom,
-                ),
-            physicalPixelDisplaySizeRatio = ratio,
-        )
-    }
-
-    @DrawableRes
-    private fun getDrawableResource(
-        displayIndex: Int,
-        @ArrayRes arrayResId: Int,
-        @DrawableRes backupDrawableId: Int,
-    ): Int {
-        val drawableResource: Int
-        context.resources.obtainTypedArray(arrayResId).let { array ->
-            drawableResource =
-                if (displayIndex >= 0 && displayIndex < array.length()) {
-                    array.getResourceId(displayIndex, backupDrawableId)
-                } else {
-                    backupDrawableId
-                }
-            array.recycle()
-        }
-        return drawableResource
-    }
-
     private fun loadIsInvocationEffectEnabledByAssistant(): Boolean {
         val persistedForUser =
             sharedPreferences.getInt(
@@ -277,8 +241,10 @@ constructor(
             isPowerButtonLongPressConfiguredToLaunchAssistantFlow,
             isInvocationEffectEnabledByAssistantFlow,
         ) { prerequisites ->
-            prerequisites.all { it ?: false } && Flags.enableLppAssistInvocationEffect()
+            prerequisites.all { it } && Flags.enableLppAssistInvocationEffect()
         }
+
+    override val isSqueezeEffectHapticEnabled = Flags.enableLppAssistInvocationHapticEffect()
 
     private fun getIsPowerButtonLongPressConfiguredToLaunchAssistant() =
         globalSettings.getInt(
@@ -314,7 +280,6 @@ constructor(
 
     private fun setIsInvocationEffectEnabledByAssistant(enabled: Boolean) {
         coroutineScope.launch {
-            isInvocationEffectEnabledByAssistantFlow.value = enabled
             sharedPreferences.edit {
                 putBoolean(IS_INVOCATION_EFFECT_ENABLED_BY_ASSISTANT_PREFERENCE, enabled)
                 putString(PERSISTED_FOR_ASSISTANT_PREFERENCE, selectedAssistantName.value)

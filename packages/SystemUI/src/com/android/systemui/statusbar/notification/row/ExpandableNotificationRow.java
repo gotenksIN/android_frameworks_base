@@ -1566,8 +1566,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     public void setGutsView(MenuItem item) {
-        if (getGuts() != null && item.getGutsView() instanceof NotificationGuts.GutsContent) {
-            getGuts().setGutsContent((NotificationGuts.GutsContent) item.getGutsView());
+        if (getGuts() != null
+                && item.getGutsContent() instanceof NotificationGuts.GutsContent gutsContent) {
+            getGuts().setGutsContent(gutsContent);
         }
     }
 
@@ -1831,7 +1832,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     /** @return true if the User has dismissed this notif's parent */
     public boolean isParentDismissed() {
         if (NotificationBundleUi.isEnabled()) {
-            return getEntryAdapter().getDismissState() == PARENT_DISMISSED;
+            return getEntryAdapter().isParentDismissed();
         } else {
             return getEntryLegacy().getDismissState() == PARENT_DISMISSED;
         }
@@ -1971,8 +1972,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         if (canEntryBeDismissed()) {
             if (mOnUserInteractionCallback != null) {
                 Runnable futureDismissal = NotificationBundleUi.isEnabled()
-                        ? getEntryAdapter().registerFutureDismissal(
-                        mOnUserInteractionCallback, REASON_CANCEL)
+                        ? getEntryAdapter().registerFutureDismissal()
                         : mOnUserInteractionCallback.registerFutureDismissal(
                                 getEntryLegacy(), REASON_CANCEL);
                 if (futureDismissal != null) {
@@ -2444,18 +2444,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     /**
-     * Retrieves an OnClickListener for the close button of a notification, which when invoked,
-     * dismisses the notificationc represented by the given ExpandableNotificationRow.
-     *
-     * @param row The ExpandableNotificationRow representing the notification to be dismissed.
-     * @return An OnClickListener instance that dismisses the notification(s) when invoked.
+     * Retrieves an OnClickListener for the dismiss button of this notification, which when invoked,
+     * dismisses the notification represented by this ExpandableNotificationRow.
      */
-    public View.OnClickListener getCloseButtonOnClickListener(ExpandableNotificationRow row) {
-        return v -> {
-            if (row != null) {
-                row.performDismiss(false);
-            }
-        };
+    public View.OnClickListener getDismissButtonOnClickListener() {
+        return v -> performDismiss(false);
     }
 
     @Override
@@ -2605,10 +2598,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             menuItem = provider.getLongpressMenuItem(mContext);
         }
         if (SEMANTIC_ACTION_MARK_CONVERSATION_AS_PRIORITY == semanticAction
-                && menuItem.getGutsView() instanceof NotificationConversationInfo) {
-            NotificationConversationInfo info =
-                    (NotificationConversationInfo) menuItem.getGutsView();
-            info.setSelectedAction(NotificationConversationInfo.ACTION_FAVORITE);
+                && menuItem.getGutsContent() instanceof NotificationConversationInfo gutsContent) {
+            gutsContent.setSelectedAction(NotificationConversationInfo.ACTION_FAVORITE);
         }
         doLongClickCallback(x, y, menuItem);
     }
@@ -2883,6 +2874,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         if (mGuts == null) {
             mGutsStub.inflate();
         }
+    }
+
+    public boolean isBundle() {
+        return mIsBundle;
     }
 
     private void updateChildrenVisibility() {
@@ -4240,7 +4235,16 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         super.onInitializeAccessibilityNodeInfoInternal(info);
         final boolean isLongClickable = isNotificationRowLongClickable();
         if (isLongClickable) {
-            info.addAction(AccessibilityAction.ACTION_LONG_CLICK);
+            if (isPromotedOngoing()) {
+                final AccessibilityAction longClick =
+                        new AccessibilityAction(
+                                AccessibilityAction.ACTION_LONG_CLICK.getId(),
+                                getContext().getResources().getString(
+                                        R.string.notification_promoted_ongoing_long_click));
+                info.addAction(longClick);
+            } else {
+                info.addAction(AccessibilityAction.ACTION_LONG_CLICK);
+            }
         }
         info.setLongClickable(isLongClickable);
 

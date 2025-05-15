@@ -25,6 +25,8 @@ import static android.view.InsetsSource.ID_IME;
 import static android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 
+import static com.android.window.flags.Flags.relativeInsets;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityTaskManager;
@@ -92,6 +94,16 @@ class InsetsPolicy {
      */
     private InsetsControlTarget mFakeNavControlTarget;
 
+    /**
+     * Used to check if the caller is qualified to abort the transient state of status bar.
+     */
+    private InsetsControlTarget mHidingTransientStatusControlTarget;
+
+    /**
+     * Used to check if the caller is qualified to abort the transient state of nav bar.
+     */
+    private InsetsControlTarget mHidingTransientNavControlTarget;
+
     private WindowState mFocusedWin;
     private final BarWindow mStatusBar = new BarWindow(StatusBarManager.WINDOW_STATUS_BAR);
     private final BarWindow mNavBar = new BarWindow(StatusBarManager.WINDOW_NAVIGATION_BAR);
@@ -100,6 +112,11 @@ class InsetsPolicy {
      * Types shown transiently because of the user action.
      */
     private @InsetsType int mShowingTransientTypes;
+
+    /**
+     * Types shown transiently are now hiding.
+     */
+    private @InsetsType int mHidingTransientTypes;
 
     /**
      * Types shown permanently by the upstream caller.
@@ -232,6 +249,9 @@ class InsetsPolicy {
         if (mShowingTransientTypes == 0) {
             return;
         }
+        mHidingTransientTypes = mShowingTransientTypes;
+        mHidingTransientStatusControlTarget = mFakeStatusControlTarget;
+        mHidingTransientNavControlTarget = mFakeNavControlTarget;
 
         dispatchTransientSystemBarsVisibilityChanged(
                 mFocusedWin,
@@ -240,6 +260,31 @@ class InsetsPolicy {
 
         mShowingTransientTypes = 0;
         updateBarControlTarget(mFocusedWin);
+    }
+
+    void onAnimatingTypesChanged(InsetsControlTarget caller,
+            @InsetsType int lastTypes, @InsetsType int newTypes) {
+        final @InsetsType int diff = lastTypes ^ newTypes;
+        @InsetsType int abortTypes = 0;
+        if (caller == mHidingTransientStatusControlTarget
+                && (mHidingTransientTypes & Type.statusBars()) != 0
+                && (diff & Type.statusBars()) != 0
+                && (newTypes & Type.statusBars()) == 0) {
+            mHidingTransientStatusControlTarget = null;
+            mHidingTransientTypes &= ~Type.statusBars();
+            abortTypes |= Type.statusBars();
+        }
+        if (caller == mHidingTransientNavControlTarget
+                && (mHidingTransientTypes & Type.navigationBars()) != 0
+                && (diff & Type.navigationBars()) != 0
+                && (newTypes & Type.navigationBars()) == 0) {
+            mHidingTransientNavControlTarget = null;
+            mHidingTransientTypes &= ~Type.navigationBars();
+            abortTypes |= Type.navigationBars();
+        }
+        if (abortTypes != 0) {
+            sendAbortTransient(abortTypes);
+        }
     }
 
     boolean isTransient(@InsetsType int type) {
@@ -321,7 +366,7 @@ class InsetsPolicy {
             }
         }
 
-        if (!attrs.isFullscreen() || attrs.getFitInsetsTypes() != 0) {
+        if (!relativeInsets() && (!attrs.isFullscreen() || attrs.getFitInsetsTypes() != 0)) {
             if (state == originalState) {
                 state = new InsetsState(originalState);
             }
@@ -502,13 +547,17 @@ class InsetsPolicy {
                 (fakeControllingTypes & caller.getRequestedVisibleTypes())
                         | (isImeVisible ? Type.navigationBars() : 0);
         mShowingTransientTypes &= ~abortTypes;
+        mHidingTransientTypes &= ~abortTypes;
         if (abortTypes != 0) {
+            if ((abortTypes & Type.statusBars()) != 0) {
+                mHidingTransientStatusControlTarget = null;
+            }
+            if ((abortTypes & Type.navigationBars()) != 0) {
+                mHidingTransientNavControlTarget = null;
+            }
             mDisplayContent.setLayoutNeeded();
             mDisplayContent.mWmService.requestTraversal();
-            final StatusBarManagerInternal statusBarManager = mPolicy.getStatusBarManagerInternal();
-            if (statusBarManager != null) {
-                statusBarManager.abortTransient(mDisplayContent.getDisplayId(), abortTypes);
-            }
+            sendAbortTransient(abortTypes);
         }
     }
 
@@ -520,11 +569,11 @@ class InsetsPolicy {
         if (mShowingTransientTypes == 0) {
             return;
         }
-        final StatusBarManagerInternal statusBarManager = mPolicy.getStatusBarManagerInternal();
-        if (statusBarManager != null) {
-            statusBarManager.abortTransient(mDisplayContent.getDisplayId(), mShowingTransientTypes);
-        }
+        sendAbortTransient(mShowingTransientTypes);
         mShowingTransientTypes = 0;
+        mHidingTransientTypes = 0;
+        mHidingTransientStatusControlTarget = null;
+        mHidingTransientNavControlTarget = null;
         mDisplayContent.setLayoutNeeded();
         mDisplayContent.mWmService.requestTraversal();
 
@@ -532,6 +581,13 @@ class InsetsPolicy {
                 mFocusedWin,
                 /* areVisible= */ false,
                 /* wereRevealedFromSwipeOnSystemBar= */ false);
+    }
+
+    private void sendAbortTransient(@InsetsType int types) {
+        final StatusBarManagerInternal statusBarManager = mPolicy.getStatusBarManagerInternal();
+        if (statusBarManager != null) {
+            statusBarManager.abortTransient(mDisplayContent.getDisplayId(), types);
+        }
     }
 
     private @Nullable InsetsControlTarget getStatusControlTarget(@Nullable WindowState focusedWin,
@@ -767,6 +823,10 @@ class InsetsPolicy {
             pw.println(prefix + "mShowingTransientTypes="
                     + WindowInsets.Type.toString(mShowingTransientTypes));
         }
+        if (mHidingTransientTypes != 0) {
+            pw.println(prefix + "mHidingTransientTypes="
+                    + WindowInsets.Type.toString(mHidingTransientTypes));
+        }
         if (mForciblyShowingTypes != 0) {
             pw.println(prefix + "mForciblyShowingTypes="
                     + WindowInsets.Type.toString(mForciblyShowingTypes));
@@ -774,6 +834,20 @@ class InsetsPolicy {
         if (mForciblyHidingTypes != 0) {
             pw.println(prefix + "mForciblyHidingTypes="
                     + WindowInsets.Type.toString(mForciblyHidingTypes));
+        }
+        if (mFakeStatusControlTarget != null) {
+            pw.println(prefix + "mFakeStatusControlTarget=" + mFakeStatusControlTarget);
+        }
+        if (mFakeNavControlTarget != null) {
+            pw.println(prefix + "mFakeNavControlTarget=" + mFakeNavControlTarget);
+        }
+        if (mHidingTransientStatusControlTarget != null) {
+            pw.println(prefix + "mHidingTransientStatusControlTarget="
+                    + mHidingTransientStatusControlTarget);
+        }
+        if (mHidingTransientNavControlTarget != null) {
+            pw.println(prefix + "mHidingTransientNavControlTarget="
+                    + mHidingTransientNavControlTarget);
         }
     }
 

@@ -23,11 +23,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
 class AmbientCueInteractor @Inject constructor(private val repository: AmbientCueRepository) {
-    val isAttached: StateFlow<Boolean> = repository.isAttached
     val isVisible: StateFlow<Boolean> = repository.isVisible
     val actions: StateFlow<List<ActionModel>> = repository.actions
+    val isImeVisible: StateFlow<Boolean> = repository.isImeVisible
 
     fun setIsVisible(visible: Boolean) {
         repository.isVisible.update { visible }
+    }
+
+    fun setIsImeVisible(visible: Boolean) {
+        repository.isImeVisible.update { visible }
     }
 }

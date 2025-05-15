@@ -708,6 +708,16 @@ flag {
 }
 
 flag {
+    name: "restrict_freeform_hidden_system_bars_to_filling_tasks"
+    namespace: "lse_desktop_experience"
+    description: "Only allow filling freeform tasks to hide the system bars"
+    bug: "415267515"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "keyboard_shortcuts_to_switch_desks"
     namespace: "lse_desktop_experience"
     description: "Enable switching the active desk with keyboard shortcuts"
@@ -1265,6 +1275,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Send onDisplay(Add|Remove)SystemDecorations callbacks via WM's IDisplayWindowListener."
     bug: "408503553"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_no_window_decoration_for_desks"
+    namespace: "lse_desktop_experience"
+    description: "Stops the creation of a window decoration for desk tasks."
+    bug: "414449402"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

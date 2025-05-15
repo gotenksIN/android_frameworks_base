@@ -16,7 +16,6 @@
 
 package com.android.systemui.ambientcue.domain.interactor
 
-import android.content.Intent
 import android.content.applicationContext
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
@@ -36,22 +35,6 @@ import org.junit.runner.RunWith
 @SmallTest
 class AmbientCueInteractorTest : SysuiTestCase() {
     private val kosmos = testKosmos()
-
-    @Test
-    fun isAttached_whenCreated_true() =
-        kosmos.runTest {
-            val isAttached by collectLastValue(ambientCueInteractor.isAttached)
-            ambientCueRepository.fake.setIsAttached(true)
-            assertThat(isAttached).isTrue()
-        }
-
-    @Test
-    fun isAttached_whenDestroyed_false() =
-        kosmos.runTest {
-            val isAttached by collectLastValue(ambientCueInteractor.isAttached)
-            ambientCueRepository.fake.setIsAttached(false)
-            assertThat(isAttached).isFalse()
-        }
 
     @Test
     fun isVisible_setTrue_true() =
@@ -83,10 +66,26 @@ class AmbientCueInteractorTest : SysuiTestCase() {
                             ),
                         label = "Sunday Morning",
                         attribution = null,
-                        intent = Intent(),
+                        onPerformAction = {},
                     )
                 )
             ambientCueRepository.fake.setActions(testActions)
             assertThat(actions).isEqualTo(testActions)
+        }
+
+    @Test
+    fun isImeVisible_setTrue_true() =
+        kosmos.runTest {
+            val isImeVisible by collectLastValue(ambientCueInteractor.isImeVisible)
+            ambientCueInteractor.setIsImeVisible(true)
+            assertThat(isImeVisible).isTrue()
+        }
+
+    @Test
+    fun isImeVisible_setFalse_false() =
+        kosmos.runTest {
+            val isImeVisible by collectLastValue(ambientCueInteractor.isImeVisible)
+            ambientCueInteractor.setIsImeVisible(false)
+            assertThat(isImeVisible).isFalse()
         }
 }

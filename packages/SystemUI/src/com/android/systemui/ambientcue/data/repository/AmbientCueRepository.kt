@@ -16,42 +16,49 @@
 
 package com.android.systemui.ambientcue.data.repository
 
+import android.app.ActivityTaskManager
+import android.app.assist.ActivityId
 import android.app.smartspace.SmartspaceConfig
 import android.app.smartspace.SmartspaceManager
 import android.app.smartspace.SmartspaceSession.OnTargetsAvailableListener
 import android.content.Context
-import android.content.IntentFilter
 import android.util.Log
+import android.view.autofill.AutofillId
+import android.view.autofill.AutofillManager
 import androidx.annotation.VisibleForTesting
 import com.android.systemui.ambientcue.shared.model.ActionModel
-import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.display.data.repository.FocusedDisplayRepository
+import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import java.util.concurrent.Executor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 
 /** Source of truth for ambient actions and visibility of their system space. */
 interface AmbientCueRepository {
     /** Chips that should be visible on the UI. */
     val actions: StateFlow<List<ActionModel>>
 
-    /** If window should be added to the navbar area or not. */
-    val isAttached: StateFlow<Boolean>
-
     /** If hint (or chips list) should be visible. */
     val isVisible: MutableStateFlow<Boolean>
+
+    /** If IME is visible or not. */
+    val isImeVisible: MutableStateFlow<Boolean>
+
+    /** Task Id which is globally focused on display. */
+    val globallyFocusedTaskId: StateFlow<Int>
 }
 
 @SysUISingleton
@@ -59,25 +66,13 @@ class AmbientCueRepositoryImpl
 @Inject
 constructor(
     @Background private val backgroundScope: CoroutineScope,
-    broadcastDispatcher: BroadcastDispatcher,
     private val smartSpaceManager: SmartspaceManager?,
+    private val autofillManager: AutofillManager?,
+    private val activityStarter: ActivityStarter,
     @Background executor: Executor,
     @Application applicationContext: Context,
+    focusdDisplayRepository: FocusedDisplayRepository,
 ) : AmbientCueRepository {
-    private val debugBroadcastFlow: Flow<Boolean> =
-        if (DEBUG) {
-            broadcastDispatcher.broadcastFlow(
-                filter =
-                    IntentFilter().apply {
-                        addAction(ACTION_CREATE_AMBIENT_CUE)
-                        addAction(ACTION_DESTROY_AMBIENT_CUE)
-                    }
-            ) { intent, _ ->
-                intent.action == ACTION_CREATE_AMBIENT_CUE
-            }
-        } else {
-            MutableStateFlow(false).asStateFlow()
-        }
 
     override val actions: StateFlow<List<ActionModel>> =
         conflatedCallbackFlow {
@@ -90,67 +85,94 @@ constructor(
                     smartSpaceManager.createSmartspaceSession(
                         SmartspaceConfig.Builder(applicationContext, AMBIENT_CUE_SURFACE).build()
                     )
+                Log.i(TAG, "SmartSpace session created")
 
                 val smartSpaceListener = OnTargetsAvailableListener { targets ->
                     val actions =
                         targets
-                            .filter { target -> target.featureType == AMBIENT_ACTION_FEATURE }
                             .filter { it.smartspaceTargetId == AMBIENT_CUE_SURFACE }
                             .flatMap { target -> target.actionChips }
                             .map { chip ->
+                                val title = chip.title.toString()
                                 ActionModel(
                                     icon =
                                         chip.icon?.loadDrawable(applicationContext)
                                             ?: applicationContext.getDrawable(
                                                 R.drawable.ic_content_paste_spark
                                             )!!,
-                                    intent = chip.intent,
-                                    label = chip.title.toString(),
+                                    label = title,
                                     attribution = chip.subtitle.toString(),
+                                    onPerformAction = {
+                                        val intent = chip.intent
+                                        val activityId =
+                                            chip.extras?.getParcelable<ActivityId>(
+                                                EXTRA_ACTIVITY_ID
+                                            )
+                                        val autofillId =
+                                            chip.extras?.getParcelable<AutofillId>(
+                                                EXTRA_AUTOFILL_ID
+                                            )
+                                        val token = activityId?.token
+                                        Log.v(
+                                            TAG,
+                                            "Performing action: $activityId, $autofillId, $intent",
+                                        )
+                                        if (token != null && autofillId != null) {
+                                            autofillManager?.autofillRemoteApp(
+                                                autofillId,
+                                                title,
+                                                token,
+                                                activityId.taskId,
+                                            )
+                                        } else if (intent != null) {
+                                            activityStarter.startActivity(intent, false)
+                                        }
+                                    },
                                 )
                             }
                     if (DEBUG) {
                         Log.d(TAG, "SmartSpace OnTargetsAvailableListener $targets")
-                        Log.d(TAG, "SmartSpace actions $actions")
                     }
+                    Log.v(TAG, "SmartSpace actions $actions")
                     trySend(actions)
                 }
 
                 session.addOnTargetsAvailableListener(executor, smartSpaceListener)
+                Log.i(TAG, "SmartSpace session addOnTargetsAvailableListener")
                 awaitClose {
                     session.removeOnTargetsAvailableListener(smartSpaceListener)
                     session.close()
+                    Log.i(TAG, "SmartSpace session closed")
                 }
             }
+            .onEach { actions -> isVisible.update { actions.isNotEmpty() } }
             .stateIn(
                 scope = backgroundScope,
                 started = SharingStarted.WhileSubscribed(),
                 initialValue = emptyList(),
             )
 
-    override val isAttached: StateFlow<Boolean> =
-        combine(actions, debugBroadcastFlow) { actions, createdViaBroadcast ->
-                actions.isNotEmpty() || createdViaBroadcast
-            }
+    override val isVisible: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
+    override val isImeVisible: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
+    override val globallyFocusedTaskId: StateFlow<Int> =
+        focusdDisplayRepository.globallyFocusedTask
+            .map { it?.taskId ?: INVALID_TASK_ID }
             .stateIn(
                 scope = backgroundScope,
                 started = SharingStarted.WhileSubscribed(),
-                initialValue = false,
+                initialValue = INVALID_TASK_ID,
             )
 
-    override val isVisible: MutableStateFlow<Boolean> = MutableStateFlow(false)
-
     companion object {
-        // Privately defined card type, exclusive for ambient actions
-        @VisibleForTesting const val AMBIENT_ACTION_FEATURE = 72
         // Surface that PCC wants to push cards into
         @VisibleForTesting const val AMBIENT_CUE_SURFACE = "ambientcue"
+        @VisibleForTesting const val EXTRA_ACTIVITY_ID = "activityId"
+        @VisibleForTesting const val EXTRA_AUTOFILL_ID = "autofillId"
         // Timeout to hide cuebar if it wasn't interacted with
         private const val TAG = "AmbientCueRepository"
         private const val DEBUG = false
-        private const val ACTION_CREATE_AMBIENT_CUE =
-            "com.systemui.ambientcue.action.CREATE_AMBIENT_CUE"
-        private const val ACTION_DESTROY_AMBIENT_CUE =
-            "com.systemui.ambientcue.action.DESTROY_AMBIENT_CUE"
+        private const val INVALID_TASK_ID = ActivityTaskManager.INVALID_TASK_ID
     }
 }

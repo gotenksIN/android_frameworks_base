@@ -17,10 +17,13 @@
 package com.android.systemui.ambientcue.ui.compose
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
@@ -40,14 +43,32 @@ fun ActionList(actions: List<ActionViewModel>, visible: Boolean, modifier: Modif
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         actions.fastForEachIndexed { index, action ->
-            val delay = 50 * (actions.size - index)
             AnimatedVisibility(
                 visible = visible,
                 enter =
-                    slideInVertically(tween(450, delayMillis = delay)) {
-                        with(density) { 15.dp.roundToPx() }
-                    } + fadeIn(tween(450, delayMillis = delay)),
-                exit = fadeOut(tween(250)),
+                    slideInVertically(
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        )
+                    ) {
+                        with(density) { it * (actions.size - index) }
+                    } +
+                        scaleIn(
+                            spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            )
+                        ),
+                exit =
+                    slideOutVertically(
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        )
+                    ) {
+                        with(density) { it * (actions.size - index) }
+                    } + scaleOut(tween(250)),
             ) {
                 Chip(action)
             }

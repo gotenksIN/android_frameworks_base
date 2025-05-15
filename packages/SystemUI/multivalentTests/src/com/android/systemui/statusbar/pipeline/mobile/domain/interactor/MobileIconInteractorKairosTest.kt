@@ -56,8 +56,8 @@ import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.ArgumentMatchers.eq
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
@@ -144,7 +144,6 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
         connectionRepo.isGsm.setValue(true)
         connectionRepo.primaryLevel.setValue(GSM_LEVEL)
         connectionRepo.cdmaLevel.setValue(CDMA_LEVEL)
-        //            mobileIconsInteractor.alwaysUseCdmaLevel.setValue(true)
         alwaysUseCdmaLevel.setValue(true)
 
         val latest by underTest.signalLevelIcon.collectLastValue()
@@ -166,7 +165,6 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
         connectionRepo.isGsm.setValue(false)
         connectionRepo.primaryLevel.setValue(GSM_LEVEL)
         connectionRepo.cdmaLevel.setValue(CDMA_LEVEL)
-        //            mobileIconsInteractor.alwaysUseCdmaLevel.setValue(true)
         alwaysUseCdmaLevel.setValue(true)
 
         val latest by underTest.signalLevelIcon.collectLastValue()
@@ -179,7 +177,6 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
         connectionRepo.isGsm.setValue(false)
         connectionRepo.primaryLevel.setValue(GSM_LEVEL)
         connectionRepo.cdmaLevel.setValue(CDMA_LEVEL)
-        //            mobileIconsInteractor.alwaysUseCdmaLevel.setValue(false)
         alwaysUseCdmaLevel.setValue(false)
 
         val latest by underTest.signalLevelIcon.collectLastValue()
@@ -319,13 +316,14 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
     fun overrideIcon_usesCarrierIdOverride() = runTest {
         overrides =
             mock<MobileIconCarrierIdOverrides> {
-                on { carrierIdEntryExists(anyInt()) } doReturn true
-                on { getOverrideFor(anyInt(), anyString(), any()) } doReturn 1234
+                on { carrierIdEntryExists(eq(4321)) } doReturn true
+                on { getOverrideFor(eq(4321), anyString(), any()) } doReturn 1234
             }
 
         connectionRepo.resolvedNetworkType.setValue(
             DefaultNetworkType(mobileMappingsProxy.toIconKey(THREE_G))
         )
+        connectionRepo.carrierId.setValue(4321)
 
         val latest by underTest.networkTypeIconGroup.collectLastValue()
 
@@ -337,12 +335,10 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
     fun alwaysShowDataRatIcon_matchesParent() = runTest {
         val latest by underTest.alwaysShowDataRatIcon.collectLastValue()
 
-        //            mobileIconsInteractor.alwaysShowDataRatIcon.setValue(true)
         alwaysShowDataRatIcon.setValue(true)
 
         assertThat(latest).isTrue()
 
-        //            mobileIconsInteractor.alwaysShowDataRatIcon.setValue(false)
         alwaysShowDataRatIcon.setValue(false)
 
         assertThat(latest).isFalse()
@@ -480,11 +476,9 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
     fun isSingleCarrier_matchesParent() = runTest {
         val latest by underTest.isSingleCarrier.collectLastValue()
 
-        //            mobileIconsInteractor.isSingleCarrier.setValue(true)
         isSingleCarrier.setValue(true)
         assertThat(latest).isTrue()
 
-        //            mobileIconsInteractor.isSingleCarrier.setValue(false)
         isSingleCarrier.setValue(false)
         assertThat(latest).isFalse()
     }
@@ -493,11 +487,9 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
     fun isForceHidden_matchesParent() = runTest {
         val latest by underTest.isForceHidden.collectLastValue()
 
-        //            mobileIconsInteractor.isForceHidden.setValue(true)
         isForceHidden.setValue(true)
         assertThat(latest).isTrue()
 
-        //            mobileIconsInteractor.isForceHidden.setValue(false)
         isForceHidden.setValue(false)
         assertThat(latest).isFalse()
     }
@@ -525,9 +517,6 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
             underTest.signalLevelIcon.map { it as? SignalIconModel.Cellular }.collectLastValue()
 
         assertThat(latest?.level).isEqualTo(1)
-
-        // TODO: need to provision MobileIconsInteractorKairos#isDefaultConnectionFailed +
-        // defaultSubscriptionHasDataEnabled?
         assertThat(latest?.showExclamationMark).isEqualTo(false)
     }
 
@@ -573,7 +562,6 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
     @Test
     fun cellBasedIcon_defaultConnectionFailed_showExclamationTrue() = runTest {
         connectionRepo.isNonTerrestrial.setValue(false)
-        //            mobileIconsInteractor.isDefaultConnectionFailed.setValue(true)
         isDefaultConnectionFailed.setValue(true)
 
         val latest by underTest.signalLevelIcon.collectLastValue()
@@ -586,7 +574,6 @@ class MobileIconInteractorKairosTest : SysuiTestCase() {
         connectionRepo.isNonTerrestrial.setValue(false)
         connectionRepo.isInService.setValue(true)
         connectionRepo.dataEnabled.setValue(true)
-        //            mobileIconsInteractor.isDefaultConnectionFailed.setValue(false)
         isDefaultConnectionFailed.setValue(false)
 
         val latest by underTest.signalLevelIcon.collectLastValue()

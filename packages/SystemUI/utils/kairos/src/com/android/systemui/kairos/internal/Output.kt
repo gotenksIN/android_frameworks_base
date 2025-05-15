@@ -16,7 +16,18 @@
 
 package com.android.systemui.kairos.internal
 
-internal class Output<A>(val onDeath: () -> Unit = {}, val onEmit: EvalScope.(A) -> Unit) {
+import com.android.systemui.kairos.util.NameData
+import com.android.systemui.kairos.util.forceInit
+
+internal class Output<A>(
+    val nameData: NameData,
+    val onDeath: () -> Unit = {},
+    val onEmit: EvalScope.(A) -> Unit,
+) {
+
+    init {
+        nameData.forceInit()
+    }
 
     val schedulable = Schedulable.O(this)
 
@@ -44,7 +55,11 @@ internal class Output<A>(val onDeath: () -> Unit = {}, val onEmit: EvalScope.(A)
                 .getPushEvent(logIndent, evalScope)
         evalScope.scheduleOutput(this)
     }
+
+    override fun toString(): String = "${super.toString()}[$nameData]"
 }
 
-internal inline fun OneShot(crossinline onEmit: EvalScope.() -> Unit): Output<Unit> =
-    Output<Unit>(onEmit = { onEmit() }).apply { result = Unit }
+internal inline fun OneShot(
+    nameData: NameData,
+    crossinline onEmit: EvalScope.() -> Unit,
+): Output<Unit> = Output<Unit>(nameData, onEmit = { onEmit() }).apply { result = Unit }

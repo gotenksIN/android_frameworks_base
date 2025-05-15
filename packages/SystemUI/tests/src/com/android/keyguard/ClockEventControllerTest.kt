@@ -16,9 +16,7 @@
 package com.android.keyguard
 
 import android.content.BroadcastReceiver
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
-import android.provider.Settings
+import android.icu.util.TimeZone as IcuTimeZone
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.FrameLayout
@@ -54,6 +52,7 @@ import com.android.systemui.plugins.clocks.ClockFaceEvents
 import com.android.systemui.plugins.clocks.ClockMessageBuffers
 import com.android.systemui.plugins.clocks.ClockTickRate
 import com.android.systemui.plugins.clocks.ThemeConfig
+import com.android.systemui.plugins.clocks.TimeFormatKind
 import com.android.systemui.plugins.clocks.ZenData
 import com.android.systemui.plugins.clocks.ZenData.ZenMode
 import com.android.systemui.res.R
@@ -301,18 +300,17 @@ class ClockEventControllerTest : SysuiTestCase() {
             verify(keyguardUpdateMonitor).registerCallback(capture(captor))
             captor.value.onTimeFormatChanged("12h")
 
-            verify(events).onTimeFormatChanged(false)
+            verify(events).onTimeFormatChanged(TimeFormatKind.HALF_DAY)
         }
 
     @Test
     fun keyguardCallback_timezoneChanged_clockNotified() =
         runBlocking(IMMEDIATE) {
-            val mockTimeZone = mock<TimeZone>()
             val captor = argumentCaptor<KeyguardUpdateMonitorCallback>()
             verify(keyguardUpdateMonitor).registerCallback(capture(captor))
-            captor.value.onTimeZoneChanged(mockTimeZone)
+            captor.value.onTimeZoneChanged(TimeZone.getTimeZone("GMT"))
 
-            verify(events).onTimeZoneChanged(mockTimeZone)
+            verify(events).onTimeZoneChanged(IcuTimeZone.getTimeZone("GMT"))
         }
 
     @Test
@@ -322,7 +320,7 @@ class ClockEventControllerTest : SysuiTestCase() {
             verify(keyguardUpdateMonitor).registerCallback(capture(captor))
             captor.value.onUserSwitchComplete(10)
 
-            verify(events).onTimeFormatChanged(false)
+            verify(events).onTimeFormatChanged(TimeFormatKind.HALF_DAY)
         }
 
     @Test
@@ -496,7 +494,6 @@ class ClockEventControllerTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_MODES_UI)
     fun listenForDnd_onDndChange_updatesClockZenMode() =
         testScope.runTest {
             underTest.listenForDnd(testScope.backgroundScope)
@@ -513,24 +510,6 @@ class ClockEventControllerTest : SysuiTestCase() {
 
             zenModeRepository.deactivateMode(MANUAL_DND)
             runCurrent()
-
-            verify(events).onZenDataChanged(eq(ZenData(ZenMode.OFF, R.string::dnd_is_off.name)))
-        }
-
-    @Test
-    @DisableFlags(android.app.Flags.FLAG_MODES_UI)
-    fun zenModeControllerCallback_onDndChange_updatesClockZenMode() =
-        runBlocking(IMMEDIATE) {
-            zenModeControllerCallback!!.onZenChanged(
-                Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS
-            )
-
-            verify(events)
-                .onZenDataChanged(
-                    eq(ZenData(ZenMode.IMPORTANT_INTERRUPTIONS, R.string::dnd_is_on.name))
-                )
-
-            zenModeControllerCallback!!.onZenChanged(Settings.Global.ZEN_MODE_OFF)
 
             verify(events).onZenDataChanged(eq(ZenData(ZenMode.OFF, R.string::dnd_is_off.name)))
         }

@@ -158,7 +158,6 @@ import com.android.server.wm.BackgroundActivityStartController.BalCode;
 import com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import com.android.server.wm.LaunchParamsController.LaunchParams;
 import com.android.server.wm.TaskFragment.EmbeddingCheckResult;
-import com.android.wm.shell.Flags;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -278,6 +277,8 @@ class ActivityStarter {
     private static final int MOVE_TO_FRONT_AVOID_PI_ONLY_CREATOR_ALLOWS = 1;
     // Avoid a task move to front because of all other legacy reasons.
     private static final int MOVE_TO_FRONT_AVOID_LEGACY = 2;
+    // Avoid a task move to front because it was requested from a visible multiple window.
+    private static final int MOVE_TO_FRONT_AVOID_VISIBLE_MULTI_WINDOW = 3;
     private @MoveToFrontCode int mCanMoveToFrontCode = MOVE_TO_FRONT_ALLOWED;
     private boolean mFrozeTaskList;
     private boolean mTransientLaunch;
@@ -1942,13 +1943,9 @@ class ActivityStarter {
         // Get top task at beginning because the order may be changed when reusing existing task.
         final Task prevTopRootTask = mPreferredTaskDisplayArea.getFocusedRootTask();
         final Task prevTopTask = prevTopRootTask != null ? prevTopRootTask.getTopLeafTask() : null;
-        final boolean sourceActivityLaunchedFromBubble =
-                sourceRecord != null && sourceRecord.getLaunchedFromBubble();
-        // if the flag is enabled, allow reusing bubbled tasks only if the source activity is
-        // bubbled.
+        // allow reusing bubbled tasks only if the source activity is bubbled.
         final boolean includeLaunchedFromBubble =
-                Flags.onlyReuseBubbledTaskWhenLaunchedFromBubble()
-                        ? sourceActivityLaunchedFromBubble : true;
+                sourceRecord != null && sourceRecord.getLaunchedFromBubble();
         final Task reusedTask = resolveReusableTask(includeLaunchedFromBubble);
 
         // If requested, freeze the task list
@@ -1992,6 +1989,14 @@ class ActivityStarter {
                     && (prevTopTask != null && prevTopTask.isActivityTypeHomeOrRecents())
                     && r.mTransitionController.isTransientHide(targetTask)) {
                 mCanMoveToFrontCode = MOVE_TO_FRONT_AVOID_LEGACY;
+            }
+            // To prevent interruption of the user's current focus, if a launch request
+            // originates from activities within the same visible task, the task should not be
+            // moved to the front, or an unfocused Task could be moved to top unexpectedly.
+            if (com.android.window.flags.Flags.fixMovingUnfocusedTask() && !avoidMoveToFront()
+                    && sourceRecord != null && sourceRecord.getTask() == targetTask
+                    && targetTask.isVisible() && targetTask.inMultiWindowMode()) {
+                mCanMoveToFrontCode = MOVE_TO_FRONT_AVOID_VISIBLE_MULTI_WINDOW;
             }
             // If the activity is started by sending a pending intent and only its creator has the
             // privilege to allow BAL (its sender does not), avoid move it to the front. Only do

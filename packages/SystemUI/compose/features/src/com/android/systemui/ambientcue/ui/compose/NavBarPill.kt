@@ -20,15 +20,14 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButtonColors
@@ -49,6 +48,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -56,6 +56,7 @@ import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.lerp
 import com.android.compose.PlatformIconButton
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
+import com.android.systemui.ambientcue.ui.compose.modifier.animatedActionBorder
 import com.android.systemui.ambientcue.ui.viewmodel.ActionViewModel
 import com.android.systemui.res.R
 
@@ -114,38 +115,60 @@ fun NavBarPill(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier =
                     Modifier.clip(RoundedCornerShape(16.dp))
-                        .border(2.dp, outlineColor, RoundedCornerShape(16.dp))
-                        .defaultMinSize(minWidth = navBarWidth)
+                        .widthIn(min = navBarWidth, max = 247.dp)
                         .background(backgroundColor)
+                        .animatedActionBorder(
+                            strokeWidth = 2.dp,
+                            strokeColor = outlineColor,
+                            cornerRadius = 16.dp,
+                            visible = visible,
+                        )
                         .clickable { onClick() }
                         .padding(horizontal = 8.dp, vertical = 6.dp)
                         .onGloballyPositioned { expandedSize = it.size },
             ) {
+                // Should have at most 1 expanded chip
+                var expandedChip by remember { mutableStateOf(false) }
                 actions.fastForEach { action ->
-                    Image(
-                        painter = rememberDrawablePainter(action.icon),
-                        colorFilter =
-                            if (action.attribution != null) {
-                                ColorFilter.tint(outlineColor)
-                            } else {
-                                null
-                            },
-                        contentDescription = action.label,
-                        modifier = Modifier.size(16.dp).clip(CircleShape),
-                    )
-                    if (actions.size == 1 || action.attribution != null) {
-                        Text(
-                            text = action.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = outlineColor,
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Image(
+                            painter = rememberDrawablePainter(action.icon),
+                            colorFilter =
+                                if (action.attribution != null) {
+                                    ColorFilter.tint(outlineColor)
+                                } else {
+                                    null
+                                },
+                            contentDescription = action.label,
+                            modifier = Modifier.size(16.dp).clip(CircleShape),
                         )
-                        if (action.attribution != null) {
+                        if ((actions.size == 1 || action.attribution != null) && !expandedChip) {
+                            expandedChip = true
                             Text(
-                                text = action.attribution,
+                                text = action.label,
                                 style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 color = outlineColor,
-                                modifier = Modifier.padding(start = 4.dp).alpha(0.4f),
+                                modifier = Modifier.weight(0.63f, fill = false),
                             )
+                            if (action.attribution != null) {
+                                Text(
+                                    text = action.attribution,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = outlineColor,
+                                    modifier =
+                                        Modifier.padding(start = 4.dp)
+                                            .alpha(0.4f)
+                                            .weight(0.37f, false),
+                                )
+                            }
                         }
                     }
                 }

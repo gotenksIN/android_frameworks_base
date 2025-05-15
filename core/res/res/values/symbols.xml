@@ -1113,6 +1113,7 @@
   <java-symbol type="string" name="media_route_status_in_use" />
   <java-symbol type="string" name="owner_name" />
   <java-symbol type="string" name="guest_name" />
+  <java-symbol type="string" name="headless_system_user_name" />
   <java-symbol type="string" name="config_chooseAccountActivity" />
   <java-symbol type="string" name="config_chooseTypeAndAccountActivity" />
   <java-symbol type="string" name="config_chooserActivity" />
@@ -1717,7 +1718,6 @@
   <java-symbol type="xml" name="sms_short_codes" />
   <java-symbol type="xml" name="audio_assets" />
   <java-symbol type="xml" name="global_keys" />
-  <java-symbol type="xml" name="default_zen_mode_config" />
   <java-symbol type="xml" name="sms_7bit_translation_table" />
   <java-symbol type="xml" name="color_extraction" />
 
@@ -3425,6 +3425,9 @@
   <java-symbol type="string" name="private_space_set_up_screen_lock_message" />
   <!-- Message shown in the dialog prompting the user to set up a screen lock to delete private space from Reset Options [CHAR LIMIT=120] -->
   <java-symbol type="string" name="private_space_set_up_screen_lock_for_reset" />
+
+  <!-- Allowlist of private space apps to receive ACTION_(LOCKED_)BOOT_COMPLETED intents immediately -->
+  <java-symbol type="array" name="config_privateSpaceBootCompletedImmediateReceivers" />
 
   <java-symbol type="string" name="deprecated_target_sdk_message" />
   <java-symbol type="string" name="deprecated_target_sdk_app_store" />
@@ -5915,6 +5918,10 @@
   <java-symbol type="drawable" name="accessibility_autoclick_resume" />
   <java-symbol type="drawable" name="ic_accessibility_autoclick" />
   <java-symbol type="drawable" name="ic_accessibility_mouse_keys" />
+  <java-symbol type="drawable" name="accessibility_autoclick_position_top_left" />
+  <java-symbol type="drawable" name="accessibility_autoclick_position_top_right" />
+  <java-symbol type="drawable" name="accessibility_autoclick_position_bottom_left" />
+  <java-symbol type="drawable" name="accessibility_autoclick_position_bottom_right" />
 
   <!-- Accessibility autoclick scroll panel related -->
   <java-symbol type="layout" name="accessibility_autoclick_scroll_panel" />
@@ -6244,4 +6251,10 @@
 
   <!-- The selection toolbar render service component name -->
   <java-symbol type="string" name="config_systemUiSelectionToolbarRenderService" />
+
+  <!-- Whether Sys UI reboot UI is prioritized for reocvery triggered UI. -->
+  <java-symbol type="bool" name="config_prioritizeSysUiForRecoveryRebootUi" />
+
+  <!-- Maximum number of devices that allows for audio sharing. -->
+  <java-symbol type="integer" name="config_audio_sharing_maximum_sinks" />
 </resources>

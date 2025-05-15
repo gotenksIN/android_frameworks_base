@@ -54,7 +54,6 @@ import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.LowestZIndexContentPicker
 import com.android.compose.animation.scene.ValueKey
-import com.android.compose.animation.scene.animateElementColorAsState
 import com.android.compose.animation.scene.animateElementFloatAsState
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 
@@ -72,20 +71,12 @@ object NotificationRowPrimitives {
 
 /** The Icon displayed at the start of any notification row. */
 @Composable
-fun ContentScope.BundleIcon(@DrawableRes drawable: Int?, modifier: Modifier = Modifier) {
+fun BundleIcon(@DrawableRes drawable: Int?, modifier: Modifier = Modifier) {
     val surfaceColor = notificationElementSurfaceColor()
-    Box(
-        modifier =
-            modifier
-                // Has to be a shared element because we may have semi-transparent background color
-                .element(NotificationRowPrimitives.Elements.NotificationIconBackground)
-                .size(40.dp)
-                .background(color = surfaceColor, shape = CircleShape)
-    ) {
+    Box(modifier = modifier.size(40.dp).background(color = surfaceColor, shape = CircleShape)) {
         if (drawable == null) return@Box
-        val painter = painterResource(drawable)
         Image(
-            painter = painter,
+            painter = painterResource(drawable),
             contentDescription = null,
             modifier = Modifier.padding(10.dp).fillMaxSize(),
             contentScale = ContentScale.Fit,
@@ -149,15 +140,18 @@ fun ContentScope.ExpansionControl(
 @Composable
 private fun ContentScope.PillBackground(modifier: Modifier = Modifier) {
     val surfaceColor = notificationElementSurfaceColor()
-    Box(
-        modifier =
-            Modifier.drawBehind {
-                drawRoundRect(
-                    color = surfaceColor,
-                    cornerRadius = CornerRadius(100.dp.toPx(), 100.dp.toPx()),
-                )
-            }
-    )
+    // Needs to be a shared element so it does not overlap while animating
+    ElementWithValues(NotificationRowPrimitives.Elements.PillBackground, modifier) {
+        Box(
+            modifier =
+                Modifier.drawBehind {
+                    drawRoundRect(
+                        color = surfaceColor,
+                        cornerRadius = CornerRadius(100.dp.toPx(), 100.dp.toPx()),
+                    )
+                }
+        )
+    }
 }
 
 @Composable

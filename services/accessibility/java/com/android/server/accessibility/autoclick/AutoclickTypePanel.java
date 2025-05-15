@@ -148,6 +148,10 @@ public class AutoclickTypePanel {
 
     private final Drawable mPauseButtonDrawable;
     private final Drawable mResumeButtonDrawable;
+    private final Drawable mPositionTopLeftDrawable;
+    private final Drawable mPositionTopRightDrawable;
+    private final Drawable mPositionBottomLeftDrawable;
+    private final Drawable mPositionBottomRightDrawable;
 
     public AutoclickTypePanel(
             Context context,
@@ -164,6 +168,14 @@ public class AutoclickTypePanel {
                 R.drawable.accessibility_autoclick_pause);
         mResumeButtonDrawable = mContext.getDrawable(
                 R.drawable.accessibility_autoclick_resume);
+        mPositionTopLeftDrawable = mContext.getDrawable(
+                R.drawable.accessibility_autoclick_position_top_left);
+        mPositionTopRightDrawable = mContext.getDrawable(
+                R.drawable.accessibility_autoclick_position_top_right);
+        mPositionBottomLeftDrawable = mContext.getDrawable(
+                R.drawable.accessibility_autoclick_position_bottom_left);
+        mPositionBottomRightDrawable = mContext.getDrawable(
+                R.drawable.accessibility_autoclick_position_bottom_right);
 
         mContentView =
                 (AutoclickLinearLayout) LayoutInflater.from(context)
@@ -268,6 +280,10 @@ public class AutoclickTypePanel {
         params.x = PANEL_EDGE_MARGIN;
         params.y = yPosition;
         mWindowManager.updateViewLayout(mContentView, params);
+
+        // Use actual position for icon (not mCurrentCorner which is mainly used for rotation
+        // sequence).
+        updatePositionButtonIcon(getVisualCorner());
     }
 
     private void initializeButtonState() {
@@ -291,6 +307,9 @@ public class AutoclickTypePanel {
         mPauseButton.setOnClickListener(v -> togglePause());
 
         resetSelectedClickType();
+
+        // Remove spacing between buttons when initialized.
+        adjustPanelSpacing(/* isExpanded= */ false);
     }
 
     /** Reset panel as collapsed state and only displays the left click button. */
@@ -341,6 +360,12 @@ public class AutoclickTypePanel {
         // defaults to bottom-right corner.
         restorePanelPosition();
         mWindowManager.addView(mContentView, mParams);
+
+        // Update icon after view is laid out on screen to ensure accurate position detection
+        // (getLocationOnScreen only works properly after layout is complete).
+        mContentView.post(() -> {
+            updatePositionButtonIcon(getVisualCorner());
+        });
     }
 
     public void hide() {
@@ -374,9 +399,15 @@ public class AutoclickTypePanel {
 
             // Sets the newly selected button.
             setSelectedClickType(clickType);
+
+            // Remove spacing between buttons when collapsed.
+            adjustPanelSpacing(/* isExpanded= */ false);
         } else {
             // If the panel is already collapsed, we just need to expand it.
             showAllClickTypeButtons();
+
+            // Add spacing when panel is expanded.
+            adjustPanelSpacing(/* isExpanded= */ true);
         }
 
         // Toggle the state.
@@ -440,6 +471,7 @@ public class AutoclickTypePanel {
 
         setPanelPositionForCorner(mParams, mCurrentCorner);
         mWindowManager.updateViewLayout(mContentView, mParams);
+        updatePositionButtonIcon(mCurrentCorner);
     }
 
     private void setPanelPositionForCorner(WindowManager.LayoutParams params, @Corner int corner) {
@@ -555,6 +587,89 @@ public class AutoclickTypePanel {
                 togglePause();
             }
         };
+    }
+
+    private void updatePositionButtonIcon(@Corner int corner) {
+        ImageButton imageButton = (ImageButton) mPositionButton.getChildAt(/* index= */ 0);
+        switch (corner) {
+            case CORNER_TOP_LEFT:
+                imageButton.setImageDrawable(mPositionTopLeftDrawable);
+                break;
+            case CORNER_TOP_RIGHT:
+                imageButton.setImageDrawable(mPositionTopRightDrawable);
+                break;
+            case CORNER_BOTTOM_LEFT:
+                imageButton.setImageDrawable(mPositionBottomLeftDrawable);
+                break;
+            case CORNER_BOTTOM_RIGHT:
+            default:
+                imageButton.setImageDrawable(mPositionBottomRightDrawable);
+                break;
+        }
+    }
+
+    /**
+     * Determines the visual corner based on the panel's position on screen.
+     *
+     * @return The corner that visually represents the panel's current position.
+     */
+    private @Corner int getVisualCorner() {
+        // Get screen dimensions.
+        int screenWidth = mContext.getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = mContext.getResources().getDisplayMetrics().heightPixels;
+
+        // Get panel's current position on screen.
+        int[] location = new int[2];
+        mContentView.getLocationOnScreen(location);
+        int panelX = location[0];
+        int panelY = location[1];
+
+        // Determine which quadrant of the screen the panel is in.
+        boolean isOnLeftHalf = panelX < screenWidth / 2;
+        boolean isOnTopHalf = panelY < screenHeight / 2;
+
+        // Return the corresponding corner.
+        if (isOnLeftHalf) {
+            return isOnTopHalf ? CORNER_TOP_LEFT : CORNER_BOTTOM_LEFT;
+        } else {
+            return isOnTopHalf ? CORNER_TOP_RIGHT : CORNER_BOTTOM_RIGHT;
+        }
+    }
+
+    /**
+     * Applies the appropriate spacing between buttons based on panel state.
+     *
+     * @param isExpanded Whether the panel is in expanded state.
+     */
+    private void adjustPanelSpacing(boolean isExpanded) {
+        int spacing = (int) mContext.getResources().getDimension(
+                R.dimen.accessibility_autoclick_type_panel_button_spacing);
+
+        // Get the button container and button group.
+        LinearLayout buttonGroupContainer = mContentView.findViewById(
+                R.id.accessibility_autoclick_button_group_container);
+        LinearLayout buttonGroup = (LinearLayout) buttonGroupContainer.getChildAt(0);
+
+        if (isExpanded) {
+            // When expanded: Apply padding to the button group with rounded background (all sides).
+            buttonGroup.setPadding(spacing, spacing, spacing, spacing);
+            // Remove extra padding from container.
+            buttonGroupContainer.setPadding(0, 0, 0, 0);
+        } else {
+            // When collapsed: Remove button group padding.
+            buttonGroup.setPadding(0, 0, 0, 0);
+            // Add extra vertical padding to the button group container.
+            buttonGroupContainer.setPadding(0, spacing, 0, spacing);
+        }
+
+        // Set end margin on each button (for spacing between buttons) when expanded.
+        int buttonSpacing = isExpanded ? spacing : 0;
+        for (int i = 0; i < buttonGroup.getChildCount() - 1; i++) {
+            LinearLayout.LayoutParams params =
+                    (LinearLayout.LayoutParams) buttonGroup.getChildAt(i).getLayoutParams();
+            params.setMarginEnd(buttonSpacing);
+            buttonGroup.getChildAt(i).setLayoutParams(params);
+        }
     }
 
     @VisibleForTesting

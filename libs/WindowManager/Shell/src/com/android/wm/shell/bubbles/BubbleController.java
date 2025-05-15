@@ -1351,8 +1351,12 @@ public class BubbleController implements ConfigurationChangeListener,
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
+        DeviceConfig deviceConfig = DeviceConfig.create(mContext, mWindowManager);
         if (mBubblePositioner != null) {
-            mBubblePositioner.update(DeviceConfig.create(mContext, mWindowManager));
+            mBubblePositioner.update(deviceConfig);
+        }
+        if (mLayerView != null) {
+            mLayerView.update(deviceConfig);
         }
         if (mStackView != null && newConfig != null) {
             if (newConfig.densityDpi != mDensityDpi
@@ -1429,6 +1433,15 @@ public class BubbleController implements ConfigurationChangeListener,
     public boolean hasStableBubbleForTask(int taskId) {
         final Bubble bubble = mBubbleData.getBubbleInStackWithTaskId(taskId);
         return bubble != null && bubble.getPreparingTransition() == null;
+    }
+
+    /** Returns whether the given task should be an App Bubble */
+    public boolean shouldBeAppBubble(@NonNull ActivityManager.RunningTaskInfo taskInfo) {
+        if (com.android.window.flags.Flags.rootTaskForBubble()) {
+            return mAppBubbleRootTaskInfo != null
+                    && taskInfo.parentTaskId == mAppBubbleRootTaskInfo.taskId;
+        }
+        return taskInfo.isAppBubble;
     }
 
     public boolean isStackExpanded() {

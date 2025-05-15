@@ -32,6 +32,27 @@ flag {
 }
 
 flag {
+    name: "consistent_max_users"
+    namespace: "multiuser"
+    description: "Makes max supported users be consistent and fine-grained."
+    bug: "394178333"
+}
+
+flag {
+    name: "consistent_max_users_including_guests"
+    namespace: "multiuser"
+    description: "Builds on consistent_max_users, making Guest users included in the max."
+    bug: "394178333"
+}
+
+flag {
+    name: "max_users_in_car_is_for_secondary"
+    namespace: "multiuser"
+    description: "Update Car SystemUi and Settings to specify FULL_SECONDARY for max users (alongside consistent_max_users flag)."
+    bug: "394178333"
+}
+
+flag {
     name: "support_communal_profile_nextgen"
     is_exported: true
     namespace: "multiuser"
@@ -44,13 +65,6 @@ flag {
     namespace: "multiuser"
     description: "Allow using all cpu cores during a user switch."
     bug: "308105403"
-}
-
-flag {
-    name: "new_multiuser_settings_ux"
-    namespace: "multiuser"
-    description: "Update multiuser settings UI"
-    bug: "298008926"
 }
 
 # Begin Multiuser Widget flags #
@@ -127,16 +141,6 @@ flag {
 }
 
 flag {
-    name: "place_add_user_dialog_within_activity"
-    namespace: "multiuser"
-    description: "Display dialog within activity to make it traversable by Accessibility"
-    bug: "376815882"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
     name: "change_switch_bar_into_main_preference"
     namespace: "multiuser"
     description: "Refactor multiuser toggle to be of type MainSwitchPreference"
@@ -162,17 +166,6 @@ flag {
     namespace: "multiuser"
     description: "Cache getProfileType to avoid unnecessary binder calls"
     bug: "350417403"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-  }
-  is_fixed_read_only: true
-}
-
-flag {
-    name: "cache_user_properties_correctly_read_only"
-    namespace: "multiuser"
-    description: "UserProperties cache needs to take into account who the callingUid is."
-    bug: "369198539"
     metadata {
         purpose: PURPOSE_BUGFIX
   }
@@ -294,7 +287,14 @@ flag {
 flag {
     name: "schedule_stop_of_background_user"
     namespace: "multiuser"
-    description: "Schedule background users to be stopped at a future point."
+    description: "Schedule background users to be stopped at a future point. Infrastructure only."
+    bug: "330351042"
+}
+
+flag {
+    name: "schedule_stop_of_background_user_by_default"
+    namespace: "multiuser"
+    description: "Activates the background-stopping schedule of inactive users based on the time specified in the configuration."
     bug: "330351042"
 }
 

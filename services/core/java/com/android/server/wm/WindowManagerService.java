@@ -125,11 +125,8 @@ import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_
 import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_RECENT_TASKS;
 import static com.android.server.wm.SensitiveContentPackages.PackageInfo;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_ALL;
-import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_APP_TRANSITION;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
 import static com.android.server.wm.WindowContainer.AnimationFlags.CHILDREN;
-import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
-import static com.android.server.wm.WindowContainer.AnimationFlags.TRANSITION;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_DISPLAY;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_INPUT_METHOD;
@@ -324,6 +321,7 @@ import android.window.ScreenCapture;
 import android.window.ScreenCapture.ScreenshotHardwareBuffer;
 import android.window.SystemPerformanceHinter;
 import android.window.TaskSnapshot;
+import android.window.TaskSnapshotManager;
 import android.window.TrustedPresentationThresholds;
 import android.window.WindowContainerToken;
 import android.window.WindowContextInfo;
@@ -493,10 +491,10 @@ public class WindowManagerService extends IWindowManager.Stub
     private final List<OnWindowRemovedListener> mOnWindowRemovedListeners = new ArrayList<>();
 
     /** Indicates whether the first keyguard locked state has been dispatched. */
-    private boolean mHasDispatchedKeyguardLockedState = false;
+    private boolean mFirstKeyguardLockedStateDispatched = false;
 
     /** The last dispatched keyguard locked state. */
-    private boolean mLastDispatchedKeyguardLockedState = false;
+    private boolean mDispatchedKeyguardLockedState = false;
 
     // VR Vr2d Display Id.
     int mVr2dDisplayId = INVALID_DISPLAY;
@@ -1024,7 +1022,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     Settings.Global.DEVELOPMENT_OVERRIDE_DESKTOP_EXPERIENCE_FEATURES,
                     DesktopModeFlags.ToggleOverride.OVERRIDE_UNSET.getSetting());
 
-            SystemProperties.set(DesktopModeFlags.SYSTEM_PROPERTY_NAME,
+            SystemProperties.set(DesktopExperienceFlags.SYSTEM_PROPERTY_NAME,
                     Integer.toString(overrideDesktopMode));
         }
 
@@ -2876,18 +2874,11 @@ public class WindowManagerService extends IWindowManager.Stub
             } else if (win.isSelfAnimating(0 /* flags */, ANIMATION_TYPE_WINDOW_ANIMATION)) {
                 // This is already animating via a WMCore-driven window animation.
                 reason = "selfAnimating";
-            } else {
-                if (win.mTransitionController.isShellTransitionsEnabled()) {
-                    // Already animating as part of a shell-transition. Currently this only handles
-                    // activity window because other types should be WMCore-driven.
-                    if ((win.mActivityRecord != null && win.mActivityRecord.inTransition())) {
-                        win.mTransitionController.mAnimatingExitWindows.add(win);
-                        reason = "inTransition";
-                    }
-                } else if (win.isAnimating(PARENTS | TRANSITION, ANIMATION_TYPE_APP_TRANSITION)) {
-                    // Already animating as part of a legacy app-transition.
-                    reason = "inLegacyTransition";
-                }
+            } else if (win.mActivityRecord != null && win.mActivityRecord.inTransition()) {
+                // Already animating as part of a shell-transition. Currently this only handles
+                // activity window because other types should be WMCore-driven.
+                win.mTransitionController.mAnimatingExitWindows.add(win);
+                reason = "inTransition";
             }
             if (reason != null) {
                 win.mAnimatingExit = true;
@@ -3645,12 +3636,12 @@ public class WindowManagerService extends IWindowManager.Stub
             final boolean isKeyguardLocked = mPolicy.isKeyguardShowing();
             if (mFlags.mDispatchFirstKeyguardLockedState) {
                 // Ensure we don't skip the call for the first dispatch
-                if (!mHasDispatchedKeyguardLockedState
-                        && mLastDispatchedKeyguardLockedState == isKeyguardLocked) {
+                if (mFirstKeyguardLockedStateDispatched
+                        && mDispatchedKeyguardLockedState == isKeyguardLocked) {
                     return;
                 }
             } else {
-                if (mLastDispatchedKeyguardLockedState == isKeyguardLocked) {
+                if (mDispatchedKeyguardLockedState == isKeyguardLocked) {
                     return;
                 }
             }
@@ -3664,8 +3655,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
             }
             mKeyguardLockedStateListeners.finishBroadcast();
-            mLastDispatchedKeyguardLockedState = isKeyguardLocked;
-            mHasDispatchedKeyguardLockedState = true;
+            mDispatchedKeyguardLockedState = isKeyguardLocked;
+            mFirstKeyguardLockedStateDispatched = true;
         });
     }
 
@@ -9202,7 +9193,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 animateStarting = !mAtmService.getTransitionController().isShellTransitionsEnabled()
                         && mRoot.forAllActivities(ActivityRecord::hasStartingWindow);
                 boolean isAnimating = mAnimator.isAnimationScheduled()
-                        || mRoot.isAnimating(TRANSITION | CHILDREN, ANIMATION_TYPE_ALL)
+                        || mRoot.isAnimating(CHILDREN, ANIMATION_TYPE_ALL)
                         || animateStarting;
                 if (!isAnimating) {
                     // isAnimating is a legacy transition query and will be removed, so also add
@@ -9221,8 +9212,7 @@ public class WindowManagerService extends IWindowManager.Stub
             mAnimator.mNotifyWhenNoAnimation = false;
 
             WindowContainer animatingContainer;
-            animatingContainer = mRoot.getAnimatingContainer(TRANSITION | CHILDREN,
-                    ANIMATION_TYPE_ALL);
+            animatingContainer = mRoot.getAnimatingContainer(CHILDREN, ANIMATION_TYPE_ALL);
             if (mAnimator.isAnimationScheduled() || animatingContainer != null || animateStarting) {
                 Slog.w(TAG, "Timed out waiting for animations to complete,"
                         + " animatingContainer=" + animatingContainer
@@ -10217,8 +10207,14 @@ public class WindowManagerService extends IWindowManager.Stub
                     return true;
                 }
             }
-            final TaskSnapshot snapshot = mTaskSnapshotController.getSnapshot(
-                    imeTargetWindowTask.mTaskId, false /* isLowResolution */);
+            final TaskSnapshot snapshot;
+            if (Flags.reduceTaskSnapshotMemoryUsage()) {
+                snapshot = mTaskSnapshotController.getSnapshot(imeTargetWindowTask.mTaskId,
+                        TaskSnapshotManager.RESOLUTION_ANY);
+            } else {
+                snapshot = mTaskSnapshotController.getSnapshot(imeTargetWindowTask.mTaskId,
+                        false /* isLowResolution */);
+            }
             return snapshot != null && snapshot.hasImeSurface();
         }
     }

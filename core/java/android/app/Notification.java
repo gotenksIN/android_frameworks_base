@@ -90,6 +90,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.text.BidiFormatter;
+import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -811,6 +812,10 @@ public class Notification implements Parcelable
 
         if (Flags.apiRichOngoing()) {
             return style.getClass() == ProgressStyle.class;
+        }
+
+        if (Flags.apiMetricStyle()) {
+            return style.getClass() == MetricStyle.class;
         }
 
         return false;
@@ -2774,12 +2779,9 @@ public class Notification implements Parcelable
     public Notification()
     {
         this.when = System.currentTimeMillis();
-        if (Flags.sortSectionByTime()) {
-            creationTime = when;
-            extras.putBoolean(EXTRA_SHOW_WHEN, true);
-        } else {
-            this.creationTime = System.currentTimeMillis();
-        }
+        creationTime = when;
+        extras.putBoolean(EXTRA_SHOW_WHEN, true);
+
         this.priority = PRIORITY_DEFAULT;
     }
 
@@ -2790,10 +2792,9 @@ public class Notification implements Parcelable
     public Notification(Context context, int icon, CharSequence tickerText, long when,
             CharSequence contentTitle, CharSequence contentText, Intent contentIntent)
     {
-        if (Flags.sortSectionByTime()) {
-            creationTime = when;
-            extras.putBoolean(EXTRA_SHOW_WHEN, true);
-        }
+        creationTime = when;
+        extras.putBoolean(EXTRA_SHOW_WHEN, true);
+
         new Builder(context)
                 .setWhen(when)
                 .setSmallIcon(icon)
@@ -2823,12 +2824,8 @@ public class Notification implements Parcelable
         this.icon = icon;
         this.tickerText = tickerText;
         this.when = when;
-        if (Flags.sortSectionByTime()) {
-            creationTime = when;
-            extras.putBoolean(EXTRA_SHOW_WHEN, true);
-        } else {
-            this.creationTime = System.currentTimeMillis();
-        }
+        creationTime = when;
+        extras.putBoolean(EXTRA_SHOW_WHEN, true);
     }
 
     /**
@@ -3298,6 +3295,7 @@ public class Notification implements Parcelable
         return notificationStyle == null
                 || BigTextStyle.class.equals(notificationStyle)
                 || CallStyle.class.equals(notificationStyle)
+                || MetricStyle.class.equals(notificationStyle)
                 || ProgressStyle.class.equals(notificationStyle);
     }
 
@@ -3428,6 +3426,39 @@ public class Notification implements Parcelable
         }
 
         return cs.toString();
+    }
+
+    @Nullable
+    private static CharSequence stripNonStyleSpans(@Nullable CharSequence text) {
+        if (text == null) return null;
+
+        if (text instanceof Spanned) {
+            Spanned ss = (Spanned) text;
+            Object[] spans = ss.getSpans(0, ss.length(), Object.class);
+            SpannableString outString = new SpannableString(ss.toString());
+            for (Object span : spans) {
+                final Object resultSpan;
+                if (span instanceof StyleSpan
+                        || span instanceof StrikethroughSpan
+                        || span instanceof UnderlineSpan) {
+                    resultSpan = span;
+                } else if (span instanceof TextAppearanceSpan) {
+                    final TextAppearanceSpan originalSpan = (TextAppearanceSpan) span;
+                    resultSpan = new TextAppearanceSpan(
+                            null,
+                            originalSpan.getTextStyle(),
+                            -1,
+                            null,
+                            null);
+                } else {
+                    continue;
+                }
+                outString.setSpan(resultSpan, ss.getSpanStart(span), ss.getSpanEnd(span),
+                        ss.getSpanFlags(span));
+            }
+            return outString;
+        }
+        return text;
     }
 
     private static CharSequence normalizeBigText(@Nullable CharSequence charSequence) {
@@ -7408,8 +7439,10 @@ public class Notification implements Parcelable
          */
         public CharSequence ensureColorSpanContrastOrStripStyling(CharSequence cs,
                 int buttonFillColor) {
-            // Ongoing promoted notifications are allowed to have styling.
-            if (Flags.cleanUpSpansAndNewLines()) {
+            if ( mN.isPromotedOngoing()) {
+                // RON keeps non style spans just like MessagingStyle
+                return stripNonStyleSpans(cs);
+            } else if (Flags.cleanUpSpansAndNewLines()) {
                 return stripStyling(cs);
             }
 
@@ -7655,10 +7688,6 @@ public class Notification implements Parcelable
             if (mUserExtras != null) {
                 final Bundle saveExtras = (Bundle) mUserExtras.clone();
                 mN.extras.putAll(saveExtras);
-            }
-
-            if (!Flags.sortSectionByTime()) {
-                mN.creationTime = System.currentTimeMillis();
             }
 
             // lazy stuff from mContext; see comment in Builder(Context, Notification)
@@ -8258,10 +8287,8 @@ public class Notification implements Parcelable
      * @hide
      */
     public long getWhen() {
-        if (Flags.sortSectionByTime()) {
-            if (when == 0) {
-                return creationTime;
-            }
+        if (when == 0) {
+            return creationTime;
         }
         return when;
     }
@@ -8271,10 +8298,7 @@ public class Notification implements Parcelable
      * @hide
      */
     public boolean showsTime() {
-        if (Flags.sortSectionByTime()) {
-            return extras.getBoolean(EXTRA_SHOW_WHEN);
-        }
-        return when != 0 && extras.getBoolean(EXTRA_SHOW_WHEN);
+        return extras.getBoolean(EXTRA_SHOW_WHEN);
     }
 
     /**
@@ -8282,10 +8306,7 @@ public class Notification implements Parcelable
      * @hide
      */
     public boolean showsChronometer() {
-        if (Flags.sortSectionByTime()) {
-            return extras.getBoolean(EXTRA_SHOW_CHRONOMETER);
-        }
-        return when != 0 && extras.getBoolean(EXTRA_SHOW_CHRONOMETER);
+        return extras.getBoolean(EXTRA_SHOW_CHRONOMETER);
     }
 
     /**
@@ -8328,6 +8349,11 @@ public class Notification implements Parcelable
         if (Flags.apiRichOngoing()) {
             if (templateClass.equals(ProgressStyle.class.getName())) {
                 return ProgressStyle.class;
+            }
+        }
+        if (Flags.apiMetricStyle()) {
+            if (templateClass.equals(MetricStyle.class.getName())) {
+                return MetricStyle.class;
             }
         }
         return null;
@@ -9028,7 +9054,7 @@ public class Notification implements Parcelable
             // Replace the text with the big text, but only if the big text is not empty.
             CharSequence bigTextText = mBuilder.processLegacyText(mBigText);
             // Ongoing promoted notifications are allowed to have styling.
-            if (Flags.cleanUpSpansAndNewLines()) {
+            if (!mBuilder.mN.isPromotedOngoing() && Flags.cleanUpSpansAndNewLines()) {
                 bigTextText = normalizeBigText(stripStyling(bigTextText));
             }
             if (!TextUtils.isEmpty(bigTextText)) {
@@ -10161,37 +10187,6 @@ public class Notification implements Parcelable
                 } else {
                     ensureColorContrast(backgroundColor);
                 }
-            }
-
-            private CharSequence stripNonStyleSpans(CharSequence text) {
-
-                if (text instanceof Spanned) {
-                    Spanned ss = (Spanned) text;
-                    Object[] spans = ss.getSpans(0, ss.length(), Object.class);
-                    SpannableStringBuilder builder = new SpannableStringBuilder(ss.toString());
-                    for (Object span : spans) {
-                        final Object resultSpan;
-                        if (span instanceof StyleSpan
-                                || span instanceof StrikethroughSpan
-                                || span instanceof UnderlineSpan) {
-                            resultSpan = span;
-                        } else if (span instanceof TextAppearanceSpan) {
-                            final TextAppearanceSpan originalSpan = (TextAppearanceSpan) span;
-                            resultSpan = new TextAppearanceSpan(
-                                    null,
-                                    originalSpan.getTextStyle(),
-                                    -1,
-                                    null,
-                                    null);
-                        } else {
-                            continue;
-                        }
-                        builder.setSpan(resultSpan, ss.getSpanStart(span), ss.getSpanEnd(span),
-                                ss.getSpanFlags(span));
-                    }
-                    return builder;
-                }
-                return text;
             }
 
             /**
@@ -11460,6 +11455,85 @@ public class Notification implements Parcelable
             return !Objects.equals(mCallType, otherS.mCallType)
                     || !Objects.equals(mPerson, otherS.mPerson)
                     || !Objects.equals(mVerificationText, otherS.mVerificationText);
+        }
+    }
+
+    /**
+     * A notification style which shows up to 3 metrics when expanded.
+     */
+    @FlaggedApi(Flags.FLAG_API_METRIC_STYLE)
+    public static class MetricStyle extends Notification.Style {
+        // TODO(b/415828647): Implement this class
+
+        /** @hide */
+        @Override
+        public boolean areNotificationsVisiblyDifferent(Style other) {
+            if (other == null || getClass() != other.getClass()) {
+                return true;
+            }
+            // TODO(b/415828647): Implement for MetricStyle
+            return false;
+        }
+
+        /** @hide */
+        @Override
+        public void purgeResources() {
+            super.purgeResources();
+            // TODO(b/415828647): Implement for MetricStyle (or delete if no image APIs)
+        }
+
+        /** @hide */
+        @Override
+        public void reduceImageSizes(Context context) {
+            super.reduceImageSizes(context);
+            // TODO(b/415828647): Implement for MetricStyle (or delete if no image APIs)
+        }
+
+        /** @hide */
+        @Override
+        public void addExtras(Bundle extras) {
+            super.addExtras(extras);
+            // TODO(b/415828647): Implement for MetricStyle
+        }
+
+        /** @hide */
+        @Override
+        protected void restoreFromExtras(Bundle extras) {
+            super.restoreFromExtras(extras);
+            // TODO(b/415828647): Implement for MetricStyle
+        }
+
+        /** @hide */
+        @Override
+        public boolean displayCustomViewInline() {
+            // This is a lie; True is returned for metric notifications to make sure
+            // that the custom view is not used instead of the template, but it will not
+            // actually be included.
+            return true;
+        }
+
+        /** @hide */
+        @Override
+        public RemoteViews makeContentView() {
+            return null;
+            // TODO(b/415828647): Implement for MetricStyle
+            // Remember: Add new layout resources to isStandardLayout()
+        }
+
+        /** @hide */
+        @Override
+        public RemoteViews makeHeadsUpContentView() {
+            return null;
+            // TODO(b/415828647): Implement for MetricStyle
+            // Remember: Add new layout resources to isStandardLayout()
+        }
+
+        /** @hide */
+        @Override
+        public RemoteViews makeExpandedContentView() {
+            return null;
+            // TODO(b/415828647): Implement for MetricStyle
+            // Remember: Add new layout resources to isStandardLayout()
         }
     }
 

@@ -16,24 +16,34 @@
 
 package com.android.systemui.ambientcue.data.repository
 
+import android.app.ActivityManager.RunningTaskInfo
+import android.app.assist.ActivityId
 import android.app.smartspace.SmartspaceAction
 import android.app.smartspace.SmartspaceManager
 import android.app.smartspace.SmartspaceSession
 import android.app.smartspace.SmartspaceSession.OnTargetsAvailableListener
 import android.app.smartspace.SmartspaceTarget
+import android.content.Intent
 import android.content.testableContext
+import android.os.Binder
+import android.os.Bundle
+import android.view.autofill.AutofillId
+import android.view.autofill.AutofillManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.AMBIENT_ACTION_FEATURE
 import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.AMBIENT_CUE_SURFACE
-import com.android.systemui.broadcast.broadcastDispatcher
+import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.EXTRA_ACTIVITY_ID
+import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.EXTRA_AUTOFILL_ID
+import com.android.systemui.ambientcue.shared.model.ActionModel
 import com.android.systemui.concurrency.fakeExecutor
 import com.android.systemui.kosmos.advanceUntilIdle
 import com.android.systemui.kosmos.backgroundScope
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
+import com.android.systemui.plugins.ActivityStarter
+import com.android.systemui.shade.data.repository.fakeFocusedDisplayRepository
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -49,6 +59,8 @@ import org.mockito.kotlin.verify
 class AmbientCueRepositoryTest : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val smartSpaceSession = mock<SmartspaceSession>()
+    private val autofillManager = mock<AutofillManager>()
+    private val activityStarter = mock<ActivityStarter>()
     private val smartSpaceManager =
         mock<SmartspaceManager>() {
             on { createSmartspaceSession(any()) } doReturn smartSpaceSession
@@ -57,36 +69,38 @@ class AmbientCueRepositoryTest : SysuiTestCase() {
     private val underTest =
         AmbientCueRepositoryImpl(
             backgroundScope = kosmos.backgroundScope,
-            broadcastDispatcher = kosmos.broadcastDispatcher,
             smartSpaceManager = smartSpaceManager,
+            autofillManager = autofillManager,
+            activityStarter = activityStarter,
             executor = kosmos.fakeExecutor,
             applicationContext = kosmos.testableContext,
+            focusdDisplayRepository = kosmos.fakeFocusedDisplayRepository,
         )
 
     @Test
-    fun isAttached_whenHasActions_true() =
+    fun isVisible_whenHasActions_true() =
         kosmos.runTest {
-            val isAttached by collectLastValue(underTest.isAttached)
+            val actions by collectLastValue(underTest.actions)
+            val isVisible by collectLastValue(underTest.isVisible)
             runCurrent()
             verify(smartSpaceSession)
                 .addOnTargetsAvailableListener(any(), onTargetsAvailableListenerCaptor.capture())
             onTargetsAvailableListenerCaptor.firstValue.onTargetsAvailable(allTargets)
             advanceUntilIdle()
-            assertThat(isAttached).isTrue()
+            assertThat(isVisible).isTrue()
         }
 
     @Test
-    fun isAttached_whenNoActions_false() =
+    fun isVisible_whenNoActions_false() =
         kosmos.runTest {
-            val isAttached by collectLastValue(underTest.isAttached)
+            val actions by collectLastValue(underTest.actions)
+            val isVisible by collectLastValue(underTest.isVisible)
             runCurrent()
             verify(smartSpaceSession)
                 .addOnTargetsAvailableListener(any(), onTargetsAvailableListenerCaptor.capture())
-            onTargetsAvailableListenerCaptor.firstValue.onTargetsAvailable(
-                listOf(invalidTarget1, invalidTarget2)
-            )
+            onTargetsAvailableListenerCaptor.firstValue.onTargetsAvailable(listOf(invalidTarget1))
             advanceUntilIdle()
-            assertThat(isAttached).isFalse()
+            assertThat(isVisible).isFalse()
         }
 
     @Test
@@ -113,6 +127,48 @@ class AmbientCueRepositoryTest : SysuiTestCase() {
             }
         }
 
+    @Test
+    fun globallyFocusedTaskId_whenFocusedTaskChange_taskIdUpdated() =
+        kosmos.runTest {
+            val globallyFocusedTaskId by collectLastValue(underTest.globallyFocusedTaskId)
+            runCurrent()
+
+            fakeFocusedDisplayRepository.setGlobalTask(RunningTaskInfo().apply { taskId = TASK_ID })
+
+            assertThat(globallyFocusedTaskId).isEqualTo(TASK_ID)
+        }
+
+    @Test
+    fun action_performAutofill() =
+        kosmos.runTest {
+            val actions by collectLastValue(underTest.actions)
+            runCurrent()
+            verify(smartSpaceSession)
+                .addOnTargetsAvailableListener(any(), onTargetsAvailableListenerCaptor.capture())
+            onTargetsAvailableListenerCaptor.firstValue.onTargetsAvailable(listOf(autofillTarget))
+
+            val action: ActionModel = actions!!.first()
+            action.onPerformAction()
+            runCurrent()
+            verify(autofillManager)
+                .autofillRemoteApp(autofillId, action.label, activityId.token!!, activityId.taskId)
+        }
+
+    @Test
+    fun action_performStartActivity() =
+        kosmos.runTest {
+            val actions by collectLastValue(underTest.actions)
+            runCurrent()
+            verify(smartSpaceSession)
+                .addOnTargetsAvailableListener(any(), onTargetsAvailableListenerCaptor.capture())
+            onTargetsAvailableListenerCaptor.firstValue.onTargetsAvailable(listOf(intentTarget))
+
+            val action: ActionModel = actions!!.first()
+            action.onPerformAction()
+            runCurrent()
+            verify(activityStarter).startActivity(launchIntent, false)
+        }
+
     companion object {
 
         private const val TITLE_1 = "title 1"
@@ -121,7 +177,6 @@ class AmbientCueRepositoryTest : SysuiTestCase() {
         private const val SUBTITLE_2 = "subtitle 2"
         private val validTarget =
             mock<SmartspaceTarget> {
-                on { featureType } doReturn AMBIENT_ACTION_FEATURE
                 on { smartspaceTargetId } doReturn AMBIENT_CUE_SURFACE
                 on { actionChips } doReturn
                     listOf(
@@ -134,22 +189,47 @@ class AmbientCueRepositoryTest : SysuiTestCase() {
                     )
             }
 
-        private val invalidTarget1 =
+        private val autofillId = AutofillId(2)
+        private val activityId = ActivityId(1, Binder())
+        private val autofillTarget =
             mock<SmartspaceTarget> {
-                on { featureType } doReturn 1
                 on { smartspaceTargetId } doReturn AMBIENT_CUE_SURFACE
                 on { actionChips } doReturn
-                    listOf(SmartspaceAction.Builder("id", "title").setSubtitle("subtitle").build())
+                    listOf(
+                        SmartspaceAction.Builder("action1-id", "title 1")
+                            .setSubtitle("subtitle 1")
+                            .setExtras(
+                                Bundle().apply {
+                                    putParcelable(EXTRA_ACTIVITY_ID, activityId)
+                                    putParcelable(EXTRA_AUTOFILL_ID, autofillId)
+                                }
+                            )
+                            .build()
+                    )
             }
 
-        private val invalidTarget2 =
+        private val launchIntent = Intent()
+        private val intentTarget =
             mock<SmartspaceTarget> {
-                on { featureType } doReturn AMBIENT_ACTION_FEATURE
+                on { smartspaceTargetId } doReturn AMBIENT_CUE_SURFACE
+                on { actionChips } doReturn
+                    listOf(
+                        SmartspaceAction.Builder("action1-id", "title 1")
+                            .setSubtitle("subtitle 1")
+                            .setIntent(launchIntent)
+                            .build()
+                    )
+            }
+
+        private val invalidTarget1 =
+            mock<SmartspaceTarget> {
                 on { smartspaceTargetId } doReturn "home"
                 on { actionChips } doReturn
                     listOf(SmartspaceAction.Builder("id", "title").setSubtitle("subtitle").build())
             }
 
-        private val allTargets = listOf(validTarget, invalidTarget1, invalidTarget2)
+        private val allTargets = listOf(validTarget, invalidTarget1)
+
+        private const val TASK_ID = 1
     }
 }

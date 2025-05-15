@@ -714,7 +714,8 @@ public final class DisplayManagerService extends SystemService {
             mDisplayTopologyCoordinator = new DisplayTopologyCoordinator(
                     this::isExtendedDisplayAllowed, this::shouldIncludeDefaultDisplayInTopology,
                     topologyChangedCallback, new HandlerExecutor(mHandler), mSyncRoot,
-                    backupManager::dataChanged, mFlags);
+                    backupManager::dataChanged, mFlags,
+                    displayId -> getDisplayInfoInternal(displayId, Process.myUid()));
         } else {
             mDisplayTopologyCoordinator = null;
         }
@@ -5734,6 +5735,19 @@ public final class DisplayManagerService extends SystemService {
         }
 
         @Override
+        public long getDisplayGroupFlags(int groupId) {
+            synchronized (mSyncRoot) {
+                final DisplayGroup displayGroup = mLogicalDisplayMapper.getDisplayGroupLocked(
+                        groupId);
+                if (displayGroup == null) {
+                    return 0;
+                }
+                return displayGroup.getFlags();
+            }
+        }
+
+
+        @Override
         public boolean requestPowerState(int groupId, DisplayPowerRequest request,
                 boolean waitForNegativeProximity) {
             synchronized (mSyncRoot) {
@@ -6398,5 +6412,10 @@ public final class DisplayManagerService extends SystemService {
     private static boolean deferDisplayEventsWhenFrozen() {
         return android.os.Flags.binderFrozenStateChangeCallback()
                 && com.android.server.am.Flags.deferDisplayEventsWhenFrozen();
+    }
+
+    interface DisplayInfoProvider {
+        @Nullable
+        DisplayInfo get(int displayId);
     }
 }

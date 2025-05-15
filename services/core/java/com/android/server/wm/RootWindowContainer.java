@@ -75,6 +75,7 @@ import static com.android.server.wm.RootWindowContainerProto.KEYGUARD_CONTROLLER
 import static com.android.server.wm.RootWindowContainerProto.WINDOW_CONTAINER;
 import static com.android.server.wm.Task.REPARENT_LEAVE_ROOT_TASK_IN_PLACE;
 import static com.android.server.wm.Task.REPARENT_MOVE_ROOT_TASK_TO_FRONT;
+import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_VISIBLE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_LAYOUT_REPEATS;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_WINDOW_TRACE;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
@@ -1218,6 +1219,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             addChild(displayContent, POSITION_BOTTOM);
             if (displayContent.mDisplayId == DEFAULT_DISPLAY) {
                 mDefaultDisplay = displayContent;
+            } else {
+                setShouldShowSystemDecorationsForNewDisplay(displayContent);
             }
         }
 
@@ -1808,7 +1811,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 continue;
             }
             try {
-                final boolean canResume = r.isFocusable() && r == tf.topRunningActivity();
+                final boolean canResume = r.isFocusable() && r == tf.topRunningActivity()
+                        && tf.getVisibility(r) == TASK_FRAGMENT_VISIBILITY_VISIBLE;
                 if (mTaskSupervisor.realStartActivityLocked(r, app, canResume,
                         true /* checkConfig */)) {
                     hasActivityStarted = true;
@@ -2949,20 +2953,23 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 return;
             }
 
-            if (ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                display.updateShouldShowSystemDecorations();
-
-                final boolean inTopology = mWindowManager.mDisplayWindowSettings
-                        .shouldShowSystemDecorsLocked(display);
-                mWmService.mDisplayManagerInternal.onDisplayBelongToTopologyChanged(displayId,
-                        inTopology);
-            }
+            setShouldShowSystemDecorationsForNewDisplay(display);
 
             startSystemDecorations(display, "displayAdded");
 
             // Drop any cached DisplayInfos associated with this display id - the values are now
             // out of date given this display added event.
             mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
+        }
+    }
+
+    private void setShouldShowSystemDecorationsForNewDisplay(DisplayContent displayContent) {
+        if (ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+            displayContent.updateShouldShowSystemDecorations();
+            final boolean inTopology = mWindowManager.mDisplayWindowSettings
+                    .shouldShowSystemDecorsLocked(displayContent);
+            mWmService.mDisplayManagerInternal.onDisplayBelongToTopologyChanged(
+                    displayContent.mDisplayId, inTopology);
         }
     }
 

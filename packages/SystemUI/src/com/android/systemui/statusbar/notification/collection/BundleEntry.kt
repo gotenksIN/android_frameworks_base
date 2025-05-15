@@ -31,7 +31,13 @@ class BundleEntry(spec: BundleSpec) : PipelineEntry(spec.key) {
     override val bucket: Int = spec.bucket
 
     /** The model used by UI. */
-    val bundleRepository = BundleRepository(spec.titleTextResId, spec.icon)
+    val bundleRepository =
+        BundleRepository(
+            titleText = spec.titleText,
+            bundleIcon = spec.icon,
+            summaryText = spec.summaryText,
+            bundleType = spec.bundleType,
+        )
 
     // TODO(b/394483200): move NotificationEntry's implementation to PipelineEntry?
     val isSensitive: MutableStateFlow<Boolean> = MutableStateFlow(false)

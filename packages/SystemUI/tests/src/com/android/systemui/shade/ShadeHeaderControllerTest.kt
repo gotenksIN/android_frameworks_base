@@ -325,6 +325,13 @@ class ShadeHeaderControllerTest : SysuiTestCase() {
     }
 
     @Test
+    fun updateLocale_clockUpdates() {
+        configurationController.notifyLocaleChanged()
+
+        verify(clock).onLocaleListChanged()
+    }
+
+    @Test
     fun animateOutOnStartCustomizing() {
         val animator = mock(ViewPropertyAnimator::class.java, Answers.RETURNS_SELF)
         val duration = 1000L
@@ -815,6 +822,43 @@ class ShadeHeaderControllerTest : SysuiTestCase() {
         verify(mockConstraintsChanges.qqsConstraintsChanges)!!.invoke(any())
         verify(mockConstraintsChanges.qsConstraintsChanges)!!.invoke(any())
         verify(mockConstraintsChanges.largeScreenConstraintsChanges)!!.invoke(any())
+    }
+
+    @Test
+    fun sameInsetsTwice_listenerCallsOnApplyWindowInsetsOnlyOnce() {
+        val windowInsets = createWindowInsets()
+
+        val captor = ArgumentCaptor.forClass(View.OnApplyWindowInsetsListener::class.java)
+        verify(view).setOnApplyWindowInsetsListener(capture(captor))
+
+        val listener = captor.value
+
+        listener.onApplyWindowInsets(view, windowInsets)
+
+        verify(view, times(1)).onApplyWindowInsets(any())
+
+        listener.onApplyWindowInsets(view, windowInsets)
+
+        verify(view, times(1)).onApplyWindowInsets(any())
+    }
+
+    @Test
+    fun twoDifferentInsets_listenerCallsOnApplyWindowInsetsTwice() {
+        val windowInsets1 = WindowInsets(Rect(1, 2, 3, 4))
+        val windowInsets2 = WindowInsets(Rect(5, 6, 7, 8))
+
+        val captor = ArgumentCaptor.forClass(View.OnApplyWindowInsetsListener::class.java)
+        verify(view).setOnApplyWindowInsetsListener(capture(captor))
+
+        val listener = captor.value
+
+        listener.onApplyWindowInsets(view, windowInsets1)
+
+        verify(view, times(1)).onApplyWindowInsets(any())
+
+        listener.onApplyWindowInsets(view, windowInsets2)
+
+        verify(view, times(2)).onApplyWindowInsets(any())
     }
 
     @Test

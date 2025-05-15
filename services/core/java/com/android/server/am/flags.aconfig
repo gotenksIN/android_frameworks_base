@@ -56,17 +56,6 @@ flag {
 }
 
 flag {
-    namespace: "backstage_power"
-    name: "trace_receiver_registration"
-    description: "Add tracing for broadcast receiver registration and un-registration"
-    bug: "336385821"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "skip_unimportant_connections"
     namespace: "backstage_power"
     description: "Avoid OomAdjuster calculations for connections that won't change importance"
@@ -248,12 +237,4 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "dump_bitmaps"
-    namespace: "system_performance"
-    is_fixed_read_only: true
-    description: "Allow am to dump information and contents of bitmaps"
-    bug: "369619160"
 }

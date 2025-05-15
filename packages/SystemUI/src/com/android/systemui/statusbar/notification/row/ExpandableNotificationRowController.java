@@ -407,7 +407,8 @@ public class ExpandableNotificationRowController implements NotifViewController 
                 if (com.android.systemui.Flags.msdlFeedback()) {
                     mMSDLPlayer.playToken(MSDLToken.LONG_PRESS, null);
                 }
-                if (mView.isSummaryWithChildren()) {
+
+                if (mView.isSummaryWithChildren() && !mView.isBundle()) {
                     mView.expandNotification();
                     return true;
                 }

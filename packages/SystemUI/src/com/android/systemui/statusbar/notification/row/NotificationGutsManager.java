@@ -83,6 +83,10 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.wmshell.BubblesManager;
 
+import kotlin.Unit;
+import kotlin.jvm.functions.Function0;
+import kotlin.jvm.functions.Function2;
+
 import java.util.Optional;
 
 import javax.inject.Inject;
@@ -306,13 +310,15 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
                 ? row.getEntryAdapter().getRanking()
                 : row.getEntryLegacy().getRanking();
 
-        if (sbn == null || ranking == null) {
+        if ((sbn == null || ranking == null) && !row.isBundle()) {
             // only valid for notification rows
             return false;
         }
 
         row.setGutsView(item);
-        row.setTag(sbn.getPackageName());
+        if (sbn != null) {
+            row.setTag(sbn.getPackageName());
+        }
         row.getGuts().setClosedListener((NotificationGuts g) -> {
             row.onGutsClosed();
             if (!g.willBeRemoved() && !row.isRemoved()) {
@@ -338,26 +344,26 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
             }
         });
 
-        View gutsView = item.getGutsView();
+        Object gutsContent = item.getGutsContent();
 
         try {
-            if (gutsView instanceof NotificationSnooze) {
-                initializeSnoozeView(row, sbn, ranking, (NotificationSnooze) gutsView);
-            } else if (gutsView instanceof NotificationInfo) {
-                initializeNotificationInfo(row, sbn, ranking, (NotificationInfo) gutsView);
-            } else if (gutsView instanceof NotificationConversationInfo) {
+            if (gutsContent instanceof NotificationSnooze ns) {
+                initializeSnoozeView(row, sbn, ranking, ns);
+            } else if (gutsContent instanceof NotificationInfo ni) {
+                initializeNotificationInfo(row, sbn, ranking, ni);
+            } else if (gutsContent instanceof NotificationConversationInfo nci) {
                 initializeConversationNotificationInfo(
-                        row, sbn, ranking, (NotificationConversationInfo) gutsView);
-            } else if (gutsView instanceof PartialConversationInfo) {
-                initializePartialConversationNotificationInfo(row, sbn, ranking,
-                        (PartialConversationInfo) gutsView);
-            } else if (gutsView instanceof FeedbackInfo) {
-                initializeFeedbackInfo(row, sbn, ranking, (FeedbackInfo) gutsView);
-            } else if (gutsView instanceof PromotedPermissionGutsContent) {
-                initializeDemoteView(sbn, (PromotedPermissionGutsContent) gutsView);
-            } else if (gutsView instanceof BundledNotificationInfo) {
-                initializeBundledNotificationInfo(
-                        row, sbn, ranking, (BundledNotificationInfo) gutsView);
+                        row, sbn, ranking, nci);
+            } else if (gutsContent instanceof PartialConversationInfo pci) {
+                initializePartialConversationNotificationInfo(row, sbn, ranking, pci);
+            } else if (gutsContent instanceof FeedbackInfo fi) {
+                initializeFeedbackInfo(row, sbn, ranking, fi);
+            } else if (gutsContent instanceof PromotedPermissionGutsContent ppgc) {
+                initializeDemoteView(sbn, ppgc);
+            } else if (gutsContent instanceof BundledNotificationInfo bni) {
+                initializeBundledNotificationInfo(row, sbn, ranking, bni);
+            } else if (gutsContent instanceof BundleHeaderGutsContent bhgc) {
+                initializeBundleHeaderGutsContent(row, bhgc);
             }
             return true;
         } catch (Exception e) {
@@ -486,7 +492,44 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
                         : mHighPriorityProvider.isHighPriority(row.getEntryLegacy()),
                 mAssistantFeedbackController,
                 mMetricsLogger,
-                row.getCloseButtonOnClickListener(row));
+                row.getDismissButtonOnClickListener());
+    }
+
+    /**
+     * Sets up the {@link BundleHeaderGutsContent} inside the notification row's guts.
+     * @param row view to set up the guts for
+     * @param gutsContent view to set up/bind within {@code row}
+     */
+    @VisibleForTesting
+    void initializeBundleHeaderGutsContent(
+            final ExpandableNotificationRow row,
+            BundleHeaderGutsContent gutsContent) {
+
+        NotificationGuts guts = row.getGuts();
+
+        Function0<Unit> onSettingsClicked = () -> {
+            guts.resetFalsingCheck();
+            // TODO(b/409748420): navigate to correct settings page
+            startBundleSettingsActivity(0, row);
+            return Unit.INSTANCE;
+        };
+
+        Function0<Unit> dismissBundle = () -> {
+            guts.resetFalsingCheck();
+            row.getDismissButtonOnClickListener().onClick(gutsContent.getContentView());
+            return Unit.INSTANCE;
+        };
+
+        Function2<Integer, Boolean, Unit> enableBundle = (type, enable) -> {
+            try {
+                mNotificationManager.setAssistantClassificationTypeState(type, enable);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Couldn't set bundle state", e);
+            }
+            return Unit.INSTANCE;
+        };
+
+        gutsContent.bindNotification(row, onSettingsClicked, dismissBundle, enableBundle);
     }
 
     /**
@@ -557,7 +600,7 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
                         : mHighPriorityProvider.isHighPriority(row.getEntryLegacy()),
                 mAssistantFeedbackController,
                 mMetricsLogger,
-                row.getCloseButtonOnClickListener(row));
+                row.getDismissButtonOnClickListener());
     }
 
     /**
@@ -621,19 +664,10 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
         UserHandle userHandle = sbn.getUser();
         PackageManager pmUser = CentralSurfaces.getPackageManagerForUser(
                 mContext, userHandle.getIdentifier());
-        final NotificationConversationInfo.OnAppSettingsClickListener onAppSettingsClick =
-                (View v, Intent intent) -> {
-                    mMetricsLogger.action(MetricsProto.MetricsEvent.ACTION_APP_NOTE_SETTINGS);
-                    guts.resetFalsingCheck();
-                    mNotificationActivityStarter.startNotificationGutsIntent(intent, sbn.getUid(),
-                            row);
-                };
 
         final NotificationConversationInfo.OnConversationSettingsClickListener
                 onConversationSettingsListener =
-                () -> {
-                    startConversationSettingsActivity(sbn.getUid(), row);
-                };
+                () -> startConversationSettingsActivity(sbn.getUid(), row);
 
         if (!userHandle.equals(UserHandle.ALL)
                 || mLockscreenUserManager.getCurrentUserId() == UserHandle.USER_SYSTEM) {
@@ -677,7 +711,7 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
                 mBubblesManagerOptional,
                 mShadeController,
                 row.canViewBeDismissed(),
-                row.getCloseButtonOnClickListener(row));
+                row.getDismissButtonOnClickListener());
     }
 
     /**
@@ -728,10 +762,6 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
         mNotificationGutsExposed = guts;
     }
 
-    public ExpandableNotificationRow.LongPressListener getNotificationLongClicker() {
-        return this::openGuts;
-    }
-
     /**
      * Opens guts on the given ExpandableNotificationRow {@code view}. This handles opening guts for
      * the normal half-swipe and long-press use cases via a circular reveal. When the blocking
@@ -748,10 +778,8 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
             int x,
             int y,
             NotificationMenuRowPlugin.MenuItem menuItem) {
-        if (menuItem.getGutsView() instanceof NotificationGuts.GutsContent) {
-            NotificationGuts.GutsContent gutsView =
-                    (NotificationGuts.GutsContent)  menuItem.getGutsView();
-            if (gutsView.needsFalsingProtection()) {
+        if (menuItem.getGutsContent() instanceof NotificationGuts.GutsContent gutsContent) {
+            if (gutsContent.needsFalsingProtection()) {
                 if (mStatusBarStateController instanceof StatusBarStateControllerImpl) {
                     ((StatusBarStateControllerImpl) mStatusBarStateController)
                             .setLeaveOpenOnKeyguardHide(true);

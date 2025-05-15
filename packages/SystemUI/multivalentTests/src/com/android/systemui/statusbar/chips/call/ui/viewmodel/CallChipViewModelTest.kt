@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.chips.call.ui.viewmodel
 
+import android.app.Flags.FLAG_OPT_IN_RICH_ONGOING
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Intent
@@ -40,6 +41,7 @@ import com.android.systemui.plugins.activityStarter
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.chips.StatusBarChipsReturnAnimations
+import com.android.systemui.statusbar.chips.notification.domain.interactor.statusBarNotificationChipsInteractor
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.view.ChipBackgroundContainer
@@ -49,6 +51,7 @@ import com.android.systemui.statusbar.notification.promoted.PromotedNotification
 import com.android.systemui.statusbar.phone.ongoingcall.DisableChipsModernization
 import com.android.systemui.statusbar.phone.ongoingcall.EnableChipsModernization
 import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
+import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallTestHelper
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallTestHelper.addOngoingCallState
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallTestHelper.callPromotedContentBuilder
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallTestHelper.removeOngoingCallState
@@ -113,8 +116,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_zeroStartTime_promotedFlagOff_hasPromotedContent_isShownAsIconOnly_withData() =
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
+    @DisableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_optInPromotedDisabled_callDidNotRequestPromotion_butHasContent_callChipIsShown() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -123,40 +127,22 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 startTimeMs = 0,
                 isAppVisible = false,
                 instanceId = instanceId,
-                promotedContent = callPromotedContentBuilder().build(),
+                requestedPromotion = false,
+                promotedContent =
+                    OngoingCallTestHelper.PromotedContentInput.OverrideToValue(
+                        callPromotedContentBuilder().build()
+                    ),
             )
 
             assertThat((latest as OngoingActivityChipModel.Active).content)
                 .isInstanceOf(OngoingActivityChipModel.Content.IconOnly::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
-        }
-
-    @Test
-    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_zeroStartTime_promotedFlagOff_noPromotedContent_isShownAsIconOnly_withData() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val instanceId = InstanceId.fakeInstanceId(10)
-            addOngoingCallState(
-                startTimeMs = 0,
-                isAppVisible = false,
-                instanceId = instanceId,
-                promotedContent = null,
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).content)
-                .isInstanceOf(OngoingActivityChipModel.Content.IconOnly::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
             assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
         }
 
     @Test
     @EnableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_zeroStartTime_promotedFlagOn_hasPromotedContent_isShownAsIconOnly_withData() =
+    @DisableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_optInPromotedDisabled_callRequestedPromotion_andIsPromoted_callChipIsShown() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -165,19 +151,23 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 startTimeMs = 0,
                 isAppVisible = false,
                 instanceId = instanceId,
-                promotedContent = callPromotedContentBuilder().build(),
+                requestedPromotion = true,
+                promotedContent =
+                    OngoingCallTestHelper.PromotedContentInput.OverrideToValue(
+                        callPromotedContentBuilder().build()
+                    ),
             )
 
             assertThat((latest as OngoingActivityChipModel.Active).content)
                 .isInstanceOf(OngoingActivityChipModel.Content.IconOnly::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
             assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
         }
 
     @Test
     @EnableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_zeroStartTime_promotedFlagOn_noPromotedContent_isInactive() =
+    @EnableChipsModernization
+    @DisableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_optInPromotedDisabled_callRequestedPromotion_butNotPromoted_noCallChip() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -186,7 +176,70 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 startTimeMs = 0,
                 isAppVisible = false,
                 instanceId = instanceId,
-                promotedContent = null,
+                requestedPromotion = true,
+                // This is null if notif isn't actually promoted
+                promotedContent = OngoingCallTestHelper.PromotedContentInput.OverrideToNull,
+            )
+
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+        }
+
+    @Test
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_optInPromotedEnabled_callDidNotRequestPromotion_callChipIsShown() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            val instanceId = InstanceId.fakeInstanceId(10)
+            addOngoingCallState(
+                startTimeMs = 0,
+                isAppVisible = false,
+                instanceId = instanceId,
+                requestedPromotion = false,
+                promotedContent = OngoingCallTestHelper.PromotedContentInput.OverrideToNull,
+            )
+
+            assertThat((latest as OngoingActivityChipModel.Active).content)
+                .isInstanceOf(OngoingActivityChipModel.Content.IconOnly::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
+        }
+
+    @Test
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_optInPromotedEnabled_callRequestedPromotion_andIsPromoted_noCallChip() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            val instanceId = InstanceId.fakeInstanceId(10)
+            addOngoingCallState(
+                startTimeMs = 0,
+                isAppVisible = false,
+                instanceId = instanceId,
+                requestedPromotion = true,
+                promotedContent =
+                    OngoingCallTestHelper.PromotedContentInput.OverrideToValue(
+                        callPromotedContentBuilder().build()
+                    ),
+            )
+
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+        }
+
+    /** See b/414830065. */
+    @Test
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_optInPromotedEnabled_callRequestedPromotion_butNotPromoted_noCallChip() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+
+            val instanceId = InstanceId.fakeInstanceId(10)
+            addOngoingCallState(
+                startTimeMs = 0,
+                isAppVisible = false,
+                instanceId = instanceId,
+                requestedPromotion = true,
+                // This is null if notif isn't actually promoted,
+                promotedContent = OngoingCallTestHelper.PromotedContentInput.OverrideToNull,
             )
 
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
@@ -208,86 +261,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_positiveStartTime_promotedFlagOff_hasPromotedContent_isShownAsTimer_withData() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val instanceId = InstanceId.fakeInstanceId(10)
-            addOngoingCallState(
-                startTimeMs = 345,
-                isAppVisible = false,
-                instanceId = instanceId,
-                promotedContent = callPromotedContentBuilder().build(),
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).content)
-                .isInstanceOf(OngoingActivityChipModel.Content.Timer::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
-        }
-
-    @Test
-    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_positiveStartTime_promotedFlagOff_noPromotedContent_isShownAsTimer_withData() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val instanceId = InstanceId.fakeInstanceId(10)
-            addOngoingCallState(
-                startTimeMs = 345,
-                isAppVisible = false,
-                instanceId = instanceId,
-                promotedContent = null,
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).content)
-                .isInstanceOf(OngoingActivityChipModel.Content.Timer::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
-        }
-
-    @Test
-    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_positiveStartTime_promotedFlagOn_hasPromotedContent_isShownAsTimer_withData() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val instanceId = InstanceId.fakeInstanceId(10)
-            addOngoingCallState(
-                startTimeMs = 345,
-                isAppVisible = false,
-                instanceId = instanceId,
-                promotedContent = callPromotedContentBuilder().build(),
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).content)
-                .isInstanceOf(OngoingActivityChipModel.Content.Timer::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).isImportantForPrivacy).isFalse()
-            assertThat((latest as OngoingActivityChipModel.Active).instanceId).isEqualTo(instanceId)
-        }
-
-    @Test
-    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_inCall_positiveStartTime_promotedFlagOn_noPromotedContent_isInactive() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val instanceId = InstanceId.fakeInstanceId(10)
-            addOngoingCallState(
-                startTimeMs = 345,
-                isAppVisible = false,
-                instanceId = instanceId,
-                promotedContent = null,
-            )
-
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
-        }
-
-    @Test
     @EnableChipsModernization
     fun chip_twoCallNotifs_earlierIsUsed() =
         kosmos.runTest {
@@ -298,50 +271,15 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 key = "earlierNotif",
                 startTimeMs = 3_000,
                 instanceId = instanceIdOld,
-                promotedContent = callPromotedContentBuilder("earlierNotif").build(),
             )
             val instanceIdNew = InstanceId.fakeInstanceId(6)
-            addOngoingCallState(
-                key = "laterNotif",
-                startTimeMs = 6_000,
-                instanceId = instanceIdNew,
-                promotedContent = callPromotedContentBuilder("laterNotif").build(),
-            )
+            addOngoingCallState(key = "laterNotif", startTimeMs = 6_000, instanceId = instanceIdNew)
 
             assertThat((latest as OngoingActivityChipModel.Active).content)
                 .isInstanceOf(OngoingActivityChipModel.Content.Timer::class.java)
             assertThat((latest as OngoingActivityChipModel.Active).key).contains("earlierNotif")
             assertThat((latest as OngoingActivityChipModel.Active).instanceId)
                 .isEqualTo(instanceIdOld)
-        }
-
-    @Test
-    @EnableChipsModernization
-    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_twoCallNotifs_earlierHasNoPromotedContent_laterIsUsed() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            val instanceIdOld = InstanceId.fakeInstanceId(3)
-            addOngoingCallState(
-                key = "earlierNotif",
-                startTimeMs = 3_000,
-                instanceId = instanceIdOld,
-                promotedContent = null,
-            )
-            val instanceIdNew = InstanceId.fakeInstanceId(6)
-            addOngoingCallState(
-                key = "laterNotif",
-                startTimeMs = 6_000,
-                instanceId = instanceIdNew,
-                promotedContent = callPromotedContentBuilder("laterNotif").build(),
-            )
-
-            assertThat((latest as OngoingActivityChipModel.Active).content)
-                .isInstanceOf(OngoingActivityChipModel.Content.Timer::class.java)
-            assertThat((latest as OngoingActivityChipModel.Active).key).contains("laterNotif")
-            assertThat((latest as OngoingActivityChipModel.Active).instanceId)
-                .isEqualTo(instanceIdNew)
         }
 
     @Test
@@ -588,40 +526,46 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             val latest by collectLastValue(underTest.chip)
 
             // WHEN there's promoted content
-            addOngoingCallState(promotedContent = callPromotedContentBuilder().build())
+            addOngoingCallState(
+                promotedContent =
+                    OngoingCallTestHelper.PromotedContentInput.OverrideToValue(
+                        callPromotedContentBuilder().build()
+                    )
+            )
             // THEN the chip is active
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
 
             // WHEN the promoted content is removed
-            addOngoingCallState(promotedContent = null)
+            addOngoingCallState(
+                promotedContent = OngoingCallTestHelper.PromotedContentInput.OverrideToNull
+            )
             // THEN the chip stays active
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
 
             // WHEN there's promoted content again
-            addOngoingCallState(promotedContent = callPromotedContentBuilder().build())
+            addOngoingCallState(
+                promotedContent =
+                    OngoingCallTestHelper.PromotedContentInput.OverrideToValue(
+                        callPromotedContentBuilder().build()
+                    )
+            )
             // THEN the chip is still active
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
         }
 
     @Test
-    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
-    fun chip_promotedFlagOn_promotedContentChanges_modelUpdates() =
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_promotedFlagOn_requestedPromotionChanges_modelUpdates() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
-            // WHEN there's promoted content
-            addOngoingCallState(promotedContent = callPromotedContentBuilder().build())
-            // THEN the chip is active
+            addOngoingCallState(requestedPromotion = false)
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
 
-            // WHEN the promoted content is removed
-            addOngoingCallState(promotedContent = null)
-            // THEN the chip is inactive
+            addOngoingCallState(requestedPromotion = true)
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
 
-            // WHEN there's promoted content again
-            addOngoingCallState(promotedContent = callPromotedContentBuilder().build())
-            // THEN the chip is active again
+            addOngoingCallState(requestedPromotion = false)
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
         }
 
@@ -663,7 +607,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @DisableChipsModernization
-    fun chip_inCall_nullIntent_nullClickListener() =
+    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_nullIntent_chipsModFlagOff_promotedUiFlagOff_nullClickListener() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -674,7 +620,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @DisableChipsModernization
-    fun chip_inCall_positiveStartTime_validIntent_clickListenerLaunchesIntent() =
+    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_positiveStartTime_validIntent_chipsModFlagOff_promotedUiFlagOff_clickListenerLaunchesIntent() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -692,7 +640,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @DisableChipsModernization
-    fun chip_inCall_zeroStartTime_validIntent_clickListenerLaunchesIntent() =
+    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_zeroStartTime_validIntent_chipsModFlagOff_promotedUiFlagOff_clickListenerLaunchesIntent() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -710,8 +660,78 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
+    @DisableChipsModernization
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_nullIntent_chipsModFlagOff_promotedUiFlagOn_clickingChipNotifiesInteractor() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+            val latestChipTapKey by
+                collectLastValue(
+                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
+                )
+
+            addOngoingCallState(key = "fakeCallKey", contentIntent = null)
+
+            val clickListener = (latest as OngoingActivityChipModel.Active).onClickListenerLegacy
+            assertThat(clickListener).isNotNull()
+
+            clickListener!!.onClick(chipView)
+
+            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
+        }
+
+    @Test
+    @DisableChipsModernization
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_positiveStartTime_validIntent_chipsModFlagOff_promotedUiFlagOn_clickingChipNotifiesInteractor() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+            val latestChipTapKey by
+                collectLastValue(
+                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
+                )
+
+            val pendingIntent = mock<PendingIntent>()
+            addOngoingCallState(
+                key = "fakeCallKey",
+                startTimeMs = 1000,
+                contentIntent = pendingIntent,
+            )
+            val clickListener = (latest as OngoingActivityChipModel.Active).onClickListenerLegacy
+            assertThat(clickListener).isNotNull()
+
+            clickListener!!.onClick(chipView)
+
+            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
+        }
+
+    @Test
+    @DisableChipsModernization
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_zeroStartTime_validIntent_chipsModFlagOff_promotedUiFlagOn_clickingChipNotifiesInteractor() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+            val latestChipTapKey by
+                collectLastValue(
+                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
+                )
+
+            val pendingIntent = mock<PendingIntent>()
+            addOngoingCallState(key = "fakeCallKey", startTimeMs = 0, contentIntent = pendingIntent)
+            val clickListener = (latest as OngoingActivityChipModel.Active).onClickListenerLegacy
+
+            assertThat(clickListener).isNotNull()
+
+            clickListener!!.onClick(chipView)
+
+            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
+        }
+
+    @Test
     @EnableChipsModernization
-    fun chip_inCall_nullIntent_noneClickBehavior() =
+    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_nullIntent_chipsModFlagOn_promotedUiFlagOff_noneClickBehavior() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -723,7 +743,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableChipsModernization
-    fun chip_inCall_positiveStartTime_validIntent_clickBehaviorLaunchesIntent() =
+    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_positiveStartTime_validIntent_chipsModFlagOn_promotedUiFlagOff_clickBehaviorLaunchesIntent() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -744,7 +766,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableChipsModernization
-    fun chip_inCall_zeroStartTime_validIntent_clickBehaviorLaunchesIntent() =
+    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_zeroStartTime_validIntent_chipsModFlagOn_promotedUiFlagOff_clickBehaviorLaunchesIntent() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -764,9 +788,89 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
+    @EnableChipsModernization
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_nullIntent_chipsModFlagOn_promotedUiFlagOn_clickingChipNotifiesInteractor() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+            val latestChipTapKey by
+                collectLastValue(
+                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
+                )
+
+            addOngoingCallState(key = "fakeCallKey", startTimeMs = 1000, contentIntent = null)
+
+            val clickBehavior = (latest as OngoingActivityChipModel.Active).clickBehavior
+            assertThat(clickBehavior)
+                .isInstanceOf(
+                    OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification::class.java
+                )
+
+            (clickBehavior as OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification)
+                .onClick()
+
+            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
+        }
+
+    @Test
+    @EnableChipsModernization
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_positiveStartTime_validIntent_chipsModFlagOn_promotedUiFlagOn_clickingChipNotifiesInteractor() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+            val latestChipTapKey by
+                collectLastValue(
+                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
+                )
+
+            val pendingIntent = mock<PendingIntent>()
+            addOngoingCallState(
+                key = "fakeCallKey",
+                startTimeMs = 1000,
+                contentIntent = pendingIntent,
+            )
+
+            val clickBehavior = (latest as OngoingActivityChipModel.Active).clickBehavior
+            assertThat(clickBehavior)
+                .isInstanceOf(
+                    OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification::class.java
+                )
+            (clickBehavior as OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification)
+                .onClick()
+
+            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
+        }
+
+    @Test
+    @EnableChipsModernization
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME, FLAG_OPT_IN_RICH_ONGOING)
+    fun chip_inCall_zeroStartTime_validIntent_chipsModFlagOn_promotedUiFlagOn_clickingChipNotifiesInteractor() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.chip)
+            val latestChipTapKey by
+                collectLastValue(
+                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
+                )
+
+            val pendingIntent = mock<PendingIntent>()
+            addOngoingCallState(key = "fakeCallKey", startTimeMs = 0, contentIntent = pendingIntent)
+
+            val clickBehavior = (latest as OngoingActivityChipModel.Active).clickBehavior
+            assertThat(clickBehavior)
+                .isInstanceOf(
+                    OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification::class.java
+                )
+            (clickBehavior as OngoingActivityChipModel.ClickBehavior.ShowHeadsUpNotification)
+                .onClick()
+
+            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
+        }
+
+    @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
     @EnableChipsModernization
-    fun chipWithReturnAnimation_updatesCorrectly_withStateAndTransitionState() =
+    @DisableFlags(PromotedNotificationUi.FLAG_NAME)
+    fun chipWithReturnAnimation_promotedUiFlagOff_updatesCorrectly_withStateAndTransitionState() =
         kosmos.runTest {
             val pendingIntent = mock<PendingIntent>()
             val intent = mock<Intent>()
@@ -846,6 +950,7 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 (latest as OngoingActivityChipModel.Active).clickBehavior
                     as OngoingActivityChipModel.ClickBehavior.ExpandAction
             clickBehavior.onClick(expandable)
+
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
             assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
             assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
@@ -884,6 +989,103 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
             // End the call with the app visible [InCall(isAppVisible=true) -> NoCall,
             // NoTransition].
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+            assertThat(latest!!.transitionManager!!.controllerFactory).isNull()
+
+            // End the call with the app hidden [InCall(isAppVisible=false) -> NoCall,
+            // NoTransition].
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                isAppVisible = false,
+            )
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+            assertThat(latest!!.transitionManager!!.controllerFactory).isNull()
+        }
+
+    // When PromotedNotificationUi flag is on, then we don't have any custom launch animation, we
+    // only have the return animation.
+    @Test
+    @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME, PromotedNotificationUi.FLAG_NAME)
+    @EnableChipsModernization
+    fun chipWithReturnAnimation_promotedUiFlagOn_updatesCorrectly_withStateAndTransitionState() =
+        kosmos.runTest {
+            val pendingIntent = mock<PendingIntent>()
+            val intent = mock<Intent>()
+            whenever(pendingIntent.intent).thenReturn(intent)
+            val component = mock<ComponentName>()
+            whenever(intent.component).thenReturn(component)
+
+            val expandable = mock<Expandable>()
+            val activityController = mock<ActivityTransitionAnimator.Controller>()
+            whenever(
+                    expandable.activityTransitionController(
+                        anyOrNull(),
+                        anyOrNull(),
+                        any(),
+                        anyOrNull(),
+                        any(),
+                    )
+                )
+                .thenReturn(activityController)
+
+            val latest by collectLastValue(underTest.chip)
+
+            // Start off with no call.
+            removeOngoingCallState(key = NOTIFICATION_KEY)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
+            assertThat(latest!!.transitionManager!!.controllerFactory).isNull()
+
+            // Call starts [NoCall -> InCall(isAppVisible=true), NoTransition].
+            addOngoingCallState(
+                key = NOTIFICATION_KEY,
+                startTimeMs = 345,
+                contentIntent = pendingIntent,
+                uid = NOTIFICATION_UID,
+                isAppVisible = true,
+            )
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isTrue()
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+            val factory = latest!!.transitionManager!!.controllerFactory
+            assertThat(factory!!.component).isEqualTo(component)
+
+            // Request a return transition [InCall(isAppVisible=true), NoTransition ->
+            // ReturnRequested].
+            factory.onCompose(expandable)
+            var controller = factory.createController(forLaunch = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isTrue()
+
+            // Start the return transition [InCall(isAppVisible=true), ReturnRequested ->
+            // Returning].
+            controller.onTransitionAnimationStart(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // End the return transition [InCall(isAppVisible=true), Returning -> NoTransition].
+            controller.onTransitionAnimationEnd(isExpandingFullyAbove = false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // Settle the return transition [InCall(isAppVisible=true) ->
+            // InCall(isAppVisible=false), NoTransition].
+            kosmos.activityManagerRepository.fake.setIsAppVisible(NOTIFICATION_UID, false)
+            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Active::class.java)
+            assertThat((latest as OngoingActivityChipModel.Active).isHidden).isFalse()
+            assertThat(latest!!.transitionManager!!.controllerFactory).isEqualTo(factory)
+            assertThat(latest!!.transitionManager!!.hideChipForTransition).isFalse()
+
+            // End the call.
             removeOngoingCallState(key = NOTIFICATION_KEY)
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
             assertThat(latest!!.transitionManager!!.controllerFactory).isNull()

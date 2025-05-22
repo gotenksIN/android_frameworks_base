@@ -286,17 +286,17 @@ public class TelephonyIcons {
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     public static final MobileIconGroup FIVE_G_BASIC_6RX = new MobileIconGroup(
             "5GBasic_6Rx",
-            R.string.data_connection_5g_basic_6rx,
+            R.string.data_connection_5g_basic,
             TelephonyIcons.ICON_5G_BASIC_6RX);
 
     public static final MobileIconGroup FIVE_G_UWB_6RX = new MobileIconGroup(
             "5GUWB_6Rx",
-            R.string.data_connection_5g_uwb_6rx,
+            R.string.data_connection_5g_uwb,
             TelephonyIcons.ICON_5G_UWB_6RX);
 
     public static final MobileIconGroup FIVE_G_PLUS_PLUS_6RX = new MobileIconGroup(
             "5G_PLUS_PLUS_6Rx",
-            R.string.data_connection_5g_plus_plus_6rx,
+            R.string.data_connection_5g_plus_plus,
             TelephonyIcons.ICON_5G_PLUS_PLUS_6RX);
 
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons

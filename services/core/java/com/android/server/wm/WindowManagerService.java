@@ -360,7 +360,7 @@ import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
+import com.android.server.am.AppBackgroundManager;
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.window.flags.Flags;
 
@@ -2900,9 +2900,9 @@ public class WindowManagerService extends IWindowManager.Stub
         //unfreeze process if the first frame appeared
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-        if (freezer != null && freezer.useFreezerManager()) {
-            freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
+        AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+        if (appBgManager != null) {
+            appBgManager.startUnfreeze(session.mPackageName, AppBackgroundManager.COMPLETE_LAUNCH_UNFREEZE);
         }
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 

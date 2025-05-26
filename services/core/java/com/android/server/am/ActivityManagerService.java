@@ -1003,11 +1003,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.addPidLocked(app);
+            if (appBgManager != null) {
+                appBgManager.addPidLocked(app);
             }
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
@@ -1036,12 +1036,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.removePidLocked(pid, app);
-                freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);
+            if (appBgManager != null) {
+                appBgManager.removePidLocked(pid, app);
+                appBgManager.startUnfreeze(
+                        app.processName, AppBackgroundManager.REMOVE_PROCESS_UNFREEZE);
             }
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }

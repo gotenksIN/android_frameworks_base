@@ -3819,23 +3819,23 @@ public class OomAdjuster {
         }
 
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+        AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-        if (freezer != null && freezer.useFreezerManager()) {
+        if (appBgManager != null) {
             // unfreeze process if user press home key before the first frame appeared
             if ((state.getSetAdj() >= ProcessList.FOREGROUND_APP_ADJ &&
                         state.getSetAdj() <= ProcessList.VISIBLE_APP_ADJ) &&
                         state.getCurAdj() > ProcessList.VISIBLE_APP_ADJ) {
-                freezer.startUnfreeze(app.processName,
-                        ProcessFreezerManager.INTERRUPT_LAUNCH_UNFREEZE);
+                appBgManager.startUnfreeze(app.processName,
+                        AppBackgroundManager.INTERRUPT_LAUNCH_UNFREEZE);
             }
             // check whether process/service that launching app depend on is in the freeze list
             if (state.getSetAdj() >= state.getCurAdj() &&
                         state.getCurAdj() <= ProcessList.VISIBLE_APP_ADJ) {
-                if (freezer.checkNeedFreezeProcessLocked(app)) {
-                    freezer.startUnfreezeService(app,
-                            ProcessFreezerManager.DEPEND_LAUNCH_UNFREEZE);
+                if (appBgManager.checkNeedFreezeProcessLocked(app)) {
+                    appBgManager.startUnfreezeService(app,
+                            AppBackgroundManager.DEPEND_LAUNCH_UNFREEZE);
                 }
             }
         }
@@ -3956,6 +3956,11 @@ public class OomAdjuster {
                     processGroup = THREAD_GROUP_DEFAULT;
                     break;
             }
+
+            if (appBgManager != null) {
+                appBgManager.handleSchedGroupTransition(app);
+            }
+
             setAppAndChildProcessGroup(app, processGroup);
             try {
                 final int renderThreadTid = app.getRenderThreadTid();

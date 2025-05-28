@@ -714,8 +714,8 @@ public class WindowManagerService extends IWindowManager.Stub
     boolean mBootAnimationStopped = false;
     long mBootWaitForWindowsStartTime = -1;
 
-    // Cache whether to Magnify the Navigation Bar and IME.
-    private boolean mMagnifyNavAndIme = false;
+    // Cache whether to Magnify the IME.
+    private boolean mMagnifyIme = false;
 
     /** Dump of the windows and app tokens at the time of the last ANR. Cleared after
      * LAST_ANR_LIFETIME_DURATION_MSECS */
@@ -834,7 +834,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 Settings.Secure.getUriFor(Settings.Secure.IMMERSIVE_MODE_CONFIRMATIONS);
         private final Uri mDisableSecureWindowsUri =
                 Settings.Secure.getUriFor(Settings.Secure.DISABLE_SECURE_WINDOWS);
-        private final Uri mMagnifyNavAndImeEnabledUri = Settings.Secure.getUriFor(
+        private final Uri mMagnifyImeEnabledUri = Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME);
         private final Uri mPolicyControlUri =
                 Settings.Global.getUriFor(Settings.Global.POLICY_CONTROL);
@@ -869,7 +869,7 @@ public class WindowManagerService extends IWindowManager.Stub
             resolver.registerContentObserver(mDisableSecureWindowsUri, false, this,
                     UserHandle.USER_ALL);
             if (com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
-                resolver.registerContentObserver(mMagnifyNavAndImeEnabledUri, false, this,
+                resolver.registerContentObserver(mMagnifyImeEnabledUri, false, this,
                         UserHandle.USER_ALL);
             }
             resolver.registerContentObserver(mPolicyControlUri, false, this, UserHandle.USER_ALL);
@@ -933,8 +933,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
 
-            if (mMagnifyNavAndImeEnabledUri.equals(uri)) {
-                updateMagnifyNavAndIme();
+            if (mMagnifyImeEnabledUri.equals(uri)) {
+                updateMagnifyIme();
             }
 
             if (mDevelopmentOverrideDesktopExperienceUri.equals(uri)) {
@@ -961,7 +961,7 @@ public class WindowManagerService extends IWindowManager.Stub
         void loadSettings() {
             updateMaximumObscuringOpacityForTouch();
             updateDisableSecureWindows();
-            updateMagnifyNavAndIme();
+            updateMagnifyIme();
         }
 
         void updateMaximumObscuringOpacityForTouch() {
@@ -1071,23 +1071,23 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         }
 
-        void updateMagnifyNavAndIme() {
+        void updateMagnifyIme() {
             if (!com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
-                mMagnifyNavAndIme = false;
+                mMagnifyIme = false;
                 return;
             }
 
-            boolean enabledMagnifyNavAndIme = Settings.Secure.getIntForUser(
+            boolean enabledMagnifyIme = Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
                     Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME,
                     AccessibilityUtils.getMagnificationMagnifyKeyboardDefaultValue(mContext),
                     mCurrentUserId) == 1;
-            if (mMagnifyNavAndIme == enabledMagnifyNavAndIme) {
+            if (mMagnifyIme == enabledMagnifyIme) {
                 return;
             }
 
             synchronized (mGlobalLock) {
-                mMagnifyNavAndIme = enabledMagnifyNavAndIme;
+                mMagnifyIme = enabledMagnifyIme;
             }
         }
     }
@@ -1529,8 +1529,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @VisibleForTesting
-    boolean isMagnifyNavAndImeEnabled() {
-        return mMagnifyNavAndIme;
+    boolean isMagnifyImeEnabled() {
+        return mMagnifyIme;
     }
 
     DisplayAreaPolicy.Provider getDisplayAreaPolicyProvider() {

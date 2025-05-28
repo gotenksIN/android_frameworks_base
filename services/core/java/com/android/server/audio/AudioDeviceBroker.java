@@ -208,7 +208,7 @@ public class AudioDeviceBroker {
 
     /** Indicates if headset profile connection and SCO audio control use the new implementation
      * aligned with other BT profiles. True if both the feature flag Flags.scoManagedByAudio() and
-     * the system property audio.sco.managed.by.audio are true.
+     * the system property bluetooth.sco.managed_by_audio are true.
      */
     private final boolean mScoManagedByAudio;
     /*package*/ boolean isScoManagedByAudio() {
@@ -2295,9 +2295,6 @@ public class AudioDeviceBroker {
     private static final int MSG_I_BT_SERVICE_DISCONNECTED_PROFILE = 22;
     private static final int MSG_IL_BT_SERVICE_CONNECTED_PROFILE = 23;
 
-    // process external command to (dis)connect a hearing aid device
-    private static final int MSG_L_HEARING_AID_DEVICE_CONNECTION_CHANGE_EXT = 31;
-
     private static final int MSG_L_COMMUNICATION_ROUTE_CLIENT_DIED = 34;
     private static final int MSG_CHECK_MUTE_MUSIC = 35;
     private static final int MSG_REPORT_NEW_ROUTES_A2DP = 36;
@@ -2333,7 +2330,6 @@ public class AudioDeviceBroker {
             case MSG_IIL_BTLEAUDIO_TIMEOUT:
             case MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE:
             case MSG_TOGGLE_HDMI:
-            case MSG_L_HEARING_AID_DEVICE_CONNECTION_CHANGE_EXT:
             case MSG_CHECK_MUTE_MUSIC:
             case MSG_IL_BT_HEARING_AID_TIMEOUT:
                 return true;
@@ -2476,9 +2472,9 @@ public class AudioDeviceBroker {
             return false;
         }
         // Do not mute on bluetooth event if music is playing on a wired headset.
-        if ((message == MSG_L_SET_BT_ACTIVE_DEVICE
+        if (message == MSG_L_SET_BT_ACTIVE_DEVICE
 // QTI_BEGIN: 2024-05-11: N/A: base: Remove A2DP to A2DP quick SHO changes
-                || message == MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE)
+                || message == MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE
 // QTI_END: 2024-05-11: N/A: base: Remove A2DP to A2DP quick SHO changes
                 && AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0)
                 && hasIntersection(mDeviceInventory.DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG_SET,

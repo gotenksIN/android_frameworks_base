@@ -1452,11 +1452,11 @@ public class DisplayPolicy {
                 // The index of the provider and corresponding insets types cannot change at
                 // runtime as ensured in WMS. Make use of the index in the provider directly
                 // to access the latest provided size at runtime.
-                final TriFunction<DisplayFrames, WindowContainer, Rect, Integer> frameProvider =
+                final TriFunction<DisplayFrames, WindowState, Rect, Integer> frameProvider =
                         getFrameProvider(win, i, INSETS_OVERRIDE_INDEX_INVALID);
                 final InsetsFrameProvider.InsetsSizeOverride[] overrides =
                         provider.getInsetsSizeOverrides();
-                final SparseArray<TriFunction<DisplayFrames, WindowContainer, Rect, Integer>>
+                final SparseArray<TriFunction<DisplayFrames, WindowState, Rect, Integer>>
                         overrideProviders;
                 if (overrides != null) {
                     overrideProviders = new SparseArray<>();
@@ -1471,15 +1471,16 @@ public class DisplayPolicy {
                         .getInsetsStateController().getOrCreateSourceProvider(provider.getId(),
                                 provider.getType());
                 sourceProvider.getSource().setFlags(provider.getFlags());
-                sourceProvider.setWindowContainer(win, frameProvider, overrideProviders);
+                sourceProvider.setWindow(win, frameProvider, overrideProviders);
                 mInsetsSourceWindowsExceptIme.add(win);
             }
         }
     }
 
-    private static TriFunction<DisplayFrames, WindowContainer, Rect, Integer> getFrameProvider(
+    @NonNull
+    private static TriFunction<DisplayFrames, WindowState, Rect, Integer> getFrameProvider(
             WindowState win, int index, int overrideIndex) {
-        return (displayFrames, windowContainer, inOutFrame) -> {
+        return (displayFrames, windowState, inOutFrame) -> {
             final LayoutParams lp = win.mAttrs.forRotation(displayFrames.mRotation);
             final InsetsFrameProvider ifp = lp.providedInsets[index];
             final Rect displayFrame = displayFrames.mUnrestricted;
@@ -1490,7 +1491,7 @@ public class DisplayPolicy {
                     inOutFrame.set(displayFrame);
                     break;
                 case SOURCE_CONTAINER_BOUNDS:
-                    inOutFrame.set(windowContainer.getBounds());
+                    inOutFrame.set(windowState.getBounds());
                     break;
                 case SOURCE_FRAME:
                     extendByCutout =
@@ -1551,13 +1552,9 @@ public class DisplayPolicy {
         }
     }
 
-    TriFunction<DisplayFrames, WindowContainer, Rect, Integer> getImeSourceFrameProvider() {
-        return (displayFrames, windowContainer, inOutFrame) -> {
-            WindowState windowState = windowContainer.asWindowState();
-            if (windowState == null) {
-                throw new IllegalArgumentException("IME insets must be provided by a window.");
-            }
-
+    @NonNull
+    TriFunction<DisplayFrames, WindowState, Rect, Integer> getImeSourceFrameProvider() {
+        return (displayFrames, windowState, inOutFrame) -> {
             inOutFrame.inset(windowState.mGivenContentInsets);
             return 0;
         };
@@ -1586,9 +1583,7 @@ public class DisplayPolicy {
             final InsetsStateController controller = mDisplayContent.getInsetsStateController();
             for (int index = providers.size() - 1; index >= 0; index--) {
                 final InsetsSourceProvider provider = providers.valueAt(index);
-                provider.setWindowContainer(
-                        null /* windowContainer */,
-                        null /* frameProvider */,
+                provider.setWindow(null /* win */, null /* frameProvider */,
                         null /* overrideFrameProviders */);
                 controller.removeSourceProvider(provider.getSource().getId());
             }
@@ -2196,8 +2191,10 @@ public class DisplayPolicy {
                 mService.mDisplayNotificationController
                         .dispatchDisplayAddSystemDecorations(displayId);
             }
-            final boolean eligibleForDesktopMode =
-                    isSystemDecorationsSupported && (mDisplayContent.isDefaultDisplay
+            final boolean isFreeformSupported =
+                    mDisplayContent.isWindowingModeSupported(WINDOWING_MODE_FREEFORM);
+            final boolean eligibleForDesktopMode = isFreeformSupported
+                    && isSystemDecorationsSupported && (mDisplayContent.isDefaultDisplay
                             || mDisplayContent.allowContentModeSwitch());
             if (eligibleForDesktopMode) {
                 mService.mDisplayNotificationController.dispatchDesktopModeEligibleChanged(

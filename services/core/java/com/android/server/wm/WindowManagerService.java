@@ -7877,6 +7877,9 @@ public class WindowManagerService extends IWindowManager.Stub
             if (!displayContent.isSystemDecorationsSupported()) {
                 return false;
             }
+            if (!displayContent.isWindowingModeSupported(WINDOWING_MODE_FREEFORM)) {
+                return false;
+            }
             return displayContent.isDefaultDisplay || displayContent.allowContentModeSwitch();
         }
     }

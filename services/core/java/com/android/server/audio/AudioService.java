@@ -99,6 +99,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.SpecialUsers.CannotBeSpecialUser;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
@@ -13848,6 +13849,18 @@ public class AudioService extends IAudioService.Stub
                     mInputMethodServiceUid = uid;
                 }
             }
+        }
+
+        @Override
+        public boolean isUserPlayingAudio(@CannotBeSpecialUser @UserIdInt int userId) {
+            final List<AudioPlaybackConfiguration> configs = getActivePlaybackConfigurations();
+            for (AudioPlaybackConfiguration cfg : configs) {
+                if (UserHandle.getUserId(cfg.getClientUid()) == userId &&
+                        cfg.getPlayerState() == AudioPlaybackConfiguration.PLAYER_STATE_STARTED) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

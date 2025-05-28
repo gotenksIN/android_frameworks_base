@@ -361,8 +361,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     private boolean mAppOpVisibility = true;
 
     boolean mPermanentlyHidden; // the window should never be shown again
-    // This is a non-system overlay window that is currently force hidden.
-    private boolean mForceHideNonSystemOverlayWindow;
+    /** This is a non-system overlay window that is currently force hidden. */
+    private boolean mIsForceHiddenNonSystemOverlayWindow;
     boolean mHidden = true;    // Used to determine if to show child windows.
     private boolean mDragResizing;
     private boolean mDragResizingChangeReported = true;
@@ -701,6 +701,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * container.
      */
     private boolean mIsDimming = false;
+
+    @Nullable
+    private InsetsSourceProvider mControllableInsetProvider;
+
+    /**
+     * The {@link InsetsSourceProvider}s provided by this window container.
+     */
+    @Nullable
+    private SparseArray<InsetsSourceProvider> mInsetsSourceProviders = null;
 
     private @InsetsType int mRequestedVisibleTypes = WindowInsets.Type.defaultVisible();
 
@@ -1131,11 +1140,18 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     boolean isWindowTrustedOverlay() {
-        return InputMonitor.isTrustedOverlay(mAttrs.type)
-                || ((mAttrs.privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0
-                        && mSession.mCanAddInternalSystemWindow)
-                || ((mAttrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0
-                        && mSession.mCanCreateSystemApplicationOverlay);
+        if (InputMonitor.isTrustedOverlay(mAttrs.type)) {
+            return true;
+        }
+        if (((mAttrs.privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0
+                && mSession.mCanAddInternalSystemWindow)) {
+            return true;
+        }
+        if (((mAttrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0
+                && mSession.mCanCreateSystemApplicationOverlay)) {
+            return true;
+        }
+        return false;
     }
 
     int getTouchOcclusionMode() {
@@ -1986,6 +2002,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     void onMovedByResize() {
         ProtoLog.d(WM_DEBUG_RESIZE, "onMovedByResize: Moving %s", this);
         mMovedByResize = true;
+        if (mControllableInsetProvider != null) {
+            mControllableInsetProvider.onWindowBoundsChanged();
+        }
         super.onMovedByResize();
     }
 
@@ -2037,6 +2056,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mHasSurface && !isGoneForLayout() && !resizingWindows.contains(this)) {
             ProtoLog.d(WM_DEBUG_RESIZE, "onResize: Resizing %s", this);
             resizingWindows.add(this);
+        }
+        if (mControllableInsetProvider != null) {
+            mControllableInsetProvider.onWindowBoundsChanged();
         }
 
         super.onResize();
@@ -2910,7 +2932,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // Being hidden due to owner package being suspended.
             return false;
         }
-        if (mForceHideNonSystemOverlayWindow) {
+        if (mIsForceHiddenNonSystemOverlayWindow) {
             // This is an alert window that is currently force hidden.
             return false;
         }
@@ -2987,6 +3009,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return true;
     }
 
+    boolean isForceHiddenNonSystemOverlayWindow() {
+        return mIsForceHiddenNonSystemOverlayWindow;
+    }
+
     void setForceHideNonSystemOverlayWindowIfNeeded(boolean forceHide) {
         final int baseType = getBaseType();
         if (mSession.mCanAddInternalSystemWindow
@@ -2999,10 +3025,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             return;
         }
 
-        if (mForceHideNonSystemOverlayWindow == forceHide) {
+        if (mIsForceHiddenNonSystemOverlayWindow == forceHide) {
             return;
         }
-        mForceHideNonSystemOverlayWindow = forceHide;
+        mIsForceHiddenNonSystemOverlayWindow = forceHide;
         if (forceHide) {
             hide(true /* doAnimation */, true /* requestAnim */);
         } else {
@@ -4010,7 +4036,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
         }
         if (!isVisibleByPolicy() || !mLegacyPolicyVisibilityAfterAnim || !mAppOpVisibility
-                || isParentWindowHidden() || mPermanentlyHidden || mForceHideNonSystemOverlayWindow
+                || isParentWindowHidden() || mPermanentlyHidden
+                || mIsForceHiddenNonSystemOverlayWindow
                 || mHiddenWhileSuspended) {
             pw.println(prefix + "mPolicyVisibility=" + isVisibleByPolicy()
                     + " mLegacyPolicyVisibilityAfterAnim=" + mLegacyPolicyVisibilityAfterAnim
@@ -4018,7 +4045,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     + " parentHidden=" + isParentWindowHidden()
                     + " mPermanentlyHidden=" + mPermanentlyHidden
                     + " mHiddenWhileSuspended=" + mHiddenWhileSuspended
-                    + " mForceHideNonSystemOverlayWindow=" + mForceHideNonSystemOverlayWindow);
+                    + " mIsForceHiddenNonSystemOverlayWindow="
+                    + mIsForceHiddenNonSystemOverlayWindow);
         }
         if (!mRelayoutCalled || mLayoutNeeded) {
             pw.println(prefix + "mRelayoutCalled=" + mRelayoutCalled
@@ -5419,6 +5447,43 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     void resetContentChanged() {
         mWindowFrames.setContentChanged(false);
+    }
+
+    /**
+     * Sets an {@link InsetsSourceProvider} to be associated with this window, but only if the
+     * provider itself is controllable, as one window can be the provider of more than one inset
+     * type (i.e. gesture insets). If this window is controllable, all its animations must be
+     * controlled by its control target, and the visibility of this window should be taken account
+     * into the state of the control target.
+     *
+     * @param insetProvider the provider which should not be visible to the client.
+     * @see WindowState#getInsetsState()
+     */
+    void setControllableInsetProvider(@Nullable InsetsSourceProvider insetProvider) {
+        mControllableInsetProvider = insetProvider;
+    }
+
+    @Nullable
+    InsetsSourceProvider getControllableInsetProvider() {
+        return mControllableInsetProvider;
+    }
+
+    /**
+     * Returns {@code true} if this node provides insets.
+     */
+    boolean hasInsetsSourceProvider() {
+        return mInsetsSourceProviders != null;
+    }
+
+    /**
+     * Returns {@link InsetsSourceProvider}s provided by this node.
+     */
+    @NonNull
+    SparseArray<InsetsSourceProvider> getInsetsSourceProviders() {
+        if (mInsetsSourceProviders == null) {
+            mInsetsSourceProviders = new SparseArray<>();
+        }
+        return mInsetsSourceProviders;
     }
 
     private final class MoveAnimationSpec implements AnimationSpec {

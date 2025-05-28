@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,16 @@
  * limitations under the License.
  */
 
-package com.android.systemui.shade.data.repository
+package com.android.systemui.biometrics.shared.model
 
-import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.statusbar.policy.nextAlarmController
+/** Data class for storing the fallback option for Biometric Prompt */
+data class FallbackOptionModel(val text: CharSequence, val iconType: IconType)
 
-var Kosmos.shadeHeaderClockRepository: ShadeHeaderClockRepository by
-    Kosmos.Fixture { ShadeHeaderClockRepository(nextAlarmController) }
+/** Enum class for the BiometricManager.IconType */
+enum class IconType {
+    PASSWORD,
+    QR_CODE,
+    ACCOUNT,
+    GENERIC,
+    SETTING,
+}

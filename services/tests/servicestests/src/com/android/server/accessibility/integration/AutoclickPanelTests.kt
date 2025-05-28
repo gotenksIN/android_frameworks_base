@@ -18,6 +18,7 @@ package com.android.server.accessibility.integration
 import android.app.Instrumentation
 import android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES
 import android.content.Context
+import android.graphics.Point
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.CheckFlagsRule
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
@@ -35,6 +36,9 @@ import com.android.compatibility.common.util.SettingsStateChangerRule
 import com.android.internal.R
 import com.android.server.accessibility.Flags
 import kotlin.time.Duration.Companion.seconds
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Rule
@@ -92,6 +96,48 @@ class AutoclickPanelTests {
         ).click()
     }
 
+    private fun clickClickTypeButton(id: Int) {
+        findObject(
+            By.res(context.getResources().getResourceName(id))
+        ).click()
+        // The delay is needed to let the animation of the panel opening/closing complete before
+        // querying for the next element.
+        uiDevice.waitForIdle(DELAY_FOR_ANIMATION.inWholeMilliseconds)
+    }
+
+    private fun clickLeftClickButton() {
+        clickClickTypeButton(R.id.accessibility_autoclick_left_click_layout)
+    }
+
+    private fun clickLongPressButton() {
+        clickClickTypeButton(R.id.accessibility_autoclick_long_press_layout)
+    }
+
+    private fun clickPositionButton() {
+        clickClickTypeButton(R.id.accessibility_autoclick_position_layout)
+    }
+
+    // The panel is considered open when every click type button is showing.
+    private fun isAutoclickPanelOpen(): Boolean {
+        val PANEL_OPEN_CLICK_TYPE_COUNT = 6
+        val clickTypeButtonGroupContainer = findObject(
+            By.res(
+                context.getResources()
+                    .getResourceName(R.id.accessibility_autoclick_click_type_button_group_container)
+            )
+        )
+        return clickTypeButtonGroupContainer.childCount == PANEL_OPEN_CLICK_TYPE_COUNT
+    }
+
+    private fun getAutoclickPanelPosition(): Point {
+        return findObject(
+            By.res(
+                context.getResources()
+                    .getResourceName(R.id.accessibility_autoclick_type_panel)
+            )
+        ).visibleCenter
+    }
+
     @Test
     fun togglePauseResumeButton_contentDescriptionReflectsTheState() {
         val autoclickPauseButtonId = context.getResources()
@@ -126,7 +172,47 @@ class AutoclickPanelTests {
         )
     }
 
+    @Test
+    fun switchClickType_LongPressClickTypeIsSelected() {
+        // Click the left click button to open the panel.
+        clickLeftClickButton()
+
+        // Click the long press button then verify only the long press button is visible with all
+        // other click type buttons hidden.
+        clickLongPressButton()
+        assertNotNull(
+            findObject(
+                By.res(
+                    context.getResources()
+                        .getResourceName(R.id.accessibility_autoclick_long_press_layout)
+                )
+            )
+        )
+        assertFalse(isAutoclickPanelOpen())
+    }
+
+    @Test
+    fun clickPositionButton_autoclickPanelMovesAroundTheScreen() {
+        // Capture position of the panel after each click.
+        val startingPosition = getAutoclickPanelPosition()
+        clickPositionButton()
+        val secondPosition = getAutoclickPanelPosition()
+        clickPositionButton()
+        val thirdPosition = getAutoclickPanelPosition()
+        clickPositionButton()
+        val fourthPosition = getAutoclickPanelPosition()
+        clickPositionButton()
+        val fifthPosition = getAutoclickPanelPosition()
+
+        // Confirm the panel moved around the screen and finished in the starting location.
+        assertNotEquals(startingPosition, secondPosition)
+        assertNotEquals(secondPosition, thirdPosition)
+        assertNotEquals(thirdPosition, fourthPosition)
+        assertEquals(startingPosition, fifthPosition)
+    }
+
     private companion object {
         private val FIND_OBJECT_TIMEOUT = 30.seconds
+        private val DELAY_FOR_ANIMATION = 2.seconds
     }
 }

@@ -179,6 +179,16 @@ flag {
 }
 
 flag {
+    name: "notifications_hun_accessibility_refactor"
+    namespace: "systemui"
+    description: "Refactors where notification HUN accessibility events happen"
+    bug: "397507681"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "notifications_hun_shared_animation_values"
     namespace: "systemui"
     description: "Adds a shared class for fetching HUN animation values."
@@ -1269,16 +1279,6 @@ flag {
 }
 
 flag {
-  name: "translucent_occluding_activity_fix"
-  namespace: "systemui"
-  description: "Fixes occlusion animation for transluent activities"
-  bug: "303010980"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
    namespace: "systemui"
    name: "fetch_bookmarks_xml_keyboard_shortcuts"
    description: "Fetches application launch keyboard shortcuts from system server rather than building a hardcoded list."
@@ -1286,16 +1286,6 @@ flag {
    metadata {
        purpose: PURPOSE_BUGFIX
    }
-}
-
-flag {
-  namespace: "systemui"
-  name: "qs_register_setting_observer_on_bg_thread"
-  description: "Registers Quick Settings content providers on background thread"
-  bug: "351766769"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -1734,6 +1724,13 @@ flag {
 }
 
 flag {
+    name: "clock_modernization"
+    namespace: "systemui"
+    description: "Implement the status bar/shade header clock in the recommended architecture"
+    bug: "390204943"
+}
+
+flag {
     name: "notifications_launch_radius"
     namespace: "systemui"
     description: "Fixes a discrepancy in corner radius between expanding notification and opening window during launch animations."
@@ -1793,16 +1790,6 @@ flag {
     metadata {
        purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "keyguard_wm_reorder_atms_calls"
-   namespace: "systemui"
-   description: "Calls ATMS#setLockScreenShown before default display callbacks in case they're slow"
-   bug: "399693427"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {

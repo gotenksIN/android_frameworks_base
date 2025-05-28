@@ -578,6 +578,25 @@ public class AccessibilityManagerServiceTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
+    public void testCursorFollowing_defaultContinuousAndThenCenter_propagateToA11yInputFilter() {
+        final AccessibilityUserState userState = mA11yms.mUserStates.get(
+                mA11yms.getCurrentUserIdLocked());
+        Settings.Secure.putIntForUser(
+                mTestableContext.getContentResolver(),
+                Settings.Secure.ACCESSIBILITY_MAGNIFICATION_CURSOR_FOLLOWING_MODE,
+                Settings.Secure.ACCESSIBILITY_MAGNIFICATION_CURSOR_FOLLOWING_MODE_CENTER,
+                mA11yms.getCurrentUserIdLocked());
+        verify(mInputFilter, never()).setCursorFollowingMode(
+                Settings.Secure.ACCESSIBILITY_MAGNIFICATION_CURSOR_FOLLOWING_MODE_CENTER);
+
+        mA11yms.readMagnificationCursorFollowingMode(userState);
+
+        verify(mInputFilter).setCursorFollowingMode(
+                Settings.Secure.ACCESSIBILITY_MAGNIFICATION_CURSOR_FOLLOWING_MODE_CENTER);
+    }
+
+    @Test
     public void testFollowTypingEnabled_defaultEnabledAndThenDisable_propagateToController() {
         final AccessibilityUserState userState = mA11yms.mUserStates.get(
                 mA11yms.getCurrentUserIdLocked());
@@ -2287,7 +2306,7 @@ public class AccessibilityManagerServiceTest {
                 mA11yms.getCurrentUserIdLocked())).isEmpty();
 
         mA11yms.handleKeyGestureEvent(new KeyGestureEvent.Builder().setKeyGestureType(
-                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_TALKBACK).setAction(
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER).setAction(
                 KeyGestureEvent.ACTION_GESTURE_COMPLETE).build());
 
         assertThat(ShortcutUtils.getShortcutTargetsFromSettings(mTestableContext, KEY_GESTURE,

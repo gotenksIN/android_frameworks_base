@@ -5554,6 +5554,25 @@ public final class Settings {
                 "hardware_haptic_feedback_intensity";
 
         /**
+         * The intensity of gesture input vibrations if configurable. See {@link
+         * android.os.VibrationAttributes#USAGE_GESTURE_INPUT} for details about gesture input
+         * vibrations.
+         *
+         * Not all devices are capable of changing their feedback intensity; on these devices
+         * there will likely be no difference between the various vibration intensities except for
+         * intensity 0 (off) and the rest.
+         *
+         * <b>Values:</b><br/>
+         * 0 - Vibration is disabled<br/>
+         * 1 - Weak vibrations<br/>
+         * 2 - Medium vibrations<br/>
+         * 3 - Strong vibrations
+         * @hide
+         */
+        public static final String GESTURE_INPUT_VIBRATION_INTENSITY =
+                "gesture_input_vibration_intensity";
+
+        /**
          * Whether keyboard vibration feedback is enabled. The value is boolean (1 or 0).
          *
          * @hide
@@ -21147,6 +21166,13 @@ public final class Settings {
              */
             public static final String GESTURE_DISMISS_ACTION_USER_PREFERENCE =
                     "gesture_dismiss_action_user_preference";
+
+            /**
+             * Setting indicating the duration, in days, between two gesture hint sessions.
+             *
+             * @hide
+             */
+            public static final String GESTURE_HINT_PERIOD_DAYS = "gesture_hint_period_days";
 
             /** Whether Wear Power Anomaly Service is enabled.
              *

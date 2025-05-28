@@ -235,6 +235,7 @@ import android.service.vr.IVrManager;
 import android.service.vr.IVrStateCallbacks;
 import android.sysprop.SurfaceFlingerProperties;
 import android.text.format.DateUtils;
+import android.tracing.TracingUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -6949,12 +6950,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     private void dumpLogStatus(PrintWriter pw) {
-        pw.println("WINDOW MANAGER LOGGING (dumpsys window logging)");
-        if (android.tracing.Flags.perfettoProtologTracing()) {
-            pw.println("Deprecated legacy command. Use Perfetto commands instead.");
-            return;
-        }
-        ((LegacyProtoLogImpl) ProtoLog.getSingleInstance()).getStatus();
+        pw.println("Deprecated legacy command. Use Perfetto commands instead.");
+        return;
     }
 
     private void dumpSessionsLocked(PrintWriter pw) {
@@ -6974,7 +6971,8 @@ public class WindowManagerService extends IWindowManager.Stub
      * @param logLevel  Determines the amount of data to be written to the Protobuf.
      */
     void dumpDebugLocked(ProtoOutputStream proto, @WindowTracingLogLevel int logLevel) {
-        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "dumpDebugLocked");
+        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER,
+                TracingUtils.uiTracingSliceName("Window::dumpDebugLocked"));
         try {
             mPolicy.dumpDebug(proto, POLICY);
             mRoot.dumpDebug(proto, ROOT_WINDOW_CONTAINER, logLevel);

@@ -14,10 +14,17 @@
  * limitations under the License.
  */
 
-package com.android.systemui.topwindoweffects.ui.viewmodel
+package com.android.systemui.camera
 
-// A container of durations for the effect. Used by both the visual and haptic effects.
-object SqueezeEffectConfig {
-    const val INWARD_EFFECT_DURATION = 800 // in milliseconds
-    const val OUTWARD_EFFECT_DURATION = 333 // in milliseconds
+import com.android.systemui.camera.data.repository.CameraSensorPrivacyRepository
+import com.android.systemui.camera.data.repository.CameraSensorPrivacyRepositoryImpl
+import dagger.Binds
+import dagger.Module
+
+/** Module for repositories that provide data regarding camera sensor privacy state. */
+@Module
+interface CameraSensorPrivacyModule {
+
+    @Binds
+    fun bindsPrivacyRepoImpl(impl: CameraSensorPrivacyRepositoryImpl): CameraSensorPrivacyRepository
 }

@@ -5236,6 +5236,12 @@
     <permission android:name="android.permission.DUMP"
         android:protectionLevel="signature|privileged|development" />
 
+    <!-- This permission protects a content provider within home/launcher applications, enabling management of home screen metadata such as shortcut placement, launch intents, and labels. -->
+    <!-- @FlaggedApi(android.provider.Flags.FLAG_LAUNCHER_DATA_ACCESS) -->
+    <permission android:name="android.permission.LAUNCHER_DATA_ACCESS"
+      android:protectionLevel="signatureOrSystem"
+      android:featureFlag="android.provider.launcher_data_access" />
+
     <!-- Allows an application to start tracing for InputMethod and WindowManager.
     <p>Not for use by third-party applications.
     @hide -->
@@ -8237,6 +8243,16 @@
                 android:label="@string/permlab_fullScreenIntent"
                 android:description="@string/permdesc_fullScreenIntent"
                 android:protectionLevel="normal|appop" />
+
+    <!-- Required for apps to post promoted notifications.
+         <p>Protection level: normal|appops
+         @FlaggedApi(android.app.Flags.FLAG_API_RICH_ONGOING_PERMISSION)
+         -->
+    <permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"
+        android:label="@string/permlab_postPromotedNotifications"
+        android:description="@string/permdesc_postPromotedNotifications"
+        android:protectionLevel="normal|appop"
+        android:featureFlag="android.app.api_rich_ongoing_permission"/>
 
     <!-- @SystemApi Required for the privileged assistant apps targeting
          {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM}

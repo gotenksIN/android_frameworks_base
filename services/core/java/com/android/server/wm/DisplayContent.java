@@ -675,10 +675,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     private InsetsControlTarget mImeControlTarget;
 
     /**
-     * The last {@link #mImeInputTarget} processed from {@link #setImeLayeringTargetInner}. This
-     * enables updating the {@link #mImeControlTarget} when the {@link #mImeLayeringTarget} remains
-     * the same, and only the {@link #mImeInputTarget} changes. For example, this can happen when
-     * the IME is moving to a SurfaceControlViewHost backed EmbeddedWindow.
+     * The last {@link #mImeInputTarget} processed from {@link #setImeLayeringTarget}. This enables
+     * updating the {@link #mImeControlTarget} when the {@link #mImeLayeringTarget} remains the
+     * same, and only the {@link #mImeInputTarget} changes. For example, this can happen when the
+     * IME is moving to a SurfaceControlViewHost backed EmbeddedWindow.
      */
     @Nullable
     private InputTarget mLastImeInputTarget;
@@ -4148,52 +4148,24 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      */
     @Nullable
     WindowState computeImeLayeringTarget(boolean update) {
+        final WindowState target;
         if (mInputMethodWindow == null) {
             // There isn't an IME so there shouldn't be a target...That was easy!
-            if (update) {
-                if (DEBUG_INPUT_METHOD) {
-                    Slog.w(TAG_WM, "Moving IME layering target from " + mImeLayeringTarget
-                            + " to null since mInputMethodWindow is null");
-                }
-                setImeLayeringTargetInner(null /* target */);
-            }
-            return null;
-        }
-
-        final WindowState curTarget = mImeLayeringTarget;
-        // TODO(multidisplay): Needs some serious rethought when the target and IME are not on the
-        // same display. Or even when the current IME/target are not on the same screen as the next
-        // IME/target. For now only look for input windows on the main screen.
-        mUpdateImeLayeringTarget = update;
-        final WindowState target = getWindow(mComputeImeLayeringTargetPredicate);
-
-        if (DEBUG_INPUT_METHOD && update) {
-            Slog.v(TAG_WM, "Proposed new IME target: " + target + " for display: "
-                    + getDisplayId());
+            target = null;
+        } else {
+            mUpdateImeLayeringTarget = update;
+            target = getWindow(mComputeImeLayeringTargetPredicate);
         }
 
         if (DEBUG_INPUT_METHOD) {
-            Slog.v(TAG_WM, "Desired IME layering target=" + target + " update=" + update);
-        }
-
-        if (target == null) {
-            if (update) {
-                if (DEBUG_INPUT_METHOD) {
-                    Slog.w(TAG_WM, "Moving IME layering target from " + curTarget + " to null."
-                            + (SHOW_STACK_CRAWLS ? " Callers=" + Debug.getCallers(4) : ""));
-                }
-                setImeLayeringTargetInner(null /* target */);
-            }
-
-            return null;
+            Slog.v(TAG_WM, "computeImeLayeringTarget found: " + target + ", update: " + update
+                    + ", was: " + mImeLayeringTarget + ", IME window: " + mInputMethodWindow
+                    + ", displayId: " + getDisplayId()
+                    + (SHOW_STACK_CRAWLS ? " Callers=" + Debug.getCallers(4) : ""));
         }
 
         if (update) {
-            if (DEBUG_INPUT_METHOD) {
-                Slog.w(TAG_WM, "Moving IME layering target from " + curTarget + " to "
-                        + target + (SHOW_STACK_CRAWLS ? " Callers=" + Debug.getCallers(4) : ""));
-            }
-            setImeLayeringTargetInner(target);
+            setImeLayeringTarget(target);
         }
 
         return target;
@@ -4334,11 +4306,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
     }
 
-    @VisibleForTesting
-    void setImeLayeringTarget(@Nullable WindowState target) {
-        mImeLayeringTarget = target;
-    }
-
     /**
      * Sets the IME layering target, and updates the IME control target. Also updates the IME parent
      * if necessary.
@@ -4346,7 +4313,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * @param target the window to place the IME on top of. If {@code null}, the IME will be placed
      *               on top of its parent's surface.
      */
-    private void setImeLayeringTargetInner(@Nullable WindowState target) {
+    @VisibleForTesting
+    void setImeLayeringTarget(@Nullable WindowState target) {
         // This function is also responsible for updating the IME control target and so in the case
         // where the IME layering target does not change but the IME input target does (for example,
         // IME moving to a SurfaceControlViewHost) we have to continue executing this function,
@@ -4370,7 +4338,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             }
         }
 
-        ProtoLog.i(WM_DEBUG_IME, "setImeLayeringTargetInner %s", target);
+        ProtoLog.i(WM_DEBUG_IME, "setImeLayeringTarget %s", target);
         boolean forceUpdateImeParent = target != mImeLayeringTarget;
         mImeLayeringTarget = target;
 
@@ -4419,6 +4387,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             }
             mImeInputTargetTokenListenerPair = null;
         }
+        ProtoLog.i(WM_DEBUG_IME, "setImeInputTarget %s", target);
         mImeInputTarget = target;
         // Notify listeners about IME input target window visibility by the target change.
         if (target != null) {
@@ -4744,6 +4713,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     void updateImeControlTarget(boolean forceUpdateImeParent) {
         final InsetsControlTarget prevImeControlTarget = mImeControlTarget;
         mImeControlTarget = computeImeControlTarget();
+        ProtoLog.i(WM_DEBUG_IME, "updateImeControlTarget %s", mImeControlTarget);
         mInsetsStateController.onImeControlTargetChanged(mImeControlTarget);
         // Update IME parent when IME insets leash created or the new IME layering target might
         // updated from setImeLayeringTarget, which is the best time that default IME visibility
@@ -4778,6 +4748,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         final var newParentWindow = computeImeParent();
         final SurfaceControl newParent =
                 newParentWindow != null ? newParentWindow.getSurfaceControl() : null;
+        ProtoLog.i(WM_DEBUG_IME, "updateImeParent %s", newParent);
         if (newParent != null && newParent != mInputMethodSurfaceParent) {
             mInputMethodSurfaceParentWindow = newParentWindow;
             mInputMethodSurfaceParent = newParent;
@@ -5583,6 +5554,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                             && imeLayeringTarget.mToken == imeControlTargetToken
                             && !imeLayeringTarget.inMultiWindowMode();
             if (canImeTargetSetRelativeLayer) {
+                ProtoLog.i(WM_DEBUG_IME, "assignRelativeLayerForIme to IME layering target %s",
+                        imeLayeringTarget);
                 mImeWindowsContainer.assignRelativeLayer(t, imeLayeringTarget.getSurfaceControl(),
                         // TODO: We need to use an extra level on the app surface to ensure
                         // this is always above SurfaceView but always below attached window.
@@ -5594,6 +5567,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // The IME surface parent may not be its window parent's surface
             // (@see #computeImeParent), so set relative layer here instead of letting the window
             // parent to assign layer.
+            ProtoLog.i(WM_DEBUG_IME, "assignRelativeLayerForIme to IME surface parent %s",
+                    mInputMethodSurfaceParent);
             mImeWindowsContainer.assignRelativeLayer(t, mInputMethodSurfaceParent, 1, forceUpdate);
         }
     }

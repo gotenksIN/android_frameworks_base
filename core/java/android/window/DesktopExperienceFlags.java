@@ -87,7 +87,7 @@ public enum DesktopExperienceFlags {
             Flags::enableDesktopCloseTaskAnimationInDtcBugfix, true,
             Flags.FLAG_ENABLE_DESKTOP_CLOSE_TASK_ANIMATION_IN_DTC_BUGFIX),
     ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX(
-            Flags::enableDesktopFirstBasedDefaultToDesktopBugfix, false,
+            Flags::enableDesktopFirstBasedDefaultToDesktopBugfix, true,
             Flags.FLAG_ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX),
     ENABLE_DESKTOP_FIRST_BASED_DRAG_TO_MAXIMIZE(Flags::enableDesktopFirstBasedDragToMaximize, true,
             Flags.FLAG_ENABLE_DESKTOP_FIRST_BASED_DRAG_TO_MAXIMIZE),
@@ -411,16 +411,9 @@ public enum DesktopExperienceFlags {
 
     /** Returns whether the toggle is overridden by the relevant system property.. */
     private static boolean isToggleOverriddenBySystem() {
-        // We never override if display content mode management is enabled.
-        if (enableDisplayContentModeManagement()) {
-            return false;
-        }
-        final Context context = getApplicationContext();
-        if (context == null) {
-            return false;
-        }
-        // If the developer option is not supported, we don't override.
-        if (!isDesktopExperienceDevOptionSupported()) {
+        // We never override if display content mode management is enabled or
+        // if the desktop experience dev option is not enabled in the build.
+        if (enableDisplayContentModeManagement() || !Flags.showDesktopExperienceDevOption()) {
             return false;
         }
         return SystemProperties.getBoolean(SYSTEM_PROPERTY_NAME, false);

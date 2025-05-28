@@ -3775,16 +3775,16 @@
     <string name="notification_inline_dismiss">Dismiss</string>
 
     <!-- [CHAR LIMIT=30] Text shown in button used to prevent app from showing Live Updates, for this notification and all future ones -->
-    <string name="notification_inline_disable_promotion">Don\'t show as pinned</string>
+    <string name="notification_inline_disable_promotion">Turn off</string>
 
     <!-- [CHAR LIMIT=30] Text shown in button used to prevent app from showing Live Updates, for this notification and all future ones -->
     <string name="notification_inline_disable_promotion_button">Block Live Updates from this app</string>
 
     <!-- Text accompanying the "Show live updates" switch explaining the purpose of the setting -->
-    <string name="live_notifications_title">Showing Live Updates</string>
+    <string name="live_notifications_title">Live updates</string>
 
     <!-- Text accompanying the "Show live updates" switch explaining the purpose of the setting -->
-    <string name="live_notifications_desc">Pinned notifications display live info from apps, and always appear on the status bar and lock screen</string>
+    <string name="live_notifications_desc">When turned off, ongoing notifications from this app won\'t be promoted on your lock screen and status bar</string>
 
     <!-- Notification: Control panel: Label that displays when the app's notifications cannot be blocked. -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -5506,8 +5506,8 @@
     <string name="media_output_dialog_single_device">1 device selected</string>
     <!-- Summary for media output group with the active device count [CHAR LIMIT=NONE] -->
     <string name="media_output_dialog_multiple_devices"><xliff:g id="count" example="2">%1$d</xliff:g> devices selected</string>
-    <!-- Summary for disconnected status [CHAR LIMIT=50] -->
-    <string name="media_output_dialog_disconnected">(disconnected)</string>
+    <!-- Accessibility label for media output item connected state [CHAR LIMIT=50] -->
+    <string name="media_output_item_connected_state">Connected</string>
     <!-- Summary for connecting error message [CHAR LIMIT=NONE] -->
     <string name="media_output_dialog_connect_failed">Can\'t switch. Tap to try again.</string>
     <!-- Title for connecting item [CHAR LIMIT=60] -->

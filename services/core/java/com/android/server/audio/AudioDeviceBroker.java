@@ -1561,7 +1561,7 @@ public class AudioDeviceBroker {
     }
 
     /*package*/ int getVolumeForDeviceIgnoreMute(int streamType, int device) {
-        return mAudioService.getVolumeForDeviceIgnoreMute(streamType, device);
+        return mAudioService.getVolumeForDevice(streamType, device).first;
     }
 
     /*package*/ int getMaxVssVolumeForStream(int streamType) {

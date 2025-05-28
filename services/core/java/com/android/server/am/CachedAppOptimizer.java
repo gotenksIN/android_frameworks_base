@@ -989,7 +989,9 @@ public class CachedAppOptimizer {
 
                     final ProcessCachedOptimizerRecord opt = process.mOptRecord;
                     if (enable && opt.hasFreezerOverride()) {
-                        freezeAppAsyncLSP(process);
+                        if (OomAdjuster.getFreezePolicy(process)) {
+                            freezeAppAsyncLSP(process);
+                        }
                         opt.setFreezerOverride(false);
                     }
 

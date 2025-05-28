@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
-package android.app.supervision;
+package com.android.systemui.qs.panels.domain.interactor
 
-/**
- * @hide
- */
-interface ISupervisionAppService {
-    void onEnabled();
-    void onDisabled();
-}
+import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.kosmos.applicationCoroutineScope
+import com.android.systemui.qs.panels.data.repository.largeTileSpanRepository
+
+val Kosmos.largeTileSpanInteractor by
+    Kosmos.Fixture {
+        LargeTileSpanInteractor(
+            applicationCoroutineScope,
+            largeTileSpanRepository,
+            qsColumnsInteractor,
+        )
+    }

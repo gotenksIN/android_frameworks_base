@@ -104,7 +104,6 @@ import com.android.wm.shell.shared.annotations.ExternalThread;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
-import com.android.wm.shell.transition.tracing.LegacyTransitionTracer;
 import com.android.wm.shell.transition.tracing.PerfettoTransitionTracer;
 import com.android.wm.shell.transition.tracing.TransitionTracer;
 
@@ -372,11 +371,7 @@ public class Transitions implements RemoteCallable<Transitions>,
         mHomeTransitionObserver = homeTransitionObserver;
         mFocusTransitionObserver = focusTransitionObserver;
 
-        if (android.tracing.Flags.perfettoTransitionTracing()) {
-            mTransitionTracer = new PerfettoTransitionTracer();
-        } else {
-            mTransitionTracer = new LegacyTransitionTracer();
-        }
+        mTransitionTracer = new PerfettoTransitionTracer();
     }
 
     private void onInit() {
@@ -1823,15 +1818,9 @@ public class Transitions implements RemoteCallable<Transitions>,
         }
         switch (args[0]) {
             case "tracing": {
-                if (!android.tracing.Flags.perfettoTransitionTracing()) {
-                    ((LegacyTransitionTracer) mTransitionTracer)
-                            .onShellCommand(Arrays.copyOfRange(args, 1, args.length), pw);
-                } else {
-                    pw.println("Command not supported. Use the Perfetto command instead to start "
-                            + "and stop this trace instead.");
-                    return false;
-                }
-                return true;
+                pw.println("Command not supported. Use the Perfetto command instead to start "
+                        + "and stop this trace instead.");
+                return false;
             }
             default: {
                 pw.println("Invalid command: " + args[0]);
@@ -1842,12 +1831,7 @@ public class Transitions implements RemoteCallable<Transitions>,
     }
 
     @Override
-    public void printShellCommandHelp(PrintWriter pw, String prefix) {
-        if (!android.tracing.Flags.perfettoTransitionTracing()) {
-            pw.println(prefix + "tracing");
-            ((LegacyTransitionTracer) mTransitionTracer).printShellCommandHelp(pw, prefix + "  ");
-        }
-    }
+    public void printShellCommandHelp(PrintWriter pw, String prefix) {}
 
     private void dump(@NonNull PrintWriter pw, String prefix) {
         pw.println(prefix + TAG);

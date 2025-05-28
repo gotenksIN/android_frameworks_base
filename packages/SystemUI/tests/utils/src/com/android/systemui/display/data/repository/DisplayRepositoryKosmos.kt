@@ -26,6 +26,8 @@ import com.android.systemui.display.domain.interactor.DisplayStateInteractor
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.kosmos.testScope
+import com.android.systemui.statusbar.core.statusBarIconRefreshInteractor
+import com.android.systemui.statusbar.domain.interactor.StatusBarIconRefreshInteractor
 import com.android.systemui.statusbar.mockCommandQueue
 import com.android.systemui.util.mockito.mock
 import kotlinx.coroutines.CoroutineScope
@@ -33,10 +35,16 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 
 val Kosmos.displayRepository by Fixture { FakeDisplayRepository() }
 
+val Kosmos.sysUiDefaultDisplaySubcomponentLifecycleListeners by Fixture {
+    mutableSetOf<SystemUIDisplaySubcomponent.LifecycleListener>()
+}
+
 fun Kosmos.createFakeDisplaySubcomponent(
     coroutineScope: CoroutineScope = testScope.backgroundScope,
     displayStateRepository: DisplayStateRepository = mock<DisplayStateRepository>(),
     displayStateInteractor: DisplayStateInteractor = mock<DisplayStateInteractor>(),
+    statusbarIconRefreshInteractorFromConstructor: StatusBarIconRefreshInteractor =
+        this.statusBarIconRefreshInteractor,
 ): SystemUIDisplaySubcomponent {
     return object : SystemUIDisplaySubcomponent {
         override val displayCoroutineScope: CoroutineScope
@@ -47,6 +55,12 @@ fun Kosmos.createFakeDisplaySubcomponent(
 
         override val displayStateInteractor: DisplayStateInteractor
             get() = displayStateInteractor
+
+        override val statusBarIconRefreshInteractor: StatusBarIconRefreshInteractor =
+            statusbarIconRefreshInteractorFromConstructor
+
+        override val lifecycleListeners: Set<SystemUIDisplaySubcomponent.LifecycleListener> =
+            sysUiDefaultDisplaySubcomponentLifecycleListeners
     }
 }
 
@@ -97,6 +111,13 @@ val Kosmos.realDisplayRepository by Fixture {
     DisplayRepositoryImpl(
         displayRepositoryFromDisplayLib,
         displayWithDecorationsRepository,
+        displaysWithDecorationsRepositoryFromDisplayLib,
+    )
+}
+
+val Kosmos.displaysWithDecorationsRepositoryCompat by Fixture {
+    com.android.app.displaylib.DisplaysWithDecorationsRepositoryCompat(
+        testScope.backgroundScope,
         displaysWithDecorationsRepositoryFromDisplayLib,
     )
 }

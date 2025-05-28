@@ -54495,6 +54495,7 @@ package android.view {
     method public boolean performContextClick();
     method public boolean performHapticFeedback(int);
     method public boolean performHapticFeedback(int, int);
+    method @FlaggedApi("android.os.vibrator.haptic_feedback_with_custom_usage") public boolean performHapticFeedback(@NonNull android.os.vibrator.HapticFeedbackRequest);
     method public boolean performLongClick();
     method public boolean performLongClick(float, float);
     method @Nullable public android.view.ContentInfo performReceiveContent(@NonNull android.view.ContentInfo);
@@ -55058,10 +55059,12 @@ package android.view {
     method public static int getKeyRepeatDelay();
     method public static int getKeyRepeatTimeout();
     method public static int getLongPressTimeout();
+    method @FlaggedApi("android.companion.virtualdevice.flags.viewconfiguration_apis") public int getLongPressTimeoutMillis();
     method @Deprecated public static int getMaximumDrawingCacheSize();
     method @Deprecated public static int getMaximumFlingVelocity();
     method @Deprecated public static int getMinimumFlingVelocity();
     method public static int getMultiPressTimeout();
+    method @FlaggedApi("android.companion.virtualdevice.flags.viewconfiguration_apis") public int getMultiPressTimeoutMillis();
     method public static int getPressedStateDuration();
     method @FloatRange(from=1.0) public float getScaledAmbiguousGestureMultiplier();
     method public int getScaledDoubleTapSlop();

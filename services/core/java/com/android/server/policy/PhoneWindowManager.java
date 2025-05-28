@@ -180,6 +180,7 @@ import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UEventObserver;
 import android.os.UserHandle;
+import android.os.VibrationAttributes;
 import android.os.Vibrator;
 import android.provider.MediaStore;
 import android.provider.Settings;
@@ -316,6 +317,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int LONG_PRESS_POWER_SHUT_OFF_NO_CONFIRM = 3;
     static final int LONG_PRESS_POWER_GO_TO_VOICE_ASSIST = 4;
     static final int LONG_PRESS_POWER_ASSISTANT = 5; // Settings.Secure.ASSISTANT
+    static final int LONG_PRESS_POWER_GO_TO_SLEEP = 6;
 
     // must match: config_veryLongPresOnPowerBehavior in config.xml
     // The config value can be overridden using Settings.Global.POWER_BUTTON_VERY_LONG_PRESS
@@ -1498,14 +1500,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             case LONG_PRESS_POWER_ASSISTANT:
                 mPowerKeyHandled = true;
-                if (!enableLppAssistInvocationHapticEffect()
-                        && !enableLppAssistInvocationEffect()) {
+                if (!enableLppAssistInvocationEffect()) {
                     performHapticFeedback(HapticFeedbackConstants.ASSISTANT_BUTTON,
                             "Power - Long Press - Go To Assistant");
                 }
                 final int powerKeyDeviceId = INVALID_INPUT_DEVICE_ID;
                 launchAssistAction(null, powerKeyDeviceId, eventTime,
                         AssistUtils.INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS);
+                break;
+            case LONG_PRESS_POWER_GO_TO_SLEEP:
+                mPowerKeyHandled = true;
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS_POWER_BUTTON,
+                        "Power - Long Press - Go To Sleep (Doze)");
+                sleepDefaultDisplayFromPowerButton(eventTime, 0);
                 break;
         }
     }
@@ -2591,6 +2598,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (getResolvedLongPressOnPowerBehavior() == LONG_PRESS_POWER_ASSISTANT) {
                     handleSingleKeyGestureInKeyGestureController(
                             KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_ASSISTANT, event);
+                    if (!enableLppAssistInvocationHapticEffect()
+                            && event.getAction() == ACTION_COMPLETE) {
+                        // The invocation effect will not play haptics so we must play the
+                        // assistant effect here
+                        performHapticFeedback(HapticFeedbackConstants.ASSISTANT_BUTTON,
+                                "Power - Long Press - Go To Assistant");
+                    }
                     return;
                 }
             }
@@ -6297,7 +6311,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private void performHapticFeedback(
             int effectId, String reason, @HapticFeedbackConstants.Flags int flags) {
-        mVibrator.performHapticFeedback(effectId, reason, flags, 0 /* privFlags */);
+        mVibrator.performHapticFeedback(effectId, VibrationAttributes.USAGE_UNKNOWN, reason, flags,
+                0 /* privFlags */);
     }
 
     @Override
@@ -6594,6 +6609,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 return "LONG_PRESS_POWER_GO_TO_VOICE_ASSIST";
             case LONG_PRESS_POWER_ASSISTANT:
                 return "LONG_PRESS_POWER_ASSISTANT";
+            case LONG_PRESS_POWER_GO_TO_SLEEP:
+                return "LONG_PRESS_POWER_GO_TO_SLEEP";
             default:
                 return Integer.toString(behavior);
         }

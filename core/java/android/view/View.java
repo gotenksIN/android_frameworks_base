@@ -17,6 +17,9 @@
 package android.view;
 
 import static android.content.res.Resources.ID_NULL;
+import static android.os.VibrationAttributes.USAGE_UNKNOWN;
+import static android.os.VibrationAttributes.USAGE_CLASS_FEEDBACK;
+import static android.os.VibrationAttributes.USAGE_CLASS_MASK;
 import static android.os.Trace.TRACE_TAG_APP;
 import static android.os.Trace.TRACE_TAG_VIEW;
 import static android.service.autofill.Flags.FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION;
@@ -51,7 +54,7 @@ import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.view.flags.Flags.toolkitFrameRateBySizeReadOnly;
 import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
-import static android.view.flags.Flags.toolkitVelocitySysprop;
+import static android.view.flags.Flags.toolkitVelocityMapSysprop;
 import static android.view.flags.Flags.toolkitViewgroupSetRequestedFrameRateApi;
 import static android.view.flags.Flags.viewVelocityApi;
 import static android.view.inputmethod.Flags.FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR;
@@ -150,6 +153,8 @@ import android.os.RemoteCallback;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
+import android.os.VibrationAttributes;
+import android.os.vibrator.HapticFeedbackRequest;
 import android.service.credentials.CredentialProviderService;
 import android.sysprop.DisplayProperties;
 import android.sysprop.ViewProperties;
@@ -2472,18 +2477,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private static boolean sToolkitViewGroupFrameRateApiFlagValue =
             toolkitViewgroupSetRequestedFrameRateApi();
 
-    // The read-write flag toolkitVelocitySysprop() cannot be initialized at Zygote. To prevent
+    // The read-write flag toolkitVelocityMapSysprop() cannot be initialized at Zygote. To prevent
     // this, initialize inside this class with special name NoPreloadHolder which prevents
     // initialization at Zygote.
     /** @hide */
     @VisibleForTesting
     static final class NoPreloadHolder {
-        private static boolean sToolkitVelocitySyspropFlagValue = toolkitVelocitySysprop();
+        private static boolean sToolkitVelocityMapSyspropFlagValue = toolkitVelocityMapSysprop();
         private static String sFrameRateSysProp =
                 ViewProperties.vrr_velocity_threshold().orElse("");
 
         static {
-            if (sToolkitVelocitySyspropFlagValue && !sFrameRateSysProp.isEmpty()) {
+            if (sToolkitVelocityMapSyspropFlagValue && !sFrameRateSysProp.isEmpty()) {
                 sFrameRateMappings = parseFrameRateMapping(sFrameRateSysProp);
             }
         }
@@ -6007,8 +6012,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         final ViewConfiguration configuration = ViewConfiguration.get(context);
         mTouchSlop = configuration.getScaledTouchSlop();
-        mTapTimeoutMillis = Flags.viewconfigurationApis()
-                ? configuration.getTapTimeoutMillis() : ViewConfiguration.getTapTimeout();
+
         mAmbiguousGestureMultiplier = configuration.getScaledAmbiguousGestureMultiplier();
 
         setOverScrollMode(OVER_SCROLL_IF_CONTENT_SCROLLS);
@@ -17575,7 +17579,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                         setPressed(true, x, y);
                     }
                     checkForLongClick(
-                            ViewConfiguration.getLongPressTimeout(),
+                            getLongPressTimeoutMillis(),
                             x,
                             y,
                             // This is not a touch gesture -- do not classify it as one.
@@ -18389,7 +18393,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
                     if (!clickable) {
                         checkForLongClick(
-                                ViewConfiguration.getLongPressTimeout(),
+                                getLongPressTimeoutMillis(),
                                 x,
                                 y,
                                 TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
@@ -18417,7 +18421,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                         // Not inside a scrolling container, so show the feedback right away
                         setPressed(true, x, y);
                         checkForLongClick(
-                                ViewConfiguration.getLongPressTimeout(),
+                                getLongPressTimeoutMillis(),
                                 x,
                                 y,
                                 TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
@@ -18451,7 +18455,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                             // just extend the timeout here, in case the classification
                             // stays ambiguous.
                             removeLongPressCallback();
-                            long delay = (long) (ViewConfiguration.getLongPressTimeout()
+                            long delay = (long) (getLongPressTimeoutMillis()
                                     * mAmbiguousGestureMultiplier);
                             // Subtract the time already spent
                             delay -= event.getEventTime() - event.getDownTime();
@@ -18537,6 +18541,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (mPendingCheckForLongPress != null) {
             removeCallbacks(mPendingCheckForLongPress);
         }
+    }
+
+    private int getLongPressTimeoutMillis() {
+        return Flags.viewconfigurationApis()
+                ? ViewConfiguration.get(getContext()).getLongPressTimeoutMillis()
+                : ViewConfiguration.getLongPressTimeout();
     }
 
     /**
@@ -29102,7 +29112,61 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         }
 
         int privFlags = computeHapticFeedbackPrivateFlags();
-        return mAttachInfo.mRootCallbacks.performHapticFeedback(feedbackConstant, flags, privFlags);
+        return mAttachInfo.mRootCallbacks.performHapticFeedback(
+                feedbackConstant, USAGE_UNKNOWN, flags, privFlags);
+    }
+
+    /**
+     * <p>Like {@link #performHapticFeedback(int, int)}, but takes a {@link HapticFeedbackRequest}.
+     *
+     * <p>Using a {@link HapticFeedbackRequest} allows you to make more elaborate haptic feedback
+     * requests, including setting the usage type for the requested feedback.
+     *
+     * <p>Specifying the usage type for your feedback allows the system to understand the context of
+     * the feedback better, and tune the haptic accordingly. When not specifying the usage type for
+     * the feedback request, or when using the other performHapticFeedback APIs, the system will do
+     * a best guess of the vibration usage based on the constant.
+     *
+     * <p>See {@link VibrationAttributes} to learn more about vibration usages. The usage provided
+     * for this API must be of {@link VibrationAttributes#USAGE_CLASS_FEEDBACK}, or
+     * {@link VibrationAttributes#USAGE_UNKNOWN}. Otherwise, the haptic feedback will not be played.
+     * If {@link VibrationAttributes#USAGE_UNKNOWN} is used, the system will do a best guess of the
+     * vibration usage based on the constant.
+     *
+     * <p>Note that, if you will be calling this API repeatedly and your
+     * {@link HapticFeedbackRequest} does not change across these repeated calls, it is recommended
+     * that you create, cache, and reuse the request object to avoid the costs of repeated object
+     * creation and garbage collection.
+     *
+     * @param request the {@link HapticFeedbackRequest} encapsulating the request for haptic.
+     * @return {@code false} if {@link #isHapticFeedbackEnabled()} is {@code false}, or this View is
+     *      not attached to a visible window, or the vibration usage in the provided request is not
+     *      valid (i.e. neither has {@link VibrationAttributes#USAGE_CLASS_FEEDBACK} nor is
+     *      {@link VibrationAttributes#USAGE_UNKNOWN}); otherwise, {@code true}, indicating
+     *      that the haptic feedback request has been sent to the system. Note that {@code true}
+     *      could be returned but no vibration may be produced if the service decides that the
+     *      device's states do not allow for this haptic feedback (for example, the user disabled
+     *      vibrations for this usage).
+     *
+     * @see VibrationAttributes#getUsage()
+     * @see VibrationAttributes#getUsageClass()
+     */
+    @FlaggedApi(android.os.vibrator.Flags.FLAG_HAPTIC_FEEDBACK_WITH_CUSTOM_USAGE)
+    public boolean performHapticFeedback(@NonNull HapticFeedbackRequest request) {
+        final int feedbackConstant = request.getFeedbackConstant();
+        final int usage = request.getUsage();
+        final int flags = request.getFlags();
+        if (usage != USAGE_UNKNOWN && (usage & USAGE_CLASS_MASK) != USAGE_CLASS_FEEDBACK) {
+            return false;
+        }
+
+        if (isPerformHapticFeedbackSuppressed(feedbackConstant, flags)) {
+            return false;
+        }
+
+        int privFlags = computeHapticFeedbackPrivateFlags();
+        return mAttachInfo.mRootCallbacks.performHapticFeedback(
+                feedbackConstant, usage, flags, privFlags);
     }
 
     /**
@@ -31723,8 +31787,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         public void run() {
             mPrivateFlags &= ~PFLAG_PREPRESSED;
             setPressed(true, x, y);
-            final long delay =
-                    (long) ViewConfiguration.getLongPressTimeout() - mTapTimeoutMillis;
+            final int delay = getLongPressTimeoutMillis() - mTapTimeoutMillis;
             checkForLongClick(delay, x, y, TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
         }
     }
@@ -32183,6 +32246,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             void playSoundEffect(int effectId);
 
             boolean performHapticFeedback(int effectId,
+                    @VibrationAttributes.Usage int usage,
                     @HapticFeedbackConstants.Flags int flags,
                     @HapticFeedbackConstants.PrivateFlags int privFlags);
 
@@ -34537,7 +34601,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     private float convertVelocityToFrameRate(float velocityPps) {
-        if (NoPreloadHolder.sToolkitVelocitySyspropFlagValue && sFrameRateMappings != null
+        if (NoPreloadHolder.sToolkitVelocityMapSyspropFlagValue && sFrameRateMappings != null
                 && sFrameRateMappings.length > 0) {
             return getFrameRateByVelocity(sFrameRateMappings, (int) velocityPps);
         }

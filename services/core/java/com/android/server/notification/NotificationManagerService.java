@@ -651,6 +651,8 @@ public class NotificationManagerService extends SystemService {
 
     // Minium number of sparse groups for a package before autogrouping them
     private static final int AUTOGROUP_SPARSE_GROUPS_AT_COUNT = 6;
+    // Minimum number notifications in a bundle section before autogrouping them
+    private static final int AUTOGROUP_BUNDLE_SECTIONS_AT_COUNT = 1;
 
     private static final Duration ZEN_BROADCAST_DELAY = Duration.ofMillis(250);
 
@@ -3199,7 +3201,8 @@ public class NotificationManagerService extends SystemService {
         mAutoGroupAtCount =
                 getContext().getResources().getInteger(R.integer.config_autoGroupAtCount);
         return new GroupHelper(getContext(), getContext().getPackageManager(),
-                mAutoGroupAtCount, AUTOGROUP_SPARSE_GROUPS_AT_COUNT, new GroupHelper.Callback() {
+                mAutoGroupAtCount, AUTOGROUP_BUNDLE_SECTIONS_AT_COUNT,
+                AUTOGROUP_SPARSE_GROUPS_AT_COUNT, new GroupHelper.Callback() {
             @Override
             public void addAutoGroup(String key, String groupName, boolean requestSort) {
                 synchronized (mNotificationLock) {
@@ -5017,8 +5020,8 @@ public class NotificationManagerService extends SystemService {
         public NotificationChannel getConversationNotificationChannel(String callingPkg, int userId,
                 String targetPkg, String channelId, boolean returnParentIfNoConversationChannel,
                 String conversationId) {
-            if (canNotifyAsPackage(callingPkg, targetPkg, userId)
-                    || isCallerSystemOrSystemUiOrShell()) {
+            if (isCallerSystemOrSystemUiOrShell()
+                    || canNotifyAsPackage(callingPkg, targetPkg, userId)) {
                 int targetUid = -1;
                 try {
                     targetUid = mPackageManagerClient.getPackageUidAsUser(targetPkg, userId);
@@ -6399,7 +6402,7 @@ public class NotificationManagerService extends SystemService {
                 String wellbeingPackage = getContext().getResources().getString(
                         com.android.internal.R.string.config_systemWellbeing);
                 boolean isCallerWellbeing = !TextUtils.isEmpty(wellbeingPackage)
-                        && mPackageManagerInternal.isSameApp(wellbeingPackage, uid, userId);
+                        && isCallerSameApp(wellbeingPackage, uid, userId);
                 if (!isCallerWellbeing) {
                     throw new IllegalArgumentException(
                             "Only the 'Wellbeing' package can use AutomaticZenRules with "
@@ -6685,7 +6688,7 @@ public class NotificationManagerService extends SystemService {
                     ? mEffectsSuppressors.get(0)
                     : null;
             if (isCallerSystemOrSystemUiOrShell() || suppressor == null
-                    || mPackageManagerInternal.isSameApp(suppressor.getPackageName(),
+                    || isCallerSameApp(suppressor.getPackageName(),
                     Binder.getCallingUid(), UserHandle.getUserId(Binder.getCallingUid()))) {
                 return suppressor;
             }
@@ -11905,7 +11908,7 @@ public class NotificationManagerService extends SystemService {
         if (uid == Process.ROOT_UID && ROOT_PKG.equals(pkg)) {
             return;
         }
-        if (!mPackageManagerInternal.isSameApp(pkg, uid, userId)) {
+        if (!UserHandle.isSameApp(uid, mPackageManagerInternal.getPackageUid(pkg, 0L, userId))) {
             throw new SecurityException("Package " + pkg + " is not owned by uid " + uid);
         }
     }

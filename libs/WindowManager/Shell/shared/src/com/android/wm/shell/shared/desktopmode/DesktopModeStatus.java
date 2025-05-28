@@ -18,7 +18,6 @@ package com.android.wm.shell.shared.desktopmode;
 
 import static android.hardware.display.DisplayManager.DISPLAY_CATEGORY_ALL_INCLUDING_DISABLED;
 
-import static com.android.server.display.feature.flags.Flags.enableDisplayContentModeManagement;
 import static com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper.enableBubbleToFullscreen;
 
 import android.annotation.NonNull;
@@ -165,14 +164,21 @@ public class DesktopModeStatus {
         }
 
         // TODO (b/395014779): Change this to use WM API
-        if ((display.getType() == Display.TYPE_EXTERNAL
-                || display.getType() == Display.TYPE_OVERLAY)
-                && enableDisplayContentModeManagement()) {
-            final WindowManager wm = context.getSystemService(WindowManager.class);
-            return wm != null && wm.isEligibleForDesktopMode(display.getDisplayId());
+        if (!DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+            return false;
         }
+        final WindowManager wm = context.getSystemService(WindowManager.class);
+        return wm != null && wm.isEligibleForDesktopMode(display.getDisplayId());
+    }
 
-        return false;
+    /**
+     * Returns true if the multi-desks frontend should be enabled on the display.
+     */
+    public static boolean isMultipleDesktopFrontendEnabledOnDisplay(@NonNull Context context,
+            Display display) {
+        return DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_FRONTEND.isTrue()
+                && DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()
+                && isDesktopModeSupportedOnDisplay(context, display);
     }
 
     /**

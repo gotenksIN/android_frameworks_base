@@ -63,6 +63,8 @@ import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 import org.mockito.junit.MockitoRule
 import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 /**
@@ -72,19 +74,13 @@ import org.mockito.kotlin.whenever
  */
 @RunWith(AndroidJUnit4::class)
 class SupervisionServiceTest {
-    @get:Rule
-    val checkFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
-    @get:Rule
-    val mocks: MockitoRule = MockitoJUnit.rule()
+    @get:Rule val checkFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
+    @get:Rule val mocks: MockitoRule = MockitoJUnit.rule()
 
-    @Mock
-    private lateinit var mockDpmInternal: DevicePolicyManagerInternal
-    @Mock
-    private lateinit var mockKeyguardManager: KeyguardManager
-    @Mock
-    private lateinit var mockPackageManager: PackageManager
-    @Mock
-    private lateinit var mockUserManagerInternal: UserManagerInternal
+    @Mock private lateinit var mockDpmInternal: DevicePolicyManagerInternal
+    @Mock private lateinit var mockKeyguardManager: KeyguardManager
+    @Mock private lateinit var mockPackageManager: PackageManager
+    @Mock private lateinit var mockUserManagerInternal: UserManagerInternal
 
     private lateinit var context: Context
     private lateinit var lifecycle: SupervisionService.Lifecycle
@@ -254,14 +250,28 @@ class SupervisionServiceTest {
         service.setSupervisionEnabledForUser(USER_ID, true)
 
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isTrue()
-        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(-1)
-        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(-1)
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
 
         service.setSupervisionEnabledForUser(USER_ID, false)
 
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
-        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
-        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(-1)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(-1)
+    }
+
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_REMOVE_POLICIES_ON_SUPERVISION_DISABLE)
+    fun setSupervisionEnabledForUser_removesPoliciesWhenDisabling() {
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        service.setSupervisionEnabledForUser(USER_ID, true)
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isTrue()
+
+        service.setSupervisionEnabledForUser(USER_ID, false)
+
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        verify(mockDpmInternal)
+            .removePoliciesForAdmins(eq(systemSupervisionPackage), eq(USER_ID))
     }
 
     @Test
@@ -273,13 +283,13 @@ class SupervisionServiceTest {
         service.mInternal.setSupervisionEnabledForUser(USER_ID, true)
 
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isTrue()
-        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(-1)
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
         assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
 
         service.mInternal.setSupervisionEnabledForUser(USER_ID, false)
 
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
-        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(-1)
         assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
     }
 

@@ -363,6 +363,14 @@ constructor(
                         }
                 }
             }
+            launch {
+                snapshotFlow { viewModel.isQsFullyExpanded }
+                    .collect {
+                        if (!it && viewModel.isEditing) {
+                            viewModel.containerViewModel.editModeViewModel.stopEditing()
+                        }
+                    }
+            }
         }
 
         SceneTransitionLayout(state = sceneState, modifier = Modifier.fillMaxSize()) {
@@ -839,7 +847,8 @@ constructor(
                                                     derivedStateOf {
                                                         viewModel.isQsVisibleAndAnyShadeExpanded &&
                                                             viewModel.expansionState.progress >
-                                                                0f &&
+                                                                QSFragmentComposeViewModel
+                                                                    .QS_LISTENING_THRESHOLD &&
                                                             !viewModel.isEditing
                                                     }
                                                 }

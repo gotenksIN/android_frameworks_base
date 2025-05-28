@@ -51,6 +51,7 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.app.WindowConfiguration.activityTypeToString;
+import static android.app.WindowConfiguration.isFloating;
 import static android.content.Context.CONTEXT_RESTRICTED;
 import static android.content.Intent.ACTION_MAIN;
 import static android.content.Intent.CATEGORY_HOME;
@@ -342,6 +343,7 @@ import android.window.SizeConfigurationBuckets;
 import android.window.SplashScreen;
 import android.window.SplashScreenView;
 import android.window.SplashScreenView.SplashScreenViewParcelable;
+import android.window.StartingWindowRemovalInfo;
 import android.window.TaskSnapshot;
 import android.window.TaskSnapshotManager;
 import android.window.TransitionInfo.AnimationOptions;
@@ -2826,6 +2828,10 @@ public final class ActivityRecord extends WindowToken {
                     mStartingData.mPrepareRemoveAnimation = prepareAnimation;
                     return;
                 }
+            } else if (mSyncState != SYNC_STATE_NONE) {
+                mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
+                mStartingData.mPrepareRemoveAnimation = prepareAnimation;
+                return;
             }
             animate = prepareAnimation && mStartingData.needRevealAnimation()
                     && mStartingWindow.isVisibleByPolicy();
@@ -2834,10 +2840,7 @@ public final class ActivityRecord extends WindowToken {
                             + " animate=%b Callers=%s", this, mStartingWindow, animate,
                     Debug.getCallers(5));
             surface = mStartingSurface;
-            mStartingData = null;
-            mStartingSurface = null;
-            mStartingWindow = null;
-            mTransitionChangeFlags &= ~FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
+            cleanUpStartingInfo();
             if (surface == null) {
                 ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "startingWindow was set but "
                         + "startingSurface==null, couldn't remove");
@@ -2850,6 +2853,25 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
         surface.remove(animate, hasImeSurface);
+    }
+
+    StartingWindowRemovalInfo getStartingWindowInfo() {
+        if (mStartingData == null || mStartingWindow == null) {
+            return null;
+        }
+        final boolean animate = mStartingData.mPrepareRemoveAnimation
+                && mStartingData.needRevealAnimation()
+                && mStartingWindow.isVisibleByPolicy();
+        final boolean hasImeSurface = mStartingData.hasImeSurface();
+        return mAtmService.mTaskOrganizerController.getStartingWindowRemovalInfo(
+                task, animate, hasImeSurface);
+    }
+
+    void cleanUpStartingInfo() {
+        mStartingData = null;
+        mStartingSurface = null;
+        mStartingWindow = null;
+        mTransitionChangeFlags &= ~FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
     }
 
     /**
@@ -7810,8 +7832,21 @@ public final class ActivityRecord extends WindowToken {
         final AppCompatSafeRegionPolicy safeRegionPolicy =
                 mAppCompatController.getSafeRegionPolicy();
         mAppCompatController.getLetterboxPolicy().resetFixedOrientationLetterboxEligibility();
+
+        boolean shouldApplyLegacyInsets =
+                !isFloating(newParentConfiguration.windowConfiguration.getWindowingMode());
+        if (com.android.wm.shell.Flags.enableCreateAnyBubble()
+                && com.android.wm.shell.Flags.enableBubbleAppCompatFixes()) {
+            final Task task = getTask();
+            if (task != null) {
+                // Similar to floating windows, an app bubble should not apply legacy insets.
+                // TODO(b/407669465): Update isAppBubble usage once migrated to the new approach.
+                shouldApplyLegacyInsets &= !task.getTaskInfo().isAppBubble;
+            }
+        }
         mResolveConfigHint.resolveTmpOverrides(mDisplayContent, newParentConfiguration,
-                isFixedRotationTransforming(), safeRegionPolicy.getLatestSafeRegionBounds());
+                isFixedRotationTransforming(), safeRegionPolicy.getLatestSafeRegionBounds(),
+                shouldApplyLegacyInsets);
 
         // Can't use resolvedConfig.windowConfiguration.getWindowingMode() because it can be
         // different from windowing mode of the task (PiP) during transition from fullscreen to PiP

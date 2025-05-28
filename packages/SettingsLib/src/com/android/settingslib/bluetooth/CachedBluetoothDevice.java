@@ -1371,7 +1371,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         builder.append(", name=").append(getName());
         builder.append(", groupId=").append(mGroupId);
         builder.append(", member=").append(mMemberDevices);
-        if (isHearingAidDevice()) {
+        if (isHearingDevice()) {
             builder.append(", hearingAidInfo=").append(mHearingAidInfo);
             builder.append(", subDevice=").append(mSubDevice);
         }
@@ -1914,7 +1914,10 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             } else {
                 int overallBattery =
                         getMinBatteryLevels(
-                                Arrays.stream(new int[]{leftBattery, rightBattery, caseBattery}));
+                                Arrays.stream(new int[]{leftBattery, rightBattery}));
+                if (overallBattery <= BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
+                    overallBattery = caseBattery;
+                }
                 Log.d(TAG, "Acquired battery info from metadata for untethered device "
                         + mDevice.getAnonymizedAddress()
                         + " left earbud battery: " + leftBattery
@@ -2020,7 +2023,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         }
         int leftBattery = BluetoothDevice.BATTERY_LEVEL_UNKNOWN;
         int rightBattery = BluetoothDevice.BATTERY_LEVEL_UNKNOWN;
-        int overallBattery = BluetoothDevice.BATTERY_LEVEL_UNKNOWN;
+        int singleBattery = BluetoothDevice.BATTERY_LEVEL_UNKNOWN;
 
         Set<BluetoothDevice> allDevices =
                 Stream.concat(
@@ -2039,15 +2042,18 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             // We should expect only one device assign to one side, but if it happens,
             // we don't care which one.
             if (isLeftRight) {
-                overallBattery = battery;
+                singleBattery = battery;
             } else if (isLeft) {
                 leftBattery = battery;
             } else if (isRight) {
                 rightBattery = battery;
             }
         }
-        overallBattery = getMinBatteryLevels(
-                Arrays.stream(new int[]{leftBattery, rightBattery, overallBattery}));
+        int overallBattery = getMinBatteryLevels(
+                Arrays.stream(new int[]{leftBattery, rightBattery}));
+        if (overallBattery <= BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
+            overallBattery = singleBattery;
+        }
 
         Log.d(TAG, "Acquired battery info from Bluetooth service for le audio device "
                 + mDevice.getAnonymizedAddress()

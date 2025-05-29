@@ -805,6 +805,115 @@ static jboolean android_os_Debug_logAllocatorStats(JNIEnv*, jobject) {
     return mallopt(M_LOG_STATS, 0) == 1 ? JNI_TRUE : JNI_FALSE;
 }
 
+static jstring android_os_Debug_getPidComm(JNIEnv* env, jobject clazz, jint pid) {
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/%d/comm", pid);
+    FILE* fp = fopen(path, "r");
+    if (!fp) {
+        return env->NewStringUTF("N/A");
+    }
+
+    char comm[64];
+    if (!fgets(comm, sizeof(comm), fp)) {
+        fclose(fp);
+        return env->NewStringUTF("N/A");
+    }
+    fclose(fp);
+    char* newline = strchr(comm, '\n');
+    if (newline) *newline = '\0';
+
+    return env->NewStringUTF(comm);
+}
+
+static jboolean android_os_Debug_getProcfsDmaBuffer(JNIEnv* env, jobject clazz, jobject listObj) {
+    std::vector<dmabufinfo::DmaBuffer> dmabufs;
+    if (!dmabufinfo::ReadProcfsDmaBufs(&dmabufs)) {
+        return false ? JNI_TRUE : JNI_FALSE;
+    }
+    if (dmabufs.empty()) {
+        return false ? JNI_TRUE : JNI_FALSE;
+    }
+
+    jclass listClass = env->GetObjectClass(listObj);
+    jmethodID listAddMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
+    jclass cls = env->FindClass("android/os/Debug$DmaBuffer");
+    if (cls == NULL) {
+        return false ? JNI_TRUE : JNI_FALSE;
+    }
+    for (auto dmabuf : dmabufs) {
+        jmethodID constructor = env->GetMethodID(cls, "<init>", "()V");
+        jobject new_object = env->NewObject(cls, constructor);
+
+        env->SetLongField(new_object, env->GetFieldID(cls, "inode", "J"), dmabuf.inode());
+        env->SetLongField(new_object, env->GetFieldID(cls, "size", "J"), dmabuf.size());
+        env->SetLongField(new_object, env->GetFieldID(cls, "count", "J"), dmabuf.count());
+        env->SetLongField(new_object, env->GetFieldID(cls, "totalRefs", "J"), dmabuf.total_refs());
+
+        jstring exporter = env->NewStringUTF(dmabuf.exporter().c_str());
+        env->SetObjectField(new_object,
+                env->GetFieldID(cls, "exporter", "Ljava/lang/String;"), exporter);
+        env->DeleteLocalRef(exporter);
+
+        jstring name = env->NewStringUTF(dmabuf.name().c_str());
+        env->SetObjectField(new_object, env->GetFieldID(cls, "name", "Ljava/lang/String;"), name);
+        env->DeleteLocalRef(name);
+
+        jclass integerClass = env->FindClass("java/lang/Integer");
+        jmethodID integerConstructor = env->GetMethodID(integerClass, "<init>", "(I)V");
+        jmethodID addMethod = env->GetMethodID(env->FindClass("java/util/List"),
+                "add", "(Ljava/lang/Object;)Z");
+        jobject pids = env->GetObjectField(new_object,
+                env->GetFieldID(cls, "pids", "Ljava/util/List;"));
+
+        if (pids != NULL) {
+            for (int value : dmabuf.pids()) {
+                jobject jValue = env->NewObject(integerClass, integerConstructor, value);
+                env->CallBooleanMethod(pids, addMethod, jValue);
+                env->DeleteLocalRef(jValue);
+            }
+            env->DeleteLocalRef(pids);
+        }
+
+        jmethodID putMethod = env->GetMethodID(env->FindClass("java/util/Map"),
+                "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
+        jobject mapRefs = env->GetObjectField(new_object,
+                env->GetFieldID(cls, "mapRefs", "Ljava/util/Map;"));
+        jobject fdRefs = env->GetObjectField(new_object,
+                env->GetFieldID(cls, "fdRefs", "Ljava/util/Map;"));
+
+        if (mapRefs != NULL) {
+            for (const auto& entry : dmabuf.maprefs()) {
+                jobject key = env->NewObject(integerClass, integerConstructor, entry.first);
+                jobject value = env->NewObject(integerClass, integerConstructor, entry.second);
+                env->CallObjectMethod(mapRefs, putMethod, key, value);
+                env->DeleteLocalRef(key);
+                env->DeleteLocalRef(value);
+            }
+            env->DeleteLocalRef(mapRefs);
+        }
+
+        if (fdRefs != NULL) {
+            for (const auto& entry : dmabuf.fdrefs()) {
+                jobject key = env->NewObject(integerClass, integerConstructor, entry.first);
+                jobject value = env->NewObject(integerClass, integerConstructor, entry.second);
+                env->CallObjectMethod(fdRefs, putMethod, key, value);
+                env->DeleteLocalRef(key);
+                env->DeleteLocalRef(value);
+            }
+            env->DeleteLocalRef(fdRefs);
+        }
+
+        env->CallBooleanMethod(listObj, listAddMethod, new_object);
+        env->DeleteLocalRef(new_object);
+        env->DeleteLocalRef(integerClass);
+    }
+
+    env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(listClass);
+    return true ? JNI_TRUE : JNI_FALSE;
+}
+
 /*
  * JNI registration.
  */
@@ -849,6 +958,8 @@ static const JNINativeMethod gMethods[] = {
         {"isVmapStack", "()Z", (void*)android_os_Debug_isVmapStack},
         {"logAllocatorStats", "()Z", (void*)android_os_Debug_logAllocatorStats},
         {"getKernelCmaUsageKb", "()J", (void*)android_os_Debug_getKernelCmaUsageKb},
+        {"getProcfsDmaBuffer", "(Ljava/util/List;)Z", (void *)android_os_Debug_getProcfsDmaBuffer},
+        {"getPidComm", "(I)Ljava/lang/String;", (void *)android_os_Debug_getPidComm},
 };
 
 int register_android_os_Debug(JNIEnv *env)

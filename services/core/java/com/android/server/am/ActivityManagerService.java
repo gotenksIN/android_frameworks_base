@@ -12369,6 +12369,57 @@ public class ActivityManagerService extends IActivityManager.Stub
         return stringifySize(size * 1024, 1024);
     }
 
+    private void dumpProcessDmaBufInfo(FileDescriptor fd, PrintWriter pw) {
+        List<Debug.DmaBuffer> dmabufs = new ArrayList<>();
+        if (!Debug.getProcfsDmaBuffer(dmabufs)) {
+            return;
+        }
+
+        long userspaceSize = 0;
+        Map<Integer, List<Long>> pidToInodes = new HashMap<Integer, List<Long>>();
+        Map<Long, Debug.DmaBuffer> inodeToDmaBuffer = new HashMap<Long, Debug.DmaBuffer>();
+        for (Debug.DmaBuffer buf : dmabufs) {
+            for (Integer pid : buf.pids) {
+                pidToInodes.computeIfAbsent(pid, k -> new ArrayList<>()).add(buf.inode);
+            }
+            inodeToDmaBuffer.put(buf.inode, buf);
+            userspaceSize += buf.size;
+        }
+
+        long totalRss = 0;
+        long totalPss = 0;
+        for (Integer pid : pidToInodes.keySet()) {
+            long rss = 0;
+            long pss = 0;
+            pw.println(String.format("%16s:%d", Debug.getPidComm(pid), pid));
+            pw.println(String.format("%22s %16s %16s %16s %16s %22s",
+                    "Name", "Rss", "Pss", "nr_procs", "Inode", "Exporter"));
+
+            for (Long inode : pidToInodes.get(pid)) {
+                Debug.DmaBuffer buf = inodeToDmaBuffer.get(inode);
+                pw.println(String.format("%22s %13d kB %13d kB %16d %16d %23s",
+                            buf.name, buf.size / 1024, buf.Pss() / 1024,
+                            buf.pids.size(), buf.inode, buf.exporter));
+                rss += buf.size;
+                pss += buf.Pss();
+            }
+            pw.println(String.format("%22s %13d kB %13d kB",
+                "PROCESS TOTAL", rss / 1024, pss / 1024));
+            pw.println("----------------------");
+            totalRss += rss;
+            totalPss += pss;
+        }
+
+        long kernelRss = Debug.getDmabufTotalExportedKb() * 1024;
+        if (kernelRss >= userspaceSize) {
+            kernelRss -= userspaceSize;
+        }
+
+        pw.println(String.format("dmabuf total: %d kB kernel_rss: %d kB userspace_rss: " +
+                "%d kB userspace_pss: %d kB", (userspaceSize + kernelRss) / 1024,
+                kernelRss / 1024, totalRss / 1024, totalPss / 1024));
+    }
+
     // Update this version number if you change the 'compact' format.
     private static final int MEMINFO_COMPACT_VERSION = 1;
 
@@ -12387,6 +12438,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         boolean dumpProto;
         boolean mDumpPrivateDirty;
         boolean mDumpAllocatorStats;
+        boolean mDumpDmaBufInfo;
     }
 
     @NeverCompile // Avoid size overhead of debugging code.
@@ -12445,6 +12497,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 opts.dumpProto = true;
             } else if ("--logstats".equals(opt)) {
                 opts.mDumpAllocatorStats = true;
+            } else if ("--dmabuf".equals(opt)) {
+                opts.mDumpDmaBufInfo = true;
             } else if ("-h".equals(opt) || "--help".equals(opt)) {
                 pw.println("meminfo dump options: [-a] [-d] [-c] [-s] [--oom] [process]");
                 pw.println("  -a: include all available information for each process.");
@@ -12462,12 +12516,18 @@ public class ActivityManagerService extends IActivityManager.Stub
                 pw.println("  --proto: dump data to proto");
                 pw.println("  --logstats: log native allocator statistics.");
                 pw.println("  --unreachable: dump unreachable native memory with libmemunreachable.");
+                pw.println("  --dmabuf: dump dma buffer information.");
                 pw.println("If [process] is specified it can be the name or ");
                 pw.println("pid of a specific process to dump.");
                 return;
             } else {
                 pw.println("Unknown argument: " + opt + "; use -h for help");
             }
+        }
+
+        if (opts.mDumpDmaBufInfo) {
+            dumpProcessDmaBufInfo(fd, pw);
+            return;
         }
 
         String[] innerArgs = new String[args.length-opti];

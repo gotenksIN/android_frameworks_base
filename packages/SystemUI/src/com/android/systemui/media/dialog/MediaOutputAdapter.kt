@@ -51,10 +51,15 @@ import com.google.android.material.slider.Slider
 /** A RecyclerView adapter for the legacy UI media output dialog device list. */
 class MediaOutputAdapter(controller: MediaSwitchingController) :
     MediaOutputAdapterBase(controller) {
-    private val mGroupSelectedItems = mController.selectedMediaDevice.size > 1
+    private var mGroupSelectedItems: Boolean? = null // Unset until the first render.
 
     /** Refreshes the RecyclerView dataset and forces re-render. */
     override fun updateItems() {
+        if (mGroupSelectedItems == null) {
+            // Decide whether to group devices only during the initial render.
+            mGroupSelectedItems = mController.selectedMediaDevice.size > 1
+        }
+
         val newList =
             mController.getMediaItemList(false /* addConnectNewDeviceButton */).toMutableList()
 
@@ -83,7 +88,7 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
     private fun coalesceSelectedDevices(newList: MutableList<MediaItem>) {
         val selectedDevices = newList.filter { this.isSelectedDevice(it) }
 
-        if (mGroupSelectedItems && selectedDevices.size > 1) {
+        if (mGroupSelectedItems == true && selectedDevices.size > 1) {
             newList.removeAll(selectedDevices.toSet())
             if (mController.isGroupListCollapsed) {
                 newList.add(0, MediaItem.createDeviceGroupMediaItem())
@@ -263,6 +268,7 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
             updateDeviceStatusIcon(deviceStatusIcon, colorTheme)
             updateContentBackground(fixedVolumeConnected, colorTheme)
             updateContentClickListener(clickListener)
+            updateContentStateDescription(connectionState)
         }
 
         override fun renderDeviceGroupItem() {
@@ -270,7 +276,9 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
             val colorTheme = ColorTheme()
             updateItemBackground()
             updateTitle(
-                title = mController.sessionName ?: "",
+                title =
+                    mController.sessionName
+                        ?: mContext.getString(R.string.media_output_dialog_group),
                 connectionState = CONNECTED,
                 colorTheme = colorTheme,
             )
@@ -384,10 +392,20 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
             }
         }
 
-        private fun initializeSeekbarVolume(currentVolume: Int) {
+        private fun initializeSeekbarVolume(
+            currentVolume: Int,
+            deviceDrawable: Drawable?,
+            muteDrawable: Drawable?,
+        ) {
             tryResolveVolumeUserRequest(currentVolume)
             if (!isDragging && hasNoPendingVolumeRequests()) {
                 mSlider.value = currentVolume.toFloat()
+                updateSliderIconsVisibility(
+                    deviceDrawable = deviceDrawable,
+                    muteDrawable = muteDrawable,
+                    isMuted = currentVolume == 0,
+                )
+                mSlider.stateDescription = getSliderStateDescription()
             }
         }
 
@@ -421,6 +439,7 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
                 return
             }
 
+            mSlider.isClickable = false
             mSlider.isEnabled = isVolumeControlAllowed
             mSlider.valueFrom = 0f
             mSlider.valueTo = maxVolume.toFloat()
@@ -432,15 +451,15 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
             mSlider.trackIconInactiveColor =
                 ColorStateList.valueOf(colorTheme.sliderInactiveIconColor)
             val muteDrawable = getMuteDrawable(isInputDevice)
-            updateSliderIconsVisibility(
+            initializeSeekbarVolume(
+                currentVolume = currentVolume,
                 deviceDrawable = deviceDrawable,
                 muteDrawable = muteDrawable,
-                isMuted = currentVolume == 0,
             )
-            initializeSeekbarVolume(currentVolume)
 
             mSlider.clearOnChangeListeners() // Prevent adding multiple listeners
             mSlider.addOnChangeListener { _: Slider, value: Float, fromUser: Boolean ->
+                mSlider.stateDescription = getSliderStateDescription()
                 if (fromUser) {
                     val seekBarVolume = value.toInt()
                     updateSliderIconsVisibility(
@@ -468,6 +487,11 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
                     }
                 }
             )
+        }
+
+        private fun getSliderStateDescription(): String {
+            val percentage = (mSlider.value * 100 / mSlider.valueTo).toInt()
+            return mContext.getString(R.string.media_output_dialog_volume_percentage, percentage)
         }
 
         private fun getMuteDrawable(isInputDevice: Boolean): Drawable? {
@@ -592,6 +616,14 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
             if (listener == null) {
                 mMainContent.isClickable = false // clickable is not removed automatically.
             }
+        }
+
+        private fun updateContentStateDescription(connectionState: ConnectionState) {
+            mMainContent.stateDescription =
+                when (connectionState) {
+                    CONNECTED -> mContext.getString(R.string.media_output_item_connected_state)
+                    else -> null
+                }
         }
 
         override fun disableSeekBar() {

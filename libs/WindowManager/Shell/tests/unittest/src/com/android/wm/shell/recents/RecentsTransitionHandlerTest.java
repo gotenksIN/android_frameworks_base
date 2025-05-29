@@ -28,14 +28,12 @@ import static com.android.wm.shell.Flags.FLAG_ENABLE_RECENTS_BOOKEND_TRANSITION;
 import static com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_ANIMATING;
 import static com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_NOT_RUNNING;
 import static com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_REQUESTED;
-import static com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_STOP_REQUESTED;
 import static com.android.wm.shell.transition.Transitions.TRANSIT_END_RECENTS_TRANSITION;
 import static com.android.wm.shell.transition.Transitions.TRANSIT_START_RECENTS_TRANSITION;
 
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -71,6 +69,7 @@ import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.TestRunningTaskInfoBuilder;
 import com.android.wm.shell.TestShellExecutor;
+import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.desktopmode.DesktopRepository;
@@ -92,8 +91,6 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -106,6 +103,8 @@ import java.util.Optional;
 public class RecentsTransitionHandlerTest extends ShellTestCase {
 
     private static final int FREEFORM_TASK_CORNER_RADIUS = 32;
+    private static final int FREEFORM_TASK_CORNER_RADIUS_ON_CD = 24;
+    private static final int CONNECTED_DISPLAY_ID = 1;
 
     @Mock
     private Context mContext;
@@ -129,6 +128,9 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
     private UserManager mUserManager;
 
     @Mock private DesktopRepository mDesktopRepository;
+    @Mock private DisplayController mDisplayController;
+    @Mock private Context mConnectedDisplayContext;
+    @Mock private Resources mConnectedDisplayResources;
 
     private ShellTaskOrganizer mShellTaskOrganizer;
     private RecentTasksController mRecentTasksController;
@@ -155,6 +157,12 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         when(mResources.getDimensionPixelSize(
                 R.dimen.desktop_windowing_freeform_rounded_corner_radius)
         ).thenReturn(FREEFORM_TASK_CORNER_RADIUS);
+        when(mDisplayController.getDisplayContext(CONNECTED_DISPLAY_ID)).thenReturn(
+                mConnectedDisplayContext);
+        when(mConnectedDisplayContext.getResources()).thenReturn(mConnectedDisplayResources);
+        when(mConnectedDisplayResources.getDimensionPixelSize(
+                R.dimen.desktop_windowing_freeform_rounded_corner_radius)
+        ).thenReturn(FREEFORM_TASK_CORNER_RADIUS_ON_CD);
         mShellInit = spy(new ShellInit(mMainExecutor));
         mShellController = spy(new ShellController(mContext, mShellInit, mShellCommandHandler,
                 mDisplayInsetsController, mUserManager, mMainExecutor));
@@ -169,7 +177,8 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
 
         doReturn(mMainExecutor).when(mTransitions).getMainExecutor();
         mRecentsTransitionHandler = new RecentsTransitionHandler(mShellInit, mShellTaskOrganizer,
-                mTransitions, mRecentTasksController, mock(HomeTransitionObserver.class));
+                mTransitions, mRecentTasksController, mock(HomeTransitionObserver.class),
+                mDisplayController);
         // By default use a mock finish transaction since we are sending transitions that don't have
         // real surface controls
         mRecentsTransitionHandler.setFinishTransactionSupplier(
@@ -223,7 +232,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         startRecentsTransition(/* synthetic= */ false);
         mMainExecutor.flushAll();
 
-        assertThat(listener.getLastProcessedState()).isEqualTo(TRANSITION_STATE_REQUESTED);
+        assertThat(listener.getState()).isEqualTo(TRANSITION_STATE_REQUESTED);
     }
 
     @Test
@@ -237,7 +246,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
                 mock(Transitions.TransitionFinishCallback.class));
         mMainExecutor.flushAll();
 
-        assertThat(listener.getLastProcessedState()).isEqualTo(TRANSITION_STATE_ANIMATING);
+        assertThat(listener.getState()).isEqualTo(TRANSITION_STATE_ANIMATING);
     }
 
     @Test
@@ -253,8 +262,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
                 false /* sendUserLeaveHint */, mock(IResultReceiver.class));
         mMainExecutor.flushAll();
 
-        assertThat(listener.getLastProcessedState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
-        assertTrue(listener.didStateGetProcessed(TRANSITION_STATE_STOP_REQUESTED));
+        assertThat(listener.getState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
     }
 
     @Test
@@ -266,7 +274,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         mRecentsTransitionHandler.findController(transition).cancel("test");
         mMainExecutor.flushAll();
 
-        assertThat(listener.getLastProcessedState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
+        assertThat(listener.getState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
     }
 
     @Test
@@ -277,7 +285,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         startRecentsTransition(/* synthetic= */ true);
         mMainExecutor.flushAll();
 
-        assertThat(listener.getLastProcessedState()).isEqualTo(TRANSITION_STATE_ANIMATING);
+        assertThat(listener.getState()).isEqualTo(TRANSITION_STATE_ANIMATING);
     }
 
     @Test
@@ -290,7 +298,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
                 false /* sendUserLeaveHint */, mock(IResultReceiver.class));
         mMainExecutor.flushAll();
 
-        assertThat(listener.getLastProcessedState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
+        assertThat(listener.getState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
     }
 
     @Test
@@ -302,7 +310,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         mRecentsTransitionHandler.findController(transition).cancel("test");
         mMainExecutor.flushAll();
 
-        assertThat(listener.getLastProcessedState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
+        assertThat(listener.getState()).isEqualTo(TRANSITION_STATE_NOT_RUNNING);
     }
 
     @Test
@@ -445,6 +453,32 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         verify(finishT).setCornerRadius(leash, FREEFORM_TASK_CORNER_RADIUS);
     }
 
+    @Test
+    @EnableFlags(FLAG_ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX)
+    public void testFinish_returningToFreeformTasks_setsCornerRadiusOnConnectedDisplay() {
+        ActivityManager.RunningTaskInfo freeformTask =
+                new TestRunningTaskInfoBuilder().setWindowingMode(
+                        WINDOWING_MODE_FREEFORM).setDisplayId(CONNECTED_DISPLAY_ID).build();
+        TransitionInfo transitionInfo = new TransitionInfoBuilder(TRANSIT_CLOSE)
+                .addChange(TRANSIT_CLOSE, freeformTask)
+                .build();
+        SurfaceControl leash = transitionInfo.getChanges().get(0).getLeash();
+        final IBinder transition = startRecentsTransition(/* synthetic= */ false);
+        SurfaceControl.Transaction finishT = mock(SurfaceControl.Transaction.class);
+        mRecentsTransitionHandler.setFinishTransactionSupplier(() -> finishT);
+        mRecentsTransitionHandler.startAnimation(
+                transition, transitionInfo, new StubTransaction(),
+                new StubTransaction(),
+                mock(Transitions.TransitionFinishCallback.class));
+
+        mRecentsTransitionHandler.findController(transition).finish(/* toHome= */ false,
+                false /* sendUserLeaveHint */, mock(IResultReceiver.class));
+        mMainExecutor.flushAll();
+
+
+        verify(finishT).setCornerRadius(leash, FREEFORM_TASK_CORNER_RADIUS_ON_CD);
+    }
+
     private IBinder startRecentsTransition(boolean synthetic) {
         return startRecentsTransition(synthetic, mock(IRecentsAnimationRunner.class));
     }
@@ -483,21 +517,17 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
     }
 
     private static class TestTransitionStateListener implements RecentsTransitionStateListener {
-        private final List<Integer> mProcessedStates =
-                new ArrayList<>(TRANSITION_STATE_NOT_RUNNING);
+        @RecentsTransitionState
+        private int mState = TRANSITION_STATE_NOT_RUNNING;
 
         @Override
         public void onTransitionStateChanged(int state) {
-            mProcessedStates.add(state);
+            mState = state;
         }
 
         @RecentsTransitionState
-        int getLastProcessedState() {
-            return mProcessedStates.getLast();
-        }
-
-        boolean didStateGetProcessed(int state) {
-            return mProcessedStates.contains(state);
+        int getState() {
+            return mState;
         }
     }
 }

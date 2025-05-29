@@ -155,12 +155,6 @@ public abstract class InputManagerInternal {
     public abstract InputChannel createInputChannel(String inputChannelName);
 
     /**
-     * Pilfer pointers from the input channel with the given token so that ongoing gestures are
-     * canceled for all other channels.
-     */
-    public abstract void pilferPointers(IBinder token);
-
-    /**
      * Called when the current input method and/or {@link InputMethodSubtype} is updated.
      *
      * @param userId User ID to be notified about.
@@ -265,14 +259,10 @@ public abstract class InputManagerInternal {
      * NOTE: This is a temporary API added to assist in a long-term refactor, and is not meant for
      * general use by system services.
      *
-     * @param deviceId the device ID of the keyboard using which the event was completed
-     * @param keycodes the keys pressed for the event
-     * @param modifierState the modifier state
-     * @param event the gesture event that was completed
+     * @param event the gesture event that needs to be handled.
      *
      */
-    public abstract void handleKeyGestureInKeyGestureController(int deviceId, int[] keycodes,
-            int modifierState, @KeyGestureEvent.KeyGestureType int event);
+    public abstract void handleKeyGestureInKeyGestureController(@NonNull KeyGestureEvent event);
 
     /**
      * Sets the magnification scale factor for pointer icons.

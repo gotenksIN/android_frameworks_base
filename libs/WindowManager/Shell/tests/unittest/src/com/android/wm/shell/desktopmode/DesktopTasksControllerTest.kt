@@ -1582,7 +1582,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         controller.addMoveToDeskTaskChanges(wct, task, deskId = 0)
 
         val finalBounds = findBoundsChange(wct, task)
-        val captionInsets = getDesktopViewAppHeaderHeightPx(context)
+        val displayId = taskRepository.getDisplayForDesk(deskId = 0)
+        val displayContext = displayController.getDisplayContext(displayId) ?: context
+        val captionInsets = getDesktopViewAppHeaderHeightPx(displayContext)
         finalBounds!!.top += captionInsets
         val finalAspectRatio =
             maxOf(finalBounds.height(), finalBounds.width()) /
@@ -1604,7 +1606,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         controller.addMoveToDeskTaskChanges(wct, task, deskId = 0)
 
         val finalBounds = findBoundsChange(wct, task)
-        val captionInsets = getDesktopViewAppHeaderHeightPx(context)
+        val displayId = taskRepository.getDisplayForDesk(deskId = 0)
+        val displayContext = displayController.getDisplayContext(displayId) ?: context
+        val captionInsets = getDesktopViewAppHeaderHeightPx(displayContext)
         finalBounds!!.top += captionInsets
         val finalAspectRatio =
             maxOf(finalBounds.height(), finalBounds.width()) /
@@ -9200,6 +9204,25 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX,
+        Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION,
+    )
+    fun onUnhandledDrag_crossDisplayDrag() {
+        taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = SECOND_DISPLAY)
+        taskRepository.setActiveDesk(displayId = SECOND_DISPLAY, deskId = SECOND_DISPLAY)
+        setUpFreeformTask(displayId = SECOND_DISPLAY, deskId = 2)
+        testOnUnhandledDrag(
+            DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR,
+            PointF(1200f, 700f),
+            Rect(240, 700, 2160, 1900),
+            tabTearingMinimizeAnimationFlagEnabled = true,
+            tabTearingLaunchAnimationFlagEnabled = true,
+            destinationDisplayId = SECOND_DISPLAY,
+        )
+    }
+
+    @Test
     fun shellController_registersUserChangeListener() {
         verify(shellController, times(2)).addUserChangeListener(any())
     }
@@ -10165,7 +10188,10 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         expectedBounds: Rect,
         tabTearingMinimizeAnimationFlagEnabled: Boolean,
         tabTearingLaunchAnimationFlagEnabled: Boolean,
+        destinationDisplayId: Int = DEFAULT_DISPLAY,
     ) {
+        desktopState.overrideDesktopModeSupportPerDisplay[DEFAULT_DISPLAY] = true
+        desktopState.overrideDesktopModeSupportPerDisplay[destinationDisplayId] = true
         setUpLandscapeDisplay()
         val task = setUpFreeformTask()
         markTaskVisible(task)
@@ -10179,10 +10205,11 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         val b = SurfaceControl.Builder()
         b.setName("test surface")
         val dragSurface = b.build()
-        whenever(shellTaskOrganizer.runningTasks).thenReturn(runningTasks)
+        whenever(focusTransitionObserver.globallyFocusedTaskId).thenReturn(task.taskId)
         whenever(mockDragEvent.dragSurface).thenReturn(dragSurface)
         whenever(mockDragEvent.x).thenReturn(inputCoordinate.x)
         whenever(mockDragEvent.y).thenReturn(inputCoordinate.y)
+        whenever(mockDragEvent.displayId).thenReturn(destinationDisplayId)
         whenever(multiInstanceHelper.supportsMultiInstanceSplit(anyOrNull(), anyInt()))
             .thenReturn(true)
         whenever(spyController.getVisualIndicator()).thenReturn(desktopModeVisualIndicator)

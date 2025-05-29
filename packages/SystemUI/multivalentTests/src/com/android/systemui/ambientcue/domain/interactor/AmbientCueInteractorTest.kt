@@ -37,19 +37,19 @@ class AmbientCueInteractorTest : SysuiTestCase() {
     private val kosmos = testKosmos()
 
     @Test
-    fun isVisible_setTrue_true() =
+    fun isDeactivated_setTrue_true() =
         kosmos.runTest {
-            val isVisible by collectLastValue(ambientCueInteractor.isVisible)
-            ambientCueInteractor.setIsVisible(true)
-            assertThat(isVisible).isTrue()
+            val isDeactivated by collectLastValue(ambientCueRepository.isDeactivated)
+            ambientCueInteractor.setDeactivated(true)
+            assertThat(isDeactivated).isTrue()
         }
 
     @Test
-    fun isVisible_setFalse_False() =
+    fun isDeactivated_setFalse_False() =
         kosmos.runTest {
-            val isVisible by collectLastValue(ambientCueInteractor.isVisible)
-            ambientCueInteractor.setIsVisible(false)
-            assertThat(isVisible).isFalse()
+            val isDeactivated by collectLastValue(ambientCueRepository.isDeactivated)
+            ambientCueInteractor.setDeactivated(false)
+            assertThat(isDeactivated).isFalse()
         }
 
     @Test
@@ -77,7 +77,7 @@ class AmbientCueInteractorTest : SysuiTestCase() {
     fun isImeVisible_setTrue_true() =
         kosmos.runTest {
             val isImeVisible by collectLastValue(ambientCueInteractor.isImeVisible)
-            ambientCueInteractor.setIsImeVisible(true)
+            ambientCueInteractor.setImeVisible(true)
             assertThat(isImeVisible).isTrue()
         }
 
@@ -85,7 +85,39 @@ class AmbientCueInteractorTest : SysuiTestCase() {
     fun isImeVisible_setFalse_false() =
         kosmos.runTest {
             val isImeVisible by collectLastValue(ambientCueInteractor.isImeVisible)
-            ambientCueInteractor.setIsImeVisible(false)
+            ambientCueInteractor.setImeVisible(false)
             assertThat(isImeVisible).isFalse()
+        }
+
+    @Test
+    fun isGestureNav_setTrue_true() =
+        kosmos.runTest {
+            val isGestureNav by collectLastValue(ambientCueInteractor.isGestureNav)
+            ambientCueRepository.fake.setIsGestureNav(true)
+            assertThat(isGestureNav).isTrue()
+        }
+
+    @Test
+    fun isGestureNav_setFalse_false() =
+        kosmos.runTest {
+            val isGestureNav by collectLastValue(ambientCueInteractor.isGestureNav)
+            ambientCueRepository.fake.setIsGestureNav(false)
+            assertThat(isGestureNav).isFalse()
+        }
+
+    @Test
+    fun isTaskBarVisible_setTrue_true() =
+        kosmos.runTest {
+            val isTaskBarVisible by collectLastValue(ambientCueInteractor.isTaskBarVisible)
+            ambientCueRepository.fake.setTaskBarVisible(true)
+            assertThat(isTaskBarVisible).isTrue()
+        }
+
+    @Test
+    fun isTaskBarVisible_setFalse_false() =
+        kosmos.runTest {
+            val isTaskBarVisible by collectLastValue(ambientCueInteractor.isTaskBarVisible)
+            ambientCueRepository.fake.setTaskBarVisible(false)
+            assertThat(isTaskBarVisible).isFalse()
         }
 }

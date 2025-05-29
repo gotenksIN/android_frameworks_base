@@ -2713,6 +2713,29 @@ public class ActivityManagerService extends IActivityManager.Stub
         return true;
     }
 
+    /**
+     * Returns true if the package has a restricted set of associations.
+     */
+    boolean hasRestrictedAssociations(String pkg) {
+        ensureAllowedAssociations();
+        // Check for associations on the target package
+        PackageAssociationInfo pai = mAllowedAssociations.get(pkg);
+        if (pai == null) {
+            // if there is no package association info then the package is allowed association
+            // with any package
+            return false;
+        }
+        final ArraySet<String> allowedAssociations = pai.getAllowedPackageAssociations();
+        if (allowedAssociations == null || allowedAssociations.size() == 0) {
+            // if there is are no allowed associations then the package is allowed association
+            // with any package
+            return false;
+        }
+        // one or more allowed associations was found, therefore the package is restricted.
+        return true;
+    }
+
+
     /** Sets up allowed associations for system prebuilt packages from system config (if needed). */
     private void ensureAllowedAssociations() {
         if (mAllowedAssociations == null) {
@@ -2882,6 +2905,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             addServiceToMap(mAppBindArgs, Context.USER_SERVICE);
             addServiceToMap(mAppBindArgs, "mount");
             addServiceToMap(mAppBindArgs, Context.PLATFORM_COMPAT_SERVICE);
+
+            // During startup, bound applications will always attempt registration of a
+            // ContentCaptureOptions listener with the ContentCaptureManager service. Seeding
+            // applications with the service handle avoids an unnecessary ServiceManager hop.
+            if (Flags.cacheContentCaptureService()) {
+                addServiceToMap(mAppBindArgs, Context.CONTENT_CAPTURE_MANAGER_SERVICE);
+            }
         }
         return mAppBindArgs;
     }
@@ -16977,8 +17007,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public boolean startUserInBackground(final int userId) {
-            return ActivityManagerService.this.startUserInBackground(userId);
+        public boolean startUserInBackgroundTemporarily(@UserIdInt int userId, int durSecs) {
+            return mUserController.startUserInBackgroundTemporarily(userId, durSecs);
         }
 
         @Override

@@ -443,6 +443,7 @@ applications that come with the platform
         <permission name="android.permission.REQUEST_COMPANION_PROFILE_COMPUTER" />
         <permission name="android.permission.REQUEST_COMPANION_SELF_MANAGED" />
         <permission name="android.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE" />
+        <permission name="android.permission.ACCESS_COMPANION_INFO" />
 
         <!-- Permission required for testing registering pull atom callbacks. -->
         <permission name="android.permission.REGISTER_STATS_PULL_ATOM"/>
@@ -638,6 +639,8 @@ applications that come with the platform
         <permission name="android.permission.ACCESS_TEXT_CLASSIFIER_BY_TYPE"/>
         <!-- Permission required for CTS test - CtsSecurityTestCases -->
         <permission name="android.permission.MANAGE_DEVICE_POLICY_MTE"/>
+        <!-- Permission required for integration test - InputTest -->
+        <permission name="android.permission.LISTEN_FOR_KEY_ACTIVITY"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.soundpicker">

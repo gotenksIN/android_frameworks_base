@@ -20,6 +20,9 @@ import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import com.android.app.tracing.coroutines.coroutineScopeTraced
 import com.android.systemui.ambientcue.domain.interactor.AmbientCueInteractor
 import com.android.systemui.lifecycle.ExclusiveActivatable
@@ -27,26 +30,61 @@ import com.android.systemui.lifecycle.Hydrator
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class AmbientCueViewModel
 @AssistedInject
 constructor(private val ambientCueInteractor: AmbientCueInteractor) : ExclusiveActivatable() {
-    private val hydrator = Hydrator("OverlayViewModel.hydrator")
+    private val hydrator = Hydrator("AmbientCueViewModel.hydrator")
 
-    val isVisible: Boolean by
+    private val isRootViewAttached: Boolean by
         hydrator.hydratedStateOf(
-            traceName = "isVisible",
+            traceName = "isRootViewAttached",
             initialValue = false,
-            source = ambientCueInteractor.isVisible,
+            source = ambientCueInteractor.isRootViewAttached,
         )
+
+    private val isImeVisible: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isImeVisible",
+            initialValue = false,
+            source = ambientCueInteractor.isImeVisible,
+        )
+
+    val isVisible: Boolean
+        get() = isRootViewAttached && !isImeVisible
 
     var isExpanded: Boolean by mutableStateOf(false)
         private set
+
+    val pillStyle: PillStyleViewModel by
+        hydrator.hydratedStateOf(
+            traceName = "pillStyle",
+            initialValue = PillStyleViewModel.Uninitialized,
+            source =
+                combine(ambientCueInteractor.isGestureNav, ambientCueInteractor.isTaskBarVisible) {
+                    isGestureNav,
+                    isTaskBarVisible ->
+                    if (isGestureNav && !isTaskBarVisible) {
+                        PillStyleViewModel.NavBarPillStyle
+                    } else {
+                        val position =
+                            if (isGestureNav) {
+                                null
+                            } else {
+                                // TODO: b/415914083 Overview button position should come from SysUI
+                                Rect(Offset.Zero, Size(100f, 100f))
+                            }
+                        PillStyleViewModel.ShortPillStyle(position)
+                    }
+                },
+        )
 
     val actions: List<ActionViewModel> by
         hydrator.hydratedStateOf(
@@ -69,7 +107,6 @@ constructor(private val ambientCueInteractor: AmbientCueInteractor) : ExclusiveA
         )
 
     fun show() {
-        ambientCueInteractor.setIsVisible(true)
         isExpanded = false
     }
 
@@ -82,8 +119,25 @@ constructor(private val ambientCueInteractor: AmbientCueInteractor) : ExclusiveA
     }
 
     fun hide() {
-        ambientCueInteractor.setIsVisible(false)
+        ambientCueInteractor.setDeactivated(true)
         isExpanded = false
+    }
+
+    private var deactivateCueBarJob: Job? = null
+
+    fun cancelDeactivation() {
+        deactivateCueBarJob?.cancel()
+    }
+
+    suspend fun delayAndDeactivateCueBar() {
+        deactivateCueBarJob?.cancel()
+
+        coroutineScopeTraced("AmbientCueViewModel") {
+            deactivateCueBarJob = launch {
+                delay(AMBIENT_CUE_TIMEOUT_SEC)
+                ambientCueInteractor.setDeactivated(true)
+            }
+        }
     }
 
     override suspend fun onActivated(): Nothing {
@@ -91,12 +145,12 @@ constructor(private val ambientCueInteractor: AmbientCueInteractor) : ExclusiveA
             launch { hydrator.activate() }
             launch {
                 // Hide the UI if the user doesn't interact with it after N seconds
-                ambientCueInteractor.isVisible.collectLatest { isVisible ->
-                    if (!isVisible) return@collectLatest
-                    delay(AMBIENT_CUE_TIMEOUT_SEC)
-                    if (!isExpanded) {
-                        ambientCueInteractor.setIsVisible(false)
+                ambientCueInteractor.isRootViewAttached.collectLatest { isAttached ->
+                    if (!isAttached) {
+                        cancelDeactivation()
+                        return@collectLatest
                     }
+                    delayAndDeactivateCueBar()
                 }
             }
             awaitCancellation()

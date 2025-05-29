@@ -46,11 +46,13 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.app.WindowConfiguration.activityTypeToString;
+import static android.app.WindowConfiguration.isFloating;
 import static android.content.Context.CONTEXT_RESTRICTED;
 import static android.content.Intent.ACTION_MAIN;
 import static android.content.Intent.CATEGORY_HOME;
@@ -99,6 +101,50 @@ import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.content.res.Configuration.ORIENTATION_UNDEFINED;
 import static android.content.res.Configuration.UI_MODE_TYPE_DESK;
 import static android.content.res.Configuration.UI_MODE_TYPE_MASK;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.ALL_DRAWN;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.APP_STOPPED;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.CLIENT_VISIBLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.ENABLE_RECENTS_SCREENSHOT;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.FILLS_PARENT;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.FRONT_OF_TASK;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IN_SIZE_COMPAT_MODE;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_ANIMATING;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_USER_FULLSCREEN_OVERRIDE_ENABLED;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.LAST_DROP_INPUT_MODE;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.LAST_SURFACE_SHOWING;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.MIN_ASPECT_RATIO;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NAME;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NUM_DRAWN_WINDOWS;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NUM_INTERESTING_WINDOWS;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.OVERRIDE_ORIENTATION;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.PIP_AUTO_ENTER_ENABLED;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.PROC_ID;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.PROVIDES_MAX_BOUNDS;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REPORTED_DRAWN;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REPORTED_VISIBLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REQUEST_OPEN_IN_BROWSER_EDUCATION_TIMESTAMP;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_ALLOW_SIMULATE_REQUESTED_ORIENTATION_FOR_CAMERA_COMPAT;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_OVERRIDE_FORCE_RESIZE_APP;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_OVERRIDE_MIN_ASPECT_RATIO;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_FOR_CAMERA_COMPAT;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_SEND_COMPAT_FAKE_FOCUS;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_DISPLAYED;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_MOVED;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_WINDOW;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STATE;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.TRANSLUCENT;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.VISIBLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.VISIBLE_REQUESTED;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.VISIBLE_SET_FROM_TRANSFERRED_STARTING_WINDOW;
+import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.WINDOW_TOKEN;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.HASH_CODE;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.TITLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.USER_ID;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerChildProto.ACTIVITY;
 import static android.os.Build.VERSION_CODES.HONEYCOMB;
 import static android.os.Build.VERSION_CODES.O;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
@@ -147,46 +193,6 @@ import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityRecord.State.STARTED;
 import static com.android.server.wm.ActivityRecord.State.STOPPED;
 import static com.android.server.wm.ActivityRecord.State.STOPPING;
-import static com.android.server.wm.ActivityRecordProto.ALL_DRAWN;
-import static com.android.server.wm.ActivityRecordProto.APP_STOPPED;
-import static com.android.server.wm.ActivityRecordProto.CLIENT_VISIBLE;
-import static com.android.server.wm.ActivityRecordProto.ENABLE_RECENTS_SCREENSHOT;
-import static com.android.server.wm.ActivityRecordProto.FILLS_PARENT;
-import static com.android.server.wm.ActivityRecordProto.FRONT_OF_TASK;
-import static com.android.server.wm.ActivityRecordProto.IN_SIZE_COMPAT_MODE;
-import static com.android.server.wm.ActivityRecordProto.IS_ANIMATING;
-import static com.android.server.wm.ActivityRecordProto.IS_USER_FULLSCREEN_OVERRIDE_ENABLED;
-import static com.android.server.wm.ActivityRecordProto.LAST_DROP_INPUT_MODE;
-import static com.android.server.wm.ActivityRecordProto.LAST_SURFACE_SHOWING;
-import static com.android.server.wm.ActivityRecordProto.MIN_ASPECT_RATIO;
-import static com.android.server.wm.ActivityRecordProto.NAME;
-import static com.android.server.wm.ActivityRecordProto.NUM_DRAWN_WINDOWS;
-import static com.android.server.wm.ActivityRecordProto.NUM_INTERESTING_WINDOWS;
-import static com.android.server.wm.ActivityRecordProto.OVERRIDE_ORIENTATION;
-import static com.android.server.wm.ActivityRecordProto.PIP_AUTO_ENTER_ENABLED;
-import static com.android.server.wm.ActivityRecordProto.PROC_ID;
-import static com.android.server.wm.ActivityRecordProto.PROVIDES_MAX_BOUNDS;
-import static com.android.server.wm.ActivityRecordProto.REPORTED_DRAWN;
-import static com.android.server.wm.ActivityRecordProto.REPORTED_VISIBLE;
-import static com.android.server.wm.ActivityRecordProto.REQUEST_OPEN_IN_BROWSER_EDUCATION_TIMESTAMP;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_ALLOW_SIMULATE_REQUESTED_ORIENTATION_FOR_CAMERA_COMPAT;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_OVERRIDE_FORCE_RESIZE_APP;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_OVERRIDE_MIN_ASPECT_RATIO;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_FOR_CAMERA_COMPAT;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT;
-import static com.android.server.wm.ActivityRecordProto.SHOULD_SEND_COMPAT_FAKE_FOCUS;
-import static com.android.server.wm.ActivityRecordProto.STARTING_DISPLAYED;
-import static com.android.server.wm.ActivityRecordProto.STARTING_MOVED;
-import static com.android.server.wm.ActivityRecordProto.STARTING_WINDOW;
-import static com.android.server.wm.ActivityRecordProto.STATE;
-import static com.android.server.wm.ActivityRecordProto.TRANSLUCENT;
-import static com.android.server.wm.ActivityRecordProto.VISIBLE;
-import static com.android.server.wm.ActivityRecordProto.VISIBLE_REQUESTED;
-import static com.android.server.wm.ActivityRecordProto.VISIBLE_SET_FROM_TRANSFERRED_STARTING_WINDOW;
-import static com.android.server.wm.ActivityRecordProto.WINDOW_TOKEN;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_APP;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_CLEANUP;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_RESULTS;
@@ -217,9 +223,6 @@ import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_N
 import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_WINDOWING_MODE_RESIZE;
 import static com.android.server.wm.ActivityTaskManagerService.getInputDispatchingTimeoutMillisLocked;
 import static com.android.server.wm.ActivityTaskManagerService.isPip2ExperimentEnabled;
-import static com.android.server.wm.IdentifierProto.HASH_CODE;
-import static com.android.server.wm.IdentifierProto.TITLE;
-import static com.android.server.wm.IdentifierProto.USER_ID;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_COPY_TO_CLIENT;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
@@ -232,7 +235,6 @@ import static com.android.server.wm.TaskPersister.DEBUG;
 import static com.android.server.wm.TaskPersister.IMAGE_EXTENSION;
 import static com.android.server.wm.WindowContainer.AnimationFlags.CHILDREN;
 import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
-import static com.android.server.wm.WindowContainerChildProto.ACTIVITY;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_CONFIGURATION;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW_VERBOSE;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
@@ -342,6 +344,7 @@ import android.window.SizeConfigurationBuckets;
 import android.window.SplashScreen;
 import android.window.SplashScreenView;
 import android.window.SplashScreenView.SplashScreenViewParcelable;
+import android.window.StartingWindowRemovalInfo;
 import android.window.TaskSnapshot;
 import android.window.TaskSnapshotManager;
 import android.window.TransitionInfo.AnimationOptions;
@@ -2826,6 +2829,10 @@ public final class ActivityRecord extends WindowToken {
                     mStartingData.mPrepareRemoveAnimation = prepareAnimation;
                     return;
                 }
+            } else if (mSyncState != SYNC_STATE_NONE) {
+                mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
+                mStartingData.mPrepareRemoveAnimation = prepareAnimation;
+                return;
             }
             animate = prepareAnimation && mStartingData.needRevealAnimation()
                     && mStartingWindow.isVisibleByPolicy();
@@ -2834,10 +2841,7 @@ public final class ActivityRecord extends WindowToken {
                             + " animate=%b Callers=%s", this, mStartingWindow, animate,
                     Debug.getCallers(5));
             surface = mStartingSurface;
-            mStartingData = null;
-            mStartingSurface = null;
-            mStartingWindow = null;
-            mTransitionChangeFlags &= ~FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
+            cleanUpStartingInfo();
             if (surface == null) {
                 ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "startingWindow was set but "
                         + "startingSurface==null, couldn't remove");
@@ -2850,6 +2854,25 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
         surface.remove(animate, hasImeSurface);
+    }
+
+    StartingWindowRemovalInfo getStartingWindowInfo() {
+        if (mStartingData == null || mStartingWindow == null) {
+            return null;
+        }
+        final boolean animate = mStartingData.mPrepareRemoveAnimation
+                && mStartingData.needRevealAnimation()
+                && mStartingWindow.isVisibleByPolicy();
+        final boolean hasImeSurface = mStartingData.hasImeSurface();
+        return mAtmService.mTaskOrganizerController.getStartingWindowRemovalInfo(
+                task, animate, hasImeSurface);
+    }
+
+    void cleanUpStartingInfo() {
+        mStartingData = null;
+        mStartingSurface = null;
+        mStartingWindow = null;
+        mTransitionChangeFlags &= ~FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
     }
 
     /**
@@ -3255,7 +3278,11 @@ public final class ActivityRecord extends WindowToken {
      *         windowing mode if it is in the given {@link TaskDisplayArea}.
      */
     boolean supportsFreeformInDisplayArea(@Nullable TaskDisplayArea tda) {
-        return mAtmService.mSupportsFreeformWindowManagement
+        return tda != null
+                && tda.isWindowingModeSupported(WINDOWING_MODE_FREEFORM,
+                        mAtmService.mSupportsMultiWindow,
+                        mAtmService.mSupportsFreeformWindowManagement,
+                        mAtmService.mSupportsPictureInPicture)
                 && supportsMultiWindowInDisplayArea(tda);
     }
 
@@ -7810,8 +7837,21 @@ public final class ActivityRecord extends WindowToken {
         final AppCompatSafeRegionPolicy safeRegionPolicy =
                 mAppCompatController.getSafeRegionPolicy();
         mAppCompatController.getLetterboxPolicy().resetFixedOrientationLetterboxEligibility();
+
+        boolean shouldApplyLegacyInsets =
+                !isFloating(newParentConfiguration.windowConfiguration.getWindowingMode());
+        if (com.android.wm.shell.Flags.enableCreateAnyBubble()
+                && com.android.wm.shell.Flags.enableBubbleAppCompatFixes()) {
+            final Task task = getTask();
+            if (task != null) {
+                // Similar to floating windows, an app bubble should not apply legacy insets.
+                // TODO(b/407669465): Update isAppBubble usage once migrated to the new approach.
+                shouldApplyLegacyInsets &= !task.getTaskInfo().isAppBubble;
+            }
+        }
         mResolveConfigHint.resolveTmpOverrides(mDisplayContent, newParentConfiguration,
-                isFixedRotationTransforming(), safeRegionPolicy.getLatestSafeRegionBounds());
+                isFixedRotationTransforming(), safeRegionPolicy.getLatestSafeRegionBounds(),
+                shouldApplyLegacyInsets);
 
         // Can't use resolvedConfig.windowConfiguration.getWindowingMode() because it can be
         // different from windowing mode of the task (PiP) during transition from fullscreen to PiP
@@ -8690,7 +8730,7 @@ public final class ActivityRecord extends WindowToken {
         // don't want to save mAppCompatDisplayInsets in onConfigurationChanged without visibility
         // check to avoid remembering obsolete configuration which can lead to unnecessary
         // size-compat mode.
-        if (mVisibleRequested) {
+        if (isVisibleRequested()) {
             // Calling from here rather than resolveOverrideConfiguration to ensure that this is
             // called after full config is updated in ConfigurationContainer#onConfigurationChanged.
             mAppCompatController.getSizeCompatModePolicy().updateAppCompatDisplayInsets();
@@ -8728,7 +8768,7 @@ public final class ActivityRecord extends WindowToken {
         setLastReportedConfiguration(getProcessGlobalConfiguration(), newMergedOverrideConfig);
         setLastReportedActivityWindowInfo(newActivityWindowInfo);
 
-        if (mState == INITIALIZING) {
+        if (getState() == INITIALIZING) {
             // No need to relaunch or schedule new config for activity that hasn't been launched
             // yet. We do, however, return after applying the config to activity record, so that
             // it will use it for launch transaction.

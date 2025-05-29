@@ -89,6 +89,7 @@ import android.os.incremental.IncrementalManager;
 import android.os.storage.StorageManager;
 import android.os.storage.VolumeInfo;
 import android.permission.PermissionManager;
+import android.ravenwood.annotation.RavenwoodSupported.SupportType;
 import android.telephony.TelephonyManager;
 import android.telephony.UiccCardInfo;
 import android.telephony.gba.GbaService;
@@ -3352,6 +3353,16 @@ public abstract class PackageManager {
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_CAR_TEMPLATES_HOST =
             "android.software.car.templates_host";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * is opted-in to render the application using Automotive App Host for Media
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_CAR_TEMPLATES_HOST_MEDIA =
+            "android.software.car.templates_host.media";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}:If this
@@ -8483,6 +8494,8 @@ public abstract class PackageManager {
      *             found on the system.
      */
     @NonNull
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodPackageManager")
     public abstract InstrumentationInfo getInstrumentationInfo(@NonNull ComponentName className,
             @InstrumentationInfoFlags int flags) throws NameNotFoundException;
 
@@ -9351,7 +9364,7 @@ public abstract class PackageManager {
     @SuppressWarnings("HiddenAbstractMethod")
     @SystemApi
     @RequiresPermission(Manifest.permission.INSTALL_PACKAGES)
-    public abstract void setUpdateAvailable(@NonNull String packageName, boolean updateAvaialble);
+    public abstract void setUpdateAvailable(@NonNull String packageName, boolean updateAvailable);
 
     /**
      * Attempts to delete a package. Since this may take a little while, the

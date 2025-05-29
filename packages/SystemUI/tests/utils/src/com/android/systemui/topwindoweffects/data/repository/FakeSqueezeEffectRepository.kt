@@ -16,15 +16,32 @@
 
 package com.android.systemui.topwindoweffects.data.repository
 
+import com.android.systemui.topwindoweffects.data.repository.InvocationEffectPreferencesImpl.Companion.DEFAULT_OUTWARD_EFFECT_DURATION_MS
+import com.android.systemui.topwindoweffects.data.repository.SqueezeEffectRepositoryImpl.Companion.DEFAULT_INWARD_EFFECT_DURATION_MILLIS
+import com.android.systemui.topwindoweffects.data.repository.SqueezeEffectRepositoryImpl.Companion.DEFAULT_LONG_PRESS_POWER_DURATION_MILLIS
+import java.io.PrintWriter
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeSqueezeEffectRepository : SqueezeEffectRepository {
-    var invocationEffectInitialDelayMs = 100L
+    var invocationEffectInitialDelayMs = DEFAULT_LONG_PRESS_POWER_DURATION_MILLIS
+    var invocationEffectInwardsAnimationDurationMs = DEFAULT_INWARD_EFFECT_DURATION_MILLIS
+    var invocationEffectOutwardsAnimationDurationMs = DEFAULT_OUTWARD_EFFECT_DURATION_MS
 
-    override val isSqueezeEffectEnabled = MutableStateFlow(false)
     override var isSqueezeEffectHapticEnabled = false
 
-    override val isPowerButtonDownInKeyCombination = MutableStateFlow(false)
+    override val isEffectEnabledAndPowerButtonPressedAsSingleGesture = MutableStateFlow(false)
 
-    override suspend fun getInvocationEffectInitialDelayMs() = invocationEffectInitialDelayMs
+    override val isPowerButtonLongPressed = MutableStateFlow(false)
+
+    override fun getInvocationEffectInitialDelayMillis() = invocationEffectInitialDelayMs
+
+    override fun getInvocationEffectInAnimationDurationMillis() =
+        invocationEffectInwardsAnimationDurationMs
+
+    override fun getInvocationEffectOutAnimationDurationMillis() =
+        invocationEffectOutwardsAnimationDurationMs
+
+    override fun dump(pw: PrintWriter, args: Array<out String>) {
+        // empty
+    }
 }

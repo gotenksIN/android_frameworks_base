@@ -30,6 +30,8 @@ import android.annotation.PermissionName;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
+import android.annotation.SpecialUsers.CanBeCURRENT;
+import android.annotation.SpecialUsers.CannotBeSpecialUser;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
@@ -3572,12 +3574,12 @@ public final class Settings {
         }
 
         public boolean putStringForUser(ContentResolver cr, String name, String value,
-                String tag, boolean makeDefault, final int userHandle,
+                String tag, boolean makeDefault, final @CanBeCURRENT @UserIdInt int userId,
                 boolean overrideableByRestore) {
             try {
                 Bundle arg = new Bundle();
                 arg.putString(Settings.NameValueTable.VALUE, value);
-                arg.putInt(CALL_METHOD_USER_KEY, userHandle);
+                arg.putInt(CALL_METHOD_USER_KEY, userId);
                 if (tag != null) {
                     arg.putString(CALL_METHOD_TAG_KEY, tag);
                 }
@@ -3645,8 +3647,9 @@ public final class Settings {
         }
 
         @UnsupportedAppUsage
-        public String getStringForUser(ContentResolver cr, String name, final int userHandle) {
-            final boolean isSelf = (userHandle == UserHandle.myUserId());
+        public String getStringForUser(ContentResolver cr, String name,
+                final @CanBeCURRENT @UserIdInt int userId) {
+            final boolean isSelf = (userId == UserHandle.myUserId());
             final AttributionSource attributionSource = cr.getAttributionSource();
             final int deviceId =
                     android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()
@@ -3665,7 +3668,7 @@ public final class Settings {
                                 Log.i(TAG, "Generation changed for setting:" + name
                                         + " type:" + mUri.getPath()
                                         + " in package:" + cr.getPackageName()
-                                        + " and user:" + userHandle);
+                                        + " and user:" + userId);
                             }
                             // When a generation number changes, remove cached value, remove the old
                             // generation tracker and request a new one
@@ -3681,14 +3684,13 @@ public final class Settings {
                     }
                 }
                 if (DEBUG) {
-                    Log.i(TAG, "Cache miss for setting:" + name + " for user:"
-                            + userHandle);
+                    Log.i(TAG, "Cache miss for setting:" + name + " for user:" + userId);
                 }
                 // Generation tracker doesn't exist or the value isn't cached
                 needsGenerationTracker = true;
             } else {
                 if (DEBUG || LOCAL_LOGV) {
-                    Log.v(TAG, "get setting for user " + userHandle
+                    Log.v(TAG, "get setting for user " + userId
                             + " by user " + UserHandle.myUserId() + " so skipping cache");
                 }
             }
@@ -3740,7 +3742,7 @@ public final class Settings {
                 try {
                     Bundle args = new Bundle();
                     if (!isSelf) {
-                        args.putInt(CALL_METHOD_USER_KEY, userHandle);
+                        args.putInt(CALL_METHOD_USER_KEY, userId);
                     }
                     if (needsGenerationTracker) {
                         args.putString(CALL_METHOD_TRACK_GENERATION_KEY, null);
@@ -3748,7 +3750,7 @@ public final class Settings {
                             Log.i(TAG, "Requested generation tracker for setting:" + name
                                     + " type:" + mUri.getPath()
                                     + " in package:" + cr.getPackageName()
-                                    + " and user:" + userHandle);
+                                    + " and user:" + userId);
                         }
                     }
                     Bundle b;
@@ -3789,7 +3791,7 @@ public final class Settings {
                                                     + name
                                                     + " type:" + mUri.getPath()
                                                     + " in package:" + cr.getPackageName()
-                                                    + " and user:" + userHandle
+                                                    + " and user:" + userId
                                                     + " with index:" + index);
                                         }
                                         // Always make sure to close any pre-existing tracker before
@@ -3815,7 +3817,7 @@ public final class Settings {
                             }
                         } else {
                             if (DEBUG || LOCAL_LOGV) {
-                                Log.i(TAG, "call-query of user " + userHandle
+                                Log.i(TAG, "call-query of user " + userId
                                         + " by " + UserHandle.myUserId()
                                         + (isInSystemServer() ? " in system_server" : "")
                                         + " so not updating cache");
@@ -4374,22 +4376,22 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage
         public static String getStringForUser(ContentResolver resolver, String name,
-                int userHandle) {
+                @CanBeCURRENT @UserIdInt int userId) {
 // QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempGetApiIdFromValue(name));
 // QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
-                return Secure.getStringForUser(resolver, name, userHandle);
+                return Secure.getStringForUser(resolver, name, userId);
             }
             if (MOVED_TO_GLOBAL.contains(name) || MOVED_TO_SECURE_THEN_GLOBAL.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Global, returning read-only value.");
-                return Global.getStringForUser(resolver, name, userHandle);
+                return Global.getStringForUser(resolver, name, userId);
             }
 
-            return sNameValueCache.getStringForUser(resolver, name, userHandle);
+            return sNameValueCache.getStringForUser(resolver, name, userId);
         }
 
         /**
@@ -4447,22 +4449,23 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
-                int userHandle) {
-            return putStringForUser(resolver, name, value, userHandle,
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(resolver, name, value, userId,
                     DEFAULT_OVERRIDEABLE_BY_RESTORE);
         }
 
         private static boolean putStringForUser(ContentResolver resolver, String name, String value,
-                int userHandle, boolean overrideableByRestore) {
+                @CanBeCURRENT @UserIdInt int userId, boolean overrideableByRestore) {
             return putStringForUser(resolver, name, value, /* tag= */ null,
-                    /* makeDefault= */ false, userHandle, overrideableByRestore);
+                    /* makeDefault= */ false, userId, overrideableByRestore);
         }
 
         private static boolean putStringForUser(ContentResolver resolver, String name, String value,
-                String tag, boolean makeDefault, int userHandle, boolean overrideableByRestore) {
+                String tag, boolean makeDefault, @CanBeCURRENT @UserIdInt int userId,
+                boolean overrideableByRestore) {
             if (LOCAL_LOGV) {
                 Log.v(TAG, "System.putString(name=" + name + ", value=" + value + ") for "
-                        + userHandle);
+                        + userId);
             }
 // QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempPutApiIdFromValue(name));
@@ -4478,7 +4481,7 @@ public final class Settings {
                 return false;
             }
             return sNameValueCache.putStringForUser(resolver, name, value, tag, makeDefault,
-                    userHandle, overrideableByRestore);
+                    userId, overrideableByRestore);
         }
 
         /**
@@ -4510,7 +4513,7 @@ public final class Settings {
          * @param resolver Handle to the content resolver.
          * @param tag Optional tag which should be associated with the settings to reset.
          * @param mode The reset mode.
-         * @param userHandle The user for which to reset to defaults.
+         * @param userId The user for which to reset to defaults.
          *
          * @see #RESET_MODE_PACKAGE_DEFAULTS
          * @see #RESET_MODE_UNTRUSTED_DEFAULTS
@@ -4520,10 +4523,11 @@ public final class Settings {
          * @hide
          */
         public static void resetToDefaultsAsUser(@NonNull ContentResolver resolver,
-                @Nullable String tag, @ResetMode int mode, @IntRange(from = 0) int userHandle) {
+                @Nullable String tag, @ResetMode int mode,
+                @IntRange(from = 0) @CannotBeSpecialUser @UserIdInt int userId) {
             try {
                 Bundle arg = new Bundle();
-                arg.putInt(CALL_METHOD_USER_KEY, userHandle);
+                arg.putInt(CALL_METHOD_USER_KEY, userId);
                 if (tag != null) {
                     arg.putString(CALL_METHOD_TAG_KEY, tag);
                 }
@@ -4581,8 +4585,9 @@ public final class Settings {
 
         /** @hide */
         @UnsupportedAppUsage
-        public static int getIntForUser(ContentResolver cr, String name, int def, int userHandle) {
-            String v = getStringForUser(cr, name, userHandle);
+        public static int getIntForUser(ContentResolver cr, String name, int def,
+                @CanBeCURRENT @UserIdInt int userId) {
+            String v = getStringForUser(cr, name, userId);
             return parseIntSettingWithDefault(v, def);
         }
 
@@ -4611,9 +4616,10 @@ public final class Settings {
 
         /** @hide */
         @UnsupportedAppUsage
-        public static int getIntForUser(ContentResolver cr, String name, int userHandle)
+        public static int getIntForUser(ContentResolver cr, String name,
+                @CanBeCURRENT @UserIdInt int userId)
                 throws SettingNotFoundException {
-            String v = getStringForUser(cr, name, userHandle);
+            String v = getStringForUser(cr, name, userId);
             return parseIntSetting(v, name);
         }
 
@@ -4637,8 +4643,8 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage
         public static boolean putIntForUser(ContentResolver cr, String name, int value,
-                int userHandle) {
-            return putStringForUser(cr, name, Integer.toString(value), userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(cr, name, Integer.toString(value), userId);
         }
 
         /**
@@ -4661,8 +4667,8 @@ public final class Settings {
 
         /** @hide */
         public static long getLongForUser(ContentResolver cr, String name, long def,
-                int userHandle) {
-            String v = getStringForUser(cr, name, userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            String v = getStringForUser(cr, name, userId);
             return parseLongSettingWithDefault(v, def);
         }
 
@@ -4689,9 +4695,10 @@ public final class Settings {
         }
 
         /** @hide */
-        public static long getLongForUser(ContentResolver cr, String name, int userHandle)
+        public static long getLongForUser(ContentResolver cr, String name,
+                @CanBeCURRENT @UserIdInt int userId)
                 throws SettingNotFoundException {
-            String v = getStringForUser(cr, name, userHandle);
+            String v = getStringForUser(cr, name, userId);
             return parseLongSetting(v, name);
         }
 
@@ -4714,8 +4721,8 @@ public final class Settings {
 
         /** @hide */
         public static boolean putLongForUser(ContentResolver cr, String name, long value,
-                int userHandle) {
-            return putStringForUser(cr, name, Long.toString(value), userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(cr, name, Long.toString(value), userId);
         }
 
         /**
@@ -4738,8 +4745,8 @@ public final class Settings {
 
         /** @hide */
         public static float getFloatForUser(ContentResolver cr, String name, float def,
-                int userHandle) {
-            String v = getStringForUser(cr, name, userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            String v = getStringForUser(cr, name, userId);
             return parseFloatSettingWithDefault(v, def);
         }
 
@@ -4767,9 +4774,10 @@ public final class Settings {
         }
 
         /** @hide */
-        public static float getFloatForUser(ContentResolver cr, String name, int userHandle)
+        public static float getFloatForUser(ContentResolver cr, String name,
+                @CanBeCURRENT @UserIdInt int userId)
                 throws SettingNotFoundException {
-            String v = getStringForUser(cr, name, userHandle);
+            String v = getStringForUser(cr, name, userId);
             return parseFloatSetting(v, name);
         }
 
@@ -4792,8 +4800,8 @@ public final class Settings {
 
         /** @hide */
         public static boolean putFloatForUser(ContentResolver cr, String name, float value,
-                int userHandle) {
-            return putStringForUser(cr, name, Float.toString(value), userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(cr, name, Float.toString(value), userId);
         }
 
         /**
@@ -4849,9 +4857,8 @@ public final class Settings {
         }
 
         private static float getDefaultFontScale(ContentResolver cr, int userHandle) {
-            return com.android.window.flags.Flags.configurableFontScaleDefault()
-                    ? Settings.System.getFloatForUser(cr, DEFAULT_DEVICE_FONT_SCALE,
-                    DEFAULT_FONT_SCALE, userHandle) : DEFAULT_FONT_SCALE;
+            return Settings.System.getFloatForUser(cr, DEFAULT_DEVICE_FONT_SCALE,
+                    DEFAULT_FONT_SCALE, userHandle);
         }
 
         /**
@@ -5553,6 +5560,25 @@ public final class Settings {
          */
         public static final String HARDWARE_HAPTIC_FEEDBACK_INTENSITY =
                 "hardware_haptic_feedback_intensity";
+
+        /**
+         * The intensity of gesture input vibrations if configurable. See {@link
+         * android.os.VibrationAttributes#USAGE_GESTURE_INPUT} for details about gesture input
+         * vibrations.
+         *
+         * Not all devices are capable of changing their feedback intensity; on these devices
+         * there will likely be no difference between the various vibration intensities except for
+         * intensity 0 (off) and the rest.
+         *
+         * <b>Values:</b><br/>
+         * 0 - Vibration is disabled<br/>
+         * 1 - Weak vibrations<br/>
+         * 2 - Medium vibrations<br/>
+         * 3 - Strong vibrations
+         * @hide
+         */
+        public static final String GESTURE_INPUT_VIBRATION_INTENSITY =
+                "gesture_input_vibration_intensity";
 
         /**
          * Whether keyboard vibration feedback is enabled. The value is boolean (1 or 0).
@@ -7277,11 +7303,11 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage
         public static String getStringForUser(ContentResolver resolver, String name,
-                int userHandle) {
+                @CanBeCURRENT @UserIdInt int userId) {
             if (MOVED_TO_GLOBAL.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.Secure"
                         + " to android.provider.Settings.Global.");
-                return Global.getStringForUser(resolver, name, userHandle);
+                return Global.getStringForUser(resolver, name, userId);
             }
 
             if (MOVED_TO_LOCK_SETTINGS.contains(name) && Process.myUid() != Process.SYSTEM_UID) {
@@ -7305,7 +7331,7 @@ public final class Settings {
                         " longer accessible. See API documentation for potential replacements.");
             }
 
-            return sNameValueCache.getStringForUser(resolver, name, userHandle);
+            return sNameValueCache.getStringForUser(resolver, name, userId);
         }
 
         /**
@@ -7340,8 +7366,8 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
-                int userHandle) {
-            return putStringForUser(resolver, name, value, null, false, userHandle,
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(resolver, name, value, null, false, userId,
                     DEFAULT_OVERRIDEABLE_BY_RESTORE);
         }
 
@@ -7349,19 +7375,20 @@ public final class Settings {
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
         public static boolean putStringForUser(@NonNull ContentResolver resolver,
                 @NonNull String name, @Nullable String value, @Nullable String tag,
-                boolean makeDefault, @UserIdInt int userHandle, boolean overrideableByRestore) {
+                boolean makeDefault, @CanBeCURRENT @UserIdInt int userId,
+                boolean overrideableByRestore) {
             if (LOCAL_LOGV) {
                 Log.v(TAG, "Secure.putString(name=" + name + ", value=" + value + ") for "
-                        + userHandle);
+                        + userId);
             }
             if (MOVED_TO_GLOBAL.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.Secure"
                         + " to android.provider.Settings.Global");
                 return Global.putStringForUser(resolver, name, value,
-                        tag, makeDefault, userHandle, DEFAULT_OVERRIDEABLE_BY_RESTORE);
+                        tag, makeDefault, userId, DEFAULT_OVERRIDEABLE_BY_RESTORE);
             }
             return sNameValueCache.putStringForUser(resolver, name, value, tag,
-                    makeDefault, userHandle, overrideableByRestore);
+                    makeDefault, userId, overrideableByRestore);
         }
 
         /**
@@ -7443,7 +7470,7 @@ public final class Settings {
          * @param resolver Handle to the content resolver.
          * @param tag Optional tag which should be associated with the settings to reset.
          * @param mode The reset mode.
-         * @param userHandle The user for which to reset to defaults.
+         * @param userId The user for which to reset to defaults.
          *
          * @see #RESET_MODE_PACKAGE_DEFAULTS
          * @see #RESET_MODE_UNTRUSTED_DEFAULTS
@@ -7453,10 +7480,11 @@ public final class Settings {
          * @hide
          */
         public static void resetToDefaultsAsUser(@NonNull ContentResolver resolver,
-                @Nullable String tag, @ResetMode int mode, @IntRange(from = 0) int userHandle) {
+                @Nullable String tag, @ResetMode int mode,
+                @IntRange(from = 0) @CannotBeSpecialUser @UserIdInt int userId) {
             try {
                 Bundle arg = new Bundle();
-                arg.putInt(CALL_METHOD_USER_KEY, userHandle);
+                arg.putInt(CALL_METHOD_USER_KEY, userId);
                 if (tag != null) {
                     arg.putString(CALL_METHOD_TAG_KEY, tag);
                 }
@@ -7509,8 +7537,9 @@ public final class Settings {
 
         /** @hide */
         @UnsupportedAppUsage
-        public static int getIntForUser(ContentResolver cr, String name, int def, int userHandle) {
-            String v = getStringForUser(cr, name, userHandle);
+        public static int getIntForUser(ContentResolver cr, String name, int def,
+                @CanBeCURRENT @UserIdInt int userId) {
+            String v = getStringForUser(cr, name, userId);
             return parseIntSettingWithDefault(v, def);
         }
 
@@ -7538,9 +7567,10 @@ public final class Settings {
         }
 
         /** @hide */
-        public static int getIntForUser(ContentResolver cr, String name, int userHandle)
+        public static int getIntForUser(ContentResolver cr, String name,
+                @CanBeCURRENT @UserIdInt int userId)
                 throws SettingNotFoundException {
-            String v = getStringForUser(cr, name, userHandle);
+            String v = getStringForUser(cr, name, userId);
             return parseIntSetting(v, name);
         }
 
@@ -7564,8 +7594,8 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage
         public static boolean putIntForUser(ContentResolver cr, String name, int value,
-                int userHandle) {
-            return putStringForUser(cr, name, Integer.toString(value), userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(cr, name, Integer.toString(value), userId);
         }
 
         /**
@@ -7589,8 +7619,8 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
         public static long getLongForUser(ContentResolver cr, String name, long def,
-                int userHandle) {
-            String v = getStringForUser(cr, name, userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            String v = getStringForUser(cr, name, userId);
             return parseLongSettingWithDefault(v, def);
         }
 
@@ -7617,9 +7647,10 @@ public final class Settings {
         }
 
         /** @hide */
-        public static long getLongForUser(ContentResolver cr, String name, int userHandle)
+        public static long getLongForUser(ContentResolver cr, String name,
+                @CanBeCURRENT @UserIdInt int userId)
                 throws SettingNotFoundException {
-            String v = getStringForUser(cr, name, userHandle);
+            String v = getStringForUser(cr, name, userId);
             return parseLongSetting(v, name);
         }
 
@@ -7643,8 +7674,8 @@ public final class Settings {
         /** @hide */
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
         public static boolean putLongForUser(ContentResolver cr, String name, long value,
-                int userHandle) {
-            return putStringForUser(cr, name, Long.toString(value), userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(cr, name, Long.toString(value), userId);
         }
 
         /**
@@ -7667,8 +7698,8 @@ public final class Settings {
 
         /** @hide */
         public static float getFloatForUser(ContentResolver cr, String name, float def,
-                int userHandle) {
-            String v = getStringForUser(cr, name, userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            String v = getStringForUser(cr, name, userId);
             return parseFloatSettingWithDefault(v, def);
         }
 
@@ -7696,9 +7727,10 @@ public final class Settings {
         }
 
         /** @hide */
-        public static float getFloatForUser(ContentResolver cr, String name, int userHandle)
+        public static float getFloatForUser(ContentResolver cr, String name,
+                @CanBeCURRENT @UserIdInt int userId)
                 throws SettingNotFoundException {
-            String v = getStringForUser(cr, name, userHandle);
+            String v = getStringForUser(cr, name, userId);
             return parseFloatSetting(v, name);
         }
 
@@ -7721,8 +7753,8 @@ public final class Settings {
 
         /** @hide */
         public static boolean putFloatForUser(ContentResolver cr, String name, float value,
-                int userHandle) {
-            return putStringForUser(cr, name, Float.toString(value), userHandle);
+                @CanBeCURRENT @UserIdInt int userId) {
+            return putStringForUser(cr, name, Float.toString(value), userId);
         }
 
         /**
@@ -9627,6 +9659,23 @@ public final class Settings {
          */
         public static final String EM_VALUE =
                 "em_value";
+        /**
+         * Setting that specifies whether High Dynamic Range brightness is enabled.
+         *
+         * @hide
+         */
+        public static final String HDR_BRIGHTNESS_ENABLED =
+                "hdr_brightness_enabled";
+
+        /**
+         * Setting that specifies the intensity of the High Dynamic Range brightness. The range is
+         * [0, 1], which is which is used to scale the HDR/SDR ratio.
+         *
+         * @hide
+         */
+        public static final String HDR_BRIGHTNESS_BOOST_LEVEL =
+                "hdr_brightness_boost_level";
+
         /**
          * List of the enabled print services.
          *
@@ -13044,7 +13093,7 @@ public final class Settings {
                 "accessibility_mouse_keys_enabled";
 
         /**
-         * The current acceleration for mouse keys movement.
+         * The current float acceleration value for mouse keys movement.
          *
          * @hide
          */
@@ -18678,6 +18727,15 @@ public final class Settings {
                 "power_button_long_press";
 
         /**
+         * Marks POWER_BUTTON_LONG_PRESS has been restored.
+         * Type: int (0 to false, 1 to true)
+         *
+         * @hide
+         */
+        public static final String POWER_BUTTON_LONG_PRESS_RESTORED =
+                "power_button_long_press_restored";
+
+        /**
          * Override internal R.integer.config_longPressOnPowerDurationMs. It determines the length
          * of power button press to be considered a long press in milliseconds.
          * Used by PhoneWindowManager.
@@ -21131,6 +21189,13 @@ public final class Settings {
              */
             public static final String GESTURE_DISMISS_ACTION_USER_PREFERENCE =
                     "gesture_dismiss_action_user_preference";
+
+            /**
+             * Setting indicating the duration, in days, between two gesture hint sessions.
+             *
+             * @hide
+             */
+            public static final String GESTURE_HINT_PERIOD_DAYS = "gesture_hint_period_days";
 
             /** Whether Wear Power Anomaly Service is enabled.
              *

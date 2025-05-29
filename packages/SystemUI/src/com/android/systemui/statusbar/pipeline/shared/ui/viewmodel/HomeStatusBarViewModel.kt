@@ -26,7 +26,6 @@ import com.android.app.tracing.FlowTracing.traceEach
 import com.android.app.tracing.TrackGroupUtils.trackGroup
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.Edge
@@ -62,6 +61,7 @@ import com.android.systemui.statusbar.featurepods.popups.StatusBarPopupChips
 import com.android.systemui.statusbar.featurepods.popups.ui.model.PopupChipModel
 import com.android.systemui.statusbar.featurepods.popups.ui.viewmodel.StatusBarPopupChipsViewModel
 import com.android.systemui.statusbar.headsup.shared.StatusBarNoHunBehavior
+import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarBoundsViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarContentInsetsViewModelStore
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
 import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
@@ -73,19 +73,16 @@ import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
 import com.android.systemui.statusbar.phone.domain.interactor.LightsOutInteractor
 import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryNextToPercentViewModel
-import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.UnifiedBatteryViewModel
+import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarIconBlockListInteractor
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarInteractor
 import com.android.systemui.statusbar.pipeline.shared.ui.model.ChipsVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.SystemInfoCombinedVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModel
-import com.android.wm.shell.windowdecor.viewholder.AppHandles
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
-import java.util.Optional
-import java.util.concurrent.Executor
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -118,10 +115,15 @@ interface HomeStatusBarViewModel : Activatable {
     /** Factory to create the view model for the battery icon with the percentage alongside */
     val batteryNextToPercentViewModel: BatteryNextToPercentViewModel.Factory
     /** Factory for the unified (percent embedded) battery view model */
-    val unifiedBatteryViewModel: UnifiedBatteryViewModel.Factory
+    val unifiedBatteryViewModel: BatteryViewModel.BasedOnUserSetting.Factory
 
     /** Factory to create the view model for system status icons */
     val systemStatusIconsViewModelFactory: SystemStatusIconsViewModel.Factory
+
+    /**
+     * Factory to create the view model for storing bounds of child views in/around the status bar.
+     */
+    val statusBarBoundsViewModelFactory: StatusBarBoundsViewModel.Factory
 
     /**
      * True if the device is currently transitioning from lockscreen to occluded and false
@@ -223,8 +225,9 @@ class HomeStatusBarViewModelImpl
 constructor(
     @Assisted thisDisplayId: Int,
     override val batteryNextToPercentViewModel: BatteryNextToPercentViewModel.Factory,
-    override val unifiedBatteryViewModel: UnifiedBatteryViewModel.Factory,
+    override val unifiedBatteryViewModel: BatteryViewModel.BasedOnUserSetting.Factory,
     override val systemStatusIconsViewModelFactory: SystemStatusIconsViewModel.Factory,
+    override val statusBarBoundsViewModelFactory: StatusBarBoundsViewModel.Factory,
     tableLoggerFactory: TableLogBufferFactory,
     homeStatusBarInteractor: HomeStatusBarInteractor,
     homeStatusBarIconBlockListInteractor: HomeStatusBarIconBlockListInteractor,
@@ -247,8 +250,6 @@ constructor(
     @Background bgDispatcher: CoroutineDispatcher,
     shadeDisplaysInteractor: Provider<ShadeDisplaysInteractor>,
     private val uiEventLogger: StatusBarChipsUiEventLogger,
-    appHandles: Optional<AppHandles>,
-    @Main sysuiMainExecutor: Executor,
 ) : HomeStatusBarViewModel, ExclusiveActivatable() {
 
     private val hydrator = Hydrator(traceName = "HomeStatusBarViewModel.hydrator")
@@ -504,7 +505,7 @@ constructor(
             isHomeStatusBarAllowed && !isSecureCameraActive && !hideStartSideContentForHeadsUp
         }
 
-    private val chipsVisibilityModel: Flow<ChipsVisibilityModel> =
+    private val chipsVisibilityModel: StateFlow<ChipsVisibilityModel> =
         combine(ongoingActivityChipsViewModel.chips, canShowOngoingActivityChips) { chips, canShow
                 ->
                 ChipsVisibilityModel(chips, areChipsAllowed = canShow)
@@ -512,6 +513,14 @@ constructor(
             .traceEach(trackGroup(TRACK_GROUP, "chips"), logcat = true) {
                 "Chips[allowed=${it.areChipsAllowed} numChips=${it.chips.active.size}]"
             }
+            .stateIn(
+                bgScope,
+                SharingStarted.WhileSubscribed(),
+                ChipsVisibilityModel(
+                    chips = MultipleOngoingActivityChipsModel(),
+                    areChipsAllowed = false,
+                ),
+            )
 
     override val ongoingActivityChips: ChipsVisibilityModel by
         hydrator.hydratedStateOf(

@@ -17,20 +17,21 @@
 package com.android.systemui.topwindoweffects.ui.viewmodel
 
 import android.os.VibrationEffect
-import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.statusbar.VibratorHelper
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class SqueezeEffectHapticPlayer
 @AssistedInject
 constructor(
     private val vibratorHelper: VibratorHelper,
-    @Background private val bgScope: CoroutineScope,
+    @Application private val applicationScope: CoroutineScope,
 ) {
 
     private val primitiveDurations =
@@ -39,33 +40,42 @@ constructor(
             VibrationEffect.Composition.PRIMITIVE_QUICK_RISE,
             VibrationEffect.Composition.PRIMITIVE_TICK,
         )
-    private val invocationHaptics =
+
+    private fun buildInvocationHaptics(totalDurationMillis: Int) =
         SqueezeEffectHapticsBuilder.createInvocationHaptics(
             lowTickDuration = primitiveDurations[0],
             quickRiseDuration = primitiveDurations[1],
             tickDuration = primitiveDurations[2],
+            totalEffectDuration = totalDurationMillis,
         )
 
     private var vibrationJob: Job? = null
 
-    fun start() {
+    fun start(totalDurationMillis: Int) {
         cancel()
-        vibrationJob =
-            bgScope.launch {
-                delay(invocationHaptics.initialDelay.toLong())
-                vibratorHelper.vibrate(
-                    invocationHaptics.vibration,
-                    SqueezeEffectHapticsBuilder.VIBRATION_ATTRIBUTES,
-                )
-                vibrationJob = null
-            }
+        val invocationHaptics = buildInvocationHaptics(totalDurationMillis)
+        if (invocationHaptics.initialDelay <= 0) {
+            vibrate(invocationHaptics.vibration)
+        } else {
+            vibrationJob =
+                applicationScope.launch {
+                    delay(invocationHaptics.initialDelay.toLong())
+                    if (isActive) {
+                        vibrate(invocationHaptics.vibration)
+                    }
+                    vibrationJob = null
+                }
+        }
     }
 
     fun cancel() {
-        vibratorHelper.cancel()
         vibrationJob?.cancel()
         vibrationJob = null
+        vibratorHelper.cancel()
     }
+
+    private fun vibrate(vibrationEffect: VibrationEffect) =
+        vibratorHelper.vibrate(vibrationEffect, SqueezeEffectHapticsBuilder.VIBRATION_ATTRIBUTES)
 
     @AssistedFactory
     interface Factory {

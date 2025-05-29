@@ -39,7 +39,6 @@ import com.android.systemui.kairos.internal.util.childScope
 import com.android.systemui.kairos.internal.util.invokeOnCancel
 import com.android.systemui.kairos.internal.util.launchImmediate
 import com.android.systemui.kairos.launchEffect
-import com.android.systemui.kairos.observeSync
 import com.android.systemui.kairos.skipNext
 import com.android.systemui.kairos.takeUntil
 import com.android.systemui.kairos.util.Maybe
@@ -47,7 +46,6 @@ import com.android.systemui.kairos.util.Maybe.Absent
 import com.android.systemui.kairos.util.Maybe.Present
 import com.android.systemui.kairos.util.NameData
 import com.android.systemui.kairos.util.NameTag
-import com.android.systemui.kairos.util.appendNames
 import com.android.systemui.kairos.util.forceInit
 import com.android.systemui.kairos.util.map
 import com.android.systemui.kairos.util.mapName
@@ -82,7 +80,7 @@ internal class BuildScopeImpl(
         get() = coroutineScope.coroutineContext.job
 
     override val kairosNetwork: LocalNetwork by lazy {
-        LocalNetwork(nameData, network, coroutineScope, stateScope.aliveLazy)
+        LocalNetwork(nameData, network, coroutineScope, stateScope.deathSignalLazy)
     }
 
     override fun <T> events(
@@ -192,28 +190,36 @@ internal class BuildScopeImpl(
         name: NameTag?,
     ): Pair<Events<Map<K, Maybe<A>>>, DeferredValue<Map<K, B>>> {
         val nameData = name.toNameData("Events.applyLatestSpecForKey")
-        val eventsByKey: KeyedEvents<K, Maybe<BuildSpec<A>>> = groupByKey(numKeys)
+        val eventsByKey: KeyedEvents<K, Maybe<BuildSpec<A>>> =
+            groupByKey(nameData + "eventsByKey", numKeys)
+        val childCoroutineScope = coroutineScope.childScope()
         val initOut: Lazy<Map<K, B>> = deferAsync {
-            initialSpecs.unwrapped.value.mapValues { (k, spec) ->
-                val newEnd = eventsByKey[k]
-                val newScope = childBuildScope(newEnd, nameData.mapName { "$it[key=$k]" })
-                newScope.spec()
+            // swap out the CoroutineScope used for this build scope with the child scope
+            reenterBuildScope(this@BuildScopeImpl, childCoroutineScope).run {
+                initialSpecs.unwrapped.value.mapValues { (k, spec) ->
+                    val newEnd: Events<Maybe<BuildSpec<A>>> = eventsByKey[k]
+                    val newScope =
+                        childBuildScope(
+                            newEnd,
+                            nameData.mapName { "$it[key=$k, epoch=$epoch, init=true]" },
+                        )
+                    newScope.spec()
+                }
             }
         }
-        // TODO: should this also be used for the initOut?
-        val childScope = coroutineScope.childScope()
         val changesImpl: EventsImpl<Map<K, Maybe<A>>> =
             mapImpl(
                 upstream = { this@applyLatestSpecForKey.init.connect(evalScope = this) },
                 nameData + "changes",
             ) { upstreamMap, _ ->
-                reenterBuildScope(this@BuildScopeImpl, childScope).run {
+                reenterBuildScope(this@BuildScopeImpl, childCoroutineScope).run {
                     upstreamMap.mapValues { (k: K, ma: Maybe<BuildSpec<A>>) ->
                         ma.map { spec ->
-                            val newEnd =
-                                skipNext(nameData.mapName { "$it[key=$k]-newEnd" }, eventsByKey[k])
-                            val newScope =
-                                childBuildScope(newEnd, nameData.mapName { "$it[key=$k]" })
+                            val newName =
+                                nameData.mapName { "$it[key=$k, epoch=$epoch, init = false]" }
+                            val newEnd: Events<Maybe<BuildSpec<A>>> =
+                                skipNext(newName + "newEnd", eventsByKey[k])
+                            val newScope = childBuildScope(newEnd, newName)
                             newScope.spec()
                         }
                     }
@@ -289,24 +295,23 @@ internal class BuildScopeImpl(
                 name: NameTag?,
                 block: suspend KairosCoroutineScope.() -> R,
             ): Deferred<R> {
-                val asynaNameData = name.toNameData("EffectScope.async")
+                val asyncNameData = name.toNameData("EffectScope.async")
                 return childScope.async(context, start) newScope@{
                     val childEndSignal: Events<Unit> =
-                        this@BuildScopeImpl.newStopEmitter(
-                                asynaNameData.appendNames("childEndSignal")
-                            )
-                            .apply { this@newScope.invokeOnCancel { emit(Unit) } }
+                        this@BuildScopeImpl.newStopEmitter(asyncNameData + "childEndSignal").apply {
+                            this@newScope.invokeOnCancel { emit(Unit) }
+                        }
                     val childStateScope: StateScopeImpl =
                         this@BuildScopeImpl.stateScope.childStateScope(
                             childEndSignal,
-                            asynaNameData,
+                            asyncNameData,
                         )
                     val localNetwork =
                         LocalNetwork(
-                            asynaNameData,
+                            asyncNameData,
                             network = this@BuildScopeImpl.network,
                             scope = this@newScope,
-                            aliveLazy = childStateScope.aliveLazy,
+                            deathSignalLazy = childStateScope.deathSignalLazy,
                         )
                     val scope =
                         object : KairosCoroutineScope, CoroutineScope by this@newScope {
@@ -321,7 +326,7 @@ internal class BuildScopeImpl(
                     nameData,
                     network = this@BuildScopeImpl.network,
                     scope = childScope,
-                    aliveLazy = this@BuildScopeImpl.stateScope.aliveLazy,
+                    deathSignalLazy = this@BuildScopeImpl.stateScope.deathSignalLazy,
                 )
         }
 
@@ -395,9 +400,7 @@ internal class BuildScopeImpl(
                         (newCoroutineScope.coroutineContext.job as CompletableJob).complete()
                     }
                 )
-                observeSync(nameData + "observeLifetime", alive) {
-                    if (!it) newCoroutineScope.cancel()
-                }
+                deathSignal.observeSync(nameData + "observeLifetime") { newCoroutineScope.cancel() }
             }
     }
 
@@ -431,7 +434,7 @@ private fun EvalScope.reenterBuildScope(
                 outerScope.stateScope.nameData,
                 outerScope.stateScope.createdEpoch,
                 evalScope = this,
-                aliveLazy = outerScope.stateScope.aliveLazy,
+                deathSignalLazy = outerScope.stateScope.deathSignalLazy,
             ),
         coroutineScope,
     )

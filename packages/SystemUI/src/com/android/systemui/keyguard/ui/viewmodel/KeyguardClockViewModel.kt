@@ -169,6 +169,10 @@ constructor(
                     ),
                 clockTopMargin =
                     context.resources.getDimensionPixelSize(SysuiR.dimen.keyguard_clock_top_margin),
+                statusViewMarginHorizontal =
+                    context.resources.getDimensionPixelSize(
+                        clocksR.dimen.status_view_margin_horizontal
+                    ),
             )
             .getSmallClockTopPadding()
     }
@@ -284,6 +288,7 @@ constructor(
 
         // Font axes width max cutoff
         // A font with a wider font axes than this is at risk of being pushed off screen
+        // Value determined by the very robust and scientific process of eye-balling a few devices
         private const val FONT_WIDTH_MAX_CUTOFF = 110
     }
 }

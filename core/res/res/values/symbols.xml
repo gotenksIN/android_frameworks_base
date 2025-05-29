@@ -1092,9 +1092,15 @@
   <java-symbol type="string" name="granularity_label_line" />
   <java-symbol type="string" name="default_audio_route_id" />
   <java-symbol type="string" name="default_audio_route_name" />
+  <java-symbol type="string" name="default_audio_route_name_analog" />
+  <java-symbol type="string" name="default_audio_route_name_arc" />
+  <java-symbol type="string" name="default_audio_route_name_aux" />
+  <java-symbol type="string" name="default_audio_route_name_digital" />
   <java-symbol type="string" name="default_audio_route_name_dock_speakers" />
+  <java-symbol type="string" name="default_audio_route_name_earc" />
   <java-symbol type="string" name="default_audio_route_name_external_device" />
   <java-symbol type="string" name="default_audio_route_name_headphones" />
+  <java-symbol type="string" name="default_audio_route_name_hdmi_tv" />
   <java-symbol type="string" name="default_audio_route_name_usb" />
   <java-symbol type="string" name="default_audio_route_category_name" />
   <java-symbol type="string" name="stk_cc_ss_to_dial" />
@@ -1773,6 +1779,7 @@
   <java-symbol type="layout" name="media_route_controller_dialog" />
   <java-symbol type="layout" name="media_route_list_item" />
   <java-symbol type="id" name="media_route_list" />
+  <java-symbol type="id" name="empty_subtitle" />
   <java-symbol type="id" name="media_route_volume_layout" />
   <java-symbol type="id" name="media_route_volume_slider" />
   <java-symbol type="id" name="media_route_extended_settings_button" />
@@ -1826,7 +1833,6 @@
   <java-symbol type="array" name="config_longPressVibePattern" />
   <java-symbol type="array" name="config_virtualKeyVibePattern" />
   <java-symbol type="array" name="config_doubleClickVibePattern" />
-  <java-symbol type="array" name="config_safeModeEnabledVibePattern" />
   <java-symbol type="attr" name="actionModePopupWindowStyle" />
   <java-symbol type="attr" name="dialogCustomTitleDecorLayout" />
   <java-symbol type="attr" name="dialogTitleDecorLayout" />
@@ -5898,6 +5904,7 @@
   <java-symbol type="dimen" name="accessibility_autoclick_type_panel_divider_width" />
   <java-symbol type="id" name="accessibility_autoclick_type_panel" />
   <java-symbol type="id" name="accessibility_autoclick_button_group_container" />
+  <java-symbol type="id" name="accessibility_autoclick_click_type_button_group_container" />
   <java-symbol type="id" name="accessibility_autoclick_left_click_layout" />
   <java-symbol type="id" name="accessibility_autoclick_left_click_button" />
   <java-symbol type="id" name="accessibility_autoclick_right_click_layout" />
@@ -5955,6 +5962,7 @@
   <java-symbol type="xml" name="haptic_feedback_customization" />
   <java-symbol type="xml" name="haptic_feedback_customization_source_rotary_encoder" />
   <java-symbol type="xml" name="haptic_feedback_customization_source_touchscreen" />
+  <java-symbol type="xml" name="haptic_feedback_customization_usage_gesture_input" />
 
   <!-- For ActivityManager PSS profiling configurability -->
   <java-symbol type="bool" name="config_am_disablePssProfiling" />

@@ -25,6 +25,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
@@ -34,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -111,6 +113,7 @@ constructor(
 
     @Composable
     override fun ContentScope.Content(modifier: Modifier) {
+        val coroutineScope = rememberCoroutineScope()
         val contentViewModel =
             rememberViewModel("QuickSettingsShadeOverlayContent") {
                 contentViewModelFactory.create()
@@ -120,6 +123,7 @@ constructor(
                 quickSettingsContainerViewModelFactory.create(
                     supportsBrightnessMirroring = true,
                     expansion = COLLAPSED,
+                    volumeSliderCoroutineScope = coroutineScope,
                 )
             }
         val hunPlaceholderViewModel =
@@ -234,7 +238,6 @@ fun ContentScope.QuickSettingsLayout(
             modifier.padding(
                 start = QuickSettingsShade.Dimensions.Padding,
                 end = QuickSettingsShade.Dimensions.Padding,
-                bottom = QuickSettingsShade.Dimensions.Padding,
             ),
     ) {
         if (isFullWidthShade()) {
@@ -304,13 +307,9 @@ fun ContentScope.QuickSettingsLayout(
                 }
             }
 
-            Box {
-                GridAnchor()
-                TileGrid(
-                    viewModel = viewModel.tileGridViewModel,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            GridAnchor()
+            TileGrid(viewModel = viewModel.tileGridViewModel, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.padding(bottom = QuickSettingsShade.Dimensions.Padding))
         }
     }
 }

@@ -251,7 +251,7 @@ class MobileConnectionRepositoryImpl(
                         }
 
                         override fun onCarrierRoamingNtnModeChanged(active: Boolean) {
-                            logger.logOnCarrierRoamingNtnModeChanged(active)
+                            logger.logOnCarrierRoamingNtnModeChanged(active, subId)
                             trySend(CallbackEvent.OnCarrierRoamingNtnModeChanged(active))
                         }
 
@@ -293,7 +293,7 @@ class MobileConnectionRepositoryImpl(
                         override fun onCarrierRoamingNtnSignalStrengthChanged(
                             signalStrength: NtnSignalStrength
                         ) {
-                            logger.logNtnSignalStrengthChanged(signalStrength)
+                            logger.logNtnSignalStrengthChanged(signalStrength, subId)
                             trySend(
                                 CallbackEvent.OnCarrierRoamingNtnSignalStrengthChanged(
                                     signalStrength

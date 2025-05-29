@@ -25,6 +25,9 @@ import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
 import static android.content.res.Configuration.EMPTY;
+import static android.internal.perfetto.protos.Windowmanagerservice.RootWindowContainerProto.IS_HOME_RECENTS_COMPONENT;
+import static android.internal.perfetto.protos.Windowmanagerservice.RootWindowContainerProto.KEYGUARD_CONTROLLER;
+import static android.internal.perfetto.protos.Windowmanagerservice.RootWindowContainerProto.WINDOW_CONTAINER;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
@@ -70,9 +73,6 @@ import static com.android.server.wm.ActivityTaskSupervisor.DEFER_RESUME;
 import static com.android.server.wm.ActivityTaskSupervisor.ON_TOP;
 import static com.android.server.wm.ActivityTaskSupervisor.dumpHistoryList;
 import static com.android.server.wm.ActivityTaskSupervisor.printThisActivity;
-import static com.android.server.wm.RootWindowContainerProto.IS_HOME_RECENTS_COMPONENT;
-import static com.android.server.wm.RootWindowContainerProto.KEYGUARD_CONTROLLER;
-import static com.android.server.wm.RootWindowContainerProto.WINDOW_CONTAINER;
 import static com.android.server.wm.Task.REPARENT_LEAVE_ROOT_TASK_IN_PLACE;
 import static com.android.server.wm.Task.REPARENT_MOVE_ROOT_TASK_TO_FRONT;
 import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_VISIBLE;
@@ -473,8 +473,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         mDeviceStateController = new DeviceStateController(service.mContext, service.mGlobalLock);
         mDisplayRotationCoordinator = new DisplayRotationCoordinator();
         mDeviceStateAutoRotateSettingController =
-                DisplayRotation.createDeviceStateAutoRotateDependencies(mService.mContext,
-                        mDeviceStateController, mService.mH);
+                DisplayRotation.createDeviceStateAutoRotateDependencies(service.mContext,
+                        mDeviceStateController, service);
     }
 
     /**
@@ -645,6 +645,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         forAllWindows(w -> {
             w.setSecureLocked(w.isSecureLocked());
         }, true /* traverseTopToBottom */);
+        forAllTasks(t -> {
+            t.setSecure(t.isSecure());
+        });
     }
 
     void updateHiddenWhileSuspendedState(final ArraySet<String> packages, final boolean suspended) {

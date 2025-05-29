@@ -19,7 +19,11 @@ package com.android.systemui.statusbar.notification.collection.render
 import android.content.Context
 import android.view.ViewGroup
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.lifecycle.WindowLifecycleState
+import com.android.systemui.lifecycle.repeatWhenAttached
+import com.android.systemui.lifecycle.viewModel
 import com.android.systemui.settings.UserTracker
+import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.NotificationPresenter
 import com.android.systemui.statusbar.notification.collection.BundleEntry
 import com.android.systemui.statusbar.notification.collection.PipelineDumpable
@@ -28,52 +32,48 @@ import com.android.systemui.statusbar.notification.collection.coordinator.Bundle
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.row.RowInflaterTask
 import com.android.systemui.statusbar.notification.row.RowInflaterTaskLogger
+import com.android.systemui.statusbar.notification.row.dagger.BundleRowComponent
 import com.android.systemui.statusbar.notification.row.dagger.ExpandableNotificationRowComponent
-import com.android.systemui.statusbar.notification.row.domain.interactor.BundleInteractor
-import com.android.systemui.statusbar.notification.row.ui.viewmodel.BundleHeaderViewModel
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer
 import com.android.systemui.util.time.SystemClock
 import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Provider
 
-/**
- * Class that handles inflating BundleEntry view and controller, for use by NodeSpecBuilder.
- */
+/** Class that handles inflating BundleEntry view and controller, for use by NodeSpecBuilder. */
 @SysUISingleton
 class BundleBarn
 @Inject
 constructor(
     private val rowComponent: ExpandableNotificationRowComponent.Builder,
+    private val bundleRowComponentBuilder: BundleRowComponent.Builder,
     private val rowInflaterTaskProvider: Provider<RowInflaterTask>,
     private val listContainer: NotificationListContainer,
-    val context: Context? = null,
+    @ShadeDisplayAware val context: Context,
     val systemClock: SystemClock,
     val logger: RowInflaterTaskLogger,
     val userTracker: UserTracker,
     private val presenterLazy: Lazy<NotificationPresenter?>? = null,
-): PipelineDumpable {
+) : PipelineDumpable {
 
     /**
-     * Map of [BundleEntry] key to [NodeController]:
-     *     no key -> not started
-     *     key maps to null -> inflating
-     *     key maps to controller -> inflated
+     * Map of [BundleEntry] key to [NodeController]: no key -> not started key maps to null ->
+     * inflating key maps to controller -> inflated
      */
     private val keyToControllerMap = mutableMapOf<String, NotifViewController?>()
 
     /** Build view and controller for BundleEntry. */
     fun inflateBundleEntry(bundleEntry: BundleEntry) {
-        debugBundleLog(TAG, { "inflateBundleEntry: ${bundleEntry.key}" })
+        debugBundleLog(TAG) { "inflateBundleEntry: ${bundleEntry.key}" }
         if (keyToControllerMap.containsKey(bundleEntry.key)) {
             // Skip if bundle is inflating or inflated.
-            debugBundleLog(TAG, { "already in map: ${bundleEntry.key}" })
+            debugBundleLog(TAG) { "already in map: ${bundleEntry.key}" }
             return
         }
         val parent: ViewGroup = listContainer.getViewParentForNotification()
         val inflationFinishedListener: (ExpandableNotificationRow) -> Unit = { row ->
             // A subset of NotificationRowBinderImpl.inflateViews
-            debugBundleLog(TAG, { "finished inflating: ${bundleEntry.key}" })
+            debugBundleLog(TAG) { "finished inflating: ${bundleEntry.key}" }
             bundleEntry.row = row
             val component =
                 rowComponent
@@ -85,12 +85,20 @@ constructor(
             controller.init(bundleEntry)
             keyToControllerMap[bundleEntry.key] = controller
 
-            // TODO(389839492): Construct BundleHeaderViewModel (or even ENRViewModel) by dagger
-            row.initBundleHeader(
-                BundleHeaderViewModel(BundleInteractor(bundleEntry.bundleRepository))
-            )
+            val bundleRowComponent =
+                bundleRowComponentBuilder.bindBundleRepository(bundleEntry.bundleRepository).build()
+
+            row.repeatWhenAttached {
+                row.viewModel(
+                    traceName = "BundleHeaderViewModel",
+                    minWindowLifecycleState = WindowLifecycleState.ATTACHED,
+                    factory = bundleRowComponent.bundleViewModelFactory()::create,
+                ) { viewModel ->
+                    row.initBundleHeader(viewModel)
+                }
+            }
         }
-        debugBundleLog(TAG, { "calling inflate: ${bundleEntry.key}" })
+        debugBundleLog(TAG) { "calling inflate: ${bundleEntry.key}" }
         keyToControllerMap[bundleEntry.key] = null
         rowInflaterTaskProvider
             .get()
@@ -104,10 +112,13 @@ constructor(
 
     /** Return ExpandableNotificationRowController for BundleEntry. */
     fun requireNodeController(bundleEntry: BundleEntry): NodeController {
-        debugBundleLog(TAG, {
-            "requireNodeController: ${bundleEntry.key}" +
+        debugBundleLog(
+            TAG,
+            {
+                "requireNodeController: ${bundleEntry.key}" +
                     "controller: ${keyToControllerMap[bundleEntry.key]}"
-        })
+            },
+        )
         return keyToControllerMap[bundleEntry.key]
             ?: error("No view has been registered for bundle: ${bundleEntry.key}")
     }
@@ -119,11 +130,12 @@ constructor(
         } else {
             d.println("Bundle Inflation States:")
             keyToControllerMap.forEach { (key, controller) ->
-                val stateString = if (controller == null) {
-                    "INFLATING"
-                } else {
-                    "INFLATED (Controller: ${controller::class.simpleName})"
-                }
+                val stateString =
+                    if (controller == null) {
+                        "INFLATING"
+                    } else {
+                        "INFLATED (Controller: ${controller::class.simpleName})"
+                    }
                 d.dump("Bundle key:$key", stateString)
             }
         }

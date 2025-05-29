@@ -17,6 +17,7 @@
 package com.android.server.companion.virtual;
 
 import static android.Manifest.permission.ADD_ALWAYS_UNLOCKED_DISPLAY;
+import static android.Manifest.permission.ADD_MIRROR_DISPLAY;
 import static android.Manifest.permission.ADD_TRUSTED_DISPLAY;
 import static android.app.admin.DevicePolicyManager.NEARBY_STREAMING_ENABLED;
 import static android.app.admin.DevicePolicyManager.NEARBY_STREAMING_NOT_CONTROLLED_BY_POLICY;
@@ -1380,7 +1381,11 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
 
     @Override
     public boolean canCreateMirrorDisplays() {
-        return DEVICE_PROFILES_ALLOWING_MIRROR_DISPLAYS.contains(getDeviceProfile());
+        if (!android.companion.virtualdevice.flags.Flags.enableLimitedVdmRole()) {
+            return DEVICE_PROFILES_ALLOWING_MIRROR_DISPLAYS.contains(getDeviceProfile());
+        }
+        return mContext.checkCallingOrSelfPermission(ADD_MIRROR_DISPLAY)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private boolean hasCustomAudioInputSupportInternal() {
@@ -1460,8 +1465,6 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             }
 
             return new GenericWindowPolicyController(
-                    WindowManager.LayoutParams.FLAG_SECURE,
-                    WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS,
                     mAttributionSource,
                     getAllowedUserHandles(),
                     activityLaunchAllowedByDefault,
@@ -1603,12 +1606,16 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             DisplayWindowPolicyController dwpc) {
         final boolean isMirrorDisplay =
                 mDisplayManagerInternal.getDisplayIdToMirror(displayId) != Display.INVALID_DISPLAY;
-        final boolean isTrustedDisplay =
-                (mDisplayManagerInternal.getDisplayInfo(displayId).flags & Display.FLAG_TRUSTED)
-                        == Display.FLAG_TRUSTED;
+        final int flags = mDisplayManagerInternal.getDisplayInfo(displayId).flags;
+        final boolean isTrustedDisplay = (flags & Display.FLAG_TRUSTED) == Display.FLAG_TRUSTED;
+        final boolean isSecureDisplay = (flags & Display.FLAG_SECURE) == Display.FLAG_SECURE;
 
         GenericWindowPolicyController gwpc = (GenericWindowPolicyController) dwpc;
-        gwpc.setDisplayId(displayId, isMirrorDisplay);
+        if (!isSecureDisplay) {
+            gwpc.setInterestedWindowFlags(WindowManager.LayoutParams.FLAG_SECURE,
+                    WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS);
+        }
+        gwpc.setDisplayId(displayId, isMirrorDisplay, isSecureDisplay);
         PowerManager.WakeLock wakeLock =
                 isTrustedDisplay ? createWakeLockForDisplay(displayId) : null;
         synchronized (mVirtualDeviceLock) {

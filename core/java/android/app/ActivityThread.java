@@ -257,8 +257,8 @@ import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.TrustedCertificateStore;
-import com.android.server.am.BitmapDumpProto;
 import com.android.server.am.MemInfoDumpProto;
+import com.android.server.am.BitmapDumpProto;
 
 import dalvik.annotation.optimization.NeverCompile;
 import dalvik.system.AppSpecializationHooks;
@@ -9026,10 +9026,14 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
-    public int getIntCoreSetting(String key, int defaultValue) {
+    int getIntCoreSetting(String key, int defaultValue) {
+        return getIntCoreSetting(key, defaultValue, mLastReportedDeviceId);
+    }
+
+    int getIntCoreSetting(String key, int defaultValue, int deviceId) {
         synchronized (mCoreSettingsLock) {
             if (mCoreSettings != null) {
-                Bundle bundle = getCoreSettingsForDeviceLocked(mLastReportedDeviceId);
+                Bundle bundle = getCoreSettingsForDeviceLocked(deviceId);
                 if (bundle != null) {
                     return bundle.getInt(key, defaultValue);
                 }
@@ -9041,7 +9045,7 @@ public final class ActivityThread extends ClientTransactionHandler
     /**
      * Get the string value of the given key from core settings.
      */
-    public String getStringCoreSetting(String key, String defaultValue) {
+    String getStringCoreSetting(String key, String defaultValue) {
         synchronized (mCoreSettingsLock) {
             if (mCoreSettings != null) {
                 Bundle bundle = getCoreSettingsForDeviceLocked(mLastReportedDeviceId);

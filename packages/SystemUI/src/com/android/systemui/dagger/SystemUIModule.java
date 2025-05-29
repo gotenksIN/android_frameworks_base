@@ -132,6 +132,7 @@ import com.android.systemui.statusbar.dagger.StatusBarModule;
 import com.android.systemui.statusbar.disableflags.dagger.DisableFlagsModule;
 import com.android.systemui.statusbar.events.StatusBarEventsModule;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
+import com.android.systemui.statusbar.featurepods.vc.AvControlsChipModule;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.collection.inflation.NotificationRowBinder;
@@ -141,6 +142,7 @@ import com.android.systemui.statusbar.notification.collection.render.Notificatio
 import com.android.systemui.statusbar.notification.headsup.HeadsUpManager;
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
 import com.android.systemui.statusbar.notification.people.PeopleHubModule;
+import com.android.systemui.statusbar.notification.row.dagger.BundleRowComponent;
 import com.android.systemui.statusbar.notification.row.dagger.ExpandableNotificationRowComponent;
 import com.android.systemui.statusbar.notification.row.dagger.NotificationRowComponent;
 import com.android.systemui.statusbar.phone.CentralSurfaces;
@@ -209,6 +211,7 @@ import javax.inject.Named;
 @Module(includes = {
         ActivityManagerModule.class,
         AmbientModule.class,
+        AvControlsChipModule.class,
         AppOpsModule.class,
         AssistModule.class,
         AuthenticationModule.class,
@@ -306,6 +309,7 @@ import javax.inject.Named;
                 NotificationRowComponent.class,
                 WindowRootViewComponent.class,
                 SystemUIDisplaySubcomponent.class,
+                BundleRowComponent.class,
         })
 public abstract class SystemUIModule {
 

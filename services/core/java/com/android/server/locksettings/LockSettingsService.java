@@ -132,7 +132,6 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
-import com.android.internal.pm.RoSystemFeatures;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.IndentingPrintWriter;
@@ -1304,7 +1303,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         mContext.enforceCallingOrSelfPermission(
                 Manifest.permission.MANAGE_WEAK_ESCROW_TOKEN,
                 "Requires MANAGE_WEAK_ESCROW_TOKEN permission.");
-        if (!RoSystemFeatures.hasFeatureAutomotive(mContext)) {
+        if (!mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
             throw new IllegalArgumentException(
                     "Weak escrow token are only for automotive devices.");
         }
@@ -1947,8 +1946,7 @@ public class LockSettingsService extends ILockSettings.Stub {
      * Set a new LSKF for the given user/profile. Only succeeds if the synthetic password for the
      * user is protected by the given {@param savedCredential}.
      * <p>
-     * When {@link android.security.Flags#clearStrongAuthOnAddingPrimaryCredential()} is enabled and
-     * setting a new credential where there was none, updates the strong auth state for
+     * When setting a new credential where there was none, updates the strong auth state for
      * {@param userId} to <tt>STRONG_AUTH_NOT_REQUIRED</tt>.
      *
      * @param savedCredential if the user is a profile with unified challenge and savedCredential is
@@ -1998,8 +1996,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
             onSyntheticPasswordUnlocked(userId, sp);
             setLockCredentialWithSpLocked(credential, sp, userId);
-            if (android.security.Flags.clearStrongAuthOnAddingPrimaryCredential()
-                    && savedCredential.isNone() && !credential.isNone()) {
+            if (savedCredential.isNone() && !credential.isNone()) {
                 // Clear the strong auth value, since the LSKF has just been entered and set,
                 // but only when the previous credential was None.
                 mStrongAuth.reportUnlock(userId);
@@ -3625,7 +3622,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         }
 
         // Escrow tokens are enabled on automotive builds.
-        if (RoSystemFeatures.hasFeatureAutomotive(mContext)) {
+        if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
             return;
         }
 

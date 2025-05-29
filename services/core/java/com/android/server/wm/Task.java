@@ -43,6 +43,24 @@ import static android.content.pm.ActivityInfo.RESIZE_MODE_FORCE_RESIZEABLE;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE_AND_PIPABLE_DEPRECATED;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.HASH_CODE;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.TITLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.USER_ID;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.AFFINITY;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.BOUNDS;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.CREATED_BY_ORGANIZER;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.FILLS_PARENT;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.HAS_CHILD_PIP_ACTIVITY;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.LAST_NON_FULLSCREEN_BOUNDS;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.ORIG_ACTIVITY;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.REAL_ACTIVITY;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.RESIZE_MODE;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.RESUMED_ACTIVITY;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.ROOT_TASK_ID;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.SURFACE_HEIGHT;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.SURFACE_WIDTH;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.TASK_FRAGMENT;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerChildProto.TASK;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.provider.Settings.Secure.USER_SETUP_COMPLETE;
 import static android.view.Display.DEFAULT_DISPLAY;
@@ -84,31 +102,13 @@ import static com.android.server.wm.ActivityTaskSupervisor.DEFER_RESUME;
 import static com.android.server.wm.ActivityTaskSupervisor.ON_TOP;
 import static com.android.server.wm.ActivityTaskSupervisor.REMOVE_FROM_RECENTS;
 import static com.android.server.wm.ActivityTaskSupervisor.printThisActivity;
-import static com.android.server.wm.IdentifierProto.HASH_CODE;
-import static com.android.server.wm.IdentifierProto.TITLE;
-import static com.android.server.wm.IdentifierProto.USER_ID;
 import static com.android.server.wm.LockTaskController.LOCK_TASK_AUTH_ALLOWLISTED;
 import static com.android.server.wm.LockTaskController.LOCK_TASK_AUTH_DONT_LOCK;
 import static com.android.server.wm.LockTaskController.LOCK_TASK_AUTH_LAUNCHABLE;
 import static com.android.server.wm.LockTaskController.LOCK_TASK_AUTH_LAUNCHABLE_PRIV;
 import static com.android.server.wm.LockTaskController.LOCK_TASK_AUTH_PINNABLE;
-import static com.android.server.wm.TaskProto.AFFINITY;
-import static com.android.server.wm.TaskProto.BOUNDS;
-import static com.android.server.wm.TaskProto.CREATED_BY_ORGANIZER;
-import static com.android.server.wm.TaskProto.FILLS_PARENT;
-import static com.android.server.wm.TaskProto.HAS_CHILD_PIP_ACTIVITY;
-import static com.android.server.wm.TaskProto.LAST_NON_FULLSCREEN_BOUNDS;
-import static com.android.server.wm.TaskProto.ORIG_ACTIVITY;
-import static com.android.server.wm.TaskProto.REAL_ACTIVITY;
-import static com.android.server.wm.TaskProto.RESIZE_MODE;
-import static com.android.server.wm.TaskProto.RESUMED_ACTIVITY;
-import static com.android.server.wm.TaskProto.ROOT_TASK_ID;
-import static com.android.server.wm.TaskProto.SURFACE_HEIGHT;
-import static com.android.server.wm.TaskProto.SURFACE_WIDTH;
-import static com.android.server.wm.TaskProto.TASK_FRAGMENT;
 import static com.android.server.wm.WindowContainer.AnimationFlags.CHILDREN;
 import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
-import static com.android.server.wm.WindowContainerChildProto.TASK;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ROOT_TASK;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_TASK_MOVEMENT;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
@@ -130,6 +130,7 @@ import android.app.PictureInPictureParams;
 import android.app.TaskInfo;
 import android.app.TaskInfo.SelfMovable;
 import android.app.WindowConfiguration;
+import android.app.admin.DevicePolicyCache;
 import android.app.servertransaction.PauseActivityItem;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -142,6 +143,7 @@ import android.content.res.Configuration;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.internal.perfetto.protos.Windowmanagerservice.TaskProto;
 import android.os.Binder;
 import android.os.Debug;
 import android.os.Handler;
@@ -1868,7 +1870,11 @@ class Task extends TaskFragment {
      *         {@link TaskDisplayArea}.
      */
     boolean supportsFreeformInDisplayArea(@Nullable TaskDisplayArea tda) {
-        return mAtmService.mSupportsFreeformWindowManagement
+        return tda != null
+                && tda.isWindowingModeSupported(WINDOWING_MODE_FREEFORM,
+                        mAtmService.mSupportsMultiWindow,
+                        mAtmService.mSupportsFreeformWindowManagement,
+                        mAtmService.mSupportsPictureInPicture)
                 && supportsMultiWindowInDisplayArea(tda);
     }
 
@@ -3080,6 +3086,7 @@ class Task extends TaskFragment {
     void setInitialSurfaceControlProperties(SurfaceControl.Builder b) {
         b.setEffectLayer().setMetadata(METADATA_TASK_ID, mTaskId);
         super.setInitialSurfaceControlProperties(b);
+        getPendingTransaction().setSecure(mSurfaceControl, isSecure());
     }
 
     /** Checking if self or its child tasks are animated by recents animation. */
@@ -4652,6 +4659,10 @@ class Task extends TaskFragment {
      * activity manifest. This flag is set by WM Shell to disable PiP for the current Task status.
      */
     boolean isDisablePip() {
+        final DisplayContent dc = getDisplayContent();
+        if (dc == null || !dc.isWindowingModeSupported(WINDOWING_MODE_PINNED)) {
+            return true;
+        }
         if (!Flags.disallowBubbleToEnterPip()) {
             return false;
         }
@@ -6313,6 +6324,9 @@ class Task extends TaskFragment {
         }
 
         if (canBeLaunchedOnDisplay(newParent.getDisplayId())) {
+            if (!newParent.isWindowingModeSupported(getRequestedOverrideWindowingMode())) {
+                setWindowingMode(WINDOWING_MODE_UNDEFINED);
+            }
             reparent(newParent, onTop ? POSITION_TOP : POSITION_BOTTOM);
             newParent.onTaskMoved(this, onTop, !onTop);
         } else {
@@ -6819,7 +6833,7 @@ class Task extends TaskFragment {
                 }
             }
 
-            if (!TaskDisplayArea.isWindowingModeSupported(mWindowingMode,
+            if (!tda.isWindowingModeSupported(mWindowingMode,
                     mAtmService.mSupportsMultiWindow,
                     mAtmService.mSupportsFreeformWindowManagement,
                     mAtmService.mSupportsPictureInPicture)) {
@@ -6973,6 +6987,18 @@ class Task extends TaskFragment {
             return;
         }
         t.show(mDecorSurfaceContainer.mDecorSurface);
+    }
+
+    void setSecure(boolean secure) {
+        getPendingTransaction().setSecure(mSurfaceControl, secure);
+        scheduleAnimation();
+    }
+
+    boolean isSecure() {
+        if (mWmService.getDisableSecureWindows()) {
+            return false;
+        }
+        return !DevicePolicyCache.getInstance().isScreenCaptureAllowed(mUserId);
     }
 
     /**

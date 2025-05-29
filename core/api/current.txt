@@ -134,6 +134,7 @@ package android {
     field public static final String INTERACT_ACROSS_PROFILES = "android.permission.INTERACT_ACROSS_PROFILES";
     field public static final String INTERNET = "android.permission.INTERNET";
     field public static final String KILL_BACKGROUND_PROCESSES = "android.permission.KILL_BACKGROUND_PROCESSES";
+    field @FlaggedApi("android.provider.launcher_data_access") public static final String LAUNCHER_DATA_ACCESS = "android.permission.LAUNCHER_DATA_ACCESS";
     field public static final String LAUNCH_CAPTURE_CONTENT_ACTIVITY_FOR_NOTE = "android.permission.LAUNCH_CAPTURE_CONTENT_ACTIVITY_FOR_NOTE";
     field public static final String LAUNCH_MULTI_PANE_SETTINGS_DEEP_LINK = "android.permission.LAUNCH_MULTI_PANE_SETTINGS_DEEP_LINK";
     field public static final String LOADER_USAGE_STATS = "android.permission.LOADER_USAGE_STATS";
@@ -244,6 +245,7 @@ package android {
     field public static final String PACKAGE_USAGE_STATS = "android.permission.PACKAGE_USAGE_STATS";
     field @Deprecated public static final String PERSISTENT_ACTIVITY = "android.permission.PERSISTENT_ACTIVITY";
     field public static final String POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS";
+    field @FlaggedApi("android.app.api_rich_ongoing_permission") public static final String POST_PROMOTED_NOTIFICATIONS = "android.permission.POST_PROMOTED_NOTIFICATIONS";
     field @Deprecated public static final String PROCESS_OUTGOING_CALLS = "android.permission.PROCESS_OUTGOING_CALLS";
     field public static final String PROVIDE_OWN_AUTOFILL_SUGGESTIONS = "android.permission.PROVIDE_OWN_AUTOFILL_SUGGESTIONS";
     field public static final String PROVIDE_REMOTE_CREDENTIALS = "android.permission.PROVIDE_REMOTE_CREDENTIALS";
@@ -282,6 +284,7 @@ package android {
     field public static final String RECEIVE_WAP_PUSH = "android.permission.RECEIVE_WAP_PUSH";
     field public static final String RECORD_AUDIO = "android.permission.RECORD_AUDIO";
     field public static final String REORDER_TASKS = "android.permission.REORDER_TASKS";
+    field @FlaggedApi("com.android.window.flags.enable_window_repositioning_api") public static final String REPOSITION_SELF_WINDOWS = "android.permission.REPOSITION_SELF_WINDOWS";
     field public static final String REQUEST_COMPANION_PROFILE_APP_STREAMING = "android.permission.REQUEST_COMPANION_PROFILE_APP_STREAMING";
     field public static final String REQUEST_COMPANION_PROFILE_AUTOMOTIVE_PROJECTION = "android.permission.REQUEST_COMPANION_PROFILE_AUTOMOTIVE_PROJECTION";
     field public static final String REQUEST_COMPANION_PROFILE_COMPUTER = "android.permission.REQUEST_COMPANION_PROFILE_COMPUTER";
@@ -6529,8 +6532,8 @@ package android.app {
     method public long getTimeoutAfter();
     method public boolean hasImage();
     method @FlaggedApi("android.app.api_rich_ongoing") public boolean hasPromotableCharacteristics();
-    method @FlaggedApi("android.app.opt_in_rich_ongoing") public boolean hasRequestedPromotedOngoing();
     method @FlaggedApi("android.app.nm_summarization") public boolean hasSummarizedContent();
+    method @FlaggedApi("android.app.opt_in_rich_ongoing") public boolean isRequestPromotedOngoing();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.media.AudioAttributes AUDIO_ATTRIBUTES_DEFAULT;
     field public static final int BADGE_ICON_LARGE = 2; // 0x2
@@ -7126,6 +7129,7 @@ package android.app {
     method public int getLightColor();
     method public int getLockscreenVisibility();
     method public CharSequence getName();
+    method @FlaggedApi("android.service.notification.notification_get_original_importance") public int getOriginalImportance();
     method @Nullable public String getParentChannelId();
     method public android.net.Uri getSound();
     method @FlaggedApi("android.app.notification_channel_vibration_effect_api") @Nullable public android.os.VibrationEffect getVibrationEffect();
@@ -8950,6 +8954,9 @@ package android.app.appfunctions {
     method @RequiresPermission(value=android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional=true) public void isAppFunctionEnabled(@NonNull String, @NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     method public void isAppFunctionEnabled(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     method public void setAppFunctionEnabled(@NonNull String, int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,java.lang.Exception>);
+    field @FlaggedApi("android.permission.flags.app_function_access_ui_enabled") public static final String ACTION_MANAGE_AGENT_APP_FUNCTION_ACCESS = "android.app.appfunctions.action.MANAGE_AGENT_APP_FUNCTION_ACCESS";
+    field @FlaggedApi("android.permission.flags.app_function_access_ui_enabled") public static final String ACTION_MANAGE_APP_FUNCTION_ACCESS = "android.app.appfunctions.action.MANAGE_APP_FUNCTION_ACCESS";
+    field @FlaggedApi("android.permission.flags.app_function_access_ui_enabled") public static final String ACTION_MANAGE_TARGET_APP_FUNCTION_ACCESS = "android.app.appfunctions.action.MANAGE_TARGET_APP_FUNCTION_ACCESS";
     field public static final int APP_FUNCTION_STATE_DEFAULT = 0; // 0x0
     field public static final int APP_FUNCTION_STATE_DISABLED = 2; // 0x2
     field public static final int APP_FUNCTION_STATE_ENABLED = 1; // 0x1
@@ -9861,13 +9868,13 @@ package android.app.usage {
   public final class UsageStatsManager {
     method public int getAppStandbyBucket();
     method public boolean isAppInactive(String);
-    method public java.util.Map<java.lang.String,android.app.usage.UsageStats> queryAndAggregateUsageStats(long, long);
-    method public java.util.List<android.app.usage.ConfigurationStats> queryConfigurations(int, long, long);
-    method public java.util.List<android.app.usage.EventStats> queryEventStats(int, long, long);
-    method public android.app.usage.UsageEvents queryEvents(long, long);
+    method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.Map<java.lang.String,android.app.usage.UsageStats> queryAndAggregateUsageStats(long, long);
+    method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.ConfigurationStats> queryConfigurations(int, long, long);
+    method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.EventStats> queryEventStats(int, long, long);
+    method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(long, long);
     method @FlaggedApi("android.app.usage.filter_based_event_query_api") @Nullable @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(@NonNull android.app.usage.UsageEventsQuery);
     method public android.app.usage.UsageEvents queryEventsForSelf(long, long);
-    method public java.util.List<android.app.usage.UsageStats> queryUsageStats(int, long, long);
+    method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.UsageStats> queryUsageStats(int, long, long);
     field @FlaggedApi("android.app.usage.user_interaction_type_api") public static final String EXTRA_EVENT_ACTION = "android.app.usage.extra.EVENT_ACTION";
     field @FlaggedApi("android.app.usage.user_interaction_type_api") public static final String EXTRA_EVENT_CATEGORY = "android.app.usage.extra.EVENT_CATEGORY";
     field public static final int INTERVAL_BEST = 4; // 0x4
@@ -10104,7 +10111,7 @@ package android.companion {
     method public int describeContents();
     method @Nullable public android.companion.AssociatedDevice getAssociatedDevice();
     method @FlaggedApi("android.companion.association_device_icon") @Nullable public android.graphics.drawable.Icon getDeviceIcon();
-    method @FlaggedApi("android.companion.association_tag") @Nullable public android.companion.DeviceId getDeviceId();
+    method @Nullable public android.companion.DeviceId getDeviceId();
     method @Nullable public android.net.MacAddress getDeviceMacAddress();
     method @Nullable public String getDeviceProfile();
     method @Nullable public CharSequence getDisplayName();
@@ -10183,6 +10190,7 @@ package android.companion {
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void attachSystemDataTransport(int, @NonNull java.io.InputStream, @NonNull java.io.OutputStream) throws android.companion.DeviceNotAssociatedException;
     method @Nullable public android.content.IntentSender buildAssociationCancellationIntent();
     method @Nullable public android.content.IntentSender buildPermissionTransferUserConsentIntent(int) throws android.companion.DeviceNotAssociatedException;
+    method @FlaggedApi("android.companion.association_verification") @Nullable public android.companion.DeviceId createAndSetDeviceId(int, @Nullable android.companion.DeviceId);
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void detachSystemDataTransport(int) throws android.companion.DeviceNotAssociatedException;
     method public void disableSystemDataSyncForTypes(int, int);
     method @Deprecated public void disassociate(@NonNull String);
@@ -10194,7 +10202,7 @@ package android.companion {
     method @FlaggedApi("android.companion.perm_sync_user_consent") public boolean isPermissionTransferUserConsented(int);
     method @FlaggedApi("android.companion.unpair_associated_device") @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public boolean removeBond(int);
     method public void requestNotificationAccess(android.content.ComponentName);
-    method @FlaggedApi("android.companion.association_tag") public void setDeviceId(int, @Nullable android.companion.DeviceId);
+    method @Deprecated @FlaggedApi("android.companion.association_verification") public void setDeviceId(int, @Nullable android.companion.DeviceId);
     method @Deprecated @FlaggedApi("android.companion.device_presence") @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void startObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
     method @FlaggedApi("android.companion.device_presence") @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void startObservingDevicePresence(@NonNull android.companion.ObservingDevicePresenceRequest);
     method public void startSystemDataTransfer(int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.companion.CompanionException>) throws android.companion.DeviceNotAssociatedException;
@@ -10239,7 +10247,7 @@ package android.companion {
   public interface DeviceFilter<D extends android.os.Parcelable> extends android.os.Parcelable {
   }
 
-  @FlaggedApi("android.companion.association_tag") public final class DeviceId implements android.os.Parcelable {
+  public final class DeviceId implements android.os.Parcelable {
     method public int describeContents();
     method @Nullable public String getCustomId();
     method @Nullable public android.net.MacAddress getMacAddress();
@@ -19066,12 +19074,18 @@ package android.hardware {
     field public static final int D_FP32 = 51; // 0x33
     field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RGBA_10101010 = 59; // 0x3b
     field public static final int RGBA_1010102 = 43; // 0x2b
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_12_14") public static final int RGBA_12121212 = 65; // 0x41
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_12_14") public static final int RGBA_14141414 = 66; // 0x42
     field public static final int RGBA_8888 = 1; // 0x1
     field public static final int RGBA_FP16 = 22; // 0x16
     field public static final int RGBX_8888 = 2; // 0x2
     field public static final int RGB_565 = 4; // 0x4
     field public static final int RGB_888 = 3; // 0x3
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_12_14") public static final int RG_1212 = 63; // 0x3f
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_12_14") public static final int RG_1414 = 64; // 0x40
     field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RG_1616 = 58; // 0x3a
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_12_14") public static final int R_12 = 61; // 0x3d
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_12_14") public static final int R_14 = 62; // 0x3e
     field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_16 = 57; // 0x39
     field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_8 = 56; // 0x38
     field public static final int S_UI8 = 53; // 0x35
@@ -25299,6 +25313,7 @@ package android.media {
 
   public final class MediaRouter2 {
     method @FlaggedApi("com.android.media.flags.enable_screen_off_scanning") public void cancelScanRequest(@NonNull android.media.MediaRouter2.ScanToken);
+    method @FlaggedApi("com.android.media.flags.enable_suggested_device_api") public void clearDeviceSuggestions();
     method @Nullable public android.media.MediaRouter2.RoutingController getController(@NonNull String);
     method @NonNull public java.util.List<android.media.MediaRouter2.RoutingController> getControllers();
     method @FlaggedApi("com.android.media.flags.enable_suggested_device_api") @NonNull public java.util.Map<java.lang.String,java.util.List<android.media.SuggestedDeviceInfo>> getDeviceSuggestions();
@@ -25308,7 +25323,7 @@ package android.media {
     method @NonNull public java.util.List<android.media.MediaRoute2Info> getRoutes();
     method @NonNull public android.media.MediaRouter2.RoutingController getSystemController();
     method public void registerControllerCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.ControllerCallback);
-    method @FlaggedApi("com.android.media.flags.enable_suggested_device_api") public void registerDeviceSuggestionsCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.DeviceSuggestionsCallback);
+    method @FlaggedApi("com.android.media.flags.enable_suggested_device_api") public void registerDeviceSuggestionsUpdatesCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.DeviceSuggestionsUpdatesCallback);
     method public void registerRouteCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.RouteCallback, @NonNull android.media.RouteDiscoveryPreference);
     method public void registerRouteListingPreferenceUpdatedCallback(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.media.RouteListingPreference>);
     method public void registerTransferCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.TransferCallback);
@@ -25321,7 +25336,7 @@ package android.media {
     method public void stop();
     method public void transferTo(@NonNull android.media.MediaRoute2Info);
     method public void unregisterControllerCallback(@NonNull android.media.MediaRouter2.ControllerCallback);
-    method @FlaggedApi("com.android.media.flags.enable_suggested_device_api") public void unregisterDeviceSuggestionsCallback(@NonNull android.media.MediaRouter2.DeviceSuggestionsCallback);
+    method @FlaggedApi("com.android.media.flags.enable_suggested_device_api") public void unregisterDeviceSuggestionsUpdatesCallback(@NonNull android.media.MediaRouter2.DeviceSuggestionsUpdatesCallback);
     method public void unregisterRouteCallback(@NonNull android.media.MediaRouter2.RouteCallback);
     method public void unregisterRouteListingPreferenceUpdatedCallback(@NonNull java.util.function.Consumer<android.media.RouteListingPreference>);
     method public void unregisterTransferCallback(@NonNull android.media.MediaRouter2.TransferCallback);
@@ -25332,9 +25347,10 @@ package android.media {
     method public void onControllerUpdated(@NonNull android.media.MediaRouter2.RoutingController);
   }
 
-  @FlaggedApi("com.android.media.flags.enable_suggested_device_api") public static interface MediaRouter2.DeviceSuggestionsCallback {
-    method public void onSuggestionRequested();
-    method public void onSuggestionUpdated(@NonNull String, @NonNull java.util.List<android.media.SuggestedDeviceInfo>);
+  @FlaggedApi("com.android.media.flags.enable_suggested_device_api") public static interface MediaRouter2.DeviceSuggestionsUpdatesCallback {
+    method public void onSuggestionsCleared(@NonNull String);
+    method public void onSuggestionsRequested();
+    method public void onSuggestionsUpdated(@NonNull String, @NonNull java.util.List<android.media.SuggestedDeviceInfo>);
   }
 
   public static interface MediaRouter2.OnGetControllerHintsListener {
@@ -35188,6 +35204,7 @@ package android.os {
     field public static final int USAGE_CLASS_MEDIA = 3; // 0x3
     field public static final int USAGE_CLASS_UNKNOWN = 0; // 0x0
     field public static final int USAGE_COMMUNICATION_REQUEST = 65; // 0x41
+    field @FlaggedApi("android.os.vibrator.haptic_feedback_with_custom_usage") public static final int USAGE_GESTURE_INPUT = 98; // 0x62
     field public static final int USAGE_HARDWARE_FEEDBACK = 50; // 0x32
     field @FlaggedApi("android.os.vibrator.vibration_attribute_ime_usage_api") public static final int USAGE_IME_FEEDBACK = 82; // 0x52
     field public static final int USAGE_MEDIA = 19; // 0x13
@@ -35622,6 +35639,20 @@ package android.os.strictmode {
 }
 
 package android.os.vibrator {
+
+  @FlaggedApi("android.os.vibrator.haptic_feedback_with_custom_usage") public final class HapticFeedbackRequest {
+    method public int getFeedbackConstant();
+    method public int getFlags();
+    method public int getUsage();
+  }
+
+  public static final class HapticFeedbackRequest.Builder {
+    ctor public HapticFeedbackRequest.Builder(int);
+    ctor public HapticFeedbackRequest.Builder(@NonNull android.os.vibrator.HapticFeedbackRequest);
+    method @NonNull public android.os.vibrator.HapticFeedbackRequest build();
+    method @NonNull public android.os.vibrator.HapticFeedbackRequest.Builder setFlags(int);
+    method @NonNull public android.os.vibrator.HapticFeedbackRequest.Builder setUsage(int);
+  }
 
   @FlaggedApi("android.os.vibrator.normalized_pwle_effects") public final class VibratorEnvelopeEffectInfo implements android.os.Parcelable {
     method public int describeContents();
@@ -42719,7 +42750,13 @@ package android.service.quicksettings {
     method public final void unlockAndRun(Runnable);
     field public static final String ACTION_QS_TILE = "android.service.quicksettings.action.QS_TILE";
     field public static final String ACTION_QS_TILE_PREFERENCES = "android.service.quicksettings.action.QS_TILE_PREFERENCES";
+    field @FlaggedApi("android.service.quicksettings.quicksettings_tile_categories") public static final String CATEGORY_ACCESSIBILITY = "android.service.quicksettings.CATEGORY_ACCESSIBILITY";
+    field @FlaggedApi("android.service.quicksettings.quicksettings_tile_categories") public static final String CATEGORY_CONNECTIVITY = "android.service.quicksettings.CATEGORY_CONNECTIVITY";
+    field @FlaggedApi("android.service.quicksettings.quicksettings_tile_categories") public static final String CATEGORY_DISPLAY = "android.service.quicksettings.CATEGORY_DISPLAY";
+    field @FlaggedApi("android.service.quicksettings.quicksettings_tile_categories") public static final String CATEGORY_PRIVACY = "android.service.quicksettings.CATEGORY_PRIVACY";
+    field @FlaggedApi("android.service.quicksettings.quicksettings_tile_categories") public static final String CATEGORY_UTILITIES = "android.service.quicksettings.CATEGORY_UTILITIES";
     field public static final String META_DATA_ACTIVE_TILE = "android.service.quicksettings.ACTIVE_TILE";
+    field @FlaggedApi("android.service.quicksettings.quicksettings_tile_categories") public static final String META_DATA_TILE_CATEGORY = "android.service.quicksettings.TILE_CATEGORY";
     field public static final String META_DATA_TOGGLEABLE_TILE = "android.service.quicksettings.TOGGLEABLE_TILE";
   }
 
@@ -47073,6 +47110,7 @@ package android.telephony {
     field public static final int RESULT_RIL_SUBSCRIPTION_NOT_AVAILABLE = 128; // 0x80
     field public static final int RESULT_RIL_SYSTEM_ERR = 108; // 0x6c
     field public static final int RESULT_SMS_BLOCKED_DURING_EMERGENCY = 29; // 0x1d
+    field @FlaggedApi("com.android.internal.telephony.flags.satellite_25q4_apis") public static final int RESULT_SMS_SEND_FAIL_AFTER_MAX_RETRY = 138; // 0x8a
     field public static final int RESULT_SMS_SEND_RETRY_FAILED = 30; // 0x1e
     field public static final int RESULT_SYSTEM_ERROR = 15; // 0xf
     field public static final int RESULT_UNEXPECTED_EVENT_STOP_SENDING = 28; // 0x1c
@@ -54476,6 +54514,7 @@ package android.view {
     method public boolean performContextClick();
     method public boolean performHapticFeedback(int);
     method public boolean performHapticFeedback(int, int);
+    method @FlaggedApi("android.os.vibrator.haptic_feedback_with_custom_usage") public boolean performHapticFeedback(@NonNull android.os.vibrator.HapticFeedbackRequest);
     method public boolean performLongClick();
     method public boolean performLongClick(float, float);
     method @Nullable public android.view.ContentInfo performReceiveContent(@NonNull android.view.ContentInfo);
@@ -55039,10 +55078,12 @@ package android.view {
     method public static int getKeyRepeatDelay();
     method public static int getKeyRepeatTimeout();
     method public static int getLongPressTimeout();
+    method @FlaggedApi("android.companion.virtualdevice.flags.viewconfiguration_apis") public int getLongPressTimeoutMillis();
     method @Deprecated public static int getMaximumDrawingCacheSize();
     method @Deprecated public static int getMaximumFlingVelocity();
     method @Deprecated public static int getMinimumFlingVelocity();
     method public static int getMultiPressTimeout();
+    method @FlaggedApi("android.companion.virtualdevice.flags.viewconfiguration_apis") public int getMultiPressTimeoutMillis();
     method public static int getPressedStateDuration();
     method @FloatRange(from=1.0) public float getScaledAmbiguousGestureMultiplier();
     method public int getScaledDoubleTapSlop();

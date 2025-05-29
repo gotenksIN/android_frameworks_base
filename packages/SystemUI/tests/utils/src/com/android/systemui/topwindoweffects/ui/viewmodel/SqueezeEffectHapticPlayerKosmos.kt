@@ -26,7 +26,7 @@ val Kosmos.squeezeEffectHapticPlayerFactory by
             override fun create(): SqueezeEffectHapticPlayer =
                 SqueezeEffectHapticPlayer(
                     vibratorHelper = vibratorHelper,
-                    bgScope = testScope.backgroundScope,
+                    applicationScope = testScope,
                 )
         }
     }

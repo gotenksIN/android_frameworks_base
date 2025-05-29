@@ -587,8 +587,8 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
             mSession.release();
             mDestroyed = true;
             mPlaybackState = null;
-            updateUserEngagedStateIfNeededLocked(
-                    /* isTimeoutExpired= */ true, /* isGlobalPrioritySessionActive= */ false);
+            mUserEngagementState = USER_DISENGAGED;
+            mHandler.removeCallbacks(mUserEngagementTimeoutExpirationRunnable);
             mHandler.post(MessageHandler.MSG_DESTROYED);
         }
     }
@@ -948,6 +948,8 @@ public class MediaSessionRecord extends MediaSessionRecordImpl implements IBinde
                 return;
             }
         }
+        mService.onSessionUserEngagementStateChange(
+                /* mediaSessionRecord= */ this, /* isUserEngaged= */ false);
         performOnCallbackHolders(
                 "pushSessionDestroyed",
                 holder -> {

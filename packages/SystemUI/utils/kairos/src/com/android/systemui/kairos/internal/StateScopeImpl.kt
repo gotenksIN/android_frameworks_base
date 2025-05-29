@@ -28,18 +28,15 @@ import com.android.systemui.kairos.StateInit
 import com.android.systemui.kairos.StateScope
 import com.android.systemui.kairos.Stateful
 import com.android.systemui.kairos.emptyEvents
-import com.android.systemui.kairos.flatMap
 import com.android.systemui.kairos.groupByKey
 import com.android.systemui.kairos.init
 import com.android.systemui.kairos.mapCheap
-import com.android.systemui.kairos.mapCheapUnsafe
+import com.android.systemui.kairos.mergeLeft
 import com.android.systemui.kairos.skipNext
-import com.android.systemui.kairos.stateOf
 import com.android.systemui.kairos.switchEvents
 import com.android.systemui.kairos.util.Maybe
 import com.android.systemui.kairos.util.NameData
 import com.android.systemui.kairos.util.NameTag
-import com.android.systemui.kairos.util.appendNames
 import com.android.systemui.kairos.util.forceInit
 import com.android.systemui.kairos.util.map
 import com.android.systemui.kairos.util.mapName
@@ -50,14 +47,14 @@ internal class StateScopeImpl(
     val nameData: NameData,
     val createdEpoch: Long,
     val evalScope: EvalScope,
-    val aliveLazy: Lazy<State<Boolean>>,
+    val deathSignalLazy: Lazy<Events<Any>>,
 ) : InternalStateScope, EvalScope by evalScope {
 
     init {
         nameData.forceInit()
     }
 
-    override val alive: State<Boolean> by aliveLazy
+    override val deathSignal: Events<Any> by deathSignalLazy
 
     override fun <A> deferredStateScope(block: StateScope.() -> A): DeferredValue<A> =
         DeferredValue(deferAsync { block() })
@@ -69,7 +66,7 @@ internal class StateScopeImpl(
         val nameData = name.toNameData("Events.holdStateDeferred")
         // Ensure state is only collected until the end of this scope
         return truncateToScope(this@holdStateDeferred, nameData + "truncatedChanges")
-            .holdStateInternalDeferred(nameData, initialValue.unwrapped)
+            .holdStateDeferredUnsafe(nameData, this@StateScopeImpl, initialValue.unwrapped)
     }
 
     override fun <K, V> Events<Map<K, Maybe<V>>>.foldStateMapIncrementally(
@@ -100,8 +97,12 @@ internal class StateScopeImpl(
             groupByKey(nameData + "eventsByKey", numKeys)
         val initOut: Lazy<Map<K, B>> = deferAsync {
             initialValues.unwrapped.value.mapValues { (k, stateful) ->
-                val newEnd = eventsByKey[k]
-                val newScope = childStateScope(newEnd, nameData.mapName { "$it[key=$k]" })
+                val newEnd: Events<Maybe<Stateful<A>>> = eventsByKey[k]
+                val newScope =
+                    childStateScope(
+                        newEnd,
+                        nameData.mapName { "$it[key=$k, epoch=$epoch, init=true]" },
+                    )
                 newScope.stateful()
             }
         }
@@ -110,14 +111,14 @@ internal class StateScopeImpl(
                 upstream = { this@applyLatestStatefulForKey.init.connect(evalScope = this) },
                 nameData + "changes",
             ) { upstreamMap, _ ->
-                upstreamMap.mapValues { (k: K, ma: Maybe<Stateful<A>>) ->
-                    // TODO: do this outside of mapValues?
-                    reenterStateScope(this@StateScopeImpl).run {
+                reenterStateScope(this@StateScopeImpl).run {
+                    upstreamMap.mapValues { (k: K, ma: Maybe<Stateful<A>>) ->
                         ma.map { stateful ->
+                            val newName =
+                                nameData.mapName { "$it[key=$k, epoch=$epoch, init=false]" }
                             val newEnd: Events<Maybe<Stateful<A>>> =
-                                skipNext(nameData.mapName { "$it[key=$k]-newEnd" }, eventsByKey[k])
-                            val newScope =
-                                childStateScope(newEnd, nameData.mapName { "$it[key=$k]" })
+                                skipNext(newName + "newEnd", eventsByKey[k])
+                            val newScope = childStateScope(newEnd, newName)
                             newScope.stateful()
                         }
                     }
@@ -144,62 +145,23 @@ internal class StateScopeImpl(
         )
     }
 
-    fun childStateScope(childEndSignal: Events<Any>, nameData: NameData): StateScopeImpl {
-        return StateScopeImpl(
+    fun childStateScope(childEndSignal: Events<Any>, nameData: NameData) =
+        StateScopeImpl(
             nameData,
             epoch,
             evalScope,
-            aliveLazy =
+            deathSignalLazy =
                 lazy {
-                    val isChildAlive: State<Boolean> =
-                        truncateToScope(
-                                childEndSignal,
-                                nameData.appendNames("isAlive", "truncatedChange"),
-                            )
-                            .nextOnlyInternal(nameData + "firstEndSignal")
-                            .mapCheap(nameData + "mapFalse") { false }
-                            .holdStateInternal(nameData.appendNames("isAlive", "child"), true)
-                    alive.flatMap(nameData + "isAlive") { isAlive ->
-                        if (isAlive) isChildAlive else stateOf(false)
-                    }
+                    mergeLeft(nameData + "mergedDeathSignal", deathSignal, childEndSignal)
+                        .nextOnlyUnsafe(nameData + "firstEndSignal", this)
                 },
         )
-    }
 
     override fun <A> truncateToScope(events: Events<A>, nameData: NameData): Events<A> =
-        alive
-            .mapCheapUnsafe(nameData + "mapCheapSwitchOff") { if (it) events else emptyEvents }
+        deathSignal
+            .mapCheap(nameData + "switchOff") { emptyEvents }
+            .holdStateUnsafe(nameData + "switchedIn", this, events)
             .switchEvents(nameData)
-
-    private fun <A> Events<A>.nextOnlyInternal(nameData: NameData): Events<A> =
-        if (this === emptyEvents) {
-            this
-        } else {
-            EventsLoop<A>().apply {
-                loopback =
-                    mapCheap(nameData + "shutoffEvent") { emptyEvents }
-                        .holdStateInternal(nameData + "state", this@nextOnlyInternal)
-                        .switchEvents(nameData)
-            }
-        }
-
-    private fun <A> Events<A>.holdStateInternal(nameData: NameData, initialValue: A): State<A> =
-        holdStateInternalDeferred(nameData, lazyOf(initialValue))
-
-    private fun <A> Events<A>.holdStateInternalDeferred(
-        nameData: NameData,
-        initialValue: Lazy<A>,
-    ): State<A> {
-        val changes = this@holdStateInternalDeferred
-        val impl =
-            activatedStateSource(
-                nameData,
-                evalScope,
-                { changes.init.connect(evalScope = this) },
-                initialValue,
-            )
-        return StateInit(constInit(nameData, impl))
-    }
 
     override fun toString(): String = "${super.toString()}[$nameData]"
 }
@@ -209,5 +171,39 @@ private fun EvalScope.reenterStateScope(outerScope: StateScopeImpl) =
         outerScope.nameData,
         outerScope.createdEpoch,
         evalScope = this,
-        aliveLazy = outerScope.aliveLazy,
+        deathSignalLazy = outerScope.deathSignalLazy,
     )
+
+private fun <A> Events<A>.nextOnlyUnsafe(nameData: NameData, evalScope: EvalScope): Events<A> =
+    if (this === emptyEvents) {
+        this
+    } else {
+        EventsLoop<A>().apply {
+            loopback =
+                mapCheap(nameData + "shutoffEvent") { emptyEvents }
+                    .holdStateUnsafe(nameData + "state", evalScope, this@nextOnlyUnsafe)
+                    .switchEvents(nameData)
+        }
+    }
+
+private fun <A> Events<A>.holdStateUnsafe(
+    nameData: NameData,
+    evalScope: EvalScope,
+    initialValue: A,
+): State<A> = holdStateDeferredUnsafe(nameData, evalScope, lazyOf(initialValue))
+
+private fun <A> Events<A>.holdStateDeferredUnsafe(
+    nameData: NameData,
+    evalScope: EvalScope,
+    initialValue: Lazy<A>,
+): State<A> {
+    val changes = this@holdStateDeferredUnsafe
+    val impl =
+        activatedStateSource(
+            nameData,
+            evalScope,
+            { changes.init.connect(evalScope = this) },
+            initialValue,
+        )
+    return StateInit(constInit(nameData, impl))
+}

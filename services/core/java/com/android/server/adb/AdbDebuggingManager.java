@@ -344,19 +344,16 @@ public class AdbDebuggingManager {
         public void run() {
             Slog.d(TAG, "Entering thread");
             while (true) {
-                synchronized (this) {
-                    if (mStopped) {
-                        Slog.d(TAG, "Exiting thread");
-                        return;
-                    }
-                    try {
-                        openSocketLocked();
-                    } catch (Exception e) {
-                        /* Don't loop too fast if adbd dies, before init restarts it */
-                        SystemClock.sleep(1000);
-                    }
-                }
                 try {
+                    synchronized (this) {
+                        if (mStopped) {
+                            Slog.d(TAG, "Exiting thread");
+                            return;
+                        }
+
+                        openSocketLocked();
+                    }
+
                     listenToSocket();
                 } catch (Exception e) {
                     /* Don't loop too fast if adbd dies, before init restarts it */
@@ -543,6 +540,8 @@ public class AdbDebuggingManager {
             }
         }
 
+        // TODO: Change the name of this method. This is not always a response. It should be called
+        // sendMessage.
         void sendResponse(String msg) {
             synchronized (this) {
                 Slog.d(TAG, "Send packet " + msg);
@@ -772,6 +771,8 @@ public class AdbDebuggingManager {
 
         // === Messages we can send to adbd ===========
         static final String MSG_DISCONNECT_DEVICE = "DD";
+        static final String MSG_START_ADB_WIFI = "W1";
+        static final String MSG_STOP_ADB_WIFI = "W0";
 
         @Nullable @VisibleForTesting AdbKeyStore mAdbKeyStore;
 
@@ -819,6 +820,18 @@ public class AdbDebuggingManager {
             } else {
                 mAdbNotificationShown = false;
                 mNotificationManager.cancelAsUser(null, id, UserHandle.ALL);
+            }
+        }
+
+        private void startAdbdWifi() {
+            if (mThread != null) {
+                mThread.sendResponse(MSG_START_ADB_WIFI);
+            }
+        }
+
+        private void stopAdbdWifi() {
+            if (mThread != null) {
+                mThread.sendResponse(MSG_STOP_ADB_WIFI);
             }
         }
 
@@ -1058,9 +1071,9 @@ public class AdbDebuggingManager {
                     intentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
                     mContext.registerReceiver(mBroadcastReceiver, intentFilter);
 
-                    SystemProperties.set(AdbService.WIFI_PERSISTENT_CONFIG_PROPERTY, "1");
 
                     startAdbDebuggingThread();
+                    startAdbdWifi();
                     mAdbWifiEnabled = true;
 
                     Slog.i(TAG, "adb start wireless adb");
@@ -1073,6 +1086,8 @@ public class AdbDebuggingManager {
                     mAdbWifiEnabled = false;
                     setAdbConnectionInfo(null);
                     mContext.unregisterReceiver(mBroadcastReceiver);
+
+                    stopAdbdWifi();
 
                     onAdbdWifiServerDisconnected(-1);
                     stopAdbDebuggingThread();
@@ -1102,9 +1117,8 @@ public class AdbDebuggingManager {
                     intentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
                     mContext.registerReceiver(mBroadcastReceiver, intentFilter);
 
-                    SystemProperties.set(AdbService.WIFI_PERSISTENT_CONFIG_PROPERTY, "1");
-
                     startAdbDebuggingThread();
+                    startAdbdWifi();
                     mAdbWifiEnabled = true;
 
                     Slog.i(TAG, "adb start wireless adb");

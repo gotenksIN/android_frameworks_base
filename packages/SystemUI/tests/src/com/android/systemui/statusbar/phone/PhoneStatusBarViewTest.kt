@@ -38,7 +38,6 @@ import android.view.View
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import androidx.test.filters.SmallTest
-import com.android.systemui.Flags.FLAG_SHADE_WINDOW_GOES_AROUND
 import com.android.systemui.Flags.FLAG_STATUS_BAR_SWIPE_OVER_CHIP
 import com.android.systemui.Gefingerpoken
 import com.android.systemui.SysuiTestCase
@@ -101,27 +100,79 @@ class PhoneStatusBarViewTest : SysuiTestCase() {
     }
 
     @Test
-    fun shouldAllowInteractions_primaryDisplay_returnsTrue() {
-        assertThat(view.shouldAllowInteractions()).isTrue()
+    fun dispatchTouchEvent_noInteractionGate_listenersNotified() {
+        val handler = TestTouchEventHandler()
+        viewForSecondaryDisplay.setTouchEventHandler(handler)
+        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
+
+        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
+        viewForSecondaryDisplay.dispatchTouchEvent(event)
+
+        assertThat(handler.lastInterceptEvent).isEqualTo(event)
+        assertThat(handler.lastEvent).isEqualTo(event)
+        verify(longPressGestureDetector).handleTouch(eq(event))
     }
 
     @Test
-    @DisableFlags(FLAG_STATUS_BAR_CONNECTED_DISPLAYS)
-    fun shouldAllowInteractions_secondaryDisplay_statusBarConnectedDisplaysDisabled_returnsTrue() {
-        assertThat(viewForSecondaryDisplay.shouldAllowInteractions()).isTrue()
+    fun dispatchTouchEvent_shouldAllowInteractions_listenersNotified() {
+        val handler = TestTouchEventHandler()
+        viewForSecondaryDisplay.setTouchEventHandler(handler)
+        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
+        viewForSecondaryDisplay.setIsStatusBarInteractiveSupplier { true }
+
+        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
+        viewForSecondaryDisplay.dispatchTouchEvent(event)
+
+        assertThat(handler.lastInterceptEvent).isEqualTo(event)
+        assertThat(handler.lastEvent).isEqualTo(event)
+        verify(longPressGestureDetector).handleTouch(eq(event))
     }
 
     @Test
-    @EnableFlags(FLAG_STATUS_BAR_CONNECTED_DISPLAYS, FLAG_SHADE_WINDOW_GOES_AROUND)
-    fun shouldAllowInteractions_secondaryDisplay_statusBarConnectedDisplaysEnabled_shadeWindowGoesAroundEnabled_returnsTrue() {
-        assertThat(viewForSecondaryDisplay.shouldAllowInteractions()).isTrue()
+    fun dispatchTouchEvent_shouldNotAllowInteractions_consumesEventAndListenersNotNotified() {
+        val handler = TestTouchEventHandler()
+        viewForSecondaryDisplay.setTouchEventHandler(handler)
+        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
+        viewForSecondaryDisplay.setIsStatusBarInteractiveSupplier { false }
+
+        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
+
+        assertThat(viewForSecondaryDisplay.dispatchTouchEvent(event)).isEqualTo(true)
+        assertThat(handler.lastInterceptEvent).isNull()
+        assertThat(handler.lastEvent).isNull()
+        verify(longPressGestureDetector, never()).handleTouch(eq(event))
     }
 
     @Test
-    @EnableFlags(FLAG_STATUS_BAR_CONNECTED_DISPLAYS)
-    @DisableFlags(FLAG_SHADE_WINDOW_GOES_AROUND)
-    fun shouldAllowInteractions_secondaryDisplay_statusBarConnectedDisplaysEnabled_shadeWindowGoesAroundDisabled_returnsFalse() {
-        assertThat(viewForSecondaryDisplay.shouldAllowInteractions()).isFalse()
+    fun dispatchHoverEvent_noInteractionGate_doesntConsumeEvent() {
+        val handler = TestTouchEventHandler()
+        viewForSecondaryDisplay.setTouchEventHandler(handler)
+        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
+
+        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
+        assertThat(viewForSecondaryDisplay.dispatchHoverEvent(event)).isEqualTo(false)
+    }
+
+    @Test
+    fun dispatchHoverEvent_shouldAllowInteractions_doesntConsumeEvent() {
+        val handler = TestTouchEventHandler()
+        viewForSecondaryDisplay.setTouchEventHandler(handler)
+        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
+        viewForSecondaryDisplay.setIsStatusBarInteractiveSupplier { true }
+
+        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
+        assertThat(viewForSecondaryDisplay.dispatchHoverEvent(event)).isEqualTo(false)
+    }
+
+    @Test
+    fun dispatchHoverEvent_shouldNotAllowInteractions_consumesEvent() {
+        val handler = TestTouchEventHandler()
+        viewForSecondaryDisplay.setTouchEventHandler(handler)
+        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
+        viewForSecondaryDisplay.setIsStatusBarInteractiveSupplier { false }
+
+        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
+        assertThat(viewForSecondaryDisplay.dispatchHoverEvent(event)).isEqualTo(true)
     }
 
     @Test
@@ -135,49 +186,6 @@ class PhoneStatusBarViewTest : SysuiTestCase() {
 
         assertThat(handler.lastEvent).isEqualTo(event)
         verify(longPressGestureDetector).handleTouch(eq(event))
-    }
-
-    @Test
-    @DisableFlags(FLAG_STATUS_BAR_CONNECTED_DISPLAYS)
-    fun onTouchEvent_touchOnSecondaryDisplay_statusBarConnectedDisplaysDisabled_listenersNotified() {
-        val handler = TestTouchEventHandler()
-        viewForSecondaryDisplay.setTouchEventHandler(handler)
-        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
-
-        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
-        viewForSecondaryDisplay.onTouchEvent(event)
-
-        assertThat(handler.lastEvent).isEqualTo(event)
-        verify(longPressGestureDetector).handleTouch(eq(event))
-    }
-
-    @Test
-    @EnableFlags(FLAG_STATUS_BAR_CONNECTED_DISPLAYS, FLAG_SHADE_WINDOW_GOES_AROUND)
-    fun onTouchEvent_touchOnSecondaryDisplay_statusBarConnectedDisplaysEnabled_shadeWindowGoesAroundEnabled_listenersNotified() {
-        val handler = TestTouchEventHandler()
-        viewForSecondaryDisplay.setTouchEventHandler(handler)
-        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
-
-        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
-        viewForSecondaryDisplay.onTouchEvent(event)
-
-        assertThat(handler.lastEvent).isEqualTo(event)
-        verify(longPressGestureDetector).handleTouch(eq(event))
-    }
-
-    @Test
-    @EnableFlags(FLAG_STATUS_BAR_CONNECTED_DISPLAYS)
-    @DisableFlags(FLAG_SHADE_WINDOW_GOES_AROUND)
-    fun onTouchEvent_touchOnSecondaryDisplay_statusBarConnectedDisplaysEnabled_shadeWindowGoesAroundDisabled_listenersNotNotified() {
-        val handler = TestTouchEventHandler()
-        viewForSecondaryDisplay.setTouchEventHandler(handler)
-        viewForSecondaryDisplay.setLongPressGestureDetector(longPressGestureDetector)
-
-        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
-        viewForSecondaryDisplay.onTouchEvent(event)
-
-        assertThat(handler.lastEvent).isNull()
-        verify(longPressGestureDetector, never()).handleTouch(eq(event))
     }
 
     @Test

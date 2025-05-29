@@ -166,6 +166,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
             assertThat(mTitleText.visibility).isEqualTo(VISIBLE)
             assertThat(mTitleText.text.toString()).isEqualTo(TEST_DEVICE_NAME_2)
             assertThat(mSlider.visibility).isEqualTo(GONE)
+            assertThat(mMainContent.stateDescription).isNull()
         }
     }
 
@@ -179,6 +180,8 @@ class MediaOutputAdapterTest : SysuiTestCase() {
             assertThat(mTitleText.visibility).isEqualTo(VISIBLE)
             assertThat(mTitleText.text.toString()).isEqualTo(TEST_DEVICE_NAME_1)
             assertThat(mSlider.visibility).isEqualTo(VISIBLE)
+            assertThat(mMainContent.stateDescription.toString())
+                .isEqualTo(mContext.getString(R.string.media_output_item_connected_state))
         }
     }
 
@@ -235,6 +238,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
             assertThat(mSlider.value).isEqualTo(TEST_CURRENT_VOLUME)
             assertThat(mSlider.valueFrom).isEqualTo(0)
             assertThat(mSlider.valueTo).isEqualTo(TEST_MAX_VOLUME)
+            assertThat(mSlider.stateDescription).isEqualTo("50%")
         }
     }
 
@@ -317,13 +321,15 @@ class MediaOutputAdapterTest : SysuiTestCase() {
 
     @Test
     fun onBindViewHolder_bindDeselectableDevice_verifyView() {
+        mMediaSwitchingController.stub { on { isGroupListCollapsed } doReturn false }
         mMediaSwitchingController.stub {
             on { selectedMediaDevice } doReturn listOf(mMediaDevice1, mMediaDevice2)
             on { deselectableMediaDevice } doReturn listOf(mMediaDevice1, mMediaDevice2)
         }
         updateAdapterWithDevices(listOf(mMediaDevice1, mMediaDevice2))
 
-        createAndBindDeviceViewHolder(position = 1).apply {
+        // positions: 0 - collapsible drop down, 1 - device1, 2 - device2.
+        createAndBindDeviceViewHolder(position = 2).apply {
             assertThat(mGroupButton.visibility).isEqualTo(VISIBLE)
             assertThat(mGroupButton.contentDescription)
                 .isEqualTo(mContext.getString(R.string.accessibility_remove_device_from_group))

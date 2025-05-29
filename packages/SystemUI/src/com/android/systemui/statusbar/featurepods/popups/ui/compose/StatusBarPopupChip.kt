@@ -68,16 +68,19 @@ import com.android.systemui.statusbar.featurepods.popups.ui.model.PopupChipModel
  * the chip can show text containing contextual information.
  */
 @Composable
-fun StatusBarPopupChip(viewModel: PopupChipModel.Shown, modifier: Modifier = Modifier) {
-    val colors = viewModel.colors
+fun StatusBarPopupChip(
+    viewModel: PopupChipModel.Shown,
+    modifier: Modifier = Modifier,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+) {
     val hasHoverBehavior = viewModel.hoverBehavior !is HoverBehavior.None
-    val interactionSource = remember { MutableInteractionSource() }
     val hoveredState by interactionSource.collectIsHoveredAsState()
     val isHovered = hasHoverBehavior && hoveredState
     val isPopupShown = viewModel.isPopupShown
     val indication = if (hoveredState) null else LocalIndication.current
     val chipShape =
         RoundedCornerShape(dimensionResource(id = R.dimen.ongoing_activity_chip_corner_radius))
+    val colors = viewModel.colors
     val chipBackgroundColor =
         colors.chipBackground(isPopupShown = isPopupShown, colorScheme = MaterialTheme.colorScheme)
 
@@ -95,6 +98,10 @@ fun StatusBarPopupChip(viewModel: PopupChipModel.Shown, modifier: Modifier = Mod
                 )
             },
     ) {
+        val text = viewModel.chipText
+        // End padding should be symmetrical if the text is omitted.
+        val startPadding = 4.dp
+        val endPadding = if (text != null) 8.dp else startPadding
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -112,7 +119,7 @@ fun StatusBarPopupChip(viewModel: PopupChipModel.Shown, modifier: Modifier = Mod
                         shape = chipShape,
                     )
                     .indication(interactionSource, indication)
-                    .padding(start = 4.dp, end = 8.dp),
+                    .padding(start = startPadding, end = endPadding),
         ) {
             val hoverBehavior = viewModel.hoverBehavior
             val chipIcons =
@@ -128,49 +135,55 @@ fun StatusBarPopupChip(viewModel: PopupChipModel.Shown, modifier: Modifier = Mod
                 isHovered = isHovered,
             )
 
-            val text = viewModel.chipText
-            val textStyle = MaterialTheme.typography.labelLarge
-            val textMeasurer = rememberTextMeasurer()
-            var textOverflow by remember { mutableStateOf(false) }
+            if (text != null) {
+                val textStyle = MaterialTheme.typography.labelLarge
+                val textMeasurer = rememberTextMeasurer()
+                var textOverflow by remember { mutableStateOf(false) }
 
-            Text(
-                text = text,
-                style = textStyle,
-                softWrap = false,
-                color =
-                    colors.chipContent(
-                        isPopupShown = isPopupShown,
-                        colorScheme = MaterialTheme.colorScheme,
-                    ),
-                modifier =
-                    Modifier.widthIn(
-                            max =
-                                dimensionResource(id = R.dimen.ongoing_activity_chip_max_text_width)
-                        )
-                        .layout { measurables, constraints ->
-                            val placeable = measurables.measure(constraints)
-                            val intrinsicWidth =
-                                textMeasurer.measure(text, textStyle, softWrap = false).size.width
-                            textOverflow = intrinsicWidth > constraints.maxWidth
+                Text(
+                    text = text,
+                    style = textStyle,
+                    softWrap = false,
+                    color =
+                        colors.chipContent(
+                            isPopupShown = isPopupShown,
+                            colorScheme = MaterialTheme.colorScheme,
+                        ),
+                    modifier =
+                        Modifier.widthIn(
+                                max =
+                                    dimensionResource(
+                                        id = R.dimen.ongoing_activity_chip_max_text_width
+                                    )
+                            )
+                            .layout { measurables, constraints ->
+                                val placeable = measurables.measure(constraints)
+                                val intrinsicWidth =
+                                    textMeasurer
+                                        .measure(text, textStyle, softWrap = false)
+                                        .size
+                                        .width
+                                textOverflow = intrinsicWidth > constraints.maxWidth
 
-                            layout(placeable.width, placeable.height) {
-                                if (textOverflow) {
-                                    placeable.placeWithLayer(0, 0) {
-                                        compositingStrategy = CompositingStrategy.Offscreen
+                                layout(placeable.width, placeable.height) {
+                                    if (textOverflow) {
+                                        placeable.placeWithLayer(0, 0) {
+                                            compositingStrategy = CompositingStrategy.Offscreen
+                                        }
+                                    } else {
+                                        placeable.place(0, 0)
                                     }
-                                } else {
-                                    placeable.place(0, 0)
                                 }
                             }
-                        }
-                        .overflowFadeOut(
-                            hasOverflow = { textOverflow },
-                            fadeLength =
-                                dimensionResource(
-                                    id = R.dimen.ongoing_activity_chip_text_fading_edge_length
-                                ),
-                        ),
-            )
+                            .overflowFadeOut(
+                                hasOverflow = { textOverflow },
+                                fadeLength =
+                                    dimensionResource(
+                                        id = R.dimen.ongoing_activity_chip_text_fading_edge_length
+                                    ),
+                            ),
+                )
+            }
         }
     }
 }

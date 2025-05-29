@@ -371,7 +371,6 @@ package android.app {
 
   public final class NotificationChannel implements android.os.Parcelable {
     method @NonNull public android.app.NotificationChannel copy();
-    method public int getOriginalImportance();
     method public boolean isImportanceLockedByCriticalDeviceFunction();
     method public void lockFields(int);
     method public void setDeleted(boolean);
@@ -510,7 +509,10 @@ package android.app {
     method @Nullable public android.graphics.Bitmap getBitmap();
     method @Nullable public android.graphics.Bitmap getBitmapAsUser(int, boolean, int);
     method @FlaggedApi("com.android.window.flags.multi_crop") @NonNull @RequiresPermission(android.Manifest.permission.READ_WALLPAPER_INTERNAL) public java.util.List<android.graphics.Rect> getBitmapCrops(@NonNull java.util.List<android.graphics.Point>, int, boolean);
+    method @NonNull @RequiresPermission(android.Manifest.permission.READ_WALLPAPER_INTERNAL) public android.util.SparseArray<android.graphics.Rect> getBitmapCrops(int);
     method @FlaggedApi("com.android.window.flags.multi_crop") @NonNull public java.util.List<android.graphics.Rect> getBitmapCrops(@NonNull android.graphics.Point, @NonNull java.util.List<android.graphics.Point>, @Nullable java.util.Map<android.graphics.Point,android.graphics.Rect>);
+    method public static int getOrientation(@NonNull android.graphics.Point);
+    method @Nullable public android.os.ParcelFileDescriptor getWallpaperFile(int, boolean);
     method public boolean isLockscreenLiveWallpaperEnabled();
     method @Nullable public android.graphics.Rect peekBitmapDimensions();
     method @Nullable public android.graphics.Rect peekBitmapDimensions(int);
@@ -520,6 +522,10 @@ package android.app {
     method public void setWallpaperZoomOut(@NonNull android.os.IBinder, float);
     method public boolean shouldEnableWideColorGamut();
     method public boolean wallpaperSupportsWcg(int);
+    field public static final int ORIENTATION_LANDSCAPE = 1; // 0x1
+    field public static final int ORIENTATION_PORTRAIT = 0; // 0x0
+    field public static final int ORIENTATION_SQUARE_LANDSCAPE = 3; // 0x3
+    field public static final int ORIENTATION_SQUARE_PORTRAIT = 2; // 0x2
   }
 
   public class WindowConfiguration implements java.lang.Comparable<android.app.WindowConfiguration> android.os.Parcelable {
@@ -907,12 +913,13 @@ package android.companion {
     method @NonNull public android.companion.AssociationInfo build();
     method @NonNull public android.companion.AssociationInfo.Builder setAssociatedDevice(@Nullable android.companion.AssociatedDevice);
     method @FlaggedApi("android.companion.association_device_icon") @NonNull public android.companion.AssociationInfo.Builder setDeviceIcon(@Nullable android.graphics.drawable.Icon);
-    method @FlaggedApi("android.companion.association_tag") @NonNull public android.companion.AssociationInfo.Builder setDeviceId(@Nullable android.companion.DeviceId);
+    method @NonNull public android.companion.AssociationInfo.Builder setDeviceId(@Nullable android.companion.DeviceId);
     method @NonNull public android.companion.AssociationInfo.Builder setDeviceMacAddress(@Nullable android.net.MacAddress);
     method @NonNull public android.companion.AssociationInfo.Builder setDeviceProfile(@Nullable String);
     method @NonNull public android.companion.AssociationInfo.Builder setDisplayName(@Nullable CharSequence);
     method @NonNull public android.companion.AssociationInfo.Builder setLastTimeConnected(long);
     method @NonNull public android.companion.AssociationInfo.Builder setNotifyOnDeviceNearby(boolean);
+    method @NonNull public android.companion.AssociationInfo.Builder setPackagesToNotify(@Nullable java.util.List<java.lang.String>);
     method @NonNull public android.companion.AssociationInfo.Builder setRevoked(boolean);
     method @NonNull public android.companion.AssociationInfo.Builder setSelfManaged(boolean);
     method @NonNull public android.companion.AssociationInfo.Builder setSystemDataSyncFlags(int);
@@ -2491,6 +2498,7 @@ package android.os {
     method public static void invalidateCache(@NonNull String, @NonNull String);
     method public final boolean isDisabled();
     method @Nullable public Result query(@NonNull Query);
+    method @FlaggedApi("android.os.ipc_data_cache_testmode_apis") public static void setCacheTestMode(boolean);
     method public static void setTestMode(boolean);
     field public static final String MODULE_BLUETOOTH = "bluetooth";
     field public static final String MODULE_SYSTEM = "system_server";
@@ -3464,7 +3472,7 @@ package android.telecom {
   }
 
   public class TelecomManager {
-    method @FlaggedApi("com.android.server.telecom.flags.voip_call_monitor_refactor") public boolean hasForegroundServiceDelegation(@Nullable android.telecom.PhoneAccountHandle);
+    method public boolean hasForegroundServiceDelegation(@Nullable android.telecom.PhoneAccountHandle);
   }
 
 }

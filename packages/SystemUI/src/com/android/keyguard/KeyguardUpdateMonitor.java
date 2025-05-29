@@ -1316,7 +1316,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
      */
     @Deprecated
     public boolean isFaceDetectionRunning() {
-        return getFaceAuthInteractor() != null && getFaceAuthInteractor().isRunning();
+        return getFaceAuthInteractor() != null
+                && (getFaceAuthInteractor().isAuthRunning()
+                || getFaceAuthInteractor().isDetectRunning());
     }
 
     private @Nullable DeviceEntryFaceAuthInteractor getFaceAuthInteractor() {

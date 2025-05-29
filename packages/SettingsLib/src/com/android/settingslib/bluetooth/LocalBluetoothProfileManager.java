@@ -790,16 +790,19 @@ public class LocalBluetoothProfileManager {
             removedProfiles.remove(mPanProfile);
         }
 
-        if ((mMapProfile != null) &&
-            (mMapProfile.getConnectionStatus(device) == BluetoothProfile.STATE_CONNECTED)) {
+        if ((mMapProfile != null
+                        && mMapProfile.getConnectionStatus(device)
+                                == BluetoothProfile.STATE_CONNECTED)
+                || removedProfiles.contains(mMapProfile)) {
             profiles.add(mMapProfile);
             removedProfiles.remove(mMapProfile);
             mMapProfile.setEnabled(device, true);
         }
 
 // QTI_BEGIN: 2021-07-30: Bluetooth: Avoid removing PBAP in device details when remote supports it
-        if ((mPbapProfile != null)
-                && BluetoothUuid.containsAnyUuid(uuids, PbapServerProfile.PBAB_CLIENT_UUIDS) ) {
+        if (mPbapProfile != null &&
+               BluetoothUuid.containsAnyUuid(uuids, PbapServerProfile.PBAB_CLIENT_UUIDS) ||
+               removedProfiles.contains(mPbapProfile)) {
 // QTI_END: 2021-07-30: Bluetooth: Avoid removing PBAP in device details when remote supports it
             profiles.add(mPbapProfile);
             removedProfiles.remove(mPbapProfile);

@@ -66,6 +66,7 @@ import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.transition.TransitionDispatchState;
 import com.android.wm.shell.transition.Transitions;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
@@ -126,6 +127,14 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             mWct = wct;
             mTaskView = taskView;
             mLaunchCookie = launchCookie;
+        }
+        /** Dumps PendingTransition state. */
+        public void dump(PrintWriter pw, String prefix) {
+            pw.print(prefix); pw.println("Pending transition:");
+            pw.print(prefix); pw.println("  task view: " + mTaskView);
+            pw.print(prefix); pw.println("  transition type: " + mType);
+            pw.print(prefix); pw.println("  external transition: " + mExternalTransition);
+            pw.print(prefix); pw.println("  claim token: " + mClaimed);
         }
     }
 
@@ -208,8 +217,8 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
      * In practice, the external is usually another transition on a different handler.
      */
     public void enqueueExternal(@NonNull TaskViewTaskController taskView, ExternalTransition ext) {
-        ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.enqueueExternal(): taskView=%d",
-                taskView.hashCode());
+        ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.enqueueExternal(): taskView=%d pending=%d",
+                taskView.hashCode(), mPending.size());
         final PendingTransition pending = new PendingTransition(
                 TRANSIT_NONE, null /* wct */, taskView, null /* cookie */);
         pending.mExternalTransition = ext;
@@ -223,8 +232,8 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
     public void onExternalDone(IBinder key) {
         final PendingTransition pending = findPending(key);
         if (pending == null) {
-            ProtoLog.w(WM_SHELL_BUBBLES_NOISY, "Transitions.onExternalDone(): unknown "
-                    + "transition=%s", key);
+            ProtoLog.w(WM_SHELL_BUBBLES_NOISY,
+                    "Transitions.onExternalDone(): unknown transition=%s", key);
             return;
         }
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.onExternalDone(): taskView=%d "
@@ -283,6 +292,15 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         return !mPending.isEmpty();
     }
 
+    /** Removes all pending transitions for the given {@code taskView}. */
+    public void removePendingTransitions(TaskViewTaskController taskView) {
+        for (int i = mPending.size() - 1; i >= 0; --i) {
+            if (mPending.get(i).mTaskView != taskView) continue;
+            if (mPending.get(i).mExternalTransition != null) continue;
+            mPending.remove(i);
+        }
+    }
+
     @Override
     public WindowContainerTransaction handleRequest(@NonNull IBinder transition,
             @Nullable TransitionRequestInfo request) {
@@ -292,8 +310,13 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         }
         final TaskViewTaskController taskView = findTaskView(triggerTask);
         if (taskView == null) return null;
+
         // Opening types should all be initiated by shell
-        if (!TransitionUtil.isClosingType(request.getType())) return null;
+        if (!TransitionUtil.isClosingType(request.getType())) {
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.handleRequest(): taskView=%d "
+                    + "skipping transition=%d", taskView.hashCode(), transition.hashCode());
+            return null;
+        }
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.handleRequest(): taskView=%d "
                         + "handling transition=%d", taskView.hashCode(), transition.hashCode());
         PendingTransition pending = new PendingTransition(request.getType(), null,
@@ -406,7 +429,7 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         // transition in taskview and then transition is intercepted using the launchcookie.
         // The task here is already created and running, it just needs to be reparented, resized
         // and tracked correctly inside taskview. Which is done by calling
-        // prepareOpenAnimationInternal() and then manually enqueuing the resulting window container
+        // prepareOpenAnimation() and then manually enqueuing the resulting window container
         // transaction.
         prepareOpenAnimation(destination, true /* newTask */, mTransaction /* startTransaction */,
                 null /* finishTransaction */, taskInfo, leash, wct);
@@ -457,7 +480,8 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         if (taskToken == null) return;
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.moveTaskViewToFullscreen(): taskView=%d",
                 taskView.hashCode());
-        final WindowContainerTransaction wct = getExitBubbleTransaction(taskToken);
+        final WindowContainerTransaction wct =
+                getExitBubbleTransaction(taskToken, taskView.getCaptionInsetsOwner());
         mShellExecutor.execute(() -> {
             mTaskOrganizer.setInterceptBackPressedOnTaskRoot(taskToken, false /* intercept */);
             mPending.add(new PendingTransition(TRANSIT_CHANGE, wct, taskView, null /* cookie */));
@@ -1010,9 +1034,9 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             SurfaceControl.Transaction finishTransaction,
             ActivityManager.RunningTaskInfo taskInfo, SurfaceControl leash,
             WindowContainerTransaction wct) {
-        ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.prepareOpenAnimation(): taskView=%d "
-                        + "newTask=%b", taskView.hashCode(), newTask);
         final Rect boundsOnScreen = taskView.prepareOpen(taskInfo, leash);
+        ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.prepareOpenAnimation(): taskView=%d "
+                        + "newTask=%b bounds=%s", taskView.hashCode(), newTask, boundsOnScreen);
         if (boundsOnScreen != null) {
             updateBounds(taskView, boundsOnScreen, startTransaction, finishTransaction, taskInfo,
                     leash, wct);
@@ -1111,6 +1135,18 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         }
         wct.setBounds(taskInfo.token, boundsOnScreen);
         taskView.applyCaptionInsetsIfNeeded();
+    }
+
+    /** Dumps TaskViewTransitions state. */
+    public void dump(PrintWriter pw) {
+        pw.println("TaskViewTransitions state:");
+        pw.println("  Pending transitions count: " + mPending.size());
+        for (PendingTransition pendingTransition : mPending) {
+            pendingTransition.dump(pw, "    ");
+        }
+        if (useRepo()) {
+            mTaskViewRepo.dump(pw, "  ");
+        }
     }
 
     /** Interface for running an external transition in this object's pending queue. */

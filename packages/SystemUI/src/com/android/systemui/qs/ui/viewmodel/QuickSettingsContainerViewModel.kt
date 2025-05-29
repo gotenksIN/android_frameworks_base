@@ -18,6 +18,7 @@ package com.android.systemui.qs.ui.viewmodel
 
 import android.content.Context
 import android.media.AudioManager
+import android.view.Display
 import androidx.compose.runtime.getValue
 import com.android.settingslib.volume.shared.model.AudioStream
 import com.android.systemui.Flags
@@ -35,17 +36,22 @@ import com.android.systemui.qs.panels.ui.viewmodel.TileGridViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.toolbar.ToolbarViewModel
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
+import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
+import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.volume.panel.component.volume.domain.model.SliderType
 import com.android.systemui.volume.panel.component.volume.slider.ui.viewmodel.AudioStreamSliderViewModel
 import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
+import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import javax.inject.Named
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class QuickSettingsContainerViewModel
@@ -53,11 +59,12 @@ class QuickSettingsContainerViewModel
 constructor(
     @ShadeDisplayAware shadeContext: Context,
     brightnessSliderViewModelFactory: BrightnessSliderViewModel.Factory,
-    private val audioStreamSliderViewModelFactory: AudioStreamSliderViewModel.Factory,
+    audioStreamSliderViewModelFactory: AudioStreamSliderViewModel.Factory,
     shadeHeaderViewModelFactory: ShadeHeaderViewModel.Factory,
     tileGridViewModelFactory: TileGridViewModel.Factory,
     @Assisted private val supportsBrightnessMirroring: Boolean,
     @Assisted private val expansion: Float?,
+    @Assisted private val volumeSliderCoroutineScope: CoroutineScope?,
     val editModeViewModel: EditModeViewModel,
     val detailsViewModel: DetailsViewModel,
     toolbarViewModelFactory: ToolbarViewModel.Factory,
@@ -65,6 +72,7 @@ constructor(
     mediaCarouselInteractor: MediaCarouselInteractor,
     val mediaCarouselController: MediaCarouselController,
     @Named(MediaModule.QS_PANEL) val mediaHost: MediaHost,
+    shadeDisplaysInteractor: Lazy<ShadeDisplaysInteractor>,
 ) : ExclusiveActivatable() {
 
     private val hydrator = Hydrator("QuickSettingsContainerViewModel.hydrator")
@@ -87,6 +95,20 @@ constructor(
                 },
         )
 
+    val isBrightnessSliderVisible by
+        hydrator.hydratedStateOf(
+            traceName = "isBrightnessSliderVisible",
+            initialValue = shouldBrightnessSliderBeVisible(Display.DEFAULT_DISPLAY),
+            source =
+                if (ShadeWindowGoesAround.isEnabled) {
+                    shadeDisplaysInteractor.get().pendingDisplayId.map {
+                        shouldBrightnessSliderBeVisible(it)
+                    }
+                } else {
+                    flowOf(true)
+                },
+        )
+
     val brightnessSliderViewModel =
         brightnessSliderViewModelFactory.create(supportsBrightnessMirroring)
 
@@ -94,7 +116,17 @@ constructor(
         QsDetailedView.isEnabled &&
             shadeContext.resources.getBoolean(R.bool.config_enableDesktopAudioTileDetailsView)
 
-    var volumeSliderViewModel: AudioStreamSliderViewModel? = null
+    val volumeSliderViewModel =
+        if (showVolumeSlider && volumeSliderCoroutineScope != null)
+            audioStreamSliderViewModelFactory.create(
+                AudioStreamSliderViewModel.FactoryAudioStreamWrapper(
+                    SliderType.Stream(AudioStream(AudioManager.STREAM_MUSIC)).stream
+                ),
+                volumeSliderCoroutineScope,
+            )
+        else {
+            null
+        }
 
     val toolbarViewModel = toolbarViewModelFactory.create()
 
@@ -110,19 +142,6 @@ constructor(
 
     override suspend fun onActivated(): Nothing {
         coroutineScope {
-            if (showVolumeSlider) {
-                val volumeSliderStream =
-                    SliderType.Stream(AudioStream(AudioManager.STREAM_MUSIC)).stream
-                launch {
-                    volumeSliderViewModel =
-                        audioStreamSliderViewModelFactory.create(
-                            AudioStreamSliderViewModel.FactoryAudioStreamWrapper(
-                                volumeSliderStream
-                            ),
-                            this,
-                        )
-                }
-            }
             expansion?.let { mediaHost.expansion = it }
             launch { hydrator.activate() }
             launch { brightnessSliderViewModel.activate() }
@@ -133,11 +152,22 @@ constructor(
         }
     }
 
+    private companion object {
+        fun shouldBrightnessSliderBeVisible(displayId: Int): Boolean {
+            return if (ShadeWindowGoesAround.isEnabled) {
+                displayId == Display.DEFAULT_DISPLAY
+            } else {
+                true
+            }
+        }
+    }
+
     @AssistedFactory
     interface Factory {
         fun create(
             supportsBrightnessMirroring: Boolean,
             expansion: Float? = null,
+            volumeSliderCoroutineScope: CoroutineScope? = null,
         ): QuickSettingsContainerViewModel
     }
 }

@@ -19,6 +19,12 @@ package com.android.server.wm;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayRotationProto.FIXED_TO_USER_ROTATION_MODE;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayRotationProto.FROZEN_TO_USER_ROTATION;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayRotationProto.IS_FIXED_TO_USER_ROTATION;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayRotationProto.LAST_ORIENTATION;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayRotationProto.ROTATION;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayRotationProto.USER_ROTATION;
 import static android.view.Display.TYPE_EXTERNAL;
 import static android.view.Display.TYPE_OVERLAY;
 import static android.view.Display.TYPE_VIRTUAL;
@@ -27,12 +33,6 @@ import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_SEAMLES
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ORIENTATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ORIENTATION_CHANGE;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_OPEN;
-import static com.android.server.wm.DisplayRotationProto.FIXED_TO_USER_ROTATION_MODE;
-import static com.android.server.wm.DisplayRotationProto.FROZEN_TO_USER_ROTATION;
-import static com.android.server.wm.DisplayRotationProto.IS_FIXED_TO_USER_ROTATION;
-import static com.android.server.wm.DisplayRotationProto.LAST_ORIENTATION;
-import static com.android.server.wm.DisplayRotationProto.ROTATION;
-import static com.android.server.wm.DisplayRotationProto.USER_ROTATION;
 import static com.android.server.wm.DisplayRotationReversionController.REVERSION_TYPE_CAMERA_COMPAT;
 import static com.android.server.wm.DisplayRotationReversionController.REVERSION_TYPE_HALF_FOLD;
 import static com.android.server.wm.DisplayRotationReversionController.REVERSION_TYPE_NOSENSOR;
@@ -110,6 +110,8 @@ import java.util.Set;
  * Non-public methods are assumed to run inside WM lock.
  */
 public class DisplayRotation {
+    public static final int USE_CURRENT_ROTATION = -1;
+    public static final int NO_UPDATE_USER_ROTATION = -2;
     private static final String TAG = TAG_WITH_CLASS_NAME ? "DisplayRotation" : TAG_WM;
 
     // Delay in milliseconds when updating config due to folding events. This prevents
@@ -873,20 +875,29 @@ public class DisplayRotation {
 
     @VisibleForTesting
     void setUserRotation(int userRotationMode, int userRotation, String caller) {
-        mRotationLockHistory.addRecord(userRotationMode, userRotation, caller);
-        mRotationChoiceShownToUserForConfirmation = ROTATION_UNDEFINED;
         if (useDefaultSettingsProvider()) {
             // We'll be notified via settings listener, so we don't need to update internal values.
             final ContentResolver res = mContext.getContentResolver();
             final int accelerometerRotation =
                     userRotationMode == WindowManagerPolicy.USER_ROTATION_LOCKED ? 0 : 1;
-            Settings.System.putIntForUser(res, Settings.System.ACCELEROMETER_ROTATION,
-                    accelerometerRotation, UserHandle.USER_CURRENT);
-            Settings.System.putIntForUser(res, Settings.System.USER_ROTATION, userRotation,
-                    UserHandle.USER_CURRENT);
+            if (mService.mRoot.mDeviceStateAutoRotateSettingController != null) {
+                // This call will trigger a setting update asynchronously. DisplayRotation will be
+                // notified of this update via the registered settings listener. That means,
+                // subsequent calls may not be able to read the updated value upon querying
+                // ACCELEROMETER_ROTATION. In future, while processing this request,
+                // setUserRotationSetting may be called.
+                mService.mRoot.mDeviceStateAutoRotateSettingController
+                        .requestAccelerometerRotationSettingChange(accelerometerRotation == 1,
+                                userRotation);
+            } else {
+                Settings.System.putIntForUser(res, Settings.System.ACCELEROMETER_ROTATION,
+                        accelerometerRotation, UserHandle.USER_CURRENT);
+                setUserRotationSetting(userRotationMode, userRotation, caller);
+            }
             return;
         }
-
+        mRotationLockHistory.addRecord(userRotationMode, userRotation, caller);
+        mRotationChoiceShownToUserForConfirmation = ROTATION_UNDEFINED;
         boolean changed = false;
         if (mUserRotationMode != userRotationMode) {
             mUserRotationMode = userRotationMode;
@@ -911,8 +922,41 @@ public class DisplayRotation {
         }
     }
 
+    /**
+     * Sets the user rotation and updates the {@link RotationLockHistory}.
+     *
+     * @param userRotationMode The user rotation mode (e.g.,
+     *                         {@link WindowManagerPolicy#USER_ROTATION_FREE},
+     *                         {@link WindowManagerPolicy#USER_ROTATION_LOCKED}).
+     * @param userRotation     The desired user rotation (e.g., {@link Surface#ROTATION_0},
+     *                         {@link Surface#ROTATION_90}, etc.). If this value is set to
+     *                         {@link USE_CURRENT_ROTATION}, the
+     *                         {@link Settings.System#USER_ROTATION} setting will be set to
+     *                         {@link #mRotation}. If this value is set to
+     *                         {@link NO_UPDATE_USER_ROTATION}, the
+     *                         {@link Settings.System#USER_ROTATION} setting will be set to
+     *                         {@link #mUserRotation}.
+     * @param caller           The caller of this method, used for logging in
+     *                         {@link RotationLockHistory}.
+     */
+    void setUserRotationSetting(int userRotationMode, int userRotation, String caller) {
+        if (userRotation == USE_CURRENT_ROTATION) {
+            userRotation = mRotation;
+        } else if (userRotation == NO_UPDATE_USER_ROTATION) {
+            userRotation = mUserRotation;
+        }
+        Settings.System.putIntForUser(mContext.getContentResolver(),
+                Settings.System.USER_ROTATION, userRotation,
+                UserHandle.USER_CURRENT);
+        mRotationLockHistory.addRecord(userRotationMode, userRotation, caller);
+        mRotationChoiceShownToUserForConfirmation = ROTATION_UNDEFINED;
+    }
+
     void requestDeviceStateAutoRotateSettingChange(int deviceState, boolean autoRotate) {
-        // TODO(b/350946537) Redirect request to DeviceStateAutoRotateSettingController
+        if (mService.mRoot.mDeviceStateAutoRotateSettingController != null) {
+            mService.mRoot.mDeviceStateAutoRotateSettingController
+                    .requestDeviceStateAutoRotateSettingChange(deviceState, autoRotate);
+        }
     }
 
     void freezeRotation(int rotation, String caller) {
@@ -920,7 +964,7 @@ public class DisplayRotation {
             rotation = RotationUtils.reverseRotationDirectionAroundZAxis(rotation);
         }
 
-        rotation = (rotation == -1) ? mRotation : rotation;
+        rotation = (rotation == USE_CURRENT_ROTATION) ? mRotation : rotation;
         setUserRotation(WindowManagerPolicy.USER_ROTATION_LOCKED, rotation, caller);
     }
 
@@ -1792,7 +1836,8 @@ public class DisplayRotation {
      */
     @Nullable
     static DeviceStateAutoRotateSettingController createDeviceStateAutoRotateDependencies(
-            Context context, DeviceStateController deviceStateController, Handler handler) {
+            Context context, DeviceStateController deviceStateController,
+            WindowManagerService wmService) {
         if (!isFoldable(context) || !isAutoRotateSupported(context)) return null;
         if (!Flags.enableDeviceStateAutoRotateSettingLogging()
                 && !Flags.enableDeviceStateAutoRotateSettingRefactor()) {
@@ -1806,17 +1851,16 @@ public class DisplayRotation {
 
         if (Flags.enableDeviceStateAutoRotateSettingLogging()) {
             new DeviceStateAutoRotateSettingIssueLogger(SystemClock::elapsedRealtime,
-                    secureSettings, deviceStateController, handler);
+                    secureSettings, deviceStateController, wmService.mH);
         }
 
         if (Flags.enableDeviceStateAutoRotateSettingRefactor()) {
             final DeviceStateAutoRotateSettingManager deviceStateAutoRotateSettingManager =
                     new DeviceStateAutoRotateSettingManagerImpl(
-                            context, BackgroundThread.getExecutor(), secureSettings, handler,
+                            context, BackgroundThread.getExecutor(), secureSettings, wmService.mH,
                             new PostureDeviceStateConverter(context, new DeviceStateManager()));
             deviceStateAutoRotateSettingController = new DeviceStateAutoRotateSettingController(
-                    context, handler.getLooper(), handler, deviceStateController,
-                    deviceStateAutoRotateSettingManager);
+                    deviceStateController, deviceStateAutoRotateSettingManager, wmService);
         }
 
         return deviceStateAutoRotateSettingController;

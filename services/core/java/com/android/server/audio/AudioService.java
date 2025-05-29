@@ -99,6 +99,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.SpecialUsers.CannotBeSpecialUser;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
@@ -253,6 +254,7 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.IntArray;
 import android.util.Log;
+import android.util.Pair;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -559,9 +561,13 @@ public class AudioService extends IAudioService.Stub
      */
     private InputDeviceVolumeHelper mInputDeviceVolumeHelper;
 
-    /*package*/ int getVolumeForDeviceIgnoreMute(int stream, int device) {
+    /** Returns a pair of volume and mute state for the given stream and device. */
+    /*package*/ Pair<Integer, Boolean> getVolumeForDevice(int stream, int device) {
         final VolumeStreamState streamState = mStreamStates.get(stream);
-        return streamState != null ? streamState.getIndex(device) : -1;
+        if (streamState == null) {
+            return new Pair<>(-1, false);
+        }
+        return new Pair<>(streamState.getIndex(device), streamState.mIsMuted);
     }
 
     /**
@@ -4328,9 +4334,9 @@ public class AudioService extends IAudioService.Stub
                         0);
             }
 
-            handleAbsoluteVolume(streamType, streamTypeAlias, deviceAttr,
-                    getVssForStreamOrDefault(streamType).getIndex(deviceType),
-                    flags);
+            final boolean muted = streamState.mIsMuted;
+            final int index = streamState.getIndex(deviceType);
+            handleAbsoluteVolume(streamType, streamTypeAlias, deviceAttr, index, muted, flags);
         }
 
         final int newIndex = getVssForStreamOrDefault(streamType).getIndex(deviceType);
@@ -4404,7 +4410,7 @@ public class AudioService extends IAudioService.Stub
     }
 
     private boolean handleAbsoluteVolume(int streamType, int streamTypeAlias,
-            @NonNull AudioDeviceAttributes ada, int newIndex, int flags) {
+            @NonNull AudioDeviceAttributes ada, int newIndex, boolean muted, int flags) {
             // Check if volume update should be handled by an external volume controller
         boolean registeredAsAbsoluteVolume = false;
         boolean volumeHandled = false;
@@ -4419,7 +4425,7 @@ public class AudioService extends IAudioService.Stub
                 info = getAbsoluteVolumeDeviceInfo(deviceType);
             }
             if (info != null) {
-                dispatchAbsoluteVolumeChanged(streamType, info, newIndex);
+                dispatchAbsoluteVolumeChanged(streamType, info, newIndex, muted);
                 registeredAsAbsoluteVolume = true;
                 volumeHandled = true;
             }
@@ -5412,8 +5418,10 @@ public class AudioService extends IAudioService.Stub
 
         final AudioDeviceAttributes device = absVolumeDevices.toArray(
                 new AudioDeviceAttributes[0])[0];
-        final int index = (getVolumeForDeviceIgnoreMute(streamType, device.getInternalType()) + 5)
-                / 10;
+        final Pair<Integer, Boolean> volumePair = getVolumeForDevice(streamType,
+                device.getInternalType());
+        final int index = (volumePair.first + 5) / 10;
+        final boolean muted = volumePair.second;
 
         if (DEBUG_VOL) {
             Slog.i(TAG, "onUpdateContextualVolumes streamType: " + streamType
@@ -5423,7 +5431,8 @@ public class AudioService extends IAudioService.Stub
 
         final int streamTypeAlias = sStreamVolumeAlias.get(streamType, /*valueIfKeyNotFound*/
                 streamType);
-        if (!handleAbsoluteVolume(streamType, streamTypeAlias, device, index * 10, /*flags=*/0)) {
+        if (!handleAbsoluteVolume(streamType, streamTypeAlias, device, index * 10, muted, /*flags=*/
+                0)) {
             return;
         }
 
@@ -5515,16 +5524,17 @@ public class AudioService extends IAudioService.Stub
             }
         }
 
+        final boolean muted = streamState.mIsMuted;
         if (!mSoundDoseHelper.willDisplayWarningAfterCheckVolume(streamType, index,
                 deviceType, flags)) {
             onSetStreamVolume(streamType, index, flags, deviceType, caller, hasModifyAudioSettings,
                     // ada is non-null when called from setDeviceVolume,
                     // which shouldn't update the mute state
                     canChangeMuteAndUpdateController /*canChangeMute*/);
-            index = getVssForStreamOrDefault(streamType).getIndex(deviceType);
+            index = streamState.getIndex(deviceType);
         }
 
-        handleAbsoluteVolume(streamType, streamTypeAlias, deviceAttr, index, flags);
+        handleAbsoluteVolume(streamType, streamTypeAlias, deviceAttr, index, muted, flags);
 
         synchronized (mHdmiClientLock) {
             if (streamTypeAlias == AudioSystem.STREAM_MUSIC
@@ -5540,14 +5550,17 @@ public class AudioService extends IAudioService.Stub
     }
 
     private void dispatchAbsoluteVolumeChanged(int streamType, AbsoluteVolumeDeviceInfo deviceInfo,
-            int index) {
+            int index, boolean muted) {
         VolumeInfo volumeInfo = deviceInfo.getMatchingVolumeInfoForStream(streamType);
         if (volumeInfo != null) {
             try {
+                VolumeInfo.Builder volInfoBuilder = new VolumeInfo.Builder(volumeInfo)
+                        .setVolumeIndex(rescaleIndex(index, streamType, volumeInfo));
+                if (unifyAbsoluteVolumeManagement()) {
+                    volInfoBuilder.setMuted(muted);
+                }
                 deviceInfo.mCallback.dispatchDeviceVolumeChanged(deviceInfo.mDevice,
-                        new VolumeInfo.Builder(volumeInfo)
-                                .setVolumeIndex(rescaleIndex(index, streamType, volumeInfo))
-                                .build());
+                        volInfoBuilder.build());
             } catch (RemoteException e) {
                 Log.w(TAG, "Couldn't dispatch absolute volume behavior volume change");
             }
@@ -13836,6 +13849,18 @@ public class AudioService extends IAudioService.Stub
                     mInputMethodServiceUid = uid;
                 }
             }
+        }
+
+        @Override
+        public boolean isUserPlayingAudio(@CannotBeSpecialUser @UserIdInt int userId) {
+            final List<AudioPlaybackConfiguration> configs = getActivePlaybackConfigurations();
+            for (AudioPlaybackConfiguration cfg : configs) {
+                if (UserHandle.getUserId(cfg.getClientUid()) == userId &&
+                        cfg.getPlayerState() == AudioPlaybackConfiguration.PLAYER_STATE_STARTED) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

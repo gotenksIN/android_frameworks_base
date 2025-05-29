@@ -76,7 +76,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.settingslib.display.DisplayDensityConfiguration;
-import com.android.window.flags.Flags;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -1122,6 +1121,15 @@ public class SettingsBackupAgent extends BackupAgentHelper {
                 value = String.valueOf(newValue);
             }
 
+            // Indicates the POWER_BUTTON_LONG_PRESS has been restored.
+            if (Settings.Global.POWER_BUTTON_LONG_PRESS.equals(key)) {
+                ContentValues powerButtonLongPressRestoredValues = new ContentValues(2);
+                powerButtonLongPressRestoredValues.put(Settings.NameValueTable.NAME,
+                        Settings.Global.POWER_BUTTON_LONG_PRESS_RESTORED);
+                powerButtonLongPressRestoredValues.put(Settings.NameValueTable.VALUE, 1);
+                cr.insert(destination, powerButtonLongPressRestoredValues);
+            }
+
             settingsHelper.restoreValue(this, cr, contentValues, destination, key, value,
                     mRestoredFromSdkInt);
 
@@ -1134,26 +1142,23 @@ public class SettingsBackupAgent extends BackupAgentHelper {
     @VisibleForTesting
     static String findClosestAllowedFontScale(@NonNull String requestedFontScale,
             @NonNull String[] availableFontScales) {
-        if (Flags.configurableFontScaleDefault()) {
-            final float requestedValue = Float.parseFloat(requestedFontScale);
-            // Whatever is the requested value, we search the closest allowed value which is
-            // equals or larger. Note that if the requested value is the previous default,
-            // and this is still available, the value will be preserved.
-            float candidate = 0.0f;
-            boolean fontScaleFound = false;
-            for (int i = 0; !fontScaleFound && i < availableFontScales.length; i++) {
-                final float fontScale = Float.parseFloat(availableFontScales[i]);
-                if (fontScale >= requestedValue) {
-                    candidate = fontScale;
-                    fontScaleFound = true;
-                }
+        final float requestedValue = Float.parseFloat(requestedFontScale);
+        // Whatever is the requested value, we search the closest allowed value which is
+        // equals or larger. Note that if the requested value is the previous default,
+        // and this is still available, the value will be preserved.
+        float candidate = 0.0f;
+        boolean fontScaleFound = false;
+        for (int i = 0; !fontScaleFound && i < availableFontScales.length; i++) {
+            final float fontScale = Float.parseFloat(availableFontScales[i]);
+            if (fontScale >= requestedValue) {
+                candidate = fontScale;
+                fontScaleFound = true;
             }
-            // If the current value is greater than all the allowed ones, we return the
-            // largest possible.
-            return fontScaleFound ? String.valueOf(candidate) : String.valueOf(
-                    availableFontScales[availableFontScales.length - 1]);
         }
-        return requestedFontScale;
+        // If the current value is greater than all the allowed ones, we return the
+        // largest possible.
+        return fontScaleFound ? String.valueOf(candidate) : String.valueOf(
+                availableFontScales[availableFontScales.length - 1]);
     }
 
     @VisibleForTesting

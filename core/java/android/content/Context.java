@@ -54,6 +54,7 @@ import android.app.BroadcastOptions;
 import android.app.GameManager;
 import android.app.GrammaticalInflectionManager;
 import android.app.IApplicationThread;
+import android.app.IBinderSession;
 import android.app.IServiceConnection;
 import android.app.VrManager;
 import android.app.ambientcontext.AmbientContextManager;
@@ -94,6 +95,7 @@ import android.provider.E2eeContactKeysManager;
 import android.provider.MediaStore;
 import android.ravenwood.annotation.RavenwoodKeep;
 import android.ravenwood.annotation.RavenwoodKeepPartialClass;
+import android.ravenwood.annotation.RavenwoodSupported.SupportType;
 import android.telephony.TelephonyRegistryManager;
 import android.util.AttributeSet;
 import android.view.Display;
@@ -340,8 +342,6 @@ public abstract class Context {
             BIND_EXTERNAL_SERVICE_LONG,
             // Make sure no flag uses the sign bit (most significant bit) of the long integer,
             // to avoid future confusion.
-            BIND_BYPASS_USER_NETWORK_RESTRICTIONS,
-            BIND_MATCH_QUARANTINED_COMPONENTS,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface BindServiceFlagsLongBits {}
@@ -748,10 +748,27 @@ public abstract class Context {
 
     /**
      * Flag for {@link #bindService} that allows the bound app to be frozen if it is eligible.
+     * When used, this provides the caller an {@link android.app.IBinderSession} via
+     * {@link ServiceConnection#onServiceConnected(ComponentName, IBinder, IBinderSession)}. This
+     * object can be used to unfreeze the remote process to allow it to process any binder calls
+     * made on the bound service.
+     *
+     * <p> Currently, this is only meant for outgoing bindings from the system process.
      *
      * @hide
      */
     public static final long BIND_ALLOW_FREEZE = 0x4_0000_0000L;
+
+    /**
+     * Flag for {@link #bindService} that enables receiving an {@link android.app.IBinderSession}
+     * via {@link ServiceConnection#onServiceConnected(ComponentName, IBinder, IBinderSession)}.
+     *
+     * This acts as a dry run of {@link #BIND_ALLOW_FREEZE}, where the system will not actually
+     * freeze the remote process even if it is not processing any binder call on the bound service.
+     *
+     * @hide
+     */
+    public static final long BIND_SIMULATE_ALLOW_FREEZE = 0x8_0000_0000L;
 
     /**
      * These bind flags reduce the strength of the binding such that we shouldn't
@@ -840,6 +857,8 @@ public abstract class Context {
      * @return an AssetManager instance for the application's package
      * @see #getResources()
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract AssetManager getAssets();
 
     /**
@@ -853,9 +872,14 @@ public abstract class Context {
      * @return a Resources instance for the application's package
      * @see #getAssets()
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract Resources getResources();
 
     /** Return PackageManager instance to find global package information. */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext",
+            comment = "Almost no APIS on PackageManager are supported yet")
     public abstract PackageManager getPackageManager();
 
     /** Return a ContentResolver instance for your application's package. */
@@ -872,6 +896,8 @@ public abstract class Context {
      *
      * @return The main looper.
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract Looper getMainLooper();
 
     /**
@@ -879,6 +905,8 @@ public abstract class Context {
      * thread associated with this context. This is the thread used to dispatch
      * calls to application components (activities, services, etc).
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public Executor getMainExecutor() {
         // This is pretty inefficient, which is why ContextImpl overrides it
         return new HandlerExecutor(new Handler(getMainLooper()));
@@ -909,6 +937,8 @@ public abstract class Context {
      * if you forget to unregister, unbind, etc.
      * </ul>
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract Context getApplicationContext();
 
     /** Non-activity related autofill ids are unique in the app */
@@ -1076,6 +1106,8 @@ public abstract class Context {
      *
      * @param resid The style resource describing the theme.
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract void setTheme(@StyleRes int resid);
 
     /** @hide Needed for some internal implementation...  not public because
@@ -1089,6 +1121,8 @@ public abstract class Context {
      * Return the Theme object associated with this Context.
      */
     @ViewDebug.ExportedProperty(deepExport = true)
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract Resources.Theme getTheme();
 
     /**
@@ -1151,9 +1185,13 @@ public abstract class Context {
     /**
      * Return a class loader you can use to retrieve classes in this package.
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract ClassLoader getClassLoader();
 
     /** Return the name of this application's package. */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract String getPackageName();
 
     /**
@@ -1174,6 +1212,8 @@ public abstract class Context {
      * This is not generally intended for third party application developers.
      */
     @NonNull
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public String getOpPackageName() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }
@@ -1185,6 +1225,9 @@ public abstract class Context {
      *
      * @return the attribution tag this context is for or {@code null} if this is the default.
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext",
+            comment = "Always returns null (for now)")
     public @Nullable String getAttributionTag() {
         return null;
     }
@@ -1228,6 +1271,8 @@ public abstract class Context {
      *
      * @return String Path to the resources.
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract String getPackageResourcePath();
 
     /**
@@ -1345,6 +1390,8 @@ public abstract class Context {
      * @see #deleteFile
      * @see java.io.FileInputStream#FileInputStream(String)
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract FileInputStream openFileInput(String name)
         throws FileNotFoundException;
 
@@ -1366,6 +1413,8 @@ public abstract class Context {
      * @see #deleteFile
      * @see java.io.FileOutputStream#FileOutputStream(String)
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract FileOutputStream openFileOutput(String name, @FileMode int mode)
         throws FileNotFoundException;
 
@@ -1384,6 +1433,8 @@ public abstract class Context {
      * @see #fileList
      * @see java.io.File#delete()
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract boolean deleteFile(String name);
 
     /**
@@ -1402,6 +1453,8 @@ public abstract class Context {
      * @see #getFilesDir
      * @see #getDir
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getFileStreamPath(String name);
 
     /**
@@ -1418,6 +1471,8 @@ public abstract class Context {
      * @removed
      */
     @SuppressWarnings("HiddenAbstractMethod")
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getSharedPreferencesPath(String name);
 
     /**
@@ -1435,6 +1490,8 @@ public abstract class Context {
      *
      * @see ApplicationInfo#dataDir
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getDataDir();
 
     /**
@@ -1452,6 +1509,8 @@ public abstract class Context {
      * @see #getFileStreamPath
      * @see #getDir
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getFilesDir();
 
     /**
@@ -1499,6 +1558,8 @@ public abstract class Context {
      * @see #getDir
      * @see android.app.backup.BackupAgent
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getNoBackupFilesDir();
 
     /**
@@ -1803,6 +1864,8 @@ public abstract class Context {
      * @see #getDir
      * @see #getExternalCacheDir
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getCacheDir();
 
     /**
@@ -1824,6 +1887,8 @@ public abstract class Context {
      *
      * @return The path of the directory holding application code cache files.
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getCodeCacheDir();
 
     /**
@@ -2038,6 +2103,8 @@ public abstract class Context {
      *
      * @see #openFileOutput(String, int)
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract File getDir(String name, @FileMode int mode);
 
     /**
@@ -4585,6 +4652,8 @@ public abstract class Context {
      * @see #AUTHENTICATION_POLICY_SERVICE
      * @see android.security.authenticationpolicy.AuthenticationPolicyManager
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract Object getSystemService(@ServiceName @NonNull String name);
 
     /**
@@ -4645,6 +4714,8 @@ public abstract class Context {
      * @param serviceClass The class of the desired service.
      * @return The service name or null if the class is not a supported system service.
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract @Nullable String getSystemServiceName(@NonNull Class<?> serviceClass);
 
     /**
@@ -6889,11 +6960,11 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
-     * {@link android.media.quality.MediaQuality} for standardize picture and audio
-     * API parameters.
+     * {@link android.media.quality.MediaQualityManager} for standardize picture
+     * and audio API parameters.
      *
      * @see #getSystemService(String)
-     * @see android.media.quality.MediaQuality
+     * @see android.media.quality.MediaQualityManager
      */
     @FlaggedApi(android.media.tv.flags.Flags.FLAG_MEDIA_QUALITY_FW)
     public static final String MEDIA_QUALITY_SERVICE = "media_quality";
@@ -7679,6 +7750,8 @@ public abstract class Context {
     @NonNull
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     @TestApi
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public @CanBeALL @CanBeCURRENT UserHandle getUser() {
         return android.os.Process.myUserHandle();
     }
@@ -7689,6 +7762,8 @@ public abstract class Context {
      */
     @UnsupportedAppUsage
     @TestApi
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public @CanBeALL @CanBeCURRENT @UserIdInt int getUserId() {
         return android.os.UserHandle.myUserId();
     }
@@ -8146,6 +8221,8 @@ public abstract class Context {
      * @see #registerDeviceIdChangeListener(Executor, IntConsumer)
      * @see #isUiContext()
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public int getDeviceId() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }
@@ -8193,6 +8270,8 @@ public abstract class Context {
      *
      * @see #CONTEXT_RESTRICTED
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public boolean isRestricted() {
         return false;
     }
@@ -8221,6 +8300,8 @@ public abstract class Context {
      * @hide
      */
     @SuppressWarnings("HiddenAbstractMethod")
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public abstract boolean canLoadUnsafeResources();
 
     /**
@@ -8290,6 +8371,8 @@ public abstract class Context {
     /**
      * @hide
      */
+    @android.ravenwood.annotation.RavenwoodSupported(
+            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
     public Handler getMainThreadHandler() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }

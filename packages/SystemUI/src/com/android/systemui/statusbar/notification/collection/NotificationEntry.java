@@ -642,6 +642,9 @@ public final class NotificationEntry extends ListEntry {
     }
 
     public void sendAccessibilityEvent(int eventType) {
+        if (com.android.systemui.Flags.notificationsHunAccessibilityRefactor()) {
+            return;
+        }
         if (row != null) {
             row.sendAccessibilityEvent(eventType);
         }
@@ -675,18 +678,6 @@ public final class NotificationEntry extends ListEntry {
 
     public boolean isRowDismissed() {
         return row != null && row.isDismissed();
-    }
-
-    public boolean isRowRemoved() {
-        return row != null && row.isRemoved();
-    }
-
-    /**
-     * @return {@code true} if the row is null or removed
-     */
-    public boolean isRemoved() {
-        //TODO: recycling invalidates this
-        return row == null || row.isRemoved();
     }
 
     public boolean isRowPinned() {

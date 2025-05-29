@@ -36,6 +36,15 @@ import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.content.res.Configuration.ORIENTATION_UNDEFINED;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.HASH_CODE;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.TITLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.USER_ID;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskFragmentProto.ACTIVITY_TYPE;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskFragmentProto.DISPLAY_ID;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskFragmentProto.MIN_HEIGHT;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskFragmentProto.MIN_WIDTH;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskFragmentProto.WINDOW_CONTAINER;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerChildProto.TASK_FRAGMENT;
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.UserHandle.USER_NULL;
@@ -58,15 +67,6 @@ import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_ATM;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.ActivityTaskManagerService.checkPermission;
 import static com.android.server.wm.ActivityTaskSupervisor.printThisActivity;
-import static com.android.server.wm.IdentifierProto.HASH_CODE;
-import static com.android.server.wm.IdentifierProto.TITLE;
-import static com.android.server.wm.IdentifierProto.USER_ID;
-import static com.android.server.wm.TaskFragmentProto.ACTIVITY_TYPE;
-import static com.android.server.wm.TaskFragmentProto.DISPLAY_ID;
-import static com.android.server.wm.TaskFragmentProto.MIN_HEIGHT;
-import static com.android.server.wm.TaskFragmentProto.MIN_WIDTH;
-import static com.android.server.wm.TaskFragmentProto.WINDOW_CONTAINER;
-import static com.android.server.wm.WindowContainerChildProto.TASK_FRAGMENT;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -459,7 +459,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mRemoteToken = new RemoteToken(this);
     }
 
-    @NonNull
+    @Nullable
     static TaskFragment fromTaskFragmentToken(@Nullable IBinder token,
             @NonNull ActivityTaskManagerService service) {
         if (token == null) return null;
@@ -2388,7 +2388,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         boolean mUseOverrideInsetsForConfig;
 
         void resolveTmpOverrides(DisplayContent dc, Configuration parentConfig,
-                boolean isFixedRotationTransforming, @Nullable Rect safeRegionBounds) {
+                boolean isFixedRotationTransforming, @Nullable Rect safeRegionBounds,
+                boolean shouldApplyLegacyInsets) {
             mParentAppBoundsOverride = safeRegionBounds != null ? safeRegionBounds : new Rect(
                     parentConfig.windowConfiguration.getAppBounds());
             mParentBoundsOverride = safeRegionBounds != null ? safeRegionBounds : new Rect(
@@ -2400,8 +2401,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 mTmpOverrideConfigOrientation =
                         mParentAppBoundsOverride.height() >= mParentAppBoundsOverride.width()
                                 ? ORIENTATION_PORTRAIT : ORIENTATION_LANDSCAPE;
-            } else if (mUseOverrideInsetsForConfig && dc != null
-                    && !isFloating(parentConfig.windowConfiguration.getWindowingMode())) {
+            } else if (shouldApplyLegacyInsets && mUseOverrideInsetsForConfig && dc != null) {
                 // Insets are decoupled from configuration by default from V+, use legacy
                 // compatibility behaviour for apps targeting SDK earlier than 35
                 // (see applySizeOverrideIfNeeded).
@@ -2595,7 +2595,18 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 // We should just inherit the value from parent for this temporary state.
                 final boolean inPipTransition = windowingMode == WINDOWING_MODE_PINNED
                         && !mTmpFullBounds.isEmpty() && mTmpFullBounds.equals(parentBounds);
-                if (WindowConfiguration.isFloating(windowingMode) && !inPipTransition) {
+                // For floating tasks and app bubbles, calculate the smallest width from the bounds
+                // of the task, because they should not be affected by insets.
+                boolean shouldUseTaskBounds = WindowConfiguration.isFloating(windowingMode);
+                if (com.android.wm.shell.Flags.enableCreateAnyBubble()
+                        && com.android.wm.shell.Flags.enableBubbleAppCompatFixes()) {
+                    final Task task = getTask();
+                    if (task != null) {
+                        // TODO(b/407669465): Update isAppBubble usage once migrated.
+                        shouldUseTaskBounds |= task.getTaskInfo().isAppBubble;
+                    }
+                }
+                if (shouldUseTaskBounds && !inPipTransition) {
                     // For floating tasks, calculate the smallest width from the bounds of the
                     // task, because they should not be affected by insets.
                     inOutConfig.smallestScreenWidthDp = (int) (0.5f

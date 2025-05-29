@@ -26,12 +26,10 @@ import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
-import com.android.systemui.keyevent.domain.interactor.KeyEventInteractor
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.topui.TopUiController
 import com.android.systemui.topui.TopUiControllerRefactor
 import com.android.systemui.topwindoweffects.domain.interactor.SqueezeEffectInteractor
-import com.android.systemui.topwindoweffects.ui.viewmodel.SqueezeEffectConfig
 import com.android.systemui.topwindoweffects.ui.viewmodel.SqueezeEffectHapticPlayer
 import com.android.wm.shell.appzoomout.AppZoomOut
 import java.io.PrintWriter
@@ -49,7 +47,6 @@ class TopLevelWindowEffects
 constructor(
     @Application private val applicationScope: CoroutineScope,
     private val squeezeEffectInteractor: SqueezeEffectInteractor,
-    private val keyEventInteractor: KeyEventInteractor,
     // TODO(b/409930584): make AppZoomOut non-optional
     private val appZoomOutOptional: Optional<AppZoomOut>,
     squeezeEffectHapticPlayerFactory: SqueezeEffectHapticPlayer.Factory,
@@ -79,39 +76,39 @@ constructor(
 
     override fun start() {
         applicationScope.launch {
-            squeezeEffectInteractor.isSqueezeEffectEnabled.collectLatest { enabled ->
-                if (enabled) {
-                    squeezeEffectInteractor.isPowerButtonDownAsSingleKeyGesture.collectLatest { down
-                        ->
-                        if (down) {
-                            startSqueeze()
-                        } else {
-                            cancelSqueeze()
-                        }
+            squeezeEffectInteractor.isEffectEnabledAndPowerButtonPressedAsSingleGesture
+                .collectLatest { enabledAndPressed ->
+                    if (enabledAndPressed) {
+                        startSqueeze()
+                    } else {
+                        cancelSqueeze()
                     }
                 }
-            }
         }
     }
 
     private suspend fun startSqueeze() {
-        delay(squeezeEffectInteractor.getInvocationEffectInitialDelayMs())
+        delay(squeezeEffectInteractor.getInvocationEffectInitialDelayMillis())
         setRequestTopUi(true)
+        val inwardsAnimationDuration =
+            squeezeEffectInteractor.getInvocationEffectInAnimationDurationMillis()
+        val outwardsAnimationDuration =
+            squeezeEffectInteractor.getInvocationEffectOutAnimationDurationMillis()
         animateSqueezeProgressTo(
             targetProgress = 1f,
-            duration = SqueezeEffectConfig.INWARD_EFFECT_DURATION.toLong(),
+            duration = inwardsAnimationDuration,
             interpolator = InterpolatorsAndroidX.LEGACY,
         ) {
             animateSqueezeProgressTo(
                 targetProgress = 0f,
-                duration = SqueezeEffectConfig.OUTWARD_EFFECT_DURATION.toLong(),
-                interpolator = InterpolatorsAndroidX.LEGACY,
+                duration = outwardsAnimationDuration,
+                interpolator = InterpolatorsAndroidX.EMPHASIZED,
             ) {
                 finishAnimation()
             }
         }
-        hapticPlayer?.start()
-        keyEventInteractor.isPowerButtonLongPressed.collectLatest { isLongPressed ->
+        hapticPlayer?.start(inwardsAnimationDuration.toInt() + outwardsAnimationDuration.toInt())
+        squeezeEffectInteractor.isPowerButtonLongPressed.collectLatest { isLongPressed ->
             if (isLongPressed) {
                 isAnimationInterruptible = false
             }
@@ -123,8 +120,8 @@ constructor(
             hapticPlayer?.cancel()
             animateSqueezeProgressTo(
                 targetProgress = 0f,
-                duration = SqueezeEffectConfig.OUTWARD_EFFECT_DURATION.toLong(),
-                interpolator = InterpolatorsAndroidX.LEGACY,
+                duration = squeezeEffectInteractor.getInvocationEffectOutAnimationDurationMillis(),
+                interpolator = InterpolatorsAndroidX.EMPHASIZED,
             ) {
                 finishAnimation()
             }
@@ -171,6 +168,7 @@ constructor(
         pw.println("$TAG:")
         pw.println("  isAnimationInterruptible=$isAnimationInterruptible")
         pw.println("  squeezeProgress=$squeezeProgress")
+        squeezeEffectInteractor.dump(pw, args)
     }
 
     companion object {

@@ -35,6 +35,15 @@ import static android.app.admin.DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER
 import static android.content.pm.PackageManager.FEATURE_FREEFORM_WINDOW_MANAGEMENT;
 import static android.content.pm.PackageManager.FEATURE_PC;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.BACK_NAVIGATION;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.FOCUSED_APP;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.FOCUSED_DISPLAY_ID;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.FOCUSED_WINDOW;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.HARD_KEYBOARD_AVAILABLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.INPUT_METHOD_WINDOW;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.POLICY;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.ROOT_WINDOW_CONTAINER;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.WINDOW_FRAMES_VALID;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.Parcelable.PARCELABLE_WRITE_RETURN_VALUE;
 import static android.os.Process.SYSTEM_UID;
@@ -66,6 +75,7 @@ import static android.view.WindowManager.LayoutParams.FLAG_SECURE;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED;
 import static android.view.WindowManager.LayoutParams.FLAG_SLIPPERY;
+import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
 import static android.view.WindowManager.LayoutParams.INPUT_FEATURE_SPY;
@@ -141,15 +151,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerInternal.OnWindowRemovedListener;
 import static com.android.server.wm.WindowManagerInternal.WindowFocusChangeListener;
-import static com.android.server.wm.WindowManagerServiceDumpProto.BACK_NAVIGATION;
-import static com.android.server.wm.WindowManagerServiceDumpProto.FOCUSED_APP;
-import static com.android.server.wm.WindowManagerServiceDumpProto.FOCUSED_DISPLAY_ID;
-import static com.android.server.wm.WindowManagerServiceDumpProto.FOCUSED_WINDOW;
-import static com.android.server.wm.WindowManagerServiceDumpProto.HARD_KEYBOARD_AVAILABLE;
-import static com.android.server.wm.WindowManagerServiceDumpProto.INPUT_METHOD_WINDOW;
-import static com.android.server.wm.WindowManagerServiceDumpProto.POLICY;
-import static com.android.server.wm.WindowManagerServiceDumpProto.ROOT_WINDOW_CONTAINER;
-import static com.android.server.wm.WindowManagerServiceDumpProto.WINDOW_FRAMES_VALID;
 import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
 import static com.android.window.flags.Flags.enableDeviceStateAutoRotateSettingRefactor;
 import static com.android.window.flags.Flags.multiCrop;
@@ -234,6 +235,7 @@ import android.service.vr.IVrManager;
 import android.service.vr.IVrStateCallbacks;
 import android.sysprop.SurfaceFlingerProperties;
 import android.text.format.DateUtils;
+import android.tracing.TracingUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -337,7 +339,6 @@ import com.android.internal.policy.IKeyguardDismissCallback;
 import com.android.internal.policy.IKeyguardLockedStateListener;
 import com.android.internal.policy.IShortcutService;
 import com.android.internal.policy.KeyInterceptionInfo;
-import com.android.internal.protolog.LegacyProtoLogImpl;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.protolog.WmProtoLogGroups;
 import com.android.internal.util.DumpUtils;
@@ -712,8 +713,8 @@ public class WindowManagerService extends IWindowManager.Stub
     boolean mBootAnimationStopped = false;
     long mBootWaitForWindowsStartTime = -1;
 
-    // Cache whether to Magnify the Navigation Bar and IME.
-    private boolean mMagnifyNavAndIme = false;
+    // Cache whether to Magnify the IME.
+    private boolean mMagnifyIme = false;
 
     /** Dump of the windows and app tokens at the time of the last ANR. Cleared after
      * LAST_ANR_LIFETIME_DURATION_MSECS */
@@ -832,7 +833,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 Settings.Secure.getUriFor(Settings.Secure.IMMERSIVE_MODE_CONFIRMATIONS);
         private final Uri mDisableSecureWindowsUri =
                 Settings.Secure.getUriFor(Settings.Secure.DISABLE_SECURE_WINDOWS);
-        private final Uri mMagnifyNavAndImeEnabledUri = Settings.Secure.getUriFor(
+        private final Uri mMagnifyImeEnabledUri = Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME);
         private final Uri mPolicyControlUri =
                 Settings.Global.getUriFor(Settings.Global.POLICY_CONTROL);
@@ -867,7 +868,7 @@ public class WindowManagerService extends IWindowManager.Stub
             resolver.registerContentObserver(mDisableSecureWindowsUri, false, this,
                     UserHandle.USER_ALL);
             if (com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
-                resolver.registerContentObserver(mMagnifyNavAndImeEnabledUri, false, this,
+                resolver.registerContentObserver(mMagnifyImeEnabledUri, false, this,
                         UserHandle.USER_ALL);
             }
             resolver.registerContentObserver(mPolicyControlUri, false, this, UserHandle.USER_ALL);
@@ -931,8 +932,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
 
-            if (mMagnifyNavAndImeEnabledUri.equals(uri)) {
-                updateMagnifyNavAndIme();
+            if (mMagnifyImeEnabledUri.equals(uri)) {
+                updateMagnifyIme();
             }
 
             if (mDevelopmentOverrideDesktopExperienceUri.equals(uri)) {
@@ -959,7 +960,7 @@ public class WindowManagerService extends IWindowManager.Stub
         void loadSettings() {
             updateMaximumObscuringOpacityForTouch();
             updateDisableSecureWindows();
-            updateMagnifyNavAndIme();
+            updateMagnifyIme();
         }
 
         void updateMaximumObscuringOpacityForTouch() {
@@ -1069,23 +1070,23 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         }
 
-        void updateMagnifyNavAndIme() {
+        void updateMagnifyIme() {
             if (!com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
-                mMagnifyNavAndIme = false;
+                mMagnifyIme = false;
                 return;
             }
 
-            boolean enabledMagnifyNavAndIme = Settings.Secure.getIntForUser(
+            boolean enabledMagnifyIme = Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
                     Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME,
                     AccessibilityUtils.getMagnificationMagnifyKeyboardDefaultValue(mContext),
                     mCurrentUserId) == 1;
-            if (mMagnifyNavAndIme == enabledMagnifyNavAndIme) {
+            if (mMagnifyIme == enabledMagnifyIme) {
                 return;
             }
 
             synchronized (mGlobalLock) {
-                mMagnifyNavAndIme = enabledMagnifyNavAndIme;
+                mMagnifyIme = enabledMagnifyIme;
             }
         }
     }
@@ -1379,11 +1380,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mWindowTracing = WindowTracing.createDefaultAndStartLooper(this,
                 Choreographer.getInstance());
 
-        if (android.tracing.Flags.perfettoTransitionTracing()) {
-            mTransitionTracer = new PerfettoTransitionTracer();
-        } else {
-            mTransitionTracer = new LegacyTransitionTracer();
-        }
+        mTransitionTracer = new PerfettoTransitionTracer();
 
         LocalServices.addService(WindowManagerPolicy.class, mPolicy);
 
@@ -1527,8 +1524,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @VisibleForTesting
-    boolean isMagnifyNavAndImeEnabled() {
-        return mMagnifyNavAndIme;
+    boolean isMagnifyImeEnabled() {
+        return mMagnifyIme;
     }
 
     DisplayAreaPolicy.Provider getDisplayAreaPolicyProvider() {
@@ -6948,12 +6945,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     private void dumpLogStatus(PrintWriter pw) {
-        pw.println("WINDOW MANAGER LOGGING (dumpsys window logging)");
-        if (android.tracing.Flags.perfettoProtologTracing()) {
-            pw.println("Deprecated legacy command. Use Perfetto commands instead.");
-            return;
-        }
-        ((LegacyProtoLogImpl) ProtoLog.getSingleInstance()).getStatus();
+        pw.println("Deprecated legacy command. Use Perfetto commands instead.");
+        return;
     }
 
     private void dumpSessionsLocked(PrintWriter pw) {
@@ -6967,13 +6960,14 @@ public class WindowManagerService extends IWindowManager.Stub
 
     /**
      * Write to a protocol buffer output stream. Protocol buffer message definition is at
-     * {@link com.android.server.wm.WindowManagerServiceDumpProto}.
+     * {@link android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto}.
      *
      * @param proto     Stream to write the WindowContainer object to.
      * @param logLevel  Determines the amount of data to be written to the Protobuf.
      */
     void dumpDebugLocked(ProtoOutputStream proto, @WindowTracingLogLevel int logLevel) {
-        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "dumpDebugLocked");
+        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER,
+                TracingUtils.uiTracingSliceName("Window::dumpDebugLocked"));
         try {
             mPolicy.dumpDebug(proto, POLICY);
             mRoot.dumpDebug(proto, ROOT_WINDOW_CONTAINER, logLevel);
@@ -7881,6 +7875,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 return false;
             }
             if (!displayContent.isSystemDecorationsSupported()) {
+                return false;
+            }
+            if (!displayContent.isWindowingModeSupported(WINDOWING_MODE_FREEFORM)) {
                 return false;
             }
             return displayContent.isDefaultDisplay || displayContent.allowContentModeSwitch();
@@ -9492,6 +9489,16 @@ public class WindowManagerService extends IWindowManager.Stub
             Slog.w(TAG, "Removing INPUT_FEATURE_SENSITIVE_FOR_PRIVACY from '" + windowName
                     + "' because it isn't a trusted overlay");
             return inputFeatures & ~INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
+        }
+
+        if ((inputFeatures & INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE) != 0) {
+            final int permissionResult = mContext.checkPermission(
+                    permission.MANAGE_DISPLAYS, callingPid, callingUid);
+            if (permissionResult != PackageManager.PERMISSION_GRANTED) {
+                throw new SecurityException(
+                        "Cannot use INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE from '" + windowName
+                                + "' because it doesn't the have MANAGE_DISPLAYS permission");
+            }
         }
         return inputFeatures;
     }

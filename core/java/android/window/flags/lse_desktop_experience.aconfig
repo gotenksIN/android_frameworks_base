@@ -1262,6 +1262,16 @@ flag {
 }
 
 flag {
+    name: "enable_app_handle_position_reporting"
+    namespace: "lse_desktop_experience"
+    description: "Report app handle position to the SysUi."
+    bug: "412444130"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_desktop_app_launch_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enabling an umbrella flag for various bugfixes related to app launch transitions."
@@ -1316,6 +1326,7 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables the API to allow default browsers to reposition their windows."
     bug: "400407139"
+    is_exported: true
 }
 
 flag {
@@ -1333,6 +1344,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Throttle recent tasks reload operations for Taskbar."
     bug: "415090968"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_block_non_desktop_display_window_drag_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Block window drag to a non-desktop-mode display."
+    bug: "383069176"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

@@ -20,6 +20,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,21 +35,21 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
+import com.android.compose.windowsizeclass.calculateWindowSizeClass
 import com.android.systemui.ambientcue.ui.viewmodel.ActionViewModel
 import com.android.systemui.ambientcue.ui.viewmodel.AmbientCueViewModel
 import com.android.systemui.ambientcue.ui.viewmodel.PillStyleViewModel
 import com.android.systemui.lifecycle.rememberViewModel
 
-// TODO: b/414507396 - Replace with the height of the navbar
-private val chipsBottomPadding = 46.dp
-
 @Composable
 fun AmbientCueContainer(
     modifier: Modifier = Modifier,
     ambientCueViewModelFactory: AmbientCueViewModel.Factory,
-    onShouldInterceptTouches: (Boolean) -> Unit,
+    onShouldInterceptTouches: (Boolean, Rect?) -> Unit,
 ) {
     val viewModel = rememberViewModel("AmbientCueContainer") { ambientCueViewModelFactory.create() }
 
@@ -58,7 +59,6 @@ fun AmbientCueContainer(
     val pillStyle = viewModel.pillStyle
 
     LaunchedEffect(expanded) {
-        onShouldInterceptTouches(expanded)
         if (expanded) {
             viewModel.cancelDeactivation()
         } else {
@@ -80,20 +80,22 @@ fun AmbientCueContainer(
                     actions = actions,
                     visible = visible,
                     expanded = expanded,
+                    onShouldInterceptTouches = onShouldInterceptTouches,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
             is PillStyleViewModel.ShortPillStyle -> {
-                val pillCenterInWindow = pillStyle.position
+                val pillPositionInWindow = pillStyle.position
                 TaskBarAnd3ButtonAmbientCue(
                     viewModel = viewModel,
                     actions = actions,
                     visible = visible,
                     expanded = expanded,
-                    pillCenterInWindow = pillCenterInWindow,
+                    pillPositionInWindow = pillPositionInWindow,
+                    onShouldInterceptTouches = onShouldInterceptTouches,
                     modifier =
-                        if (pillCenterInWindow == null) {
-                            Modifier.align(Alignment.BottomCenter)
+                        if (pillPositionInWindow == null) {
+                            Modifier.align(Alignment.BottomEnd)
                         } else {
                             Modifier
                         },
@@ -110,17 +112,31 @@ private fun TaskBarAnd3ButtonAmbientCue(
     actions: List<ActionViewModel>,
     visible: Boolean,
     expanded: Boolean,
-    pillCenterInWindow: Rect?,
+    pillPositionInWindow: Rect?,
+    onShouldInterceptTouches: (Boolean, Rect?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val actionsVerticalPaddingPx = with(density) { SHORT_PILL_ACTIONS_VERTICAL_PADDING.dp.toPx() }
+    val actionsHorizontalPaddingPx = with(density) { ACTIONS_HORIZONTAL_PADDING.dp.toPx() }
     val portrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     var pillCenter by remember { mutableStateOf(Offset.Zero) }
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    var touchableRegion by remember { mutableStateOf<Rect?>(null) }
+    LaunchedEffect(expanded, touchableRegion) {
+        onShouldInterceptTouches(true, if (expanded) null else touchableRegion)
+    }
     BackgroundGlow(
         visible = visible,
         expanded = expanded,
         collapsedOffset = IntOffset(0, 110),
-        modifier = modifier.graphicsLayer { translationX = -size.width / 2 + pillCenter.x },
+        modifier =
+            modifier.graphicsLayer {
+                translationX = -size.width / 2 + pillCenter.x
+                translationY = screenHeightPx - size.height
+            },
     )
     ShortPill(
         actions = actions,
@@ -128,17 +144,31 @@ private fun TaskBarAnd3ButtonAmbientCue(
         horizontal = portrait,
         expanded = expanded,
         modifier =
-            if (pillCenterInWindow == null) {
+            if (pillPositionInWindow == null) {
                 modifier.padding(bottom = 12.dp, end = 24.dp).onGloballyPositioned {
                     pillCenter = it.boundsInParent().center
                 }
             } else {
                 Modifier.graphicsLayer {
-                    val center = pillCenterInWindow.center
-                    translationX = center.x - size.width / 2
-                    translationY = center.y - size.height / 2
-                    pillCenter = center
-                }
+                        translationX = pillCenter.x - size.width / 2
+                        translationY = pillCenter.y - size.height / 2
+                    }
+                    .onGloballyPositioned { layoutCoordinates ->
+                        layoutCoordinates.parentCoordinates?.let { parentCoordinates ->
+                            pillCenter =
+                                parentCoordinates.screenToLocal(pillPositionInWindow.center)
+                            touchableRegion =
+                                Rect(
+                                    offset =
+                                        pillCenter -
+                                            Offset(
+                                                layoutCoordinates.size.width / 2f,
+                                                layoutCoordinates.size.height / 2f,
+                                            ),
+                                    size = layoutCoordinates.size.toSize(),
+                                )
+                        }
+                    }
             },
         onClick = { viewModel.expand() },
         onCloseClick = { viewModel.hide() },
@@ -147,7 +177,11 @@ private fun TaskBarAnd3ButtonAmbientCue(
         actions = actions,
         visible = visible && expanded,
         horizontalAlignment = Alignment.End,
-        modifier = modifier.padding(bottom = chipsBottomPadding, end = 24.dp),
+        modifier =
+            modifier.graphicsLayer {
+                translationX = screenWidthPx - size.width - actionsHorizontalPaddingPx
+                translationY = pillCenter.y - size.height - actionsVerticalPaddingPx
+            },
     )
 }
 
@@ -157,12 +191,20 @@ private fun NavBarAmbientCue(
     actions: List<ActionViewModel>,
     visible: Boolean,
     expanded: Boolean,
+    onShouldInterceptTouches: (Boolean, Rect?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val windowWidthSizeClass = calculateWindowSizeClass().widthSizeClass
+
+    val navBarWidth =
+        if (windowWidthSizeClass == WindowWidthSizeClass.Compact) NAV_BAR_WIDTH_DP.dp
+        else NAV_BAR_LARGE_WIDTH_DP.dp
+
+    LaunchedEffect(expanded) { onShouldInterceptTouches(expanded, null) }
     BackgroundGlow(visible = visible, expanded = expanded, modifier = modifier)
     NavBarPill(
         actions = actions,
-        navBarWidth = 110.dp, // TODO: b/414507396 - Replace with the width of the navbar
+        navBarWidth = navBarWidth,
         visible = visible,
         expanded = expanded,
         modifier = modifier,
@@ -172,6 +214,19 @@ private fun NavBarAmbientCue(
     ActionList(
         actions = actions,
         visible = visible && expanded,
-        modifier = modifier.padding(bottom = chipsBottomPadding),
+        modifier =
+            modifier.padding(
+                bottom = NAV_BAR_ACTIONS_PADDING.dp,
+                start = ACTIONS_HORIZONTAL_PADDING.dp,
+                end = ACTIONS_HORIZONTAL_PADDING.dp,
+            ),
     )
 }
+
+private const val NAV_BAR_WIDTH_DP = 108 // R.dimen.taskbar_stashed_small_screen from Launcher
+private const val NAV_BAR_LARGE_WIDTH_DP = 220 // R.dimen.taskbar_stashed_handle_width from Launcher
+
+private const val NAV_BAR_HEIGHT_DP = 24 // R.dimen.taskbar_stashed_size from Launcher
+private const val SHORT_PILL_ACTIONS_VERTICAL_PADDING = 38
+private const val NAV_BAR_ACTIONS_PADDING = NAV_BAR_HEIGHT_DP + 22
+private const val ACTIONS_HORIZONTAL_PADDING = 32

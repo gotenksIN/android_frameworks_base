@@ -42,6 +42,13 @@ flag {
 }
 
 flag {
+    name: "software_ratelimiter"
+    namespace: "security"
+    description: "Enable support for SoftwareRateLimiter in LockSettingsService"
+    bug: "395976735"
+}
+
+flag {
     name: "frp_enforcement"
     is_exported: true
     namespace: "hardware_backed_security"
@@ -96,6 +103,14 @@ flag {
     namespace: "biometrics"
     description: "Feature flag for Secure Lockdown feature"
     bug: "373422357"
+    is_exported: true
+}
+
+flag {
+    name: "secure_lock_device"
+    namespace: "biometrics"
+    description: "Feature flag for Secure Lock Device feature"
+    bug: "401645997"
     is_exported: true
 }
 

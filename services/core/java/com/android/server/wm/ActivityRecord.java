@@ -3363,6 +3363,10 @@ public final class ActivityRecord extends WindowToken {
             return false;
         }
 
+        if (getOptions() != null && getOptions().isLaunchIntoPip()) {
+            return true;
+        }
+
         boolean isCurrentAppLocked =
                 mAtmService.getLockTaskModeState() != LOCK_TASK_MODE_NONE;
         final TaskDisplayArea taskDisplayArea = getDisplayArea();
@@ -4664,6 +4668,7 @@ public final class ActivityRecord extends WindowToken {
                 if (fromActivity.isVisible()) {
                     setVisible(true);
                     setVisibleRequested(true);
+                    mWmService.mAnimator.addSurfaceVisibilityUpdate(this);
                     mVisibleSetFromTransferredStartingWindow = true;
                 }
                 setClientVisible(fromActivity.isClientVisible());
@@ -4769,6 +4774,10 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean containsDismissKeyguardWindow() {
+        if (inPinnedWindowingMode()) {
+            return false;
+        }
+
         // Window state is transient during relaunch. We are not guaranteed to be frozen during the
         // entirety of the relaunch.
         if (isRelaunching()) {
@@ -7349,6 +7358,7 @@ public final class ActivityRecord extends WindowToken {
             // window. We now reset it back to false since the starting window was the last
             // window in the token.
             setVisible(false);
+            mWmService.mAnimator.addSurfaceVisibilityUpdate(this);
         }
     }
 
@@ -7845,8 +7855,8 @@ public final class ActivityRecord extends WindowToken {
             final Task task = getTask();
             if (task != null) {
                 // Similar to floating windows, an app bubble should not apply legacy insets.
-                // TODO(b/407669465): Update isAppBubble usage once migrated to the new approach.
-                shouldApplyLegacyInsets &= !task.getTaskInfo().isAppBubble;
+                // TODO(b/407669465): Update mLaunchNextToBubble usage when migrated.
+                shouldApplyLegacyInsets &= !task.mLaunchNextToBubble;
             }
         }
         mResolveConfigHint.resolveTmpOverrides(mDisplayContent, newParentConfiguration,

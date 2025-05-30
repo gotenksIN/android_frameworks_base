@@ -35,7 +35,6 @@ import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -66,6 +65,7 @@ import com.android.wm.shell.transition.Transitions;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -117,10 +117,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
     public void setUp() {
         MockitoAnnotations.initMocks(this);
 
-        if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            doReturn(true).when(mTransitions).isRegistered();
-        }
-
         mToken = new MockToken().token();
 
         mTaskInfo = createMockTaskInfo(314, mToken);
@@ -137,7 +133,12 @@ public class TaskViewTransitionsTest extends ShellTestCase {
     public void testMoveTaskViewToFullscreen_resetsInterceptBackPressed() {
         mTaskViewTransitions.moveTaskViewToFullscreen(mTaskViewTaskController);
 
-        verify(mOrganizer).setInterceptBackPressedOnTaskRoot(mToken, false);
+        ArgumentCaptor<WindowContainerTransaction> wctCaptor =
+                ArgumentCaptor.forClass(WindowContainerTransaction.class);
+        verify(mTransitions).startTransition(anyInt(), wctCaptor.capture(), any());
+        WindowContainerTransaction.Change chg =
+                wctCaptor.getValue().getChanges().get(mToken.asBinder());
+        assertThat(chg.getInterceptBackPressed()).isFalse();
     }
 
     @EnableFlags({
@@ -163,8 +164,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void testSetTaskBounds_taskNotVisible_noTransaction() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.setTaskViewVisible(mTaskViewTaskController, false);
         mTaskViewTransitions.setTaskBounds(mTaskViewTaskController,
                 new Rect(0, 0, 100, 100));
@@ -175,8 +174,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void testSetTaskBounds_taskVisible_boundsChangeTransaction() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.setTaskViewVisible(mTaskViewTaskController, true);
 
         // Consume the pending transaction from visibility change
@@ -202,8 +199,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void testSetTaskBounds_taskVisibleWithPending_noTransaction() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.setTaskViewVisible(mTaskViewTaskController, true);
 
         TaskViewTransitions.PendingTransition pending =
@@ -218,8 +213,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void testSetTaskBounds_sameBounds_noTransaction() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.setTaskViewVisible(mTaskViewTaskController, true);
 
         // Consume the pending transaction from visibility change
@@ -266,14 +259,11 @@ public class TaskViewTransitionsTest extends ShellTestCase {
     public void testSetTaskVisibility_taskRemoved_noNPE() {
         mTaskViewTransitions.unregisterTaskView(mTaskViewTaskController);
 
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.setTaskViewVisible(mTaskViewTaskController, false);
     }
 
     @Test
     public void testSetTaskVisibility_reorderNoHiddenVisibilitySync_resetsAlwaysOnTopAndReorder() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
         assumeTrue(TaskViewTransitions.useRepo());
         assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubbleWithForceExcludedFromRecents());
 
@@ -304,16 +294,12 @@ public class TaskViewTransitionsTest extends ShellTestCase {
     public void testSetTaskBounds_taskRemoved_noNPE() {
         mTaskViewTransitions.unregisterTaskView(mTaskViewTaskController);
 
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.setTaskBounds(mTaskViewTaskController,
                 new Rect(0, 0, 100, 100));
     }
 
     @Test
     public void testReorderTask_movedToFrontTransaction() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.reorderTaskViewTask(mTaskViewTaskController, true);
         // Consume the pending transaction from order change
         TaskViewTransitions.PendingTransition pending =
@@ -333,8 +319,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void testReorderTask_movedToBackTransaction() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         mTaskViewTransitions.reorderTaskViewTask(mTaskViewTaskController, false);
         // Consume the pending transaction from order change
         TaskViewTransitions.PendingTransition pending =
@@ -354,8 +338,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void test_startAnimation_setsTaskNotFound() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         TransitionInfo.Change change = mock(TransitionInfo.Change.class);
         when(change.getTaskInfo()).thenReturn(mTaskInfo);
         when(change.getMode()).thenReturn(TRANSIT_OPEN);
@@ -384,8 +366,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void updateBoundsForUnfold_taskNotFound_doesNothing() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         ActivityManager.RunningTaskInfo taskInfo = new ActivityManager.RunningTaskInfo();
         taskInfo.token = mock(WindowContainerToken.class);
         taskInfo.taskId = 666;
@@ -402,8 +382,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void updateBoundsForUnfold_noPendingTransition_doesNothing() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         Rect bounds = new Rect(100, 50, 200, 250);
         mTaskViewTransitions.setTaskBounds(mTaskViewTaskController, bounds);
         assertThat(mTaskViewTransitions.hasPending()).isFalse();
@@ -419,8 +397,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Test
     public void updateBoundsForUnfold() {
-        assumeTrue(Transitions.ENABLE_SHELL_TRANSITIONS);
-
         Rect bounds = new Rect(100, 50, 200, 250);
         mTaskViewTransitions.updateVisibilityState(mTaskViewTaskController, /* visible= */ true);
         mTaskViewTransitions.setTaskBounds(mTaskViewTaskController, bounds);

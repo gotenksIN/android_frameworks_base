@@ -121,6 +121,10 @@ public class Watchdog implements Dumpable {
     // The pre-watchdog event is similar to a full watchdog except it does not crash system server.
     private static final int PRE_WATCHDOG_TIMEOUT_RATIO = 4;
 
+    // Throttle non-fatal thread dumps to avoid adversely affecting performance.
+    private static final long PRE_WATCHDOG_COOL_OFF_MILLIS =
+            com.android.internal.os.Flags.preWatchdogThrottleThreadDump() ? 60 * 60 * 1000 : 0;
+
     // These are temporally ordered: larger values as lateness increases
     static final int COMPLETED = 0;
     static final int WAITING = 1;
@@ -474,6 +478,26 @@ public class Watchdog implements Dumpable {
 
     public interface Monitor {
         void monitor();
+    }
+
+    static final class Throttler {
+        private final Clock mUptimeClock;
+        private final long mCoolOffPeriodMillis;
+        private long mLastTriggerMillis = 0;
+
+        Throttler(Clock uptimeClock, long coolOffPeriodMillis) {
+            this.mUptimeClock = uptimeClock;
+            this.mCoolOffPeriodMillis = coolOffPeriodMillis;
+        }
+
+        boolean isThrottled() {
+            return mLastTriggerMillis > 0
+                    && (mUptimeClock.millis() - mLastTriggerMillis) < mCoolOffPeriodMillis;
+        }
+
+        void markTrigger() {
+            mLastTriggerMillis = mUptimeClock.millis();
+        }
     }
 
     public static Watchdog getInstance() {
@@ -853,7 +877,9 @@ public class Watchdog implements Dumpable {
     }
 
     private void run() {
-        boolean waitedHalf = false;
+        boolean preWatchdogTriggered = false;
+        Throttler preWatchdogThrottler = new Throttler(
+                SystemClock.uptimeClock(), PRE_WATCHDOG_COOL_OFF_MILLIS);
         while (true) {
             List<HandlerChecker> blockedCheckers = Collections.emptyList();
             String subject = "";
@@ -905,15 +931,15 @@ public class Watchdog implements Dumpable {
                 final int waitState = evaluateCheckerCompletionLocked();
                 if (waitState == COMPLETED) {
                     // The monitors have returned; reset
-                    waitedHalf = false;
+                    preWatchdogTriggered = false;
                     continue;
                 } else if (waitState == WAITING) {
                     // still waiting but within their configured intervals; back off and recheck
                     continue;
                 } else if (waitState == WAITED_UNTIL_PRE_WATCHDOG) {
-                    if (!waitedHalf) {
+                    if (!preWatchdogTriggered) {
                         Slog.i(TAG, "WAITED_UNTIL_PRE_WATCHDOG");
-                        waitedHalf = true;
+                        preWatchdogTriggered = true;
                         // We've waited until the pre-watchdog, but we'd need to do the stack trace
                         // dump w/o the lock.
                         blockedCheckers = getCheckersWithStateLocked(WAITED_UNTIL_PRE_WATCHDOG);
@@ -948,7 +974,16 @@ public class Watchdog implements Dumpable {
 // QTI_BEGIN: 2018-03-25: Frameworks: Create a new WD trace file for ease of debugging
             }
 // QTI_END: 2018-03-25: Frameworks: Create a new WD trace file for ease of debugging
-            logWatchog(doWaitedPreDump, subject, pids);
+            // restart. If we reached pre-watchdog timeout, just log some information and continue.
+
+            // Get critical event log before logging the watchdog so that it doesn't
+            // occur in the log.
+            String criticalLog = CriticalEventLog.getInstance().logLinesForSystemServerTraceFile();
+            UUID errorId = logWatchdog(doWaitedPreDump, subject);
+            if (!doWaitedPreDump || !preWatchdogThrottler.isThrottled()) {
+                collectThreadDumps(errorId, doWaitedPreDump, criticalLog, subject, pids);
+                preWatchdogThrottler.markTrigger();
+            }
 
             if (doWaitedPreDump) {
                 // We have waited for only pre-watchdog timeout, we continue to wait for the
@@ -970,7 +1005,7 @@ public class Watchdog implements Dumpable {
                     int res = controller.systemNotResponding(subject);
                     if (res >= 0) {
                         Slog.i(TAG, "Activity controller requested to coninue to wait");
-                        waitedHalf = false;
+                        preWatchdogTriggered = false;
                         continue;
                     }
                 } catch (RemoteException e) {
@@ -1008,17 +1043,12 @@ public class Watchdog implements Dumpable {
                 System.exit(10);
             }
 
-            waitedHalf = false;
+            preWatchdogTriggered = false;
         }
     }
 
-    private void logWatchog(boolean preWatchdog, String subject, ArrayList<Integer> pids) {
-        File initialStack = null;
+    private UUID logWatchdog(boolean preWatchdog, String subject) {
         ArrayList<Integer> nativePids = getInterestingNativePids();
-        // Get critical event log before logging the half watchdog so that it doesn't
-        // occur in the log.
-        String criticalEvents =
-                CriticalEventLog.getInstance().logLinesForSystemServerTraceFile();
         final UUID errorId = mTraceErrorLogger.generateErrorId();
         if (mTraceErrorLogger.isAddErrorIdEnabled()) {
             mTraceErrorLogger.addProcessInfoAndErrorIdToTrace("system_server", Process.myPid(),
@@ -1026,22 +1056,10 @@ public class Watchdog implements Dumpable {
             mTraceErrorLogger.addSubjectToTrace(subject, errorId);
         }
 
-        final String dropboxTag;
         if (preWatchdog) {
-            dropboxTag = "pre_watchdog";
             CriticalEventLog.getInstance().logHalfWatchdog(subject);
-            // We've waited half the deadlock-detection interval.  Pull a stack
-            // trace and wait another half.
-            initialStack = StackTracesDumpHelper.dumpStackTraces(pids, null, null,
-                    CompletableFuture.completedFuture(nativePids), null, subject,
-                    criticalEvents, /* extraHeaders */null, Runnable::run,/* latencyTracker= */null);
-            if (initialStack != null){
-                SmartTraceUtils.dumpStackTraces(Process.myPid(), pids,
-                    nativePids, initialStack);
-            }
             FrameworkStatsLog.write(FrameworkStatsLog.SYSTEM_SERVER_PRE_WATCHDOG_OCCURRED);
         } else {
-            dropboxTag = "watchdog";
             CriticalEventLog.getInstance().logWatchdog(subject, errorId);
             EventLog.writeEvent(EventLogTags.WATCHDOG, subject);
             // Log the atom as early as possible since it is used as a mechanism to trigger
@@ -1049,10 +1067,14 @@ public class Watchdog implements Dumpable {
             // point in time when the Watchdog happens as possible.
             FrameworkStatsLog.write(FrameworkStatsLog.SYSTEM_SERVER_WATCHDOG_OCCURRED, subject);
         }
+        return errorId;
+    }
 
+    private void collectThreadDumps(UUID errorId, boolean preWatchdog, String criticalEvents,
+            String subject, ArrayList<Integer> pids) {
+        String dropboxTag = preWatchdog ? "pre_watchdog" : "watchdog";
         final LinkedHashMap headersMap =
-                com.android.server.am.Flags.enableDropboxWatchdogHeaders()
-                ? new LinkedHashMap<>(Collections.singletonMap("Watchdog-Type", dropboxTag)) : null;
+                new LinkedHashMap<>(Collections.singletonMap("Watchdog-Type", dropboxTag));
         long anrTime = SystemClock.uptimeMillis();
         StringBuilder report = new StringBuilder();
         report.append(ResourcePressureUtil.currentPsiState());
@@ -1064,7 +1086,7 @@ public class Watchdog implements Dumpable {
                 tracesFileException, subject, criticalEvents, headersMap,
                 Runnable::run, /* latencyTracker= */null);
         if (finalStack != null){
-            SmartTraceUtils.dumpStackTraces(Process.myPid(), pids, nativePids, finalStack);
+            SmartTraceUtils.dumpStackTraces(Process.myPid(), pids, getInterestingNativePids(), finalStack);
         }
         //Collect Binder State logs to get status of all the transactions
         if (Build.IS_DEBUGGABLE) {
@@ -1083,6 +1105,10 @@ public class Watchdog implements Dumpable {
                 + String.valueOf(Process.myPid());
         File tracesDir = new File(StackTracesDumpHelper.ANR_TRACE_DIR);
         watchdogTraces = new File(tracesDir, newTracesPath);
+        File initialStack = null;
+        initialStack = StackTracesDumpHelper.dumpStackTraces(pids, null, null,
+                    CompletableFuture.completedFuture(getInterestingNativePids()), null, subject,
+                    criticalEvents, /* extraHeaders */null, Runnable::run,/* latencyTracker= */null);
         try {
             if (watchdogTraces.createNewFile()) {
                 FileUtils.setPermissions(watchdogTraces.getAbsolutePath(),

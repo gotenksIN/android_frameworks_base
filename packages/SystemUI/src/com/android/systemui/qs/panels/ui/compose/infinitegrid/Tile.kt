@@ -75,8 +75,12 @@ import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.animation.Expandable
 import com.android.compose.animation.bounceable
 import com.android.compose.animation.rememberExpandableController
+import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementKey
 import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.LocalAndroidColorScheme
+import com.android.mechanics.compose.modifier.verticalFadeContentReveal
+import com.android.mechanics.spec.builder.rememberMotionBuilderContext
 import com.android.systemui.Flags
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.Icon
@@ -128,7 +132,7 @@ private val TileViewModel.traceName
     get() = spec.toString().takeLast(Trace.MAX_SECTION_NAME_LEN)
 
 @Composable
-fun Tile(
+fun ContentScope.Tile(
     tile: TileViewModel,
     iconOnly: Boolean,
     squishiness: () -> Float,
@@ -139,6 +143,7 @@ fun Tile(
     isVisible: () -> Boolean = { true },
     requestToggleTextFeedback: (TileSpec) -> Unit = {},
     detailsViewModel: DetailsViewModel?,
+    revealEffectContainer: ElementKey? = null,
 ) {
     trace(tile.traceName) {
         val currentBounceableInfo by rememberUpdatedState(bounceableInfo)
@@ -246,6 +251,16 @@ fun Tile(
                 accessibilityUiState = uiState.accessibilityUiState,
                 iconOnly = iconOnly,
                 isDualTarget = isDualTarget,
+                modifier =
+                    if (revealEffectContainer != null) {
+                        Modifier.verticalFadeContentReveal(
+                            contentScope = this,
+                            motionBuilderContext = rememberMotionBuilderContext(),
+                            container = revealEffectContainer,
+                        )
+                    } else {
+                        Modifier
+                    },
             ) {
                 val iconProvider: Context.() -> Icon = { getTileIcon(icon = icon) }
                 if (iconOnly) {

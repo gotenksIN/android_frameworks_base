@@ -139,7 +139,6 @@ public class BubbleTransitionsTest extends ShellTestCase {
         final ShellExecutor syncExecutor = new TestSyncExecutor();
 
         when(mTransitions.getMainExecutor()).thenReturn(syncExecutor);
-        when(mTransitions.isRegistered()).thenReturn(true);
         mTaskViewTransitions = new TaskViewTransitions(mTransitions, mRepository, mTaskOrganizer,
                 mSyncQueue);
         mBubbleTransitions = new BubbleTransitions(mContext, mTransitions, mTaskOrganizer,
@@ -491,13 +490,14 @@ public class BubbleTransitionsTest extends ShellTestCase {
             Rect r = invocation.getArgument(0);
             r.set(0, 0, 50, 100);
             return null;
-        }).when(mLayerView).getExpandedViewRestBounds(any());
+        }).when(mBubblePositioner).getTaskViewRestBounds(any());
 
         final SurfaceControl.Transaction transaction = mock(SurfaceControl.Transaction.class);
         final BubbleTransitions.TransactionProvider transactionProvider = () -> transaction;
 
         final BubbleTransitions.FloatingToBarConversion bt =
-                mBubbleTransitions.new FloatingToBarConversion(mBubble, transactionProvider);
+                mBubbleTransitions.new FloatingToBarConversion(mBubble, transactionProvider,
+                        mBubblePositioner);
 
         verify(mBubble).setPreparingTransition(bt);
         verify(mTransitions, never()).startTransition(anyInt(), any(), eq(bt));
@@ -563,13 +563,14 @@ public class BubbleTransitionsTest extends ShellTestCase {
             Rect r = invocation.getArgument(0);
             r.set(0, 0, 50, 100);
             return null;
-        }).when(mLayerView).getExpandedViewRestBounds(any());
+        }).when(mBubblePositioner).getTaskViewRestBounds(any());
 
         final SurfaceControl.Transaction transaction = mock(SurfaceControl.Transaction.class);
         final BubbleTransitions.TransactionProvider transactionProvider = () -> transaction;
 
         final BubbleTransitions.FloatingToBarConversion bt =
-                mBubbleTransitions.new FloatingToBarConversion(mBubble, transactionProvider);
+                mBubbleTransitions.new FloatingToBarConversion(mBubble, transactionProvider,
+                        mBubblePositioner);
 
         verify(mBubble).setPreparingTransition(bt);
         verify(mTransitions, never()).startTransition(anyInt(), any(), eq(bt));
@@ -613,7 +614,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
         setupBubble();
 
         final BubbleTransitions.FloatingToBarConversion bt =
-                mBubbleTransitions.new FloatingToBarConversion(mBubble);
+                mBubbleTransitions.new FloatingToBarConversion(mBubble, mBubblePositioner);
 
         verify(mTransitions, never()).startTransition(anyInt(), any(), eq(bt));
 

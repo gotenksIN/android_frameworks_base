@@ -44,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -120,7 +119,7 @@ fun NavBarPill(
                         .widthIn(min = navBarWidth, max = maxPillWidth)
                         .background(backgroundColor)
                         .animatedActionBorder(
-                            strokeWidth = 2.dp,
+                            strokeWidth = 1.dp,
                             strokeColor = outlineColor,
                             cornerRadius = 16.dp,
                             visible = visible,
@@ -143,12 +142,6 @@ fun NavBarPill(
                     ) {
                         Image(
                             painter = rememberDrawablePainter(action.icon),
-                            colorFilter =
-                                if (hasAttribution) {
-                                    ColorFilter.tint(outlineColor)
-                                } else {
-                                    null
-                                },
                             contentDescription = action.label,
                             modifier = Modifier.size(16.dp).clip(CircleShape),
                         )
@@ -163,16 +156,6 @@ fun NavBarPill(
                                 color = outlineColor,
                                 modifier = Modifier.widthIn(0.dp, maxPillWidth * 0.5f),
                             )
-                            if (hasAttribution) {
-                                Text(
-                                    text = action.attribution!!,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = outlineColor,
-                                    modifier = Modifier.padding(start = 4.dp).alpha(0.4f),
-                                )
-                            }
                         }
                     }
                 }

@@ -32,8 +32,6 @@ import com.android.systemui.kairos.groupByKey
 import com.android.systemui.kairos.init
 import com.android.systemui.kairos.mapCheap
 import com.android.systemui.kairos.mergeLeft
-import com.android.systemui.kairos.skipNext
-import com.android.systemui.kairos.switchEvents
 import com.android.systemui.kairos.util.Maybe
 import com.android.systemui.kairos.util.NameData
 import com.android.systemui.kairos.util.NameTag
@@ -47,14 +45,14 @@ internal class StateScopeImpl(
     val nameData: NameData,
     val createdEpoch: Long,
     val evalScope: EvalScope,
-    val deathSignalLazy: Lazy<Events<Any>>,
+    val deathSignalLazy: Lazy<Events<*>>,
 ) : InternalStateScope, EvalScope by evalScope {
 
     init {
         nameData.forceInit()
     }
 
-    override val deathSignal: Events<Any> by deathSignalLazy
+    override val deathSignal: Events<*> by deathSignalLazy
 
     override fun <A> deferredStateScope(block: StateScope.() -> A): DeferredValue<A> =
         DeferredValue(deferAsync { block() })
@@ -117,7 +115,7 @@ internal class StateScopeImpl(
                             val newName =
                                 nameData.mapName { "$it[key=$k, epoch=$epoch, init=false]" }
                             val newEnd: Events<Maybe<Stateful<A>>> =
-                                skipNext(newName + "newEnd", eventsByKey[k])
+                                eventsByKey[k].skipNextUnsafe(newName + "newEnd")
                             val newScope = childStateScope(newEnd, newName)
                             newScope.stateful()
                         }
@@ -145,7 +143,15 @@ internal class StateScopeImpl(
         )
     }
 
-    fun childStateScope(childEndSignal: Events<Any>, nameData: NameData) =
+    override fun <A> childStateScope(
+        stop: Events<*>,
+        name: NameTag?,
+        stateful: Stateful<A>,
+    ): DeferredValue<A> =
+        childStateScope(stop, name.toNameData("StateScope.childStateScope"))
+            .deferredStateScope(stateful)
+
+    fun childStateScope(childEndSignal: Events<*>, nameData: NameData) =
         StateScopeImpl(
             nameData,
             epoch,
@@ -153,15 +159,23 @@ internal class StateScopeImpl(
             deathSignalLazy =
                 lazy {
                     mergeLeft(nameData + "mergedDeathSignal", deathSignal, childEndSignal)
-                        .nextOnlyUnsafe(nameData + "firstEndSignal", this)
+                        .nextOnlyUnsafe(nameData + "deathSignal")
                 },
         )
 
-    override fun <A> truncateToScope(events: Events<A>, nameData: NameData): Events<A> =
-        deathSignal
-            .mapCheap(nameData + "switchOff") { emptyEvents }
-            .holdStateUnsafe(nameData + "switchedIn", this, events)
-            .switchEvents(nameData)
+    override fun <A> truncateToScope(events: Events<A>, nameData: NameData): Events<A> {
+        val switchOff = deathSignal.mapCheap(nameData + "switchOff") { neverImpl }
+        return EventsInit(
+            constInit(
+                nameData,
+                switchDeferredImplSingle(
+                    nameData,
+                    getStorage = { events.init.connect(this) },
+                    getPatches = { switchOff.init.connect(this) },
+                ),
+            )
+        )
+    }
 
     override fun toString(): String = "${super.toString()}[$nameData]"
 }
@@ -174,23 +188,46 @@ private fun EvalScope.reenterStateScope(outerScope: StateScopeImpl) =
         deathSignalLazy = outerScope.deathSignalLazy,
     )
 
-private fun <A> Events<A>.nextOnlyUnsafe(nameData: NameData, evalScope: EvalScope): Events<A> =
+private fun <A> Events<A>.nextOnlyUnsafe(nameData: NameData): Events<A> =
     if (this === emptyEvents) {
         this
     } else {
         EventsLoop<A>().apply {
+            val switchOff = mapCheap(nameData + "switchOff") { neverImpl }
             loopback =
-                mapCheap(nameData + "shutoffEvent") { emptyEvents }
-                    .holdStateUnsafe(nameData + "state", evalScope, this@nextOnlyUnsafe)
-                    .switchEvents(nameData)
+                EventsInit(
+                    constInit(
+                        nameData,
+                        switchDeferredImplSingle(
+                            nameData,
+                            getStorage = { this@nextOnlyUnsafe.init.connect(this) },
+                            getPatches = { switchOff.init.connect(this) },
+                        ),
+                    )
+                )
         }
     }
 
-private fun <A> Events<A>.holdStateUnsafe(
-    nameData: NameData,
-    evalScope: EvalScope,
-    initialValue: A,
-): State<A> = holdStateDeferredUnsafe(nameData, evalScope, lazyOf(initialValue))
+internal fun <A> Events<A>.skipNextUnsafe(nameData: NameData): Events<A> =
+    if (this == emptyEvents) {
+        this
+    } else {
+        val onlyOne = nextOnlyUnsafe(nameData + "onlyOne")
+        val turnOn =
+            mapImpl({ onlyOne.init.connect(this) }, nameData + "turnOn") { _, _ ->
+                this@skipNextUnsafe.init.connect(this)
+            }
+        EventsInit(
+            constInit(
+                nameData,
+                switchDeferredImplSingle(
+                    nameData,
+                    getStorage = { neverImpl },
+                    getPatches = { turnOn },
+                ),
+            )
+        )
+    }
 
 private fun <A> Events<A>.holdStateDeferredUnsafe(
     nameData: NameData,

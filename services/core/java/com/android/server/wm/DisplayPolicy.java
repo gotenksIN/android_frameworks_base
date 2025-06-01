@@ -371,7 +371,7 @@ public class DisplayPolicy {
      */
     private final ArrayList<LetterboxDetails> mLetterboxDetails = new ArrayList<>();
 
-    private String mFocusedApp;
+    private String mFocusedPackageName;
     private int mLastDisableFlags;
     private int mLastAppearance;
     private int mLastBehavior;
@@ -2867,10 +2867,22 @@ public class DisplayPolicy {
             // Always accept the window not in multi-window mode.
             return true;
         }
-        // Accept the window in multi-window mode only if it fills the display.
+        // Accept the window in multi-window mode only if its task fills the display.
         // e.g., A maximized free-form window.
         final Task task = win.getTask();
         final Rect bounds = task != null ? task.getBounds() : win.getBounds();
+        return bounds.equals(mDisplayContent.getBounds());
+    }
+
+    private boolean fillsDisplayWindowingMode(@NonNull ActivityRecord app) {
+        if (!WindowConfiguration.inMultiWindowMode(app.getWindowingMode())) {
+            // Always accept the app not in multi-window mode.
+            return true;
+        }
+        // Accept the app in multi-window mode only if its task fills the display.
+        // e.g., A maximized free-form window.
+        final Task task = app.getTask();
+        final Rect bounds = task != null ? task.getBounds() : app.getBounds();
         return bounds.equals(mDisplayContent.getBounds());
     }
 
@@ -2881,9 +2893,6 @@ public class DisplayPolicy {
                 mFocusedWindow != null && fillsDisplayWindowingMode(mFocusedWindow)
                         ? mFocusedWindow
                         : mTopFullscreenOpaqueWindowState;
-        if (winCandidate == null && !com.android.window.flags.Flags.forceShowSystemBarForBubble()) {
-            return;
-        }
 
         // Immersive mode confirmation should never affect the system bar visibility, otherwise
         // it will unhide the navigation bar and hide itself.
@@ -2900,8 +2909,15 @@ public class DisplayPolicy {
             } else {
                 winCandidate = mTopFullscreenOpaqueWindowState;
             }
-            if (winCandidate == null
-                    && !com.android.window.flags.Flags.forceShowSystemBarForBubble()) {
+        }
+        if (winCandidate == null) {
+            if (!com.android.window.flags.Flags.forceShowSystemBarForBubble()) {
+                // Before this feature, this method early returns when winCandidate is null.
+                return;
+            }
+            final ActivityRecord focusedApp = mDisplayContent.mFocusedApp;
+            if (focusedApp == null || fillsDisplayWindowingMode(focusedApp)) {
+                // Don't change the system UI controlling window when the new one is not ready.
                 return;
             }
         }
@@ -2930,7 +2946,9 @@ public class DisplayPolicy {
         final int behavior = navBarControlWin != null
                 ? navBarControlWin.mAttrs.insetsFlags.behavior
                 : BEHAVIOR_DEFAULT;
-        final String focusedApp = win != null ? win.mAttrs.packageName : "none";
+        final String focusedPackageName = win != null
+                ? win.mAttrs.packageName
+                : "none";
         final boolean isFullscreen = win != null && (!win.isRequestedVisible(Type.statusBars())
                 || !win.isRequestedVisible(Type.navigationBars()));
         final AppearanceRegion[] statusBarAppearanceRegions =
@@ -2949,7 +2967,7 @@ public class DisplayPolicy {
         if (mLastAppearance == appearance
                 && mLastBehavior == behavior
                 && mLastRequestedVisibleTypes == requestedVisibleTypes
-                && Objects.equals(mFocusedApp, focusedApp)
+                && Objects.equals(mFocusedPackageName, focusedPackageName)
                 && mLastFocusIsFullscreen == isFullscreen
                 && Arrays.equals(mLastStatusBarAppearanceRegions, statusBarAppearanceRegions)
                 && Arrays.equals(mLastLetterboxDetails, letterboxDetails)) {
@@ -2963,13 +2981,13 @@ public class DisplayPolicy {
         mLastAppearance = appearance;
         mLastBehavior = behavior;
         mLastRequestedVisibleTypes = requestedVisibleTypes;
-        mFocusedApp = focusedApp;
+        mFocusedPackageName = focusedPackageName;
         mLastFocusIsFullscreen = isFullscreen;
         mLastStatusBarAppearanceRegions = statusBarAppearanceRegions;
         mLastLetterboxDetails = letterboxDetails;
         callStatusBarSafely(statusBar -> statusBar.onSystemBarAttributesChanged(displayId,
                 appearance, statusBarAppearanceRegions, isNavbarColorManagedByIme, behavior,
-                requestedVisibleTypes, focusedApp, letterboxDetails));
+                requestedVisibleTypes, focusedPackageName, letterboxDetails));
     }
 
     private void callStatusBarSafely(Consumer<StatusBarManagerInternal> consumer) {

@@ -702,7 +702,9 @@ class Task extends TaskFragment {
         mResizeMode = resizeMode;
         if (info != null) {
             setIntent(_intent, info);
-            setMinDimensions(info);
+            if (!Flags.updateTaskMinDimensionsWithRootActivity()) {
+                setMinDimensions(info);
+            }
         } else {
             intent = _intent;
             mMinWidth = minWidth;
@@ -729,7 +731,9 @@ class Task extends TaskFragment {
         voiceSession = _voiceSession;
         voiceInteractor = _voiceInteractor;
         setIntent(activity, intent, info);
-        setMinDimensions(info);
+        if (!Flags.updateTaskMinDimensionsWithRootActivity()) {
+            setMinDimensions(info);
+        }
         // Before we began to reuse a root task as the leaf task, we used to
         // create a leaf task in this case. Therefore now we won't send out the task created
         // notification when we decide to reuse it here, so we send out the notification below.
@@ -1058,8 +1062,17 @@ class Task extends TaskFragment {
         } else {
             autoRemoveRecents = false;
         }
+        boolean shouldUpdateTaskDescription = false;
         if (mResizeMode != info.resizeMode) {
             mResizeMode = info.resizeMode;
+            shouldUpdateTaskDescription = true;
+        }
+        if (Flags.updateTaskMinDimensionsWithRootActivity()) {
+            if (setMinDimensions(info)) {
+                shouldUpdateTaskDescription = true;
+            }
+        }
+        if (shouldUpdateTaskDescription) {
             updateTaskDescription();
         }
         mSupportsPictureInPicture = info.supportsPictureInPicture();
@@ -1072,15 +1085,33 @@ class Task extends TaskFragment {
         }
     }
 
-    /** Sets the original minimal width and height. */
-    void setMinDimensions(ActivityInfo info) {
+    /** Sets the original minimal width and height. Returns true if changed. */
+    @VisibleForTesting
+    boolean setMinDimensions(ActivityInfo info) {
+        final int minWidth;
+        final int minHeight;
         if (info != null && info.windowLayout != null) {
-            mMinWidth = info.windowLayout.minWidth;
-            mMinHeight = info.windowLayout.minHeight;
+            minWidth = info.windowLayout.minWidth;
+            minHeight = info.windowLayout.minHeight;
         } else {
-            mMinWidth = INVALID_MIN_SIZE;
-            mMinHeight = INVALID_MIN_SIZE;
+            minWidth = INVALID_MIN_SIZE;
+            minHeight = INVALID_MIN_SIZE;
         }
+
+        if (mMinWidth == minWidth && mMinHeight == minHeight) {
+            return false;
+        }
+        mMinWidth = minWidth;
+        mMinHeight = minHeight;
+        if (Flags.updateTaskMinDimensionsWithRootActivity()) {
+            // Only update for pure TaskFragment.
+            forAllTaskFragments(tf -> {
+                if (tf.asTask() == null) {
+                    tf.setMinDimensions(minWidth, minHeight);
+                }
+            });
+        }
+        return true;
     }
 
     /**
@@ -2614,9 +2645,13 @@ class Task extends TaskFragment {
 
     /** Return the top-most leaf-task under this one, or this task if it is a leaf. */
     public Task getTopLeafTask() {
+        return getTopLeafTask(alwaysTruePredicate());
+    }
+
+    Task getTopLeafTask(Predicate<Task> filter) {
         for (int i = mChildren.size() - 1; i >= 0; --i) {
             final Task child = mChildren.get(i).asTask();
-            if (child == null) continue;
+            if (child == null || !filter.test(child)) continue;
             return child.getTopLeafTask();
         }
         return this;

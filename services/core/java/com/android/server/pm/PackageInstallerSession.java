@@ -564,6 +564,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @GuardedBy("mLock")
     private DomainSet mPreVerifiedDomains;
 
+    @GuardedBy("mMetrics")
+    @NonNull private final SessionMetrics mMetrics;
+
     private AtomicBoolean mDependencyInstallerEnabled = new AtomicBoolean();
     private AtomicInteger mMissingSharedLibraryCount = new AtomicInteger();
 
@@ -1309,6 +1312,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                         "Archived installation can only use Streaming System DataLoader.");
             }
         }
+
+        mMetrics = new SessionMetrics(mHandler, sessionId, userId, installerUid, params,
+                createdMillis, committedMillis, committed, childSessionIds, parentSessionId,
+                sessionErrorCode);
     }
 
     PackageInstallerHistoricalSession createHistoricalSession() {
@@ -2582,6 +2589,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 }
                 committedMillis = System.currentTimeMillis();
             }
+            synchronized (mMetrics) {
+                mMetrics.onSessionCommitted(committedMillis);
+            }
             return true;
         } catch (PackageManagerException e) {
             throw e;
@@ -2911,6 +2921,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // Commit was keeping session marked as active until now; release
             // that extra refcount so session appears idle.
             deactivate();
+            synchronized (mMetrics) {
+                mMetrics.onUserActionIntentSent();
+            }
             return;
         } else if (mUserActionRequired) {
             // If user action is required, control comes back here when the user allows
@@ -2969,6 +2982,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private void runExtractNativeLibraries() {
         IoThread.getHandler().post(() -> {
             try {
+                synchronized (mMetrics) {
+                    mMetrics.onNativeLibExtractionStarted();
+                }
                 List<PackageInstallerSession> children = getChildSessions();
                 if (isMultiPackage()) {
                     for (PackageInstallerSession child : children) {
@@ -2989,6 +3005,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 final String errorMsg = PackageManager.installStatusToString(e.error, completeMsg);
                 setSessionFailed(e.error, errorMsg);
                 onSessionVerificationFailure(e.error, errorMsg);
+            } finally {
+                synchronized (mMetrics) {
+                    mMetrics.onNativeLibExtractionFinished();
+                }
             }
         });
     }
@@ -3170,8 +3190,14 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         synchronized (mLock) {
             markStageDirInUseLocked();
         }
+        synchronized (mMetrics) {
+            mMetrics.onSessionVerificationStarted();
+        }
         mSessionProvider.getSessionVerifier().verify(this, (error, msg) -> {
             mHandler.post(() -> {
+                synchronized (mMetrics) {
+                    mMetrics.onSessionVerificationFinished();
+                }
                 if (dispatchPendingAbandonCallback()) {
                     // No need to continue if abandoned
                     return;
@@ -3201,6 +3227,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
      * @return a future that will be completed when the whole process is completed.
      */
     private CompletableFuture<Void> install() {
+        synchronized (mMetrics) {
+            mMetrics.onInternalInstallationStarted();
+        }
         // `futures` either contains only one session (`this`) or contains one parent session
         // (`this`) and n-1 child sessions.
         List<CompletableFuture<InstallResult>> futures = installNonStaged();
@@ -5203,6 +5232,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             mFinalStatus = returnCode;
             mFinalMessage = msg;
         }
+        synchronized (mMetrics) {
+            mMetrics.onInternalInstallationFinished();
+            mMetrics.onSessionFinished(returnCode);
+        }
 
         final boolean success = (returnCode == INSTALL_SUCCEEDED);
 
@@ -5287,6 +5320,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             assertPreparedAndNotSealedLocked("request of session " + sessionId);
             mPreapprovalDetails = details;
             setPreapprovalRemoteStatusReceiver(statusReceiver);
+        }
+        synchronized (mMetrics) {
+            mMetrics.onPreapprovalSet();
         }
     }
 
@@ -5948,6 +5984,15 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 || (isReady && !isApplied && !isFailed)
                 || (!isReady && isApplied && !isFailed)
                 || (!isReady && !isApplied && isFailed);
+    }
+
+    /**
+     * Called to log the metrics about a session being removed due to expiration.
+     */
+    public void onSessionExpired() {
+        synchronized (mMetrics) {
+            mMetrics.onSessionExpired();
+        }
     }
 
     /**

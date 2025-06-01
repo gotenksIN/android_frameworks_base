@@ -62,6 +62,9 @@ import android.util.proto.ProtoOutputStream;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.IProtoLogConfigurationService.RegisterClientArgs;
+import com.android.internal.protolog.ProtoLogDataSource.Instance.TracingFlushCallback;
+import com.android.internal.protolog.ProtoLogDataSource.Instance.TracingInstanceStartCallback;
+import com.android.internal.protolog.ProtoLogDataSource.Instance.TracingInstanceStopCallback;
 import com.android.internal.protolog.common.ILogger;
 import com.android.internal.protolog.common.IProtoLog;
 import com.android.internal.protolog.common.IProtoLogGroup;
@@ -71,6 +74,7 @@ import com.android.internal.protolog.common.LogLevel;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.StringBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -93,7 +97,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * A service for the ProtoLog logging system.
  */
-public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implements IProtoLog {
+public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implements IProtoLog,
+        TracingInstanceStartCallback, TracingInstanceStopCallback, TracingFlushCallback {
     private static final String LOG_TAG = "ProtoLog";
     public static final String NULL_STRING = "null";
     private final AtomicInteger mTracingInstances = new AtomicInteger();
@@ -172,9 +177,9 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
             connectToConfigurationService();
         }
 
-        mDataSource.registerOnStartCallback(this::onTracingInstanceStart);
-        mDataSource.registerOnFlushCallback(this::onTracingFlush);
-        mDataSource.registerOnStopCallback(this::onTracingInstanceStop);
+        mDataSource.registerOnStartCallback(this);
+        mDataSource.registerOnFlushCallback(this);
+        mDataSource.registerOnStopCallback(this);
     }
 
     private void connectToConfigurationService() {
@@ -207,9 +212,20 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
      * the datasource and the configuration service to ensure we no longer receive the callback.
      */
     public void disable() {
-        mDataSource.unregisterOnStartCallback(this::onTracingInstanceStart);
-        mDataSource.unregisterOnFlushCallback(this::onTracingFlush);
-        mDataSource.unregisterOnStopCallback(this::onTracingInstanceStop);
+        mDataSource.unregisterOnStartCallback(this);
+        mDataSource.unregisterOnFlushCallback(this);
+        mDataSource.unregisterOnStopCallback(this);
+
+        if (android.tracing.Flags.clientSideProtoLogging()) {
+            mBackgroundLoggingService.execute(() -> {
+                try {
+                    mConfigurationService.unregisterClient(this);
+                } catch (RemoteException e) {
+                    throw new RuntimeException("Failed to unregister ProtoLog client", e);
+                }
+            });
+        }
+        mBackgroundLoggingService.shutdown();
     }
 
     @NonNull
@@ -399,9 +415,34 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
             }
             mBackgroundServiceLock.lock();
             try {
-                mBackgroundLoggingService.execute(() ->
+                mBackgroundLoggingService.execute(() -> {
+                    try {
                         logToProto(logLevel, group, message, args, tsNanos,
-                                stacktrace));
+                                stacktrace);
+                    } catch (RuntimeException e) {
+                        // An error occurred during the logging process itself.
+                        // Log this error along with information about the original log call.
+                        final var sb = new StringBuilder();
+                        sb.append("Failed to log to ProtoLog for ");
+
+                        if (message.mMessageString != null) {
+                            sb.append("message: \"").append(message.mMessageString).append("\"");
+                        } else if (message.mMessageHash != null) {
+                            sb.append("message with hash: ").append(message.mMessageHash);
+                        } else {
+                            sb.append("message: (info unavailable)");
+                        }
+
+                        if (stacktrace != null && !stacktrace.isEmpty()) {
+                            sb.append("\nOriginal Call Site Stack Trace:\n");
+                            for (String line : stacktrace.split("\n")) {
+                                sb.append("    ").append(line).append("\n");
+                            }
+                        }
+
+                        throw new RuntimeException(sb.toString(), e);
+                    }
+                });
             } finally {
                 mBackgroundServiceLock.unlock();
             }
@@ -411,7 +452,8 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
         }
     }
 
-    private void onTracingFlush() {
+    @Override
+    public void onTracingFlush() {
         Log.d(LOG_TAG, "Executing onTracingFlush");
         waitForExistingBackgroundTasksToComplete();
 
@@ -739,7 +781,8 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
         return -1;
     }
 
-    private void onTracingInstanceStart(
+    @Override
+    public void onTracingInstanceStart(
             int instanceIdx, ProtoLogDataSource.ProtoLogConfig config) {
         Log.d(LOG_TAG, "Executing onTracingInstanceStart");
 
@@ -775,11 +818,6 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
                 mCollectStackTraceGroupCounts.put(overriddenGroupTag,
                         mCollectStackTraceGroupCounts.getOrDefault(overriddenGroupTag, 0) + 1);
             }
-
-            if (config.getConfigFor(overriddenGroupTag).collectStackTrace) {
-                mCollectStackTraceGroupCounts.put(overriddenGroupTag,
-                        mCollectStackTraceGroupCounts.getOrDefault(overriddenGroupTag, 0) + 1);
-            }
         }
 
         mCacheUpdater.update(this);
@@ -787,7 +825,8 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
         this.mTracingInstances.incrementAndGet();
     }
 
-    private synchronized void onTracingInstanceStop(
+    @Override
+    public synchronized void onTracingInstanceStop(
             int instanceIdx, ProtoLogDataSource.ProtoLogConfig config) {
         Log.d(LOG_TAG, "Executing onTracingInstanceStop");
 

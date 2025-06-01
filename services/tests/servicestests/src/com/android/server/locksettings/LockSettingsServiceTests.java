@@ -45,12 +45,9 @@ import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
-import android.platform.test.annotations.RequiresFlagsDisabled;
-import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.platform.test.flag.junit.SetFlagsRule;
-import android.service.gatekeeper.GateKeeperResponse;
 import android.text.TextUtils;
 
 import androidx.test.filters.SmallTest;
@@ -637,6 +634,65 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         mService.setString(null, "value", 0);
     }
 
+    @Test
+    @EnableFlags(android.security.Flags.FLAG_SOFTWARE_RATELIMITER)
+    public void testDuplicateWrongGuessesAreNotCounted() throws Exception {
+        final int userId = PRIMARY_USER_ID;
+        final LockscreenCredential pin = newPin("1234");
+        final LockscreenCredential wrongPin = newPin("1111");
+        final int numGuesses = 100;
+
+        mSpManager.enableWeaver();
+        setCredential(userId, pin);
+        final long protectorId = mService.getCurrentLskfBasedProtectorId(userId);
+        final LskfIdentifier lskfId = new LskfIdentifier(userId, protectorId);
+
+        // The software and hardware counters start at 0.
+        assertEquals(0, mSpManager.readWrongGuessCounter(lskfId));
+        assertEquals(0, mSpManager.getSumOfWeaverFailureCounters());
+
+        // Try the same wrong PIN repeatedly.
+        for (int i = 0; i < numGuesses; i++) {
+            VerifyCredentialResponse response =
+                    mService.verifyCredential(wrongPin, userId, 0 /* flags */);
+            assertFalse(response.isMatched());
+            assertEquals(0, response.getTimeout());
+        }
+        // The software and hardware counters should now be 1, for 1 unique guess.
+        assertEquals(1, mSpManager.readWrongGuessCounter(lskfId));
+        assertEquals(1, mSpManager.getSumOfWeaverFailureCounters());
+    }
+
+    @Test
+    @DisableFlags(android.security.Flags.FLAG_SOFTWARE_RATELIMITER)
+    public void testSoftwareRateLimiterFlagDisabled() throws Exception {
+        final int userId = PRIMARY_USER_ID;
+        final LockscreenCredential pin = newPin("1234");
+        final LockscreenCredential wrongPin = newPin("1111");
+        final int numGuesses = 100;
+
+        mSpManager.enableWeaver();
+        setCredential(userId, pin);
+        final long protectorId = mService.getCurrentLskfBasedProtectorId(userId);
+        final LskfIdentifier lskfId = new LskfIdentifier(userId, protectorId);
+
+        // The software and hardware counters start at 0.
+        assertEquals(0, mSpManager.readWrongGuessCounter(lskfId));
+        assertEquals(0, mSpManager.getSumOfWeaverFailureCounters());
+
+        // Try the same wrong PIN repeatedly.
+        for (int i = 0; i < numGuesses; i++) {
+            VerifyCredentialResponse response =
+                    mService.verifyCredential(wrongPin, userId, 0 /* flags */);
+            assertFalse(response.isMatched());
+        }
+        // The software counter should still be 0, since the software rate-limiter is fully disabled
+        // and thus it should have never been told about the guesses at all. The hardware counter
+        // should now be numGuesses, as all the (duplicate) guesses should have been sent to it.
+        assertEquals(0, mSpManager.readWrongGuessCounter(lskfId));
+        assertEquals(numGuesses, mSpManager.getSumOfWeaverFailureCounters());
+    }
+
     private void checkRecordedFrpNotificationIntent() {
         if (android.security.Flags.frpEnforcement()) {
             Intent savedNotificationIntent = mService.getSavedFrpNotificationIntent();
@@ -685,7 +741,7 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         VerifyCredentialResponse response = mService.verifyCredential(credential, userId,
                 0 /* flags */);
 
-        assertEquals(GateKeeperResponse.RESPONSE_OK, response.getResponseCode());
+        assertEquals(VerifyCredentialResponse.RESPONSE_OK, response.getResponseCode());
         if (credential.isPassword()) {
             assertEquals(CREDENTIAL_TYPE_PASSWORD, mService.getCredentialType(userId));
         } else if (credential.isPin()) {
@@ -703,8 +759,9 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         } else {
             badCredential = LockscreenCredential.createPin("0");
         }
-        assertEquals(GateKeeperResponse.RESPONSE_ERROR, mService.verifyCredential(
-                badCredential, userId, 0 /* flags */).getResponseCode());
+        assertEquals(
+                VerifyCredentialResponse.RESPONSE_ERROR,
+                mService.verifyCredential(badCredential, userId, 0 /* flags */).getResponseCode());
     }
 
     private void setAndVerifyCredential(int userId, LockscreenCredential newCredential)

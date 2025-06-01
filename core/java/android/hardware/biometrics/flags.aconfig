@@ -86,3 +86,17 @@ flag {
   description: "This flag is for test API changes related to Identity Check"
   bug: "347123256"
 }
+
+flag {
+  name: "identity_check_all_surfaces"
+  namespace: "biometrics_framework"
+  description: "This flag applies Identity Check to all biometric prompt requests"
+  bug: "402534668"
+}
+
+flag {
+  name: "identity_check_watch"
+  namespace: "biometrics_framework"
+  description: "This flag is for the integration of Identity Check with Watch"
+  bug: "397954948"
+}

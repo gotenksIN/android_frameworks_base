@@ -2307,6 +2307,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     mActivityRecord != null && mActivityRecord.inTransition(),
                     Debug.getCallers(6));
 
+            if (Flags.excludeNonMainWindowFromSnapshot()
+                    && mAttrs.type != TYPE_BASE_APPLICATION && mHasSurface
+                    && mActivityRecord != null && !mActivityRecord.isVisibleRequested()
+                    && mWinAnimator.getShown()) {
+                // Only remove the activity snapshot, because the user might still want to see the
+                // task snapshot during the recents animation.
+                mWmService.mSnapshotController.mActivitySnapshotController
+                        .invalidateSnapshot(mActivityRecord);
+            }
             // First, see if we need to run an animation. If we do, we have to hold off on removing the
             // window until the animation is done. If the display is frozen, just remove immediately,
             // since the animation wouldn't be seen.
@@ -4935,7 +4944,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean shouldMagnify() {
         if (mAttrs.type == TYPE_ACCESSIBILITY_MAGNIFICATION_OVERLAY
                 || mAttrs.type == TYPE_MAGNIFICATION_OVERLAY
-                || mAttrs.type == TYPE_NAVIGATION_BAR
                 // It's tempting to wonder: Have we forgotten the rounded corners overlay?
                 // worry not: it's a fake TYPE_NAVIGATION_BAR_PANEL
                 || mAttrs.type == TYPE_NAVIGATION_BAR_PANEL) {
@@ -4944,6 +4952,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mAttrs.type == TYPE_INPUT_METHOD
                 || mAttrs.type == TYPE_INPUT_METHOD_DIALOG) {
             return mWmService.isMagnifyImeEnabled();
+        }
+        if (mAttrs.type == TYPE_NAVIGATION_BAR) {
+            return mWmService.isMagnifyNavBarEnabled();
         }
         if ((mAttrs.privateFlags & PRIVATE_FLAG_NOT_MAGNIFIABLE) != 0) {
             return false;
@@ -5272,7 +5283,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     @Override
     public InsetsControlTarget getImeControlTarget() {
-        return getDisplayContent().getImeHostOrFallback(this);
+        return getDisplayContent().getImeHost(this);
     }
 
     @Override
@@ -5540,7 +5551,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 || mKeyInterceptionInfo.windowTitle != getWindowTag()
                 || mKeyInterceptionInfo.windowOwnerUid != getOwningUid()) {
             mKeyInterceptionInfo = new KeyInterceptionInfo(mAttrs.type, mAttrs.privateFlags,
-                    getWindowTag().toString(), getOwningUid());
+                    mAttrs.inputFeatures, getWindowTag().toString(), getOwningUid());
         }
         return mKeyInterceptionInfo;
     }
@@ -5576,6 +5587,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     void setViewVisibility(int viewVisibility) {
         mViewVisibility = viewVisibility;
+
+        if (isPresentation()
+                && (viewVisibility == View.INVISIBLE || viewVisibility == View.GONE)) {
+            mWmService.mPresentationController.removePresentation(getDisplayId(),
+                    "setViewVisibility");
+        }
     }
 
     SurfaceControl getClientViewRootSurface() {

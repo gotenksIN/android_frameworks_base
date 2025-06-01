@@ -32,6 +32,7 @@ import static android.view.WindowManager.fixScale;
 import static android.window.TransitionInfo.FLAGS_IS_NON_APP_WINDOW;
 import static android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY;
 import static android.window.TransitionInfo.FLAG_IS_BEHIND_STARTING_WINDOW;
+import static android.window.TransitionInfo.FLAG_IS_DISPLAY;
 import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 import static android.window.TransitionInfo.FLAG_NO_ANIMATION;
@@ -232,7 +233,6 @@ public class Transitions implements RemoteCallable<Transitions>,
     private final ShellTransitionImpl mImpl = new ShellTransitionImpl();
     private final SleepHandler mSleepHandler = new SleepHandler();
     private final TransitionTracer mTransitionTracer;
-    private boolean mIsRegistered = false;
 
     /** List of possible handlers. Ordered by specificity (eg. tapped back to front). */
     private final ArrayList<TransitionHandler> mHandlers = new ArrayList<>();
@@ -387,12 +387,10 @@ public class Transitions implements RemoteCallable<Transitions>,
                 Settings.Global.getUriFor(Settings.Global.TRANSITION_ANIMATION_SCALE), false,
                 new SettingsObserver());
 
-        mIsRegistered = true;
         // Register this transition handler with Core
         try {
             mOrganizer.registerTransitionPlayer(mPlayerImpl);
         } catch (RuntimeException e) {
-            mIsRegistered = false;
             throw e;
         }
         // Pre-load the instance.
@@ -400,10 +398,6 @@ public class Transitions implements RemoteCallable<Transitions>,
 
         mShellCommandHandler.addCommandCallback("transitions", this, this);
         mShellCommandHandler.addDumpCallback(this::dump, this);
-    }
-
-    public boolean isRegistered() {
-        return mIsRegistered;
     }
 
     private float getTransitionAnimationScaleSetting() {
@@ -676,6 +670,11 @@ public class Transitions implements RemoteCallable<Transitions>,
             if (!TransitionInfo.isIndependent(change, info)) {
                 continue;
             }
+            // Don't reparent display level if only changing order (since root will be inside it).
+            if (change.hasFlags(FLAG_IS_DISPLAY) && TransitionUtil.isOrderOnly(change)
+                    && change.getStartRotation() == change.getEndRotation()) {
+                continue;
+            }
 
             boolean hasParent = change.getParent() != null;
 
@@ -787,7 +786,7 @@ public class Transitions implements RemoteCallable<Transitions>,
         for (TransitionInfo.Change change : info.getChanges()) {
             if (change.getTaskInfo() != null
                     && DesktopWallpaperActivity.isWallpaperTask(change.getTaskInfo())) {
-                change.setFlags(FLAG_IS_DESKTOP_WALLPAPER_ACTIVITY);
+                change.setFlags(change.getFlags() | FLAG_IS_DESKTOP_WALLPAPER_ACTIVITY);
             }
         }
 

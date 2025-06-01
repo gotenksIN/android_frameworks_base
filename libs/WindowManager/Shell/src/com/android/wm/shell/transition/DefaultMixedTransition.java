@@ -27,6 +27,7 @@ import static com.android.wm.shell.transition.MixedTransitionHelper.animateKeygu
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.ActivityManager;
 import android.os.IBinder;
 import android.view.SurfaceControl;
 import android.window.TransitionInfo;
@@ -104,6 +105,9 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             case TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE_FROM_EXISTING_BUBBLE ->
                     animateEnterBubblesFromBubble(transition, info, startTransaction,
                             finishTransaction, finishCallback, mBubbleTransitions);
+            case TYPE_LAUNCH_OR_CONVERT_PIP_TASK_TO_BUBBLE ->
+                    animateEnterBubblesFromPip(this, transition, info, startTransaction,
+                            finishTransaction, finishCallback, mPipHandler, mBubbleTransitions);
             case TYPE_KEYGUARD ->
                     animateKeyguard(this, info, startTransaction, finishTransaction, finishCallback,
                             mKeyguardHandler, mPipHandler);
@@ -378,6 +382,25 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
         return true;
     }
 
+    static boolean animateEnterBubblesFromPip(
+            @NonNull DefaultMixedHandler.MixedTransition mixed,
+            @NonNull IBinder transition,
+            @NonNull TransitionInfo info,
+            @NonNull SurfaceControl.Transaction startTransaction,
+            @NonNull SurfaceControl.Transaction finishTransaction,
+            @NonNull Transitions.TransitionFinishCallback finishCallback,
+            @NonNull PipTransitionController pipHandler,
+            @NonNull BubbleTransitions bubbleTransitions) {
+        final Transitions.TransitionHandler handler = bubbleTransitions.getRunningEnterTransition(
+                transition);
+        ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "
+                + "entering Bubbles while PIP is foreground by %s", handler);
+        pipHandler.cleanUpState();
+        handler.startAnimation(transition, info, startTransaction, finishTransaction,
+                finishCallback);
+        return true;
+    }
+
     static boolean animateEnterBubblesFromBubble(
             @NonNull IBinder transition,
             @NonNull TransitionInfo info,
@@ -386,16 +409,23 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             @NonNull Transitions.TransitionFinishCallback finishCallback,
             @NonNull BubbleTransitions bubbleTransitions) {
         // Identify the task being launched into a bubble
-        TransitionInfo.Change bubblingTask = getChangeForBubblingTask(info, bubbleTransitions);
-        if (bubblingTask == null) {
+        final TransitionInfo.Change change = getChangeForBubblingTask(info, bubbleTransitions);
+        if (change == null) {
+            // Fallback to remote transition scenarios, ex:
+            // 1. Move bubble'd app to fullscreen for launcher icon clicked
+            // 2. Launch activity in expanded and selected bubble for notification clicked
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " No bubbling task found");
             return false;
         }
 
+        // Task transition scenarios, ex:
+        // 1. Start a new task from a bubbled task
+        // 2. Expand the collapsed bubble for notification launch
+        // 3. Switch the expanded bubble for notification launch
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "
-                + "entering Bubbles from another bubbled task");
-        boolean started = bubbleTransitions.startBubbleToBubbleLaunch(transition,
-                bubblingTask.getTaskInfo(), handler -> {
+                + "entering bubble from another bubbled task or for an existing bubble");
+        final boolean started = bubbleTransitions.startBubbleToBubbleLaunchOrExistingBubbleConvert(
+                transition, change.getTaskInfo(), handler -> {
                     final Transitions.TransitionHandler h = bubbleTransitions
                             .getRunningEnterTransition(transition);
                     ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animation played by %s",
@@ -414,17 +444,20 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             @NonNull TransitionInfo info, BubbleTransitions bubbleTransitions) {
         for (int i = 0; i < info.getChanges().size(); i++) {
             final TransitionInfo.Change chg = info.getChanges().get(i);
-            if (chg.getTaskInfo() != null
-                    && chg.getTaskInfo().getActivityType() == ACTIVITY_TYPE_STANDARD) {
-                if (!TransitionUtil.isOpeningMode(chg.getMode())
-                        && chg.getMode() != TRANSIT_CHANGE) {
-                    continue;
-                }
-                if (!bubbleTransitions.shouldBeAppBubble(chg.getTaskInfo())) {
-                    continue;
-                }
-                return chg;
+            final ActivityManager.RunningTaskInfo taskInfo = chg.getTaskInfo();
+            // Exclude activity transition scenarios.
+            if (taskInfo == null || taskInfo.getActivityType() != ACTIVITY_TYPE_STANDARD) {
+                continue;
             }
+            // Only process opening or change transitions.
+            if (!TransitionUtil.isOpeningMode(chg.getMode()) && chg.getMode() != TRANSIT_CHANGE) {
+                continue;
+            }
+            // Skip non-app-bubble tasks (e.g., a reused task in a bubble-to-fullscreen scenario).
+            if (!bubbleTransitions.shouldBeAppBubble(taskInfo)) {
+                continue;
+            }
+            return chg;
         }
         return null;
     }
@@ -552,6 +585,7 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             case TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE:
             case TYPE_LAUNCH_OR_CONVERT_SPLIT_TASK_TO_BUBBLE:
             case TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE_FROM_EXISTING_BUBBLE:
+            case TYPE_LAUNCH_OR_CONVERT_PIP_TASK_TO_BUBBLE:
                 final Transitions.TransitionHandler handler =
                         mBubbleTransitions.getRunningEnterTransition(transition);
                 if (handler != null) {
@@ -592,6 +626,7 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             case TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE:
             case TYPE_LAUNCH_OR_CONVERT_SPLIT_TASK_TO_BUBBLE:
             case TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE_FROM_EXISTING_BUBBLE:
+            case TYPE_LAUNCH_OR_CONVERT_PIP_TASK_TO_BUBBLE:
                 final Transitions.TransitionHandler handler =
                         mBubbleTransitions.getRunningEnterTransition(transition);
                 if (handler != null) {

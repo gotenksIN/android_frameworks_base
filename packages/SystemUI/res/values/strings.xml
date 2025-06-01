@@ -1190,6 +1190,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_desc_lock_screen">Lock screen</string>
+    <!-- Content description for the lock screen customization action. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_desc_customize_lock_screen">Lock screen, double tap and hold to customize lock screen.</string>
     <!-- Content description for the work profile lock screen. This prevents work profile apps from being used, but personal apps can be used as normal (not shown on the screen). [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1637,6 +1639,11 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_flashlight_camera_in_use">Camera in use</string>
+    <!-- Flashlight dialog title [CHAR LIMIT=NONE] -->
+    <string name="flashlight_dialog_title">Flashlight Strength</string>
+    <!-- QuickSettings: Flashlight tile level percentage [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_flashlight_tile_level_percentage"><xliff:g id="percentage" example="46">%1$d</xliff:g>%%</string>
+
     <!-- QuickSettings: Cellular detail panel title [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3679,6 +3686,12 @@
     <string name="notification_guts_social_summary">Likes, posts, and more</string>
     <!-- [CHAR LIMIT=100] Notification bundle inline settings summary -->
     <string name="notification_guts_recs_summary">Newsletters, recommended media, and more</string>
+
+    <!-- Battery saver confirmation dialog ok text [CHAR LIMIT=40]-->
+    <string name="notification_onboarding_summaries_turn_on">Turn on</string>
+
+    <!-- Battery saver confirmation dialog ok text [CHAR LIMIT=NONE]-->
+    <string name="notification_onboarding_summaries_message">Your longer conversations can now be summarized to give you quick recaps</string>
 
     <!-- Notification Inline controls: button to dismiss the blocking helper [CHAR_LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

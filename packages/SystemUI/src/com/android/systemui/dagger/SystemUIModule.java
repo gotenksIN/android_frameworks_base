@@ -73,6 +73,7 @@ import com.android.systemui.dreams.dagger.DreamModule;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.FlagDependenciesModule;
 import com.android.systemui.flags.FlagsModule;
+import com.android.systemui.growth.dagger.GrowthModule;
 import com.android.systemui.haptics.msdl.dagger.MSDLModule;
 import com.android.systemui.inputmethod.InputMethodModule;
 import com.android.systemui.keyboard.KeyboardModule;
@@ -156,6 +157,7 @@ import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionCont
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.statusbar.policy.dagger.SmartRepliesInflationModule;
 import com.android.systemui.statusbar.policy.dagger.StatusBarPolicyModule;
+import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsModule;
 import com.android.systemui.statusbar.ui.binder.StatusBarViewBinderModule;
 import com.android.systemui.statusbar.window.StatusBarWindowModule;
 import com.android.systemui.telephony.data.repository.TelephonyRepositoryModule;
@@ -245,6 +247,7 @@ import javax.inject.Named;
         FooterActionsModule.class,
         KairosCoreStartableModule.class,
         GestureModule.class,
+        GrowthModule.class,
         InputMethodModule.class,
         KeyEventRepositoryModule.class,
         KeyboardModule.class,
@@ -282,6 +285,7 @@ import javax.inject.Named;
         StatusBarViewBinderModule.class,
         StatusBarWindowModule.class,
         SystemPropertiesFlagsModule.class,
+        SystemStatusIconsModule.class,
         SysUIConcurrencyModule.class,
         SysUICoroutinesModule.class,
         CommonSystemUIUnfoldModule.class,

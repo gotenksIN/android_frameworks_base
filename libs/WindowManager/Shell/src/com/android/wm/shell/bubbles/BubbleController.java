@@ -50,7 +50,6 @@ import android.app.NotificationChannel;
 import android.app.PendingIntent;
 import android.app.TaskInfo;
 import android.content.BroadcastReceiver;
-import android.content.ClipDescription;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -104,7 +103,6 @@ import com.android.wm.shell.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.bubbles.appinfo.BubbleAppInfoProvider;
-import com.android.wm.shell.bubbles.bar.BubbleBarDragListener;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
 import com.android.wm.shell.bubbles.shortcut.BubbleShortcutHelper;
 import com.android.wm.shell.common.DisplayController;
@@ -131,7 +129,6 @@ import com.android.wm.shell.shared.bubbles.BubbleBarUpdate;
 import com.android.wm.shell.shared.bubbles.BubbleDropTargetBoundsProvider;
 import com.android.wm.shell.shared.bubbles.ContextUtils;
 import com.android.wm.shell.shared.bubbles.DeviceConfig;
-import com.android.wm.shell.shared.draganddrop.DragAndDropConstants;
 import com.android.wm.shell.splitscreen.SplitScreenController;
 import com.android.wm.shell.sysui.ConfigurationChangeListener;
 import com.android.wm.shell.sysui.ShellCommandHandler;
@@ -167,7 +164,7 @@ import java.util.function.IntConsumer;
  */
 public class BubbleController implements ConfigurationChangeListener,
         RemoteCallable<BubbleController>, Bubbles.SysuiProxy.Provider,
-        BubbleBarDragListener, BubbleTaskUnfoldTransitionMerger {
+        BubbleTaskUnfoldTransitionMerger {
 
     private static final String TAG = TAG_WITH_CLASS_NAME ? "BubbleController" : TAG_BUBBLES;
 
@@ -941,59 +938,14 @@ public class BubbleController implements ConfigurationChangeListener,
         }
     }
 
-    @Override
-    public void onDragItemOverBubbleBarDragZone(@Nullable BubbleBarLocation bubbleBarLocation) {
-        if (bubbleBarLocation == null) return;
-        if (isShowingAsBubbleBar() && BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
-            if (mBubbleStateListener != null) {
-                mBubbleStateListener.onDragItemOverBubbleBarDragZone(bubbleBarLocation);
-            }
-            showBubbleBarExpandedViewDropTarget(bubbleBarLocation);
+    /**
+     * Show bubble bar pin view given location.
+     */
+    public void showBubbleBarPinAtLocation(BubbleBarLocation bubbleBarLocation) {
+        if (isShowingAsBubbleBar() && mBubbleStateListener != null) {
+            // TODO(b/411505605) show bubble bar drop target in launcher since taskbar window is
+            // layered on top of the shell drag window
         }
-    }
-
-    @Override
-    public void onItemDraggedOutsideBubbleBarDropZone() {
-        if (isShowingAsBubbleBar() && BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
-            if (mBubbleStateListener != null) {
-                mBubbleStateListener.onItemDraggedOutsideBubbleBarDropZone();
-            }
-            hideBubbleBarExpandedViewDropTarget();
-        }
-    }
-
-    @Override
-    public void onItemDroppedOverBubbleBarDragZone(@NonNull BubbleBarLocation location,
-            Intent itemIntent) {
-        hideBubbleBarExpandedViewDropTarget();
-        ShortcutInfo shortcutInfo = (ShortcutInfo) itemIntent
-                .getExtra(DragAndDropConstants.EXTRA_SHORTCUT_INFO);
-        if (shortcutInfo != null) {
-            expandStackAndSelectBubble(shortcutInfo, location);
-            return;
-        }
-        UserHandle user = (UserHandle) itemIntent.getExtra(Intent.EXTRA_USER);
-        PendingIntent pendingIntent = (PendingIntent) itemIntent
-                .getExtra(ClipDescription.EXTRA_PENDING_INTENT);
-        if (pendingIntent != null && user != null) {
-            expandStackAndSelectBubble(pendingIntent, user, location);
-        }
-    }
-
-    @Override
-    public Map<BubbleBarLocation, Rect> getBubbleBarDropZones(int l, int t, int r, int b) {
-        Map<BubbleBarLocation, Rect> result = new HashMap<>();
-        if (isShowingAsBubbleBar() && BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
-            // TODO(b/393172431) : Utilise DragZoneFactory once it is ready
-            final int bubbleBarDropZoneSideSize = getContext().getResources().getDimensionPixelSize(
-                    R.dimen.bubble_bar_drop_zone_side_size);
-            int top = b - bubbleBarDropZoneSideSize;
-            result.put(BubbleBarLocation.LEFT,
-                    new Rect(l, top, l + bubbleBarDropZoneSideSize, b));
-            result.put(BubbleBarLocation.RIGHT,
-                    new Rect(r - bubbleBarDropZoneSideSize, top, r, b));
-        }
-        return result;
     }
 
     private void showBubbleBarExpandedViewDropTarget(BubbleBarLocation bubbleBarLocation) {
@@ -1435,7 +1387,6 @@ public class BubbleController implements ConfigurationChangeListener,
      * Whether or not there are bubbles present, regardless of them being visible on the
      * screen (e.g. if on AOD).
      */
-    @VisibleForTesting
     public boolean hasBubbles() {
         if (mStackView == null && mLayerView == null) {
             return false;
@@ -1742,8 +1693,14 @@ public class BubbleController implements ConfigurationChangeListener,
             Consumer<Transitions.TransitionHandler> onInflatedCallback) {
         if (!BubbleAnythingFlagHelper.enableCreateAnyBubble()) return null;
 
-        // Create a new bubble and show it
-        Bubble b = mBubbleData.getOrCreateBubble(taskInfo); // Removes from overflow
+        Bubble b = mBubbleData.getBubbleInStackWithTaskId(taskInfo.taskId);
+        if (b != null) {
+            // Reuse the existing bubble
+            mBubbleData.setSelectedBubbleAndExpandStack(b, BubbleBarLocation.DEFAULT);
+        } else {
+            // Create a new bubble and show it, remove from overflow
+            b = mBubbleData.getOrCreateBubble(taskInfo);
+        }
         ProtoLog.v(WM_SHELL_BUBBLES, "expandStackAndSelectBubbleForExistingTransition() taskId=%s",
                 taskInfo.taskId);
         b.enable(Notification.BubbleMetadata.FLAG_AUTO_EXPAND_BUBBLE);
@@ -2007,7 +1964,9 @@ public class BubbleController implements ConfigurationChangeListener,
                 if (mStackView != null) {
                     b.setSuppressFlyout(true);
                     mStackView.addBubble(b);
-                    mStackView.setSelectedBubble(b);
+                    if (b.getKey().equals(mBubbleData.getSelectedBubbleKey())) {
+                        mStackView.setSelectedBubble(b);
+                    }
                 } else {
                     Log.w(TAG, "Tried to add a bubble to the stack but the stack is null");
                 }
@@ -2018,6 +1977,11 @@ public class BubbleController implements ConfigurationChangeListener,
                     mLayerView.showExpandedView(b);
                 }
             };
+        }
+        // TODO (b/380105874): Remove this after properly transitioning the expanded bubble from bar
+        // to floating
+        if (mStackView != null && mBubbleData.isExpanded()) {
+            mBubbleData.collapseNoUpdate();
         }
         for (int i = mBubbleData.getBubbles().size() - 1; i >= 0; i--) {
             Bubble bubble = mBubbleData.getBubbles().get(i);
@@ -3332,13 +3296,6 @@ public class BubbleController implements ConfigurationChangeListener,
         }
 
         @Override
-        public void collapseStack() {
-            mMainExecutor.execute(() -> {
-                BubbleController.this.collapseStack();
-            });
-        }
-
-        @Override
         public void expandStackAndSelectBubble(BubbleEntry entry) {
             mMainExecutor.execute(() -> {
                 BubbleController.this.expandStackAndSelectBubble(entry);
@@ -3630,11 +3587,6 @@ public class BubbleController implements ConfigurationChangeListener,
         @Override
         public void setTaskBounds(TaskViewTaskController taskView, Rect boundsOnScreen) {
             mBaseTransitions.setTaskBounds(taskView, boundsOnScreen);
-        }
-
-        @Override
-        public boolean isUsingShellTransitions() {
-            return mBaseTransitions.isUsingShellTransitions();
         }
     }
 }

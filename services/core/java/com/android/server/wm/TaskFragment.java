@@ -679,9 +679,11 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mResumedActivity = r;
         final ActivityRecord topResumed = mTaskSupervisor.updateTopResumedActivityIfNeeded(reason);
         if (mResumedActivity != null && topResumed != null && topResumed.isEmbedded()
-                && topResumed.getTaskFragment().isAdjacentTo(this)) {
+                && topResumed.getTaskFragment().isAdjacentTo(this)
+                && topResumed.getTaskFragment().isPinned()) {
             // Explicitly updates the last resumed Activity if the resumed activity is
-            // adjacent to the top-resumed embedded activity.
+            // adjacent to the top-resumed embedded activity and the top-resumed TaskFragment is
+            // pinned.
             mAtmService.setLastResumedActivityUncheckLocked(mResumedActivity, reason);
         }
         if (r == null && prevR.mDisplayContent != null
@@ -1969,7 +1971,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (prev.attachedToProcess()) {
             if (shouldAutoPip && ActivityTaskManagerService.isPip2ExperimentEnabled()) {
                 prev.mPauseSchedulePendingForPip = true;
-                boolean willAutoPip = mAtmService.prepareAutoEnterPictureAndPictureMode(prev);
+                boolean willAutoPip = mAtmService.setPipCandidateIfNeeded(prev);
                 ProtoLog.d(WM_DEBUG_STATES, "Auto-PIP allowed, requesting PIP mode "
                         + "via requestStartTransition(): %s, willAutoPip: %b", prev, willAutoPip);
             } else if (shouldAutoPip) {
@@ -2602,8 +2604,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                         && com.android.wm.shell.Flags.enableBubbleAppCompatFixes()) {
                     final Task task = getTask();
                     if (task != null) {
-                        // TODO(b/407669465): Update isAppBubble usage once migrated.
-                        shouldUseTaskBounds |= task.getTaskInfo().isAppBubble;
+                        // TODO(b/407669465): Update mLaunchNextToBubble usage when migrated.
+                        shouldUseTaskBounds |= task.mLaunchNextToBubble;
                     }
                 }
                 if (shouldUseTaskBounds && !inPipTransition) {

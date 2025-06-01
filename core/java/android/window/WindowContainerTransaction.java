@@ -504,7 +504,7 @@ public final class WindowContainerTransaction implements Parcelable {
      *
      * @param container The window container of the task that the exclusion state is set on.
      * @param forceExcluded  {@code true} to force exclude the task, {@code false} otherwise.
-     * @throws IllegalStateException if the flag {@link Flags.FLAG_EXCLUDE_TASK_FROM_RECENTS} is
+     * @throws IllegalStateException if the flag {@link Flags#FLAG_EXCLUDE_TASK_FROM_RECENTS} is
      *                               not enabled.
      * @hide
      */
@@ -559,6 +559,27 @@ public final class WindowContainerTransaction implements Parcelable {
         final Change change = getOrCreateChange(container.asBinder());
         change.mChangeMask |= Change.CHANGE_IS_TASK_MOVE_ALLOWED;
         change.mIsTaskMoveAllowed = isTaskMoveAllowed;
+        return this;
+    }
+
+    /**
+     * Sets whether back press should be intercepted for the root activity of the given task
+     * container. If true, then
+     * {@link TaskOrganizer#onBackPressedOnTaskRoot(ActivityManager.RunningTaskInfo)} will be
+     * called.
+     *
+     * @param container The window container of the task that the intercept-back state is set on.
+     * @param interceptBackPressed {@code true} to allow back to be intercepted for the root
+     *                             activity of the task, {@code false} otherwise.
+     * @hide
+     */
+    @NonNull
+    public WindowContainerTransaction setInterceptBackPressedOnTaskRoot(
+            @NonNull WindowContainerToken container,
+            boolean interceptBackPressed) {
+        final Change change = getOrCreateChange(container.asBinder());
+        change.mChangeMask |= Change.CHANGE_INTERCEPT_BACK_PRESSED;
+        change.mInterceptBackPressed = interceptBackPressed;
         return this;
     }
 
@@ -669,7 +690,7 @@ public final class WindowContainerTransaction implements Parcelable {
      * Finds and removes a task and its children using its container token. The task is removed
      * from recents.
      *
-     * If the task is a root task, its leaves are removed but the root task is not. Use
+     * <p>If the task is a root task, its leaves are removed but the root task is not. Use
      * {@link #removeRootTask(WindowContainerToken)} to remove the root task.
      *
      * @param containerToken ContainerToken of Task to be removed
@@ -749,7 +770,7 @@ public final class WindowContainerTransaction implements Parcelable {
     /**
      * Sends a pending intent in sync.
      * @param sender The PendingIntent sender.
-     * @param intent The fillIn intent to patch over the sender's base intent.
+     * @param fillInIntent The fillIn intent to patch over the sender's base intent.
      * @param options bundle containing ActivityOptions for the task's top activity.
      * @hide
      */
@@ -757,7 +778,8 @@ public final class WindowContainerTransaction implements Parcelable {
     public WindowContainerTransaction sendPendingIntent(@Nullable PendingIntent sender,
             @Nullable Intent fillInIntent, @Nullable Bundle options) {
         if (DEBUG_START_ACTIVITY) {
-            Log.d(Instrumentation.TAG, "WCT.sendPendingIntent: sender=" + sender.getIntent()
+            Log.d(Instrumentation.TAG, "WCT.sendPendingIntent: sender="
+                    + (sender != null ? sender.getIntent() : "null")
                     + " fillInIntent=" + fillInIntent + " options=" + options, new Throwable());
         }
         mHierarchyOps.add(new HierarchyOp.Builder(HierarchyOp.HIERARCHY_OP_TYPE_PENDING_INTENT)
@@ -827,12 +849,12 @@ public final class WindowContainerTransaction implements Parcelable {
      * Sets multiple containers adjacent to each other. Containers below the visible adjacent roots
      * will be made invisible. This currently only applies to Task containers created by organizer.
      *
-     * To remove one container from the adjacent roots, one can call {@link #clearAdjacentRoots}
+     * <p>To remove one container from the adjacent roots, one can call {@link #clearAdjacentRoots}
      * with the target container.
      * To remove all containers from the adjacent roots, one much call {@link #clearAdjacentRoots}
      * on each container if there were more than two containers in the set.
      *
-     * For non-Task TaskFragment, use {@link #setAdjacentTaskFragments} instead.
+     * <p>For non-Task TaskFragment, use {@link #setAdjacentTaskFragments} instead.
      *
      * @param roots the Tasks that should be adjacent to each other.
      * @throws IllegalArgumentException if roots have size < 2.
@@ -871,7 +893,7 @@ public final class WindowContainerTransaction implements Parcelable {
 
     /**
      * Sets the container as launch adjacent flag root. Task starting with
-     * {@link FLAG_ACTIVITY_LAUNCH_ADJACENT} will be launching to.
+     * {@link Intent#FLAG_ACTIVITY_LAUNCH_ADJACENT} will be launching to.
      */
     @NonNull
     public WindowContainerTransaction setLaunchAdjacentFlagRoot(
@@ -894,8 +916,8 @@ public final class WindowContainerTransaction implements Parcelable {
 
     /**
      * Disables or enables activities to be started in adjacent tasks (see
-     * {@link FLAG_ACTIVITY_LAUNCH_ADJACENT}) for the specified root of any child tasks.  This
-     * differs from {@link #setLaunchAdjacentFlagRoot(WindowContainerToken)} which controls the
+     * {@link Intent#FLAG_ACTIVITY_LAUNCH_ADJACENT}) for the specified root of any child tasks.
+     * This differs from {@link #setLaunchAdjacentFlagRoot(WindowContainerToken)} which controls the
      * preferred launch-adjacent target and allows for selectively setting which root tasks can
      * support launch-adjacent.
      * @hide
@@ -964,8 +986,8 @@ public final class WindowContainerTransaction implements Parcelable {
      * Sets whether a Task or any of its children can enter picture-in-picture.
      * When {@code false}, the container and its children won't be able to enter PiP.
      *
-     * Note: this is different from {@link #setDoNotPip}, which is to temporarily disable PiP during
-     * finishTransition.
+     * <p>Note: this is different from {@link #setDoNotPip}, which is to temporarily disable PiP
+     * during finishTransition.
      * @hide
      */
     @NonNull
@@ -1123,7 +1145,7 @@ public final class WindowContainerTransaction implements Parcelable {
      * trigger callback with this {@param errorCallbackToken}.
      * @param errorCallbackToken    client provided token that will be passed back as parameter in
      *                              the callback if there is an error on the server side.
-     * @see ITaskFragmentOrganizer#onTaskFragmentError
+     * @see com.android.server.wm.TaskFragmentOrganizerController#onTaskFragmentError
      */
     @NonNull
     public WindowContainerTransaction setErrorCallbackToken(@NonNull IBinder errorCallbackToken) {
@@ -1300,7 +1322,7 @@ public final class WindowContainerTransaction implements Parcelable {
      * @param fragmentToken client assigned unique token to create TaskFragment with specified in
      *                      {@link TaskFragmentCreationParams#getFragmentToken()}.
      * @param taskFragmentOperation the {@link TaskFragmentOperation} to apply to the given
-     *                              TaskFramgent.
+     *                              TaskFragment.
      * @hide
      */
     @NonNull
@@ -1457,6 +1479,7 @@ public final class WindowContainerTransaction implements Parcelable {
         public static final int CHANGE_DISABLE_PIP = 1 << 11;
         public static final int CHANGE_DISABLE_LAUNCH_ADJACENT = 1 << 12;
         public static final int CHANGE_IS_TASK_MOVE_ALLOWED = 1 << 13;
+        public static final int CHANGE_INTERCEPT_BACK_PRESSED = 1 << 14;
 
         @IntDef(flag = true, prefix = { "CHANGE_" }, value = {
                 CHANGE_FOCUSABLE,
@@ -1473,6 +1496,7 @@ public final class WindowContainerTransaction implements Parcelable {
                 CHANGE_DISABLE_PIP,
                 CHANGE_DISABLE_LAUNCH_ADJACENT,
                 CHANGE_IS_TASK_MOVE_ALLOWED,
+                CHANGE_INTERCEPT_BACK_PRESSED
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface ChangeMask {}
@@ -1487,6 +1511,7 @@ public final class WindowContainerTransaction implements Parcelable {
         private boolean mDisablePip = false;
         private boolean mDisableLaunchAdjacent = false;
         private boolean mIsTaskMoveAllowed = false;
+        private boolean mInterceptBackPressed = false;
 
         private @ChangeMask int mChangeMask = 0;
         private @ActivityInfo.Config int mConfigSetMask = 0;
@@ -1517,6 +1542,7 @@ public final class WindowContainerTransaction implements Parcelable {
             mDisablePip = in.readBoolean();
             mDisableLaunchAdjacent = in.readBoolean();
             mIsTaskMoveAllowed = in.readBoolean();
+            mInterceptBackPressed = in.readBoolean();
             mChangeMask = in.readInt();
             mConfigSetMask = in.readInt();
             mWindowSetMask = in.readInt();
@@ -1577,6 +1603,9 @@ public final class WindowContainerTransaction implements Parcelable {
             }
             if ((other.mChangeMask & CHANGE_IS_TASK_MOVE_ALLOWED) != 0) {
                 mIsTaskMoveAllowed = other.mIsTaskMoveAllowed;
+            }
+            if ((other.mChangeMask & CHANGE_INTERCEPT_BACK_PRESSED) != 0) {
+                mInterceptBackPressed = other.mInterceptBackPressed;
             }
             mChangeMask |= other.mChangeMask;
             if (other.mActivityWindowingMode >= WINDOWING_MODE_UNDEFINED) {
@@ -1684,6 +1713,15 @@ public final class WindowContainerTransaction implements Parcelable {
             return mDisableLaunchAdjacent;
         }
 
+        /** Gets the intercept-back-pressed state. */
+        public boolean getInterceptBackPressed() {
+            if ((mChangeMask & CHANGE_INTERCEPT_BACK_PRESSED) == 0) {
+                throw new RuntimeException("Intercept back pressed not set. "
+                        + "Check CHANGE_INTERCEPT_BACK_PRESSED first");
+            }
+            return mInterceptBackPressed;
+        }
+
         /** Gets whether the config should be sent to the client at the end of the transition. */
         public boolean getConfigAtTransitionEnd() {
             return mConfigAtTransitionEnd;
@@ -1744,50 +1782,57 @@ public final class WindowContainerTransaction implements Parcelable {
             final boolean changesSs = (mConfigSetMask & ActivityInfo.CONFIG_SCREEN_SIZE) != 0;
             final boolean changesSss =
                     (mConfigSetMask & ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE) != 0;
-            StringBuilder sb = new StringBuilder();
+            final var sb = new StringBuilder();
             sb.append('{');
             if (changesBounds) {
-                sb.append("bounds:" + mConfiguration.windowConfiguration.getBounds() + ",");
+                sb.append("bounds:").append(mConfiguration.windowConfiguration.getBounds())
+                        .append(",");
             }
             if (changesAppBounds) {
-                sb.append("appbounds:" + mConfiguration.windowConfiguration.getAppBounds() + ",");
+                sb.append("appbounds:").append(mConfiguration.windowConfiguration.getAppBounds())
+                        .append(",");
             }
             if (changesSss) {
-                sb.append("ssw:" + mConfiguration.smallestScreenWidthDp + ",");
+                sb.append("ssw:").append(mConfiguration.smallestScreenWidthDp).append(",");
             }
             if (changesSs) {
-                sb.append("sw/h:" + mConfiguration.screenWidthDp + "x"
-                        + mConfiguration.screenHeightDp + ",");
+                sb.append("sw/h:").append(mConfiguration.screenWidthDp).append("x")
+                        .append(mConfiguration.screenHeightDp).append(",");
             }
             if ((mChangeMask & CHANGE_FOCUSABLE) != 0) {
-                sb.append("focusable:" + mFocusable + ",");
+                sb.append("focusable:").append(mFocusable).append(",");
             }
             if ((mChangeMask & CHANGE_FORCE_TRANSLUCENT) != 0) {
-                sb.append("forceTranslucent:" + mForceTranslucent + ",");
+                sb.append("forceTranslucent:").append(mForceTranslucent).append(",");
             }
             if ((mChangeMask & CHANGE_HIDDEN) != 0) {
-                sb.append("hidden:" + mHidden + ",");
+                sb.append("hidden:").append(mHidden).append(",");
             }
             if ((mChangeMask & CHANGE_DRAG_RESIZING) != 0) {
-                sb.append("dragResizing:" + mDragResizing + ",");
+                sb.append("dragResizing:").append(mDragResizing).append(",");
             }
             if ((mChangeMask & CHANGE_FORCE_EXCLUDED_FROM_RECENTS) != 0) {
-                sb.append("forceExcludedFromRecents:" + mForceExcludedFromRecents + ",");
+                sb.append("forceExcludedFromRecents:").append(mForceExcludedFromRecents)
+                        .append(",");
             }
             if ((mChangeMask & CHANGE_DISABLE_PIP) != 0) {
-                sb.append("disablePip:" + mDisablePip + ",");
+                sb.append("disablePip:").append(mDisablePip).append(",");
             }
             if ((mChangeMask & CHANGE_DISABLE_LAUNCH_ADJACENT) != 0) {
-                sb.append("disableLaunchAdjacent:" + mDisableLaunchAdjacent + ",");
+                sb.append("disableLaunchAdjacent:").append(mDisableLaunchAdjacent).append(",");
             }
             if ((mChangeMask & CHANGE_IS_TASK_MOVE_ALLOWED) != 0) {
-                sb.append("isTaskMoveAllowed:" + mIsTaskMoveAllowed + ",");
+                sb.append("isTaskMoveAllowed:").append(mIsTaskMoveAllowed).append(",");
+            }
+            if ((mChangeMask & CHANGE_INTERCEPT_BACK_PRESSED) != 0) {
+                sb.append("interceptBack:" + mInterceptBackPressed + ",");
             }
             if (mBoundsChangeTransaction != null) {
                 sb.append("hasBoundsTransaction,");
             }
             if ((mChangeMask & CHANGE_IGNORE_ORIENTATION_REQUEST) != 0) {
-                sb.append("ignoreOrientationRequest:" + mIgnoreOrientationRequest + ",");
+                sb.append("ignoreOrientationRequest:").append(mIgnoreOrientationRequest)
+                        .append(",");
             }
             if ((mChangeMask & CHANGE_RELATIVE_BOUNDS) != 0) {
                 sb.append("relativeBounds:").append(mRelativeBounds).append(",");
@@ -1815,6 +1860,7 @@ public final class WindowContainerTransaction implements Parcelable {
             dest.writeBoolean(mDisablePip);
             dest.writeBoolean(mDisableLaunchAdjacent);
             dest.writeBoolean(mIsTaskMoveAllowed);
+            dest.writeBoolean(mInterceptBackPressed);
             dest.writeInt(mChangeMask);
             dest.writeInt(mConfigSetMask);
             dest.writeInt(mWindowSetMask);
@@ -1837,7 +1883,7 @@ public final class WindowContainerTransaction implements Parcelable {
             return 0;
         }
 
-        public static final Creator<Change> CREATOR = new Creator<Change>() {
+        public static final Creator<Change> CREATOR = new Creator<>() {
             @Override
             public Change createFromParcel(@NonNull Parcel in) {
                 return new Change(in);
@@ -2019,7 +2065,7 @@ public final class WindowContainerTransaction implements Parcelable {
          * @param container which needs to be reordered
          * @param toTop if true, the container reorders
          * @param includingParents if true, all the parents in the hierarchy above are also
-         *                         reoredered among their respective siblings
+         *                         reordered among their respective siblings
          * @return
          */
         @NonNull
@@ -2546,7 +2592,7 @@ public final class WindowContainerTransaction implements Parcelable {
             return 0;
         }
 
-        public static final Creator<HierarchyOp> CREATOR = new Creator<HierarchyOp>() {
+        public static final Creator<HierarchyOp> CREATOR = new Creator<>() {
             @Override
             public HierarchyOp createFromParcel(@NonNull Parcel in) {
                 return new HierarchyOp(in);

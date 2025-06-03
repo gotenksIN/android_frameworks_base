@@ -104,7 +104,7 @@ import javax.inject.Inject;
 public final class WMShell implements
         CoreStartable,
         CommandQueue.Callbacks {
-    private static final String TAG = WMShell.class.getName();
+    private static final String TAG = WMShell.class.getSimpleName();
     private static final long INVALID_SYSUI_STATE_MASK =
             SYSUI_STATE_DIALOG_SHOWING
                     | SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING
@@ -281,14 +281,16 @@ public final class WMShell implements
                 new PipTransitionController.PipTransitionCallback() {
                     @Override
                     public void onPipTransitionStarted(int direction, Rect pipBounds) {
+                        Log.d(TAG, "Set disable_gesture_pip_animating on transition start");
                         mSysUiState.setFlag(SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING, true)
-                                .commitUpdate(mDisplayTracker.getDefaultDisplayId());
+                                .commitUpdate();
                     }
 
                     @Override
                     public void onPipTransitionFinished(int direction) {
+                        Log.d(TAG, "Reset disable_gesture_pip_animating on transition finish");
                         mSysUiState.setFlag(SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING, false)
-                                .commitUpdate(mDisplayTracker.getDefaultDisplayId());
+                                .commitUpdate();
                     }
 
                     @Override
@@ -298,8 +300,9 @@ public final class WMShell implements
                 }, mSysUiMainExecutor);
         pip.addOnIsInPipStateChangedListener((isInPip) -> {
             if (!isInPip) {
+                Log.d(TAG, "Reset disable_gesture_pip_animating on pip exit");
                 mSysUiState.setFlag(SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING, false)
-                        .commitUpdate(mDisplayTracker.getDefaultDisplayId());
+                        .commitUpdate();
             }
         });
         mSysUiState.addCallback((sysUiStateFlag, displayId) -> {

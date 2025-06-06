@@ -38,7 +38,6 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import android.app.PropertyInvalidatedCache;
 import android.content.Intent;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -75,7 +74,6 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
 
     @Before
     public void setUp() {
-        PropertyInvalidatedCache.disableForTestMode();
         mService.initializeSyntheticPassword(PRIMARY_USER_ID);
         mService.initializeSyntheticPassword(MANAGED_PROFILE_USER_ID);
     }
@@ -534,7 +532,8 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         final LockSettingsStateListener listener = mock(LockSettingsStateListener.class);
         mLocalService.registerLockSettingsStateListener(listener);
 
-        assertEquals(VerifyCredentialResponse.RESPONSE_ERROR,
+        assertEquals(
+                VerifyCredentialResponse.RESPONSE_OTHER_ERROR,
                 mService.verifyCredential(badPassword, PRIMARY_USER_ID, 0 /* flags */)
                         .getResponseCode());
 
@@ -555,7 +554,8 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         verify(listener).onAuthenticationSucceeded(PRIMARY_USER_ID);
 
         mLocalService.unregisterLockSettingsStateListener(listener);
-        assertEquals(VerifyCredentialResponse.RESPONSE_ERROR,
+        assertEquals(
+                VerifyCredentialResponse.RESPONSE_OTHER_ERROR,
                 mService.verifyCredential(badPassword, PRIMARY_USER_ID, 0 /* flags */)
                         .getResponseCode());
         verify(listener, never()).onAuthenticationFailed(PRIMARY_USER_ID);
@@ -760,7 +760,7 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
             badCredential = LockscreenCredential.createPin("0");
         }
         assertEquals(
-                VerifyCredentialResponse.RESPONSE_ERROR,
+                VerifyCredentialResponse.RESPONSE_OTHER_ERROR,
                 mService.verifyCredential(badCredential, userId, 0 /* flags */).getResponseCode());
     }
 

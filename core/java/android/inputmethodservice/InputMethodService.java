@@ -838,8 +838,14 @@ public class InputMethodService extends AbstractInputMethodService {
             // {@link #restartInput(InputConnection, EditorInfo)}.
             mImeDispatcher = params.imeDispatcher;
             if (mWindow != null) {
-                mWindow.getOnBackInvokedDispatcher().setImeOnBackInvokedDispatcher(
-                        params.imeDispatcher);
+                mWindow.getOnBackInvokedDispatcher().setImeOnBackInvokedDispatcher(mImeDispatcher);
+                if (mDecorViewVisible && mShowInputRequested) {
+                    // Back callback is typically registered in {@link #showWindow()}, but it's
+                    // possible for {@link #doStartInput()} to be called without
+                    // {@link #showWindow()} so we also register here, after setting the new
+                    // dispatcher.
+                    registerDefaultOnBackInvokedCallback();
+                }
             }
         }
 
@@ -1326,11 +1332,10 @@ public class InputMethodService extends AbstractInputMethodService {
     }
 
     private void updateEditorToolTypeInternal(int toolType) {
-        if (Flags.useHandwritingListenerForTooltype()) {
-            if (mInputEditorInfo != null) {
-                mInputEditorInfo.setInitialToolType(toolType);
-            }
+        if (mInputEditorInfo != null) {
+            mInputEditorInfo.setInitialToolType(toolType);
         }
+
         onUpdateEditorToolType(toolType);
     }
 
@@ -3406,10 +3411,6 @@ public class InputMethodService extends AbstractInputMethodService {
                 mInlineSuggestionSessionController.notifyOnStartInputView();
                 onStartInputView(mInputEditorInfo, restarting);
                 startExtractingText(true);
-                // Back callback is typically registered in {@link #showWindow()}, but it's possible
-                // for {@link #doStartInput()} to be called without {@link #showWindow()} so we also
-                // register here.
-                registerDefaultOnBackInvokedCallback();
             } else if (mCandidatesVisibility == View.VISIBLE) {
                 if (DEBUG) Log.v(TAG, "CALL: onStartCandidatesView");
                 mCandidatesViewStarted = true;
@@ -3652,10 +3653,8 @@ public class InputMethodService extends AbstractInputMethodService {
      *         had not seen the event at all.
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (Flags.useHandwritingListenerForTooltype()) {
-            // any KeyEvent keyDown should reset last toolType.
-            updateEditorToolTypeInternal(MotionEvent.TOOL_TYPE_UNKNOWN);
-        }
+        // any KeyEvent keyDown should reset last toolType.
+        updateEditorToolTypeInternal(MotionEvent.TOOL_TYPE_UNKNOWN);
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             final ExtractEditText eet = getExtractEditTextIfVisible();

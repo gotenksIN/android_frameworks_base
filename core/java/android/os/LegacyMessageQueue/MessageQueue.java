@@ -121,6 +121,8 @@ public final class MessageQueue {
         throw new IllegalStateException("Test-only API called not from a test!");
     }
 
+    static boolean getUseConcurrent() { return false; }
+
     private static void throwIfNotTest$ravenwood() {
         return;
     }

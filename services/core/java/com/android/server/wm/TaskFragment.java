@@ -1971,7 +1971,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (prev.attachedToProcess()) {
             if (shouldAutoPip && ActivityTaskManagerService.isPip2ExperimentEnabled()) {
                 prev.mPauseSchedulePendingForPip = true;
-                boolean willAutoPip = mAtmService.setPipCandidateIfNeeded(prev);
+                boolean willAutoPip = mAtmService.prepareAutoEnterPictureAndPictureMode(prev);
                 ProtoLog.d(WM_DEBUG_STATES, "Auto-PIP allowed, requesting PIP mode "
                         + "via requestStartTransition(): %s, willAutoPip: %b", prev, willAutoPip);
             } else if (shouldAutoPip) {

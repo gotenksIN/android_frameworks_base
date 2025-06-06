@@ -36,16 +36,6 @@ flag {
  }
 
 flag {
-   name: "fingerprint_cancel_race_mitigation"
-   namespace: "systemui"
-   description: "Mitigate the race condition between KeyguardUpdateMonitor cancelling a fingerprint listening state and FingerprintManager sending the cancellation."
-   bug: "398973663"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "user_encrypted_source"
    namespace: "systemui"
    description: "Get rid of the local cache and rely on UserManager.isUserUnlocked directly to determine whether user CE storage is encrypted."
@@ -74,16 +64,6 @@ flag {
    namespace: "systemui"
    description: "Convert the NotificationContentInflater to Kotlin and restructure it to support modern views"
    bug: "343942780"
-}
-
-flag {
-   name: "notification_row_is_removed_fix"
-   namespace: "systemui"
-   description: "Fix incorrect isRemoved value in ExpandableNotificationRow"
-   bug: "417457086"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1683,16 +1663,6 @@ flag {
 }
 
 flag {
-  name: "disable_shade_trackpad_two_finger_swipe"
-  namespace: "systemui"
-  description: "Disables expansion of the shade via two finger swipe on a trackpad"
-  bug: "356804470"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
    name: "notification_animated_actions_treatment"
    namespace: "systemui"
    description: "Special UI treatment for animated actions and replys"
@@ -2060,3 +2030,14 @@ flag {
      purpose: PURPOSE_BUGFIX
    }
 }
+
+flag {
+    name: "remember_view_model_off_main_thread"
+    namespace: "systemui"
+    description: "View-models are remembered off the main thread"
+    bug: "421000550"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+

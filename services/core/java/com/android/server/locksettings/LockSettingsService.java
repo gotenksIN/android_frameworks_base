@@ -260,7 +260,10 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private static final int HEADLESS_VENDOR_AUTH_SECRET_LENGTH = 32;
 
-    // Order of holding lock: mSeparateChallengeLock -> mSpManager -> this
+    // Order of holding lock:
+    //          mSeparateChallengeLock -> mSpManager
+    //          mSpManager -> this
+    //          mSpManager -> mSoftwareRateLimiter
     // Do not call into ActivityManager while holding mSpManager lock.
     private final Object mSeparateChallengeLock = new Object();
 // QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
@@ -687,6 +690,11 @@ public class LockSettingsService extends ILockSettings.Stub {
         @Override
         public void postDelayed(Runnable runnable, Object token, long delayMillis) {
             Handler.getMain().postDelayed(runnable, token, delayMillis);
+        }
+
+        @Override
+        public int getHardwareRateLimiter(LskfIdentifier id) {
+            return mSpManager.getHardwareRateLimiter(id);
         }
     }
 
@@ -1642,9 +1650,9 @@ public class LockSettingsService extends ILockSettings.Stub {
     }
 
     private void unlockChildProfile(int profileHandle) {
-        try {
-            doVerifyCredential(getDecryptedPasswordForTiedProfile(profileHandle),
-                    profileHandle, null /* progressCallback */, 0 /* flags */);
+        try (LockscreenCredential credential = getDecryptedPasswordForTiedProfile(profileHandle)) {
+            doVerifyCredential(
+                    credential, profileHandle, /* progressCallback= */ null, /* flags= */ 0);
         } catch (UnrecoverableKeyException | InvalidKeyException | KeyStoreException
                 | NoSuchAlgorithmException | NoSuchPaddingException
                 | InvalidAlgorithmParameterException | IllegalBlockSizeException
@@ -1715,10 +1723,10 @@ public class LockSettingsService extends ILockSettings.Stub {
                     // Unlock profile with unified lock
                     unlockChildProfile(profile.id);
                 } else {
-                    try {
+                    try (LockscreenCredential credential =
+                            getDecryptedPasswordForTiedProfile(profile.id)) {
                         // Profile not ready for unlock yet, but decrypt the unified challenge now
                         // so it goes into the cache
-                        getDecryptedPasswordForTiedProfile(profile.id);
                     } catch (GeneralSecurityException | IOException e) {
                         Slog.d(TAG, "Cache unified profile password failed", e);
                     }
@@ -1933,8 +1941,11 @@ public class LockSettingsService extends ILockSettings.Stub {
                 // Verify the parent credential again, to make sure we have a fresh enough
                 // auth token such that getDecryptedPasswordForTiedProfile() inside
                 // setLockCredentialInternal() can function correctly.
-                verifyCredential(savedCredential, mUserManager.getProfileParent(userId).id,
-                        0 /* flags */);
+                doVerifyCredential(
+                        savedCredential,
+                        mUserManager.getProfileParent(userId).id,
+                        /* progressCallback= */ null,
+                        /* flags= */ 0);
                 savedCredential.zeroize();
                 savedCredential = LockscreenCredential.createNone();
             }
@@ -1995,46 +2006,66 @@ public class LockSettingsService extends ILockSettings.Stub {
             boolean isLockTiedToParent) {
         Objects.requireNonNull(credential);
         Objects.requireNonNull(savedCredential);
-        synchronized (mSpManager) {
-            if (savedCredential.isNone() && isProfileWithUnifiedLock(userId)) {
-                // get credential from keystore when profile has unified lock
-                try {
-                    //TODO: remove as part of b/80170828
-                    savedCredential = getDecryptedPasswordForTiedProfile(userId);
-                } catch (FileNotFoundException e) {
-                    Slog.i(TAG, "Child profile key not found");
-                } catch (UnrecoverableKeyException | InvalidKeyException | KeyStoreException
-                        | NoSuchAlgorithmException | NoSuchPaddingException
-                        | InvalidAlgorithmParameterException | IllegalBlockSizeException
-                        | BadPaddingException | CertificateException | IOException e) {
-                    Slog.e(TAG, "Failed to decrypt child profile key", e);
+        LockscreenCredential profilePassword = null;
+        try {
+            synchronized (mSpManager) {
+                if (savedCredential.isNone() && isProfileWithUnifiedLock(userId)) {
+                    // get credential from keystore when profile has unified lock
+                    try {
+                        // TODO: remove as part of b/80170828
+                        profilePassword = getDecryptedPasswordForTiedProfile(userId);
+                        savedCredential = profilePassword;
+                    } catch (FileNotFoundException e) {
+                        Slog.i(TAG, "Child profile key not found");
+                    } catch (UnrecoverableKeyException
+                            | InvalidKeyException
+                            | KeyStoreException
+                            | NoSuchAlgorithmException
+                            | NoSuchPaddingException
+                            | InvalidAlgorithmParameterException
+                            | IllegalBlockSizeException
+                            | BadPaddingException
+                            | CertificateException
+                            | IOException e) {
+                        Slog.e(TAG, "Failed to decrypt child profile key", e);
+                    }
                 }
-            }
-            final long oldProtectorId = getCurrentLskfBasedProtectorId(userId);
-            AuthenticationResult authResult = mSpManager.unlockLskfBasedProtector(
-                    getGateKeeperService(), oldProtectorId, savedCredential, userId, null);
-            VerifyCredentialResponse response = authResult.response;
-            SyntheticPassword sp = authResult.syntheticPassword;
+                final long oldProtectorId = getCurrentLskfBasedProtectorId(userId);
+                AuthenticationResult authResult =
+                        mSpManager.unlockLskfBasedProtector(
+                                getGateKeeperService(),
+                                oldProtectorId,
+                                savedCredential,
+                                userId,
+                                null);
+                VerifyCredentialResponse response = authResult.response;
+                SyntheticPassword sp = authResult.syntheticPassword;
 
-            if (sp == null) {
-                if (response != null
-                        && response.getResponseCode() == VerifyCredentialResponse.RESPONSE_RETRY) {
-                    Slog.w(TAG, "Failed to enroll: rate limit exceeded.");
-                } else {
-                    Slog.w(TAG, "Failed to enroll: incorrect credential.");
+                if (sp == null) {
+                    if (response != null
+                            && response.getResponseCode()
+                                    == VerifyCredentialResponse.RESPONSE_RETRY) {
+                        Slog.w(TAG, "Failed to enroll: rate limit exceeded.");
+                    } else {
+                        Slog.w(TAG, "Failed to enroll: incorrect credential.");
+                    }
+                    return false;
                 }
-                return false;
-            }
 
-            onSyntheticPasswordUnlocked(userId, sp);
-            setLockCredentialWithSpLocked(credential, sp, userId);
-            if (savedCredential.isNone() && !credential.isNone()) {
-                // Clear the strong auth value, since the LSKF has just been entered and set,
-                // but only when the previous credential was None.
-                mStrongAuth.reportUnlock(userId);
+                onSyntheticPasswordUnlocked(userId, sp);
+                setLockCredentialWithSpLocked(credential, sp, userId);
+                if (savedCredential.isNone() && !credential.isNone()) {
+                    // Clear the strong auth value, since the LSKF has just been entered and set,
+                    // but only when the previous credential was None.
+                    mStrongAuth.reportUnlock(userId);
+                }
+                sendCredentialsOnChangeIfRequired(credential, userId, isLockTiedToParent);
+                return true;
             }
-            sendCredentialsOnChangeIfRequired(credential, userId, isLockTiedToParent);
-            return true;
+        } finally {
+            if (profilePassword != null) {
+                profilePassword.zeroize();
+            }
         }
     }
 
@@ -2070,13 +2101,13 @@ public class LockSettingsService extends ILockSettings.Stub {
             passwordHistory = "";
         } else {
             Slogf.d(TAG, "Adding new password to password history for user %d", userHandle);
-            final byte[] hashFactor = getHashFactor(password, userHandle);
+            final byte[] hashFactor = getHashFactorInternal(password, userHandle);
             final byte[] salt = getSalt(userHandle).getBytes();
             String hash = password.passwordToHistoryHash(salt, hashFactor);
             if (hash == null) {
                 // This should never happen, as all information needed to compute the hash should be
-                // available.  In particular, unwrapping the SP in getHashFactor() should always
-                // succeed, as we're using the LSKF that was just set.
+                // available. In particular, unwrapping the SP in getHashFactorInternal() should
+                // always succeed, as we're using the LSKF that was just set.
                 Slog.e(TAG, "Failed to compute password hash; password history won't be updated");
                 return;
             }
@@ -2455,7 +2486,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         synchronized (mSpManager) {
             if (gatekeeperPassword == null) {
                 Slog.d(TAG, "No gatekeeper password for handle");
-                response = VerifyCredentialResponse.ERROR;
+                response = VerifyCredentialResponse.OTHER_ERROR;
             } else {
                 response = mSpManager.verifyChallengeInternal(getGateKeeperService(),
                         gatekeeperPassword, challenge, userId);
@@ -2489,11 +2520,11 @@ public class LockSettingsService extends ILockSettings.Stub {
         if (userId == USER_FRP && Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.DEVICE_PROVISIONED, 0) != 0) {
             Slog.e(TAG, "FRP credential can only be verified prior to provisioning.");
-            return VerifyCredentialResponse.ERROR;
+            return VerifyCredentialResponse.OTHER_ERROR;
         }
         if (userId == USER_REPAIR_MODE && !LockPatternUtils.isRepairModeActive(mContext)) {
             Slog.e(TAG, "Repair mode is not active on the device.");
-            return VerifyCredentialResponse.ERROR;
+            return VerifyCredentialResponse.OTHER_ERROR;
         }
         Slogf.i(TAG, "Verifying lockscreen credential for user %d", userId);
 
@@ -2536,7 +2567,7 @@ public class LockSettingsService extends ILockSettings.Stub {
                 if ((flags & VERIFY_FLAG_WRITE_REPAIR_MODE_PW) != 0) {
                     if (!mSpManager.writeRepairModeCredentialLocked(protectorId, userId)) {
                         Slog.e(TAG, "Failed to write repair mode credential");
-                        return VerifyCredentialResponse.ERROR;
+                        return VerifyCredentialResponse.OTHER_ERROR;
                     }
                 }
                 // credential has matched
@@ -2627,10 +2658,9 @@ public class LockSettingsService extends ILockSettings.Stub {
             return parentResponse;
         }
 
-        try {
+        try (LockscreenCredential profilePassword = getDecryptedPasswordForTiedProfile(userId)) {
             // Unlock profile with unified lock
-            return doVerifyCredential(getDecryptedPasswordForTiedProfile(userId),
-                    userId, null /* progressCallback */, flags);
+            return doVerifyCredential(profilePassword, userId, /* progressCallback= */ null, flags);
         } catch (UnrecoverableKeyException | InvalidKeyException | KeyStoreException
                 | NoSuchAlgorithmException | NoSuchPaddingException
                 | InvalidAlgorithmParameterException | IllegalBlockSizeException
@@ -3375,19 +3405,19 @@ public class LockSettingsService extends ILockSettings.Stub {
     }
 
     /**
-     * Returns a fixed pseudorandom byte string derived from the user's synthetic password.
-     * This is used to salt the password history hash to protect the hash against offline
-     * bruteforcing, since rederiving this value requires a successful authentication.
-     * If user is a profile with unified challenge, currentCredential is ignored.
+     * Returns a fixed pseudorandom byte string derived from the user's synthetic password. This is
+     * used to salt the password history hash to protect the hash against offline bruteforcing,
+     * since rederiving this value requires a successful authentication. If user is a profile with
+     * unified challenge, currentCredential is ignored.
      */
-    @Override
-    public byte[] getHashFactor(LockscreenCredential currentCredential, int userId) {
-        checkPasswordReadPermission();
+    private byte[] getHashFactorInternal(LockscreenCredential currentCredential, int userId) {
+        LockscreenCredential profilePassword = null;
         try {
             Slogf.d(TAG, "Getting password history hash factor for user %d", userId);
             if (isProfileWithUnifiedLock(userId)) {
                 try {
-                    currentCredential = getDecryptedPasswordForTiedProfile(userId);
+                    profilePassword = getDecryptedPasswordForTiedProfile(userId);
+                    currentCredential = profilePassword;
                 } catch (Exception e) {
                     Slog.e(TAG, "Failed to get unified profile password", e);
                     return null;
@@ -3404,8 +3434,17 @@ public class LockSettingsService extends ILockSettings.Stub {
                 return auth.syntheticPassword.derivePasswordHashFactor();
             }
         } finally {
+            if (profilePassword != null) {
+                profilePassword.zeroize();
+            }
             scheduleGc();
         }
+    }
+
+    @Override
+    public byte[] getHashFactor(LockscreenCredential currentCredential, int userId) {
+        checkPasswordReadPermission();
+        return getHashFactorInternal(currentCredential, userId);
     }
 
     private long addEscrowToken(@NonNull byte[] token, @TokenType int type, int userId,

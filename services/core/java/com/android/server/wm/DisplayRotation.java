@@ -352,7 +352,7 @@ public class DisplayRotation {
             mOrientationListener.setCurrentRotation(mRotation);
             mSettingsObserver = new SettingsObserver(uiHandler);
             mSettingsObserver.observe();
-            if (mSupportAutoRotation && isFoldable(mContext)) {
+            if (mSupportAutoRotation && mDeviceStateController.isFoldable()) {
                 mFoldController = new FoldController();
             } else {
                 mFoldController = null;
@@ -416,10 +416,6 @@ public class DisplayRotation {
 // QTI_END: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
 // QTI_BEGIN: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
 // QTI_END: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
-    }
-
-    private static boolean isFoldable(Context context) {
-        return context.getResources().getIntArray(R.array.config_foldedDeviceStates).length > 0;
     }
 
     private static boolean isAutoRotateSupported(@NonNull Context context) {
@@ -1836,9 +1832,9 @@ public class DisplayRotation {
      */
     @Nullable
     static DeviceStateAutoRotateSettingController createDeviceStateAutoRotateDependencies(
-            Context context, DeviceStateController deviceStateController,
-            WindowManagerService wmService) {
-        if (!isFoldable(context) || !isAutoRotateSupported(context)) return null;
+            @NonNull Context context, @NonNull  DeviceStateController deviceStateController,
+            @NonNull WindowManagerService wmService) {
+        if (!deviceStateController.isFoldable() || !isAutoRotateSupported(context)) return null;
         if (!Flags.enableDeviceStateAutoRotateSettingLogging()
                 && !Flags.enableDeviceStateAutoRotateSettingRefactor()) {
             return null;
@@ -1855,12 +1851,15 @@ public class DisplayRotation {
         }
 
         if (Flags.enableDeviceStateAutoRotateSettingRefactor()) {
+            final PostureDeviceStateConverter postureDeviceStateController =
+                    new PostureDeviceStateConverter(context, new DeviceStateManager());
             final DeviceStateAutoRotateSettingManager deviceStateAutoRotateSettingManager =
                     new DeviceStateAutoRotateSettingManagerImpl(
                             context, BackgroundThread.getExecutor(), secureSettings, wmService.mH,
-                            new PostureDeviceStateConverter(context, new DeviceStateManager()));
+                            postureDeviceStateController);
             deviceStateAutoRotateSettingController = new DeviceStateAutoRotateSettingController(
-                    deviceStateController, deviceStateAutoRotateSettingManager, wmService);
+                    deviceStateController, deviceStateAutoRotateSettingManager, wmService,
+                    postureDeviceStateController);
         }
 
         return deviceStateAutoRotateSettingController;

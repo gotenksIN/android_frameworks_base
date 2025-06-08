@@ -126,6 +126,7 @@ import com.android.wm.shell.desktopmode.VisualIndicatorUpdateScheduler;
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository;
 import com.android.wm.shell.desktopmode.compatui.SystemModalsTransitionHandler;
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopDisplayModeController;
+import com.android.wm.shell.desktopmode.desktopfirst.DesktopFirstListenerManager;
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationFilter;
@@ -882,7 +883,8 @@ public abstract class WMShellModule {
             HomeIntentProvider homeIntentProvider,
             DesktopState desktopState,
             DesktopConfig desktopConfig,
-            VisualIndicatorUpdateScheduler visualIndicatorUpdateScheduler) {
+            VisualIndicatorUpdateScheduler visualIndicatorUpdateScheduler,
+            Optional<DesktopFirstListenerManager> desktopFirstListenerManager) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -929,7 +931,8 @@ public abstract class WMShellModule {
                 homeIntentProvider,
                 desktopState,
                 desktopConfig,
-                visualIndicatorUpdateScheduler);
+                visualIndicatorUpdateScheduler,
+                desktopFirstListenerManager);
     }
 
     @WMSingleton
@@ -1412,18 +1415,23 @@ public abstract class WMShellModule {
                                         desktopState,
                                         shellInit)));
     }
+
     @WMSingleton
     @Provides
     static Optional<DesksTransitionObserver> provideDesksTransitionObserver(
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             @NonNull DesksOrganizer desksOrganizer,
             @NonNull Transitions transitions,
+            @NonNull ShellController shellController,
+            @NonNull DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
+            @NonNull @ShellMainThread CoroutineScope mainScope,
             DesktopState desktopState
     ) {
         if (desktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.of(
                     new DesksTransitionObserver(desktopUserRepositories, desksOrganizer,
-                            transitions));
+                            transitions, shellController, desktopWallpaperActivityTokenProvider,
+                            mainScope));
         }
         return Optional.empty();
     }
@@ -1519,6 +1527,23 @@ public abstract class WMShellModule {
                         desktopDisplayModeController.get(),
                         desksTransitionObserver.get(),
                         desktopState));
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<DesktopFirstListenerManager> provideDesktopFirstListenerManager(
+            @NonNull DesktopState desktopState,
+            @NonNull ShellInit shellInit,
+            @NonNull RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
+            @NonNull DisplayController displayController
+    ) {
+        if (desktopState.canEnterDesktopMode()
+                && DesktopExperienceFlags.ENABLE_DESKTOP_FIRST_LISTENER.isTrue()) {
+            return Optional.of(
+                    new DesktopFirstListenerManager(shellInit, rootTaskDisplayAreaOrganizer,
+                            displayController));
+        }
+        return Optional.empty();
     }
 
     @WMSingleton

@@ -176,6 +176,7 @@ private fun TaskBarAnd3ButtonAmbientCue(
     ActionList(
         actions = actions,
         visible = visible && expanded,
+        onDismiss = { viewModel.collapse() },
         horizontalAlignment = Alignment.End,
         modifier =
             modifier.graphicsLayer {
@@ -207,13 +208,14 @@ private fun NavBarAmbientCue(
         navBarWidth = navBarWidth,
         visible = visible,
         expanded = expanded,
-        modifier = modifier,
+        modifier = modifier.padding(bottom = 4.dp),
         onClick = { viewModel.expand() },
         onCloseClick = { viewModel.hide() },
     )
     ActionList(
         actions = actions,
         visible = visible && expanded,
+        onDismiss = { viewModel.collapse() },
         modifier =
             modifier.padding(
                 bottom = NAV_BAR_ACTIONS_PADDING.dp,

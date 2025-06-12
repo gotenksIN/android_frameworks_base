@@ -410,6 +410,7 @@ public abstract class OomAdjuster {
     boolean mEnableBgt = false;
 // QTI_END: 2020-07-09: Performance: Hooks for background apps transition
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+    boolean mLazyLmkKillMainProc = false;
 
     public static BoostFramework mPerf = new BoostFramework();
     private int mLegacyUiPerfHandler = -1;
@@ -499,8 +500,16 @@ public abstract class OomAdjuster {
             ProcessList.batchSetOomAdj(procsToOomAdj);
         }
 
+        void batchSetOomAdjExt(ArrayList<ProcessRecord> procsToOomAdj) {
+            ProcessList.batchSetOomAdjExt(procsToOomAdj);
+        }
+
         void setOomAdj(int pid, int uid, int adj) {
             ProcessList.setOomAdj(pid, uid, adj);
+        }
+
+        void setOomAdjExt(int pid, int uid, int adj, int isSystemApp, int isMainProc) {
+            ProcessList.setOomAdjExt(pid, uid, adj, isSystemApp, isMainProc);
         }
 
         void setThreadPriority(int tid, int priority) {
@@ -587,6 +596,7 @@ public abstract class OomAdjuster {
             mEnableBgt = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.bgt.enable","false"));
 // QTI_END: 2020-07-09: Performance: Hooks for background apps transition
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+            mLazyLmkKillMainProc = Boolean.parseBoolean(mPerf.perfGetProp("ro.lmk.lazy_killing_3rd_app_main_proc","false"));
         }
 
 // QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
@@ -1418,7 +1428,11 @@ public abstract class OomAdjuster {
         }
 
         if (!mProcsToOomAdj.isEmpty()) {
-            mInjector.batchSetOomAdj(mProcsToOomAdj);
+            if (mLazyLmkKillMainProc) {
+                mInjector.batchSetOomAdjExt(mProcsToOomAdj);
+            } else {
+                mInjector.batchSetOomAdj(mProcsToOomAdj);
+            }
             mProcsToOomAdj.clear();
         }
 
@@ -1439,10 +1453,25 @@ public abstract class OomAdjuster {
         if ((numBServices > mBServiceAppThreshold) && (true == mService.mAppProfiler.allowLowerMemLevelLocked())
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                 && (selectedAppRecord != null)) {
+            if (mLazyLmkKillMainProc) {
+                String packageName = selectedAppRecord.info.packageName;
+                String processName = selectedAppRecord.processName;
+                int isMainProc = 0;
+                int isSystemApp = 0;
+                if (packageName.equals(processName)) {
+                    isMainProc = 1;
+                }
+                if (selectedAppRecord.info.isSystemApp()) {
+                    isSystemApp = 1;
+                }
+                ProcessList.setOomAdjExt(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
+                    ProcessList.CACHED_APP_MAX_ADJ, isSystemApp, isMainProc);
+            } else {
 // QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-            ProcessList.setOomAdj(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
+                ProcessList.setOomAdj(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                     ProcessList.CACHED_APP_MAX_ADJ);
+            }
 // QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
             selectedAppRecord.mState.setSetAdj(selectedAppRecord.mState.getCurAdj());
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
@@ -2224,7 +2253,21 @@ public abstract class OomAdjuster {
             if (isBatchingOomAdj && mConstants.ENABLE_BATCHING_OOM_ADJ) {
                 mProcsToOomAdj.add(app);
             } else {
-                mInjector.setOomAdj(app.getPid(), app.uid, app.mState.getCurAdj());
+                if (mLazyLmkKillMainProc) {
+                    String packageName = app.info.packageName;
+                    String processName = app.processName;
+                    int isMainProc = 0;
+                    int isSystemApp = 0;
+                    if (packageName.equals(processName)) {
+                        isMainProc = 1;
+                    }
+                    if (app.info.isSystemApp()) {
+                        isSystemApp = 1;
+                    }
+                    mInjector.setOomAdjExt(app.getPid(), app.uid, app.mState.getCurAdj(), isSystemApp, isMainProc);
+                } else {
+                    mInjector.setOomAdj(app.getPid(), app.uid, app.mState.getCurAdj());
+                }
             }
 
             if (DEBUG_SWITCH || DEBUG_OOM_ADJ || mService.mCurOomAdjUid == app.info.uid) {

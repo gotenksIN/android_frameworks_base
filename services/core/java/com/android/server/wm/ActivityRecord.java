@@ -1476,7 +1476,9 @@ public final class ActivityRecord extends WindowToken {
                 // PiP2 should handle sending out the configuration as a part of Shell Transitions.
                 ensureActivityConfiguration(true /* ignoreVisibility */);
             }
-            if (inPictureInPictureMode && findMainWindow() == null
+            if (inPictureInPictureMode
+                    // A window might not be added if the activity is directly launching-into-PiP.
+                    && findMainWindow() == null && !pictureInPictureArgs.isLaunchIntoPip()
                     && task.topRunningActivity() == this) {
                 // Prevent malicious app entering PiP without valid WindowState, which can in turn
                 // result a non-touchable PiP window since the InputConsumer for PiP requires it.
@@ -3361,6 +3363,10 @@ public final class ActivityRecord extends WindowToken {
             Slog.w(TAG, "Display " + mDisplayContent.getDisplayId()
                     + " doesn't support enter picture-in-picture mode. caller = " + caller);
             return false;
+        }
+
+        if (getOptions() != null && getOptions().isLaunchIntoPip()) {
+            return true;
         }
 
         boolean isCurrentAppLocked =

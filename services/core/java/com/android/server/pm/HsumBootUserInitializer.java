@@ -70,7 +70,7 @@ public final class HsumBootUserInitializer {
             };
 
     /** Whether it should create a main user on first boot. */
-    private final boolean mShouldCreateMainUser;
+    private final boolean mShouldDesignateMainUser;
 
     /** Whether it should create an initial user, but without setting it as the main user. */
     private final boolean mShouldCreateInitialUser;
@@ -78,24 +78,24 @@ public final class HsumBootUserInitializer {
     /** Static factory method for creating a {@link HsumBootUserInitializer} instance. */
     public static @Nullable HsumBootUserInitializer createInstance(UserManagerService ums,
             ActivityManagerService ams, PackageManagerService pms, ContentResolver contentResolver,
-            boolean shouldCreateInitialUser) {
+            boolean shouldDesignateMainUser, boolean shouldCreateInitialUser) {
 
         if (!UserManager.isHeadlessSystemUserMode()) {
             return null;
         }
         return new HsumBootUserInitializer(ums, ams, pms, contentResolver,
-                ums.isMainUserPermanentAdmin(), shouldCreateInitialUser);
+                shouldDesignateMainUser, shouldCreateInitialUser);
     }
 
     @VisibleForTesting
     HsumBootUserInitializer(UserManagerService ums, ActivityManagerService ams,
             PackageManagerService pms, ContentResolver contentResolver,
-            boolean shouldCreateMainUser, boolean shouldCreateInitialUser) {
+            boolean shouldDesignateMainUser, boolean shouldCreateInitialUser) {
         mUms = ums;
         mAms = ams;
         mPms = pms;
         mContentResolver = contentResolver;
-        mShouldCreateMainUser = shouldCreateMainUser;
+        mShouldDesignateMainUser = shouldDesignateMainUser;
         mShouldCreateInitialUser = shouldCreateInitialUser;
     }
 
@@ -105,7 +105,7 @@ public final class HsumBootUserInitializer {
             Slogf.d(TAG, "preCreateInitialUserFlagInit())");
         }
 
-        if (mShouldCreateMainUser) {
+        if (mShouldDesignateMainUser) {
             t.traceBegin("createMainUserIfNeeded");
             preCreateInitialUserCreateMainUserIfNeeded();
             t.traceEnd();
@@ -153,9 +153,9 @@ public final class HsumBootUserInitializer {
      */
     public void init(TimingsTraceAndSlog t) {
         if (DEBUG) {
-            Slogf.d(TAG, "init(): shouldCreateMainUser=%b, shouldCreateInitialUser=%b, "
+            Slogf.d(TAG, "init(): mShouldDesignateMainUser=%b, shouldCreateInitialUser=%b, "
                     + "Flags.createInitialUser=%b",
-                    mShouldCreateMainUser, mShouldCreateInitialUser, Flags.createInitialUser());
+                    mShouldDesignateMainUser, mShouldCreateInitialUser, Flags.createInitialUser());
         } else {
             Slogf.i(TAG, "Initializing");
         }
@@ -169,8 +169,8 @@ public final class HsumBootUserInitializer {
         int mainUserId = mUms.getMainUserId();
         t.traceEnd();
 
-        if (mShouldCreateMainUser) {
-            createMainUserIfNeeded(t, mainUserId);
+        if (mShouldDesignateMainUser) {
+            designateMainUserIfNeeded(t, mainUserId);
             return;
         }
 
@@ -187,18 +187,48 @@ public final class HsumBootUserInitializer {
         }
     }
 
-    private void createMainUserIfNeeded(TimingsTraceAndSlog t, @UserIdInt int mainUserId) {
-        // Always tracing as it used to be done by the caller
+    private void designateMainUserIfNeeded(TimingsTraceAndSlog t, @UserIdInt int mainUserId) {
+        // Always tracing as it used to be done by the caller - removing it (as createInitialUser
+        // also traces) could break existing performance tests (for that same reason, the name in
+        // trace call is not changed)
         t.traceBegin("createMainUserIfNeeded");
         try {
             if (mainUserId != UserHandle.USER_NULL) {
                 if (DEBUG) {
-                    Slogf.d(TAG, "createMainUserIfNeeded(): found MainUser (userId=%d)",
+                    Slogf.d(TAG, "designateMainUserIfNeeded(): found MainUser (userId=%d)",
                             mainUserId);
                 }
                 return;
             }
-            createInitialUser(/* isMainUser= */ true);
+            if (!promoteAdminUserToMainUserIfNeeded(t)) {
+                createInitialUser(/* isMainUser= */ true);
+            }
+        } finally {
+            t.traceEnd();
+        }
+    }
+
+    private boolean promoteAdminUserToMainUserIfNeeded(TimingsTraceAndSlog t) {
+        t.traceBegin("promoteAdminUserToMainUserIfNeeded");
+        try {
+            // TODO(b/419086491): use getUsers(Filter)
+            var users = mUms.getUsers(/* excludeDying= */ true);
+            int numberUsers = users.size();
+            for (int i = 0; i < numberUsers; i++) {
+                var user = users.get(i);
+                if (user.isFull() && user.isAdmin()) {
+                    Slogf.i(TAG, "Promoting admin user (%d) as main user", user.id);
+                    if (!mUms.setMainUser(user.id)) {
+                        Slogf.e(TAG, "Failed to promote admin user (%d) as main user", user.id);
+                        continue;
+                    }
+                    return true;
+                }
+            }
+            if (DEBUG) {
+                Slogf.d(TAG, "No existing admin user was promoted as main user (users=%s)", users);
+            }
+            return false;
         } finally {
             t.traceEnd();
         }
@@ -221,9 +251,11 @@ public final class HsumBootUserInitializer {
             t.traceEnd();
         }
     }
+
     private void createAdminUserIfNeeded(TimingsTraceAndSlog t) {
         t.traceBegin("createAdminUserIfNeeded");
         try {
+            // TODO(b/419086491): use getUsers(Filter)
             int[] userIds = mUms.getUserIds();
             if (userIds != null && userIds.length > 1) {
                 if (DEBUG) {

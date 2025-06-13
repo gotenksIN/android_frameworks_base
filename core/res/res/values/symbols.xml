@@ -369,6 +369,7 @@
   <java-symbol type="bool" name="config_isMainUserPermanentAdmin"/>
   <java-symbol type="bool" name="config_supportProfilesOnNonMainUser"/>
   <java-symbol type="bool" name="config_createInitialUser"/>
+  <java-symbol type="bool" name="config_designateMainUser"/>
   <java-symbol type="bool" name="config_canSwitchToHeadlessSystemUser"/>
   <java-symbol type="bool" name="config_enableMultiUserUI"/>
   <java-symbol type="bool" name="config_enableMultipleAdmins"/>
@@ -410,6 +411,7 @@
   <java-symbol type="bool" name="config_windowShowCircularMask" />
   <java-symbol type="bool" name="config_predictShowStartingSurface" />
   <java-symbol type="bool" name="config_windowEnableCircularEmulatorDisplayOverlay" />
+  <java-symbol type="bool" name="config_windowEnableScreenBrightnessEmulatorDisplayOverlay" />
   <java-symbol type="bool" name="config_supportMicNearUltrasound" />
   <java-symbol type="bool" name="config_supportSpeakerNearUltrasound" />
   <java-symbol type="bool" name="config_supportAudioSourceUnprocessed" />

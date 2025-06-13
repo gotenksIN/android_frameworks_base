@@ -695,12 +695,9 @@ class DesktopTasksController(
             if (desktopModeSupportedOnDisplay) {
                 // Desktop supported on display; reparent desks, focused desk on top.
                 for (deskId in deskIds) {
-                    val toTop =
-                        desktopRepository
-                            .getActiveTasks(disconnectedDisplayId)
-                            .contains(focusTransitionObserver.globallyFocusedTaskId)
+                    val deskTasks = desktopRepository.getActiveTaskIdsInDesk(deskId)
                     // Remove desk if it's empty.
-                    if (desktopRepository.getActiveTasks(disconnectedDisplayId).isEmpty()) {
+                    if (deskTasks.isEmpty()) {
                         desksOrganizer.removeDesk(wct, deskId, desktopRepository.userId)
                         desksTransitionObserver.addPendingTransition(
                             DeskTransition.RemoveDesk(
@@ -714,6 +711,8 @@ class DesktopTasksController(
                         )
                     } else {
                         // Otherwise, reparent it to the destination display.
+                        val toTop =
+                            deskTasks.contains(focusTransitionObserver.globallyFocusedTaskId)
                         desksOrganizer.moveDeskToDisplay(wct, deskId, destinationDisplayId, toTop)
                         desksTransitionObserver.addPendingTransition(
                             DeskTransition.ChangeDeskDisplay(
@@ -1245,10 +1244,20 @@ class DesktopTasksController(
                 transitions.dispatchRequest(SYNTHETIC_TRANSITION, requestInfo, /* skip= */ null)
             wct.merge(requestRes.second, true)
 
-            // In multi-activity case, we explicitly reorder the parent task to the back so that it
-            // is not brought to the front and shown when the child task breaks off into PiP.
-            if (taskInfo.numActivities > 1) {
-                wct.reorder(taskInfo.token, /* onTop= */ false)
+            // In multi-activity case, we either explicitly minimize the parent task, or reorder the
+            // parent task to the back so that it is not brought to the front and shown when the
+            // child task breaks off into PiP.
+            val isMultiActivityPip = taskInfo.numActivities > 1
+            if (isMultiActivityPip) {
+                if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
+                    desksOrganizer.minimizeTask(
+                        wct = wct,
+                        deskId = checkNotNull(deskId) { "Expected non-null deskId" },
+                        task = taskInfo,
+                    )
+                } else {
+                    wct.reorder(taskInfo.token, /* onTop= */ false)
+                }
             }
 
             // If the task minimizing to PiP is the last task, modify wct to perform Desktop cleanup
@@ -1263,6 +1272,16 @@ class DesktopTasksController(
                     )
             }
             val transition = freeformTaskTransitionStarter.startPipTransition(wct)
+            if (isMultiActivityPip) {
+                desktopTasksLimiter.ifPresent {
+                    it.addPendingMinimizeChange(
+                        transition = transition,
+                        displayId = displayId,
+                        taskId = taskId,
+                        minimizeReason = minimizeReason,
+                    )
+                }
+            }
             desktopExitRunnable?.invoke(transition)
         } else {
             val willExitDesktop =
@@ -1562,19 +1581,8 @@ class DesktopTasksController(
     ) {
         val deskId = taskRepository.getDeskIdForTask(taskInfo.taskId)
         logV("moveTaskToFront taskId=%s deskId=%s", taskInfo.taskId, deskId)
-        // If a task is tiled, another task should be brought to foreground with it so let
-        // tiling controller handle the request.
-        if (snapEventHandler.moveTaskToFrontIfTiled(taskInfo)) {
-            return
-        }
         val wct = WindowContainerTransaction()
-        if (deskId == null || !DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            // Not a desktop task, just move to the front.
-            wct.reorder(taskInfo.token, /* onTop= */ true, /* includingParents= */ true)
-        } else {
-            // A desktop task with multiple desks enabled, reorder it within its desk.
-            desksOrganizer.reorderTaskToFront(wct, deskId, taskInfo)
-        }
+        addMoveTaskToFrontChanges(wct = wct, deskId = deskId, taskInfo = taskInfo)
         startLaunchTransition(
             transitionType = TRANSIT_TO_FRONT,
             wct = wct,
@@ -1584,6 +1592,27 @@ class DesktopTasksController(
             displayId = taskInfo.displayId,
             unminimizeReason = unminimizeReason,
         )
+    }
+
+    /** Applies the necessary [wct] changes to move [taskInfo] to front. */
+    fun addMoveTaskToFrontChanges(
+        wct: WindowContainerTransaction,
+        deskId: Int?,
+        taskInfo: RunningTaskInfo,
+    ) {
+        logV("addMoveTaskToFrontChanges taskId=%s deskId=%s", taskInfo.taskId, deskId)
+        // If a task is tiled, another task should be brought to foreground with it so let
+        // tiling controller handle the request.
+        if (snapEventHandler.moveTaskToFrontIfTiled(taskInfo)) {
+            return
+        }
+        if (deskId == null || !DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
+            // Not a desktop task, just move to the front.
+            wct.reorder(taskInfo.token, /* onTop= */ true, /* includingParents= */ true)
+        } else {
+            // A desktop task with multiple desks enabled, reorder it within its desk.
+            desksOrganizer.reorderTaskToFront(wct, deskId, taskInfo)
+        }
     }
 
     /**

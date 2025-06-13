@@ -44,6 +44,7 @@ import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_USER_ALREADY_AN
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_USER_IS_NOT_AN_ADMIN;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_INVALID_USER_TYPE;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_DEMOTE_MAIN_USER;
+import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_PROMOTE_MAIN_USER;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_GRANT_ADMIN;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_REVOKE_ADMIN;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_USER_CREATE;
@@ -161,6 +162,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.annotations.VisibleForTesting.Visibility;
 import com.android.internal.app.IAppOpsService;
 import com.android.internal.app.SetScreenLockDialogActivity;
+import com.android.internal.app.SetScreenLockDialogContract;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
@@ -1516,8 +1518,7 @@ public class UserManagerService extends IUserManager.Stub {
             final int userSize = mUsers.size();
             for (int i = 0; i < userSize; i++) {
                 final UserData userData = mUsers.valueAt(i);
-                if (userData.info.supportsSwitchToByUser() &&
-                        (!fullUserOnly || userData.info.isFull())) {
+                if (userData.info.supportsSwitchTo() && (!fullUserOnly || userData.info.isFull())) {
                     int firstSwitchable = userData.info.id;
                     return firstSwitchable;
                 }
@@ -1605,7 +1606,12 @@ public class UserManagerService extends IUserManager.Stub {
                 /* resolveNullNames= */ false);
     }
 
-    private @NonNull List<UserInfo> getUsersInternal(boolean excludePartial, boolean excludeDying,
+    /**
+     * @deprecated should use {@link #getUsers(UserFilter)} instead.
+     */
+    @Deprecated
+    @VisibleForTesting
+    List<UserInfo> getUsersInternal(boolean excludePartial, boolean excludeDying,
             boolean excludePreCreated, boolean resolveNullNames) {
         synchronized (mUsersLock) {
             ArrayList<UserInfo> users = new ArrayList<>(mUsers.size());
@@ -1992,17 +1998,23 @@ public class UserManagerService extends IUserManager.Stub {
                         showConfirmCredentialToDisableQuietMode(userId, target, callingPackage);
                         return false;
                     } else if (km != null && !km.isDeviceSecure(parentUserId)
-                            && android.multiuser.Flags.showSetScreenLockDialog()
-                            // TODO(b/330720545): Add a better way to accomplish this, also use it
-                            //  to block profile creation w/o device credentials present.
                             && Settings.Secure.getIntForUser(mContext.getContentResolver(),
                                 Settings.Secure.USER_SETUP_COMPLETE, 0, userId) == 1) {
-                        Intent setScreenLockPromptIntent =
-                                SetScreenLockDialogActivity
-                                        .createBaseIntent(LAUNCH_REASON_DISABLE_QUIET_MODE);
-                        setScreenLockPromptIntent.putExtra(EXTRA_ORIGIN_USER_ID, userId);
-                        mContext.startActivityAsUser(setScreenLockPromptIntent,
-                                UserHandle.of(parentUserId));
+                        final Intent setScreenLockPromptIntent;
+                        if (android.multiuser.Flags.moveSetScreenLockDialogToSettingsApp()) {
+                            setScreenLockPromptIntent =
+                                    SetScreenLockDialogContract.createUserSpecificDialogIntent(
+                                            SetScreenLockDialogContract
+                                                    .LAUNCH_REASON_DISABLE_QUIET_MODE,
+                                            userId);
+                        } else {
+                            setScreenLockPromptIntent =
+                                    SetScreenLockDialogActivity.createBaseIntent(
+                                            LAUNCH_REASON_DISABLE_QUIET_MODE);
+                            setScreenLockPromptIntent.putExtra(EXTRA_ORIGIN_USER_ID, userId);
+                        }
+                        mContext.startActivityAsUser(
+                                setScreenLockPromptIntent, UserHandle.of(parentUserId));
                         return false;
                     } else {
                         Slog.w(LOG_TAG, "Allowing profile unlock even when device credentials "
@@ -8089,6 +8101,10 @@ public class UserManagerService extends IUserManager.Stub {
         pw.print("    Last entered foreground: ");
         dumpTimeAgo(pw, tempStringBuilder, now, userData.mLastEnteredForegroundTimeMillis);
 
+        // bedstead relies on this being here, even though since Android 14 this has always been
+        // false. TODO(b/258213147) update bedstead and remove this.
+        pw.println("    Has profile owner: false");
+
         pw.println("    Restrictions:");
         synchronized (mRestrictionsLock) {
             UserRestrictionsUtils.dumpRestrictions(
@@ -8840,6 +8856,11 @@ public class UserManagerService extends IUserManager.Stub {
         return defaultValue;
     }
 
+    /**
+     * "Demotes" the main user to be just an admin.
+     *
+     * <p>Should be called only by {@link HsumBootUserInitializer} and unit tests
+     */
     boolean demoteMainUser() {
         if (!android.multiuser.Flags.demoteMainUser()) {
             Slog.d(LOG_TAG, "demoteMainUser(): ignoring because flag is disabled");
@@ -8864,6 +8885,48 @@ public class UserManagerService extends IUserManager.Stub {
             writeUserLP(userData);
             return true;
         }
+    }
+
+    /**
+     * Sets the given user as the main user.
+     *
+     * <p>User must be an admin (and alive), and the current main user must be {@code null}.
+     *
+     * <p>Should be called only by {@link HsumBootUserInitializer} and unit tests
+     *
+     * @return whether it succeeded.
+     */
+    boolean setMainUser(@UserIdInt int userId) {
+        if (!android.multiuser.Flags.demoteMainUser()) {
+            Slogf.d(LOG_TAG, "setMainUser(%d): ignoring because flag is disabled", userId);
+            return false;
+        }
+        synchronized (mUsersLock) {
+            var mainUser = getMainUserLU();
+            if (mainUser != null) {
+                Slogf.e(LOG_TAG, "setMainUser(%d): already have a main user (%d)", userId,
+                        mainUser.id);
+                return false;
+            }
+
+            var userData = getUserDataLU(userId);
+            if (userData == null) {
+                Slogf.e(LOG_TAG, "setMainUser(%d): user not found", userId);
+                return false;
+
+            }
+            if (!userData.info.isAdmin()) {
+                Slogf.e(LOG_TAG, "setMainUser(%d): user is not an admin", userId);
+                return false;
+            }
+
+            Slogf.i(LOG_TAG, "Setting user %d as main user", userId);
+            mUserJourneyLogger.logUserJourneyBegin(userId, USER_JOURNEY_PROMOTE_MAIN_USER);
+            userData.info.flags |= UserInfo.FLAG_MAIN;
+            writeUserLP(userData);
+            return true;
+        }
+
     }
 
     /**

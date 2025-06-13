@@ -9586,16 +9586,6 @@ public final class ActivityRecord extends WindowToken {
         return true;
     }
 
-    @Override
-    void getAnimationFrames(Rect outFrame, Rect outInsets, Rect outStableInsets,
-            Rect outSurfaceInsets) {
-        final WindowState win = findMainWindow();
-        if (win == null) {
-            return;
-        }
-        win.getAnimationFrames(outFrame, outInsets, outStableInsets, outSurfaceInsets);
-    }
-
     void setPictureInPictureParams(PictureInPictureParams p) {
         pictureInPictureArgs.copyOnlySet(p);
         adjustPictureInPictureParamsIfNeeded(getBounds());

@@ -217,6 +217,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API),
     ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS(Flags::enterDesktopByDefaultOnFreeformDisplays,
             true, Flags.FLAG_ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS),
+    EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS(Flags::excludeDeskRootsFromDesktopTasks,
+            false, Flags.FLAG_EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS),
     FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK(
             Flags::forceCloseTopTransparentFullscreenTask, true,
             Flags.FLAG_FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK),
@@ -230,6 +232,9 @@ public enum DesktopExperienceFlags {
     RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS(
             Flags::respectFullscreenActivityOptionInDesktopLaunchParams, true,
             Flags.FLAG_RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS),
+    SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT(
+            Flags::skipDeactivationOfDeskWithNothingInFront, false,
+            Flags.FLAG_SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT),
     USE_RESOURCES_FROM_CONTEXT_TO_CREATE_DRAWABLE_ICONS(
             com.android.graphics.flags.Flags::useResourcesFromContextToCreateDrawableIcons,
             true,

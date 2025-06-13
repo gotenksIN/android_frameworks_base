@@ -12693,6 +12693,14 @@ public final class Settings {
         public static final String NAV_BAR_KIDS_MODE = "nav_bar_kids_mode";
 
         /**
+         * This defines the order in which the 3-button navigation bar's buttons are displayed.
+         * 0 = left-to-right (back, home, recent)
+         * 1 = right-to-left (recent, home, back)
+         * @hide
+         */
+        public static final String NAV_BAR_ORDER = "nav_bar_order";
+
+        /**
          * Navigation bar mode.
          *  0 = 3 button
          *  1 = 2 button
@@ -13148,6 +13156,14 @@ public final class Settings {
          */
         public static final String ACCESSIBILITY_MOUSE_KEYS_MAX_SPEED =
                 "accessibility_mouse_keys_max_speed";
+
+        /**
+         * Whether the primary keys are selected to control the mouse keys.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_MOUSE_KEYS_USE_PRIMARY_KEYS =
+                "accessibility_mouse_keys_use_primary_keys";
 
         /**
          * Whether the Adaptive connectivity option is enabled.

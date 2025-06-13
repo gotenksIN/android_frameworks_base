@@ -625,6 +625,7 @@ public abstract class WMShellModule {
             LaunchAdjacentController launchAdjacentController,
             Optional<WindowDecorViewModel> windowDecorViewModel,
             Optional<DesktopTasksController> desktopTasksController,
+            Optional<DesktopUserRepositories> desktopUserRepositories,
             MultiInstanceHelper multiInstanceHelper,
             SplitState splitState,
             @ShellMainThread ShellExecutor mainExecutor,
@@ -652,6 +653,7 @@ public abstract class WMShellModule {
                 launchAdjacentController,
                 windowDecorViewModel,
                 desktopTasksController,
+                desktopUserRepositories,
                 null /* stageCoordinator */,
                 multiInstanceHelper,
                 splitState,
@@ -1772,11 +1774,9 @@ public abstract class WMShellModule {
             DisplayController displayController,
             DisplayLayout displayLayout,
             @ShellMainThread ShellExecutor mainExecutor,
-            @ShellMainThread Handler mainHandler,
             InteractionJankMonitor interactionJankMonitor) {
         return AppZoomOutController.create(context, shellInit, shellTaskOrganizer,
-                displayController, displayLayout, mainExecutor, mainHandler,
-                interactionJankMonitor);
+                displayController, displayLayout, mainExecutor, interactionJankMonitor);
     }
 
     //

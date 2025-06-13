@@ -98,7 +98,7 @@ package android {
     field public static final String DUMP = "android.permission.DUMP";
     field public static final String ENFORCE_UPDATE_OWNERSHIP = "android.permission.ENFORCE_UPDATE_OWNERSHIP";
     field public static final String EXECUTE_APP_ACTION = "android.permission.EXECUTE_APP_ACTION";
-    field @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public static final String EXECUTE_APP_FUNCTIONS = "android.permission.EXECUTE_APP_FUNCTIONS";
+    field public static final String EXECUTE_APP_FUNCTIONS = "android.permission.EXECUTE_APP_FUNCTIONS";
     field public static final String EXPAND_STATUS_BAR = "android.permission.EXPAND_STATUS_BAR";
     field @FlaggedApi("android.xr.xr_manifest_entries") public static final String EYE_TRACKING_COARSE = "android.permission.EYE_TRACKING_COARSE";
     field @FlaggedApi("android.xr.xr_manifest_entries") public static final String EYE_TRACKING_FINE = "android.permission.EYE_TRACKING_FINE";
@@ -4822,6 +4822,7 @@ package android.app {
     method public boolean isLowRamDevice();
     method @Deprecated public static boolean isRunningInTestHarness();
     method public static boolean isRunningInUserTestHarness();
+    method @FlaggedApi("com.android.window.flags.enable_window_repositioning_api") public boolean isTaskMoveAllowedOnDisplay(int);
     method public static boolean isUserAMonkey();
     method @RequiresPermission(android.Manifest.permission.KILL_BACKGROUND_PROCESSES) public void killBackgroundProcesses(String);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int);
@@ -10276,6 +10277,7 @@ package android.companion {
     method @Nullable public android.os.ParcelUuid getUuid();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.DevicePresenceEvent> CREATOR;
+    field @FlaggedApi("android.companion.notify_association_removed") public static final int EVENT_ASSOCIATION_REMOVED = 6; // 0x6
     field public static final int EVENT_BLE_APPEARED = 0; // 0x0
     field public static final int EVENT_BLE_DISAPPEARED = 1; // 0x1
     field public static final int EVENT_BT_CONNECTED = 2; // 0x2
@@ -13083,6 +13085,7 @@ package android.content.pm {
     method @NonNull public java.util.List<android.content.pm.PackageInstaller.SessionInfo> getMySessions();
     method @Nullable public android.content.pm.PackageInstaller.SessionInfo getSessionInfo(int);
     method @NonNull public java.util.List<android.content.pm.PackageInstaller.SessionInfo> getStagedSessions();
+    method @FlaggedApi("android.content.pm.verification_service") @Nullable public final String getVerificationServiceProvider();
     method @RequiresPermission(allOf={android.Manifest.permission.INSTALL_PACKAGES, "com.android.permission.INSTALL_EXISTING_PACKAGES"}) public void installExistingPackage(@NonNull String, int, @Nullable android.content.IntentSender);
     method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public void installPackageArchived(@NonNull android.content.pm.ArchivedPackageInfo, @NonNull android.content.pm.PackageInstaller.SessionParams, @NonNull android.content.IntentSender);
     method @NonNull public android.content.pm.PackageInstaller.Session openSession(int) throws java.io.IOException;
@@ -13117,6 +13120,8 @@ package android.content.pm {
     field @FlaggedApi("android.content.pm.archiving") public static final String EXTRA_UNARCHIVE_ID = "android.content.pm.extra.UNARCHIVE_ID";
     field @FlaggedApi("android.content.pm.archiving") public static final String EXTRA_UNARCHIVE_PACKAGE_NAME = "android.content.pm.extra.UNARCHIVE_PACKAGE_NAME";
     field @FlaggedApi("android.content.pm.archiving") public static final String EXTRA_UNARCHIVE_STATUS = "android.content.pm.extra.UNARCHIVE_STATUS";
+    field @FlaggedApi("android.content.pm.verification_service") public static final String EXTRA_VERIFICATION_EXTENSION_RESPONSE = "android.content.pm.extra.VERIFICATION_EXTENSION_RESPONSE";
+    field @FlaggedApi("android.content.pm.verification_service") public static final String EXTRA_VERIFICATION_FAILURE_REASON = "android.content.pm.extra.VERIFICATION_FAILURE_REASON";
     field public static final int PACKAGE_SOURCE_DOWNLOADED_FILE = 4; // 0x4
     field public static final int PACKAGE_SOURCE_LOCAL_FILE = 3; // 0x3
     field public static final int PACKAGE_SOURCE_OTHER = 1; // 0x1
@@ -13139,6 +13144,9 @@ package android.content.pm {
     field @FlaggedApi("android.content.pm.archiving") public static final int UNARCHIVAL_ERROR_USER_ACTION_NEEDED = 1; // 0x1
     field @FlaggedApi("android.content.pm.archiving") public static final int UNARCHIVAL_GENERIC_ERROR = 100; // 0x64
     field @FlaggedApi("android.content.pm.archiving") public static final int UNARCHIVAL_OK = 0; // 0x0
+    field @FlaggedApi("android.content.pm.verification_service") public static final int VERIFICATION_FAILED_REASON_NETWORK_UNAVAILABLE = 1; // 0x1
+    field @FlaggedApi("android.content.pm.verification_service") public static final int VERIFICATION_FAILED_REASON_PACKAGE_BLOCKED = 2; // 0x2
+    field @FlaggedApi("android.content.pm.verification_service") public static final int VERIFICATION_FAILED_REASON_UNKNOWN = 0; // 0x0
   }
 
   public static final class PackageInstaller.InstallConstraints implements android.os.Parcelable {
@@ -13292,6 +13300,7 @@ package android.content.pm {
     method @FlaggedApi("android.content.pm.sdk_dependency_installer") public void setAutoInstallDependenciesEnabled(boolean);
     method @Deprecated public void setAutoRevokePermissionsMode(boolean);
     method public void setDontKillApp(boolean);
+    method @FlaggedApi("android.content.pm.verification_service") public void setExtensionParams(@NonNull android.os.PersistableBundle);
     method public void setInstallLocation(int);
     method public void setInstallReason(int);
     method public void setInstallScenario(int);

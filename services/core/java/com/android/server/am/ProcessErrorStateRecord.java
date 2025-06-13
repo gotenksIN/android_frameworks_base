@@ -18,11 +18,11 @@ package com.android.server.am;
 
 import static android.os.Process.SYSTEM_UID;
 
+import static com.android.internal.os.ProcfsMemoryUtil.readMemorySnapshotFromProcfs;
 import static com.android.server.Watchdog.NATIVE_STACKS_OF_INTEREST;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ANR;
 import static com.android.server.am.ActivityManagerService.MY_PID;
 import static com.android.server.am.ProcessRecord.TAG;
-import static com.android.internal.os.ProcfsMemoryUtil.readMemorySnapshotFromProcfs;
 
 import android.annotation.Nullable;
 import android.app.ActivityManager;
@@ -55,6 +55,7 @@ import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.ProcessCpuTracker;
+import com.android.internal.os.ProcfsMemoryUtil.MemorySnapshot;
 import com.android.internal.os.TimeoutRecord;
 import com.android.internal.os.anr.AnrLatencyTracker;
 import com.android.internal.util.FrameworkStatsLog;
@@ -65,7 +66,6 @@ import com.android.modules.expresslog.Counter;
 import com.android.server.ResourcePressureUtil;
 import com.android.server.criticalevents.CriticalEventLog;
 import com.android.server.Watchdog;
-import com.android.internal.os.ProcfsMemoryUtil.MemorySnapshot;
 import com.android.server.wm.WindowProcessController;
 
 import java.io.File;
@@ -340,7 +340,12 @@ class ProcessErrorStateRecord {
                 latencyTracker.waitingOnAMSLockEnded();
                 // Store annotation here as instance below races with this killLocked.
                 setAnrAnnotation(annotation);
-                mApp.killLocked("anr", ApplicationExitInfo.REASON_ANR, true);
+                if (android.app.Flags.includeAnrSubreason()) {
+                    mApp.killLocked("anr", ApplicationExitInfo.REASON_ANR,
+                            timeoutRecord.getAppExitInfoAnrSubreason(), true);
+                } else {
+                    mApp.killLocked("anr", ApplicationExitInfo.REASON_ANR, true);
+                }
             }
         });
 
@@ -740,7 +745,12 @@ class ProcessErrorStateRecord {
         if (mApp.getWindowProcessController().appNotResponding(info.toString(),
                 () -> {
                     synchronized (mService) {
-                        mApp.killLocked("anr", ApplicationExitInfo.REASON_ANR, true);
+                        if (android.app.Flags.includeAnrSubreason()) {
+                            mApp.killLocked("anr", ApplicationExitInfo.REASON_ANR,
+                                    timeoutRecord.getAppExitInfoAnrSubreason(), true);
+                        } else {
+                            mApp.killLocked("anr", ApplicationExitInfo.REASON_ANR, true);
+                        }
                     }
                 },
                 () -> {
@@ -759,7 +769,12 @@ class ProcessErrorStateRecord {
             }
 
             if (isSilentAnr() && !mApp.isDebugging()) {
-                mApp.killLocked("bg anr", ApplicationExitInfo.REASON_ANR, true);
+                if (android.app.Flags.includeAnrSubreason()) {
+                    mApp.killLocked("bg anr", ApplicationExitInfo.REASON_ANR,
+                            timeoutRecord.getAppExitInfoAnrSubreason(), true);
+                } else {
+                    mApp.killLocked("bg anr", ApplicationExitInfo.REASON_ANR, true);
+                }
                 return;
             }
 

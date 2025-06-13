@@ -1249,6 +1249,13 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_brightness">Display brightness</string>
 
+    <!-- Content description for AV chip when camera is in use.-->
+    <string name="accessibility_camera_in_use">Camera in use</string>
+    <!-- Content description for AV chip when microphone is in use.-->
+    <string name="accessibility_microphone_in_use">Microphone in use</string>
+    <!-- Content description for AV chip when microphone is in use.-->
+    <string name="accessibility_camera_and_microphone_in_use">Camera and microphone in use</string>
+
     <!-- Content description of the charging indicator on Ambient Display (lower-power version of the lock screen). [CHAR LIMIT=NONE] -->
 
     <!-- Title of dialog shown when mobile data usage has exceeded limit and has been disabled. [CHAR LIMIT=48] -->

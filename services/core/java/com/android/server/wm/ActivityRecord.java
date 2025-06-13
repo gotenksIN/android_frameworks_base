@@ -4700,7 +4700,8 @@ public final class ActivityRecord extends WindowToken {
             return true;
         } else if (fromActivity.mStartingData != null) {
             if (fromActivity.mStartingData instanceof SnapshotStartingData
-                    && !isStartingOrientationCompatible(fromActivity)) {
+                    && (!isStartingOrientationCompatible(fromActivity)
+                    || !(((SnapshotStartingData) fromActivity.mStartingData).isValid()))) {
                 // Do not transfer because the snapshot will be distorted in different orientation.
                 return false;
             }

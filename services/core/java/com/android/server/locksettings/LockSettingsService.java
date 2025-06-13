@@ -668,13 +668,13 @@ public class LockSettingsService extends ILockSettings.Stub {
     private class SoftwareRateLimiterInjector implements SoftwareRateLimiter.Injector {
 
         @Override
-        public int readWrongGuessCounter(LskfIdentifier id) {
-            return mSpManager.readWrongGuessCounter(id);
+        public int readFailureCounter(LskfIdentifier id) {
+            return mSpManager.readFailureCounter(id);
         }
 
         @Override
-        public void writeWrongGuessCounter(LskfIdentifier id, int count) {
-            mSpManager.writeWrongGuessCounter(id, count);
+        public void writeFailureCounter(LskfIdentifier id, int count) {
+            mSpManager.writeFailureCounter(id, count);
         }
 
         @Override
@@ -2615,8 +2615,12 @@ public class LockSettingsService extends ILockSettings.Stub {
             if (response.isMatched()) {
                 mSoftwareRateLimiter.reportSuccess(lskfId);
             } else {
-                // TODO(b/395976735): don't count transient failures
-                Duration swTimeout = mSoftwareRateLimiter.reportWrongGuess(lskfId, credential);
+                boolean isCertainlyWrongGuess =
+                        response.getResponseCode()
+                                == VerifyCredentialResponse.RESPONSE_CRED_INCORRECT;
+                Duration swTimeout =
+                        mSoftwareRateLimiter.reportFailure(
+                                lskfId, credential, isCertainlyWrongGuess);
 
                 // The software rate-limiter may use longer delays than the hardware one. While the
                 // long-term solution is to update the hardware rate-limiter to match, for now this

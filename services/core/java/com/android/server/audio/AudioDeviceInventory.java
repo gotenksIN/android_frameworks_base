@@ -1049,8 +1049,10 @@ public class AudioDeviceInventory {
                 "onBluetoothDeviceConfigChange addr=" + address
                     + " event=" + BtHelper.deviceEventToString(event)));
 
-        int deviceType = BtHelper.getTypeFromProfile(btInfo.mProfile, btInfo.mIsLeOutput);
+        int deviceType = BtHelper.getTypeFromProfile(
+                btInfo.mProfile, btInfo.mIsLeOutput, btDevice);
 
+        boolean disconnectDevice = false;
         synchronized (mDevicesLock) {
             if (mDeviceBroker.hasScheduledA2dpConnection(btDevice, btInfo.mProfile)) {
                 AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
@@ -1110,19 +1112,20 @@ public class AudioDeviceInventory {
                                         + AudioSystem.audioFormatToString(codec))
                                 .printLog(TAG));
 
-                        // force A2DP device disconnection in case of error so that AudioService
-                        // state is consistent with audio policy manager state
-                        setBluetoothActiveDevice(new AudioDeviceBroker.BtDeviceInfo(btInfo,
-                                BluetoothProfile.STATE_DISCONNECTED));
-                    } else {
-                        AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                                "APM handleDeviceConfigChange success for A2DP device addr="
-                                        + address
-                                        + " codec=" + AudioSystem.audioFormatToString(codec))
-                                .printLog(TAG));
+                            // force A2DP device disconnection in case of error so that AudioService
+                            // state is consistent with audio policy manager state
+                            disconnectDevice = true;
+                        } else {
+                            AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
+                                    "APM handleDeviceConfigChange success for device addr="
+                                            + address
+                                            + " codec=" + AudioSystem.audioFormatToString(codec))
+                                    .printSlog(EventLogger.Event.ALOGI, TAG));
+                            delayMs = BT_CONFIG_CHANGE_MUTE_DELAY_MS;
 // QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
 
 // QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
+                        }
                     }
                 }
                 if (!codecChanged) {
@@ -1132,6 +1135,9 @@ public class AudioDeviceInventory {
 // QTI_BEGIN: 2023-07-03: Audio: base: Reduce A2DP SHO time
             }
 // QTI_END: 2023-07-03: Audio: base: Reduce A2DP SHO time
+        if (disconnectDevice) {
+            setBluetoothActiveDevice(new AudioDeviceBroker.BtDeviceInfo(btInfo,
+                    BluetoothProfile.STATE_DISCONNECTED));
         }
         mmi.record();
         return delayMs;
@@ -2216,12 +2222,11 @@ public class AudioDeviceInventory {
             } else {
                 delay = 0;
             }
-
             if (AudioService.DEBUG_DEVICES) {
                 Log.i(TAG, "setBluetoothActiveDevice " + info.toString() + " delay(ms): " + delay);
             }
-            mDeviceBroker.postBluetoothActiveDevice(info, delay);
         }
+        mDeviceBroker.postBluetoothActiveDevice(info, delay);
         return delay;
     }
 

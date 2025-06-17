@@ -837,6 +837,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
                     .get(displayId, LOGICAL_DISPLAY_EVENT_BASE);
             boolean hasBasicInfoChanged =
                     !mTempDisplayInfo.equals(newDisplayInfo, /* compareOnlyBasicChanges */ true);
+
             // The display is no longer valid and needs to be removed.
             if (!display.isValidLocked()) {
                 // Remove from group
@@ -890,13 +891,13 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             } else if (hasBasicInfoChanged
                     || mTempDisplayInfo.getRefreshRate() != newDisplayInfo.getRefreshRate()
                     || mTempDisplayInfo.appVsyncOffsetNanos != newDisplayInfo.appVsyncOffsetNanos
+                    || mTempDisplayInfo.committedState != newDisplayInfo.committedState
                     || mTempDisplayInfo.presentationDeadlineNanos
                     != newDisplayInfo.presentationDeadlineNanos) {
                 // If only the hdr/sdr ratio changed, then send just the event for that case
                 if ((diff == DisplayDeviceInfo.DIFF_HDR_SDR_RATIO)) {
                     logicalDisplayEventMask |= LOGICAL_DISPLAY_EVENT_HDR_SDR_RATIO_CHANGED;
                 } else {
-
                     if (hasBasicInfoChanged) {
                         logicalDisplayEventMask |= LOGICAL_DISPLAY_EVENT_BASIC_CHANGED;
                     }
@@ -1133,8 +1134,15 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
 
             int reason = mDisplayGroupAllocator.getContentModeForDisplayLocked(
                     display, displayDeviceInfo.type);
-            if (reason == REASON_PROJECTED || reason == REASON_EXTENDED
-                    || reason == REASON_NON_DESKTOP) {
+
+            // We set the flag only if the group being created is a non-default group, is internal
+            // or external(We don't want to set FLAG_DEFAULT_GROUP_ADJACENT for virtual displays)
+            // and is in projected,extended or non desktop mode
+            if (groupId != Display.DEFAULT_DISPLAY_GROUP
+                    && (displayDeviceInfo.type == Display.TYPE_INTERNAL
+                            || displayDeviceInfo.type == Display.TYPE_EXTERNAL)
+                    && (reason == REASON_PROJECTED || reason == REASON_EXTENDED
+                    || reason == REASON_NON_DESKTOP)) {
                 newGroup.setFlags(DisplayGroup.FLAG_DEFAULT_GROUP_ADJACENT);
             }
         }

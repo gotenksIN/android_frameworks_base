@@ -346,9 +346,7 @@ final class DeletePackageHelper {
         }
 
         if (res && isInstallerPackage) {
-            final PackageInstallerService packageInstallerService =
-                    mPm.mInjector.getPackageInstallerService();
-            packageInstallerService.onInstallerPackageDeleted(uninstalledPs.getAppId(), removeUser);
+            mPm.onInstallerPackageDeleted(uninstalledPs.getAppId(), removeUser);
         }
 
         if (res && packageName != null) {

@@ -2181,16 +2181,19 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                         .setActivityType(r.getActivityType())
                         .setOnTop(true)
                         .setActivityInfo(r.info)
-                        .setParent(taskDisplayArea)
                         .setIntent(r.intent)
                         .setDeferTaskAppear(true)
                         .setHasBeenVisible(true)
-                        // In case the activity is in system split screen, or Activity Embedding
-                        // split, we need to animate the PIP Task from the original TaskFragment
-                        // bounds, so also setting the windowing mode, otherwise the bounds may
-                        // be reset to fullscreen.
-                        .setWindowingMode(taskFragment.getWindowingMode())
                         .build();
+
+                taskDisplayArea.addChild(rootTask, POSITION_TOP);
+                // The windowing mode should be set after attaching to display area or it will abort
+                // silently. In case the activity is in system split screen, or Activity Embedding
+                // split, we need to animate the PIP Task from the original TaskFragment
+                // bounds, so also setting the windowing mode, otherwise the bounds may
+                // be reset to fullscreen.
+                rootTask.setWindowingMode(taskFragment.getWindowingMode());
+
                 // Establish bi-directional link between the original and pinned task.
                 r.setLastParentBeforePip(launchIntoPipHostActivity);
                 // It's possible the task entering PIP is in freeform, so save the last
@@ -2260,10 +2263,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // TODO(remove-legacy-transit): Move this to the `singleActivity` case when removing
             //                              legacy transit.
             rootTask.setRootTaskWindowingMode(WINDOWING_MODE_PINNED);
-            if (isPip2ExperimentEnabled() && bounds != null) {
-                // set the final pip bounds in advance if pip2 is enabled
-                rootTask.setBounds(bounds);
-            }
 
             // Set the launch bounds for launch-into-pip Activity on the root task.
             if (r.getOptions() != null && r.getOptions().isLaunchIntoPip()) {
@@ -2271,8 +2270,17 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // We do this early in the process to make sure the right snapshot is used for
                 // entering content-pip animation.
                 mWindowManager.mTaskSnapshotController.recordSnapshot(task);
-                rootTask.setBounds(r.pictureInPictureArgs.getSourceRectHint());
+                if (!isPip2ExperimentEnabled()) {
+                    // PiP2 always supplies bounds from Shell, so we can skip this.
+                    rootTask.setBounds(r.pictureInPictureArgs.getSourceRectHint());
+                }
             }
+
+            if (isPip2ExperimentEnabled() && bounds != null) {
+                // set the final pip bounds in advance if pip2 is enabled
+                rootTask.setBounds(bounds);
+            }
+
             rootTask.setDeferTaskAppear(false);
 
             if (!isPip2ExperimentEnabled()) {
@@ -4141,5 +4149,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 }
             }
         }
+    }
+
+    boolean isTaskMoveAllowedOnDisplay(int displayId) {
+        DisplayContent dc = getDisplayContent(displayId);
+        return dc == null ? false : dc.isTaskMoveAllowedOnDisplay();
     }
 }

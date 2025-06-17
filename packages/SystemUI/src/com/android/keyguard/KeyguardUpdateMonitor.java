@@ -2120,6 +2120,12 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private void handleDreamingStateChanged(int dreamStart) {
         Assert.isMainThread();
         mIsDreaming = dreamStart == 1;
+
+        // Allow keyguard to be locked once dream starts.
+        if (mIsDreaming) {
+            setForceIsDismissibleKeyguard(false);
+        }
+
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
             if (cb != null) {

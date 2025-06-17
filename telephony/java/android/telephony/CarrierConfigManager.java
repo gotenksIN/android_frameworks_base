@@ -10955,6 +10955,16 @@ public class CarrierConfigManager {
     public static final String KEY_AVOID_BAD_WIFI_BOOL =
             "avoid_bad_wifi_bool";
 
+    /**
+     * Used to decide if the device's UI should present the "avoid bad Wi-Fi" from carrier config.
+     * This method effectively enables or disables the display of the relevant setting toggle.
+     * This is only used if KEY_AVOID_BAD_WIFI_BOOL is true.
+     * When KEY_AVOID_BAD_WIFI_BOOL is false, the setting is always shown even if this is false.
+     */
+    @FlaggedApi(FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG)
+    public static final String KEY_SHOW_AVOID_BAD_WIFI_TOGGLE_BOOL =
+            "show_avoid_bad_wifi_bool";
+
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
 
@@ -11583,12 +11593,7 @@ public class CarrierConfigManager {
         sDefaults.putAll(Iwlan.getDefaults());
         sDefaults.putStringArray(KEY_CARRIER_CERTIFICATE_STRING_ARRAY, new String[0]);
         sDefaults.putBoolean(KEY_FORMAT_INCOMING_NUMBER_TO_NATIONAL_FOR_JP_BOOL, false);
-        if (Flags.doNotOverridePreciseLabel()) {
-            sDefaults.putIntArray(KEY_DISCONNECT_CAUSE_PLAY_BUSYTONE_INT_ARRAY, new int[]{});
-        } else {
-            sDefaults.putIntArray(KEY_DISCONNECT_CAUSE_PLAY_BUSYTONE_INT_ARRAY,
-                    new int[]{4 /* BUSY */});
-        }
+        sDefaults.putIntArray(KEY_DISCONNECT_CAUSE_PLAY_BUSYTONE_INT_ARRAY, new int[]{});
         sDefaults.putBoolean(KEY_PREVENT_CLIR_ACTIVATION_AND_DEACTIVATION_CODE_BOOL, false);
         sDefaults.putLong(KEY_DATA_SWITCH_VALIDATION_TIMEOUT_LONG, 5000);
         sDefaults.putStringArray(KEY_MMI_TWO_DIGIT_NUMBER_PATTERN_STRING_ARRAY, new String[0]);
@@ -11862,6 +11867,7 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_SATELLITE_SOS_MAX_DATAGRAM_SIZE_BYTES_INT, 255);
         if (avoidBadWifiFromCarrierConfig()) {
             sDefaults.putBoolean(KEY_AVOID_BAD_WIFI_BOOL, true);
+            sDefaults.putBoolean(KEY_SHOW_AVOID_BAD_WIFI_TOGGLE_BOOL, false);
         }
     }
 

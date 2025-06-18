@@ -50,35 +50,35 @@ import static android.view.WindowInsets.Type.STATUS_BARS;
 import static android.view.WindowInsets.Type.SYSTEM_GESTURES;
 import static android.view.WindowInsets.Type.TAPPABLE_ELEMENT;
 import static android.view.WindowInsets.Type.WINDOW_DECOR;
-import static android.view.WindowLayoutParamsProto.ALPHA;
-import static android.view.WindowLayoutParamsProto.APPEARANCE;
-import static android.view.WindowLayoutParamsProto.BEHAVIOR;
-import static android.view.WindowLayoutParamsProto.BUTTON_BRIGHTNESS;
-import static android.view.WindowLayoutParamsProto.COLOR_MODE;
-import static android.view.WindowLayoutParamsProto.FIT_IGNORE_VISIBILITY;
-import static android.view.WindowLayoutParamsProto.FIT_INSETS_SIDES;
-import static android.view.WindowLayoutParamsProto.FIT_INSETS_TYPES;
-import static android.view.WindowLayoutParamsProto.FLAGS;
-import static android.view.WindowLayoutParamsProto.FORMAT;
-import static android.view.WindowLayoutParamsProto.GRAVITY;
-import static android.view.WindowLayoutParamsProto.HAS_SYSTEM_UI_LISTENERS;
-import static android.view.WindowLayoutParamsProto.HEIGHT;
-import static android.view.WindowLayoutParamsProto.HORIZONTAL_MARGIN;
-import static android.view.WindowLayoutParamsProto.INPUT_FEATURE_FLAGS;
-import static android.view.WindowLayoutParamsProto.PREFERRED_REFRESH_RATE;
-import static android.view.WindowLayoutParamsProto.PRIVATE_FLAGS;
-import static android.view.WindowLayoutParamsProto.ROTATION_ANIMATION;
-import static android.view.WindowLayoutParamsProto.SCREEN_BRIGHTNESS;
-import static android.view.WindowLayoutParamsProto.SOFT_INPUT_MODE;
-import static android.view.WindowLayoutParamsProto.SUBTREE_SYSTEM_UI_VISIBILITY_FLAGS;
-import static android.view.WindowLayoutParamsProto.SYSTEM_UI_VISIBILITY_FLAGS;
-import static android.view.WindowLayoutParamsProto.TYPE;
-import static android.view.WindowLayoutParamsProto.USER_ACTIVITY_TIMEOUT;
-import static android.view.WindowLayoutParamsProto.VERTICAL_MARGIN;
-import static android.view.WindowLayoutParamsProto.WIDTH;
-import static android.view.WindowLayoutParamsProto.WINDOW_ANIMATIONS;
-import static android.view.WindowLayoutParamsProto.X;
-import static android.view.WindowLayoutParamsProto.Y;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.ALPHA;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.APPEARANCE;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.BEHAVIOR;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.BUTTON_BRIGHTNESS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.COLOR_MODE;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.FIT_IGNORE_VISIBILITY;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.FIT_INSETS_SIDES;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.FIT_INSETS_TYPES;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.FLAGS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.FORMAT;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.GRAVITY;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.HAS_SYSTEM_UI_LISTENERS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.HEIGHT;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.HORIZONTAL_MARGIN;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.INPUT_FEATURE_FLAGS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.PREFERRED_REFRESH_RATE;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.PRIVATE_FLAGS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.ROTATION_ANIMATION;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.SCREEN_BRIGHTNESS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.SOFT_INPUT_MODE;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.SUBTREE_SYSTEM_UI_VISIBILITY_FLAGS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.SYSTEM_UI_VISIBILITY_FLAGS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.TYPE;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.USER_ACTIVITY_TIMEOUT;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.VERTICAL_MARGIN;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.WIDTH;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.WINDOW_ANIMATIONS;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.X;
+import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.Y;
 
 import static com.android.server.display.feature.flags.Flags.FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT;
 
@@ -4608,6 +4608,14 @@ public interface WindowManager extends ViewManager {
                 INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE = 1 << 4;
 
         /**
+         * Input feature flag used to indicate that this window wants to capture keys before
+         * system processes system shortcuts and actions.
+         *
+         * @hide
+         */
+        public static final int INPUT_FEATURE_CAPTURE_KEYBOARD = 1 << 5;
+
+        /**
          * An internal annotation for flags that can be specified to {@link #inputFeatures}.
          *
          * NOTE: These are not the same as {@link android.os.InputConfig} flags.
@@ -4620,7 +4628,8 @@ public interface WindowManager extends ViewManager {
                 INPUT_FEATURE_DISABLE_USER_ACTIVITY,
                 INPUT_FEATURE_SPY,
                 INPUT_FEATURE_SENSITIVE_FOR_PRIVACY,
-                INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE
+                INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE,
+                INPUT_FEATURE_CAPTURE_KEYBOARD
         })
         public @interface InputFeatureFlags {
         }
@@ -4637,6 +4646,47 @@ public interface WindowManager extends ViewManager {
         @InputFeatureFlags
         @UnsupportedAppUsage
         public int inputFeatures;
+
+        /**
+         * Allows the currently focused window to capture keys before system processes system
+         * shortcuts and actions.
+         *
+         * <p>
+         * This will allow the application to receive keys before the system processes system
+         * shortcuts and actions. But certain system keys (Power keys, etc.) and shortcuts can be
+         * reserved and can never be blocked by the current focused window even with "keyboard
+         * capture" on.
+         * </p>
+         *
+         * <p>
+         * Window which set this attribute to {@code true}, but doesn't have the required
+         * permission will not be allowed to capture system shortcuts and actions. No exception
+         * will be thrown due to missing permission, we will just fallback to the default
+         * behavior of processing system shortcuts and actions.
+         * </p>
+         *
+         * @param hasCapture whether the window should capture system shortcuts and actions.
+         */
+        @FlaggedApi(com.android.hardware.input.Flags.FLAG_REQUEST_KEY_CAPTURE_API)
+        @RequiresPermission(permission.CAPTURE_KEYBOARD)
+        public void setHasKeyboardCapture(boolean hasCapture) {
+            if (hasCapture) {
+                inputFeatures |= INPUT_FEATURE_CAPTURE_KEYBOARD;
+            } else {
+                inputFeatures &= ~INPUT_FEATURE_CAPTURE_KEYBOARD;
+            }
+        }
+
+        /**
+         * Returns whether "keyboard capture" is on.
+         *
+         * @return whether currently focused window is capturing keys before system processes
+         * shortcuts and actions.
+         */
+        @FlaggedApi(com.android.hardware.input.Flags.FLAG_REQUEST_KEY_CAPTURE_API)
+        public boolean hasKeyboardCapture() {
+            return (inputFeatures & INPUT_FEATURE_CAPTURE_KEYBOARD) != 0;
+        }
 
         /**
          * Sets the number of milliseconds before the user activity timeout occurs
@@ -6311,6 +6361,10 @@ public interface WindowManager extends ViewManager {
             if ((inputFeatures & INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE) != 0) {
                 inputFeatures &= ~INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE;
                 features.add("INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE");
+            }
+            if ((inputFeatures & INPUT_FEATURE_CAPTURE_KEYBOARD) != 0) {
+                inputFeatures &= ~INPUT_FEATURE_CAPTURE_KEYBOARD;
+                features.add("INPUT_FEATURE_CAPTURE_KEYBOARD");
             }
             if (inputFeatures != 0) {
                 features.add(Integer.toHexString(inputFeatures));

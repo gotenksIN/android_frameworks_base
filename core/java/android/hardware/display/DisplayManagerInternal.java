@@ -16,6 +16,7 @@
 
 package android.hardware.display;
 
+import android.annotation.FloatRange;
 import android.annotation.IntDef;
 import android.annotation.Nullable;
 import android.companion.virtual.IVirtualDevice;
@@ -51,7 +52,8 @@ public abstract class DisplayManagerInternal {
             REFRESH_RATE_LIMIT_HIGH_BRIGHTNESS_MODE
     })
     @Retention(RetentionPolicy.SOURCE)
-    public @interface RefreshRateLimitType {}
+    public @interface RefreshRateLimitType {
+    }
 
     /** Refresh rate should be limited when High Brightness Mode is active. */
     public static final int REFRESH_RATE_LIMIT_HIGH_BRIGHTNESS_MODE = 1;
@@ -182,7 +184,7 @@ public abstract class DisplayManagerInternal {
      * to the display information synchronously so that applications will immediately
      * observe the new state.
      *
-     * NOTE: This method must be the only entry point by which the window manager
+     * <p>NOTE: This method must be the only entry point by which the window manager
      * influences the logical configuration of displays.
      *
      * @param displayId The logical display id.
@@ -238,10 +240,10 @@ public abstract class DisplayManagerInternal {
      *                                window that has a preference.
      * @param requestedMinimalPostProcessing The preferred minimal post processing setting for the
      * display. This is true when there is at least one visible window that wants minimal post
-     * processng on.
+     * processing on.
      * @param disableHdrConversion The preferred HDR conversion setting for the window.
      * @param inTraversal True if called from WindowManagerService during a window traversal
-     * prior to call to performTraversalInTransactionFromWindowManager.
+     * prior to call to performTraversal.
      */
     public abstract void setDisplayProperties(int displayId, boolean hasContent,
             float requestedRefreshRate, int requestedModeId, float requestedMinRefreshRate,
@@ -281,6 +283,21 @@ public abstract class DisplayManagerInternal {
      * Persist brightness slider events and ambient brightness stats.
      */
     public abstract void persistBrightnessTrackerState();
+
+    /**
+     * Sets a maximum brightness cap for the display.
+     *
+     * <p>A cap of {@code 1f} will remove the cap.
+     *
+     * @param displayId id of the display to cap the maximum brightness for
+     * @param cap the brightness cap between {@code 0f} and {@code 1f}
+     * @param reason reason for capping brightness. Using the same reason again for a display
+     *     replaces the previous cap
+     */
+    public abstract void setBrightnessCap(
+            int displayId,
+            @FloatRange(from = 0f, to = 1f) float cap,
+            @BrightnessInfo.BrightnessMaxReason int reason);
 
     /**
      * Notifies the display manager that resource overlays have changed.
@@ -350,7 +367,7 @@ public abstract class DisplayManagerInternal {
      * @param name The name of the sensor.
      * @param type The type of sensor.
      *
-     * @return The min/max refresh-rate restriction as a {@link Pair} of floats, or null if not
+     * @return The min/max refresh-rate restriction as a pair of floats, or {@code null} if not
      * restricted.
      */
     public abstract RefreshRateRange getRefreshRateForDisplayAndSensor(
@@ -496,10 +513,10 @@ public abstract class DisplayManagerInternal {
      * Used by the window manager to override the per-display screen brightness based on the
      * current foreground activity.
      *
-     * The key of the array is the displayId. If a displayId is missing from the array, this is
+     * <p>The key of the array is the displayId. If a displayId is missing from the array, this is
      * equivalent to clearing any existing brightness overrides for that display.
      *
-     * This method must only be called by the window manager.
+     * <p>This method must only be called by the window manager.
      */
     public abstract void setScreenBrightnessOverrideFromWindowManager(
             SparseArray<DisplayBrightnessOverrideRequest> brightnessOverrides);
@@ -524,7 +541,7 @@ public abstract class DisplayManagerInternal {
     /**
      * Describes the requested power state of the display.
      *
-     * This object is intended to describe the general characteristics of the
+     * <p>This object is intended to describe the general characteristics of the
      * power state, such as whether the screen should be on or off and the current
      * brightness controls leaving the DisplayPowerController to manage the
      * details of how the transitions between states should occur.  The goal is for
@@ -783,7 +800,8 @@ public abstract class DisplayManagerInternal {
      * range as well as information about when it applies, such as high-brightness-mode.
      */
     public static final class RefreshRateLimitation {
-        @RefreshRateLimitType public int type;
+        @RefreshRateLimitType
+        public int type;
 
         /** The range the that refresh rate should be limited to. */
         public RefreshRateRange range;
@@ -870,9 +888,9 @@ public abstract class DisplayManagerInternal {
 
         /**
          * Update the brightness from the offload chip.
-         * @param brightness The brightness value between {@link PowerManager.BRIGHTNESS_MIN} and
-         *                   {@link PowerManager.BRIGHTNESS_MAX}, or
-         *                   {@link PowerManager.BRIGHTNESS_INVALID_FLOAT} which removes
+         * @param brightness The brightness value between {@link PowerManager#BRIGHTNESS_MIN} and
+         *                   {@link PowerManager#BRIGHTNESS_MAX}, or
+         *                   {@link PowerManager#BRIGHTNESS_INVALID_FLOAT} which removes
          *                   the brightness from offload. Other values will be ignored.
          */
         void updateBrightness(float brightness);
@@ -897,7 +915,7 @@ public abstract class DisplayManagerInternal {
          * @param mode The auto-brightness mode
          *             (AutomaticBrightnessController.AutomaticBrightnessMode)
          * @return The brightness levels for the specified mode. The values are between
-         * {@link PowerManager.BRIGHTNESS_MIN} and {@link PowerManager.BRIGHTNESS_MAX}.
+         * {@link PowerManager#BRIGHTNESS_MIN} and {@link PowerManager#BRIGHTNESS_MAX}.
          */
         float[] getAutoBrightnessLevels(int mode);
 

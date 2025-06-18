@@ -66,6 +66,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ServiceInfo;
+import android.content.pm.dex.PackageOptimizationInfo;
 import android.content.res.Configuration;
 import android.os.Binder;
 import android.os.Build;
@@ -87,6 +88,7 @@ import com.android.internal.app.HeavyWeightSwitcherActivity;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.Watchdog;
+import com.android.server.art.ReasonMapping;
 import com.android.server.grammaticalinflection.GrammaticalInflectionManagerInternal;
 import com.android.server.wm.ActivityTaskManagerService.HotPath;
 import com.android.server.wm.BackgroundLaunchProcessController.BalCheckConfiguration;
@@ -335,6 +337,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     public static final int ACTIVITY_STATE_FLAG_RESUMED_SPLIT_SCREEN = 1 << 23;
     public static final int ACTIVITY_STATE_FLAG_PERCEPTIBLE_FREEFORM = 1 << 24;
     public static final int ACTIVITY_STATE_FLAG_VISIBLE_MULTI_WINDOW_MODE = 1 << 25;
+    public static final int ACTIVITY_STATE_FLAG_OCCLUDED_FREEFORM = 1 << 26;
     public static final int ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER = 0x0000ffff;
 
     /**
@@ -349,6 +352,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
      * perceptible task became stopped. Written by window manager and read by activity manager.
      */
     private volatile long mPerceptibleTaskStoppedTimeMillis = Long.MIN_VALUE;
+
+    private volatile PackageOptimizationInfo mOptimizationInfo = null;
 
     public WindowProcessController(@NonNull ActivityTaskManagerService atm,
             @NonNull ApplicationInfo info, String name, int uid, int userId, Object owner,
@@ -830,6 +835,9 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             return;
         }
         mActivities.add(r);
+        if (!mHasActivities) {
+            mAtm.mProcessStateController.setHasActivityAsync(this, true);
+        }
         mHasActivities = true;
         if (mInactiveActivities != null) {
             mInactiveActivities.remove(r);
@@ -860,6 +868,9 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mActivities.remove(r);
         mHasActivities = !mActivities.isEmpty();
+        if (!mHasActivities) {
+            mAtm.mProcessStateController.setHasActivityAsync(this, false);
+        }
         updateActivityConfigurationListener();
     }
 
@@ -867,6 +878,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mInactiveActivities = null;
         mActivities.clear();
         mHasActivities = false;
+        mAtm.mProcessStateController.setHasActivityAsync(this, false);
         updateActivityConfigurationListener();
     }
 
@@ -1332,7 +1344,10 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         if (hasResumedFreeform
                 // Exclude task layer 1 because it is already the top most.
                 && minTaskLayer > 1) {
-            if (minTaskLayer <= 1 + MAX_NUM_PERCEPTIBLE_FREEFORM
+            if (com.android.window.flags.Flags.bgPriorityForOccludedFreeformTasks()
+                    && nonOccludedRatio == 0) {
+                stateFlags |= ACTIVITY_STATE_FLAG_OCCLUDED_FREEFORM;
+            } else if (minTaskLayer <= 1 + MAX_NUM_PERCEPTIBLE_FREEFORM
                     || nonOccludedRatio >= PERCEPTIBLE_FREEFORM_VISIBLE_RATIO) {
                 stateFlags |= ACTIVITY_STATE_FLAG_PERCEPTIBLE_FREEFORM;
             } else {
@@ -1352,6 +1367,10 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mActivityStateFlags = stateFlags;
         mPerceptibleTaskStoppedTimeMillis = perceptibleTaskStoppedTimeMillis;
+        // TODO: b/399680824 - batch these state changes when called from
+        //  computeProcessActivityStateBatch
+        mAtm.mProcessStateController.setActivityStateAsync(this, stateFlags,
+                perceptibleTaskStoppedTimeMillis);
 
         final boolean anyVisible = (stateFlags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0;
         if (!wasAnyVisible && anyVisible) {
@@ -1868,11 +1887,16 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     void addRecentTask(Task task) {
         mRecentTasks.add(task);
         mHasRecentTasks = true;
+        mAtm.mProcessStateController.setHasRecentTasksAsync(this, true);
     }
 
     void removeRecentTask(Task task) {
         mRecentTasks.remove(task);
-        mHasRecentTasks = !mRecentTasks.isEmpty();
+        final boolean hasRecentTask = !mRecentTasks.isEmpty();
+        mHasRecentTasks = hasRecentTask;
+        if (!hasRecentTask) {
+            mAtm.mProcessStateController.setHasRecentTasksAsync(this, false);
+        }
     }
 
     @HotPath(caller = HotPath.OOM_ADJUSTMENT)
@@ -1886,6 +1910,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mRecentTasks.clear();
         mHasRecentTasks = false;
+        mAtm.mProcessStateController.setHasRecentTasksAsync(this, false);
     }
 
     public void appEarlyNotResponding(String annotation, Runnable killAppCallback) {
@@ -2222,5 +2247,20 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         overrideConfig.setGrammaticalGender(targetValue);
         return true;
+    }
+
+    /** Sets the ART optimization info of the app process. */
+    public void setOptimizationInfo(
+            @NonNull String compilerFilter, @NonNull String compilationReason) {
+        if (com.android.art.flags.Flags.updatableFilterAndReason()) {
+            mOptimizationInfo = new PackageOptimizationInfo(
+                    ReasonMapping.getCompilerFilterValueForFrameworkStatsReporting(compilerFilter),
+                    ReasonMapping.getCompilationReasonValueForFrameworkStatsReporting(
+                            compilationReason));
+        }
+    }
+
+    PackageOptimizationInfo getOptimizationInfo() {
+        return mOptimizationInfo;
     }
 }

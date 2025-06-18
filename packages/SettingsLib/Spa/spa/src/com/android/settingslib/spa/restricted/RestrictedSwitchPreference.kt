@@ -18,22 +18,14 @@ package com.android.settingslib.spa.restricted
 
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.android.settingslib.spa.framework.common.SpaEnvironmentFactory
 import com.android.settingslib.spa.widget.preference.SwitchPreference
 import com.android.settingslib.spa.widget.preference.SwitchPreferenceModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
 
 /**
  * Restricted version [SwitchPreference].
  *
  * @param ifBlockedOverrideCheckedTo if this is not null and the current [RestrictedMode] is
- *   [Blocked] and [Blocked.canOverrideSwitchChecked] is set to true, the switch's checked status
- *   will be overridden to this value.
+ *   [Blocked], the switch's checked status will be overridden to this value.
  */
 @Composable
 fun RestrictedSwitchPreference(
@@ -41,12 +33,7 @@ fun RestrictedSwitchPreference(
     restrictions: Restrictions,
     ifBlockedOverrideCheckedTo: Boolean? = null,
 ) {
-    val context = LocalContext.current
-    val repository = remember {
-        checkNotNull(SpaEnvironmentFactory.instance.getRestrictedRepository(context)) {
-            "RestrictedRepository not set"
-        }
-    }
+    val repository = rememberRestrictedRepository()
     RestrictedSwitchPreference(model, restrictions, repository, ifBlockedOverrideCheckedTo)
 }
 
@@ -58,24 +45,12 @@ internal fun RestrictedSwitchPreference(
     repository: RestrictedRepository,
     ifBlockedOverrideCheckedTo: Boolean? = null,
 ) {
-    if (restrictions.isEmpty()) {
-        SwitchPreference(model)
-        return
+    RestrictedBaseSwitchPreference(
+        model = model,
+        restrictions = restrictions,
+        repository = repository,
+        ifBlockedOverrideCheckedTo = ifBlockedOverrideCheckedTo,
+    ) { model, modifier ->
+        SwitchPreference(model, modifier)
     }
-    val restrictedModeFlow =
-        remember(restrictions) {
-            repository.restrictedModeFlow(restrictions).flowOn(Dispatchers.Default)
-        }
-    val restrictedMode by
-        restrictedModeFlow.collectAsStateWithLifecycle(initialValue = NoRestricted)
-    val restrictedSwitchPreferenceModel =
-        remember(restrictedMode, model, ifBlockedOverrideCheckedTo) {
-            RestrictedSwitchPreferenceModel(
-                model = model,
-                restrictedMode = restrictedMode,
-                ifBlockedOverrideCheckedTo = ifBlockedOverrideCheckedTo,
-            )
-        }
-
-    restrictedSwitchPreferenceModel.RestrictionWrapper { SwitchPreference(it) }
 }

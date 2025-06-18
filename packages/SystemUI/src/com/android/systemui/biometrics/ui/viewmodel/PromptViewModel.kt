@@ -86,10 +86,10 @@ constructor(
     deviceEntryUdfpsInteractor: DeviceEntryUdfpsInteractor,
     udfpsOverlayInteractor: UdfpsOverlayInteractor,
     biometricStatusInteractor: BiometricStatusInteractor,
-    private val udfpsUtils: UdfpsUtils,
+    udfpsUtils: UdfpsUtils,
     private val iconProvider: IconProvider,
     private val activityTaskManager: ActivityTaskManager,
-    private val accessibilityInteractor: AccessibilityInteractor,
+    accessibilityInteractor: AccessibilityInteractor,
     accessibilityManager: AccessibilityManager,
     promptFallbackViewModelFactory: PromptFallbackViewModel.Factory,
     shadeInteractor: ShadeInteractor,
@@ -112,8 +112,8 @@ constructor(
             .map { it?.modalities ?: BiometricModalities() }
             .distinctUntilChanged()
 
-    /** Whether the shade is expanded */
-    val isShadeExpanded = shadeInteractor.isShadeAnyExpanded
+    /** Whether the shade is being interacted with */
+    val isShadeInteracted = shadeInteractor.isUserInteracting
 
     val udfpsAccessibilityOverlayViewModel =
         BiometricPromptUdfpsAccessibilityOverlayViewModel(

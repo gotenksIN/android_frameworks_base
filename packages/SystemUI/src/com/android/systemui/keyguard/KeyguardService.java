@@ -37,7 +37,6 @@ import static android.view.WindowManager.TransitionType;
 
 import android.annotation.NonNull;
 import android.app.ActivityManager;
-import android.app.ActivityTaskManager;
 import android.app.Service;
 import android.app.WindowConfiguration;
 import android.content.Intent;
@@ -55,8 +54,6 @@ import android.util.RotationUtils;
 import android.util.Slog;
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.IRemoteAnimationRunner;
-import android.view.RemoteAnimationAdapter;
-import android.view.RemoteAnimationDefinition;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.WindowManagerPolicyConstants;
@@ -99,7 +96,6 @@ import com.android.systemui.settings.DisplayTracker;
 import com.android.wm.shell.shared.CounterRotator;
 import com.android.wm.shell.shared.ShellTransitions;
 import com.android.wm.shell.shared.TransitionUtil;
-import com.android.wm.shell.transition.Transitions;
 
 import dagger.Lazy;
 
@@ -277,6 +273,8 @@ public class KeyguardService extends Service {
                     SurfaceControl.Transaction candidateT, IBinder currentTransition,
                     IRemoteTransitionFinishedCallback candidateFinishCallback) {
                 if ((candidateInfo.getFlags() & TRANSIT_FLAG_KEYGUARD_APPEARING) != 0) {
+                    Log.i(TAG, "Transition merged with keyguard appearing, setPendingLock(true) "
+                            + " and call cancelKeyguardExitAnimation()");
                     keyguardViewMediator.setPendingLock(true);
                     keyguardViewMediator.cancelKeyguardExitAnimation();
                     return;
@@ -434,7 +432,9 @@ public class KeyguardService extends Service {
             checkPermission();
             if (SceneContainerFlag.isEnabled()) {
                 mKeyguardStateCallbackStartableLazy.get().addCallback(callback);
-            } else if (KeyguardWmStateRefactor.isEnabled()) {
+            }
+
+            if (KeyguardWmStateRefactor.isEnabled()) {
                 mKeyguardStateCallbackInteractor.addCallback(callback);
             } else {
                 mKeyguardViewMediator.addStateMonitorCallback(callback);

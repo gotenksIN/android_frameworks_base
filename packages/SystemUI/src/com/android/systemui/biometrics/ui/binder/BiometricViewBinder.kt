@@ -225,7 +225,10 @@ object BiometricViewBinder {
                 legacyCallback.onUseDeviceCredential()
             }
             if (Flags.bpFallbackOptions()) {
-                fallbackButton.setOnClickListener { viewModel.onSwitchToFallback() }
+                fallbackButton.setOnClickListener {
+                    viewModel.onSwitchToFallback()
+                    legacyCallback.onPauseAuthentication()
+                }
             }
             confirmationButton.setOnClickListener { viewModel.confirmAuthenticated() }
             retryButton.setOnClickListener {
@@ -302,8 +305,8 @@ object BiometricViewBinder {
                 }
 
                 launch {
-                    viewModel.isShadeExpanded.collect { isShadeExpanded ->
-                        if (isShadeExpanded) {
+                    viewModel.isShadeInteracted.collect { isShadeInteracted ->
+                        if (isShadeInteracted) {
                             legacyCallback.onUserCanceled()
                         }
                     }
@@ -519,6 +522,10 @@ class Spaghetti(
         fun onError()
 
         fun onUseDeviceCredential()
+
+        fun onPauseAuthentication()
+
+        fun onResumeAuthentication()
 
         fun onStartDelayedFingerprintSensor()
 

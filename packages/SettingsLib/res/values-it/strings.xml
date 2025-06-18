@@ -81,7 +81,7 @@
     <string name="speed_label_fast" msgid="2677719134596044051">"Veloce"</string>
     <string name="speed_label_very_fast" msgid="8215718029533182439">"Molto veloce"</string>
     <string name="wifi_passpoint_expired" msgid="6540867261754427561">"Scaduta"</string>
-    <string name="preference_summary_default_combination" msgid="2644094566845577901">"<xliff:g id="STATE">%1$s</xliff:g>/<xliff:g id="DESCRIPTION">%2$s</xliff:g>"</string>
+    <string name="preference_summary_default_combination" msgid="2644094566845577901">"<xliff:g id="STATE">%1$s</xliff:g> / <xliff:g id="DESCRIPTION">%2$s</xliff:g>"</string>
     <string name="bluetooth_disconnected" msgid="7739366554710388701">"Disconnesso"</string>
     <string name="bluetooth_disconnecting" msgid="7638892134401574338">"Disconnessione…"</string>
     <string name="bluetooth_connecting" msgid="5871702668260192755">"Connessione…"</string>
@@ -578,6 +578,7 @@
     <string name="wifi_tether_connected_summary" msgid="5100712926640492336">"{count,plural, =1{1 dispositivo connesso}other{# dispositivi connessi}}"</string>
     <string name="accessibility_manual_zen_more_time" msgid="5141801092071134235">"Più tempo."</string>
     <string name="accessibility_manual_zen_less_time" msgid="6828877595848229965">"Meno tempo."</string>
+    <string name="accessibility_screen_magnification_title" msgid="4981096059561256342">"Ingrandimento"</string>
     <string name="cancel" msgid="5665114069455378395">"Annulla"</string>
     <string name="next" msgid="2699398661093607009">"Avanti"</string>
     <string name="back" msgid="5554327870352703710">"Indietro"</string>

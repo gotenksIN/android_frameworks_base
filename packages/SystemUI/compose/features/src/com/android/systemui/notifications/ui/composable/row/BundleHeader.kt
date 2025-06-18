@@ -28,22 +28,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -227,7 +223,8 @@ private fun ContentScope.BundlePreviewIcons(
     check(previewDrawables.isNotEmpty())
     val iconSize = 32.dp
 
-    val borderWidth = 2.5.dp
+    // The design stroke width is 2.5dp but there is a ~4% padding inside app icons; ~1.25dp here.
+    val borderWidth = 1.25.dp
     HalfOverlappingReversedRow(
         modifier =
             modifier.graphicsLayer {
@@ -235,20 +232,25 @@ private fun ContentScope.BundlePreviewIcons(
                 compositingStrategy = CompositingStrategy.Offscreen
             }
     ) {
+        // We need to lay out icons from the end (icon1) to the start (icon3) so that we can define
+        // STL animations statically per element, rather than making the movement of each element's
+        // animation dynamic based on the number of visible siblings. This take/reversed does that,
+        // while preserving the user's expected ordering of start-to-end == top-to-bottom contents.
+        val reversedIcons = previewDrawables.take(3).reversed()
         PreviewIcon(
-            drawable = previewDrawables[0],
+            drawable = reversedIcons[0],
             modifier = Modifier.element(BundleHeader.Elements.PreviewIcon1).size(iconSize),
             borderWidth = borderWidth,
         )
-        if (previewDrawables.size < 2) return@HalfOverlappingReversedRow
+        if (reversedIcons.size < 2) return@HalfOverlappingReversedRow
         PreviewIcon(
-            drawable = previewDrawables[1],
+            drawable = reversedIcons[1],
             modifier = Modifier.element(BundleHeader.Elements.PreviewIcon2).size(iconSize),
             borderWidth = borderWidth,
         )
-        if (previewDrawables.size < 3) return@HalfOverlappingReversedRow
+        if (reversedIcons.size < 3) return@HalfOverlappingReversedRow
         PreviewIcon(
-            drawable = previewDrawables[2],
+            drawable = reversedIcons[2],
             modifier = Modifier.element(BundleHeader.Elements.PreviewIcon3).size(iconSize),
             borderWidth = borderWidth,
         )
@@ -259,39 +261,28 @@ private fun ContentScope.BundlePreviewIcons(
 @Composable
 private fun PreviewIcon(drawable: Drawable, modifier: Modifier = Modifier, borderWidth: Dp) {
     val strokeWidthPx = with(LocalDensity.current) { borderWidth.toPx() }
-    val stroke = remember(borderWidth) { Stroke(width = strokeWidthPx) }
-
     Box(
         modifier =
             modifier.drawWithContent {
-                // Draw the original content of the inner Box
-                drawContent()
-
-                // Draw a circle with BlendMode.Clear to 'erase' pixels for the stroke.
+                // Draw a circle with BlendMode.Clear to 'erase' pixels for the "border".
                 // This will punch a hole in *this* icon's local offscreen buffer, allowing the
                 // background of the containing Composable (which needs to have a global
                 // offscreen layer) to show through.
                 drawCircle(
                     color = Color.Black, // Color doesn't matter for BlendMode.Clear
-                    // Calculate the radius for the clearing circle.
-                    // It should be the full size.minDimension / 2 PLUS half the stroke width.
-                    // This pushes the *center* of the stroke outward, so the *inner* edge of the
-                    // stroke aligns with the existing content boundary.
-                    radius = (size.minDimension / 2f) + (strokeWidthPx / 2f),
+                    radius = (size.minDimension / 2f) + strokeWidthPx,
                     center = center,
-                    style = stroke,
                     blendMode = BlendMode.Clear,
                 )
+
+                // Draw the original content of the inner Box
+                drawContent()
             }
     ) {
-        val surfaceColor = notificationElementSurfaceColor()
         Image(
             painter = rememberDrawablePainter(drawable),
             contentDescription = null,
-            modifier =
-                Modifier.fillMaxSize()
-                    .clip(CircleShape)
-                    .background(color = surfaceColor, shape = CircleShape),
+            modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit,
         )
     }

@@ -108,6 +108,7 @@ import com.android.systemui.statusbar.RemoteInputController;
 import com.android.systemui.statusbar.SmartReplyController;
 import com.android.systemui.statusbar.StatusBarIconView;
 import com.android.systemui.statusbar.notification.AboveShelfChangedListener;
+import com.android.systemui.statusbar.notification.BundleInteractionLogger;
 import com.android.systemui.statusbar.notification.ColorUpdateLogger;
 import com.android.systemui.statusbar.notification.FeedbackIcon;
 import com.android.systemui.statusbar.notification.LaunchAnimationParameters;
@@ -216,6 +217,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private MetricsLogger mMetricsLogger;
     private NotificationChildrenContainerLogger mChildrenContainerLogger;
     private ColorUpdateLogger mColorUpdateLogger;
+    private BundleInteractionLogger mBundleInteractionLogger;
     private NotificationDismissibilityProvider mDismissibilityProvider;
     private int mIconTransformContentShift;
     private int mMaxHeadsUpHeightBeforeN;
@@ -268,11 +270,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
      * user expansion.
      */
     private boolean mIsSystemExpanded;
-
-    /**
-     * Whether the notification is on the keyguard and the expansion is disabled.
-     */
-    private boolean mOnKeyguard;
 
     private Animator mTranslateAnim;
     private ArrayList<View> mTranslateableViews;
@@ -422,6 +419,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 if (shouldLogExpandClickMetric) {
                     mMetricsLogger.action(
                             MetricsEvent.ACTION_NOTIFICATION_GROUP_EXPANDER, nowExpanded);
+                }
+                if (isBundle()) {
+                    mBundleInteractionLogger.logBundleExpansionChanged(
+                            mEntryAdapter.getBundleType(), nowExpanded);
                 }
                 onExpansionChanged(true /* userAction */, wasExpanded);
             } else {
@@ -1796,14 +1797,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         return mPrivateLayout.getSingleLineView();
     }
 
-    /**
-     * Whether this row is displayed over the unoccluded lockscreen. Returns false on the
-     * locked shade.
-     */
-    public boolean isOnKeyguard() {
-        return mOnKeyguard;
-    }
-
     @Override
     public void dismiss(boolean refocusOnDismiss) {
         super.dismiss(refocusOnDismiss);
@@ -2273,7 +2266,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             SmartReplyController smartReplyController,
             IStatusBarService statusBarService,
             UiEventLogger uiEventLogger,
-            NotificationRebindingTracker notificationRebindingTracker) {
+            NotificationRebindingTracker notificationRebindingTracker,
+            BundleInteractionLogger bundleInteractionLogger) {
 
         if (NotificationBundleUi.isEnabled()) {
             mEntryAdapter = entryAdapter;
@@ -2322,6 +2316,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mChildrenContainerLogger = childrenContainerLogger;
         mColorUpdateLogger = colorUpdateLogger;
         mDismissibilityProvider = dismissibilityProvider;
+        mBundleInteractionLogger = bundleInteractionLogger;
         setHapticFeedbackEnabled(!Flags.msdlFeedback());
     }
 
@@ -2668,7 +2663,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 mTranslateableViews.get(i).setTranslationX(0);
             }
             invalidateOutline();
-            getShelfIcon().setScrollX(0);
+            @Nullable final StatusBarIconView shelfIcon = getShelfIcon();
+            // TODO(b/416147040): Remove null check, will be unnecessary
+            if (shelfIcon != null) {
+                shelfIcon.setScrollX(0);
+            }
         }
 
         if (mMenuRow != null) {
@@ -3058,7 +3057,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     @Override
-    public @NonNull StatusBarIconView getShelfIcon() {
+    public @Nullable StatusBarIconView getShelfIcon() {
+        // TODO(b/416147040): Add requireNotNull check and change annotation to @NonNull
         if (NotificationBundleUi.isEnabled()) {
             return getEntryAdapter().getIcons().getShelfIcon();
         } else {
@@ -3246,29 +3246,30 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     }
 
-    /** @see #isOnKeyguard() */
+    @Override
     public void setOnKeyguard(boolean onKeyguard) {
-        if (onKeyguard != mOnKeyguard) {
-            boolean wasAboveShelf = isAboveShelf();
-            final boolean wasExpanded = isExpanded();
-            mOnKeyguard = onKeyguard;
-            onExpansionChanged(false /* userAction */, wasExpanded);
-            if (wasExpanded != isExpanded()) {
-                if (mIsSummaryWithChildren) {
-                    mChildrenContainer.updateGroupOverflow();
-                }
-                notifyHeightChanged(/* needsAnimation= */ false);
+        if (onKeyguard == mOnKeyguard) {
+            return;
+        }
+
+        boolean wasAboveShelf = isAboveShelf();
+        final boolean wasExpanded = isExpanded();
+
+        super.setOnKeyguard(onKeyguard);
+
+        onExpansionChanged(false /* userAction */, wasExpanded);
+        if (wasExpanded != isExpanded()) {
+            if (mIsSummaryWithChildren) {
+                mChildrenContainer.updateGroupOverflow();
             }
-            if (isAboveShelf() != wasAboveShelf) {
-                mAboveShelfChangedListener.onAboveShelfStateChanged(!wasAboveShelf);
-            }
-            if (SceneContainerFlag.isEnabled()) {
-                if (mIsSummaryWithChildren) {
-                    mChildrenContainer.setOnKeyguard(onKeyguard);
-                }
-            }
-            if (notificationRowTransparency()) {
-                updateBackgroundTint();
+            notifyHeightChanged(/* needsAnimation= */ false);
+        }
+        if (isAboveShelf() != wasAboveShelf) {
+            mAboveShelfChangedListener.onAboveShelfStateChanged(!wasAboveShelf);
+        }
+        if (SceneContainerFlag.isEnabled()) {
+            if (mIsSummaryWithChildren) {
+                mChildrenContainer.setOnKeyguard(onKeyguard);
             }
         }
     }
@@ -4881,7 +4882,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         return super.usesTransparentBackground()
                 && !mustStayOnScreen()
                 && !(isChildInGroup() && !mNotificationParent.usesTransparentBackground())
-                && !mHeadsupDisappearRunning
-                && !mOnKeyguard;
+                && !mHeadsupDisappearRunning;
     }
 }

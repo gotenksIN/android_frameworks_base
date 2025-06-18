@@ -138,6 +138,10 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Obecnie nagrywasz cały widok ekranu"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Obecnie nagrywasz widok aplikacji <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Zatrzymaj nagrywanie"</string>
+    <!-- no translation found for screen_capture_toolbar_capture_button (8512731007891496030) -->
+    <skip />
+    <!-- no translation found for screen_capture_toolbar_record_button (7533814143351870339) -->
+    <skip />
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Udostępniam ekran"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Udostępniasz treści"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Zatrzymać udostępnianie ekranu?"</string>
@@ -207,9 +211,29 @@
     <string name="biometric_dialog_fallback_button" msgid="7808939083554391449">"Zweryfikuj w inny sposób"</string>
     <string name="biometric_dialog_manage_identity_check" msgid="6283423571297422689">"Zarządzaj potwierdzeniem tożsamości"</string>
     <string name="biometric_dialog_identity_check_pin_footer" msgid="2943916725380489626">"Nie można użyć kodu PIN do weryfikacji, ponieważ potwierdzenie tożsamości jest włączone i wymaga danych biometrycznych. Więcej informacji o potwierdzeniu tożsamości"</string>
+    <!-- no translation found for biometric_dialog_identity_check_pattern_footer (8695014155334581855) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_identity_check_password_footer (6818380955155542018) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_identity_check_watch_ranging (4600194412220409723) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_unavailable (8242160331783709764) -->
+    <skip />
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"Użyj kodu PIN"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"Użyj wzoru"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"Użyj hasła"</string>
+    <!-- no translation found for biometric_dialog_enter_pin (8625265944863623975) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_enter_password (200503318983048202) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_enter_pattern (3065746760277739487) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_recovery_pin (5798389437594195177) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_recovery_pattern (382786088892502550) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_recovery_password (8288127966207678230) -->
+    <skip />
     <string name="biometric_dialog_wrong_pin" msgid="1878539073972762803">"Nieprawidłowy kod PIN"</string>
     <string name="biometric_dialog_wrong_pattern" msgid="8954812279840889029">"Nieprawidłowy wzór"</string>
     <string name="biometric_dialog_wrong_password" msgid="69477929306843790">"Nieprawidłowe hasło"</string>
@@ -263,10 +287,8 @@
     <string name="accessibility_collapse_group" msgid="1842704016768329517">"Zwiń grupę."</string>
     <string name="accessibility_add_device_to_group" msgid="5446422960697860806">"Dodaj urządzenie do grupy."</string>
     <string name="accessibility_remove_device_from_group" msgid="3114694270949142228">"Usuń urządzenie z grupy."</string>
-    <!-- no translation found for accessibility_add_device_to_group_with_name (1042306202917036858) -->
-    <skip />
-    <!-- no translation found for accessibility_remove_device_from_group_with_name (5582015497111561027) -->
-    <skip />
+    <string name="accessibility_add_device_to_group_with_name" msgid="1042306202917036858">"Dodaj urządzenie <xliff:g id="DEVICE_NAME">%s</xliff:g> do grupy."</string>
+    <string name="accessibility_remove_device_from_group_with_name" msgid="5582015497111561027">"Usuń urządzenie <xliff:g id="DEVICE_NAME">%s</xliff:g> z grupy."</string>
     <string name="accessibility_open_application" msgid="1749126077501259712">"Otwórz aplikację."</string>
     <string name="accessibility_not_connected" msgid="4061305616351042142">"Nie połączono."</string>
     <string name="data_connection_roaming" msgid="375650836665414797">"Roaming"</string>
@@ -302,6 +324,9 @@
     <string name="accessibility_quick_settings_less_time" msgid="9110364286464977870">"Mniej czasu."</string>
     <string name="accessibility_casting_turned_off" msgid="1387906158563374962">"Zatrzymano przesyłanie ekranu."</string>
     <string name="accessibility_brightness" msgid="5391187016177823721">"Jasność wyświetlacza"</string>
+    <string name="accessibility_camera_in_use" msgid="1090160655874262911">"Aparat jest używany"</string>
+    <string name="accessibility_microphone_in_use" msgid="1921058214238108340">"Mikrofon jest używany"</string>
+    <string name="accessibility_camera_and_microphone_in_use" msgid="1250516397875447442">"Kamera i mikrofon są używane"</string>
     <string name="data_usage_disabled_dialog_mobile_title" msgid="2286843518689837719">"Mobilna transmisja danych jest wstrzymana"</string>
     <string name="data_usage_disabled_dialog_title" msgid="9131615296036724838">"Transmisja danych została wstrzymana"</string>
     <string name="data_usage_disabled_dialog" msgid="7933201635215099780">"Osiągnięto ustawiony limit danych. Nie korzystasz już z mobilnej transmisji danych.\n\nJeśli włączysz ją ponownie, może zostać naliczona opłata za użycie danych."</string>
@@ -651,6 +676,8 @@
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"Wyłącz"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"Odblokuj i zobacz starsze powiadomienia"</string>
     <string name="quick_settings_disclosure_parental_controls" msgid="2114102871438223600">"Tym urządzeniem zarządza Twój rodzic"</string>
+    <!-- no translation found for quick_settings_disclosure_pin_protection (9219481515114868267) -->
+    <skip />
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"Twoja organizacja jest właścicielem tego urządzenia i może monitorować ruch w sieci"</string>
     <string name="quick_settings_disclosure_named_management_monitoring" msgid="2831423806103479812">"Organizacja <xliff:g id="ORGANIZATION_NAME">%1$s</xliff:g> jest właścicielem tego urządzenia i może monitorować ruch w sieci"</string>
     <string name="quick_settings_financed_disclosure_named_management" msgid="2307703784594859524">"To urządzenie dostarcza organizacja <xliff:g id="ORGANIZATION_NAME">%s</xliff:g>"</string>
@@ -691,6 +718,8 @@
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">"  "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"Otwórz ustawienia VPN"</string>
     <string name="monitoring_description_parental_controls" msgid="8184693528917051626">"Tym urządzeniem zarządza Twój rodzic. Rodzic może zobaczyć różne informacje, np. o aplikacjach, których używasz, lokalizacji i czasie korzystania z urządzenia, a także zarządzać tymi danymi."</string>
+    <!-- no translation found for monitoring_description_pin_protection (1983580207046670355) -->
+    <skip />
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"Blokada anulowana przez agenta zaufania"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="2587481497846342760">"Urządzenie zostało zablokowane, zbyt wiele prób uwierzytelnienia"</string>
@@ -794,6 +823,8 @@
     <string name="status_bar_work" msgid="5238641949837091056">"Profil służbowy"</string>
     <string name="status_bar_airplane" msgid="4848702508684541009">"Tryb samolotowy"</string>
     <string name="status_bar_supervision" msgid="6735015942701134125">"Kontrola rodzicielska"</string>
+    <!-- no translation found for status_bar_pin_supervision (4376576498566645782) -->
+    <skip />
     <string name="zen_alarm_warning" msgid="7844303238486849503">"Nie usłyszysz swojego następnego alarmu <xliff:g id="WHEN">%1$s</xliff:g>"</string>
     <string name="alarm_template" msgid="2234991538018805736">"o <xliff:g id="WHEN">%1$s</xliff:g>"</string>
     <string name="alarm_template_far" msgid="3561752195856839456">"w: <xliff:g id="WHEN">%1$s</xliff:g>"</string>
@@ -804,6 +835,8 @@
     <string name="accessibility_status_bar_satellite_available" msgid="6514855015496916829">"Satelita – połączenie dostępne"</string>
     <string name="satellite_connected_carrier_text" msgid="118524195198532589">"Satelitarne połączenie alarmowe"</string>
     <string name="satellite_emergency_only_carrier_text" msgid="9103913890116841786">"Tylko połączenia alarmowe lub SOS"</string>
+    <!-- no translation found for satellite_network_title_text (4825315858295910999) -->
+    <skip />
     <string name="accessibility_phone_string_format" msgid="7798841417881811812">"<xliff:g id="CARRIER_NAME">%1$s</xliff:g>, <xliff:g id="SIGNAL_STRENGTH_DESCRIPTION">%2$s</xliff:g>."</string>
     <string name="accessibility_no_signal" msgid="7052827511409250167">"brak sygnału"</string>
     <string name="accessibility_one_bar" msgid="5342012847647834506">"1 pasek"</string>
@@ -824,19 +857,15 @@
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"Włącz"</string>
     <string name="rotation_lock_camera_rotation_on" msgid="789434807790534274">"Włączono – na podstawie twarzy"</string>
     <string name="notification_guts_bundle_title" msgid="5252530007273079591">"Wyciszaj i grupuj"</string>
-    <!-- no translation found for notification_guts_single_bundle_notif_title (3186784466618443494) -->
-    <skip />
+    <string name="notification_guts_single_bundle_notif_title" msgid="3186784466618443494">"Użyj narzędzia do porządkowania powiadomień"</string>
     <string name="notification_guts_bundle_summary" msgid="3971530802237393600">"<xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="notification_guts_promotions_summary" msgid="1565750619813325885">"Wyprzedaże, nowe funkcje i inne"</string>
     <string name="notification_guts_news_summary" msgid="638697931043407835">"Najpopularniejsze artykuły, materiały redakcyjne i inne"</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"Polubienia, posty i inne"</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Newslettery, polecane media i inne"</string>
-    <!-- no translation found for notification_onboarding_summaries_turn_on (5050003857531272655) -->
-    <skip />
-    <!-- no translation found for notification_onboarding_summaries_message (6061524903176459064) -->
-    <skip />
-    <!-- no translation found for notification_onboarding_bundles_message (9038023612294384832) -->
-    <skip />
+    <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Włącz"</string>
+    <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Teraz możesz szybko uzyskiwać podsumowania dłuższych rozmów"</string>
+    <string name="notification_onboarding_bundles_message" msgid="9038023612294384832">"Narzędzie do porządkowania powiadomień grupuje i wycisza powiadomienia o niższym priorytecie"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"Gotowe"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Zastosuj"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Wyłącz"</string>
@@ -989,6 +1018,8 @@
     <string name="battery" msgid="769686279459897127">"Bateria"</string>
     <string name="headset" msgid="4485892374984466437">"Zestaw słuchawkowy"</string>
     <string name="accessibility_long_click_tile" msgid="210472753156768705">"Otwórz ustawienia"</string>
+    <!-- no translation found for accessibility_long_click_tile_details (3408103115710601894) -->
+    <skip />
     <string name="accessibility_status_bar_headphones" msgid="1304082414912647414">"Słuchawki są podłączone"</string>
     <string name="accessibility_status_bar_headset" msgid="2699275863720926104">"Zestaw słuchawkowy jest podłączony"</string>
     <string name="data_saver" msgid="3484013368530820763">"Oszczędzanie danych"</string>
@@ -1309,6 +1340,8 @@
     <string name="media_output_group_title" msgid="6789001895863332576">"Urządzenie wyjściowe"</string>
     <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"Zatrzymaj udostępnianie sesji, aby przenieść multimedia na inne urządzenie"</string>
     <string name="media_output_end_session_dialog_stop" msgid="208189434474624412">"Zatrzymaj"</string>
+    <!-- no translation found for media_output_dialog_button_stop_sharing (5043482739689716185) -->
+    <skip />
     <string name="media_output_first_broadcast_title" msgid="6292237789860753022">"Jak działa transmitowanie"</string>
     <string name="media_output_broadcast" msgid="3555580945878071543">"Transmisja"</string>
     <string name="media_output_first_notify_broadcast_message" msgid="6353857724136398494">"Osoby w pobliżu ze zgodnymi urządzeniami Bluetooth mogą słuchać transmitowanych przez Ciebie multimediów"</string>
@@ -1429,7 +1462,6 @@
     <string name="dream_overlay_status_bar_alarm_set" msgid="566707328356590886">"Alarm ustawiony"</string>
     <string name="dream_overlay_status_bar_camera_off" msgid="5273073778969890823">"Kamera jest wyłączona"</string>
     <string name="dream_overlay_status_bar_mic_off" msgid="8366534415013819396">"Mikrofon jest wyłączony"</string>
-    <string name="dream_overlay_status_bar_camera_mic_off" msgid="3199425257833773569">"Aparat i mikrofon są wyłączone"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# powiadomienie}few{# powiadomienia}many{# powiadomień}other{# powiadomienia}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
     <string name="note_task_button_label" msgid="230135078402003532">"Notatki"</string>
@@ -1496,7 +1528,8 @@
     <string name="mirror_display" msgid="2515262008898122928">"Powielaj obraz"</string>
     <string name="dismiss_dialog" msgid="2195508495854675882">"Zamknij"</string>
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"Wyświetlacz podłączony"</string>
-    <string name="privacy_dialog_title" msgid="7839968133469098311">"Mikrofon i aparat"</string>
+    <!-- no translation found for privacy_dialog_title (5201413527644766025) -->
+    <skip />
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"Aplikacje korzystające w ostatnim czasie"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"Zobacz ostatni dostęp"</string>
     <string name="privacy_dialog_done_button" msgid="4504330708531434263">"Gotowe"</string>

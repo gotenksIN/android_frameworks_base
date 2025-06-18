@@ -32,6 +32,7 @@ import androidx.test.filters.SmallTest
 import com.android.app.displaylib.DisplayDecorationListener
 import com.android.app.displaylib.DisplayRepository.PendingDisplay
 import com.android.app.displaylib.DisplaysWithDecorationsRepositoryCompat
+import com.android.server.display.feature.flags.Flags.FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.FlowValue
 import com.android.systemui.coroutines.collectLastValue
@@ -63,7 +64,6 @@ import org.mockito.kotlin.whenever
 @RunWith(AndroidJUnit4::class)
 @TestableLooper.RunWithLooper
 @SmallTest
-@android.platform.test.annotations.EnabledOnRavenwood
 class DisplayRepositoryTest : SysuiTestCase() {
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
 
@@ -651,7 +651,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displayIdsWithSystemDecorations_withWmCallback_systemDecorationAdded_emitsIncludingNewDisplayIds() =
         testScope.runTest {
             setDisplays(0)
@@ -667,7 +670,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displayIdsWithSystemDecorations_withWmCallback_systemDecorationAdded_emitsToNewSubscribers() =
         testScope.runTest {
             setDisplays(0)
@@ -685,7 +691,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displayIdsWithSystemDecorations_withWmCallback_systemDecorationAdded_doesNotEmitRemovedDisplayId() =
         testScope.runTest {
             val lastDisplayIdsWithSystemDecorations by
@@ -700,7 +709,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displayIdsWithSystemDecorations_withWmCallback_systemDecorationsRemoved_nonExistentDisplay_noEffect() =
         testScope.runTest {
             val lastDisplayIdsWithSystemDecorations by
@@ -714,7 +726,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displayIdsWithSystemDecorations_withWmCallback_displayRemoved_doesNotEmitRemovedDisplayId() =
         testScope.runTest {
             val lastDisplayIdsWithSystemDecorations by
@@ -730,7 +745,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displayIdsWithSystemDecorations_withWmCallback_displayRemoved_nonExistentDisplay_noEffect() =
         testScope.runTest {
             val lastDisplayIdsWithSystemDecorations by
@@ -745,7 +763,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displaysWithSystemDecorationsCompat_registerListener_notifyAddSystemDecor() =
         testScope.runTest {
             val listener = mock<DisplayDecorationListener>()
@@ -758,7 +779,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displaysWithSystemDecorationsCompat_registerListener_notifyInitialDisplaysWithSysDecor() =
         testScope.runTest {
             setDisplays(0)
@@ -772,7 +796,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displaysWithSystemDecorationsCompat_registerListener_notifyRemoveSystemDecor() =
         testScope.runTest {
             setDisplays(0)
@@ -788,7 +815,10 @@ class DisplayRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM,
+        FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
+    )
     fun displaysWithSystemDecorationsCompat_registerListener_notifyAllDisplaysWithSysDecor() =
         testScope.runTest {
             setDisplays(0, 2)

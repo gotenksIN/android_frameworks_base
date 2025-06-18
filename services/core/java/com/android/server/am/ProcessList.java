@@ -2174,6 +2174,7 @@ public final class ProcessList {
         if (mPlatformCompat != null) {
             app.setDisabledCompatChanges(mPlatformCompat.getDisabledChanges(app.info));
             app.setLoggableCompatChanges(mPlatformCompat.getLoggableChanges(app.info));
+            app.setLogChangeChecksToStatsD(mPlatformCompat.isLogChangeChecksToStatsd());
         }
         final long startSeq = ++mProcStartSeqCounter;
         app.setStartSeq(startSeq);
@@ -5639,14 +5640,14 @@ public final class ProcessList {
     @GuardedBy("mService")
     long killAppIfBgRestrictedAndCachedIdleLocked(ProcessRecord app, long nowElapsed) {
         final UidRecord uidRec = app.getUidRecord();
-        final long lastCanKillTime = app.mState.getLastCanKillOnBgRestrictedAndIdleTime();
+        final long lastCachedTime = app.mState.getLastCachedTime();
         if (!mService.mConstants.mKillBgRestrictedAndCachedIdle
                 || app.isKilled() || app.getThread() == null || uidRec == null || !uidRec.isIdle()
-                || !app.isCached() || app.mState.shouldNotKillOnBgRestrictedAndIdle()
-                || !app.mState.isBackgroundRestricted() || lastCanKillTime == 0) {
+                || !app.isCached() || !app.mState.isBackgroundRestricted()
+                || lastCachedTime == 0) {
             return 0;
         }
-        final long future = lastCanKillTime
+        final long future = lastCachedTime
                 + mService.mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs;
         if (future <= nowElapsed) {
             app.killLocked("cached idle & background restricted",

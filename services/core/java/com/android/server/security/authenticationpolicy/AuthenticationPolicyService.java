@@ -25,11 +25,14 @@ import static android.security.Flags.failedAuthLockToggle;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.SOME_AUTH_REQUIRED_AFTER_ADAPTIVE_AUTH_REQUEST;
 
 import android.annotation.EnforcePermission;
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.biometrics.AuthenticationStateListener;
 import android.hardware.biometrics.BiometricManager;
+import android.hardware.biometrics.Flags;
 import android.hardware.biometrics.events.AuthenticationAcquiredInfo;
 import android.hardware.biometrics.events.AuthenticationErrorInfo;
 import android.hardware.biometrics.events.AuthenticationFailedInfo;
@@ -46,6 +49,7 @@ import android.os.Message;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
 import android.proximity.IProximityResultCallback;
 import android.security.authenticationpolicy.AuthenticationPolicyManager;
 import android.security.authenticationpolicy.AuthenticationPolicyManager.DisableSecureLockDeviceRequestStatus;
@@ -58,8 +62,6 @@ import android.security.authenticationpolicy.ISecureLockDeviceStatusListener;
 import android.util.Slog;
 import android.util.SparseIntArray;
 import android.util.SparseLongArray;
-
-import androidx.annotation.NonNull;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.FrameworkStatsLog;
@@ -97,6 +99,7 @@ public class AuthenticationPolicyService extends SystemService {
     private final WindowManagerInternal mWindowManager;
     private final UserManagerInternal mUserManager;
     private SecureLockDeviceServiceInternal mSecureLockDeviceService;
+    private WatchRangingServiceInternal mWatchRangingService;
     @VisibleForTesting
     final SparseIntArray mFailedAttemptsForUser = new SparseIntArray();
     private final SparseLongArray mLastLockedTimestamp = new SparseLongArray();
@@ -121,6 +124,10 @@ public class AuthenticationPolicyService extends SystemService {
             mSecureLockDeviceService = Objects.requireNonNull(
                     LocalServices.getService(SecureLockDeviceServiceInternal.class));
         }
+        if (Flags.identityCheckWatch()) {
+            mWatchRangingService = Objects.requireNonNull(LocalServices.getService(
+                    WatchRangingServiceInternal.class));
+        }
     }
 
     @Override
@@ -136,10 +143,49 @@ public class AuthenticationPolicyService extends SystemService {
         }
     }
 
+    @Override
+    public void onUserSwitching(@Nullable TargetUser from, @NonNull TargetUser to) {
+        if (failedAuthLockToggle()) {
+            mayInitiateFailedAuthLockSettings(to.getUserIdentifier());
+        }
+    }
+
     @VisibleForTesting
     void init() {
         mLockSettings.registerLockSettingsStateListener(mLockSettingsStateListener);
         mBiometricManager.registerAuthenticationStateListener(mAuthenticationStateListener);
+
+        if (failedAuthLockToggle()) {
+            final int mainUserId = mUserManager.getMainUserId();
+            if (mainUserId != UserHandle.USER_NULL) {
+                mayInitiateFailedAuthLockSettings(mainUserId);
+            } else {
+                Slog.w(TAG, "No main user exists so use user 0 instead");
+                mayInitiateFailedAuthLockSettings(UserHandle.USER_SYSTEM);
+            }
+        }
+    }
+
+    private void mayInitiateFailedAuthLockSettings(int userId) {
+        // If userId is a profile, check its parent's settings
+        final int parentUserId = mUserManager.getProfileParentId(userId);
+        try {
+            // Attempt to get the settings without specifying the default value
+            Settings.Secure.getIntForUser(
+                    getContext().getContentResolver(),
+                    Settings.Secure.DISABLE_ADAPTIVE_AUTH_LIMIT_LOCK,
+                    parentUserId);
+        } catch (SettingNotFoundException e) {
+            // If the settings does not exist yet, set it to the default value for the main user, so
+            // that other components can start populating the settings value accordingly (e.g. for
+            // showing the failed auth lock toggle)
+            Slog.i(TAG, "Initiate the failed auth lock settings for userId=" + parentUserId);
+            Settings.Secure.putIntForUser(
+                    getContext().getContentResolver(),
+                    Settings.Secure.DISABLE_ADAPTIVE_AUTH_LIMIT_LOCK,
+                    DEFAULT_DISABLE_ADAPTIVE_AUTH_LIMIT_LOCK ? 1 : 0,
+                    parentUserId);
+        }
     }
 
     private final LockSettingsStateListener mLockSettingsStateListener =
@@ -267,8 +313,7 @@ public class AuthenticationPolicyService extends SystemService {
         }
 
         //TODO(b/421051706): Remove the condition Build.IS_DEBUGGABLE after flags are ramped up
-        if (failedAuthLockToggle()
-                || (disableAdaptiveAuthCounterLock() && Build.IS_DEBUGGABLE)) {
+        if (failedAuthLockToggle() || (disableAdaptiveAuthCounterLock() && Build.IS_DEBUGGABLE)) {
             // If userId is a profile, use its parent's settings to determine whether failed auth
             // lock is enabled or disabled for the profile, irrespective of the profile's own
             // settings. If userId is a main user (i.e. parentUserId equals to userId), use its own
@@ -497,11 +542,20 @@ public class AuthenticationPolicyService extends SystemService {
 
         @Override
         @EnforcePermission(USE_BIOMETRIC_INTERNAL)
-        public void startWatchRangingForIdentityCheck(
-                IProximityResultCallback resultCallback) {
+        public void startWatchRangingForIdentityCheck(long authenticationRequestId,
+                @NonNull IProximityResultCallback proximityResultCallback) {
             startWatchRangingForIdentityCheck_enforcePermission();
-            Slog.d(TAG, "startWatchRangingForIdentityCheck");
-            //TODO (b/397954948) : Bind to IProximityProviderService and start ranging
+
+            mWatchRangingService.startWatchRangingForIdentityCheck(authenticationRequestId,
+                    proximityResultCallback);
+        }
+
+        @Override
+        @EnforcePermission(USE_BIOMETRIC_INTERNAL)
+        public void cancelWatchRangingForRequestId(long authenticationRequestId) {
+            cancelWatchRangingForRequestId_enforcePermission();
+
+            mWatchRangingService.cancelWatchRangingForRequestId(authenticationRequestId);
         }
     };
 }

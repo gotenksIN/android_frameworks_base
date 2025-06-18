@@ -397,6 +397,9 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
      */
     private boolean mTopResumedActivityWaitingForPrev;
 
+    /** Whether a process state update of top resumed activity is deferred. */
+    private boolean mHasPendingTopResumedProcessState;
+
     /** The target root task bounds for the picture-in-picture mode changed that we need to
      * report to the application */
     private Rect mPipModeChangedTargetRootTaskBounds;
@@ -1179,6 +1182,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         if (app != null && mService.mHomeProcess != app) {
             scheduleStartHome("homeChanged");
             mService.mHomeProcess = app;
+            mService.mProcessStateController.setHomeProcessAsync(app);
         }
     }
 
@@ -2562,6 +2566,17 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         }
     }
 
+    /** This is only used for switching between resumed activities without activity state change. */
+    private void updateTopResumedProcessState() {
+        if (mTopResumedActivity == null || mTopResumedActivity.app == null) {
+            return;
+        }
+        mTopResumedActivity.app.updateProcessInfo(
+                false /* updateServiceConnectionActivities */, true /* activityChange */,
+                false /* updateOomAdj */, true /* addPendingTopUid */);
+        mService.updateOomAdj();
+    }
+
     /**
      * Updates the record of top resumed activity when it changes and handles reporting of the
      * state changes to previous and new top activities. It will immediately dispatch top resumed
@@ -2596,10 +2611,11 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         // If the previous top is null, there should be activity state change from it, Then the
         // process state should also have been updated so no need to update again.
         if (mTopResumedActivity != null && prevTopActivity != null) {
-            if (mTopResumedActivity.app != null) {
-                mTopResumedActivity.app.addToPendingTop();
+            if (readyToResume()) {
+                updateTopResumedProcessState();
+            } else {
+                mHasPendingTopResumedProcessState = true;
             }
-            mService.updateOomAdj();
         }
         // Update the last resumed activity and focused app when the top resumed activity changed
         // because the new top resumed activity might be already resumed and thus won't have
@@ -2892,6 +2908,10 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     void endDeferResume() {
         mDeferResumeCount--;
         if (readyToResume()) {
+            if (mHasPendingTopResumedProcessState) {
+                mHasPendingTopResumedProcessState = false;
+                updateTopResumedProcessState();
+            }
             if (mLastReportedTopResumedActivity != null
                     && mTopResumedActivity != mLastReportedTopResumedActivity) {
                 scheduleTopResumedActivityStateLossIfNeeded();
@@ -3092,8 +3112,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                     // activity from whatever is started from the recents activity, so move
                     // the home root task forward.
                     // TODO (b/115289124): Multi-display supports for recents.
-                    mRootWindowContainer.getDefaultTaskDisplayArea().moveHomeRootTaskToFront(
-                            "startActivityFromRecents");
+                    task.getTaskDisplayArea().moveHomeRootTaskToFront("startActivityFromRecents");
                 }
 
                 // If the user must confirm credentials (e.g. when first launching a work

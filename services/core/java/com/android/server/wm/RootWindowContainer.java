@@ -1731,12 +1731,15 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      * <p>NOTE: If the top activity is in the split screen, the other activities in the same split
      * screen will also be returned.
      */
-    List<ActivityAssistInfo> getTopVisibleActivities() {
+    List<ActivityAssistInfo> getTopVisibleActivities(int displayId) {
         final ArrayList<ActivityAssistInfo> topVisibleActivities = new ArrayList<>();
         final ArrayList<ActivityAssistInfo> activityAssistInfos = new ArrayList<>();
-        final Task topFocusedRootTask = getTopDisplayFocusedRootTask();
-        // Traverse all displays.
-        forAllRootTasks(rootTask -> {
+        final DisplayContent dc =
+                displayId != INVALID_DISPLAY ? getDisplayContent(displayId) : null;
+        final Task topFocusedRootTask =
+                dc != null ? dc.getFocusedRootTask() : getTopDisplayFocusedRootTask();
+
+        final Consumer<Task> collectVisibleActivities = rootTask -> {
             // Get top activity from a visible root task and add it to the list.
             if (rootTask.shouldBeVisible(null /* starting */)) {
                 final ActivityRecord top = rootTask.getTopNonFinishingActivity();
@@ -1759,7 +1762,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     }
                 }
             }
-        });
+        };
+
+        if (dc != null) {
+            dc.forAllRootTasks(collectVisibleActivities);
+        } else {
+            // Traverse all displays.
+            forAllRootTasks(collectVisibleActivities);
+        }
         return topVisibleActivities;
     }
 

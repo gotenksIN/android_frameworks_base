@@ -40,6 +40,8 @@ import android.os.Trace;
 // QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
 import android.util.BoostFramework.ScrollOptimizer;
 // QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+import android.ravenwood.annotation.RavenwoodKeepWholeClass;
+import android.ravenwood.annotation.RavenwoodReplace;
 import android.util.Log;
 import android.util.TimeUtils;
 import android.view.animation.AnimationUtils;
@@ -90,6 +92,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * to which the choreographer belongs.
  * </p>
  */
+@RavenwoodKeepWholeClass
 public final class Choreographer {
     private static final String TAG = "Choreographer";
 
@@ -107,7 +110,17 @@ public final class Choreographer {
     // for jitter and hardware variations).  Regardless of this value, the animation
     // and display loop is ultimately rate-limited by how fast new graphics buffers can
     // be dequeued.
-    private static final long DEFAULT_FRAME_DELAY = 10;
+    private static final long DEFAULT_FRAME_DELAY = getDefaultFrameDelay();
+
+    @RavenwoodReplace(reason = "run as fast as possible on ravenwood")
+    private static long getDefaultFrameDelay() {
+        return 10;
+    }
+
+    @SuppressWarnings("unused")
+    private static long getDefaultFrameDelay$ravenwood() {
+        return 1;
+    }
 
     // The number of milliseconds between animation frames.
     private static volatile long sFrameDelay = DEFAULT_FRAME_DELAY;
@@ -146,8 +159,17 @@ public final class Choreographer {
 
     // Enable/disable vsync for animations and drawing.
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 123769497)
-    private static final boolean USE_VSYNC = SystemProperties.getBoolean(
-            "debug.choreographer.vsync", true);
+    private static final boolean USE_VSYNC = getUseVsync();
+
+    @RavenwoodReplace(reason = "don't simulate vsync on ravenwood")
+    private static boolean getUseVsync() {
+        return SystemProperties.getBoolean("debug.choreographer.vsync", true);
+    }
+
+    @SuppressWarnings("unused")
+    private static boolean getUseVsync$ravenwood() {
+        return false;
+    }
 
     // Enable/disable using the frame time instead of returning now.
     private static final boolean USE_FRAME_TIME = SystemProperties.getBoolean(
@@ -359,10 +381,17 @@ public final class Choreographer {
         setFPSDivisor(SystemProperties.getInt(ThreadedRenderer.DEBUG_FPS_DIVISOR, 1));
     }
 
+    @RavenwoodReplace(blockedBy = DisplayManagerGlobal.class,
+            reason = "just use fixed refresh rate")
     private static float getRefreshRate() {
         DisplayInfo di = DisplayManagerGlobal.getInstance().getDisplayInfo(
                 Display.DEFAULT_DISPLAY);
         return di.getRefreshRate();
+    }
+
+    @SuppressWarnings("unused")
+    private static float getRefreshRate$ravenwood() {
+        return 120f;
     }
 
     /**
@@ -1454,7 +1483,7 @@ public final class Choreographer {
             }
 
             long newPreferredDeadline = mFrameTimelines[newPreferredIndex].mDeadlineNanos;
-            if (newPreferredDeadline < minimumDeadline) {
+            if (USE_VSYNC && newPreferredDeadline < minimumDeadline) {
                 DisplayEventReceiver.VsyncEventData latestVsyncEventData =
                         displayEventReceiver.getLatestVsyncEventData();
                 if (latestVsyncEventData == null) {

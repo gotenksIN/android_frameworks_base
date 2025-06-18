@@ -9,7 +9,9 @@ import com.android.systemui.biometrics.domain.interactor.FakeCredentialInteracto
 import com.android.systemui.biometrics.domain.interactor.PromptCredentialInteractor
 import com.android.systemui.biometrics.domain.interactor.promptSelectorInteractor
 import com.android.systemui.biometrics.promptInfo
+import com.android.systemui.biometrics.shared.model.BiometricModalities
 import com.android.systemui.biometrics.shared.model.PromptKind
+import com.android.systemui.kosmos.testScope
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -48,6 +51,8 @@ class CredentialViewModelTest : SysuiTestCase() {
                 kosmos.shadeInteractor,
                 kosmos.promptSelectorInteractor,
             )
+
+        kosmos.testScope.runCurrent()
     }
 
     @Test fun setsPinInputFlags() = setsInputFlags(PromptKind.Pin, expectFlags = true)
@@ -181,7 +186,14 @@ class CredentialViewModelTest : SysuiTestCase() {
     ) =
         runTest(dispatcher) {
             init()
-            promptRepository.setPrompt(promptInfo(), USER_ID, REQUEST_ID, OPERATION_ID, kind)
+            promptRepository.setPrompt(
+                promptInfo(),
+                USER_ID,
+                BiometricModalities(),
+                REQUEST_ID,
+                OPERATION_ID,
+                kind,
+            )
             block()
         }
 }

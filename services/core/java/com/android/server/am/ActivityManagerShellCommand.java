@@ -1517,11 +1517,11 @@ final class ActivityManagerShellCommand extends ShellCommand {
         HashMap<Long, Integer> duplicatedBitmaps;
 
         private static final String bitmapInfoHeader =
-          "   Bitmap ID  | Width | Height |   Size   |   Config  | M |   Type   |  Source";
+          "   Bitmap ID  | Width | Height |   Size     |   Config  | M |   Type   |  Source";
         private static final String bitmapInfoSep =
-          "--------------|-------|--------|----------|-----------|---|----------|--------";
+          "--------------|-------|--------|------------|-----------|---|----------|--------";
         private static final String bitmapInfoRowFormat =
-          " %12d | %5d |  %5d | %8d | %9.9s | %s | %8.8s | %12d";
+          " %12d | %5d |  %5d | %,10d | %9.9s | %s | %8.8s | %12d";
 
         private static final String bitmapInfoHeaderCSV =
           "PID, Process Name, Bitmap ID, Width, Height, Size, Config, Mutable, AllocType, Source";
@@ -4121,6 +4121,17 @@ final class ActivityManagerShellCommand extends ShellCommand {
                     return -1;
                 }
             }
+        } else if (toggleValue.equals("log-change-checks-to-statsd")) {
+            // Note that this is only used for testing.
+            final String value = getNextArgRequired();
+            if ("on".equals(value) || "off".equals(value)) {
+                pw.println("Setting log compat change checks to statsd " + value);
+                platformCompat.setLogChangeChecksToStatsd(value.equals("on"));
+            } else {
+                pw.println("Invalid value for logging compat change checks to statsd.");
+                return -1;
+            }
+            return 0;
         } else {
             String changeIdString = getNextArgRequired();
             try {

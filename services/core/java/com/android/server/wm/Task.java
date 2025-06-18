@@ -1451,6 +1451,11 @@ class Task extends TaskFragment {
         return (topTask != this && topTask != null) ? topTask.getBaseIntent() : null;
     }
 
+    /** Returns the user id associated with the current task. */
+    int getUserId() {
+        return isLeafTask() ? mUserId : mCurrentUser;
+    }
+
     /**
      * Returns the package name which stands for this task. It is empty string if no activities
      * have been added to this task.
@@ -3425,7 +3430,7 @@ class Task extends TaskFragment {
         info.addLaunchCookie(mLaunchCookie);
         final ActivityRecord top = mTaskSupervisor.mTaskInfoHelper.fillAndReturnTop(this, info);
 
-        info.userId = isLeafTask() ? mUserId : mCurrentUser;
+        info.userId = getUserId();
         info.taskId = mTaskId;
         info.effectiveUid = effectiveUid;
         info.displayId = getDisplayId();
@@ -4690,9 +4695,6 @@ class Task extends TaskFragment {
         if (dc == null || !dc.isWindowingModeSupported(WINDOWING_MODE_PINNED)) {
             return true;
         }
-        if (!Flags.disallowBubbleToEnterPip()) {
-            return false;
-        }
         if (mDisablePip) {
             return true;
         }
@@ -4705,10 +4707,6 @@ class Task extends TaskFragment {
     }
 
     void setDisablePip(boolean disablePip) {
-        if (!Flags.disallowBubbleToEnterPip()) {
-            Slog.w(TAG, "Flag " + Flags.FLAG_DISALLOW_BUBBLE_TO_ENTER_PIP + " is not enabled");
-            return;
-        }
         mDisablePip = disablePip;
     }
 
@@ -5277,29 +5275,60 @@ class Task extends TaskFragment {
                     someActivityResumed = resumeTopActivityInnerLocked(prev, options, deferPause);
                 }
             } else {
-                int idx = mChildren.size() - 1;
-                while (idx >= 0) {
-                    final Task child = (Task) getChildAt(idx--);
-                    if (!child.isTopActivityFocusable()) {
-                        continue;
-                    }
-                    if (child.getVisibility(null /* starting */)
-                            != TASK_FRAGMENT_VISIBILITY_VISIBLE) {
-                        if (child.topRunningActivity() == null) {
-                            // Skip the task if no running activity and continue resuming next task.
+                if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()) {
+                    // Find visible tasks top-to-bottom.
+                    final List<Task> tasksToResumeTopToBottom = new ArrayList<>();
+                    for (int i = mChildren.size() - 1; i >= 0; i--) {
+                        final Task child = (Task) getChildAt(i);
+                        if (!child.isTopActivityFocusable()) {
                             continue;
                         }
-                        // Otherwise, assuming everything behind this task should also be invisible.
-                        break;
+                        if (child.getVisibility(null /* starting */)
+                                != TASK_FRAGMENT_VISIBILITY_VISIBLE) {
+                            if (child.topRunningActivity() == null) {
+                                // Skip the task if no running activity and continue resuming next
+                                // task.
+                                continue;
+                            }
+                            // Otherwise, assuming everything behind this task should also be
+                            // invisible.
+                            break;
+                        }
+                        tasksToResumeTopToBottom.add(child);
                     }
+                    // Resume them bottom-to-top, so Z order is preserved.
+                    for (int i = tasksToResumeTopToBottom.size() - 1; i >= 0; i--) {
+                        final Task child = tasksToResumeTopToBottom.get(i);
+                        someActivityResumed |= child.resumeTopActivityUncheckedLocked(prev,
+                                options, deferPause);
+                    }
+                } else {
+                    int idx = mChildren.size() - 1;
+                    while (idx >= 0) {
+                        final Task child = (Task) getChildAt(idx--);
+                        if (!child.isTopActivityFocusable()) {
+                            continue;
+                        }
+                        if (child.getVisibility(null /* starting */)
+                                != TASK_FRAGMENT_VISIBILITY_VISIBLE) {
+                            if (child.topRunningActivity() == null) {
+                                // Skip the task if no running activity and continue resuming next
+                                // task.
+                                continue;
+                            }
+                            // Otherwise, assuming everything behind this task should also be
+                            // invisible.
+                            break;
+                        }
 
-                    someActivityResumed |= child.resumeTopActivityUncheckedLocked(prev, options,
-                            deferPause);
-                    // Doing so in order to prevent IndexOOB since hierarchy might changes while
-                    // resuming activities, for example dismissing split-screen while starting
-                    // non-resizeable activity.
-                    if (idx >= mChildren.size()) {
-                        idx = mChildren.size() - 1;
+                        someActivityResumed |= child.resumeTopActivityUncheckedLocked(prev, options,
+                                deferPause);
+                        // Doing so in order to prevent IndexOOB since hierarchy might changes while
+                        // resuming activities, for example dismissing split-screen while starting
+                        // non-resizeable activity.
+                        if (idx >= mChildren.size()) {
+                            idx = mChildren.size() - 1;
+                        }
                     }
                 }
             }

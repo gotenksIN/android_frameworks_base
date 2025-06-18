@@ -1733,8 +1733,19 @@ public final class Settings {
      * <p>
      * Output: Nothing.
      *
-     * @hide
+     * <p>To prevent interception by third-party applications, system settings apps should implement
+     * the system update functionality that must set a priority higher than default value (0).
+     * Example:
+     *
+     * <pre>{@code
+     * <Activity android:name=".MySystemUpdate">
+     *     <intent-filter android:priority="1">
+     *         <action android:name="android.settings.SYSTEM_UPDATE_SETTINGS" />
+     *     </intent-filter>
+     * </Activity>
+     * }</pre>
      */
+    @FlaggedApi(Flags.FLAG_EXPOSE_SYSTEM_UPDATE_SETTINGS)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_SYSTEM_UPDATE_SETTINGS =
             "android.settings.SYSTEM_UPDATE_SETTINGS";
@@ -9611,6 +9622,8 @@ public final class Settings {
          */
         @UnsupportedAppUsage
         @Readable
+        @TestApi
+        @SuppressLint({"UnflaggedApi", "NoSettingsProvider"}) // @TestApi purely for CTS support.
         public static final String LONG_PRESS_TIMEOUT = "long_press_timeout";
 
         /**
@@ -9619,6 +9632,8 @@ public final class Settings {
          * @hide
          */
         @Readable
+        @TestApi
+        @SuppressLint({"UnflaggedApi", "NoSettingsProvider"}) // @TestApi purely for CTS support.
         public static final String MULTI_PRESS_TIMEOUT = "multi_press_timeout";
 
         /**
@@ -20419,6 +20434,12 @@ public final class Settings {
             public static final int AUTO_TIME_ZONE_OFF = 2;
             /** @hide */
             public static final int INVALID_AUTO_TIME_ZONE_STATE = 3;
+
+            /** Store user enablement settings for location time zone detection
+             * Type: int (0 to disabled, 1 to enabled)
+             * @hide */
+            public static final String CLOCKWORK_LOCATION_TIME_ZONE_DETECTION_ENABLED =
+                    "clockwork_location_time_zone_detection_enabled";
 
             /**
              * Whether 24 hour time format is enabled on the watch.

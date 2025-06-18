@@ -705,7 +705,7 @@ class ContextImpl extends Context {
                     res++;
                 }
             } catch (IOException e) {
-                Log.w(TAG, "Failed to migrate " + sourceFile + ": " + e);
+                Log.w(TAG, "Failed to migrate " + sourceFile, e);
                 res = -1;
             }
         }
@@ -821,7 +821,7 @@ class ContextImpl extends Context {
                 if (e.errno == OsConstants.EEXIST) {
                     // We must have raced with someone; that's okay
                 } else {
-                    Log.w(TAG, "Failed to ensure " + file + ": " + e.getMessage());
+                    Log.w(TAG, "Failed to ensure " + file, e);
                 }
             }
 
@@ -832,7 +832,7 @@ class ContextImpl extends Context {
                     Memory.pokeLong(value, 0, stat.st_ino, ByteOrder.nativeOrder());
                     Os.setxattr(file.getParentFile().getAbsolutePath(), xattr, value, 0);
                 } catch (ErrnoException e) {
-                    Log.w(TAG, "Failed to update " + xattr + ": " + e.getMessage());
+                    Log.w(TAG, "Failed to update " + xattr, e);
                 }
             }
         }
@@ -1571,10 +1571,17 @@ class ContextImpl extends Context {
         sendOrderedBroadcastAsUserMultiplePermissions(intent, user, receiverPermissions, appOp,
                 options, resultReceiver, scheduler, initialCode, initialData, initialExtras);
     }
-
     @Override
     public void sendOrderedBroadcastAsUserMultiplePermissions(Intent intent, UserHandle user,
             String[] receiverPermissions, int appOp, Bundle options,
+            BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
+            String initialData, Bundle initialExtras) {
+        sendOrderedBroadcastAsUserMultiplePermissions(intent, user, receiverPermissions, null,
+                appOp, options, resultReceiver, scheduler, initialCode, initialData, initialExtras);
+    }
+
+    private void sendOrderedBroadcastAsUserMultiplePermissions(Intent intent, UserHandle user,
+            String[] receiverPermissions, String[] excludedPermissions, int appOp, Bundle options,
             BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
             String initialData, Bundle initialExtras) {
         IIntentReceiver rd = null;
@@ -1601,7 +1608,7 @@ class ContextImpl extends Context {
             ActivityManager.getService().broadcastIntentWithFeature(
                     mMainThread.getApplicationThread(), getAttributionTag(), intent, resolvedType,
                     rd, initialCode, initialData, initialExtras, receiverPermissions,
-                    null /*excludedPermissions=*/, null, appOp, options, true, false,
+                    excludedPermissions, null, appOp, options, true, false,
                     user.getIdentifier());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -1633,6 +1640,20 @@ class ContextImpl extends Context {
         sendOrderedBroadcastAsUserMultiplePermissions(intent, getUser(), receiverPermissions,
                 intAppOp, options, resultReceiver, scheduler, initialCode, initialData,
                 initialExtras);
+    }
+
+    @Override
+    public void sendOrderedBroadcastMultiplePermissions(Intent intent, String[] receiverPermissions,
+            String[] excludedPermissions, String receiverAppOp, BroadcastReceiver resultReceiver,
+            Handler scheduler, int initialCode, String initialData, @Nullable Bundle initialExtras,
+            @Nullable Bundle options) {
+        int intAppOp = AppOpsManager.OP_NONE;
+        if (!TextUtils.isEmpty(receiverAppOp)) {
+            intAppOp = AppOpsManager.strOpToOp(receiverAppOp);
+        }
+        sendOrderedBroadcastAsUserMultiplePermissions(intent, getUser(), receiverPermissions,
+                excludedPermissions, intAppOp, options, resultReceiver, scheduler, initialCode,
+                initialData, initialExtras);
     }
 
     @Override
@@ -3768,7 +3789,7 @@ class ContextImpl extends Context {
                         }
                     }
                 } catch (Exception e) {
-                    Log.w(TAG, "Failed to ensure " + dir + ": " + e);
+                    Log.w(TAG, "Failed to ensure " + dir, e);
                     dir = null;
                 }
             }

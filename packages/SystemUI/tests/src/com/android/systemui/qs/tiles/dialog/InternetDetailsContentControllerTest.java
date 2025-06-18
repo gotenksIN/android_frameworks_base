@@ -58,6 +58,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyDisplayInfo;
 import android.telephony.TelephonyManager;
+import android.telephony.satellite.SatelliteManager;
 import android.testing.TestableLooper;
 import android.testing.TestableResources;
 import android.text.TextUtils;
@@ -107,6 +108,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
@@ -127,6 +129,8 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
     private WifiManager mWifiManager;
     @Mock
     private ConnectivityManager mConnectivityManager;
+    @Mock
+    private Optional<SatelliteManager> mSatelliteManager;
     @Mock
     private Network mNetwork;
     @Mock
@@ -240,7 +244,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
         mInternetDetailsContentController = new InternetDetailsContentController(mContext,
                 mock(UiEventLogger.class), mock(ActivityStarter.class), mAccessPointController,
                 mSubscriptionManager, mTelephonyManager, mWifiManager,
-                mConnectivityManager, mHandler, mExecutor, mBroadcastDispatcher,
+                mConnectivityManager, mSatelliteManager, mHandler, mExecutor, mBroadcastDispatcher,
                 mock(KeyguardUpdateMonitor.class), mGlobalSettings, mKeyguardStateController,
                 mWindowManager, mToastFactory, mWorkerHandler, mCarrierConfigTracker,
                 mLocationController, mDialogTransitionAnimator, mWifiStateWorker, mFlags,

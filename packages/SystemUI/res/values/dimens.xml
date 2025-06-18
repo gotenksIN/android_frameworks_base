@@ -473,7 +473,8 @@
 
     <!-- Dimensions related to screenshots -->
 
-
+    <!-- Fade out the screenshot UI over this distance when dismissing -->
+    <dimen name="dismissal_max_distance_fadeout">250dp</dimen>
     <dimen name="screenshot_crop_handle_thickness">3dp</dimen>
     <dimen name="long_screenshot_action_bar_top_margin">4dp</dimen>
 
@@ -2008,9 +2009,7 @@
     <dimen name="dream_overlay_status_icon_margin">8dp</dimen>
     <dimen name="dream_overlay_status_bar_icon_size">
         @*android:dimen/status_bar_system_icon_size</dimen>
-    <dimen name="dream_overlay_camera_mic_off_indicator_size">8dp</dimen>
     <dimen name="dream_overlay_notification_indicator_size">6dp</dimen>
-    <dimen name="dream_overlay_grey_chip_width">56dp</dimen>
     <dimen name="dream_overlay_status_bar_extra_margin">8dp</dimen>
 
     <!-- Dream overlay complications related dimensions -->
@@ -2266,7 +2265,7 @@
     <!-- Spacing attributes to overwrite end -->
 
     <!-- Tile Details start-->
-    <dimen name="internet_details_toggle_row_height">48dp</dimen>
+    <dimen name="tile_details_toggle_row_height">48dp</dimen>
     <dimen name="bluetooth_details_toggle_row_margin_start">32dp</dimen>
     <dimen name="bluetooth_details_toggle_row_margin_end">26dp</dimen>
     <dimen name="tile_details_switch_container_width">52dp</dimen>
@@ -2277,6 +2276,7 @@
     <dimen name="tile_details_bottom_padding">14dp</dimen>
     <dimen name="tile_details_horizontal_padding">14dp</dimen>
     <dimen name="tile_details_vertical_padding">8dp</dimen>
+    <dimen name="tile_details_entry_start_margin">16dp</dimen>
     <!-- Tile Details end -->
 
 </resources>

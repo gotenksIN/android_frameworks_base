@@ -113,6 +113,7 @@ import com.android.systemui.scene.shared.model.SceneContainerConfig;
 import com.android.systemui.scene.shared.model.SceneDataSource;
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator;
 import com.android.systemui.scene.ui.view.WindowRootViewComponent;
+import com.android.systemui.screencapture.common.ScreenCaptureModule;
 import com.android.systemui.screenrecord.ScreenRecordModule;
 import com.android.systemui.screenshot.dagger.ScreenshotModule;
 import com.android.systemui.security.data.repository.SecurityRepositoryModule;
@@ -133,7 +134,7 @@ import com.android.systemui.statusbar.dagger.StatusBarModule;
 import com.android.systemui.statusbar.disableflags.dagger.DisableFlagsModule;
 import com.android.systemui.statusbar.events.StatusBarEventsModule;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
-import com.android.systemui.statusbar.featurepods.vc.AvControlsChipModule;
+import com.android.systemui.statusbar.featurepods.av.AvControlsChipModule;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.collection.inflation.NotificationRowBinder;
@@ -176,8 +177,6 @@ import com.android.systemui.util.reference.ReferenceModule;
 import com.android.systemui.util.sensors.SensorModule;
 import com.android.systemui.util.settings.SettingsProxy;
 import com.android.systemui.util.settings.SettingsUtilModule;
-import com.android.systemui.util.time.SystemClock;
-import com.android.systemui.util.time.SystemClockImpl;
 import com.android.systemui.wallet.dagger.WalletModule;
 import com.android.systemui.wmshell.BubblesManager;
 import com.android.wm.shell.bubbles.Bubbles;
@@ -273,6 +272,7 @@ import javax.inject.Named;
         ScreenshotModule.class,
         SensorModule.class,
         SecurityRepositoryModule.class,
+        ScreenCaptureModule.class,
         ScreenRecordModule.class,
         SettingsUtilModule.class,
         SmartRepliesInflationModule.class,
@@ -408,10 +408,6 @@ public abstract class SystemUIModule {
     @BoundsDeviceStateAutoRotateModule
     abstract Optional<DeviceStateRotationLockSettingController>
             optionalDeviceStateRotationLockSettingController();
-
-    @SysUISingleton
-    @Binds
-    abstract SystemClock bindSystemClock(SystemClockImpl systemClock);
 
     // TODO: This should provided by the WM component
 

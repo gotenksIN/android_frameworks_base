@@ -120,6 +120,7 @@ package android.content {
 package android.content.pm {
 
   public class ApplicationInfo extends android.content.pm.PackageItemInfo implements android.os.Parcelable {
+    method @FlaggedApi("android.security.conscrypt_network_security_config") @XmlRes public int getNetworkSecurityConfigResourceId();
     method @FlaggedApi("android.content.pm.sdk_lib_independence") @NonNull public java.util.List<android.content.pm.SharedLibraryInfo> getOptionalSharedLibraryInfos();
     method @NonNull public java.util.List<android.content.pm.SharedLibraryInfo> getSharedLibraryInfos();
     field public static final int HIDDEN_API_ENFORCEMENT_DEFAULT = -1; // 0xffffffff
@@ -220,6 +221,12 @@ package android.media {
 
   public static final class MediaServiceManager.ServiceRegisterer {
     method @Nullable public android.os.IBinder get();
+  }
+
+  @FlaggedApi("android.media.audio.ringtone_vibration_utils_api") public class Utils {
+    method @FlaggedApi("android.media.audio.ringtone_vibration_utils_api") public static boolean hasVibrationParameter(@Nullable android.net.Uri);
+    field @FlaggedApi("android.media.audio.ringtone_vibration_utils_api") public static final String SYNCHRONIZED_VIBRATION = "synchronized";
+    field @FlaggedApi("android.media.audio.ringtone_vibration_utils_api") public static final String VIBRATION_URI_PARAM = "vibration_uri";
   }
 
 }
@@ -423,6 +430,28 @@ package android.os {
     method public boolean shouldBypassCache(@NonNull Q);
   }
 
+  @FlaggedApi("android.location.flags.change_get_adas_allowlist_from_hidden_to_system") public final class PackageTagsMap implements android.os.Parcelable {
+    method public boolean contains(@NonNull String, @Nullable String);
+    method public boolean containsAll(@NonNull android.os.PackageTagsMap);
+    method public boolean containsPackage(@NonNull String);
+    method public boolean containsPackageWithAllTags(@NonNull String);
+    method public int describeContents();
+    method @NonNull public java.util.Set<java.lang.String> getPackages();
+    method public boolean isEmpty();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.os.PackageTagsMap> CREATOR;
+  }
+
+  public static final class PackageTagsMap.Builder {
+    ctor public PackageTagsMap.Builder();
+    ctor public PackageTagsMap.Builder(int);
+    method @NonNull public android.os.PackageTagsMap.Builder add(@NonNull String);
+    method @NonNull public android.os.PackageTagsMap.Builder add(@NonNull String, @Nullable String);
+    method @NonNull public android.os.PackageTagsMap.Builder addAll(@NonNull android.os.PackageTagsMap);
+    method @NonNull public android.os.PackageTagsMap.Builder addAll(@NonNull java.util.Map<java.lang.String,? extends java.util.Set<java.lang.String>>);
+    method @NonNull public android.os.PackageTagsMap build();
+  }
+
   public class Process {
     method public static final int toSdkSandboxUid(int);
     field public static final int NFC_UID = 1027; // 0x403
@@ -471,6 +500,15 @@ package android.os {
     method @NonNull public java.util.List<android.content.ComponentName> getEnabledComponentOverrides(@NonNull String);
     method @FlaggedApi("android.permission.flags.enhanced_confirmation_mode_apis_enabled") @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_ENHANCED_CONFIRMATION_STATES) public java.util.Set<android.content.pm.SignedPackage> getEnhancedConfirmationTrustedInstallers();
     method @FlaggedApi("android.permission.flags.enhanced_confirmation_mode_apis_enabled") @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_ENHANCED_CONFIRMATION_STATES) public java.util.Set<android.content.pm.SignedPackage> getEnhancedConfirmationTrustedPackages();
+  }
+
+  @FlaggedApi("com.android.internal.telephony.flags.enable_phone_number_parsing_api") public class TelephonyServiceManager {
+    method @NonNull public android.os.TelephonyServiceManager.ServiceRegisterer getPhoneNumberServiceRegisterer();
+  }
+
+  public static final class TelephonyServiceManager.ServiceRegisterer {
+    method @Nullable public android.os.IBinder get();
+    method public void publishBinderService(@NonNull android.os.IBinder);
   }
 
   public final class Trace {
@@ -618,6 +656,12 @@ package android.telephony {
   public class SubscriptionManager {
     method public void addSubscriptionInfoRecord(@NonNull String, @Nullable String, int, int);
     method public void removeSubscriptionInfoRecord(@NonNull String, int);
+  }
+
+  @FlaggedApi("com.android.internal.telephony.flags.enable_phone_number_parsing_api") public class TelephonyFrameworkInitializer {
+    method @Nullable public static android.os.TelephonyServiceManager getTelephonyServiceManager();
+    method public static void registerServiceWrappers();
+    method public static void setTelephonyServiceManager(@NonNull android.os.TelephonyServiceManager);
   }
 
   public class TelephonyManager {

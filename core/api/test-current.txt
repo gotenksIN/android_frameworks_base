@@ -769,6 +769,16 @@ package android.app.admin {
 
 }
 
+package android.app.appfunctions {
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public final class AppFunctionManager {
+    field public static final int ACCESS_FLAG_MASK_ALL = 31; // 0x1f
+    field public static final int ACCESS_FLAG_MASK_OTHER = 6; // 0x6
+    field public static final int ACCESS_FLAG_MASK_USER = 24; // 0x18
+  }
+
+}
+
 package android.app.assist {
 
   public final class ActivityId implements android.os.Parcelable {
@@ -1216,7 +1226,7 @@ package android.content.pm {
     method public boolean isRestricted();
     method @FlaggedApi("android.multiuser.allow_supervising_profile") public boolean isSupervisingProfile();
     method public boolean supportsSwitchTo();
-    method @Deprecated public boolean supportsSwitchToByUser();
+    method public boolean supportsSwitchToByUser();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.content.pm.UserInfo> CREATOR;
     field public static final int FLAG_ADMIN = 2; // 0x2
@@ -2164,10 +2174,9 @@ package android.media {
     method public android.media.PlaybackParams setAudioStretchMode(int);
   }
 
-  public class Utils {
-    ctor public Utils();
-    field public static final String SYNCHRONIZED_VIBRATION = "synchronized";
-    field public static final String VIBRATION_URI_PARAM = "vibration_uri";
+  @FlaggedApi("android.media.audio.ringtone_vibration_utils_api") public class Utils {
+    field @FlaggedApi("android.media.audio.ringtone_vibration_utils_api") public static final String SYNCHRONIZED_VIBRATION = "synchronized";
+    field @FlaggedApi("android.media.audio.ringtone_vibration_utils_api") public static final String VIBRATION_URI_PARAM = "vibration_uri";
   }
 
   public final class VolumePolicy implements android.os.Parcelable {
@@ -2538,6 +2547,28 @@ package android.os {
     method @NonNull public android.os.PackageTagsList.Builder add(@NonNull java.util.Map<java.lang.String,? extends java.util.Set<java.lang.String>>);
     method @NonNull public android.os.PackageTagsList build();
     method @NonNull public android.os.PackageTagsList.Builder clear();
+  }
+
+  @FlaggedApi("android.location.flags.change_get_adas_allowlist_from_hidden_to_system") public final class PackageTagsMap implements android.os.Parcelable {
+    method public boolean contains(@NonNull String, @Nullable String);
+    method public boolean containsAll(@NonNull android.os.PackageTagsMap);
+    method public boolean containsPackage(@NonNull String);
+    method public boolean containsPackageWithAllTags(@NonNull String);
+    method public int describeContents();
+    method @NonNull public java.util.Set<java.lang.String> getPackages();
+    method public boolean isEmpty();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.os.PackageTagsMap> CREATOR;
+  }
+
+  public static final class PackageTagsMap.Builder {
+    ctor public PackageTagsMap.Builder();
+    ctor public PackageTagsMap.Builder(int);
+    method @NonNull public android.os.PackageTagsMap.Builder add(@NonNull String);
+    method @NonNull public android.os.PackageTagsMap.Builder add(@NonNull String, @Nullable String);
+    method @NonNull public android.os.PackageTagsMap.Builder addAll(@NonNull android.os.PackageTagsMap);
+    method @NonNull public android.os.PackageTagsMap.Builder addAll(@NonNull java.util.Map<java.lang.String,? extends java.util.Set<java.lang.String>>);
+    method @NonNull public android.os.PackageTagsMap build();
   }
 
   public final class Parcel {
@@ -3070,6 +3101,8 @@ package android.provider {
     field public static final String ENABLED_VR_LISTENERS = "enabled_vr_listeners";
     field public static final String GLANCEABLE_HUB_ENABLED = "glanceable_hub_enabled";
     field public static final String IMMERSIVE_MODE_CONFIRMATIONS = "immersive_mode_confirmations";
+    field public static final String LONG_PRESS_TIMEOUT = "long_press_timeout";
+    field public static final String MULTI_PRESS_TIMEOUT = "multi_press_timeout";
     field public static final String NOTIFICATION_BADGING = "notification_badging";
     field public static final String NOTIFICATION_BUBBLES = "notification_bubbles";
     field public static final String POWER_MENU_LOCKED_SHOW_CONTENT = "power_menu_locked_show_content";
@@ -3091,6 +3124,13 @@ package android.provider {
 
   public static final class Telephony.Sms.Intents {
     field public static final String SMS_CARRIER_PROVISION_ACTION = "android.provider.Telephony.SMS_CARRIER_PROVISION";
+  }
+
+  public static interface Telephony.TextBasedSmsColumns {
+    field @FlaggedApi("com.android.internal.telephony.flags.redact_otp_sms_api") public static final String CONTAINS_OTP = "contains_otp";
+    field @FlaggedApi("com.android.internal.telephony.flags.redact_otp_sms_api") public static final int OTP_TYPE_CONTAINS_OTP = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.redact_otp_sms_api") public static final int OTP_TYPE_NONE = 0; // 0x0
+    field @FlaggedApi("com.android.internal.telephony.flags.redact_otp_sms_api") public static final int OTP_TYPE_PENDING = 2; // 0x2
   }
 
   public static final class VoicemailContract.Voicemails implements android.provider.BaseColumns android.provider.OpenableColumns {

@@ -138,6 +138,10 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Trenutno snemate celotni zaslon"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Trenutno snemate aplikacijo <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Ustavi snemanje"</string>
+    <!-- no translation found for screen_capture_toolbar_capture_button (8512731007891496030) -->
+    <skip />
+    <!-- no translation found for screen_capture_toolbar_record_button (7533814143351870339) -->
+    <skip />
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Deljenje zaslona"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Deljenje vsebine"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Želite ustaviti deljenje zaslona?"</string>
@@ -207,9 +211,29 @@
     <string name="biometric_dialog_fallback_button" msgid="7808939083554391449">"Preveri na drugačen način"</string>
     <string name="biometric_dialog_manage_identity_check" msgid="6283423571297422689">"Upravljanje preverjanja identitete"</string>
     <string name="biometric_dialog_identity_check_pin_footer" msgid="2943916725380489626">"Kode PIN ni mogoče uporabiti za preverjanje, ker je vklopljeno preverjanje identitete, ki zahteva biometrične podatke. Preberite več o preverjanju identitete."</string>
+    <!-- no translation found for biometric_dialog_identity_check_pattern_footer (8695014155334581855) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_identity_check_password_footer (6818380955155542018) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_identity_check_watch_ranging (4600194412220409723) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_unavailable (8242160331783709764) -->
+    <skip />
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"Uporabi kodo PIN"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"Uporabi vzorec"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"Uporabi geslo"</string>
+    <!-- no translation found for biometric_dialog_enter_pin (8625265944863623975) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_enter_password (200503318983048202) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_enter_pattern (3065746760277739487) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_recovery_pin (5798389437594195177) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_recovery_pattern (382786088892502550) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_recovery_password (8288127966207678230) -->
+    <skip />
     <string name="biometric_dialog_wrong_pin" msgid="1878539073972762803">"Napačna koda PIN"</string>
     <string name="biometric_dialog_wrong_pattern" msgid="8954812279840889029">"Napačen vzorec"</string>
     <string name="biometric_dialog_wrong_password" msgid="69477929306843790">"Napačno geslo"</string>
@@ -263,10 +287,8 @@
     <string name="accessibility_collapse_group" msgid="1842704016768329517">"Strnitev skupine."</string>
     <string name="accessibility_add_device_to_group" msgid="5446422960697860806">"Dodajte napravo v skupino."</string>
     <string name="accessibility_remove_device_from_group" msgid="3114694270949142228">"Odstranite napravo iz skupine."</string>
-    <!-- no translation found for accessibility_add_device_to_group_with_name (1042306202917036858) -->
-    <skip />
-    <!-- no translation found for accessibility_remove_device_from_group_with_name (5582015497111561027) -->
-    <skip />
+    <string name="accessibility_add_device_to_group_with_name" msgid="1042306202917036858">"Dodajanje naprave <xliff:g id="DEVICE_NAME">%s</xliff:g> v skupino."</string>
+    <string name="accessibility_remove_device_from_group_with_name" msgid="5582015497111561027">"Odstranitev naprave <xliff:g id="DEVICE_NAME">%s</xliff:g> iz skupine."</string>
     <string name="accessibility_open_application" msgid="1749126077501259712">"Odpiranje aplikacije."</string>
     <string name="accessibility_not_connected" msgid="4061305616351042142">"Ni povezan."</string>
     <string name="data_connection_roaming" msgid="375650836665414797">"Gostovanje"</string>
@@ -302,6 +324,9 @@
     <string name="accessibility_quick_settings_less_time" msgid="9110364286464977870">"Krajši čas."</string>
     <string name="accessibility_casting_turned_off" msgid="1387906158563374962">"Predvajanje zaslona je ustavljeno."</string>
     <string name="accessibility_brightness" msgid="5391187016177823721">"Svetlost zaslona"</string>
+    <string name="accessibility_camera_in_use" msgid="1090160655874262911">"Fotoaparat je v uporabi"</string>
+    <string name="accessibility_microphone_in_use" msgid="1921058214238108340">"Mikrofon je v uporabi"</string>
+    <string name="accessibility_camera_and_microphone_in_use" msgid="1250516397875447442">"Fotoaparat in mikrofon sta v uporabi"</string>
     <string name="data_usage_disabled_dialog_mobile_title" msgid="2286843518689837719">"Prenos podatkov v mobil. omrežju je zaustavljen"</string>
     <string name="data_usage_disabled_dialog_title" msgid="9131615296036724838">"Prenos podatkov je zaustavljen"</string>
     <string name="data_usage_disabled_dialog" msgid="7933201635215099780">"Dosegli ste nastavljeno omejitev porabe podatkov. Prenosa podatkov v mobilnem omrežju ne uporabljate več.\n\nČe nadaljujete, lahko nastanejo stroški prenosa podatkov."</string>
@@ -651,6 +676,8 @@
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"Izklopi"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"Odklenite za ogled starejših obvestil"</string>
     <string name="quick_settings_disclosure_parental_controls" msgid="2114102871438223600">"To napravo upravlja tvoj starš"</string>
+    <!-- no translation found for quick_settings_disclosure_pin_protection (9219481515114868267) -->
+    <skip />
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"Vaša organizacija je lastnica te naprave in lahko nadzira omrežni promet"</string>
     <string name="quick_settings_disclosure_named_management_monitoring" msgid="2831423806103479812">"Organizacija <xliff:g id="ORGANIZATION_NAME">%1$s</xliff:g> je lastnica te naprave in lahko nadzira omrežni promet"</string>
     <string name="quick_settings_financed_disclosure_named_management" msgid="2307703784594859524">"To napravo zagotavlja <xliff:g id="ORGANIZATION_NAME">%s</xliff:g>."</string>
@@ -691,6 +718,8 @@
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"Odpri nastavitve omrežja VPN"</string>
     <string name="monitoring_description_parental_controls" msgid="8184693528917051626">"To napravo upravlja tvoj starš. Lahko si ogleda in upravlja podatke, na primer katere aplikacije uporabljaš, tvojo lokacijo in koliko časa uporabljaš napravo."</string>
+    <!-- no translation found for monitoring_description_pin_protection (1983580207046670355) -->
+    <skip />
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"TrustAgent ohranja odklenjeno"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="2587481497846342760">"Naprava se je zaklenila, preveč poskusov preverjanja pristnosti"</string>
@@ -794,6 +823,8 @@
     <string name="status_bar_work" msgid="5238641949837091056">"Profil za Android Work"</string>
     <string name="status_bar_airplane" msgid="4848702508684541009">"Način za letalo"</string>
     <string name="status_bar_supervision" msgid="6735015942701134125">"Starševski nadzor"</string>
+    <!-- no translation found for status_bar_pin_supervision (4376576498566645782) -->
+    <skip />
     <string name="zen_alarm_warning" msgid="7844303238486849503">"Naslednjega alarma ob <xliff:g id="WHEN">%1$s</xliff:g> ne boste slišali"</string>
     <string name="alarm_template" msgid="2234991538018805736">"ob <xliff:g id="WHEN">%1$s</xliff:g>"</string>
     <string name="alarm_template_far" msgid="3561752195856839456">"ob tem času: <xliff:g id="WHEN">%1$s</xliff:g>"</string>
@@ -804,6 +835,8 @@
     <string name="accessibility_status_bar_satellite_available" msgid="6514855015496916829">"Satelit, povezava je na voljo"</string>
     <string name="satellite_connected_carrier_text" msgid="118524195198532589">"SOS prek satelita"</string>
     <string name="satellite_emergency_only_carrier_text" msgid="9103913890116841786">"Samo klici v sili ali SOS"</string>
+    <!-- no translation found for satellite_network_title_text (4825315858295910999) -->
+    <skip />
     <string name="accessibility_phone_string_format" msgid="7798841417881811812">"<xliff:g id="CARRIER_NAME">%1$s</xliff:g>, <xliff:g id="SIGNAL_STRENGTH_DESCRIPTION">%2$s</xliff:g>."</string>
     <string name="accessibility_no_signal" msgid="7052827511409250167">"ni signala"</string>
     <string name="accessibility_one_bar" msgid="5342012847647834506">"ena črtica"</string>
@@ -824,19 +857,15 @@
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"Vklop"</string>
     <string name="rotation_lock_camera_rotation_on" msgid="789434807790534274">"Vklopljeno – na podlagi obraza"</string>
     <string name="notification_guts_bundle_title" msgid="5252530007273079591">"Utišanje in združevanje"</string>
-    <!-- no translation found for notification_guts_single_bundle_notif_title (3186784466618443494) -->
-    <skip />
+    <string name="notification_guts_single_bundle_notif_title" msgid="3186784466618443494">"Uporaba organizatorja obvestil"</string>
     <string name="notification_guts_bundle_summary" msgid="3971530802237393600">"Za aplikacijo <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="notification_guts_promotions_summary" msgid="1565750619813325885">"Prodaja, nove funkcije in drugo"</string>
     <string name="notification_guts_news_summary" msgid="638697931043407835">"Najpomembnejše novice, uvodniki in drugo"</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"Všečki, objave in drugo"</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Glasila, priporočena predstavnost in drugo"</string>
-    <!-- no translation found for notification_onboarding_summaries_turn_on (5050003857531272655) -->
-    <skip />
-    <!-- no translation found for notification_onboarding_summaries_message (6061524903176459064) -->
-    <skip />
-    <!-- no translation found for notification_onboarding_bundles_message (9038023612294384832) -->
-    <skip />
+    <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Vklopi"</string>
+    <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Daljše pogovore lahko zdaj povzamete in si ogledate hitre povzetke"</string>
+    <string name="notification_onboarding_bundles_message" msgid="9038023612294384832">"Organizator obvestil združuje in utiša manj pomembna obvestila"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"Končano"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Uporabi"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Izklopi"</string>
@@ -989,6 +1018,8 @@
     <string name="battery" msgid="769686279459897127">"Baterija"</string>
     <string name="headset" msgid="4485892374984466437">"Slušalke z mikrofonom"</string>
     <string name="accessibility_long_click_tile" msgid="210472753156768705">"Odpri nastavitve"</string>
+    <!-- no translation found for accessibility_long_click_tile_details (3408103115710601894) -->
+    <skip />
     <string name="accessibility_status_bar_headphones" msgid="1304082414912647414">"Slušalke priključene"</string>
     <string name="accessibility_status_bar_headset" msgid="2699275863720926104">"Slušalke z mikrofonom priključene"</string>
     <string name="data_saver" msgid="3484013368530820763">"Varčevanje s podatki"</string>
@@ -1309,6 +1340,8 @@
     <string name="media_output_group_title" msgid="6789001895863332576">"Izhod"</string>
     <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"Ustavi deljeno sejo za premik predstavnosti v drugo napravo."</string>
     <string name="media_output_end_session_dialog_stop" msgid="208189434474624412">"Ustavi"</string>
+    <!-- no translation found for media_output_dialog_button_stop_sharing (5043482739689716185) -->
+    <skip />
     <string name="media_output_first_broadcast_title" msgid="6292237789860753022">"Kako deluje oddajanje"</string>
     <string name="media_output_broadcast" msgid="3555580945878071543">"Oddajanje"</string>
     <string name="media_output_first_notify_broadcast_message" msgid="6353857724136398494">"Osebe v bližini z združljivo napravo Bluetooth lahko poslušajo predstavnost, ki jo oddajate."</string>
@@ -1429,7 +1462,6 @@
     <string name="dream_overlay_status_bar_alarm_set" msgid="566707328356590886">"Alarm je nastavljen."</string>
     <string name="dream_overlay_status_bar_camera_off" msgid="5273073778969890823">"Fotoaparat je izklopljen"</string>
     <string name="dream_overlay_status_bar_mic_off" msgid="8366534415013819396">"Mikrofon je izklopljen"</string>
-    <string name="dream_overlay_status_bar_camera_mic_off" msgid="3199425257833773569">"Fotoaparat in mikrofon sta izklopljena."</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# obvestilo}one{# obvestilo}two{# obvestili}few{# obvestila}other{# obvestil}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
     <string name="note_task_button_label" msgid="230135078402003532">"Ustvarjanje zapiskov"</string>
@@ -1496,7 +1528,8 @@
     <string name="mirror_display" msgid="2515262008898122928">"Zrcali zaslon"</string>
     <string name="dismiss_dialog" msgid="2195508495854675882">"Opusti"</string>
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"Zaslon je povezan"</string>
-    <string name="privacy_dialog_title" msgid="7839968133469098311">"Mikrofon in fotoaparat"</string>
+    <!-- no translation found for privacy_dialog_title (5201413527644766025) -->
+    <skip />
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"Nedavna uporaba v aplikacijah"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"Ogled nedavnih dostopov"</string>
     <string name="privacy_dialog_done_button" msgid="4504330708531434263">"Končano"</string>

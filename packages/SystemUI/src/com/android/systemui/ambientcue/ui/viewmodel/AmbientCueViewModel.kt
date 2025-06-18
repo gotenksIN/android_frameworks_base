@@ -64,8 +64,15 @@ constructor(
             source = ambientCueInteractor.isImeVisible,
         )
 
+    private val isOccludedBySystemUi: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isOccludedBySystemUi",
+            initialValue = false,
+            source = ambientCueInteractor.isOccludedBySystemUi,
+        )
+
     val isVisible: Boolean
-        get() = isRootViewAttached && !isImeVisible
+        get() = isRootViewAttached && !isImeVisible && !isOccludedBySystemUi
 
     var isExpanded: Boolean by mutableStateOf(false)
         private set
@@ -102,7 +109,12 @@ constructor(
                 ambientCueInteractor.actions.map { actions ->
                     actions.map { action ->
                         ActionViewModel(
-                            icon = action.icon,
+                            icon =
+                                IconViewModel(
+                                    drawable = action.icon.drawable,
+                                    iconId = action.icon.iconId,
+                                    repeated = false,
+                                ),
                             label = action.label,
                             attribution = action.attribution,
                             onClick = {

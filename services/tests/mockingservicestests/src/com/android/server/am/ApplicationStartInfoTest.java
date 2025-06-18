@@ -114,13 +114,13 @@ public class ApplicationStartInfoTest {
         mHandler = new Handler(mHandlerThread.getLooper());
         mProcessList = spy(new ProcessList());
         mAppStartInfoTracker = spy(new AppStartInfoTracker());
-        mAppStartInfoTracker.mEnabled = true;
         setFieldValue(ProcessList.class, mProcessList, "mAppStartInfoTracker",
                 mAppStartInfoTracker);
         mInjector = new TestInjector(mContext);
         mAms = new ActivityManagerService(mInjector, mServiceThreadRule.getThread());
         mAms.mActivityTaskManager = new ActivityTaskManagerService(mContext);
-        mAms.mActivityTaskManager.initialize(null, null, mContext.getMainLooper());
+        mAms.mActivityTaskManager.initialize(null, null, mAms.mProcessStateController,
+                mContext.getMainLooper());
         mAms.mAtmInternal = spy(mAms.mActivityTaskManager.getAtmInternal());
         mAms.mPackageManagerInt = mPackageManagerInt;
         mAppStartInfoTracker.mService = mAms;

@@ -2011,9 +2011,6 @@ public class WindowManagerService extends IWindowManager.Stub
         winAnimator.mEnterAnimationPending = true;
         winAnimator.mEnteringAnimation = true;
 
-        if (displayPolicy.areSystemBarsForcedConsumedLw()) {
-            res |= WindowManagerGlobal.ADD_FLAG_ALWAYS_CONSUME_SYSTEM_BARS;
-        }
         if (displayContent.isInTouchMode()) {
             res |= WindowManagerGlobal.ADD_FLAG_IN_TOUCH_MODE;
         }
@@ -2183,10 +2180,6 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     private boolean shouldHideNonSystemOverlayWindow(WindowState win) {
-        if (!Flags.fixHideOverlayApi()) {
-            return !mHidingNonSystemOverlayWindows.isEmpty();
-        }
-
         if (mHidingNonSystemOverlayWindows.isEmpty()) {
             return false;
         }
@@ -2788,9 +2781,6 @@ public class WindowManagerService extends IWindowManager.Stub
             if (win.mActivityRecord != null) {
                 win.mActivityRecord.updateReportedVisibilityLocked();
             }
-            if (displayPolicy.areSystemBarsForcedConsumedLw()) {
-                result |= WindowManagerGlobal.RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS;
-            }
 
             if (outFrames != null && outMergedConfiguration != null) {
                 final boolean shouldReportActivityWindowInfo = outRelayoutResult != null
@@ -3111,13 +3101,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 // registration in DisplayContent#onParentChanged at DisplayContent initialization.
                 final DisplayContent dc = mRoot.getDisplayContent(displayId);
                 if (dc == null) {
-                    if (callingPid != MY_PID) {
-                        throw new IllegalArgumentException(
-                                "attachWindowContextToDisplayContent: trying to attach to a"
-                                        + " non-existing display:" + displayId);
-                    }
-                    // Early return if this method is invoked from system process.
-                    // See above comments for more detail.
+                    ProtoLog.w(WM_ERROR, "attachWindowContextToDisplayContent: trying"
+                            + " to attach to a non-existing display:" + displayId);
                     return null;
                 }
                 mWindowContextListenerController.registerWindowContainerListener(wpc, clientToken,
@@ -3967,6 +3952,10 @@ public class WindowManagerService extends IWindowManager.Stub
                     }
                 }
             }
+
+            // This call is crucial on user switch to ensure the Magnify IME state
+            // is correctly re-evaluated and applied for the new user.
+            mSettingsObserver.updateMagnifyIme();
             mAtmService.mChainTracker.end();
         }
     }
@@ -4414,16 +4403,29 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    private void requestAssistScreenshotInternal(final IAssistDataReceiver receiver,
+            int displayId) {
+        final ScreenshotHardwareBuffer shb = takeAssistScreenshot(/* predicate= */ null,
+                displayId);
+        final Bitmap bm = shb != null ? shb.asBitmap() : null;
+        FgThread.getHandler().post(() -> {
+            try {
+                receiver.onHandleAssistScreenshot(bm);
+            } catch (RemoteException e) {
+            }
+        });
+    }
+
     @Nullable
     private ScreenshotHardwareBuffer takeAssistScreenshot(
-            @Nullable ToBooleanFunction<WindowState> predicate) {
+            @Nullable ToBooleanFunction<WindowState> predicate, int displayId) {
         if (!checkCallingPermission(READ_FRAME_BUFFER, "requestAssistScreenshot()")) {
             throw new SecurityException("Requires READ_FRAME_BUFFER permission");
         }
 
         ScreenCapture.LayerCaptureArgs captureArgs;
         synchronized (mGlobalLock) {
-            final DisplayContent displayContent = mRoot.getDisplayContent(DEFAULT_DISPLAY);
+            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
             if (displayContent == null) {
                 if (DEBUG_SCREENSHOT) {
                     Slog.i(TAG_WM, "Screenshot returning null. No Display for displayId="
@@ -4466,14 +4468,7 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     @Override
     public void requestAssistScreenshot(final IAssistDataReceiver receiver) {
-        final ScreenshotHardwareBuffer shb = takeAssistScreenshot(/* predicate= */ null);
-        final Bitmap bm = shb != null ? shb.asBitmap() : null;
-        FgThread.getHandler().post(() -> {
-            try {
-                receiver.onHandleAssistScreenshot(bm);
-            } catch (RemoteException e) {
-            }
-        });
+        requestAssistScreenshotInternal(receiver, DEFAULT_DISPLAY);
     }
 
     /**
@@ -7995,6 +7990,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     && (demoteTopAppReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) == 0) {
                 mAtmService.mDemoteTopAppReasons =
                         demoteTopAppReasons | DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
+                mAtmService.mProcessStateController.setExpandedNotificationShadeAsync(true);
                 Trace.instant(TRACE_TAG_WINDOW_MANAGER, "demote-top-for-ns");
                 if (topApp != null) {
                     topApp.scheduleUpdateOomAdj();
@@ -8003,6 +7999,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     && (demoteTopAppReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) != 0) {
                 mAtmService.mDemoteTopAppReasons =
                         demoteTopAppReasons & ~DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
+                mAtmService.mProcessStateController.setExpandedNotificationShadeAsync(false);
                 Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancel-demote-top-for-ns");
                 if (topApp != null) {
                     topApp.scheduleUpdateOomAdj();
@@ -8965,7 +8962,8 @@ public class WindowManagerService extends IWindowManager.Stub
         @Override
         public ScreenshotHardwareBuffer takeAssistScreenshot() {
             // WMS.takeAssistScreenshot takes care of the locking.
-            return WindowManagerService.this.takeAssistScreenshot(/* predicate */ null);
+            return WindowManagerService.this.takeAssistScreenshot(/* predicate */ null,
+                    DEFAULT_DISPLAY);
         }
 
         @Override
@@ -8983,7 +8981,21 @@ public class WindowManagerService extends IWindowManager.Stub
                     default:
                         return true;
                 }
-            });
+            }, DEFAULT_DISPLAY);
+        }
+
+        @Override
+        public void requestAssistScreenshot(IAssistDataReceiver receiver, IBinder activityToken) {
+            int displayId = DEFAULT_DISPLAY;
+            synchronized (mGlobalLock) {
+                final ActivityRecord r = ActivityRecord.forTokenLocked(activityToken);
+                if (r != null && r.isAttached()) {
+                    displayId = r.getDisplayId();
+                } else {
+                    Slog.e(TAG, "Failed to get displayId for activityToken: " + activityToken);
+                }
+            }
+            WindowManagerService.this.requestAssistScreenshotInternal(receiver, displayId);
         }
     }
 
@@ -9060,27 +9072,20 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         final boolean changed;
-        if (Flags.fixHideOverlayApi()) {
-            final int uid = win.getOwningUid();
-            final int numUIDsPreUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
-            final int newCount = mHidingNonSystemOverlayWindowsCountPerUid.getOrDefault(uid, 0)
-                    + (effective ? +1 : -1);
-            if (newCount <= 0) {
-                mHidingNonSystemOverlayWindowsCountPerUid.remove(uid);
-            } else {
-                mHidingNonSystemOverlayWindowsCountPerUid.put(uid, newCount);
-            }
-            final int numUIDsPostUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
-            // The visibility of SAWs needs to be refreshed when the number of uids that
-            // request hiding SAWs changes between "0", "1", or "2+".
-            changed = (numUIDsPostUpdate != numUIDsPreUpdate)
-                    && (numUIDsPostUpdate <= 1 || numUIDsPreUpdate <= 1);
+        final int uid = win.getOwningUid();
+        final int numUIDsPreUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
+        final int newCount = mHidingNonSystemOverlayWindowsCountPerUid.getOrDefault(uid, 0)
+                + (effective ? +1 : -1);
+        if (newCount <= 0) {
+            mHidingNonSystemOverlayWindowsCountPerUid.remove(uid);
         } else {
-            // The visibility of SAWs needs to be refreshed when the number of windows that
-            // request hiding SAWs changes between "0" or "1+".
-            changed = (effective && mHidingNonSystemOverlayWindows.size() == 1)
-                    || (!effective && mHidingNonSystemOverlayWindows.isEmpty());
+            mHidingNonSystemOverlayWindowsCountPerUid.put(uid, newCount);
         }
+        final int numUIDsPostUpdate = mHidingNonSystemOverlayWindowsCountPerUid.size();
+        // The visibility of SAWs needs to be refreshed when the number of uids that
+        // request hiding SAWs changes between "0", "1", or "2+".
+        changed = (numUIDsPostUpdate != numUIDsPreUpdate)
+                && (numUIDsPostUpdate <= 1 || numUIDsPreUpdate <= 1);
 
         if (changed) {
             mRoot.forAllWindows((w) -> {
@@ -9921,7 +9926,7 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
-    public boolean getWindowInsets(int displayId, IBinder token, InsetsState outInsetsState) {
+    public void getWindowInsets(int displayId, IBinder token, InsetsState outInsetsState) {
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
@@ -9932,7 +9937,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 final WindowToken winToken = dc.getWindowToken(token);
                 dc.getInsetsPolicy().getInsetsForWindowMetrics(winToken, outInsetsState);
-                return dc.getDisplayPolicy().areSystemBarsForcedConsumedLw();
             }
         } finally {
             Binder.restoreCallingIdentity(origId);

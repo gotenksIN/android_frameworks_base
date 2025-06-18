@@ -93,6 +93,13 @@ flag {
 }
 
 flag {
+    name: "enable_braille_suw_immediate_connections"
+    namespace: "accessibility"
+    description: "Whether to allow Braille devices to connect automatically in the SUW."
+    bug: "400776305"
+}
+
+flag {
     name: "enable_hardware_shortcut_disables_warning"
     namespace: "accessibility"
     description: "When the user purposely enables the hardware shortcut, preemptively disables the first-time warning message."
@@ -221,16 +228,6 @@ flag {
     namespace: "accessibility"
     description: "Fix the ACTION_CANCEL logic used in MotionEventInjector to avoid InputDispatcher inconsistency"
     bug: "384451671"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "package_monitor_dedicated_thread"
-    namespace: "accessibility"
-    description: "Runs the A11yManagerService PackageMonitor on a dedicated thread"
-    bug: "348138695"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

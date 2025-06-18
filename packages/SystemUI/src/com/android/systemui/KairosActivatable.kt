@@ -18,8 +18,10 @@ package com.android.systemui
 
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.kairos.BuildScope
 import com.android.systemui.kairos.BuildSpec
+import com.android.systemui.kairos.CoalescingPolicy
 import com.android.systemui.kairos.Events
 import com.android.systemui.kairos.EventsLoop
 import com.android.systemui.kairos.ExperimentalKairosApi
@@ -40,7 +42,9 @@ import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
 import dagger.multibindings.Multibinds
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -181,22 +185,34 @@ private class KairosBuilderImpl @Inject constructor() : KairosBuilder {
 class KairosCoreStartable
 private constructor(
     private val appScope: CoroutineScope,
-    private val activatables: dagger.Lazy<Set<@JvmSuppressWildcards KairosActivatable>>,
+    private val activatables: Provider<Set<@JvmSuppressWildcards KairosActivatable>>,
     private val unwrappedNetwork: RootKairosNetwork,
 ) : CoreStartable, KairosNetwork by unwrappedNetwork {
 
     @Inject
     constructor(
         @Application appScope: CoroutineScope,
-        activatables: dagger.Lazy<Set<@JvmSuppressWildcards KairosActivatable>>,
-    ) : this(appScope, activatables, appScope.launchKairosNetwork())
+        activatables: Provider<Set<@JvmSuppressWildcards KairosActivatable>>,
+        @Background bgDispatcher: CoroutineDispatcher,
+    ) : this(
+        appScope = appScope,
+        activatables = activatables,
+        unwrappedNetwork =
+            appScope.launchKairosNetwork(
+                context = bgDispatcher,
+                coalescingPolicy = CoalescingPolicy.Eager,
+            ),
+    )
 
     private val started = CompletableDeferred<Unit>()
 
     override fun start() {
         appScope.launch {
+            // Many of our Dagger-provided classes are not safe to init off of the main thread, so
+            // query the [Provider] here outside of [activateSpec].
+            val activatableSet = activatables.get()
             unwrappedNetwork.activateSpec(nameTag("KairosCoreStartable")) {
-                for (activatable in activatables.get()) {
+                for (activatable in activatableSet) {
                     activatable.run { activate() }
                 }
                 effect(name = nameTag("KairosCoreStartable::notifyStarted")) {

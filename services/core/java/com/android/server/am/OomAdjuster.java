@@ -518,6 +518,30 @@ public abstract class OomAdjuster {
 
         /** Is memory level normal since last evaluation. */
         boolean isLastMemoryLevelNormal();
+
+        /** The ProcessState to assign to the Top process. */
+        @ActivityManager.ProcessState int getTopProcessState();
+
+        /** Keyguard is in the process of unlocking. */
+        boolean isUnlocking();
+
+        /** The notification shade is expanded. */
+        boolean hasExpandedNotificationShade();
+
+        /** The current Top process. */
+        @Nullable ProcessRecord getTopProcess();
+
+        /** The current Home process. */
+        @Nullable ProcessRecord getHomeProcess();
+
+        /** The current Heavy Weight process. */
+        @Nullable ProcessRecord getHeavyWeightProcess();
+
+        /** The current process showing UI if the device is in doze. */
+        @Nullable ProcessRecord getShowingUiWhileDozingProcess();
+
+        /** The previous process that showed an activity. */
+        @Nullable ProcessRecord getPreviousProcess();
     }
 
     boolean isChangeEnabled(@CachedCompatChangeId int cachedCompatChangeId,
@@ -725,9 +749,9 @@ public abstract class OomAdjuster {
 
     @GuardedBy({"mService", "mProcLock"})
     protected int enqueuePendingTopAppIfNecessaryLSP() {
-        final int prevTopProcessState = mService.mAtmInternal.getTopProcessState();
+        final int prevTopProcessState = getTopProcessState();
         mService.enqueuePendingTopAppIfNecessaryLocked();
-        final int topProcessState = mService.mAtmInternal.getTopProcessState();
+        final int topProcessState = getTopProcessState();
         if (prevTopProcessState != topProcessState) {
             // Unlikely but possible: WM just updated the top process state, it may have
             // enqueued the new top app to the pending top UID list. Enqueue that one here too.
@@ -1702,6 +1726,10 @@ public abstract class OomAdjuster {
                 // Currently the only case is from freeform apps which are not close to top.
                 schedGroup = SCHED_GROUP_FOREGROUND_WINDOW;
                 mAdjType = "vis-multi-window-activity";
+            } else if ((flags
+                    & WindowProcessController.ACTIVITY_STATE_FLAG_OCCLUDED_FREEFORM) != 0) {
+                schedGroup = SCHED_GROUP_BACKGROUND;
+                mAdjType = "occluded-freeform-activity";
             }
             foregroundActivities = true;
             mHasVisibleActivities = true;
@@ -1835,6 +1863,70 @@ public abstract class OomAdjuster {
         }
     }
 
+    protected int getTopProcessState() {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mGlobalState.getTopProcessState();
+        } else {
+            return mService.mAtmInternal.getTopProcessState();
+        }
+    }
+
+    protected boolean useTopSchedGroupForTopProcess() {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            if (mGlobalState.isUnlocking()) {
+                // Keyguard is unlocking, suppress the top process priority for now.
+                return false;
+            }
+            if (mGlobalState.hasExpandedNotificationShade()) {
+                // The notification shade is occluding the top process, suppress top.
+                return false;
+            }
+            return true;
+        } else {
+            return mService.mAtmInternal.useTopSchedGroupForTopProcess();
+        }
+    }
+
+    protected ProcessRecord getTopProcess() {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mGlobalState.getTopProcess();
+        } else {
+            return mService.getTopApp();
+        }
+    }
+
+    protected boolean isHomeProcess(ProcessRecord proc) {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mGlobalState.getHomeProcess() == proc;
+        } else {
+            return proc.mState.getCachedIsHomeProcess();
+        }
+    }
+
+    protected boolean isHeavyWeightProcess(ProcessRecord proc) {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mGlobalState.getHeavyWeightProcess() == proc;
+        } else {
+            return proc.mState.getCachedIsHeavyWeight();
+        }
+    }
+
+    protected boolean isVisibleDozeUiProcess(ProcessRecord proc) {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mGlobalState.getShowingUiWhileDozingProcess() == proc;
+        } else {
+            return proc.getWindowProcessController().isShowingUiWhileDozing();
+        }
+    }
+
+    protected boolean isPreviousProcess(ProcessRecord proc) {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mGlobalState.getPreviousProcess() == proc;
+        } else {
+            return proc.mState.getCachedIsPreviousProcess();
+        }
+    }
+
     /**
      * @return The proposed change to the schedGroup.
      */
@@ -1941,12 +2033,7 @@ public abstract class OomAdjuster {
             // Process has user perceptible activities.
             return PROCESS_CAPABILITY_CPU_TIME;
         }
-        if (Flags.prototypeAggressiveFreezing()) {
-            if (app.mServices.hasUndemotedShortForegroundService(nowUptime)) {
-                // Grant cpu time for short FGS even when aggressively freezing.
-                return PROCESS_CAPABILITY_CPU_TIME;
-            }
-        } else if (app.mServices.hasForegroundServices()) {
+        if (app.mServices.hasForegroundServices()) {
             return PROCESS_CAPABILITY_CPU_TIME;
         }
         if (app.mReceivers.isReceivingBroadcast()) {
@@ -2377,28 +2464,24 @@ public abstract class OomAdjuster {
                             + " target=" + state.getAdjTarget());
         }
 
-        if (state.isCached() && !state.shouldNotKillOnBgRestrictedAndIdle()) {
-            // It's eligible to get killed when in UID idle and bg restricted mode,
-            // check if these states are just flipped.
-            if (!state.isSetCached() || state.isSetNoKillOnBgRestrictedAndIdle()) {
-                // Take the timestamp, we'd hold the killing for the background settle time
-                // (for states debouncing to avoid from thrashing).
-                state.setLastCanKillOnBgRestrictedAndIdleTime(nowElapsed);
-                // Kick off the delayed checkup message if needed.
-                if (mService.mDeterministicUidIdle
-                        || !mService.mHandler.hasMessages(IDLE_UIDS_MSG)) {
-                    if (mLogger.shouldLog(app.uid)) {
-                        mLogger.logScheduleUidIdle2(
-                                uidRec.getUid(), app.getPid(),
-                                mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs);
-                    }
-                    mService.mHandler.sendEmptyMessageDelayed(IDLE_UIDS_MSG,
+        if (state.isCached() && !state.isSetCached()) {
+            // Cached procs are eligible to get killed when in an UID idle and bg restricted.
+            // However, we want to debounce state changes to avoid thrashing. Mark down when this
+            // process became eligible and then schedule a check for eligible processes after
+            // a background settling time, if needed.
+            state.setLastCachedTime(nowElapsed);
+            if (mService.mDeterministicUidIdle
+                    || !mService.mHandler.hasMessages(IDLE_UIDS_MSG)) {
+                if (mLogger.shouldLog(app.uid)) {
+                    mLogger.logScheduleUidIdle2(
+                            uidRec.getUid(), app.getPid(),
                             mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs);
                 }
+                mService.mHandler.sendEmptyMessageDelayed(IDLE_UIDS_MSG,
+                        mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs);
             }
         }
         state.setSetCached(state.isCached());
-        state.setSetNoKillOnBgRestrictedAndIdle(state.shouldNotKillOnBgRestrictedAndIdle());
         if (((oldProcState != state.getSetProcState()) || (oldOomAdj != state.getSetAdj()))
                 && mLogger.shouldLog(app.uid)) {
             mLogger.logProcStateChanged(app.uid, app.getPid(),

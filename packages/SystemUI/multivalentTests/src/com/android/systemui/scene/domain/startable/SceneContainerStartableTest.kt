@@ -2198,6 +2198,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             prepareState()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
             underTest.start()
+            runCurrent()
 
             fakeBiometricSettingsRepository.setIsFaceAuthEnrolledAndEnabled(true)
             fakeBiometricSettingsRepository.setIsUserInLockdown(true)
@@ -2261,35 +2262,6 @@ class SceneContainerStartableTest : SysuiTestCase() {
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Gone)
-        }
-
-    @Test
-    fun notifyKeyguardDismissCallbacks_whenUnlockingFromBouncer_onDismissSucceeded() =
-        kosmos.runTest {
-            val currentSceneKey by collectLastValue(sceneInteractor.currentScene)
-            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
-            prepareState(
-                authenticationMethod = AuthenticationMethodModel.Pin,
-                isDeviceUnlocked = false,
-                initialSceneKey = Scenes.Lockscreen,
-                initialOverlays = setOf(Overlays.Bouncer),
-            )
-            assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
-            assertThat(currentOverlays).contains(Overlays.Bouncer)
-            underTest.start()
-
-            // run all pending dismiss succeeded/cancelled calls from setup:
-            runCurrent()
-            fakeExecutor.runAllReady()
-
-            val dismissCallback: IKeyguardDismissCallback = mock()
-            dismissCallbackRegistry.addCallback(dismissCallback)
-
-            updateFingerprintAuthStatus(isSuccess = true)
-            runCurrent()
-            fakeExecutor.runAllReady()
-
-            verify(dismissCallback).onDismissSucceeded()
         }
 
     @Test

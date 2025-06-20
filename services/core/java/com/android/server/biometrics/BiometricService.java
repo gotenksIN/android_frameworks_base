@@ -28,6 +28,7 @@ import static com.android.server.biometrics.BiometricServiceStateProto.STATE_AUT
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.IActivityManager;
@@ -51,6 +52,7 @@ import android.hardware.biometrics.IBiometricSensorReceiver;
 import android.hardware.biometrics.IBiometricService;
 import android.hardware.biometrics.IBiometricServiceReceiver;
 import android.hardware.biometrics.IBiometricSysuiReceiver;
+import android.hardware.biometrics.IIdentityCheckStateListener;
 import android.hardware.biometrics.IInvalidationCallback;
 import android.hardware.biometrics.ITestSession;
 import android.hardware.biometrics.ITestSessionCallback;
@@ -76,7 +78,6 @@ import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
-import android.proximity.IProximityResultCallback;
 import android.security.GateKeeper;
 import android.security.KeyStoreAuthorization;
 import android.security.authenticationpolicy.AuthenticationPolicyManager;
@@ -123,11 +124,11 @@ public class BiometricService extends SystemService {
     @VisibleForTesting
     final SettingObserver mSettingObserver;
     private final List<EnabledOnKeyguardCallback> mEnabledOnKeyguardCallbacks;
+    private final List<IIdentityCheckStateListener> mIdentityCheckStateListeners;
     private final Random mRandom = new Random();
     @NonNull private final Supplier<Long> mRequestCounter;
     @NonNull private final BiometricContext mBiometricContext;
     private final UserManager mUserManager;
-    private final AuthenticationPolicyManager mAuthenticationPolicyManager;
 
     @VisibleForTesting
     IStatusBarService mStatusBarService;
@@ -838,6 +839,16 @@ public class BiometricService extends SystemService {
             public void onStartFingerprintNow() {
                 mHandler.post(() -> handleOnStartFingerprintNow(requestId));
             }
+
+            @Override
+            public void onPauseAuthentication() {
+                mHandler.post(() -> handleOnPauseAuthentication(requestId));
+            }
+
+            @Override
+            public void onResumeAuthentication() {
+                mHandler.post(() -> handleOnResumeAuthentication(requestId));
+            }
         };
     }
 
@@ -1106,6 +1117,20 @@ public class BiometricService extends SystemService {
             } catch (RemoteException e) {
                 Slog.w(TAG, "Remote exception", e);
             }
+        }
+
+        @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
+        @Override
+        public void registerIdentityCheckStateListener(IIdentityCheckStateListener listener) {
+            super.registerIdentityCheckStateListener_enforcePermission();
+            mIdentityCheckStateListeners.add(listener);
+        }
+
+        @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
+        @Override
+        public void unregisterIdentityCheckStateListener(IIdentityCheckStateListener listener) {
+            super.unregisterIdentityCheckStateListener_enforcePermission();
+            mIdentityCheckStateListeners.remove(listener);
         }
 
         @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
@@ -1440,8 +1465,7 @@ public class BiometricService extends SystemService {
         }
 
         public AuthenticationPolicyManager getAuthenticationPolicyManager(Context context) {
-            return (AuthenticationPolicyManager)
-                    context.getSystemService(Context.AUTHENTICATION_POLICY_SERVICE);
+            return context.getSystemService(AuthenticationPolicyManager.class);
         }
     }
 
@@ -1468,6 +1492,7 @@ public class BiometricService extends SystemService {
         mDevicePolicyManager = mInjector.getDevicePolicyManager(context);
         mImpl = new BiometricServiceWrapper();
         mEnabledOnKeyguardCallbacks = new ArrayList<>();
+        mIdentityCheckStateListeners = new ArrayList<>();
         mSettingObserver = mInjector.getSettingObserver(context, mHandler,
                 mEnabledOnKeyguardCallbacks);
         mRequestCounter = mInjector.getRequestGenerator();
@@ -1477,7 +1502,6 @@ public class BiometricService extends SystemService {
         mKeyStoreAuthorization = injector.getKeyStoreAuthorization();
         mGateKeeper = injector.getGateKeeperService();
         mBiometricNotificationLogger = injector.getNotificationLogger();
-        mAuthenticationPolicyManager = mInjector.getAuthenticationPolicyManager(context);
 
         try {
             injector.getActivityManagerService().registerUserSwitchObserver(
@@ -1625,6 +1649,7 @@ public class BiometricService extends SystemService {
         session.onAcquired(sensorId, acquiredInfo, vendorCode);
     }
 
+    @RequiresPermission(USE_BIOMETRIC_INTERNAL)
     private void handleOnDismissed(long requestId, @BiometricPrompt.DismissedReason int reason,
             @Nullable byte[] credentialAttestation) {
         final AuthSession session = getAuthSessionIfCurrent(requestId);
@@ -1711,6 +1736,30 @@ public class BiometricService extends SystemService {
         session.onStartFingerprint();
     }
 
+    private void handleOnPauseAuthentication(long requestId) {
+        Slog.d(TAG, "handleOnPauseAuthentication");
+
+        final AuthSession session = getAuthSessionIfCurrent(requestId);
+        if (session == null) {
+            Slog.w(TAG, "handleOnPauseAuthentication: AuthSession is not current");
+            return;
+        }
+
+        session.onPauseAuthentication();
+    }
+
+    private void handleOnResumeAuthentication(long requestId) {
+        Slog.d(TAG, "handleOnResumeAuthentication");
+
+        final AuthSession session = getAuthSessionIfCurrent(requestId);
+        if (session == null) {
+            Slog.w(TAG, "handleOnResumeAuthentication: AuthSession is not current");
+            return;
+        }
+
+        session.onResumeAuthentication();
+    }
+
     /**
      * Invoked when each service has notified that its client is ready to be started. When
      * all biometrics are ready, this invokes the SystemUI dialog through StatusBar.
@@ -1728,6 +1777,7 @@ public class BiometricService extends SystemService {
         session.onCookieReceived(cookie);
     }
 
+    @RequiresPermission(USE_BIOMETRIC_INTERNAL)
     private void handleAuthenticate(IBinder token, long requestId, long operationId, int userId,
             IBiometricServiceReceiver receiver, String opPackageName, PromptInfo promptInfo) {
         mHandler.post(() -> {
@@ -1807,6 +1857,7 @@ public class BiometricService extends SystemService {
      * Note that this path is NOT invoked when the BiometricPrompt "Try again" button is pressed.
      * In that case, see {@link #handleOnTryAgainPressed()}.
      */
+    @RequiresPermission(USE_BIOMETRIC_INTERNAL)
     private void authenticateInternal(IBinder token, long requestId, long operationId, int userId,
             IBiometricServiceReceiver receiver, String opPackageName, PromptInfo promptInfo,
             PreAuthInfo preAuthInfo) {
@@ -1829,8 +1880,10 @@ public class BiometricService extends SystemService {
                 createClientDeathReceiver(requestId), preAuthInfo, token, requestId,
                 operationId, userId, createBiometricSensorReceiver(requestId), receiver,
                 opPackageName, promptInfo, debugEnabled,
-                mInjector.getFingerprintSensorProperties(getContext()));
-        startWatchRangingIfIdentityCheckActive(promptInfo);
+                mInjector.getFingerprintSensorProperties(getContext()), new WatchRangingHelper(
+                requestId,
+                mInjector.getAuthenticationPolicyManager(getContext()), mHandler,
+                this::onWatchRangingStateChange));
 
         try {
             mAuthSession.goToInitialState();
@@ -1839,42 +1892,7 @@ public class BiometricService extends SystemService {
         }
     }
 
-    /**
-     * This is invoked only if Identity Check is active and the device is considered at risk. If the
-     * watch is in range, it will re-enable device credential if it was originally requested.
-     *
-     * @param promptInfo biometric prompt info
-     */
     @SuppressLint("MissingPermission")
-    private void startWatchRangingIfIdentityCheckActive(PromptInfo promptInfo) {
-        if (android.hardware.biometrics.Flags.identityCheckWatch()
-                && promptInfo.isIdentityCheckActive() && promptInfo.isDeviceCredentialAllowed()) {
-            if (mAuthenticationPolicyManager == null) {
-                Slog.e(TAG, "Authentication policy manager is null. Skipping watch ranging");
-                return;
-            }
-
-            //TODO (b/397954948) : Update callback results to handle System UI changes
-            mAuthenticationPolicyManager.startWatchRangingForIdentityCheck(
-                    new IProximityResultCallback() {
-                        @Override
-                        public void onError(int error) throws RemoteException {
-
-                        }
-
-                        @Override
-                        public void onSuccess(int result) throws RemoteException {
-
-                        }
-
-                        @Override
-                        public IBinder asBinder() {
-                            return null;
-                        }
-                    }, mHandler);
-        }
-    }
-
     private void handleCancelAuthentication(long requestId) {
         final AuthSession session = getAuthSessionIfCurrent(requestId);
         if (session == null) {
@@ -1898,6 +1916,16 @@ public class BiometricService extends SystemService {
             }
         }
         return null;
+    }
+
+    private void onWatchRangingStateChange(int state) {
+        for (int i = 0; i < mIdentityCheckStateListeners.size(); i++) {
+            try {
+                mIdentityCheckStateListeners.get(i).onWatchRangingStateChanged(state);
+            } catch (RemoteException e) {
+                Slog.e(TAG, "RemoteException", e);
+            }
+        }
     }
 
     private void dumpInternal(PrintWriter pw) {

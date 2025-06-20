@@ -279,6 +279,7 @@ import com.android.server.am.AssistDataRequester;
 import com.android.server.am.BaseErrorDialog;
 import com.android.server.am.PendingIntentController;
 import com.android.server.am.PendingIntentRecord;
+import com.android.server.am.ProcessStateController;
 import com.android.server.am.UserState;
 import com.android.server.firewall.IntentFirewall;
 import com.android.server.grammaticalinflection.GrammaticalInflectionManagerInternal;
@@ -387,6 +388,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     GrammaticalInflectionManagerInternal mGrammaticalManagerInternal;
     PendingIntentController mPendingIntentController;
     IntentFirewall mIntentFirewall;
+
+    ProcessStateController mProcessStateController;
 
     final VisibleActivityProcessTracker mVisibleActivityProcessTracker;
 
@@ -1009,7 +1012,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     public void initialize(IntentFirewall intentFirewall, PendingIntentController intentController,
-            Looper looper) {
+            ProcessStateController processStateController, Looper looper) {
         mH = new H(looper);
         mUiHandler = new UiHandler();
         mIntentFirewall = intentFirewall;
@@ -1017,6 +1020,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mAppWarnings = createAppWarnings(mUiContext, mH, mUiHandler, systemDir);
         mCompatModePackages = new CompatModePackages(this, systemDir, mH);
         mPendingIntentController = intentController;
+        mProcessStateController = processStateController;
         mTaskSupervisor = createTaskSupervisor();
         mActivityClientController = new ActivityClientController(this);
 
@@ -3067,6 +3071,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         // unlock is either completed or canceled.
         if ((mDemoteTopAppReasons & DEMOTE_TOP_REASON_DURING_UNLOCKING) != 0) {
             mDemoteTopAppReasons &= ~DEMOTE_TOP_REASON_DURING_UNLOCKING;
+            mProcessStateController.setDeviceUnlocking(false);
             // The scheduling group of top process was demoted by unlocking, so recompute
             // to restore its real top priority if possible.
             if (mTopApp != null) {
@@ -3127,6 +3132,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         final WindowProcessController proc;
         synchronized (mGlobalLockWithoutBoost) {
             mDemoteTopAppReasons &= ~DEMOTE_TOP_REASON_DURING_UNLOCKING;
+            mProcessStateController.setDeviceUnlocking(false);
             final WindowState notificationShade = mRootWindowContainer.getDefaultDisplay()
                     .getDisplayPolicy().getNotificationShade();
             proc = notificationShade != null ? notificationShade.getProcess() : null;
@@ -3521,28 +3527,28 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 "enqueueAssistContext()");
 
         synchronized (mGlobalLock) {
-            final Task rootTask = getTopDisplayFocusedRootTask();
-            ActivityRecord activity =
+            final ActivityRecord activity = ActivityRecord.forTokenLocked(activityToken);
+            final DisplayContent dc =
+                    activity != null && activity.isAttached() ? activity.getDisplayContent()
+                            : mRootWindowContainer.getTopFocusedDisplayContent();
+            final Task rootTask = dc.getFocusedRootTask();
+            final ActivityRecord topActivity =
                     rootTask != null ? rootTask.getTopNonFinishingActivity() : null;
-            if (activity == null) {
+            if (topActivity == null) {
                 Slog.w(TAG, "getAssistContextExtras failed: no top activity");
                 return null;
             }
-            if (!activity.attachedToProcess()) {
-                Slog.w(TAG, "getAssistContextExtras failed: no process for " + activity);
+            if (!topActivity.attachedToProcess()) {
+                Slog.w(TAG, "getAssistContextExtras failed: no process for " + topActivity);
                 return null;
             }
             if (checkActivityIsTop) {
-                if (activityToken != null) {
-                    ActivityRecord caller = ActivityRecord.forTokenLocked(activityToken);
-                    if (activity != caller) {
-                        Slog.w(TAG, "enqueueAssistContext failed: caller " + caller
-                                + " is not current top " + activity);
-                        return null;
-                    }
+                if (topActivity != activity) {
+                    Slog.w(TAG, "enqueueAssistContext failed: caller " + activity
+                            + " is not current top " + topActivity);
+                    return null;
                 }
             } else {
-                activity = ActivityRecord.forTokenLocked(activityToken);
                 if (activity == null) {
                     Slog.w(TAG, "enqueueAssistContext failed: activity for token=" + activityToken
                             + " couldn't be found");
@@ -3658,29 +3664,60 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             }
 
             final ActivityRecord activity = focusedRootTask.getTopNonFinishingActivity();
-            if (activity == null) {
+            if (!isAssistDataForActivityAllowed(activity)) {
                 return false;
             }
             userId = activity.mUserId;
-            DisplayContent displayContent = activity.getDisplayContent();
-            if (displayContent == null) {
-                return false;
-            }
-            final long callingIdentity = Binder.clearCallingIdentity();
-            try {
-                hasRestrictedWindow = displayContent.forAllWindows(
-                        windowState -> windowState.isOnScreen() && (
-                                UserManager.isUserTypePrivateProfile(
-                                        getUserManager().getProfileType(windowState.mShowUserId))
-                                        || hasUserRestriction(
-                                        UserManager.DISALLOW_ASSIST_CONTENT,
-                                        windowState.mShowUserId)), true /* traverseTopToBottom */);
-            } finally {
-                Binder.restoreCallingIdentity(callingIdentity);
+        }
+        return DevicePolicyCache.getInstance().isScreenCaptureAllowed(userId);
+    }
+
+    private boolean isAssistDataForActivityAllowed(ActivityRecord activity) {
+        if (activity == null) {
+            return false;
+        }
+
+        boolean hasRestrictedWindow;
+        DisplayContent displayContent = activity.getDisplayContent();
+        if (displayContent == null) {
+            return false;
+        }
+        final long callingIdentity = Binder.clearCallingIdentity();
+        try {
+            hasRestrictedWindow = displayContent.forAllWindows(
+                    windowState -> windowState.isOnScreen() && (
+                            UserManager.isUserTypePrivateProfile(
+                                    getUserManager().getProfileType(windowState.mShowUserId))
+                                    || hasUserRestriction(
+                                    UserManager.DISALLOW_ASSIST_CONTENT,
+                                    windowState.mShowUserId)), true /* traverseTopToBottom */);
+        } finally {
+            Binder.restoreCallingIdentity(callingIdentity);
+        }
+        return !hasRestrictedWindow;
+    }
+
+    boolean isAssistDataForActivitiesAllowed(List<IBinder> activityTokens) {
+        final ArraySet<Integer> userIds = new ArraySet<>();
+        synchronized (mGlobalLock) {
+            for (int i = activityTokens.size() - 1; i >= 0; i--) {
+                final ActivityRecord r = ActivityRecord.isInRootTaskLocked(activityTokens.get(i));
+                if (!isAssistDataForActivityAllowed(r)) {
+                    Slog.w(TAG, "Assist Data not allowed for " + r);
+                    return false;
+                }
+                userIds.add(r.mUserId);
             }
         }
-        return DevicePolicyCache.getInstance().isScreenCaptureAllowed(userId)
-                && !hasRestrictedWindow;
+
+        for (int i = userIds.size() - 1; i >= 0; i--) {
+            int userId = userIds.valueAt(i);
+            if (!DevicePolicyCache.getInstance().isScreenCaptureAllowed(userId)) {
+                Slog.w(TAG, "Screen capture not allowed for user " + userId);
+                return false;
+            }
+        }
+        return true;
     }
 
     private void onLocalVoiceInteractionStartedLocked(IBinder activity,
@@ -3759,18 +3796,15 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 } else if (mKeyguardShown) {
                     // Only set if it is not unlocking to launcher which may also animate.
                     mDemoteTopAppReasons |= DEMOTE_TOP_REASON_DURING_UNLOCKING;
+                    mProcessStateController.setDeviceUnlocking(true);
                 }
 
-                boolean foundResumed = false;
-                for (int i = mRootWindowContainer.getChildCount() - 1; i >= 0; i--) {
-                    final DisplayContent dc = mRootWindowContainer.getChildAt(i);
-                    final boolean wasNoResumed = dc.mFocusedApp == null
-                            || !dc.mFocusedApp.isState(RESUMED);
-                    mKeyguardController.keyguardGoingAway(dc.mDisplayId, flags);
-                    if (wasNoResumed && dc.mFocusedApp != null && dc.mFocusedApp.isState(RESUMED)) {
-                        foundResumed = true;
-                    }
-                }
+                final boolean wasNoResumed = mTopApp == null || !mTopApp.hasResumedActivity();
+
+                mKeyguardController.keyguardGoingAway(flags);
+
+                final boolean foundResumed = wasNoResumed
+                        && mTopApp != null && mTopApp.hasResumedActivity();
                 if (isPowerModePreApplied && !foundResumed) {
                     endPowerMode(POWER_MODE_REASON_START_ACTIVITY);
                 }
@@ -4999,6 +5033,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 mH.removeMessages(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG);
             }
             mRetainPowerModeAndTopProcessState = true;
+            mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
             mH.sendEmptyMessageDelayed(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG,
                     POWER_MODE_UNKNOWN_VISIBILITY_TIMEOUT_MS);
             Slog.d(TAG, "Temporarily retain top process state for launching app");
@@ -5033,6 +5068,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             if (allResolved) {
                 mPowerModeReasons &= ~POWER_MODE_REASON_UNKNOWN_VISIBILITY;
                 mRetainPowerModeAndTopProcessState = false;
+                mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
                 mH.removeMessages(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG);
             }
         }
@@ -5329,6 +5365,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     mTopApp.addToPendingTop();
                 }
                 mTopProcessState = ActivityManager.PROCESS_STATE_TOP;
+                mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
                 Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP");
                 mTaskSupervisor.comeOutOfSleepIfNeededLocked();
                 updateOomAdj = true;
@@ -5342,6 +5379,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 mCurAppTimeTracker.stop();
             }
             mTopProcessState = ActivityManager.PROCESS_STATE_TOP_SLEEPING;
+            mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
             Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP_SLEEPING");
             mTaskSupervisor.goingToSleepLocked();
             updateResumedAppTrace(null /* resumed */);
@@ -5372,14 +5410,22 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         final ActivityRecord top = topResumedActivity != null ? topResumedActivity
                 // If there is no resumed activity, it will choose the pausing or focused activity.
                 : mRootWindowContainer.getTopResumedActivity();
-        mTopApp = top != null ? top.app : null;
-        if (mTopApp == mPreviousProcess) mPreviousProcess = null;
+        final WindowProcessController topApp = top != null ? top.app : null;
+        mTopApp = topApp;
+
+        final boolean clearPrevious = mTopApp == mPreviousProcess;
+        if (clearPrevious) mPreviousProcess = null;
 
         final int demoteReasons = mDemoteTopAppReasons;
+        final boolean cancelExpandedShade;
         if ((demoteReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) != 0) {
             Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancel-demote-top-for-ns-switch");
             mDemoteTopAppReasons = demoteReasons & ~DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
+            cancelExpandedShade = mDemoteTopAppReasons == 0;
+        } else {
+            cancelExpandedShade = false;
         }
+        mProcessStateController.setTopProcessAsync(topApp, clearPrevious, cancelExpandedShade);
     }
 
     /**
@@ -5398,8 +5444,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 && !mRecentTasks.isRecentsComponent(
                         stoppedActivity.mActivityComponent,
                         stoppedActivity.info.applicationInfo.uid)) {
-            mPreviousProcess = stoppedActivity.app;
+            final WindowProcessController previousProcess = stoppedActivity.app;
+            mPreviousProcess = previousProcess;
             mPreviousProcessVisibleTime = stoppedActivity.lastVisibleTime;
+            mProcessStateController.setPreviousProcessAsync(previousProcess);
         }
     }
 
@@ -5478,11 +5526,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     void setHeavyWeightProcess(ActivityRecord root) {
-        mHeavyWeightProcess = root.app;
+        final WindowProcessController wpc = root.app;
+        mHeavyWeightProcess = wpc;
         final Message m = PooledLambda.obtainMessage(
                 ActivityTaskManagerService::postHeavyWeightProcessNotification, this,
-                root.app, root.intent, root.mUserId);
+                wpc, root.intent, root.mUserId);
         mH.sendMessage(m);
+        mProcessStateController.setHeavyWeightProcessAsync(wpc);
     }
 
     void clearHeavyWeightProcessIfEquals(WindowProcessController proc) {
@@ -5495,6 +5545,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 ActivityTaskManagerService::cancelHeavyWeightProcessNotification, this,
                 proc.mUserId);
         mH.sendMessage(m);
+        mProcessStateController.setHeavyWeightProcessAsync(null);
     }
 
     private void cancelHeavyWeightProcessNotification(int userId) {
@@ -6104,6 +6155,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 case END_POWER_MODE_UNKNOWN_VISIBILITY_MSG: {
                     synchronized (mGlobalLock) {
                         mRetainPowerModeAndTopProcessState = false;
+                        mProcessStateController.setTopProcessStateAsync(
+                                mInternal.getTopProcessState());
                         endPowerMode(POWER_MODE_REASON_UNKNOWN_VISIBILITY);
                         if (mTopApp != null
                                 && mTopProcessState == ActivityManager.PROCESS_STATE_TOP_SLEEPING) {
@@ -6168,7 +6221,14 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public List<ActivityAssistInfo> getTopVisibleActivities() {
             synchronized (mGlobalLock) {
-                return mRootWindowContainer.getTopVisibleActivities();
+                return mRootWindowContainer.getTopVisibleActivities(INVALID_DISPLAY);
+            }
+        }
+
+        @Override
+        public List<ActivityAssistInfo> getTopVisibleActivities(int displayId) {
+            synchronized (mGlobalLock) {
+                return mRootWindowContainer.getTopVisibleActivities(displayId);
             }
         }
 
@@ -6440,9 +6500,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLockWithoutBoost) {
                 if (proc == mHomeProcess) {
                     mHomeProcess = null;
+                    mProcessStateController.setHomeProcessAsync(null);
                 }
                 if (proc == mPreviousProcess) {
                     mPreviousProcess = null;
+                    mProcessStateController.setPreviousProcessAsync(null);
                 }
             }
         }
@@ -7688,6 +7750,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public boolean isAssistDataAllowed() {
             return ActivityTaskManagerService.this.isAssistDataAllowed();
+        }
+
+        @Override
+        public boolean isAssistDataForActivitiesAllowed(List<IBinder> activityTokens) {
+            return ActivityTaskManagerService.this.isAssistDataForActivitiesAllowed(activityTokens);
         }
     }
 

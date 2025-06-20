@@ -16,10 +16,7 @@
 
 package com.android.settingslib.spa.restricted
 
-import android.content.Context
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.isOff
@@ -28,20 +25,17 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.settingslib.spa.restricted.Blocked.SwitchPreferenceOverrides
 import com.android.settingslib.spa.widget.preference.SwitchPreferenceModel
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.kotlin.spy
 
 @RunWith(AndroidJUnit4::class)
 class RestrictedSwitchPreferenceTest {
     @get:Rule val composeTestRule = createComposeRule()
-
-    private val context: Context = spy(ApplicationProvider.getApplicationContext()) {}
 
     private val switchPreferenceModel =
         object : SwitchPreferenceModel {
@@ -118,11 +112,10 @@ class RestrictedSwitchPreferenceTest {
     }
 
     @Test
-    fun whenBlockedWithDetailsThenOverrideSwitchCheckedToFalse_overrideCheckedToFalse() {
+    fun whenBlockedWithDetailsThenOverrideCheckedToFalse_overrideCheckedToFalse() {
         switchPreferenceModel.checkedState.value = true
         val restrictions = TestRestrictions(isEmpty = false)
         testRestrictedRepository.isBlockedWithDetails = true
-        testRestrictedRepository.canOverrideSwitchChecked = true
 
         setContent(restrictions, ifBlockedOverrideCheckedTo = false)
 
@@ -131,15 +124,42 @@ class RestrictedSwitchPreferenceTest {
     }
 
     @Test
-    fun whenBlockedWithDetailsThenOverrideSwitchCheckedToTrue_overrideCheckedToTrue() {
+    fun whenBlockedWithDetailsThenOverrideCheckedToTrue_overrideCheckedToTrue() {
         switchPreferenceModel.checkedState.value = false
         val restrictions = TestRestrictions(isEmpty = false)
         testRestrictedRepository.isBlockedWithDetails = true
-        testRestrictedRepository.canOverrideSwitchChecked = true
 
         setContent(restrictions, ifBlockedOverrideCheckedTo = true)
 
         composeTestRule.onNodeWithText(TITLE).assertIsDisplayed().assertIsEnabled()
+        composeTestRule.onNode(isOn()).assertIsDisplayed()
+    }
+
+    @Test
+    fun whenBlockedWithDetailsThenOverrideCheckedAndSummaryToFalse_overrideCorrectly() {
+        switchPreferenceModel.checkedState.value = true
+        val restrictions = TestRestrictions(isEmpty = false)
+        testRestrictedRepository.isBlockedWithDetails = true
+        testRestrictedRepository.switchPreferenceOverrides =
+            SwitchPreferenceOverrides(summaryOff = FORCED_OFF_SUMMARY)
+
+        setContent(restrictions, ifBlockedOverrideCheckedTo = false)
+
+        composeTestRule.onNodeWithText(FORCED_OFF_SUMMARY).assertIsDisplayed().assertIsEnabled()
+        composeTestRule.onNode(isOff()).assertIsDisplayed()
+    }
+
+    @Test
+    fun whenBlockedWithDetailsThenOverrideCheckedAndSummaryToTrue_overrideCorrectly() {
+        switchPreferenceModel.checkedState.value = false
+        val restrictions = TestRestrictions(isEmpty = false)
+        testRestrictedRepository.isBlockedWithDetails = true
+        testRestrictedRepository.switchPreferenceOverrides =
+            SwitchPreferenceOverrides(summaryOn = FORCED_ON_SUMMARY)
+
+        setContent(restrictions, ifBlockedOverrideCheckedTo = true)
+
+        composeTestRule.onNodeWithText(FORCED_ON_SUMMARY).assertIsDisplayed().assertIsEnabled()
         composeTestRule.onNode(isOn()).assertIsDisplayed()
     }
 
@@ -148,18 +168,18 @@ class RestrictedSwitchPreferenceTest {
         ifBlockedOverrideCheckedTo: Boolean? = null,
     ) {
         composeTestRule.setContent {
-            CompositionLocalProvider(LocalContext provides context) {
-                RestrictedSwitchPreference(
-                    model = switchPreferenceModel,
-                    restrictions = restrictions,
-                    repository = testRestrictedRepository,
-                    ifBlockedOverrideCheckedTo = ifBlockedOverrideCheckedTo,
-                )
-            }
+            RestrictedSwitchPreference(
+                model = switchPreferenceModel,
+                restrictions = restrictions,
+                repository = testRestrictedRepository,
+                ifBlockedOverrideCheckedTo = ifBlockedOverrideCheckedTo,
+            )
         }
     }
 
     private companion object {
         const val TITLE = "Title"
+        const val FORCED_ON_SUMMARY = "Forced On Summary"
+        const val FORCED_OFF_SUMMARY = "Forced Off Summary"
     }
 }

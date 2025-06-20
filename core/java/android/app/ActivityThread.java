@@ -19,6 +19,7 @@ package android.app;
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.app.ConfigurationController.createNewConfigAndUpdateIfNotNull;
 import static android.app.Flags.skipBgMemTrimOnFgApp;
+import static android.app.Flags.earlyRenderThreadPriorityBoost;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.app.servertransaction.ActivityLifecycleItem.ON_CREATE;
@@ -252,8 +253,8 @@ import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.TrustedCertificateStore;
-import com.android.server.am.MemInfoDumpProto;
 import com.android.server.am.BitmapDumpProto;
+import com.android.server.am.MemInfoDumpProto;
 
 import dalvik.annotation.optimization.NeverCompile;
 import dalvik.system.AppSpecializationHooks;
@@ -1000,6 +1001,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
         long[] disabledCompatChanges;
         long[] mLoggableCompatChanges;
+        boolean mLogChangeChecksToStatsD;
 
         SharedMemory mSerializedSystemFontMap;
 
@@ -1142,6 +1144,7 @@ public final class ActivityThread extends ClientTransactionHandler
         private static final String DB_POOL_INFO_HEADER = "  %13s %13s %13s  %s";
         private static final String DB_POOL_INFO_FORMAT = "  %13d %13d %13d  %s";
 
+        @Override
         public final void scheduleReceiver(Intent intent, ActivityInfo info,
                 CompatibilityInfo compatInfo, int resultCode, String data, Bundle extras,
                 boolean ordered, boolean assumeDelivered, int sendingUser, int processState,
@@ -1157,6 +1160,7 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.RECEIVER, r);
         }
 
+        @Override
         public final void scheduleReceiverList(List<ReceiverInfo> info) throws RemoteException {
             for (int i = 0; i < info.size(); i++) {
                 ReceiverInfo r = info.get(i);
@@ -1174,6 +1178,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @Override
         public final void scheduleCreateBackupAgent(ApplicationInfo app,
                 int backupMode, int userId, @BackupDestination int backupDestination) {
             CreateBackupAgentData d = new CreateBackupAgentData();
@@ -1185,6 +1190,7 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.CREATE_BACKUP_AGENT, d);
         }
 
+        @Override
         public final void scheduleDestroyBackupAgent(ApplicationInfo app, int userId) {
             CreateBackupAgentData d = new CreateBackupAgentData();
             d.appInfo = app;
@@ -1193,6 +1199,7 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.DESTROY_BACKUP_AGENT, d);
         }
 
+        @Override
         public final void scheduleCreateService(IBinder token,
                 ServiceInfo info, CompatibilityInfo compatInfo, int processState) {
             updateProcessState(processState, false);
@@ -1210,6 +1217,7 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.CREATE_SERVICE, s);
         }
 
+        @Override
         public final void scheduleBindService(IBinder token, IBinder bindToken, Intent intent,
                 boolean rebind, int processState, long bindSeq) {
             updateProcessState(processState, false);
@@ -1235,6 +1243,7 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.BIND_SERVICE, s);
         }
 
+        @Override
         public final void scheduleUnbindService(IBinder token, IBinder bindToken, Intent intent) {
             BindServiceData s = new BindServiceData();
             s.token = token;
@@ -1249,6 +1258,7 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.UNBIND_SERVICE, s);
         }
 
+        @Override
         public final void scheduleServiceArgs(IBinder token, ParceledListSlice args) {
             List<ServiceStartArgs> list = args.getList();
 
@@ -1272,6 +1282,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @Override
         public final void scheduleStopService(IBinder token) {
             if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                 Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "scheduleStopService. token="
@@ -1331,6 +1342,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 ContentCaptureOptions contentCaptureOptions,
                 long[] disabledCompatChanges,
                 long[] loggableCompatChanges,
+                boolean logChangeChecksToStatsD,
                 SharedMemory serializedSystemFontMap,
                 FileDescriptor applicationSharedMemoryFd,
                 long startRequestedElapsedTime,
@@ -1402,6 +1414,7 @@ public final class ActivityThread extends ClientTransactionHandler
             data.contentCaptureOptions = contentCaptureOptions;
             data.disabledCompatChanges = disabledCompatChanges;
             data.mLoggableCompatChanges = loggableCompatChanges;
+            data.mLogChangeChecksToStatsD = logChangeChecksToStatsD;
             data.mSerializedSystemFontMap = serializedSystemFontMap;
             data.startRequestedElapsedTime = startRequestedElapsedTime;
             data.startRequestedUptime = startRequestedUptime;
@@ -1430,6 +1443,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @Override
         public final void runIsolatedEntryPoint(String entryPoint, String[] entryPointArgs) {
             SomeArgs args = SomeArgs.obtain();
             args.arg1 = entryPoint;
@@ -1437,14 +1451,17 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.RUN_ISOLATED_ENTRY_POINT, args);
         }
 
+        @Override
         public final void scheduleExit() {
             sendMessage(H.EXIT_APPLICATION, null);
         }
 
+        @Override
         public final void scheduleSuicide() {
             sendMessage(H.SUICIDE, null);
         }
 
+        @Override
         public void scheduleApplicationInfoChanged(ApplicationInfo ai) {
             synchronized (mResourcesManager) {
                 var oldAi = mPendingAppInfoUpdates.put(ai.packageName, ai);
@@ -1461,10 +1478,12 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.APPLICATION_INFO_CHANGED, ai.packageName);
         }
 
+        @Override
         public void updateTimeZone() {
             TimeZone.setDefault(null);
         }
 
+        @Override
         public void clearDnsCache() {
             // a non-standard API to get this to libcore
             InetAddress.clearDnsCache();
@@ -1473,6 +1492,7 @@ public final class ActivityThread extends ClientTransactionHandler
             NetworkEventDispatcher.getInstance().dispatchNetworkConfigurationChange();
         }
 
+        @Override
         public void updateHttpProxy() {
             final Application app;
             synchronized (ActivityThread.this) {
@@ -1488,11 +1508,13 @@ public final class ActivityThread extends ClientTransactionHandler
             ActivityThread.updateHttpProxy(app);
         }
 
+        @Override
         public void processInBackground() {
             mH.removeMessages(H.GC_WHEN_IDLE);
             mH.sendMessage(mH.obtainMessage(H.GC_WHEN_IDLE));
         }
 
+        @Override
         public void dumpService(ParcelFileDescriptor pfd, IBinder servicetoken, String[] args) {
             DumpComponentInfo data = new DumpComponentInfo();
             try {
@@ -1510,6 +1532,7 @@ public final class ActivityThread extends ClientTransactionHandler
         // This function exists to make sure all receiver dispatching is
         // correctly ordered, since these are one-way calls and the binder driver
         // applies transaction ordering per object for such calls.
+        @Override
         public void scheduleRegisteredReceiver(IIntentReceiver receiver, Intent intent,
                 int resultCode, String dataStr, Bundle extras, boolean ordered,
                 boolean sticky, boolean assumeDelivered, int sendingUser, int processState,
@@ -1574,14 +1597,17 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.DUMP_HEAP, dhd, 0, 0, true /*async*/);
         }
 
+        @Override
         public void attachAgent(String agent) {
             sendMessage(H.ATTACH_AGENT, agent);
         }
 
+        @Override
         public void attachStartupAgents(String dataDir) {
             sendMessage(H.ATTACH_STARTUP_AGENTS, dataDir);
         }
 
+        @Override
         public void setSchedulingGroup(int group) {
             // Note: do this immediately, since going into the foreground
             // should happen regardless of what pending work we have to do
@@ -1594,6 +1620,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @Override
         public void dispatchPackageBroadcast(int cmd, String[] packages) {
             sendMessage(H.DISPATCH_PACKAGE_BROADCAST, packages, cmd);
         }
@@ -1620,6 +1647,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @Override
         public void dumpActivity(ParcelFileDescriptor pfd, IBinder activitytoken,
                 String prefix, String[] args) {
             DumpComponentInfo data = new DumpComponentInfo();
@@ -1636,6 +1664,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @Override
         public void dumpProvider(ParcelFileDescriptor pfd, IBinder providertoken,
                 String[] args) {
             DumpComponentInfo data = new DumpComponentInfo();
@@ -2090,10 +2119,12 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.REQUEST_ASSIST_CONTEXT_EXTRAS, cmd);
         }
 
+        @Override
         public void setCoreSettings(Bundle coreSettings) {
             sendMessage(H.SET_CORE_SETTINGS, coreSettings);
         }
 
+        @Override
         public void updatePackageCompatibilityInfo(String pkg, CompatibilityInfo info) {
             UpdateCompatibilityData ucd = new UpdateCompatibilityData();
             ucd.pkg = pkg;
@@ -2103,6 +2134,7 @@ public final class ActivityThread extends ClientTransactionHandler
             sendMessage(H.UPDATE_PACKAGE_COMPATIBILITY_INFO, ucd);
         }
 
+        @Override
         public void scheduleTrimMemory(int level) {
             final Runnable r = PooledLambda.obtainRunnable(ActivityThread::handleTrimMemory,
                     ActivityThread.this, level).recycleOnUse();
@@ -2115,15 +2147,18 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @Override
         public void scheduleTranslucentConversionComplete(IBinder token, boolean drawComplete) {
             sendMessage(H.TRANSLUCENT_CONVERSION_COMPLETE, token, drawComplete ? 1 : 0);
         }
 
+        @Override
         public void scheduleOnNewSceneTransitionInfo(IBinder token, SceneTransitionInfo info) {
             sendMessage(H.ON_NEW_SCENE_TRANSITION_INFO,
                     new Pair<IBinder, SceneTransitionInfo>(token, info));
         }
 
+        @Override
         public void setProcessState(int state) {
             updateProcessState(state, true);
         }
@@ -2540,6 +2575,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
             return Integer.toString(code);
         }
+        @Override
         public void handleMessage(Message msg) {
             if (DEBUG_MESSAGES) Slog.v(TAG, ">>> handling: " + codeToString(msg.what));
             long debugStoreId = -1;
@@ -3990,6 +4026,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
+    @Override
     public final Activity getActivity(IBinder token) {
         final ActivityClientRecord activityRecord = mActivities.get(token);
         return activityRecord != null ? activityRecord.activity : null;
@@ -4116,6 +4153,7 @@ public final class ActivityThread extends ClientTransactionHandler
         return mTransactionExecutor;
     }
 
+    @Override
     void sendMessage(int what, Object obj) {
         sendMessage(what, obj, 0, 0, false);
     }
@@ -4223,8 +4261,7 @@ public final class ActivityThread extends ClientTransactionHandler
         } catch (Exception e) {
             if (!mInstrumentation.onException(activity, e)) {
                 throw new RuntimeException(
-                    "Unable to instantiate activity " + component
-                    + ": " + e.toString(), e);
+                    "Unable to instantiate activity " + component, e);
             }
         }
 
@@ -4317,8 +4354,7 @@ public final class ActivityThread extends ClientTransactionHandler
         } catch (Exception e) {
             if (!mInstrumentation.onException(activity, e)) {
                 throw new RuntimeException(
-                    "Unable to start activity " + component
-                    + ": " + e.toString(), e);
+                    "Unable to start activity " + component, e);
             }
         }
 
@@ -4496,7 +4532,19 @@ public final class ActivityThread extends ClientTransactionHandler
         // Initialize before creating the activity
         if (ThreadedRenderer.sRendererEnabled
                 && (r.activityInfo.flags & ActivityInfo.FLAG_HARDWARE_ACCELERATED) != 0) {
-            HardwareRenderer.preload();
+            if (earlyRenderThreadPriorityBoost()) {
+                final int tid = HardwareRenderer.preload();
+                // Adjust the RenderThread priority as soon as it's created.
+                if (tid > 0) {
+                    try {
+                        ActivityManager.getService().setRenderThread(tid);
+                    } catch (Throwable t) {
+                        Log.w(TAG, "Failed to set scheduler for RenderThread", t);
+                    }
+                }
+            } else {
+                HardwareRenderer.preload();
+            }
         }
         WindowManagerGlobal.initialize();
 
@@ -5070,8 +5118,7 @@ public final class ActivityThread extends ClientTransactionHandler
                     "Finishing failed broadcast to " + data.intent.getComponent());
             data.sendFinished(mgr);
             throw new RuntimeException(
-                "Unable to instantiate receiver " + component
-                + ": " + e.toString(), e);
+                "Unable to instantiate receiver " + component, e);
         }
 
         long debugStoreId = -1;
@@ -5098,8 +5145,7 @@ public final class ActivityThread extends ClientTransactionHandler
             data.sendFinished(mgr);
             if (!mInstrumentation.onException(receiver, e)) {
                 throw new RuntimeException(
-                    "Unable to start receiver " + component
-                    + ": " + e.toString(), e);
+                    "Unable to start receiver " + component, e);
             }
         } finally {
             sCurrentBroadcastIntent.set(null);
@@ -5216,7 +5262,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 } catch (Exception e) {
                     // If this is during restore, fail silently; otherwise go
                     // ahead and let the user see the crash.
-                    Slog.e(TAG, "Agent threw during creation: " + e);
+                    Slog.e(TAG, "Agent threw during creation", e);
                     if (data.backupMode != ApplicationThreadConstants.BACKUP_MODE_RESTORE
                             && data.backupMode !=
                                     ApplicationThreadConstants.BACKUP_MODE_RESTORE_FULL) {
@@ -5234,7 +5280,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         } catch (Exception e) {
             throw new RuntimeException("Unable to create BackupAgent "
-                    + classname + ": " + e.toString(), e);
+                    + classname, e);
         }
     }
 
@@ -5354,8 +5400,7 @@ public final class ActivityThread extends ClientTransactionHandler
         } catch (Exception e) {
             if (!mInstrumentation.onException(service, e)) {
                 throw new RuntimeException(
-                    "Unable to create service " + data.info.name
-                    + ": " + e.toString(), e);
+                    "Unable to create service " + data.info.name, e);
             }
         }
     }
@@ -5387,7 +5432,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 if (!mInstrumentation.onException(s, e)) {
                     throw new RuntimeException(
                             "Unable to bind to service " + s
-                            + " with " + data.intent + ": " + e.toString(), e);
+                            + " with " + data.intent, e);
                 }
             }
         }
@@ -5417,7 +5462,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 if (!mInstrumentation.onException(s, e)) {
                     throw new RuntimeException(
                             "Unable to unbind to service " + s
-                            + " with " + data.intent + ": " + e.toString(), e);
+                            + " with " + data.intent, e);
                 }
             }
         }
@@ -5531,7 +5576,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 if (!mInstrumentation.onException(s, e)) {
                     throw new RuntimeException(
                             "Unable to start service " + s
-                            + " with " + data.args + ": " + e.toString(), e);
+                            + " with " + data.args, e);
                 }
             }
         }
@@ -5561,9 +5606,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 }
             } catch (Exception e) {
                 if (!mInstrumentation.onException(s, e)) {
-                    throw new RuntimeException(
-                            "Unable to stop service " + s
-                            + ": " + e.toString(), e);
+                    throw new RuntimeException("Unable to stop service " + s, e);
                 }
                 Slog.i(TAG, "handleStopService: exception for " + token, e);
             }
@@ -5587,8 +5630,7 @@ public final class ActivityThread extends ClientTransactionHandler
             } catch (Exception e) {
                 if (!mInstrumentation.onException(s, e)) {
                     throw new RuntimeException(
-                            "Unable to call onTimeout on service " + s
-                                    + ": " + e.toString(), e);
+                            "Unable to call onTimeout on service " + s, e);
                 }
                 Slog.i(TAG, "handleTimeoutService: exception for " + token, e);
             }
@@ -5608,7 +5650,7 @@ public final class ActivityThread extends ClientTransactionHandler
             } catch (Exception e) {
                 if (!mInstrumentation.onException(s, e)) {
                     throw new RuntimeException(
-                            "Unable to call onTimeLimitExceeded on service " + s + ": " + e, e);
+                            "Unable to call onTimeLimitExceeded on service " + s, e);
                 }
                 Slog.i(TAG, "handleTimeoutServiceForType: exception for " + token, e);
             }
@@ -5675,7 +5717,7 @@ public final class ActivityThread extends ClientTransactionHandler
         } catch (Exception e) {
             if (!mInstrumentation.onException(r.activity, e)) {
                 throw new RuntimeException("Unable to resume activity "
-                        + r.intent.getComponent().toShortString() + ": " + e.toString(), e);
+                        + r.intent.getComponent().toShortString(), e);
             }
         }
         return true;
@@ -5974,7 +6016,7 @@ public final class ActivityThread extends ClientTransactionHandler
         } catch (Exception e) {
             if (!mInstrumentation.onException(r.activity, e)) {
                 throw new RuntimeException("Unable to pause activity "
-                        + safeToComponentShortString(r.intent) + ": " + e.toString(), e);
+                        + safeToComponentShortString(r.intent), e);
             }
         }
         r.setState(ON_PAUSE);
@@ -6054,8 +6096,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 if (!mInstrumentation.onException(r.activity, e)) {
                     throw new RuntimeException(
                             "Unable to save state of activity "
-                            + r.intent.getComponent().toShortString()
-                            + ": " + e.toString(), e);
+                            + r.intent.getComponent().toShortString(), e);
                 }
             }
         }
@@ -6087,8 +6128,7 @@ public final class ActivityThread extends ClientTransactionHandler
             if (!mInstrumentation.onException(r.activity, e)) {
                 throw new RuntimeException(
                         "Unable to stop activity "
-                                + r.intent.getComponent().toShortString()
-                                + ": " + e.toString(), e);
+                                + r.intent.getComponent().toShortString(), e);
             }
         }
         r.setState(ON_STOP);
@@ -6244,8 +6284,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 if (!mInstrumentation.onException(r.activity, e)) {
                     throw new RuntimeException(
                             "Failure delivering result " + ri + " to activity "
-                            + r.intent.getComponent().toShortString()
-                            + ": " + e.toString(), e);
+                            + r.intent.getComponent().toShortString(), e);
                 }
             }
         }
@@ -6278,8 +6317,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 if (!mInstrumentation.onException(r.activity, e)) {
                     throw new RuntimeException(
                             "Unable to pause activity "
-                            + r.intent.getComponent().toShortString()
-                            + ": " + e.toString(), e);
+                            + r.intent.getComponent().toShortString(), e);
                 }
             }
         }
@@ -6311,7 +6349,7 @@ public final class ActivityThread extends ClientTransactionHandler
             } catch (Exception e) {
                 if (!mInstrumentation.onException(r.activity, e)) {
                     throw new RuntimeException("Unable to retain activity "
-                            + r.intent.getComponent().toShortString() + ": " + e.toString(), e);
+                            + r.intent.getComponent().toShortString(), e);
                 }
             }
         }
@@ -6330,7 +6368,7 @@ public final class ActivityThread extends ClientTransactionHandler
         } catch (Exception e) {
             if (!mInstrumentation.onException(r.activity, e)) {
                 throw new RuntimeException("Unable to destroy activity "
-                        + safeToComponentShortString(r.intent) + ": " + e.toString(), e);
+                        + safeToComponentShortString(r.intent), e);
             }
         }
         r.setState(ON_DESTROY);
@@ -7605,7 +7643,10 @@ public final class ActivityThread extends ClientTransactionHandler
         Process.setStartTimes(SystemClock.elapsedRealtime(), SystemClock.uptimeMillis(),
                 data.startRequestedElapsedTime, data.startRequestedUptime);
 
-        AppCompatCallbacks.install(data.disabledCompatChanges, data.mLoggableCompatChanges);
+        AppCompatCallbacks.install(
+                data.disabledCompatChanges,
+                data.mLoggableCompatChanges,
+                data.mLogChangeChecksToStatsD);
         // Let libcore handle any compat changes after installing the list of compat changes.
         AppSpecializationHooks.handleCompatChangesBeforeBindingApplication();
 
@@ -7936,8 +7977,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
             catch (Exception e) {
                 throw new RuntimeException(
-                    "Exception thrown in onCreate() of "
-                    + data.instrumentationName + ": " + e.toString(), e);
+                    "Exception thrown in onCreate() of " + data.instrumentationName, e);
             }
             try {
                 timestampApplicationOnCreateNs = SystemClock.uptimeNanos();
@@ -7946,8 +7986,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 timestampApplicationOnCreateNs = 0;
                 if (!mInstrumentation.onException(app, e)) {
                     throw new RuntimeException(
-                      "Unable to create application " + app.getClass().getName()
-                      + ": " + e.toString(), e);
+                      "Unable to create application " + app.getClass().getName(), e);
                 }
             }
         } finally {
@@ -8151,8 +8190,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 mInstrumentation.onCreate(data.instrumentationArgs);
             } catch (Exception e) {
                 throw new RuntimeException(
-                        "Exception thrown in onCreate() of "
-                                + data.instrumentationName + ": " + e.toString(), e);
+                        "Exception thrown in onCreate() of " + data.instrumentationName, e);
             }
 
         } catch (Exception e) {
@@ -8229,8 +8267,7 @@ public final class ActivityThread extends ClientTransactionHandler
                     cl.loadClass(data.instrumentationName.getClassName()).newInstance();
         } catch (Exception e) {
             throw new RuntimeException(
-                    "Unable to instantiate instrumentation "
-                            + data.instrumentationName + ": " + e.toString(), e);
+                    "Unable to instantiate instrumentation " + data.instrumentationName, e);
         }
 
         final ComponentName component = new ComponentName(ii.packageName, ii.name);
@@ -8812,8 +8849,7 @@ public final class ActivityThread extends ClientTransactionHandler
             } catch (java.lang.Exception e) {
                 if (!mInstrumentation.onException(null, e)) {
                     throw new RuntimeException(
-                            "Unable to get provider " + info.name
-                            + ": " + e.toString(), e);
+                            "Unable to get provider " + info.name, e);
                 }
                 return null;
             }
@@ -8983,7 +9019,7 @@ public final class ActivityThread extends ClientTransactionHandler
             thread.mInitialApplication = context.mPackageInfo.makeApplicationInner(true, null);
             thread.mInitialApplication.onCreate();
         } catch (Exception e) {
-            throw new RuntimeException("Unable to instantiate Application():" + e, e);
+            throw new RuntimeException("Unable to instantiate Application()", e);
         }
     }
 
@@ -9065,7 +9101,13 @@ public final class ActivityThread extends ClientTransactionHandler
 
     private Bundle getCoreSettingsForDeviceLocked(int deviceId) {
         if (android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()) {
-            return mCoreSettings.getBundle(String.valueOf(deviceId));
+            Bundle bundle = mCoreSettings.getBundle(String.valueOf(deviceId));
+            if (deviceId != Context.DEVICE_ID_DEFAULT && bundle == null) {
+                // There hasn't been any overridden settings for the virtual device, so just return
+                // the settings for the default device.
+                bundle = mCoreSettings.getBundle(String.valueOf(Context.DEVICE_ID_DEFAULT));
+            }
+            return bundle;
         }
         return mCoreSettings;
     }

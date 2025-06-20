@@ -264,13 +264,6 @@ flag {
 }
 
 flag {
-    name: "show_set_screen_lock_dialog"
-    namespace: "profile_experiences"
-    description: "Display the dialog to set up screen lock when private space unlock operation is requested"
-    bug: "316129700"
-}
-
-flag {
     name: "reorder_wallpaper_during_user_switch"
     namespace: "multiuser"
     description: "Reorder loading home and lock screen wallpapers during a user switch."
@@ -296,6 +289,13 @@ flag {
     namespace: "multiuser"
     description: "Activates the background-stopping schedule of inactive users based on the time specified in the configuration."
     bug: "330351042"
+}
+
+flag {
+    name: "stop_excess_for_background_starts"
+    namespace: "multiuser"
+    description: "Be more aggressive when stopping excess users, by triggering this even on background user starts and by allowing user 0's profiles to be stopped."
+    bug: "419867128"
 }
 
 flag {
@@ -424,16 +424,6 @@ flag {
   namespace: "profile_experiences"
   description: "When private space is unlocked show dynamic title in unlock factor screens based on lock factor set for the profile"
   bug: "323835257"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "ignore_restrictions_when_deleting_private_profile"
-  namespace: "profile_experiences"
-  description: "Ignore any user restrictions when deleting private profiles."
-  bug: "350953833"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

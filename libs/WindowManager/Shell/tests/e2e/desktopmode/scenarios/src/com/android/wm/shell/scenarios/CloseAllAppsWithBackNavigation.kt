@@ -40,6 +40,7 @@ import org.junit.Test
 
 @Ignore("Base Test Class")
 abstract class CloseAllAppsWithBackNavigation(
+    val navigationMode: NavBar = NavBar.MODE_GESTURAL,
     val rotation: Rotation = Rotation.ROTATION_0
 ) : TestScenarioBase() {
     private val instrumentation: Instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -50,7 +51,9 @@ abstract class CloseAllAppsWithBackNavigation(
     private val mailApp = DesktopModeAppHelper(MailAppHelper(instrumentation))
     private val nonResizeableApp = DesktopModeAppHelper(NonResizeableAppHelper(instrumentation))
 
-    @Rule @JvmField val testSetupRule = Utils.testSetupRule(NavBar.MODE_GESTURAL, rotation)
+    val appsInZOrder: ArrayList<DesktopModeAppHelper> = ArrayList()
+
+    @Rule @JvmField val testSetupRule = Utils.testSetupRule(navigationMode, rotation)
 
     @Before
     fun setup() {
@@ -59,19 +62,33 @@ abstract class CloseAllAppsWithBackNavigation(
                 .isDesktopModeSupportedOnDisplay(DEFAULT_DISPLAY)
         )
         Assume.assumeTrue(Flags.enableDesktopWindowingBackNavigation())
+        Assume.assumeTrue(Flags.enableEmptyDeskOnMinimize())
         tapl.setEnableRotation(true)
         tapl.setExpectedRotation(rotation.value)
+
+        // Set up apps
         testApp.enterDesktopMode(wmHelper, device)
+        appsInZOrder.add(testApp)
+
         mailApp.launchViaIntent(wmHelper)
+        appsInZOrder.add( mailApp)
+
         nonResizeableApp.launchViaIntent(wmHelper)
+        appsInZOrder.add(nonResizeableApp)
     }
 
     @Test
     open fun closeAllAppsInDesktop() {
-        nonResizeableApp.closeDesktopApp(wmHelper, device, usingBackNavigation = true)
-        mailApp.closeDesktopApp(wmHelper, device, usingBackNavigation = true)
-        testApp.closeDesktopApp(wmHelper, device, usingBackNavigation = true)
+        repeat(appsInZOrder.size) {
+            useBackNavigation()
+        }
     }
+
+    private fun useBackNavigation() {
+        tapl.pressBack()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+    }
+
 
     @After
     fun teardown() {

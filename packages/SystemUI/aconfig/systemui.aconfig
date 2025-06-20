@@ -392,20 +392,6 @@ flag {
 }
 
 flag {
-   name: "status_bar_signal_policy_refactor"
-   namespace: "systemui"
-   description: "Use a settings observer for airplane mode and make StatusBarSignalPolicy startable"
-   bug: "264539100"
-}
-
-flag {
-   name: "status_bar_signal_policy_refactor_ethernet"
-   namespace: "systemui"
-   description: "Use recommended architecture for ethernet icon in status bar"
-   bug: "291321279"
-}
-
-flag {
   name: "status_bar_system_status_icons_in_compose"
   namespace: "systemui"
   description: "Use compose for displaying icons in the status bar system status area"
@@ -738,6 +724,16 @@ flag {
     namespace: "systemui"
     description: "Only capture a single display when screenshotting"
     bug: "362720389"
+}
+
+flag {
+    name: "screenshot_dismissal_spring"
+    namespace: "systemui"
+    description: "Use a spring animator for screenshot dismissal, fade out after const distance"
+    bug: "412986001"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1978,16 +1974,6 @@ flag {
 }
 
 flag {
-   name: "bouncer_lifecycle_fix"
-   namespace: "systemui"
-   description: "Don't resume the Bouncer InputView when the view is inflated."
-   bug: "417307529"
-   metadata {
-     purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "qs_compose_fragment_early_expansion"
    namespace: "systemui"
    description: "Start expansion from QQS into QS early when touching the shade."
@@ -2031,3 +2017,29 @@ flag {
     }
 }
 
+flag {
+    name: "ongoing_activity_chips_on_dream"
+    namespace: "systemui"
+    description: "Enables ongoing activity chips in dream status bar"
+    bug: "418243972"
+}
+
+flag {
+    name: "instant_hide_shade"
+    namespace: "systemui"
+    description: "Enables the Shade to hide instantaneously at the end of a launch animation, preventing flickers."
+    bug: "419304171"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "hub_blurred_by_shade_fix"
+    namespace: "systemui"
+    description: "Fixes the blurring issue on hub after the shade is pulled down slightly."
+    bug: "412261838"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}

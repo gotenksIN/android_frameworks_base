@@ -599,6 +599,11 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenrecord_stop_dialog_button">Stop recording</string>
 
+    <!-- Button text in the toolbar for choosing the screenshot type. [CHAR LIMIT=35] -->
+    <string name="screen_capture_toolbar_capture_button">Capture</string>
+    <!-- Button text in the toolbar for choosing the screen recording type. [CHAR LIMIT=35] -->
+    <string name="screen_capture_toolbar_record_button">Record</string>
+
     <!-- Content description for the status bar chip shown to the user when they're sharing their screen to another app on the device [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -875,6 +880,10 @@
     <string name="biometric_dialog_fallback_button">Verify another way</string>
     <string name="biometric_dialog_manage_identity_check">Manage Identity Check</string>
     <string name="biometric_dialog_identity_check_pin_footer">PIN can\'t be used for verification as Identity Check is on and requires a biometric. Learn more about Identity Check</string>
+    <string name="biometric_dialog_identity_check_pattern_footer">Pattern can\'t be used for verification as Identity Check is on and requires a biometric. Learn more about Identity Check</string>
+    <string name="biometric_dialog_identity_check_password_footer">Password can\'t be used for verification as Identity Check is on and requires a biometric. Learn more about Identity Check</string>
+    <string name="biometric_dialog_identity_check_watch_ranging">Assessing risk...</string>
+    <string name="biometric_dialog_unavailable">Unavailable</string>
 
     <!-- Button text shown on BiometricPrompt giving the user the option to use an alternate form of authentication (Pin) [CHAR LIMIT=30] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -888,6 +897,18 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="biometric_dialog_use_password">Use password</string>
+    <!-- Header text for biometric prompt reset lockout with PIN [CHAR LIMIT=40] -->
+    <string name="biometric_dialog_enter_pin">Enter your PIN</string>
+    <!-- Header text for biometric prompt reset lockout with password [CHAR LIMIT=40] -->
+    <string name="biometric_dialog_enter_password">Enter your password</string>
+    <!-- Header text for biometric prompt reset lockout with pattern [CHAR LIMIT=40] -->
+    <string name="biometric_dialog_enter_pattern">Enter your pattern</string>
+    <!-- Subtitle string for biometric prompt reset lockout with pin [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_recovery_pin">PIN is required to recover biometrics after too many failed attempts</string>
+    <!-- Subtitle string for biometric prompt reset lockout with pattern [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_recovery_pattern">Pattern is required to recover biometrics after too many failed attempts</string>
+    <!-- Subtitle string for biometric prompt reset lockout with password [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_recovery_password">Password is required to recover biometrics after too many failed attempts</string>
     <!-- Error string shown when the user enters an incorrect PIN [CHAR LIMIT=40]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -2893,6 +2914,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_disclosure_parental_controls">This device is managed by your parent</string>
 
+    <!-- Disclosure at the bottom of Quick Settings that indicates that some of the settings changes are protected by a PIN. [CHAR LIMIT=100] -->
+    <string name="quick_settings_disclosure_pin_protection">Some device settings are PIN protected.</string>
+
     <!-- Disclosure at the bottom of Quick Settings that indicates that the user's device belongs to their organization, and the organization can monitor network traffic on that device. [CHAR LIMIT=100] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3096,6 +3120,9 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="monitoring_description_parental_controls">This device is managed by your parent. Your parent can see and manage information such as the apps you use, your location, and your screen time.</string>
+
+    <!-- Dialog that a user can access via Quick Settings. [CHAR LIMIT=NONE]-->
+    <string name="monitoring_description_pin_protection">Some controls on your device, like daily limits \u0026 downtime, can only be changed with a PIN.</string>
 
     <!-- Name for a generic legacy VPN connection [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3534,6 +3561,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="status_bar_supervision">Parental controls</string>
 
+    <!-- Name of the supervision status bar icon when pin is set. -->
+    <string name="status_bar_pin_supervision">PIN protection for some device controls</string>
+
     <!-- Description for adding  a quick settings tile -->
 
     <!-- Name of a quick settings tile controlled by broadcast -->
@@ -3590,6 +3620,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="satellite_emergency_only_carrier_text">Emergency calls or SOS only</string>
+    <!-- Text displayed indicating current network is satellite network. -->
+    <string name="satellite_network_title_text">Satellite network</string>
 
     <!-- Content description skeleton. Input strings should be carrier name and signal bar description [CHAR LIMIT=NONE]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4190,6 +4222,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="group_system_access_notification_shade">View notifications</string>
+    <!-- User visible title for the keyboard shortcut that triggers the quick settings panel. [CHAR LIMIT=70] -->
+    <string name="group_system_access_quick_settings_panel">View quick settings</string>
     <!-- User visible title for the keyboard shortcut that takes a full screenshot. [CHAR LIMIT=70] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4289,6 +4323,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="system_desktop_mode_minimize_window">Minimize window</string>
+    <!-- User visible title for the keyboard shortcut that switches between desktops in multiple desktop mode [CHAR LIMIT=70] -->
+    <string name="system_multiple_desktop_mode_switch_between_desks">Move between desktops</string>
 
     <!-- User visible title for the input keyboard shortcuts list. [CHAR LIMIT=70] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4395,6 +4431,9 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_long_click_tile">Open settings</string>
+    <!-- Accessibility description for long click on a quick settings tile - this is used in the
+     context of the sentence "double tap and hold to _Open more details_" [CHAR LIMIT=NONE] -->
+    <string name="accessibility_long_click_tile_details">Open more details</string>
 
     <!-- Accessibility description of headphones icon [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4592,6 +4631,18 @@
 
     <!-- Label for header of customize QS to indicate that tiles can be selected to be edited [CHAR LIMIT=60] -->
     <string name="select_to_rearrange_tiles">Select tiles to rearrange and resize</string>
+
+    <!-- Label for header of customize QS to indicate that tiles can be tapped to be removed [CHAR LIMIT=60] -->
+    <string name="tap_to_remove_tiles">Tap to remove tiles</string>
+
+    <!-- Label for header of customize QS to indicate that tiles can be resized and reordered [CHAR LIMIT=60] -->
+    <string name="resize_and_reorder_tiles">Resize and reorder layout</string>
+
+    <!-- Label for tab of customize QS used to add and remove tiles [CHAR LIMIT=60] -->
+    <string name="qs_edit_edit_tab">Edit</string>
+
+    <!-- Label for tab of customize QS used to reorder tiles [CHAR LIMIT=60] -->
+    <string name="qs_edit_layout_tab">Layout</string>
 
     <!-- Label for placing tiles in edit mode for QS [CHAR LIMIT=60] -->
     <string name="tap_to_position_tile">Tap to position tile</string>
@@ -4800,6 +4851,14 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_quick_settings_page">Page <xliff:g name="current_page" example="1">%1$d</xliff:g> of <xliff:g name="num_pages" example="2">%2$d</xliff:g></string>
+
+    <!-- Strings for the dialog to enable accessibility services in key gestures -->
+    <!-- Text for the dialog title. -->
+    <string name="accessibility_key_gesture_dialog_title" translatable="false">Turn on <xliff:g name="feature_name" example="Magnification">%1$s</xliff:g>?</string>
+    <!-- Text for showing inside the dialog.-->
+    <string name="accessibility_key_gesture_dialog_content" translatable="false">Action + <xliff:g name="secondary_key" example="Alt">%1$s</xliff:g> + <xliff:g name="key_code" example="M">%2$s</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="Magnification">%3$s</xliff:g>. <xliff:g name="feature_intro" example="Magnification intro">%4$s</xliff:g></string>
+    <!-- The prefix string for the magnification intro -->
+    <string name="accessibility_key_gesture_dialog_magnifier_intro" translatable="false">This allows you to quickly zoom in on the screen to make content larger.</string>
 
     <!-- Plugin control section of the tuner. Non-translatable since it should
          not appear on production builds ever. -->
@@ -5583,6 +5642,8 @@
     <string name="media_output_end_session_dialog_summary">Stop your shared session to move media to another device</string>
     <!-- Button text for stopping session [CHAR LIMIT=60] -->
     <string name="media_output_end_session_dialog_stop">Stop</string>
+    <!-- Button text for stopping sharing [CHAR LIMIT=60] -->
+    <string name="media_output_dialog_button_stop_sharing">Stop sharing</string>
 
 
     <!-- Media Output Broadcast Dialog -->
@@ -5861,8 +5922,6 @@
     <string name="dream_overlay_status_bar_camera_off">Camera is off</string>
     <!-- Content description for the mic off icon in the dream overlay status bar [CHAR LIMIT=NONE] -->
     <string name="dream_overlay_status_bar_mic_off">Mic is off</string>
-    <!-- Content description for the camera and mic off icon in the dream overlay status bar [CHAR LIMIT=NONE] -->
-    <string name="dream_overlay_status_bar_camera_mic_off">Camera and mic are off</string>
     <!-- Content description for the notifications indicator icon in the dream overlay status bar [CHAR LIMIT=NONE] -->
     <string name="dream_overlay_status_bar_notification_indicator">{count, plural,
     =1 {# notification}
@@ -6087,7 +6146,7 @@
     <string name="connected_display_icon_desc">Display connected</string>
 
     <!-- Title of the privacy dialog, shown for active / recent app usage of some phone sensors [CHAR LIMIT=30] -->
-    <string name="privacy_dialog_title">Microphone &amp; Camera</string>
+    <string name="privacy_dialog_title">Microphone, Camera &amp; Location</string>
     <!-- Subtitle of the privacy dialog, shown for active / recent app usage of some phone sensors [CHAR LIMIT=NONE] -->
     <string name="privacy_dialog_summary">Recent app use</string>
     <!-- Label of the secondary button of the privacy dialog, used to check recent app usage of phone sensors [CHAR LIMIT=30] -->

@@ -17,16 +17,15 @@
 package com.android.server.am;
 
 import android.app.IBinderSession;
-import android.os.Handler;
 import android.os.IBinder;
 import android.os.Trace;
+import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.util.ArrayMap;
 import android.util.IndentingPrintWriter;
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.os.BackgroundThread;
 import com.android.internal.util.IntPair;
 
 import java.lang.ref.WeakReference;
@@ -37,6 +36,7 @@ import java.util.function.BiConsumer;
  * is used to facilitate important binder calls to a bound remote service hosted by a process that
  * is eligible to get frozen by {@link ProcessStateController}.
  */
+@RavenwoodKeepWholeClass
 public class BoundServiceSession implements IBinderSession {
     private static final String TAG = BoundServiceSession.class.getSimpleName();
     private static final int MAGIC_ID = 0xFBD_5E55;
@@ -48,7 +48,6 @@ public class BoundServiceSession implements IBinderSession {
     // for when we enable a BinderProxy pointing to this from outside of the system process.
     private final WeakReference<ConnectionRecord> mConnection;
     private final BiConsumer<ConnectionRecord, Boolean> mProcessStateUpdater;
-    private final Handler mBackgroundHandler;
     private final String mDebugName;
 
     @VisibleForTesting
@@ -61,7 +60,6 @@ public class BoundServiceSession implements IBinderSession {
 
     BoundServiceSession(BiConsumer<ConnectionRecord, Boolean> processStateUpdater,
             WeakReference<ConnectionRecord> weakCr, String debugName) {
-        mBackgroundHandler = BackgroundThread.getHandler();
         mProcessStateUpdater = processStateUpdater;
         mConnection = weakCr;
         mDebugName = debugName;
@@ -87,7 +85,7 @@ public class BoundServiceSession implements IBinderSession {
                     + " already gone. Possibly the service has unbound.");
             return;
         }
-        mBackgroundHandler.post(() -> mProcessStateUpdater.accept(strongCr, mTotal > 0));
+        mProcessStateUpdater.accept(strongCr, mTotal > 0);
     }
 
     private void logTraceInstant(String message) {

@@ -262,6 +262,7 @@ import com.android.server.security.KeyChainSystemService;
 import com.android.server.security.advancedprotection.AdvancedProtectionService;
 import com.android.server.security.authenticationpolicy.AuthenticationPolicyService;
 import com.android.server.security.authenticationpolicy.SecureLockDeviceService;
+import com.android.server.security.authenticationpolicy.WatchRangingService;
 import com.android.server.security.intrusiondetection.IntrusionDetectionService;
 import com.android.server.security.rkp.RemoteProvisioningService;
 import com.android.server.selectiontoolbar.SelectionToolbarManagerService;
@@ -947,12 +948,10 @@ public final class SystemServer implements Dumpable {
             SystemServerInitThreadPool tp = SystemServerInitThreadPool.start();
             mDumper.addDumpable(tp);
 
-            if (android.server.Flags.earlySystemConfigInit()) {
-                // SystemConfig init is expensive, so enqueue the work as early as possible to allow
-                // concurrent execution before it's needed (typically by ActivityManagerService).
-                // As native library loading is also expensive, this is a good place to start.
-                startSystemConfigInit(t);
-            }
+            // SystemConfig init is expensive, so enqueue the work as early as possible to allow
+            // concurrent execution before it's needed (typically by ActivityManagerService).
+            // As native library loading is also expensive, this is a good place to start.
+            startSystemConfigInit(t);
 
             // Initialize native services.
             System.loadLibrary("android_servers");
@@ -1200,12 +1199,6 @@ public final class SystemServer implements Dumpable {
         mDumper.addDumpable(watchdog);
         t.traceEnd();
 
-        // Legacy entry point for starting SystemConfig init, only needed if the early init flag is
-        // disabled and we haven't already triggered init before bootstrap services.
-        if (!android.server.Flags.earlySystemConfigInit()) {
-            startSystemConfigInit(t);
-        }
-
         // Orchestrates some ProtoLogging functionality.
         if (android.tracing.Flags.clientSideProtoLogging()) {
             t.traceBegin("StartProtoLogConfigurationService");
@@ -1225,7 +1218,7 @@ public final class SystemServer implements Dumpable {
         ServiceManager.addService(Context.PLATFORM_COMPAT_SERVICE, platformCompat);
         ServiceManager.addService(Context.PLATFORM_COMPAT_NATIVE_SERVICE,
                 new PlatformCompatNative(platformCompat));
-        AppCompatCallbacks.install(new long[0], new long[0]);
+        AppCompatCallbacks.install(new long[0], new long[0], false);
         t.traceEnd();
 
         // FileIntegrityService responds to requests from apps and the system. It needs to run after
@@ -2866,6 +2859,11 @@ public final class SystemServer implements Dumpable {
                 if (android.security.Flags.secureLockdown()) {
                     t.traceBegin("StartSecureLockDeviceService.Lifecycle");
                     mSystemServiceManager.startService(SecureLockDeviceService.Lifecycle.class);
+                    t.traceEnd();
+                }
+                if (android.hardware.biometrics.Flags.identityCheckWatch()) {
+                    t.traceBegin("StartWatchRangingService.Lifecycle");
+                    mSystemServiceManager.startService(WatchRangingService.Lifecycle.class);
                     t.traceEnd();
                 }
 

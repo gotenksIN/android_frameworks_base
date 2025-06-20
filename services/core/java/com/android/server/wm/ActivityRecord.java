@@ -161,6 +161,7 @@ import static android.view.WindowManager.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENAB
 import static android.view.WindowManager.PROPERTY_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING_STATE_SHARING;
 import static android.view.WindowManager.TRANSIT_RELAUNCH;
 import static android.view.WindowManager.hasWindowExtensionsEnabled;
+import static android.window.DesktopExperienceFlags.ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS;
 import static android.window.TransitionInfo.FLAGS_IS_OCCLUDED_NO_ANIMATION;
 import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
 import static android.window.TransitionInfo.FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
@@ -5763,6 +5764,7 @@ public final class ActivityRecord extends WindowToken {
                 // state. Updating the PAUSED usage state in that case, since the Activity will be
                 // STOPPED while cycled through the PAUSED state.
                 if (prevState == RESUMED) {
+                    mAtmService.updateBatteryStats(this, false);
                     mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_PAUSED);
                 }
                 break;
@@ -9117,6 +9119,14 @@ public final class ActivityRecord extends WindowToken {
                 mAtmService.mAmInternal.killProcess(wpc.mName, wpc.mUid, "resetConfig");
             });
             return;
+        }
+
+        // Process restart may require trampoline activity launch, for which app switching needs to
+        // be enabled. App switching may be allowed only for specific cases while/after Recents is
+        // shown. As when a process is restarted, the user should be interacting with the app, so
+        // it's safe to do this. See b/421048151 for more detail.
+        if (ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS.isTrue()) {
+            mAtmService.resumeAppSwitches();
         }
 
         if (mTransitionController.isShellTransitionsEnabled()) {

@@ -1078,6 +1078,7 @@ public abstract class Context {
      *         does not exist.
      */
     @Nullable
+    @RavenwoodKeep
     public final Drawable getDrawable(@DrawableRes int id) {
         return getResources().getDrawable(id, getTheme());
     }
@@ -1094,6 +1095,7 @@ public abstract class Context {
      *         does not exist.
      */
     @NonNull
+    @RavenwoodKeep
     public final ColorStateList getColorStateList(@ColorRes int id) {
         return getResources().getColorStateList(id, getTheme());
     }
@@ -3162,6 +3164,21 @@ public abstract class Context {
     }
 
     /**
+     * Like {@link #sendOrderedBroadcastMultiplePermissions(Intent, String[], String,
+     * BroadcastReceiver, Handler, int, String, Bundle, Bundle)}, but also allows specification of a
+     * list of multiple permissions that the receiver should NOT hold.
+     * @hide
+     */
+    public void sendOrderedBroadcastMultiplePermissions(
+            @NonNull Intent intent, @NonNull String[] receiverPermissions,
+            @NonNull String[] excludedPermissions, @Nullable String receiverAppOp,
+            @Nullable BroadcastReceiver resultReceiver, @Nullable Handler scheduler,
+            int initialCode, @Nullable String initialData, @Nullable Bundle initialExtras,
+            @Nullable Bundle options) {
+        throw new RuntimeException("Not implemented. Must override in a subclass.");
+    }
+
+    /**
      * <p>Perform a {@link #sendBroadcast(Intent)} that is "sticky," meaning the
      * Intent you are sending stays around after the broadcast is complete,
      * so that others can quickly retrieve that data through the return
@@ -4385,6 +4402,7 @@ public abstract class Context {
                 MEDIA_ROUTER_SERVICE,
                 TELEPHONY_SERVICE,
                 TELEPHONY_SUBSCRIPTION_SERVICE,
+                TELEPHONY_PHONE_NUMBER_SERVICE,
                 CARRIER_CONFIG_SERVICE,
                 EUICC_SERVICE,
                 // @hide: MMS_SERVICE,
@@ -5433,6 +5451,16 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.telephony.PhoneNumberManager} for parsing phone numbers.
+     *
+     * @see #getSystemService(String)
+     * @see android.telephony.PhoneNumberManager
+     */
+    @FlaggedApi(com.android.internal.telephony.flags.Flags.FLAG_ENABLE_PHONE_NUMBER_PARSING_API)
+    public static final String TELEPHONY_PHONE_NUMBER_SERVICE = "telephony_phone_number";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.telecom.TelecomManager} to manage telecom-related features
      * of the device.
      *
@@ -6206,7 +6234,6 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @see android.service.persistentdata.PersistentDataBlockManager
      */
-    @FlaggedApi(android.security.Flags.FLAG_FRP_ENFORCEMENT)
     public static final String PERSISTENT_DATA_BLOCK_SERVICE = "persistent_data_block";
 
     /**

@@ -68,6 +68,7 @@ import libcore.util.HexEncoding;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -701,19 +702,6 @@ class SyntheticPasswordManager {
     }
 
     /**
-     * Create a VerifyCredentialResponse from a timeout base on the WeaverReadResponse.
-     * This checks the received timeout(long) to make sure it sure it fits in an int before
-     * using it. If it doesn't fit, we use Integer.MAX_VALUE.
-     */
-    private static VerifyCredentialResponse responseFromTimeout(WeaverReadResponse response) {
-        int timeout =
-                response.timeout > Integer.MAX_VALUE || response.timeout < 0
-                ? Integer.MAX_VALUE
-                : (int) response.timeout;
-        return VerifyCredentialResponse.fromTimeout(timeout);
-    }
-
-    /**
      * Translate a {@link WeaverReadResponse} to a {@link VerifyCredentialResponse}.
      *
      * <p>This isn't a static method in {@link VerifyCredentialResponse} because {@link
@@ -721,16 +709,16 @@ class SyntheticPasswordManager {
      */
     private static VerifyCredentialResponse verifyCredentialResponseFromWeaverResponse(
             WeaverReadResponse weaverResponse) {
-        switch (weaverResponse.status) {
-            case WeaverReadStatus.OK:
-                return VerifyCredentialResponse.OK;
-            case WeaverReadStatus.THROTTLE:
-                // Either the credential could not be verified because a timeout is still active, or
-                // the credential was incorrect and there is a timeout before the next attempt will
-                // be allowed. INCORRECT_KEY is preferred in the latter case to avoid the ambiguity,
-                // but we still have to support implementations that use THROTTLE for both cases.
-                return responseFromTimeout(weaverResponse);
-            case WeaverReadStatus.INCORRECT_KEY:
+        return switch (weaverResponse.status) {
+            case WeaverReadStatus.OK -> VerifyCredentialResponse.OK;
+            case WeaverReadStatus.THROTTLE ->
+                    // Either the credential could not be verified because a timeout is still
+                    // active, or the credential was incorrect and there is a timeout before the
+                    // next attempt will be allowed. INCORRECT_KEY is preferred in the latter case
+                    // to avoid the ambiguity, but we still have to support implementations that use
+                    // THROTTLE for both cases.
+                    VerifyCredentialResponse.fromTimeout(Duration.ofMillis(weaverResponse.timeout));
+            case WeaverReadStatus.INCORRECT_KEY -> {
                 if (weaverResponse.timeout != 0) {
                     // The credential was incorrect, and there is a timeout until the next attempt
                     // will be allowed. This is reached if the Weaver implementation returns
@@ -738,15 +726,16 @@ class SyntheticPasswordManager {
                     //
                     // TODO(b/395976735): use RESPONSE_CRED_INCORRECT in this case, and update users
                     // of VerifyCredentialResponse to be compatible with that.
-                    return responseFromTimeout(weaverResponse);
+                    yield VerifyCredentialResponse.fromTimeout(
+                            Duration.ofMillis(weaverResponse.timeout));
                 }
                 if (android.security.Flags.softwareRatelimiter()) {
-                    return VerifyCredentialResponse.fromError(
-                            VerifyCredentialResponse.RESPONSE_CRED_INCORRECT);
+                    yield VerifyCredentialResponse.credIncorrect();
                 }
-                break;
-        }
-        return VerifyCredentialResponse.OTHER_ERROR;
+                yield VerifyCredentialResponse.OTHER_ERROR;
+            }
+            default -> VerifyCredentialResponse.OTHER_ERROR;
+        };
     }
 
     /**

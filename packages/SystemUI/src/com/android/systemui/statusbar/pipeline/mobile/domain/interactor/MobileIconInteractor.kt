@@ -88,6 +88,11 @@ import kotlinx.coroutines.flow.mapLatest
 // QTI_END: 2023-04-24: Android_UI: SystemUI: Add defaultDataSub for DDS RAT customization
 import kotlinx.coroutines.flow.stateIn
 interface MobileIconInteractor {
+    /** The subscriptionId that this connection represents */
+    // TODO(b/423048138): The interactor should have enough information to get the proper RAT
+    // indicator icon, rather than just exposing the subId here.
+    val subscriptionId: Int
+
     /** The table log created for this connection */
     val tableLogBuffer: TableLogBuffer
     /** The current mobile data activity */
@@ -246,6 +251,8 @@ class MobileIconInteractorImpl(
     carrierNameCustomization: CarrierNameCustomization,
 // QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization
 ) : MobileIconInteractor {
+    override val subscriptionId = connectionRepository.subId
+
     override val tableLogBuffer: TableLogBuffer = connectionRepository.tableLogBuffer
     override val activity = connectionRepository.dataActivityDirection
     override val isDataEnabled: StateFlow<Boolean> = connectionRepository.dataEnabled

@@ -136,7 +136,8 @@ public class ProcessObserverTest {
                 new TestInjector(mContext), mServiceThreadRule.getThread());
         mRealAms.mConstants.loadDeviceConfigConstants();
         mRealAms.mActivityTaskManager = new ActivityTaskManagerService(mContext);
-        mRealAms.mActivityTaskManager.initialize(null, null, mContext.getMainLooper());
+        mRealAms.mActivityTaskManager.initialize(null, null, mRealAms.mProcessStateController,
+                mContext.getMainLooper());
         mRealAms.mAtmInternal = mActivityTaskManagerInt;
         mRealAms.mPackageManagerInt = mPackageManagerInt;
         mRealAms.mUsageStatsService = mUsageStatsManagerInt;
@@ -215,8 +216,8 @@ public class ProcessObserverTest {
                 anyBoolean(), anyBoolean(), any(),
                 any(), any(), any(),
                 any(), any(),
+                any(), any(), any(), anyBoolean(),
                 any(), any(),
-                any(), any(), any(),
                 anyLong(), anyLong());
         final ProcessRecord r = spy(new ProcessRecord(mAms, ai, ai.processName, ai.uid));
         r.setPid(myPid());
@@ -265,7 +266,7 @@ public class ProcessObserverTest {
                 null, null,
                 null,
                 null, null, null,
-                null, null, null, null,
+                null, null, false, null, null,
                 0, 0);
         return app;
     }

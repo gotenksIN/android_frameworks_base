@@ -48,7 +48,7 @@ interface SwitchPreferenceModel {
     /**
      * The summary of this [SwitchPreference].
      */
-    val summary: () -> String
+    val summary: () -> CharSequence
         get() = { "" }
 
     /**
@@ -89,8 +89,14 @@ interface SwitchPreferenceModel {
  */
 @Composable
 fun SwitchPreference(model: SwitchPreferenceModel) {
+    SwitchPreference(model = model, modifier = Modifier)
+}
+
+@Composable
+internal fun SwitchPreference(model: SwitchPreferenceModel, modifier: Modifier) {
     InternalSwitchPreference(
         title = model.title,
+        modifier = modifier,
         summary = model.summary,
         icon = model.icon,
         checked = model.checked(),
@@ -102,7 +108,8 @@ fun SwitchPreference(model: SwitchPreferenceModel) {
 @Composable
 internal fun InternalSwitchPreference(
     title: String,
-    summary: () -> String = { "" },
+    modifier: Modifier = Modifier,
+    summary: () -> CharSequence = { "" },
     icon: @Composable (() -> Unit)? = null,
     checked: Boolean?,
     changeable: Boolean = true,
@@ -114,9 +121,9 @@ internal fun InternalSwitchPreference(
     val indication = LocalIndication.current
     val onChangeWithLog = wrapOnSwitchWithLog(onCheckedChange)
     val interactionSource = remember { MutableInteractionSource() }
-    val modifier =
+    val localModifier =
         if (checked != null && onChangeWithLog != null) {
-            Modifier.toggleable(
+            modifier.toggleable(
                 value = checked,
                 interactionSource = interactionSource,
                 indication = indication,
@@ -124,11 +131,11 @@ internal fun InternalSwitchPreference(
                 role = Role.Switch,
                 onValueChange = onChangeWithLog,
             )
-        } else Modifier
+        } else modifier
     BasePreference(
         title = title,
         summary = summary,
-        modifier = modifier,
+        modifier = localModifier,
         enabled = { changeable },
         paddingStart = paddingStart,
         paddingEnd = paddingEnd,

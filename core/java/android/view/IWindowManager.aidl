@@ -470,6 +470,7 @@ interface IWindowManager
 
     /**
      * Used only for assist -- request a screenshot of the current application.
+     * @deprecated. Use WindowManagerInternal#requestAssistScreenshot instead.
      */
     void requestAssistScreenshot(IAssistDataReceiver receiver);
 
@@ -845,10 +846,8 @@ interface IWindowManager
 
     /**
      * Called to get the expected window insets.
-     *
-     * @return {@code true} if system bars are always consumed.
      */
-    boolean getWindowInsets(int displayId, in IBinder token, out InsetsState outInsetsState);
+    void getWindowInsets(int displayId, in IBinder token, out InsetsState outInsetsState);
 
     /**
      * Returns a list of {@link android.view.DisplayInfo} for the logical display. This is not

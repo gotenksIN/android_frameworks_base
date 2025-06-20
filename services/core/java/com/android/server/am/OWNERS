@@ -1,5 +1,6 @@
 # Applications & Processes
 per-file ActivityManager* = file:/ACTIVITY_MANAGER_OWNERS
+per-file ActivityManager* = file:platform/system/zygote:/OWNERS
 per-file ActiveServices.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file ProcessList.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file ActivityThread.java = file:/ACTIVITY_MANAGER_OWNERS

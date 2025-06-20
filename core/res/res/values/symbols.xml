@@ -295,6 +295,7 @@
   <java-symbol type="integer" name="config_audio_ring_vol_steps" />
   <java-symbol type="integer" name="config_audio_alarm_min_vol" />
   <java-symbol type="bool" name="config_audio_ringer_mode_affects_alarm_stream" />
+  <java-symbol type="bool" name="config_multi_audio_focus_enabled_default" />
   <java-symbol type="bool" name="config_spatial_audio_head_tracking_enabled_default" />
   <java-symbol type="bool" name="config_avoidGfxAccel" />
   <java-symbol type="bool" name="config_bluetooth_address_validation" />
@@ -3424,6 +3425,10 @@
   <java-symbol type="string" name="page_size_compat_apk_warning" />
   <java-symbol type="string" name="page_size_compat_elf_warning" />
   <java-symbol type="string" name="page_size_compat_apk_and_elf_warning" />
+  <java-symbol type="string" name="page_size_compat_apk_warning_4kb" />
+  <java-symbol type="string" name="page_size_compat_elf_warning_4kb" />
+  <java-symbol type="string" name="page_size_compat_apk_and_elf_warning_4kb" />
+  <java-symbol type="string" name="page_size_compat_never_show" />
 
   <!--  Work profile unlaunchable app alert dialog-->
   <java-symbol type="style" name="AlertDialogWithEmergencyButton"/>
@@ -3824,6 +3829,7 @@
   <java-symbol type="raw" name="fallback_categories" />
 
   <java-symbol type="string" name="config_icon_mask" />
+  <java-symbol type="string" name="config_banner_mask" />
   <java-symbol type="string" name="config_batterymeterPerimeterPath" />
   <java-symbol type="string" name="config_batterymeterErrorPerimeterPath" />
   <java-symbol type="string" name="config_batterymeterFillMask" />
@@ -6223,6 +6229,7 @@
 
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_app_title" />
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_title" />
+  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" />
 
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_text" />
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" />
@@ -6276,6 +6283,10 @@
   <java-symbol type="integer" name="no_blink_accessibility_text_cursor_blink_interval_ms" />
   <java-symbol type="array" name="accessibility_text_cursor_blink_intervals" />
 
-  <!-- Verification service provider -->
-  <java-symbol type="string" name="config_verificationServiceProviderPackageName" />
+  <!-- Developer verification service provider -->
+  <java-symbol type="string" name="config_developerVerificationServiceProviderPackageName" />
+
+  <!-- Package and class info to bind to ProximityProviderService -->
+  <java-symbol type="string" name="proximity_provider_service_package_name" />
+  <java-symbol type="string" name="proximity_provider_service_class_name" />
 </resources>

@@ -254,12 +254,12 @@ public final class MessageQueue {
         mMessageCount.incrementAndGet();
         if (PerfettoTrace.MQ_CATEGORY.isEnabled()) {
             msg.sendingThreadName = Thread.currentThread().getName();
-            msg.mEventId.set(PerfettoTrace.getFlowId());
+            final long eventId = msg.eventId = PerfettoTrace.getFlowId();
 
             traceMessageCount();
             final long messageDelayMs = Math.max(0L, when - SystemClock.uptimeMillis());
             PerfettoTrace.instant(PerfettoTrace.MQ_CATEGORY, "message_queue_send")
-                    .setFlow(msg.mEventId.get())
+                    .setFlow(eventId)
                     .beginProto()
                     .beginNested(2004 /* message_queue */)
                     .addField(2 /* receiving_thread_name */, mThreadName)
@@ -289,28 +289,12 @@ public final class MessageQueue {
     static final class EnqueueOrder implements Comparator<Message> {
         @Override
         public int compare(Message m1, Message m2) {
-            return compareMessages(m1, m2);
+            return Message.compareMessages(m1, m2);
         }
     }
 
     private static final EnqueueOrder sEnqueueOrder = new EnqueueOrder();
 
-    static int compareMessages(@NonNull Message m1, @NonNull Message m2) {
-        // Primary queue order is by when.
-        // Messages with an earlier when should come first in the queue.
-        final long whenDiff = m1.when - m2.when;
-        if (whenDiff > 0) return 1;
-        if (whenDiff < 0) return -1;
-
-        // Secondary queue order is by insert sequence.
-        // If two messages were inserted with the same `when`, the one inserted
-        // first should come first in the queue.
-        final long insertSeqDiff = m1.insertSeq - m2.insertSeq;
-        if (insertSeqDiff > 0) return 1;
-        if (insertSeqDiff < 0) return -1;
-
-        return 0;
-    }
 
     private static boolean isBarrier(Message msg) {
         return msg != null && msg.target == null;
@@ -806,7 +790,7 @@ public final class MessageQueue {
                 if (msg == null) {
                     earliest = asyncMsg;
                 } else if (asyncMsg != null) {
-                    if (compareMessages(msg, asyncMsg) > 0) {
+                    if (Message.compareMessages(msg, asyncMsg) > 0) {
                         earliest = asyncMsg;
                     }
                 }
@@ -2608,6 +2592,8 @@ public final class MessageQueue {
         private volatile boolean mRemovedFromStackValue;
         static {
             try {
+                // We need to use VarHandle rather than java.util.concurrent.atomic.*
+                // for performance reasons. See: b/421437036
                 MethodHandles.Lookup l = MethodHandles.lookup();
                 sRemovedFromStack = l.findVarHandle(MessageQueue.MessageNode.class,
                         "mRemovedFromStackValue", boolean.class);
@@ -2681,6 +2667,8 @@ public final class MessageQueue {
 
     static {
         try {
+            // We need to use VarHandle rather than java.util.concurrent.atomic.*
+            // for performance reasons. See: b/421437036
             MethodHandles.Lookup l = MethodHandles.lookup();
             sState = l.findVarHandle(MessageQueue.class, "mStateValue",
                     MessageQueue.StackNode.class);
@@ -2803,6 +2791,8 @@ public final class MessageQueue {
         private volatile long mCountsValue = 0;
         static {
             try {
+                // We need to use VarHandle rather than java.util.concurrent.atomic.*
+                // for performance reasons. See: b/421437036
                 MethodHandles.Lookup l = MethodHandles.lookup();
                 sCounts = l.findVarHandle(MessageQueue.MessageCounts.class, "mCountsValue",
                         long.class);
@@ -2900,6 +2890,7 @@ public final class MessageQueue {
         msg.when = when;
         msg.insertSeq = seq;
         msg.markInUse();
+        incAndTraceMessageCount(msg, when);
 
         if (DEBUG) {
             Log.d(TAG_C, "Insert message"
@@ -2920,7 +2911,6 @@ public final class MessageQueue {
             }
 
             insertIntoPriorityQueue(msg);
-            incAndTraceMessageCount(msg, when);
             /*
              * We still need to do this even though we are the current thread,
              * otherwise next() may sleep indefinitely.
@@ -2967,6 +2957,7 @@ public final class MessageQueue {
 
                 case STACK_NODE_QUITTING:
                     logDeadThread(msg);
+                    decAndTraceMessageCount();
                     return false;
 
                 default:
@@ -2989,7 +2980,6 @@ public final class MessageQueue {
                         mMessageCounts.incrementQueued();
                     }
                 }
-                incAndTraceMessageCount(msg, when);
                 return true;
             }
         }

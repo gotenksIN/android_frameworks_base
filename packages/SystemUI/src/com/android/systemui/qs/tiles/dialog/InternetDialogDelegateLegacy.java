@@ -28,6 +28,8 @@ import static android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TE
 import static com.android.settingslib.satellite.SatelliteDialogUtils.TYPE_IS_WIFI;
 import static com.android.systemui.Prefs.Key.QS_HAS_TURNED_OFF_MOBILE_DATA;
 import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.MAX_WIFI_ENTRY_COUNT;
+import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.SATELLITE_NOT_STARTED;
+import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.SATELLITE_STARTED;
 
 import static com.qti.extphone.ExtPhoneCallbackListener.EVENT_ON_CIWLAN_CONFIG_CHANGE;
 
@@ -293,7 +295,7 @@ public class InternetDialogDelegateLegacy implements
             ShadeDialogContextInteractor shadeDialogContextInteractor,
             ShadeModeInteractor shadeModeInteractor) {
         // TODO (b/393628355): remove this after the details view is supported for single shade.
-        if (shadeModeInteractor.isDualShade()){
+        if (shadeModeInteractor.isDualShade()) {
             // If `QsDetailedView` is enabled, it should show the details view.
             QsDetailedView.assertInLegacyMode();
         }
@@ -537,6 +539,11 @@ public class InternetDialogDelegateLegacy implements
         internetContent.mIsWifiScanEnabled = mInternetDetailsContentController.isWifiScanEnabled();
         internetContent.mActiveAutoSwitchNonDdsSubId =
                 mInternetDetailsContentController.getActiveAutoSwitchNonDdsSubId();
+        internetContent.mCurrentSatelliteState =
+                mInternetDetailsContentController.getCurrentSatelliteState();
+        internetContent.mDefaultSubSignalStrengthIcon =
+                mInternetDetailsContentController.getSignalStrengthDrawable(mDefaultDataSubId);
+
         return internetContent;
     }
 
@@ -639,6 +646,7 @@ public class InternetDialogDelegateLegacy implements
     }
 
     private void setMobileDataLayout(SystemUIDialog dialog, InternetContent internetContent) {
+        Context context = dialog.getContext();
         boolean isNetworkConnected =
                 internetContent.mActiveNetworkIsCellular
                         || internetContent.mIsCarrierNetworkActive;
@@ -664,184 +672,202 @@ public class InternetDialogDelegateLegacy implements
                 mMobileDataToggle.setEnabled(true);
             }
             mMobileNetworkLayout.setVisibility(View.VISIBLE);
-            mMobileDataToggle.setChecked(mInternetDetailsContentController.isMobileDataEnabled());
-            mMobileTitleText.setText(getMobileNetworkTitle(mDefaultDataSubId));
-            String summary = getMobileNetworkSummary(mDefaultDataSubId);
-            if (!TextUtils.isEmpty(summary)) {
-                mMobileSummaryText.setText(
-                        Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY));
-                mMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
-                mMobileSummaryText.setVisibility(View.VISIBLE);
-            } else {
-                mMobileSummaryText.setVisibility(View.GONE);
-            }
-            mBackgroundExecutor.execute(() -> {
-                Drawable drawable = getSignalStrengthDrawable(mDefaultDataSubId);
-                mHandler.post(() -> {
-                    mSignalIcon.setImageDrawable(drawable);
-                });
-            });
-
-            mMobileDataToggle.setVisibility(mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
-            mMobileToggleDivider.setVisibility(
-                    mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
-            mNddsSubId = getNddsSubId();
-            boolean nonDdsVisibleForDualData = SubscriptionManager
-                    .isUsableSubscriptionId(mNddsSubId) && isDualDataEnabled();
-            int primaryColor = isNetworkConnected
-                    ? R.color.connected_network_primary_color
-                    : R.color.disconnected_network_primary_color;
-            mMobileToggleDivider.setBackgroundColor(dialog.getContext().getColor(primaryColor));
-            // Display the info for the non-DDS if it's actively being used
-            int autoSwitchNonDdsSubId = internetContent.mActiveAutoSwitchNonDdsSubId;
-            int nonDdsVisibility = (autoSwitchNonDdsSubId
-                    != SubscriptionManager.INVALID_SUBSCRIPTION_ID || nonDdsVisibleForDualData)
-                    ? View.VISIBLE : View.GONE;
-            Log.d(TAG, "mNddsSubId: " + mNddsSubId
-                    + " isDualDataEnabled: " + isDualDataEnabled()
-                    + " nonDdsVisibleForDualData: " + nonDdsVisibleForDualData
-                    + " nonDdsVisibility: " + nonDdsVisibility);
-            int secondaryRes = isNetworkConnected
-                    ? R.style.TextAppearance_InternetDialog_Secondary_Active
-                    : R.style.TextAppearance_InternetDialog_Secondary;
-            if (nonDdsVisibleForDualData) {
-                ViewStub stub = mDialogView.findViewById(R.id.secondary_mobile_network_stub);
-                if (stub != null) {
-                    stub.setLayoutResource(R.layout.qs_diaglog_secondary_generic_mobile_network);
-                    stub.inflate();
-                }
-                mMobileNetworkLayout.setBackground(mBackgroundOn);
-                mSecondaryMobileNetworkLayout = mDialogView.findViewById(
-                        R.id.secondary_mobile_network_layout);
-                mSecondaryMobileNetworkLayout.setBackground(mSecondaryBackgroundOn);
-                mSecondaryMobileDataToggle =
-                        mDialogView.requireViewById(R.id.secondary_generic_mobile_toggle);
-                mSecondaryMobileDataToggle.setChecked(
-                        mInternetDetailsContentController.isMobileDataEnabled(mNddsSubId));
-                TextView mobileTitleText =
-                        mDialogView.requireViewById(R.id.secondary_generic_mobile_title);
-                mobileTitleText.setText(getMobileNetworkTitle(mNddsSubId));
-
-                TextView summaryText =
-                        mDialogView.requireViewById(R.id.secondary_generic_mobile_summary);
-                String secondarySummary = getMobileNetworkSummary(mNddsSubId);
-                if (!TextUtils.isEmpty(secondarySummary)) {
-                    summaryText.setText(
-                            Html.fromHtml(secondarySummary, Html.FROM_HTML_MODE_LEGACY));
-                    summaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
-                    summaryText.setVisibility(View.VISIBLE);
+            if (internetContent.mCurrentSatelliteState != SATELLITE_NOT_STARTED) {
+                mMobileTitleText.setText(R.string.satellite_network_title_text);
+                mMobileDataToggle.setVisibility(View.INVISIBLE);
+                mMobileToggleDivider.setVisibility(View.INVISIBLE);
+                if (internetContent.mCurrentSatelliteState
+                        == InternetDetailsContentController.SATELLITE_CONNECTED) {
+                    mMobileSummaryText.setText(R.string.mobile_data_connection_active);
+                    mMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
+                    mMobileSummaryText.setVisibility(View.VISIBLE);
                 } else {
-                    summaryText.setVisibility(View.GONE);
+                    mMobileSummaryText.setVisibility(View.GONE);
                 }
-
-                final ImageView signalIcon =
-                        mDialogView.requireViewById(R.id.secondary_generic_signal_icon);
-                mBackgroundExecutor.execute(() -> {
-                    Drawable drawable = getSignalStrengthDrawable(mNddsSubId);
-                    mHandler.post(() -> {
-                        signalIcon.setImageDrawable(drawable);
-                    });
-                });
-
-                View divider = mDialogView.requireViewById(
-                        R.id.secondary_generic_mobile_toggle_divider);
-
-                mSecondaryMobileDataToggle.setVisibility(
-                        mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
-                divider.setVisibility(
-                        mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
-                mSecondaryMobileDataToggle.setOnClickListener(
-                    (v) -> {
-                        boolean isChecked = mSecondaryMobileDataToggle.isChecked();
-                        if (!isChecked && shouldShowMobileDialog(mNddsSubId)) {
-                            mSecondaryMobileDataToggle.setChecked(true);
-                            showTurnOffMobileDialog(mNddsSubId);
-                        } else if (!shouldShowMobileDialog(mNddsSubId)) {
-                            if (mInternetDetailsContentController.isMobileDataEnabled(
-                                    mNddsSubId) == isChecked) {
-                                return;
-                            }
-                            mInternetDetailsContentController.setMobileDataEnabled(
-                                    dialog.getContext(), mNddsSubId, isChecked, false);
-                        }
-                });
-                nonDdsVisibility = View.VISIBLE;
-            } else if (nonDdsVisibility == View.VISIBLE) {
-                // non DDS is the currently active sub, set primary visual for it
-                ViewStub stub = mDialogView.findViewById(R.id.secondary_mobile_network_stub);
-                if (stub != null) {
-                    stub.inflate();
-                }
-                mSecondaryMobileNetworkLayout = mDialogView.findViewById(
-                        R.id.secondary_mobile_network_layout);
-                if (mCanConfigMobileData) {
-                    mSecondaryMobileNetworkLayout.setOnClickListener(
-                            this::onClickConnectedSecondarySub);
-                }
-                mSecondaryMobileNetworkLayout.setBackground(mSecondaryBackgroundOn);
-
-                TextView mSecondaryMobileTitleText = mDialogView.requireViewById(
-                        R.id.secondary_mobile_title);
-                mSecondaryMobileTitleText.setText(getMobileNetworkTitle(autoSwitchNonDdsSubId));
-                mSecondaryMobileTitleText.setTextAppearance(
-                        R.style.TextAppearance_InternetDialog_Active);
-
-                TextView mSecondaryMobileSummaryText =
-                        mDialogView.requireViewById(R.id.secondary_mobile_summary);
-                summary = getMobileNetworkSummary(autoSwitchNonDdsSubId);
+                Drawable drawable = context.getResources()
+                        .getDrawable(internetContent.mCurrentSatelliteState > SATELLITE_STARTED
+                                ? R.drawable.ic_satellite_connected_2
+                                : R.drawable.ic_satellite_not_connected);
+                drawable.setTint(context.getColor(R.color.connected_network_primary_color));
+                mSignalIcon.setImageDrawable(drawable);
+            } else {
+                mMobileDataToggle.setChecked(
+                        mInternetDetailsContentController.isMobileDataEnabled());
+                mMobileTitleText.setText(getMobileNetworkTitle(mDefaultDataSubId));
+                String summary = getMobileNetworkSummary(mDefaultDataSubId);
                 if (!TextUtils.isEmpty(summary)) {
-                    mSecondaryMobileSummaryText.setText(
+                    mMobileSummaryText.setText(
                             Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY));
-                    mSecondaryMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
-                    mSecondaryMobileSummaryText.setTextAppearance(
-                            R.style.TextAppearance_InternetDialog_Active);
+                    mMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
+                    mMobileSummaryText.setVisibility(View.VISIBLE);
+                } else {
+                    mMobileSummaryText.setVisibility(View.GONE);
                 }
 
-                ImageView mSecondarySignalIcon =
-                        mDialogView.requireViewById(R.id.secondary_signal_icon);
-                mBackgroundExecutor.execute(() -> {
-                    Drawable drawable = getSignalStrengthDrawable(autoSwitchNonDdsSubId);
-                    mHandler.post(() -> {
-                        mSecondarySignalIcon.setImageDrawable(drawable);
+                mSignalIcon.setImageDrawable(internetContent.mDefaultSubSignalStrengthIcon);
+
+                mMobileDataToggle.setVisibility(
+                        mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
+                mMobileToggleDivider.setVisibility(
+                        mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
+                mNddsSubId = getNddsSubId();
+                boolean nonDdsVisibleForDualData = SubscriptionManager
+                        .isUsableSubscriptionId(mNddsSubId) && isDualDataEnabled();
+                int primaryColor = isNetworkConnected
+                        ? R.color.connected_network_primary_color
+                        : R.color.disconnected_network_primary_color;
+                mMobileToggleDivider.setBackgroundColor(context.getColor(primaryColor));
+                // Display the info for the non-DDS if it's actively being used
+                int autoSwitchNonDdsSubId = internetContent.mActiveAutoSwitchNonDdsSubId;
+                int nonDdsVisibility = (autoSwitchNonDdsSubId
+                        != SubscriptionManager.INVALID_SUBSCRIPTION_ID || nonDdsVisibleForDualData)
+                        ? View.VISIBLE : View.GONE;
+                Log.d(TAG, "mNddsSubId: " + mNddsSubId
+                        + " isDualDataEnabled: " + isDualDataEnabled()
+                        + " nonDdsVisibleForDualData: " + nonDdsVisibleForDualData
+                        + " nonDdsVisibility: " + nonDdsVisibility);
+                int secondaryRes = isNetworkConnected
+                        ? R.style.TextAppearance_InternetDialog_Secondary_Active
+                        : R.style.TextAppearance_InternetDialog_Secondary;
+                if (nonDdsVisibleForDualData) {
+                    ViewStub stub = mDialogView.findViewById(R.id.secondary_mobile_network_stub);
+                    if (stub != null) {
+                        stub.setLayoutResource(R.layout.qs_diaglog_secondary_generic_mobile_network);
+                        stub.inflate();
+                    }
+                    mMobileNetworkLayout.setBackground(mBackgroundOn);
+                    mSecondaryMobileNetworkLayout = mDialogView.findViewById(
+                            R.id.secondary_mobile_network_layout);
+                    mSecondaryMobileNetworkLayout.setBackground(mSecondaryBackgroundOn);
+                    mSecondaryMobileDataToggle =
+                            mDialogView.requireViewById(R.id.secondary_generic_mobile_toggle);
+                    mSecondaryMobileDataToggle.setChecked(
+                            mInternetDetailsContentController.isMobileDataEnabled(mNddsSubId));
+                    TextView mobileTitleText =
+                            mDialogView.requireViewById(R.id.secondary_generic_mobile_title);
+                    mobileTitleText.setText(getMobileNetworkTitle(mNddsSubId));
+
+                    TextView summaryText =
+                            mDialogView.requireViewById(R.id.secondary_generic_mobile_summary);
+                    String secondarySummary = getMobileNetworkSummary(mNddsSubId);
+                    if (!TextUtils.isEmpty(secondarySummary)) {
+                        summaryText.setText(
+                                Html.fromHtml(secondarySummary, Html.FROM_HTML_MODE_LEGACY));
+                        summaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
+                        summaryText.setVisibility(View.VISIBLE);
+                    } else {
+                        summaryText.setVisibility(View.GONE);
+                    }
+
+                    final ImageView signalIcon =
+                            mDialogView.requireViewById(R.id.secondary_generic_signal_icon);
+                    mBackgroundExecutor.execute(() -> {
+                        Drawable drawable = getSignalStrengthDrawable(mNddsSubId);
+                        mHandler.post(() -> {
+                            signalIcon.setImageDrawable(drawable);
+                        });
                     });
-                });
 
-                ImageView mSecondaryMobileSettingsIcon =
-                        mDialogView.requireViewById(R.id.secondary_settings_icon);
-                mSecondaryMobileSettingsIcon.setColorFilter(
-                        dialog.getContext().getColor(R.color.connected_network_primary_color));
-                mSecondaryMobileSettingsIcon.setVisibility(mCanConfigMobileData ?
-                        View.VISIBLE : View.INVISIBLE);
+                    View divider = mDialogView.requireViewById(
+                            R.id.secondary_generic_mobile_toggle_divider);
 
-                // set secondary visual for default data sub
-                mMobileNetworkLayout.setBackground(mBackgroundOff);
-                mMobileTitleText.setTextAppearance(R.style.TextAppearance_InternetDialog);
-                mMobileSummaryText.setTextAppearance(
-                        R.style.TextAppearance_InternetDialog_Secondary);
-                mSignalIcon.setColorFilter(
-                        dialog.getContext().getColor(R.color.connected_network_secondary_color));
-            } else {
-                mMobileNetworkLayout.setBackground(
-                        isNetworkConnected ? mBackgroundOn : mBackgroundOff);
-                mMobileTitleText.setTextAppearance(isNetworkConnected
-                        ?
-                        R.style.TextAppearance_InternetDialog_Active
-                        : R.style.TextAppearance_InternetDialog);
-                mMobileSummaryText.setTextAppearance(secondaryRes);
-            }
+                    mSecondaryMobileDataToggle.setVisibility(
+                            mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
+                    divider.setVisibility(
+                            mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
+                    mSecondaryMobileDataToggle.setOnClickListener(
+                            (v) -> {
+                                boolean isChecked = mSecondaryMobileDataToggle.isChecked();
+                                if (!isChecked && shouldShowMobileDialog(mNddsSubId)) {
+                                    mSecondaryMobileDataToggle.setChecked(true);
+                                    showTurnOffMobileDialog(mNddsSubId);
+                                } else if (!shouldShowMobileDialog(mNddsSubId)) {
+                                    if (mInternetDetailsContentController.isMobileDataEnabled(
+                                            mNddsSubId) == isChecked) {
+                                        return;
+                                    }
+                                    mInternetDetailsContentController.setMobileDataEnabled(
+                                            context, mNddsSubId, isChecked, false);
+                                }
+                            });
+                    nonDdsVisibility = View.VISIBLE;
+                } else if (nonDdsVisibility == View.VISIBLE) {
+                    // non DDS is the currently active sub, set primary visual for it
+                    ViewStub stub = mDialogView.findViewById(R.id.secondary_mobile_network_stub);
+                    if (stub != null) {
+                        stub.inflate();
+                    }
+                    mSecondaryMobileNetworkLayout = mDialogView.findViewById(
+                            R.id.secondary_mobile_network_layout);
+                    if (mCanConfigMobileData) {
+                        mSecondaryMobileNetworkLayout.setOnClickListener(
+                                this::onClickConnectedSecondarySub);
+                    }
+                    mSecondaryMobileNetworkLayout.setBackground(mSecondaryBackgroundOn);
 
-            if (mSecondaryMobileNetworkLayout != null) {
-                mSecondaryMobileNetworkLayout.setVisibility(nonDdsVisibility);
-            }
+                    TextView mSecondaryMobileTitleText = mDialogView.requireViewById(
+                            R.id.secondary_mobile_title);
+                    mSecondaryMobileTitleText.setText(getMobileNetworkTitle(autoSwitchNonDdsSubId));
+                    mSecondaryMobileTitleText.setTextAppearance(
+                            R.style.TextAppearance_InternetDialog_Active);
 
-            // Set airplane mode to the summary for carrier network
-            if (internetContent.mIsAirplaneModeEnabled) {
-                mAirplaneModeSummaryText.setVisibility(View.VISIBLE);
-                mAirplaneModeSummaryText.setText(
-                        dialog.getContext().getText(R.string.airplane_mode));
-                mAirplaneModeSummaryText.setTextAppearance(secondaryRes);
-            } else {
-                mAirplaneModeSummaryText.setVisibility(View.GONE);
+                    TextView mSecondaryMobileSummaryText =
+                            mDialogView.requireViewById(R.id.secondary_mobile_summary);
+                    summary = getMobileNetworkSummary(autoSwitchNonDdsSubId);
+                    if (!TextUtils.isEmpty(summary)) {
+                        mSecondaryMobileSummaryText.setText(
+                                Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY));
+                        mSecondaryMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
+                        mSecondaryMobileSummaryText.setTextAppearance(
+                                R.style.TextAppearance_InternetDialog_Active);
+                    }
+
+                    ImageView mSecondarySignalIcon =
+                            mDialogView.requireViewById(R.id.secondary_signal_icon);
+                    mBackgroundExecutor.execute(() -> {
+                        Drawable drawable = getSignalStrengthDrawable(autoSwitchNonDdsSubId);
+                        mHandler.post(() -> {
+                            mSecondarySignalIcon.setImageDrawable(drawable);
+                        });
+                    });
+
+                    ImageView mSecondaryMobileSettingsIcon =
+                            mDialogView.requireViewById(R.id.secondary_settings_icon);
+                    mSecondaryMobileSettingsIcon.setColorFilter(
+                            context.getColor(R.color.connected_network_primary_color));
+                    mSecondaryMobileSettingsIcon.setVisibility(mCanConfigMobileData
+                            ? View.VISIBLE : View.INVISIBLE);
+
+                    // set secondary visual for default data sub
+                    mMobileNetworkLayout.setBackground(mBackgroundOff);
+                    mMobileTitleText.setTextAppearance(R.style.TextAppearance_InternetDialog);
+                    mMobileSummaryText.setTextAppearance(
+                            R.style.TextAppearance_InternetDialog_Secondary);
+                    mSignalIcon.setColorFilter(
+                            context.getColor(R.color.connected_network_secondary_color));
+                } else {
+                    mMobileNetworkLayout.setBackground(
+                            isNetworkConnected ? mBackgroundOn : mBackgroundOff);
+                    mMobileTitleText.setTextAppearance(isNetworkConnected
+                            ?
+                            R.style.TextAppearance_InternetDialog_Active
+                            : R.style.TextAppearance_InternetDialog);
+                    mMobileSummaryText.setTextAppearance(secondaryRes);
+                }
+
+                if (mSecondaryMobileNetworkLayout != null) {
+                    mSecondaryMobileNetworkLayout.setVisibility(nonDdsVisibility);
+                }
+
+                // Set airplane mode to the summary for carrier network
+                if (internetContent.mIsAirplaneModeEnabled) {
+                    mAirplaneModeSummaryText.setVisibility(View.VISIBLE);
+                    mAirplaneModeSummaryText.setText(
+                            context.getText(R.string.airplane_mode));
+                    mAirplaneModeSummaryText.setTextAppearance(secondaryRes);
+                } else {
+                    mAirplaneModeSummaryText.setVisibility(View.GONE);
+                }
             }
         }
     }
@@ -1348,6 +1374,11 @@ public class InternetDialogDelegateLegacy implements
     }
 
     @Override
+    public void onSatelliteModemStateChanged(int state) {
+        updateDialog(true /* shouldUpdateMobileNetwork */);
+    }
+
+    @Override
     public void onWindowFocusChanged(SystemUIDialog dialog, boolean hasFocus) {
         if (mAlertDialog != null && !mAlertDialog.isShowing()) {
             if (!hasFocus && dialog.isShowing()) {
@@ -1431,5 +1462,8 @@ public class InternetDialogDelegateLegacy implements
         boolean mIsDeviceLocked = false;
         boolean mIsWifiScanEnabled = false;
         int mActiveAutoSwitchNonDdsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        int mCurrentSatelliteState = SATELLITE_NOT_STARTED;
+
+        Drawable mDefaultSubSignalStrengthIcon = null;
     }
 }

@@ -557,6 +557,7 @@ public interface RILConstants {
     int RIL_REQUEST_SET_USER_DATA_ENABLED = 254;
     int RIL_REQUEST_SET_USER_DATA_ROAMING_ENABLED = 255;
     int RIL_REQUEST_UPDATE_ALLOWED_IMS_SERVICES = 256;
+    int RIL_REQUEST_NOTIFY_IMS_DATA_NETWORK = 257;
 
 // QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* RIL Request to get newly supported radio

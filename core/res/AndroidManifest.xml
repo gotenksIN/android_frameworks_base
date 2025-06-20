@@ -1903,12 +1903,12 @@
                 android:protectionLevel="normal" />
 
     <!-- Allows an app to access moisture intrusion sensor data
-        <p>Protection level: normal
+        <p>Protection level: signature | privileged
          @hide
     -->
     <permission android:name="android.permission.READ_MOISTURE_INTRUSION"
                 android:permissionGroup="android.permission-group.SENSORS"
-                android:protectionLevel="normal"
+                android:protectionLevel="signature|privileged"
                 android:featureFlag="com.android.tradeinmode.flags.trade_in_mode_2025q4"/>
 
     <!-- Allows an application to access data from sensors that the user uses to
@@ -5264,7 +5264,7 @@
 
     <!-- This permission protects a content provider within home/launcher applications, enabling management of home screen metadata such as shortcut placement, launch intents, and labels. -->
     <!-- @FlaggedApi(android.provider.Flags.FLAG_LAUNCHER_DATA_ACCESS) -->
-    <permission android:name="android.permission.LAUNCHER_DATA_ACCESS"
+    <permission android:name="android.permission.ACCESS_LAUNCHER_DATA"
       android:protectionLevel="signatureOrSystem"
       android:featureFlag="android.provider.launcher_data_access" />
 
@@ -5402,12 +5402,12 @@
                 android:featureFlag="android.xr.xr_manifest_entries" />
 
     <!-- Used for permissions that are associated with accessing
-         particularly sensitive XR tracking data.
+         sensitive XR eye tracking data.
 
          @FlaggedApi(android.xr.Flags.FLAG_XR_MANIFEST_ENTRIES) -->
-    <permission-group android:name="android.permission-group.XR_TRACKING_SENSITIVE"
-                      android:label="@string/permgrouplab_xr_tracking_sensitive"
-                      android:description="@string/permgroupdesc_xr_tracking_sensitive"
+    <permission-group android:name="android.permission-group.XR_EYE_SENSITIVE"
+                      android:label="@string/permgrouplab_xr_eye_sensitive"
+                      android:description="@string/permgroupdesc_xr_eye_sensitive"
                       android:priority="100"
                       android:featureFlag="android.xr.xr_manifest_entries" />
 
@@ -5422,6 +5422,16 @@
                 android:label="@string/permlab_eye_tracking_fine"
                 android:description="@string/permdesc_eye_tracking_fine"
                 android:featureFlag="android.xr.xr_manifest_entries" />
+
+    <!-- Used for permissions that are associated with accessing
+         sensitive XR tracking data.
+
+         @FlaggedApi(android.xr.Flags.FLAG_XR_MANIFEST_ENTRIES) -->
+    <permission-group android:name="android.permission-group.XR_TRACKING_SENSITIVE"
+                      android:label="@string/permgrouplab_xr_tracking_sensitive"
+                      android:description="@string/permgroupdesc_xr_tracking_sensitive"
+                      android:priority="100"
+                      android:featureFlag="android.xr.xr_manifest_entries" />
 
     <!-- Allows an application to get head tracking data.  Unmanaged
          activities (OpenXR activities with the manifest property
@@ -8656,11 +8666,21 @@
     <!-- Allows an application to perform actions on behalf of users inside of
          applications.
          <p>This permission is currently only granted to privileged system apps.
-         <p>Protection level: internal|privileged
-         @FlaggedApi(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER)  -->
+         <p>Protection level: internal|privileged -->
     <permission android:name="android.permission.EXECUTE_APP_FUNCTIONS"
-        android:featureFlag="android.app.appfunctions.flags.enable_app_function_manager"
+        android:featureFlag="!android.permission.flags.app_function_access_api_enabled"
         android:protectionLevel="internal|privileged" />
+
+    <!-- Allows an application to perform actions on behalf of users inside of
+     applications.
+     <p>To execute a function in another app, an application must first hold the
+        android.permission.EXECUTE_APP_FUNCTIONS permission. In addition, the application must be
+        on a device allowlist, and its ability to execute functions is subject to user approval or
+        disapproval.
+     <p>Protection level: normal -->
+    <permission android:name="android.permission.EXECUTE_APP_FUNCTIONS"
+        android:featureFlag="android.permission.flags.app_function_access_api_enabled"
+        android:protectionLevel="normal" />
 
     <!-- Allows an application to display its suggestions using the autofill framework.
          <p>For now, this permission is only granted to the Browser application.
@@ -8790,6 +8810,18 @@
          @hide -->
     <permission android:name="android.permission.MONITOR_STICKY_MODIFIER_STATE"
                 android:protectionLevel="signature" />
+
+    <!--
+        @FlaggedApi(com.android.hardware.input.Flags.FLAG_REQUEST_KEY_CAPTURE_API)
+        Allows an application to be able to capture keys before Android system get chance to
+        process system keys and shortcuts.
+        <p> Protection level: normal
+    -->
+    <permission android:name="android.permission.CAPTURE_KEYBOARD"
+        android:protectionLevel="normal"
+        android:label="@string/permlab_capture_keyboard"
+        android:description="@string/permdesc_capture_keyboard"
+        android:featureFlag="com.android.hardware.input.request_key_capture_api"/>
 
     <!-- Allows low-level access to manage key gestures.
          <p>Not for use by third-party applications.
@@ -9045,16 +9077,18 @@
     <permission android:name="android.permission.OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW"
         android:protectionLevel="signature|privileged" />
 
-    <!-- @hide @SystemApi
-        @FlaggedApi("android.view.flags.sensitive_content_app_protection_api")
+    <!--
+        @FlaggedApi(com.android.internal.telephony.flags.Flags.FLAG_REDACT_OTP_SMS_API)
         Allows apps with a NotificationListenerService to receive notifications with sensitive
         information
         <p>Apps with a NotificationListenerService without this permission will not be able
         to view certain types of sensitive information contained in notifications
-        <p>Protection level: signature|role
+        <p>This permission also allows apps with the SMS permissions to query and receive broadcasts
+        about SMS messages that contain One Time Passwords
+        <p>Protection level: signature|preinstalled|knownSigner|role
     -->
     <permission android:name="android.permission.RECEIVE_SENSITIVE_NOTIFICATIONS"
-        android:protectionLevel="signature|role" />
+        android:protectionLevel="signature|preinstalled|knownSigner|role" />
 
     <!-- @SystemApi
          @FlaggedApi("android.app.bic_client")
@@ -9227,37 +9261,51 @@
 
     <!-- @SystemApi
         @FlaggedApi(android.content.pm.Flags.FLAG_VERIFICATION_SERVICE)
-        Allows app to be the verification agent to verify packages.
+        Allows app to be the developer verification agent to verify packages.
         <p>Protection level: signature|privileged
         @hide
     -->
-    <permission android:name="android.permission.VERIFICATION_AGENT"
+    <permission android:name="android.permission.DEVELOPER_VERIFICATION_AGENT"
         android:protectionLevel="signature|privileged"
         android:featureFlag="android.content.pm.verification_service" />
 
     <!-- @SystemApi
         @FlaggedApi(android.content.pm.Flags.FLAG_VERIFICATION_SERVICE)
-        Must be required by a privileged {@link android.content.pm.verify.pkg.VerifierService}
+        Must be required by a privileged {@link android.content.pm.verify.developer.DeveloperVerifierService}
         to ensure that only the system can bind to it.
         This permission should not be held by anything other than the system.
         <p>Not for use by third-party applications. </p>
         <p>Protection level: signature
         @hide
     -->
-    <permission android:name="android.permission.BIND_VERIFICATION_AGENT"
+    <permission android:name="android.permission.BIND_DEVELOPER_VERIFICATION_AGENT"
         android:protectionLevel="internal"
         android:featureFlag="android.content.pm.verification_service" />
 
      <!-- @SystemApi
         @FlaggedApi(android.content.pm.Flags.FLAG_VERIFICATION_SERVICE)
         Allows only the default PackageInstaller app to set user's response for
-        an incomplete verification.
+        an incomplete developer verification.
         <p>Protection level: internal|installer
         @hide
     -->
-    <permission android:name="android.permission.SET_VERIFICATION_USER_RESPONSE"
+    <permission android:name="android.permission.SET_DEVELOPER_VERIFICATION_USER_RESPONSE"
         android:protectionLevel="internal|installer"
         android:featureFlag="android.content.pm.verification_service" />
+
+    <!-- Permission required to access TV Watchdog Metrics
+     <p>Not for use by third-party applications.</p>
+     @hide -->
+    <permission android:name="android.permission.COLLECT_TV_WATCHDOG_METRICS"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="android.media.tv.flags.enable_tv_watchdog_emmc_protection" />
+
+    <!-- Permission required to control configuration for TV Watchdog Metrics
+     <p>Not for use by third-party applications.</p>
+     @hide -->
+    <permission android:name="android.permission.CONTROL_TV_WATCHDOG_CONFIG"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="android.media.tv.flags.enable_tv_watchdog_emmc_protection" />
 
     <!-- Attribution for Geofencing service. -->
     <attribution android:tag="GeofencingService" android:label="@string/geofencing_service"/>
@@ -9687,6 +9735,13 @@
         <service android:name="android.hardware.location.GeofenceHardwareService"
             android:permission="android.permission.LOCATION_HARDWARE"
             android:exported="false" />
+
+        <service android:name="android.proximity.DefaultProximityProviderService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.proximity.ProximityProviderService" />
+            </intent-filter>
+        </service>
 
         <service android:name="com.android.server.MountServiceIdler"
                  android:exported="true"

@@ -16,6 +16,8 @@
 
 package android.app;
 
+import static dalvik.system.DexFile.OptimizationInfo;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.compat.annotation.UnsupportedAppUsage;
@@ -62,8 +64,10 @@ import android.view.DisplayAdjustments;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.os.DebugStore;
+import com.android.internal.os.RuntimeInit;
 import com.android.internal.util.ArrayUtils;
 
+import dalvik.system.ApplicationRuntime;
 import dalvik.system.BaseDexClassLoader;
 import dalvik.system.VMRuntime;
 
@@ -1195,6 +1199,17 @@ public final class LoadedApk {
         // help deciding whether or not a dex file is the primary apk or a
         // secondary dex.
         DexLoadReporter.getInstance().registerAppDataDir(mPackageName, mDataDir);
+
+        IBinder app = RuntimeInit.getApplicationObject();
+        if (android.app.Flags.getOptimizationInfoFromAppProcess() && app != null) {
+            OptimizationInfo info = ApplicationRuntime.getBaseApkOptimizationInfo();
+            try {
+                ActivityManager.getService().reportOptimizationInfo(
+                        app, info.getStatus(), info.getReason());
+            } catch (RemoteException ex) {
+                throw ex.rethrowFromSystemServer();
+            }
+        }
     }
 
     /**
@@ -1488,7 +1503,7 @@ public final class LoadedApk {
                 if (!mActivityThread.mInstrumentation.onException(app, e)) {
                     throw new RuntimeException(
                         "Unable to instantiate application " + appClass
-                        + " package " + mPackageName + ": " + e.toString(), e);
+                        + " package " + mPackageName, e);
                 }
             }
             mActivityThread.addApplication(app);
@@ -1505,8 +1520,7 @@ public final class LoadedApk {
                 } catch (Exception e) {
                     if (!instrumentation.onException(app, e)) {
                         throw new RuntimeException(
-                            "Unable to create application " + app.getClass().getName()
-                            + ": " + e.toString(), e);
+                            "Unable to create application " + app.getClass().getName(), e);
                     }
                 }
             }
@@ -1824,7 +1838,7 @@ public final class LoadedApk {
                     if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                                 "broadcastReceiveReg: " + intent.getAction()
-                                + ";clz=" + receiver.getClass().getSimpleName());
+                                + ";clz=" + receiver.getClass().getName());
                     }
                     long debugStoreId = -1;
                     if (DEBUG_STORE_ENABLED) {
@@ -2081,6 +2095,7 @@ public final class LoadedApk {
                 mDispatcher = new WeakReference<LoadedApk.ServiceDispatcher>(sd);
             }
 
+            @Override
             public void connected(ComponentName name, IBinder service, IBinderSession binderSession,
                     boolean dead) throws RemoteException {
                 LoadedApk.ServiceDispatcher sd = mDispatcher.get();
@@ -2278,6 +2293,7 @@ public final class LoadedApk {
                 mDead = dead;
             }
 
+            @Override
             public void run() {
                 if (mCommand == 0) {
                     doConnected(mName, mService, mBinderSession, mDead);
@@ -2300,6 +2316,7 @@ public final class LoadedApk {
                 mService = service;
             }
 
+            @Override
             public void binderDied() {
                 death(mName, mService);
             }

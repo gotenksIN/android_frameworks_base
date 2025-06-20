@@ -139,6 +139,7 @@ import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.shade.domain.interactor.PanelExpansionInteractor;
 import com.android.systemui.shared.recents.utilities.Utilities;
+import com.android.systemui.shared.rotation.RotationButton;
 import com.android.systemui.shared.rotation.RotationButtonController;
 import com.android.systemui.shared.rotation.RotationPolicyUtil;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
@@ -230,7 +231,6 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     private final DisplayTracker mDisplayTracker;
     private final RegionSamplingHelper mRegionSamplingHelper;
     private final int mNavColorSampleMargin;
-    private final int mLongPressTimeoutMillis;
     private EdgeBackGestureHandler mEdgeBackGestureHandler;
     private NavigationBarFrame mFrame;
     private MotionEvent mCurrentDownEvent;
@@ -690,10 +690,6 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         mView.setEdgeBackGestureHandler(mEdgeBackGestureHandler);
         mView.setDisplayTracker(mDisplayTracker);
         mNavBarMode = mNavigationModeController.addListener(mModeChangedListener);
-        mLongPressTimeoutMillis =
-                android.companion.virtualdevice.flags.Flags.viewconfigurationApis()
-                        ? ViewConfiguration.get(context).getLongPressTimeoutMillis()
-                        : ViewConfiguration.getLongPressTimeout();
     }
 
     public NavigationBarView getView() {
@@ -1175,12 +1171,13 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         final RotationButtonController rotationButtonController =
                 mView.getRotationButtonController();
         if (DEBUG_ROTATION) {
+            RotationButton rotationButton = rotationButtonController.getRotationButton();
             Log.v(TAG, "onRotationProposal proposedRotation=" + Surface.rotationToString(rotation)
                     + ", isValid=" + isValid + ", mNavBarWindowState="
                     + StatusBarManager.windowStateToString(mNavigationBarWindowState)
                     + ", rotateSuggestionsDisabled=" + rotateSuggestionsDisabled
                     + ", isRotateButtonVisible="
-                    + rotationButtonController.getRotationButton().isVisible());
+                    + (rotationButton != null && rotationButton.isVisible()));
         }
         // Respect the disabled flag, no need for action as flag change callback will handle hiding
         if (rotateSuggestionsDisabled) return;
@@ -1425,9 +1422,9 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
                         // If override timeout doesn't exist but override touch slop exists, we use
                         // system default long press duration
                         Log.d(TAG, "ACTION_DOWN default duration: "
-                                + mLongPressTimeoutMillis);
+                                + ViewConfiguration.getLongPressTimeout());
                         mHandler.postDelayed(mOnVariableDurationHomeLongClick,
-                                mLongPressTimeoutMillis);
+                                ViewConfiguration.getLongPressTimeout());
                     } else {
                         mHomeButtonLongPressDurationMs.ifPresent(longPressDuration -> {
                             Log.d(TAG, "ACTION_DOWN original duration: " + longPressDuration);

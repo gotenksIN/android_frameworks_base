@@ -18,6 +18,8 @@ package com.android.server.wm.flicker.helpers
 
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
 import android.content.Context
+import android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.graphics.Insets
 import android.graphics.Point
 import android.graphics.Rect
@@ -26,6 +28,7 @@ import android.os.SystemClock
 import android.platform.uiautomatorhelpers.DeviceHelpers
 import android.tools.PlatformConsts
 import android.tools.device.apphelpers.IStandardAppHelper
+import android.tools.device.apphelpers.StandardAppHelper
 import android.tools.helpers.SYSTEMUI_PACKAGE
 import android.tools.traces.parsers.WindowManagerStateHelper
 import android.tools.traces.wm.WindowingMode
@@ -55,7 +58,7 @@ import kotlin.math.abs
  * Wrapper class around App helper classes. This class adds functionality to the apps that the
  * desktop apps would have.
  */
-open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
+open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
     IStandardAppHelper by innerHelper {
 
     enum class Corners {
@@ -305,20 +308,15 @@ open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
             .waitForAndVerify()
     }
 
-    /** Close a desktop app by clicking the close button on the app header for the given app or by
-     *  pressing back. */
+    /** Close a desktop app by clicking the close button on the app header for the given app. */
     fun closeDesktopApp(
         wmHelper: WindowManagerStateHelper,
         device: UiDevice,
-        usingBackNavigation: Boolean = false
-    ) {
-        if (usingBackNavigation) {
-            device.pressBack()
-        } else {
-            val caption = getCaptionForTheApp(wmHelper, device)
-            val closeButton = caption?.children?.find { it.resourceName.endsWith(CLOSE_BUTTON) }
-            closeButton?.click()
-        }
+        ) {
+        val caption = getCaptionForTheApp(wmHelper, device)
+        val closeButton = caption?.children?.find { it.resourceName.endsWith(CLOSE_BUTTON) }
+        closeButton?.click()
+
         wmHelper
             .StateSyncBuilder()
             .withAppTransitionIdle()
@@ -555,19 +553,23 @@ open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
         waitForTransitionToFullscreen(wmHelper)
     }
 
+    private fun clickAppHandle(wmHelper: WindowManagerStateHelper, device: UiDevice) {
+        val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
+        val startX = windowRect.centerX()
+        // Click a little under the top to prevent opening the notification shade.
+        val startY = windowRect.top + 30
+
+        // Click on the app handle coordinates.
+        device.click(startX, startY)
+    }
+
     fun enterDesktopModeFromAppHandleMenu(
         wmHelper: WindowManagerStateHelper,
         device: UiDevice
     ) {
         if (isAnyDesktopWindowVisible(wmHelper)) error("Already in Desktop Mode")
 
-        val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
-        val startX = windowRect.centerX()
-        // Click a little under the top to prevent opening the notification shade.
-        val startY = 10
-
-        // Click on the app handle coordinates.
-        device.click(startX, startY)
+        clickAppHandle(wmHelper, device)
         wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
 
         val pill = getDesktopAppViewByRes(PILL_CONTAINER)
@@ -577,6 +579,51 @@ open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
 
         desktopModeButton.click()
         waitForTransitionToFreeform(wmHelper)
+    }
+
+    fun enterSplitScreenFromAppHandleMenu(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice
+    ) {
+        clickAppHandle(wmHelper, device)
+
+        val pill = getDesktopAppViewByRes(PILL_CONTAINER)
+        val splitScreenButton =
+            pill.children?.find { it.resourceName.endsWith(SPLIT_SCREEN_BUTTON) }
+                ?: error("Unable to find Split Screen button")
+
+        splitScreenButton.click()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+    }
+
+    fun exitDesktopModeToFullScreenWithAppHeader(wmHelper:WindowManagerStateHelper) {
+        val openMenuButton = getDesktopAppViewByRes(OPEN_MENU_BUTTON)
+        openMenuButton?.click()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+
+        val pill = getDesktopAppViewByRes(PILL_CONTAINER)
+        val fullScreenModeButton =
+            pill
+                ?.children
+                ?.find { it.resourceName.endsWith(FULL_SCREEN_BUTTON) }
+
+        fullScreenModeButton?.click()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+    }
+
+    fun exitDesktopModeToSplitScreenWithAppHeader(wmHelper:WindowManagerStateHelper) {
+        val openMenuButton = getDesktopAppViewByRes(OPEN_MENU_BUTTON)
+        openMenuButton?.click()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+
+        val pill = getDesktopAppViewByRes(PILL_CONTAINER)
+        val splitScreenModeButton =
+            pill
+                ?.children
+                ?.find { it.resourceName.endsWith(SPLIT_SCREEN_BUTTON) }
+
+        splitScreenModeButton?.click()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
     }
 
     fun restartFromAppHandleMenu(wmHelper: WindowManagerStateHelper) {
@@ -607,6 +654,26 @@ open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
                 display.containsActivity(innerHelper)
             }
         }.waitForAndVerify()
+    }
+
+    /**
+     * Opens a specified number of the same application.
+     *
+     * This method iterates a number of times, defined by the {@code numTasks}, and on each
+     * iteration, it launches a new instance of an application.
+     *
+     * @param wmHelper The helper class that waits until some action (like app opening) is completed.
+     * @param numTasks The number of tasks to open from the same application.
+     */
+    fun openTasks(wmHelper: WindowManagerStateHelper, numTasks: Int) {
+        for (i in 0..<numTasks) {
+            launchViaIntent(
+                wmHelper = wmHelper,
+                intent = innerHelper.openAppIntent.apply {
+                    addFlags(FLAG_ACTIVITY_MULTIPLE_TASK or FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
+        }
     }
 
     private fun getDesktopAppViewByRes(viewResId: String): UiObject2 =
@@ -705,6 +772,8 @@ open class DesktopModeAppHelper(private val innerHelper: IStandardAppHelper) :
         const val OPEN_MENU_BUTTON: String = "open_menu_button"
         const val RESTART_BUTTON: String = "handle_menu_restart_button"
         const val RESTART_DIALOG_RESTART_BUTTON: String = "letterbox_restart_dialog_restart_button"
+        const val FULL_SCREEN_BUTTON: String = "fullscreen_button"
+        const val SPLIT_SCREEN_BUTTON: String = "split_screen_button"
         val caption: BySelector
             get() = By.res(SYSTEMUI_PACKAGE, CAPTION)
 

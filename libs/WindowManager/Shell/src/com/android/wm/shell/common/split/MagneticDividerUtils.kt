@@ -17,6 +17,7 @@
 package com.android.wm.shell.common.split
 
 import android.content.res.Resources
+import androidx.annotation.VisibleForTesting
 import androidx.compose.ui.unit.dp
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
@@ -37,7 +38,7 @@ object MagneticDividerUtils {
      * When the user moves the divider towards or away from a snap point, a magnetic spring movement
      * and haptic will take place at this distance.
      */
-    private val DEFAULT_MAGNETIC_ATTACH_THRESHOLD = 56.dp
+    @VisibleForTesting val DEFAULT_MAGNETIC_ATTACH_THRESHOLD = 56.dp
     /** The minimum spacing between snap zones, to prevent overlap on smaller displays. */
     private val MINIMUM_SPACE_BETWEEN_SNAP_ZONES = 4.dp
     /** The stiffness of the magnetic snap effect. */
@@ -53,14 +54,7 @@ object MagneticDividerUtils {
      * A key that can be passed into a MotionValue to retrieve the SnapPosition associated with the
      * current drag.
      */
-    @JvmStatic val SNAP_POSITION_KEY = SemanticKey<Int?>()
-
-    /**
-     * Key used for identity regions which don't have drop zones associated with them. Need to keep
-     * this key separate for the SemanticKeys we create with null values as it seems like this
-     * overwrites the semantics created with real snapTarget values
-     */
-    @JvmStatic private val SNAP_POSITION_KEY_IDENTITY = SemanticKey<Int?>()
+    @JvmStatic val SNAP_POSITION_KEY = SemanticKey<Int?>(debugLabel = "snapPosition")
 
     /**
      * Create a MotionSpec that has "snap zones" for each of the SnapTargets provided.
@@ -87,11 +81,9 @@ object MagneticDividerUtils {
             // "effects" movement).
             spatialDirectionalMotionSpec(
                 initialMapping = Mapping.Fixed(topLeftDismissPosition),
-                semantics = listOf(SNAP_POSITION_KEY_IDENTITY with null),
+                semantics = listOf(SNAP_POSITION_KEY with topLeftDismissTarget.snapPosition),
                 defaultSpring = MagneticSpring,
             ) {
-                // NOTE: This block is a trailing lambda passed in as the "init" parameter.
-
                 // A DirectionalMotionSpec is essentially a number line from -infinity to infinity,
                 // with instructions on how to interpret the value at each point. We create each
                 // individual segment below to fill out our number line.
@@ -145,7 +137,7 @@ object MagneticDividerUtils {
                     // Create another identity zone.
                     identity(
                         breakpoint = targetPosition + snapThreshold,
-                        semantics = listOf(SNAP_POSITION_KEY_IDENTITY with null),
+                        semantics = listOf(SNAP_POSITION_KEY with null),
                     )
                 }
 
@@ -156,7 +148,7 @@ object MagneticDividerUtils {
                 fixedValue(
                     breakpoint = bottomRightDismissPosition,
                     value = bottomRightDismissPosition,
-                    semantics = listOf(SNAP_POSITION_KEY_IDENTITY with null),
+                    semantics = listOf(SNAP_POSITION_KEY with bottomRightDismissTarget.snapPosition),
                 )
             }
         )

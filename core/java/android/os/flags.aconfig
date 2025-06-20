@@ -162,13 +162,6 @@ flag {
 }
 
 flag {
-     name: "app_zygote_retry_start"
-     namespace: "arc_next"
-     description: "Guard the new added retry logic in app zygote."
-     bug: "361799815"
-}
-
-flag {
     name: "async_trace_for_track"
     is_exported: true
     namespace: "perfetto"
@@ -251,6 +244,13 @@ flag {
     description: "Whether to read from angle allowlist to determine if app should use ANGLE"
     is_fixed_read_only: true
     bug: "370845648"
+}
+
+flag {
+    name: "enable_binder_call_signal_collector"
+    namespace: "backstage_power"
+    description: "Enable binder call signal collector for anomaly detection."
+    bug: "421243909"
 }
 
 flag {
@@ -452,6 +452,13 @@ flag {
      description: "Control framework initialization APIs of telemetry APIs feature."
      is_fixed_read_only: true
      bug: "324241334"
+}
+
+flag {
+    namespace: "system_performance"
+    name: "zygote_app_launch_latency_ablation"
+    description: "Fast is overrated. Let's make Android slower."
+    bug: "423047108"
 }
 
 flag {

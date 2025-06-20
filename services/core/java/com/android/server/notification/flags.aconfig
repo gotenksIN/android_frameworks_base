@@ -171,10 +171,24 @@ flag {
 }
 
 flag {
+  name: "strict_zen_rule_component_validation"
+  namespace: "systemui"
+  description: "Properly validate both CPS and configActivity in both add and update paths"
+  bug: "420605963"
+}
+
+flag {
   name: "managed_services_concurrent_multiuser"
   namespace: "systemui"
   description: "Enables ManagedServices to support Concurrent multi user environment"
   bug: "380297485"
+}
+
+flag {
+  name: "allow_freezing_idle_nls"
+  namespace: "backstage_power"
+  description: "Allows freezing idle notification listener services"
+  bug: "344050265"
 }
 
 flag {
@@ -196,3 +210,15 @@ flag {
     purpose: PURPOSE_BUGFIX
   }
 }
+
+flag {
+  name: "skip_policy_access_nls_check"
+  namespace: "systemui"
+  description: "When querying whether a caller has Notification Policy Access, don't explicitly look in the NLSes list. All NLSes are also ConditionProviders so this is unnecessary."
+  bug: "390441924"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+

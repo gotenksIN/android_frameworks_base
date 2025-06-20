@@ -11,6 +11,7 @@ import android.provider.Settings
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.KeyguardUpdateMonitorCallback
 import com.android.systemui.CoreStartable
+import com.android.systemui.ambient.statusbar.shared.flag.OngoingActivityChipsOnDream
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlagsClassic
@@ -19,7 +20,6 @@ import com.android.systemui.settings.UserTracker
 import com.android.systemui.statusbar.NotificationLockscreenUserManager
 import com.android.systemui.statusbar.StatusBarState
 import com.android.systemui.statusbar.SysuiStatusBarStateController
-import com.android.systemui.statusbar.notification.collection.ListEntry
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.collection.PipelineEntry
 import com.android.systemui.statusbar.notification.collection.provider.HighPriorityProvider
@@ -186,6 +186,9 @@ constructor(
 
     override fun shouldHideNotification(entry: NotificationEntry): Boolean =
         when {
+            // Don't hide notifications if we're in a dream. The dream status bar needs
+            // notifications to render ongoing call chip.
+            OngoingActivityChipsOnDream.isEnabled && keyguardUpdateMonitor.isDreaming -> false
             // Keyguard state doesn't matter if the keyguard is not showing.
             !isLockedOrLocking -> false
             // Notifications not allowed on the lockscreen, always hide.
@@ -201,19 +204,13 @@ constructor(
 
     private fun shouldHideIfEntrySilent(entry: PipelineEntry): Boolean =
         when {
-            // TODO(b/410825977): The bundle classifier clobbers the channel that the notification
-            //  was posted to, and so we don't know whether any child of a bundle is SECRET. For now
-            //  treat all bundles as SECRET.
-            entry !is ListEntry -> true
             // Show if explicitly high priority (not hidden)
             highPriorityProvider.isExplicitlyHighPriority(entry) -> false
             // Ambient notifications are hidden always from lock screen
-            entry.representativeEntry?.isAmbient == true -> true
+            entry.asListEntry()?.representativeEntry?.isAmbient == true -> true
             // [Now notification is silent]
-            // Hide regardless of parent priority if user wants silent notifs hidden
+            // Always hide if user wants silent notifs hidden
             hideSilentNotificationsOnLockscreen -> true
-            // Parent priority is high enough to be shown on the lockscreen, do not hide.
-            entry.parent?.let(::shouldHideIfEntrySilent) == false -> false
             // Show when silent notifications are allowed on lockscreen
             else -> false
         }
@@ -244,8 +241,7 @@ constructor(
         // ranking.lockscreenVisibilityOverride contains possibly out of date DPC and Setting
         // info, and NotificationLockscreenUserManagerImpl is already listening for updates
         // to those
-        return entry.ranking.channel != null &&
-            entry.ranking.channel.lockscreenVisibility == VISIBILITY_SECRET
+        return entry.ranking.channel?.lockscreenVisibility == VISIBILITY_SECRET
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) =

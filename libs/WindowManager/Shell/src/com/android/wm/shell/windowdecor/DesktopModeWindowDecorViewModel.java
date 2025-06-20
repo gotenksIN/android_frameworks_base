@@ -89,6 +89,7 @@ import androidx.annotation.OptIn;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.jank.Cuj;
 import com.android.internal.jank.InteractionJankMonitor;
+import com.android.internal.policy.DesktopModeCompatPolicy;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.LatencyTracker;
 import com.android.window.flags.Flags;
@@ -135,7 +136,6 @@ import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.desktopmode.DesktopConfig;
-import com.android.wm.shell.shared.desktopmode.DesktopModeCompatPolicy;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.shared.desktopmode.DesktopState;
 import com.android.wm.shell.shared.split.SplitScreenConstants.SplitPosition;
@@ -1047,7 +1047,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         private final DragDetector mHandleDragDetector;
         private final DragDetector mHeaderDragDetector;
         private final GestureDetector mGestureDetector;
-        private final int mDisplayId;
         private final Rect mOnDragStartInitialBounds = new Rect();
         private final Rect mCurrentBounds = new Rect();
 
@@ -1083,7 +1082,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             mHeaderDragDetector = new DragDetector(this, APP_HEADER_HOLD_TO_DRAG_DURATION_MS,
                     touchSlop);
             mGestureDetector = new GestureDetector(mContext, this);
-            mDisplayId = taskInfo.displayId;
         }
 
         @Override
@@ -1112,14 +1110,14 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     WindowContainerTransaction wct = new WindowContainerTransaction();
                     final Function1<IBinder, Unit> runOnTransitionStart =
                             mDesktopTasksController.onDesktopWindowClose(
-                                    wct, mDisplayId, decoration.mTaskInfo);
+                                    wct, decoration.mTaskInfo.displayId, decoration.mTaskInfo);
                     final IBinder transition = mTaskOperations.closeTask(mTaskToken, wct);
                     if (transition != null) {
                         runOnTransitionStart.invoke(transition);
                     }
                 }
             } else if (id == R.id.back_button) {
-                mTaskOperations.injectBackKey(mDisplayId);
+                mTaskOperations.injectBackKey(decoration.mTaskInfo.displayId);
             } else if (id == R.id.caption_handle || id == R.id.open_menu_button) {
                 if (id == R.id.caption_handle && !decoration.mTaskInfo.isFreeform()) {
                     // Clicking the App Handle.

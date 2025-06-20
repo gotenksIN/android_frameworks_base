@@ -16,6 +16,7 @@
 package com.android.systemui.biometrics
 
 import android.content.packageManager
+import android.content.pm.PackageInfo
 import android.content.res.Configuration
 import android.content.testableContext
 import android.hardware.biometrics.BiometricAuthenticator
@@ -58,6 +59,7 @@ import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.keyguard.wakefulnessLifecycle
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.res.R
+import com.android.systemui.shade.data.repository.fakeShadeRepository
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runCurrent
@@ -69,6 +71,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
+import org.mockito.Mockito.any
 import org.mockito.Mockito.anyBoolean
 import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.anyLong
@@ -97,6 +100,7 @@ open class AuthContainerViewTest : SysuiTestCase() {
 
     private val testScope = kosmos.testScope
     private val fakeExecutor = kosmos.fakeExecutor
+    private val fakeShadeRepository = kosmos.fakeShadeRepository
 
     private val defaultLogoIcon = context.getDrawable(R.drawable.ic_android)
 
@@ -106,6 +110,8 @@ open class AuthContainerViewTest : SysuiTestCase() {
     fun setup() {
         // Set up default logo icon
         whenever(packageManager.getApplicationIcon(OP_PACKAGE_NAME)).thenReturn(defaultLogoIcon)
+        whenever(packageManager.getPackageInfo(any(String::class.java), anyInt()))
+            .thenReturn(PackageInfo())
         context.setMockPackageManager(packageManager)
     }
 
@@ -152,7 +158,7 @@ open class AuthContainerViewTest : SysuiTestCase() {
     }
 
     @Test
-    fun testDismissOnShadeDown() {
+    fun testDismissOnShadeInteraction() {
         val container = initializeFingerprintContainer(addToView = true)
         assertThat(container.parent).isNotNull()
         val root = container.rootView
@@ -297,6 +303,43 @@ open class AuthContainerViewTest : SysuiTestCase() {
             .onDismissed(
                 eq(BiometricPrompt.DISMISSED_REASON_FALLBACK_OPTION_BASE),
                 eq<ByteArray?>(null),
+                eq(authContainer?.requestId ?: 0L),
+            )
+    }
+
+    @Test
+    fun testActionCredentialMatched_dismissesWhenCredentialAllowed() {
+        val container =
+            initializeFingerprintContainer(
+                authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+        val attestation = ByteArray(10)
+        container.onCredentialMatched(attestation, true)
+        waitForIdleSync()
+
+        verify(callback)
+            .onDismissed(
+                eq(BiometricPrompt.DISMISSED_REASON_CREDENTIAL_CONFIRMED),
+                eq(attestation),
+                eq(authContainer?.requestId ?: 0L),
+            )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_BP_FALLBACK_OPTIONS)
+    fun testActionCredentialMatched_doesNotDismissWhenCredentialNotAllowed() {
+        val container =
+            initializeFingerprintContainer(
+                authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+        val attestation = ByteArray(10)
+        container.onCredentialMatched(attestation, false)
+        waitForIdleSync()
+
+        verify(callback, never())
+            .onDismissed(
+                eq(BiometricPrompt.DISMISSED_REASON_CREDENTIAL_CONFIRMED),
+                eq(attestation),
                 eq(authContainer?.requestId ?: 0L),
             )
     }

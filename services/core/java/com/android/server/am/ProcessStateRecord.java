@@ -268,12 +268,6 @@ final class ProcessStateRecord {
     private int mCompletedAdjSeq;
 
     /**
-     * Whether this app has encountered a cycle in the most recent update.
-     */
-    @GuardedBy("mService")
-    private boolean mContainsCycle;
-
-    /**
      * When (uptime) the process last became unimportant.
      */
     @CompositeRWLock({"mService", "mProcLock"})
@@ -379,32 +373,29 @@ final class ProcessStateRecord {
     private long mLastInvisibleTime;
 
     /**
-     * Whether or not this process could be killed when it's in background restricted mode
-     * and cached &amp; idle state.
-     */
-    @GuardedBy("mService")
-    private boolean mNoKillOnBgRestrictedAndIdle;
-
-    /**
      * Last set value of {@link #isCached()}.
      */
     @GuardedBy("mService")
     private boolean mSetCached;
 
     /**
-     * Last set value of {@link #mNoKillOnBgRestrictedAndIdle}.
+     * When the proc became cached. Used to debounce killing bg restricted apps in
+     * an idle UID.
      */
     @GuardedBy("mService")
-    private boolean mSetNoKillOnBgRestrictedAndIdle;
+    private @ElapsedRealtimeLong long mLastCachedTime;
 
-    /**
-     * The last time when the {@link #mNoKillOnBgRestrictedAndIdle} is false and the
-     * {@link #isCached()} is true, and either the former state is flipping from true to false
-     * when latter state is true, or the latter state is flipping from false to true when the
-     * former state is false.
-     */
     @GuardedBy("mService")
-    private @ElapsedRealtimeLong long mLastCanKillOnBgRestrictedAndIdleTime;
+    private boolean mHasActivities = false;
+
+    @GuardedBy("mService")
+    private int mActivityStateFlags = ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
+
+    @GuardedBy("mService")
+    private long mPerceptibleTaskStoppedTimeMillis = Long.MIN_VALUE;
+
+    @GuardedBy("mService")
+    private boolean mHasRecentTask = false;
 
     // Below are the cached task info for OomAdjuster only
     private static final int VALUE_INVALID = -1;
@@ -871,16 +862,6 @@ final class ProcessStateRecord {
         return mCompletedAdjSeq;
     }
 
-    @GuardedBy("mService")
-    void setContainsCycle(boolean containsCycle) {
-        mContainsCycle = containsCycle;
-    }
-
-    @GuardedBy("mService")
-    boolean containsCycle() {
-        return mContainsCycle;
-    }
-
     @GuardedBy({"mService", "mProcLock"})
     void setWhenUnimportant(long whenUnimportant) {
         mWhenUnimportant = whenUnimportant;
@@ -994,6 +975,26 @@ final class ProcessStateRecord {
     }
 
     @GuardedBy("mService")
+    void setHasActivities(boolean hasActivities) {
+        mHasActivities = hasActivities;
+    }
+
+    @GuardedBy("mService")
+    void setActivityStateFlags(int flags) {
+        mActivityStateFlags = flags;
+    }
+
+    @GuardedBy("mService")
+    void setPerceptibleTaskStoppedTimeMillis(long uptimeMs) {
+        mPerceptibleTaskStoppedTimeMillis = uptimeMs;
+    }
+
+    @GuardedBy("mService")
+    void setHasRecentTask(boolean hasRecentTask) {
+        mHasRecentTask = hasRecentTask;
+    }
+
+    @GuardedBy("mService")
     void resetCachedInfo() {
         mCachedHasActivities = VALUE_INVALID;
         mCachedIsHeavyWeight = VALUE_INVALID;
@@ -1010,7 +1011,7 @@ final class ProcessStateRecord {
     }
 
     @GuardedBy("mService")
-    boolean getCachedHasActivities() {
+    private boolean getCachedHasActivities() {
         if (mCachedHasActivities == VALUE_INVALID) {
             mCachedHasActivities = mApp.getWindowProcessController().hasActivities() ? VALUE_TRUE
                     : VALUE_FALSE;
@@ -1024,6 +1025,15 @@ final class ProcessStateRecord {
     }
 
     @GuardedBy("mService")
+    boolean getHasActivities() {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mHasActivities;
+        } else {
+            return getCachedHasActivities();
+        }
+    }
+
+    @GuardedBy("mService")
     boolean getCachedIsHeavyWeight() {
         if (mCachedIsHeavyWeight == VALUE_INVALID) {
             mCachedIsHeavyWeight = mApp.getWindowProcessController().isHeavyWeightProcess()
@@ -1033,12 +1043,21 @@ final class ProcessStateRecord {
     }
 
     @GuardedBy("mService")
-    boolean getCachedHasVisibleActivities() {
+    private boolean getCachedHasVisibleActivities() {
         if (mCachedHasVisibleActivities == VALUE_INVALID) {
             mCachedHasVisibleActivities = mApp.getWindowProcessController().hasVisibleActivities()
                     ? VALUE_TRUE : VALUE_FALSE;
         }
         return mCachedHasVisibleActivities == VALUE_TRUE;
+    }
+
+    @GuardedBy("mService")
+    boolean getHasVisibleActivities() {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return (mActivityStateFlags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0;
+        } else {
+            return getCachedHasVisibleActivities();
+        }
     }
 
     @GuardedBy("mService")
@@ -1072,6 +1091,15 @@ final class ProcessStateRecord {
                     ? VALUE_TRUE : VALUE_FALSE;
         }
         return mCachedHasRecentTasks == VALUE_TRUE;
+    }
+
+    @GuardedBy("mService")
+    boolean getHasRecentTasks() {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            return mHasRecentTask;
+        } else {
+            return getCachedHasRecentTasks();
+        }
     }
 
     @GuardedBy("mService")
@@ -1109,7 +1137,12 @@ final class ProcessStateRecord {
         }
         callback.initialize(mApp, adj, foregroundActivities, hasVisibleActivities, procState,
                 schedGroup, appUid, logUid, processCurTop);
-        final int flags = mApp.getWindowProcessController().getActivityStateFlags();
+        final int flags;
+        if (Flags.pushActivityStateToOomadjuster()) {
+            flags = mActivityStateFlags;
+        } else {
+            flags = mApp.getWindowProcessController().getActivityStateFlags();
+        }
 
         if ((flags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0) {
             callback.onVisibleActivity(flags);
@@ -1118,7 +1151,13 @@ final class ProcessStateRecord {
         } else if ((flags & ACTIVITY_STATE_FLAG_IS_STOPPING) != 0) {
             callback.onStoppingActivity((flags & ACTIVITY_STATE_FLAG_IS_STOPPING_FINISHING) != 0);
         } else {
-            final long ts = mApp.getWindowProcessController().getPerceptibleTaskStoppedTimeMillis();
+            final long ts;
+            if (Flags.pushActivityStateToOomadjuster()) {
+                ts = mPerceptibleTaskStoppedTimeMillis;
+            } else {
+                ts = mApp.getWindowProcessController().getPerceptibleTaskStoppedTimeMillis();
+            }
+
             callback.onOtherActivity(ts);
         }
 
@@ -1224,6 +1263,10 @@ final class ProcessStateRecord {
         for (int i = 0; i < mCachedCompatChanges.length; i++) {
             mCachedCompatChanges[i] = VALUE_INVALID;
         }
+        mHasActivities = false;
+        mActivityStateFlags = ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
+        mPerceptibleTaskStoppedTimeMillis = Long.MIN_VALUE;
+        mHasRecentTask = false;
     }
 
     @GuardedBy("mService")
@@ -1272,16 +1315,6 @@ final class ProcessStateRecord {
     }
 
     @GuardedBy("mService")
-    void setNoKillOnBgRestrictedAndIdle(boolean shouldNotKill) {
-        mNoKillOnBgRestrictedAndIdle = shouldNotKill;
-    }
-
-    @GuardedBy("mService")
-    boolean shouldNotKillOnBgRestrictedAndIdle() {
-        return mNoKillOnBgRestrictedAndIdle;
-    }
-
-    @GuardedBy("mService")
     void setSetCached(boolean cached) {
         mSetCached = cached;
     }
@@ -1292,24 +1325,14 @@ final class ProcessStateRecord {
     }
 
     @GuardedBy("mService")
-    void setSetNoKillOnBgRestrictedAndIdle(boolean shouldNotKill) {
-        mSetNoKillOnBgRestrictedAndIdle = shouldNotKill;
-    }
-
-    @GuardedBy("mService")
-    boolean isSetNoKillOnBgRestrictedAndIdle() {
-        return mSetNoKillOnBgRestrictedAndIdle;
-    }
-
-    @GuardedBy("mService")
-    void setLastCanKillOnBgRestrictedAndIdleTime(@ElapsedRealtimeLong long now) {
-        mLastCanKillOnBgRestrictedAndIdleTime = now;
+    void setLastCachedTime(@ElapsedRealtimeLong long now) {
+        mLastCachedTime = now;
     }
 
     @ElapsedRealtimeLong
     @GuardedBy("mService")
-    long getLastCanKillOnBgRestrictedAndIdleTime() {
-        return mLastCanKillOnBgRestrictedAndIdleTime;
+    long getLastCachedTime() {
+        return mLastCachedTime;
     }
 
     public void setCacheOomRankerRss(long rss, long rssTimeMs) {

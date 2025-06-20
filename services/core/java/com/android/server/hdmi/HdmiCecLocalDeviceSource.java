@@ -408,7 +408,8 @@ abstract class HdmiCecLocalDeviceSource extends HdmiCecLocalDevice {
         if (!isActiveSource()) {
             return;
         }
-        addAndStartAction(new ActiveSourceAction(this, dest));
+        mService.setWakeUpMessageReceived(false);
+        addAndStartAction(new ActiveSourceAction(this, dest), true);
     }
 
     /**

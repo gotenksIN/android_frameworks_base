@@ -309,7 +309,7 @@ public class PipTransition extends PipTransitionController implements
     @Override
     public void onTransitionConsumed(@NonNull IBinder transition, boolean aborted,
             @Nullable SurfaceControl.Transaction finishT) {
-        if (transition == mBoundsChangeTransition && aborted) {
+        if ((transition == mBoundsChangeTransition || transition == mEnterTransition) && aborted) {
             onTransitionAborted();
         }
     }
@@ -1115,6 +1115,13 @@ public class PipTransition extends PipTransitionController implements
         switch (currentState) {
             case PipTransitionState.SCHEDULED_BOUNDS_CHANGE:
                 nextState = PipTransitionState.CHANGED_PIP_BOUNDS;
+                break;
+            case PipTransitionState.SCHEDULED_ENTER_PIP:
+                if (mPipTransitionState.getPipTaskToken() != null) {
+                    nextState = PipTransitionState.ENTERED_PIP;
+                } else {
+                    nextState = PipTransitionState.EXITED_PIP;
+                }
                 break;
         }
 

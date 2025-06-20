@@ -16,15 +16,52 @@
 
 package com.android.settingslib.spa.system.restricted
 
+import android.app.admin.DevicePolicyManager
+import android.app.admin.DevicePolicyResourcesManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.provider.Settings
+import com.android.settingslib.spa.flow.broadcastReceiverFlow
+import com.android.settingslib.spa.restricted.Blocked.SwitchPreferenceOverrides
 import com.android.settingslib.spa.restricted.BlockedWithDetails
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
-internal class SystemBlockedByAdmin(private val context: Context) : BlockedWithDetails {
-    override val canOverrideSwitchChecked = true
+internal class SystemBlockedByAdmin(private val context: Context, private val key: String) :
+    BlockedWithDetails {
+
+    private val devicePolicyResourcesManager: DevicePolicyResourcesManager? =
+        context.getSystemService(DevicePolicyManager::class.java)?.resources
+
+    override val switchPreferenceOverridesFlow: Flow<SwitchPreferenceOverrides> =
+        context
+            .broadcastReceiverFlow(
+                IntentFilter(DevicePolicyManager.ACTION_DEVICE_POLICY_RESOURCE_UPDATED)
+            )
+            .map {}
+            .onStart { emit(Unit) }
+            .map { switchPreferenceOverrides() }
+
+    private fun switchPreferenceOverrides() =
+        SwitchPreferenceOverrides(
+            summaryOn =
+                devicePolicyResourcesManager?.getString(ENABLED_BY_ADMIN_SWITCH_SUMMARY) { null },
+            summaryOff =
+                devicePolicyResourcesManager?.getString(DISABLED_BY_ADMIN_SWITCH_SUMMARY) { null },
+        )
 
     override fun showDetails() {
-        context.startActivity(Intent(Settings.ACTION_SHOW_ADMIN_SUPPORT_DETAILS))
+        context.startActivity(
+            Intent(Settings.ACTION_SHOW_ADMIN_SUPPORT_DETAILS).apply {
+                putExtra(DevicePolicyManager.EXTRA_RESTRICTION, key)
+            }
+        )
+    }
+
+    companion object {
+        const val ENABLED_BY_ADMIN_SWITCH_SUMMARY = "Settings.ENABLED_BY_ADMIN_SWITCH_SUMMARY"
+        const val DISABLED_BY_ADMIN_SWITCH_SUMMARY = "Settings.DISABLED_BY_ADMIN_SWITCH_SUMMARY"
     }
 }

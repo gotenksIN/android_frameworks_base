@@ -42,6 +42,7 @@ import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_ABORTED;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_INVALID_USER_TYPE;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_UNSPECIFIED;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_USER_ALREADY_AN_ADMIN;
+import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_USER_IS_LAST_ADMIN;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_USER_IS_NOT_AN_ADMIN;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_DEMOTE_MAIN_USER;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_PROMOTE_MAIN_USER;
@@ -1588,16 +1589,15 @@ public class UserManagerService extends IUserManager.Stub {
     @Override
     public @NonNull List<UserInfo> getUsers(boolean excludeDying) {
         checkCreateUsersPermission("query users");
-        return getUsersInternal(/* excludePartial= */ true, excludeDying, /* excludePreCreated= */
-                true, /* resolveNullNames= */ true);
+        return getUsersInternal(/* excludePartial= */ true, excludeDying,
+                /* resolveNullNames= */ true);
     }
 
     // Used by cmd users
     @NonNull List<UserInfo> getUsersWithUnresolvedNames(boolean excludePartial,
-            boolean excludeDying, boolean excludePreCreated) {
+            boolean excludeDying) {
         checkCreateUsersPermission("get users with unresolved names");
-        return getUsersInternal(excludePartial, excludeDying, excludePreCreated,
-                /* resolveNullNames= */ false);
+        return getUsersInternal(excludePartial, excludeDying, /* resolveNullNames= */ false);
     }
 
     /**
@@ -1606,7 +1606,7 @@ public class UserManagerService extends IUserManager.Stub {
     @Deprecated
     @VisibleForTesting
     List<UserInfo> getUsersInternal(boolean excludePartial, boolean excludeDying,
-            boolean excludePreCreated, boolean resolveNullNames) {
+            boolean resolveNullNames) {
         synchronized (mUsersLock) {
             ArrayList<UserInfo> users = new ArrayList<>(mUsers.size());
             final int userSize = mUsers.size();
@@ -1614,7 +1614,8 @@ public class UserManagerService extends IUserManager.Stub {
                 UserInfo ui = mUsers.valueAt(i).info;
                 if ((excludePartial && ui.partial)
                         || (excludeDying && mRemovingUserIds.get(ui.id))
-                        || (excludePreCreated && ui.preCreated)) {
+                        // NOTE: preCreated users are not supported anymore
+                        || ui.preCreated) {
                     continue;
                 }
                 var user = resolveNullNames ? userWithName(ui) : ui;
@@ -2337,14 +2338,14 @@ public class UserManagerService extends IUserManager.Stub {
                             currentUserId, userId, /* userType */ "", /* userFlags */ -1);
                     return;
                 } else if (user.info.isAdmin()) {
-                    // Exit if the user is already an Admin.
+                    // Exit if the user is already an admin.
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId,
                         user.info, USER_JOURNEY_GRANT_ADMIN,
                         ERROR_CODE_USER_ALREADY_AN_ADMIN);
                     return;
                 } else if (user.info.isProfile() || user.info.isGuest()
                         || user.info.isRestricted()) {
-                    // Profiles, guest users or restricted profiles cannot become an Admin.
+                    // Profiles, guest users or restricted profiles cannot become an admin.
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId,
                             user.info, USER_JOURNEY_GRANT_ADMIN, ERROR_CODE_INVALID_USER_TYPE);
                     return;
@@ -2376,14 +2377,20 @@ public class UserManagerService extends IUserManager.Stub {
                             USER_JOURNEY_REVOKE_ADMIN, currentUserId, userId, "", -1);
                     return;
                 } else if (!user.info.isAdmin()) {
-                    // Exit if user is not an Admin.
+                    // Exit if user is not an admin.
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
                             USER_JOURNEY_REVOKE_ADMIN, ERROR_CODE_USER_IS_NOT_AN_ADMIN);
                     return;
                 } else if ((user.info.flags & UserInfo.FLAG_SYSTEM) != 0) {
-                    // System user must always be an Admin.
+                    // System user cannot lose its admin status.
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
                             USER_JOURNEY_REVOKE_ADMIN, ERROR_CODE_INVALID_USER_TYPE);
+                    return;
+                } else if (isNonRemovableLastAdminUserLU(user.info)) {
+                    // This is the last admin user and this device requires that it not lose its
+                    // admin status.
+                    mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
+                            USER_JOURNEY_REVOKE_ADMIN, ERROR_CODE_USER_IS_LAST_ADMIN);
                     return;
                 }
                 user.info.flags ^= UserInfo.FLAG_ADMIN;
@@ -3289,7 +3296,7 @@ public class UserManagerService extends IUserManager.Stub {
 
     /** Called by PackageManagerService */
     public boolean exists(@UserIdInt int userId) {
-        return mLocalService.exists(userId);
+        return userId == UserHandle.USER_SYSTEM || mLocalService.exists(userId);
     }
 
     /**
@@ -5309,8 +5316,7 @@ public class UserManagerService extends IUserManager.Stub {
     /** Returns the oldest Full Admin user, or null is if there none. */
     private @Nullable UserInfo getEarliestCreatedFullUser() {
         List<UserInfo> users = getUsersInternal(/* excludePartial= */ true,
-                /* excludeDying= */ true, /* excludePreCreated= */ true,
-                /* resolveNullNames= */ false);
+                /* excludeDying= */ true, /* resolveNullNames= */ false);
         UserInfo earliestUser = null;
         long earliestCreationTime = Long.MAX_VALUE;
         for (int i = 0; i < users.size(); i++) {
@@ -6622,8 +6628,7 @@ public class UserManagerService extends IUserManager.Stub {
     private int onPullAtom(int atomTag, List<StatsEvent> data) {
         if (atomTag == FrameworkStatsLog.USER_INFO) {
             final List<UserInfo> users = getUsersInternal(/* excludePartial= */ true,
-                    /* excludeDying= */ true, /* excludePreCreated= */ true,
-                    /* resolveNullNames= */ false);
+                    /* excludeDying= */ true, /* resolveNullNames= */ false);
             final int size = users.size();
             if (size > 1) {
                 for (int idx = 0; idx < size; idx++) {
@@ -6824,11 +6829,12 @@ public class UserManagerService extends IUserManager.Stub {
         if (!isProfile) {
             Pair<Integer, Integer> currentAndTargetUserIds = getCurrentAndTargetUserIds();
             if (userId == currentAndTargetUserIds.first) {
-                Slog.w(LOG_TAG, "Current user cannot be removed.");
+                Slogf.w(LOG_TAG, "Current user (%d) cannot be removed.", userId);
                 return false;
             }
             if (userId == currentAndTargetUserIds.second) {
-                Slog.w(LOG_TAG, "Target user of an ongoing user switch cannot be removed.");
+                Slogf.w(LOG_TAG, "Target user (%d) of an ongoing user switch (from user %d) cannot "
+                        + "be removed.", userId, currentAndTargetUserIds.first);
                 return false;
             }
             for (int i = profileIds.size() - 1; i >= 0; i--) {
@@ -6837,16 +6843,16 @@ public class UserManagerService extends IUserManager.Stub {
                     //Remove the associated profiles first and then remove the user
                     continue;
                 }
-                Slog.i(LOG_TAG, "removing profile:" + profileId
-                        + " associated with user:" + userId);
+                Slogf.i(LOG_TAG, "removing profile: %d associated with user: %d",
+                        profileId, userId);
                 if (!removeUserUnchecked(profileId)) {
                     // If the profile was not immediately removed, make sure it is marked as
                     // ephemeral. Don't mark as disabled since, per UserInfo.FLAG_DISABLED
                     // documentation, an ephemeral user should only be marked as disabled
                     // when its removal is in progress.
-                    Slog.i(LOG_TAG, "Unable to immediately remove profile " + profileId
-                            + "associated with user " + userId + ". User is set as ephemeral "
-                            + "and will be removed on user switch or reboot.");
+                    Slogf.i(LOG_TAG, "Unable to immediately remove profile %d associated with user "
+                            + "%d. User is set as ephemeral and will be removed on user switch or "
+                            + "reboot.", profileId, userId);
                     synchronized (mPackagesLock) {
                         UserData profileData = getUserDataNoChecks(userId);
                         profileData.info.flags |= UserInfo.FLAG_EPHEMERAL;
@@ -6867,12 +6873,10 @@ public class UserManagerService extends IUserManager.Stub {
     }
 
     /**
-     * Returns an optional string name of the restriction to check for user removal. The restriction
-     * name varies depending on whether the user is a managed profile.
-     *
-     * <p>If the flag android.multiuser.ignore_restrictions_when_deleting_private_profile is enabled
-     * and the user is a private profile (i.e. has no removal restrictions) the method will return
-     * {@code Optional.empty()}.
+     * Returns an optional string name of the restriction to check for user removal or {@code
+     * Optional.empty()} if the user is a private profile (i.e. has no removal restrictions). The
+     * restriction name for non private profiles varies depending on whether the user is a managed
+     * profile.
      */
     private Optional<String> getUserRemovalRestrictionOptional(@UserIdInt int userId) {
         final boolean isPrivateProfile;
@@ -6883,8 +6887,7 @@ public class UserManagerService extends IUserManager.Stub {
         }
         isPrivateProfile = userInfo != null && userInfo.isPrivateProfile();
         isManagedProfile = userInfo != null && userInfo.isManagedProfile();
-        if (android.multiuser.Flags.ignoreRestrictionsWhenDeletingPrivateProfile()
-                && isPrivateProfile) {
+        if (isPrivateProfile) {
             return Optional.empty();
         }
         return Optional.of(
@@ -7047,17 +7050,10 @@ public class UserManagerService extends IUserManager.Stub {
                     msg);
             return UserManager.REMOVE_RESULT_ALREADY_BEING_REMOVED;
         }
-        if (android.multiuser.Flags.disallowRemovingLastAdminUser()) {
-            if (getContextResources().getBoolean(R.bool.config_disallowRemovingLastAdminUser)) {
-                // For HSUM, the headless system user is currently flagged as an admin user now.
-                // Thus we must exclude it when checking for the last admin user, and only consider
-                // full admin users. b/419105275 will investigate not making HSU an admin.
-                if (isLastFullAdminUserLU(userData.info)) {
-                    Slogf.e(LOG_TAG, "User %d can not be %s, last admin user cannot be removed.",
-                            userId, msg);
-                    return UserManager.REMOVE_RESULT_ERROR_LAST_ADMIN_USER;
-                }
-            }
+        if (isNonRemovableLastAdminUserLU(userData.info)) {
+            Slogf.e(LOG_TAG, "User %d can not be %s, last admin user cannot be removed.", userId,
+                    msg);
+            return UserManager.REMOVE_RESULT_ERROR_LAST_ADMIN_USER;
         }
         return UserManager.REMOVE_RESULT_USER_IS_REMOVABLE;
     }
@@ -8336,14 +8332,8 @@ public class UserManagerService extends IUserManager.Stub {
 
         @Override
         public @NonNull List<UserInfo> getUsers(boolean excludeDying) {
-            return getUsers(/*excludePartial= */ true, excludeDying, /* excludePreCreated= */ true);
-        }
-
-        @Override
-        public @NonNull List<UserInfo> getUsers(boolean excludePartial, boolean excludeDying,
-                boolean excludePreCreated) {
-            return UserManagerService.this.getUsersInternal(excludePartial, excludeDying,
-                    excludePreCreated, /* resolveNullNames= */ true);
+            return UserManagerService.this.getUsersInternal(/*excludePartial= */ true, excludeDying,
+                    /* resolveNullNames= */ true);
         }
 
         @Override
@@ -8849,6 +8839,21 @@ public class UserManagerService extends IUserManager.Stub {
      */
     private boolean isNonRemovableMainUser(UserInfo userInfo) {
         return userInfo.isMain() && isMainUserPermanentAdmin();
+    }
+
+    /**
+     * Returns true if we must not delete this user or revoke its admin status because it is the
+     * last admin user on a device that requires there to always be at least one admin.
+     */
+    @GuardedBy("mUsersLock")
+    private boolean isNonRemovableLastAdminUserLU(UserInfo userInfo) {
+        return android.multiuser.Flags.disallowRemovingLastAdminUser()
+                && getContextResources().getBoolean(R.bool.config_disallowRemovingLastAdminUser)
+                // For HSUM, the headless system user is currently flagged as an admin user now.
+                // Thus we must exclude it when checking for the last admin user, and only consider
+                // full admin users.
+                // TODO(b/419105275): Investigate not making HSU an admin.
+                && isLastFullAdminUserLU(userInfo);
     }
 
     /** Returns if the user is the last admin user that is a full user. */

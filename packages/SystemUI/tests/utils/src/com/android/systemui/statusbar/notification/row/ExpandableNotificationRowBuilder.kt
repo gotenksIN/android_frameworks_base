@@ -57,6 +57,7 @@ import com.android.systemui.statusbar.NotificationRemoteInputManager
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.RankingBuilder
 import com.android.systemui.statusbar.SmartReplyController
+import com.android.systemui.statusbar.notification.BundleInteractionLogger
 import com.android.systemui.statusbar.notification.ColorUpdateLogger
 import com.android.systemui.statusbar.notification.ConversationNotificationManager
 import com.android.systemui.statusbar.notification.ConversationNotificationProcessor
@@ -113,7 +114,6 @@ import kotlinx.coroutines.test.TestScope
 import org.junit.Assert.assertTrue
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers
-import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.Mockito
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
@@ -318,12 +318,7 @@ class ExpandableNotificationRowBuilder(
     ): NotifRemoteViewsFactoryContainer {
         val iconDrawable = mock<Drawable>()
         whenever(
-                kosmos.mockAppIconProvider.getOrFetchAppIcon(
-                    anyOrNull(),
-                    anyOrNull(),
-                    anyBoolean(),
-                    anyBoolean(),
-                )
+                kosmos.mockAppIconProvider.getOrFetchAppIcon(anyOrNull(), anyOrNull(), anyOrNull())
             )
             .thenReturn(iconDrawable)
 
@@ -355,11 +350,12 @@ class ExpandableNotificationRowBuilder(
         summary.row = kosmos.createRowWithEntry(summary)
         val groupBuilder = GroupEntryBuilder().setSummary(summary)
         for (i in 0..<childCount) {
-            val childEntry = kosmos.buildNotificationEntry {
-                Notification.Builder(context, "channel")
-                    .setSmallIcon(R.drawable.ic_person)
-                    .setGroup("group")
-            }
+            val childEntry =
+                kosmos.buildNotificationEntry {
+                    Notification.Builder(context, "channel")
+                        .setSmallIcon(R.drawable.ic_person)
+                        .setGroup("group")
+                }
             childEntry.row = kosmos.createRowWithEntry(childEntry)
             groupBuilder.addChild(childEntry)
             summary.row.addChildNotification(childEntry.row)
@@ -482,6 +478,7 @@ class ExpandableNotificationRowBuilder(
             Mockito.mock(IStatusBarService::class.java, STUB_ONLY),
             Mockito.mock(UiEventLogger::class.java, STUB_ONLY),
             Mockito.mock(NotificationRebindingTracker::class.java, STUB_ONLY),
+            Mockito.mock(BundleInteractionLogger::class.java, STUB_ONLY),
         )
         row.setAboveShelfChangedListener {}
         mBindStage.getStageParams(entry).requireContentViews(extraInflationFlags)

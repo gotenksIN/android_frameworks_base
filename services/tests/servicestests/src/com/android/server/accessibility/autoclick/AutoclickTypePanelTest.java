@@ -122,39 +122,40 @@ public class AutoclickTypePanelTest {
     }
 
     @Test
-    public void AutoclickTypePanel_initialState_expandedFalse() {
-        assertThat(mAutoclickTypePanel.getExpansionStateForTesting()).isFalse();
-    }
-
-    @Test
-    public void AutoclickTypePanel_initialState_correctButtonVisibility() {
-        // On initialization, only left button is visible.
-        assertThat(mLeftClickButton.getVisibility()).isEqualTo(View.VISIBLE);
-        assertThat(mRightClickButton.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mDoubleClickButton.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mDragButton.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mScrollButton.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mLongPressButton.getVisibility()).isEqualTo(View.GONE);
-        assertThat(mPauseButton.getVisibility()).isEqualTo(View.VISIBLE);
-    }
-
-    @Test
-    public void AutoclickTypePanel_initialState_correctButtonStyle() {
-        verifyButtonHasSelectedStyle(mLeftClickButton);
-    }
-
-    @Test
-    public void togglePanelExpansion_onClick_expandedTrue() {
-        // On clicking left click button, the panel is expanded and all buttons are visible.
-        mLeftClickButton.callOnClick();
-
+    public void autoclickTypePanel_initialState_expandedTrue() {
         assertThat(mAutoclickTypePanel.getExpansionStateForTesting()).isTrue();
+    }
+
+    @Test
+    public void autoclickTypePanel_initialState_correctButtonVisibility() {
+        // On initialization, all buttons are visible.
         assertThat(mLeftClickButton.getVisibility()).isEqualTo(View.VISIBLE);
         assertThat(mRightClickButton.getVisibility()).isEqualTo(View.VISIBLE);
         assertThat(mDoubleClickButton.getVisibility()).isEqualTo(View.VISIBLE);
         assertThat(mDragButton.getVisibility()).isEqualTo(View.VISIBLE);
         assertThat(mScrollButton.getVisibility()).isEqualTo(View.VISIBLE);
         assertThat(mLongPressButton.getVisibility()).isEqualTo(View.VISIBLE);
+        assertThat(mPauseButton.getVisibility()).isEqualTo(View.VISIBLE);
+    }
+
+    @Test
+    public void autoclickTypePanel_initialState_correctButtonStyle() {
+        verifyButtonHasSelectedStyle(mLeftClickButton);
+    }
+
+    @Test
+    public void togglePanelExpansion_onClick_expandedTrue() {
+        // On clicking left click button, the panel is collapsed and only left click
+        // button is visible.
+        mLeftClickButton.callOnClick();
+
+        assertThat(mAutoclickTypePanel.getExpansionStateForTesting()).isFalse();
+        assertThat(mLeftClickButton.getVisibility()).isEqualTo(View.VISIBLE);
+        assertThat(mRightClickButton.getVisibility()).isEqualTo(View.GONE);
+        assertThat(mDoubleClickButton.getVisibility()).isEqualTo(View.GONE);
+        assertThat(mDragButton.getVisibility()).isEqualTo(View.GONE);
+        assertThat(mScrollButton.getVisibility()).isEqualTo(View.GONE);
+        assertThat(mLongPressButton.getVisibility()).isEqualTo(View.GONE);
 
         // Pause button is always visible.
         assertThat(mPauseButton.getVisibility()).isEqualTo(View.VISIBLE);
@@ -162,8 +163,7 @@ public class AutoclickTypePanelTest {
 
     @Test
     public void togglePanelExpansion_onClickAgain_expandedFalse() {
-        // By first click, the panel is expanded.
-        mLeftClickButton.callOnClick();
+        // On init, the panel is expanded.
         assertThat(mAutoclickTypePanel.getExpansionStateForTesting()).isTrue();
 
         // Clicks any button in the expanded state, the panel is expected to collapse
@@ -195,9 +195,6 @@ public class AutoclickTypePanelTest {
 
     @Test
     public void togglePanelExpansion_selectButton_correctActiveClickType() {
-        // By first click, the panel is expanded.
-        mLeftClickButton.callOnClick();
-
         // Clicks any button in the expanded state to select a type button.
         mScrollButton.callOnClick();
 
@@ -285,11 +282,11 @@ public class AutoclickTypePanelTest {
     public void moveToNextCorner_positionButton_rotatesThroughAllPositions() {
         // Define all positions in sequence
         int[][] expectedPositions = {
-                {CORNER_BOTTOM_RIGHT, Gravity.END | Gravity.BOTTOM, /*x=*/ 15, /*y=*/ 90},
-                {CORNER_BOTTOM_LEFT, Gravity.START | Gravity.BOTTOM, /*x=*/ 15, /*y=*/ 90},
+                {CORNER_BOTTOM_RIGHT, Gravity.END | Gravity.BOTTOM, /*x=*/ 15, /*y=*/ 30},
+                {CORNER_BOTTOM_LEFT, Gravity.START | Gravity.BOTTOM, /*x=*/ 15, /*y=*/ 30},
                 {CORNER_TOP_LEFT, Gravity.START | Gravity.TOP, /*x=*/ 15, /*y=*/ 30},
                 {CORNER_TOP_RIGHT, Gravity.END | Gravity.TOP, /*x=*/ 15, /*y=*/ 30},
-                {CORNER_BOTTOM_RIGHT, Gravity.END | Gravity.BOTTOM, /*x=*/ 15, /*y=*/ 90}
+                {CORNER_BOTTOM_RIGHT, Gravity.END | Gravity.BOTTOM, /*x=*/ 15, /*y=*/ 30}
         };
 
         // Check initial position
@@ -418,7 +415,7 @@ public class AutoclickTypePanelTest {
         assertThat(panel.getCurrentCornerForTesting()).isEqualTo(CORNER_BOTTOM_RIGHT);
         assertThat(params.gravity).isEqualTo(Gravity.END | Gravity.BOTTOM);
         assertThat(params.x).isEqualTo(15);  // Default edge margin.
-        assertThat(params.y).isEqualTo(90);  // Default bottom offset.
+        assertThat(params.y).isEqualTo(30);  // Default bottom offset.
     }
 
     @Test
@@ -478,7 +475,7 @@ public class AutoclickTypePanelTest {
         assertThat(Integer.parseInt(parts[0])).isEqualTo(Gravity.START | Gravity.TOP);
         assertThat(Integer.parseInt(parts[1])).isEqualTo(15);
         assertThat(Integer.parseInt(parts[2])).isEqualTo(
-                Math.max(0, panelLocation[1] + 10
+                Math.max(30, panelLocation[1] + 10
                         - mAutoclickTypePanel.getStatusBarHeightForTesting()));
         assertThat(Integer.parseInt(parts[3])).isEqualTo(CORNER_BOTTOM_LEFT);
 
@@ -489,7 +486,7 @@ public class AutoclickTypePanelTest {
         WindowManager.LayoutParams params = mAutoclickTypePanel.getLayoutParamsForTesting();
         assertThat(params.gravity).isEqualTo(Gravity.START | Gravity.TOP);
         assertThat(params.x).isEqualTo(15); // PANEL_EDGE_MARGIN
-        assertThat(params.y).isEqualTo(Math.max(0,
+        assertThat(params.y).isEqualTo(Math.max(30,
                 panelLocation[1] + 10 - mAutoclickTypePanel.getStatusBarHeightForTesting()));
         assertThat(mAutoclickTypePanel.getCurrentCornerForTesting()).isEqualTo(
                 CORNER_BOTTOM_LEFT);

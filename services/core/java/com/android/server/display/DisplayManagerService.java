@@ -16,11 +16,11 @@
 
 package com.android.server.display;
 
+import static android.Manifest.permission.ACCESS_COMPUTER_CONTROL;
 import static android.Manifest.permission.ADD_ALWAYS_UNLOCKED_DISPLAY;
 import static android.Manifest.permission.ADD_TRUSTED_DISPLAY;
 import static android.Manifest.permission.CAPTURE_SECURE_VIDEO_OUTPUT;
 import static android.Manifest.permission.CAPTURE_VIDEO_OUTPUT;
-import static android.Manifest.permission.ACCESS_COMPUTER_CONTROL;
 import static android.Manifest.permission.CONFIGURE_WIFI_DISPLAY;
 import static android.Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS;
 import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
@@ -32,7 +32,6 @@ import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHE
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_GONE;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE;
 import static android.hardware.display.DisplayManager.BRIGHTNESS_UNIT_PERCENTAGE;
-import static android.hardware.display.DisplayManagerGlobal.InternalEventFlag;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_CAN_SHOW_WITH_INSECURE_KEYGUARD;
@@ -47,6 +46,7 @@ import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_SHOUL
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED;
 import static android.hardware.display.DisplayManagerGlobal.DisplayEvent;
+import static android.hardware.display.DisplayManagerGlobal.InternalEventFlag;
 import static android.hardware.display.DisplayViewport.VIEWPORT_EXTERNAL;
 import static android.hardware.display.DisplayViewport.VIEWPORT_INTERNAL;
 import static android.hardware.display.DisplayViewport.VIEWPORT_VIRTUAL;
@@ -68,6 +68,7 @@ import static com.android.server.display.layout.Layout.Display.POSITION_REAR;
 
 import android.Manifest;
 import android.annotation.EnforcePermission;
+import android.annotation.FloatRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
@@ -903,9 +904,9 @@ public final class DisplayManagerService extends SystemService {
             }
 
             if (mFlags.isDefaultDisplayInTopologySwitchEnabled()) {
-                mIncludeDefaultDisplayInTopology = mInjector.canInternalDisplayHostDesktops(
-                        mContext) || (Settings.Secure.getIntForUser(mContext.getContentResolver(),
-                        INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY, 0, UserHandle.USER_CURRENT) != 0);
+                mIncludeDefaultDisplayInTopology =
+                        mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)
+                                || getIncludeDefaultDisplayInTopologySetting();
             }
         }
 
@@ -1267,7 +1268,7 @@ public final class DisplayManagerService extends SystemService {
             }
 
             if (mFlags.isDefaultDisplayInTopologySwitchEnabled()
-                    && !mInjector.canInternalDisplayHostDesktops(mContext)) {
+                    && !mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
                 mContext.getContentResolver().registerContentObserver(
                         Settings.Secure.getUriFor(
                                 Settings.Secure.INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY),
@@ -1298,7 +1299,7 @@ public final class DisplayManagerService extends SystemService {
             if (Settings.Secure.getUriFor(INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY).equals(uri)) {
                 synchronized (mSyncRoot) {
                     if (mFlags.isDefaultDisplayInTopologySwitchEnabled()
-                            && !mInjector.canInternalDisplayHostDesktops(mContext)) {
+                            && !mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
                         handleIncludeDefaultDisplayInTopologySettingChangeLocked();
                     }
                 }
@@ -1340,9 +1341,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void handleIncludeDefaultDisplayInTopologySettingChangeLocked() {
-        ContentResolver resolver = mContext.getContentResolver();
-        final boolean includeDefaultDisplayInTopology = Settings.Secure.getIntForUser(resolver,
-                INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY, 0, UserHandle.USER_CURRENT) != 0;
+        final boolean includeDefaultDisplayInTopology = getIncludeDefaultDisplayInTopologySetting();
 
         if (mIncludeDefaultDisplayInTopology == includeDefaultDisplayInTopology) {
             return;
@@ -1367,6 +1366,12 @@ public final class DisplayManagerService extends SystemService {
                 }
             }
         }
+    }
+
+    private boolean getIncludeDefaultDisplayInTopologySetting() {
+        ContentResolver resolver = mContext.getContentResolver();
+        return Settings.Secure.getIntForUser(resolver, INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY, 0,
+                UserHandle.USER_CURRENT) != 0;
     }
 
     private void restoreResolutionFromBackup() {
@@ -2526,7 +2531,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     boolean shouldIncludeDefaultDisplayInTopology() {
-        return mInjector.canInternalDisplayHostDesktops(mContext)
+        return mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)
                 || mIncludeDefaultDisplayInTopology;
     }
 
@@ -4147,8 +4152,8 @@ public final class DisplayManagerService extends SystemService {
                     onBrightnessChangeRunnable, hbmMetadata, bootCompleted, flags);
         }
 
-        boolean canInternalDisplayHostDesktops(Context context) {
-            return DesktopModeHelper.canInternalDisplayHostDesktops(context);
+        boolean isDesktopModeSupportedOnInternalDisplay(Context context) {
+            return DesktopModeHelper.isDesktopModeSupportedOnInternalDisplay(context);
         }
 
         PersistentDataStore getPersistentDataStore() {
@@ -6051,6 +6056,18 @@ public final class DisplayManagerService extends SystemService {
             synchronized (mSyncRoot) {
                 mDisplayPowerControllers.get(Display.DEFAULT_DISPLAY)
                         .persistBrightnessTrackerState();
+            }
+        }
+
+        @Override
+        public void setBrightnessCap(
+                int displayId,
+                @FloatRange(from = 0f, to = 1f) float cap,
+                @BrightnessInfo.BrightnessMaxReason int reason) {
+            synchronized (mSyncRoot) {
+                if (mDisplayPowerControllers.contains(displayId)) {
+                    mDisplayPowerControllers.get(displayId).setBrightnessCap(cap, reason);
+                }
             }
         }
 

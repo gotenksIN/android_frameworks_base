@@ -1471,9 +1471,9 @@ public class VirtualDeviceManagerServiceTest {
                 .setDoubleTapTimeoutDuration(Duration.ofMillis(10L))
                 .setDoubleTapMinTimeDuration(Duration.ofMillis(10L))
                 .setScrollFriction(10f)
-                .setMinimumFlingVelocityDpPerSecond(10f)
-                .setMaximumFlingVelocityDpPerSecond(10f)
-                .setTouchSlopDp(10f)
+                .setMinimumFlingVelocityPixelsPerSecond(10)
+                .setMaximumFlingVelocityPixelsPerSecond(10)
+                .setTouchSlopPixels(10)
                 .build();
 
         VirtualDeviceImpl virtualDevice = createVirtualDevice(VIRTUAL_DEVICE_ID_1,
@@ -1561,14 +1561,15 @@ public class VirtualDeviceManagerServiceTest {
                 associationId, deviceProfile, /* displayName= */ deviceProfile);
     }
 
-    private AssociationInfo createAssociationInfo(int associationId, String deviceProfile,
-            CharSequence displayName) {
-        return new AssociationInfo(associationId, /* userId= */ 0, /* packageName= */ null,
-                MacAddress.BROADCAST_ADDRESS, displayName, deviceProfile,
-                /* associatedDevice= */ null, /* selfManaged= */ true,
-                /* notifyOnDeviceNearby= */ false, /* revoked= */ false, /* pending= */ false,
-                /* timeApprovedMs= */0, /* lastTimeConnectedMs= */0,
-                /* systemDataSyncFlags= */ -1, /* deviceIcon= */ null, /* deviceId= */ null,
-                /* packageToNotify= */ null);
+    private AssociationInfo createAssociationInfo(
+            int associationId, String deviceProfile, CharSequence displayName) {
+        return new AssociationInfo.Builder(associationId, /* userId= */ 0, /* packageName= */ null)
+                .setDeviceMacAddress(MacAddress.BROADCAST_ADDRESS)
+                .setDisplayName(displayName)
+                .setDeviceProfile(deviceProfile)
+                .setSelfManaged(true)
+                .setTimeApproved(0)
+                .setLastTimeConnected(0)
+                .build();
     }
 }

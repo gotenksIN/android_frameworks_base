@@ -912,7 +912,7 @@ public class DisplayContentTests extends WindowTestsBase {
         assertEquals("Visible keyguard must influence device orientation",
                 SCREEN_ORIENTATION_PORTRAIT, mDisplayContent.getOrientation());
 
-        mAtm.mKeyguardController.keyguardGoingAway(appWin.getDisplayId(), 0 /* flags */);
+        mAtm.mKeyguardController.keyguardGoingAway(0 /* flags */);
         assertEquals("Keyguard that is going away must not influence device orientation",
                 SCREEN_ORIENTATION_LANDSCAPE, mDisplayContent.getOrientation());
     }
@@ -2557,7 +2557,7 @@ public class DisplayContentTests extends WindowTestsBase {
         transitions.flush();
 
         // Start unlocking from AOD.
-        keyguard.keyguardGoingAway(displayId, 0x0 /* flags */);
+        keyguard.keyguardGoingAway(0x0 /* flags */);
         assertTrue(keyguardGoingAway.getAsBoolean());
         assertTrue(appVisible.getAsBoolean());
 
@@ -2620,7 +2620,7 @@ public class DisplayContentTests extends WindowTestsBase {
         transitions.flush();
 
         // Start unlocking from AOD.
-        keyguard.keyguardGoingAway(displayId, 0x0 /* flags */);
+        keyguard.keyguardGoingAway(0x0 /* flags */);
         assertTrue(keyguardGoingAway.getAsBoolean());
         assertTrue(appVisible.getAsBoolean());
 
@@ -2743,19 +2743,22 @@ public class DisplayContentTests extends WindowTestsBase {
         final var keyguardWin = newWindowBuilder("keyguardWin", TYPE_NOTIFICATION_SHADE).build();
         final Rect rect2 = new Rect(10, 10, 20, 20);
         keyguardWin.setKeepClearAreas(List.of(rect2), Collections.emptyList());
+        mDisplayContent.updateKeepClearAreas();
 
         // No keep clear areas on display, because the windows are not visible
-        assertEquals(Collections.emptySet(), mDisplayContent.getKeepClearAreas());
+        assertEquals(Collections.emptySet(), mDisplayContent.mRestrictedKeepClearAreas);
 
         makeWindowVisible(navBarWin);
+        mDisplayContent.updateKeepClearAreas();
 
         // The returned keep-clear areas contain the areas just from the visible window
-        assertEquals(Set.of(rect1), mDisplayContent.getKeepClearAreas());
+        assertEquals(Set.of(rect1), mDisplayContent.mRestrictedKeepClearAreas);
 
         makeWindowVisible(navBarWin, keyguardWin);
+        mDisplayContent.updateKeepClearAreas();
 
         // The returned keep-clear areas contain the areas from all visible windows
-        assertEquals(Set.of(rect1, rect2), mDisplayContent.getKeepClearAreas());
+        assertEquals(Set.of(rect1, rect2), mDisplayContent.mRestrictedKeepClearAreas);
     }
 
     @Test

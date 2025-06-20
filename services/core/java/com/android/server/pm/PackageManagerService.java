@@ -1001,7 +1001,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     final @NonNull Set<String> mInitialNonStoppedSystemPackages;
     final boolean mShouldStopSystemPackagesByDefault;
     private final @NonNull String mRequiredSdkSandboxPackage;
-    private final @Nullable String mDeveloperVerificationServiceProviderPackage;
+    private final @Nullable ComponentName mDeveloperVerificationServiceProvider;
     @GuardedBy("mLock")
     private final PackageUsage mPackageUsage = new PackageUsage();
     final CompilerStats mCompilerStats = new CompilerStats();
@@ -1954,8 +1954,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mRequiredSdkSandboxPackage = testParams.requiredSdkSandboxPackage;
         mInitialNonStoppedSystemPackages = testParams.initialNonStoppedSystemPackages;
         mShouldStopSystemPackagesByDefault = testParams.shouldStopSystemPackagesByDefault;
-        mDeveloperVerificationServiceProviderPackage =
-                testParams.developerVerificationServiceProviderPackage;
+        mDeveloperVerificationServiceProvider =
+                testParams.developerVerificationServiceProvider;
 
         mLiveComputer = createLiveComputer();
         mSnapshotStatistics = null;
@@ -2510,11 +2510,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mRequiredSdkSandboxPackage = getRequiredSdkSandboxPackageName(computer);
             // Check that the developer verification service provider package specified in the
             // config can indeed be a verifier.
-            mDeveloperVerificationServiceProviderPackage =
-                    getVerificationServiceProviderPackage(computer, mContext.getString(
+            mDeveloperVerificationServiceProvider =
+                    getVerificationServiceProvider(computer, mContext.getString(
                             R.string.config_developerVerificationServiceProviderPackageName));
             mProtectedPackages.setDeveloperVerificationServiceProviderPackage(
-                    mDeveloperVerificationServiceProviderPackage);
+                    mDeveloperVerificationServiceProvider);
 
             // Initialize InstantAppRegistry's Instant App list for all users.
             forEachPackageState(computer, packageState -> {
@@ -2532,7 +2532,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             });
 
             mInstallerService = mInjector.getPackageInstallerService(
-                    mDeveloperVerificationServiceProviderPackage);
+                    mDeveloperVerificationServiceProvider);
             final ComponentName instantAppResolverComponent = getInstantAppResolver(computer);
             if (instantAppResolverComponent != null) {
                 if (DEBUG_INSTANT) {
@@ -3791,7 +3791,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     @Nullable
-    private static String getVerificationServiceProviderPackage(@NonNull Computer computer,
+    private static ComponentName getVerificationServiceProvider(@NonNull Computer computer,
             @Nullable String packageName) {
         if (TextUtils.isEmpty(packageName)) {
             return null;
@@ -3823,9 +3823,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 != PackageManager.PERMISSION_GRANTED) {
             return null;
         }
-        return applicationInfo.packageName;
+        return ri.getComponentInfo().getComponentName();
     }
-
 
     @Nullable
     private String getRetailDemoPackageName() {
@@ -6857,7 +6856,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     mRetailDemoPackage,
                     mOverlayConfigSignaturePackage,
                     mRecentsPackage,
-                    mDeveloperVerificationServiceProviderPackage);
+                    mDeveloperVerificationServiceProvider == null
+                            ? null : mDeveloperVerificationServiceProvider.getPackageName());
             final ArrayMap<String, FeatureInfo> availableFeatures;
             availableFeatures = new ArrayMap<>(mAvailableFeatures);
             final ArraySet<String> protectedBroadcasts;
@@ -8065,7 +8065,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 mRetailDemoPackage,
                 mOverlayConfigSignaturePackage,
                 mRecentsPackage,
-                mDeveloperVerificationServiceProviderPackage)
+                mDeveloperVerificationServiceProvider == null
+                        ? null : mDeveloperVerificationServiceProvider.getPackageName())
                 .getKnownPackageNames(snapshot, knownPackage, userId);
     }
 

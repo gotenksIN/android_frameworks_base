@@ -41,6 +41,7 @@ import androidx.compose.ui.res.integerResource
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.modifiers.padding
 import com.android.systemui.common.ui.compose.PagerDots
@@ -70,19 +71,21 @@ constructor(
         tiles: List<TileViewModel>,
         modifier: Modifier,
         listening: () -> Boolean,
+        revealEffectContainer: ElementKey?,
     ) {
         val viewModel =
             rememberViewModel(traceName = "PaginatedGridLayout-TileGrid") {
                 viewModelFactory.create()
             }
+        val delegateGridViewModel =
+            rememberViewModel(traceName = "PaginatedGridLayout-TileGrid") {
+                delegateGridLayout.viewModelFactory.create()
+            }
 
-        val columns = viewModel.columns
         val rows = integerResource(R.integer.quick_settings_paginated_grid_num_rows)
-        val largeTiles by viewModel.largeTilesState
-
         val pages =
-            remember(tiles, columns, rows, largeTiles) {
-                delegateGridLayout.splitIntoPages(tiles, rows = rows, columns = columns)
+            remember(tiles, rows, *delegateGridViewModel.pageKeys) {
+                delegateGridViewModel.splitIntoPages(tiles, rows)
             }
 
         val pagerState = rememberPagerState(0) { pages.size }

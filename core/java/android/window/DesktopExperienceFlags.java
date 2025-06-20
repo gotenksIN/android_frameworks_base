@@ -203,6 +203,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS),
     ENABLE_SEE_THROUGH_TASK_FRAGMENTS(Flags::enableSeeThroughTaskFragments,
             true, Flags.FLAG_ENABLE_SEE_THROUGH_TASK_FRAGMENTS),
+    ENABLE_SHRINK_WINDOW_BOUNDS_AFTER_DRAG(Flags::enableShrinkWindowBoundsAfterDrag, false,
+            Flags.FLAG_ENABLE_SHRINK_WINDOW_BOUNDS_AFTER_DRAG),
     ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS(
             Flags::enableSizeCompatModeImprovementsForConnectedDisplays, true,
             Flags.FLAG_ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS),
@@ -225,6 +227,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS),
     ENABLE_WINDOW_DECORATION_REFACTOR(Flags::enableWindowDecorationRefactor, false,
             Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR),
+    ENABLE_WINDOW_DROP_SMOOTH_TRANSITION(Flags::enableWindowDropSmoothTransition, false,
+            Flags.FLAG_ENABLE_WINDOW_DROP_SMOOTH_TRANSITION),
     ENABLE_WINDOW_REPOSITIONING_API(Flags::enableWindowRepositioningApi, false,
             Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API),
     ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS(Flags::enterDesktopByDefaultOnFreeformDisplays,

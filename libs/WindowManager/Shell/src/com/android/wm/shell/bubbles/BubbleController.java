@@ -86,8 +86,8 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.window.IMultitaskingController;
 import android.window.IMultitaskingControllerCallback;
-import android.window.ScreenCapture;
-import android.window.ScreenCapture.SynchronousScreenCaptureListener;
+import android.window.ScreenCaptureInternal;
+import android.window.ScreenCaptureInternal.SynchronousScreenCaptureListener;
 import android.window.TaskOrganizer;
 import android.window.TransitionInfo;
 import android.window.WindowContainerToken;
@@ -1195,6 +1195,10 @@ public class BubbleController implements ConfigurationChangeListener,
             }
         });
         try {
+            if (mOnImeHidden != null) {
+                Log.w(TAG, "removing bubbles from window manager with non-null onImeHidden");
+            }
+            mOnImeHidden = null;
             if (mStackView != null) {
                 mWindowManager.removeView(mStackView);
                 mBubbleData.getOverflow().cleanUpExpandedState();
@@ -1924,16 +1928,17 @@ public class BubbleController implements ConfigurationChangeListener,
     public void getScreenshotExcludingBubble(int displayId,
             SynchronousScreenCaptureListener screenCaptureListener) {
         try {
-            ScreenCapture.CaptureArgs args = null;
+            ScreenCaptureInternal.CaptureArgs args = null;
             View viewToUse = mStackView != null ? mStackView : mLayerView;
             if (viewToUse != null) {
                 ViewRootImpl viewRoot = viewToUse.getViewRootImpl();
                 if (viewRoot != null) {
                     SurfaceControl bubbleLayer = viewRoot.getSurfaceControl();
                     if (bubbleLayer != null) {
-                        args = new ScreenCapture.CaptureArgs.Builder<>()
-                                .setExcludeLayers(new SurfaceControl[] {bubbleLayer})
-                                .build();
+                        args =
+                                new ScreenCaptureInternal.CaptureArgs.Builder<>()
+                                        .setExcludeLayers(new SurfaceControl[] {bubbleLayer})
+                                        .build();
                     }
                 }
             }
@@ -1966,7 +1971,13 @@ public class BubbleController implements ConfigurationChangeListener,
                     return;
                 }
                 bubble.inflate(
-                        (b) -> mBubbleData.overflowBubble(Bubbles.DISMISS_RELOAD_FROM_DISK, bubble),
+                        (b) -> {
+                            if (Flags.enableOptionalBubbleOverflow()) {
+                                mBubbleData.addOverflowBubbleFromDisk(bubble);
+                            } else {
+                                mBubbleData.doOverflow(Bubbles.DISMISS_RELOAD_FROM_DISK, bubble);
+                            }
+                        },
                         mContext,
                         mExpandedViewManager,
                         mBubbleTaskViewFactory,
@@ -3443,7 +3454,7 @@ public class BubbleController implements ConfigurationChangeListener,
         @Nullable
         public SynchronousScreenCaptureListener getScreenshotExcludingBubble(int displayId) {
             SynchronousScreenCaptureListener screenCaptureListener =
-                    ScreenCapture.createSyncCaptureListener();
+                    ScreenCaptureInternal.createSyncCaptureListener();
 
             mMainExecutor.execute(
                     () -> BubbleController.this.getScreenshotExcludingBubble(displayId,

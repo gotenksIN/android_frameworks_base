@@ -16,7 +16,7 @@
 
 package com.android.systemui.lowlightclock;
 
-import static android.service.dreams.Flags.dreamsV2;
+import static com.android.systemui.Flags.lowlightClockUsesKeyguardChargingStatus;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -33,6 +33,8 @@ import com.android.settingslib.fuelgauge.BatteryStatus;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.KeyguardIndicationController;
+
+import dagger.Lazy;
 
 import java.text.NumberFormat;
 
@@ -56,7 +58,7 @@ public class ChargingStatusProvider {
     // callback being GC'd.
     private ChargingStatusCallback mChargingStatusCallback;
 
-    private final KeyguardIndicationController mKeyguardIndicationController;
+    private final Lazy<KeyguardIndicationController> mKeyguardIndicationController;
 
     private Callback mCallback;
 
@@ -66,7 +68,7 @@ public class ChargingStatusProvider {
             @Main Resources resources,
             IBatteryStats iBatteryStats,
             KeyguardUpdateMonitor keyguardUpdateMonitor,
-            KeyguardIndicationController keyguardIndicationController) {
+            Lazy<KeyguardIndicationController> keyguardIndicationController) {
         mContext = context;
         mResources = resources;
         mBatteryInfo = iBatteryStats;
@@ -169,8 +171,8 @@ public class ChargingStatusProvider {
     }
 
     private String getChargingString() {
-        if (dreamsV2()) {
-            return mKeyguardIndicationController.getPowerChargingString();
+        if (lowlightClockUsesKeyguardChargingStatus()) {
+            return mKeyguardIndicationController.get().getPowerChargingString();
         } else {
             return computeChargingString();
         }

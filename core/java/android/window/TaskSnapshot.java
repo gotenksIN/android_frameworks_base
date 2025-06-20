@@ -17,6 +17,7 @@
 package android.window;
 
 import android.annotation.IntDef;
+import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ComponentName;
@@ -30,10 +31,9 @@ import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
+import android.util.DisplayMetrics;
 import android.view.Surface;
 import android.view.WindowInsetsController;
-
-import com.android.window.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -74,6 +74,7 @@ public class TaskSnapshot implements Parcelable {
     private final boolean mIsTranslucent;
     private final boolean mHasImeSurface;
     private final int mUiMode;
+    private final int mDensityDpi;
     // Must be one of the named color spaces, otherwise, always use SRGB color space.
     private final ColorSpace mColorSpace;
     private int mInternalReferences;
@@ -110,7 +111,7 @@ public class TaskSnapshot implements Parcelable {
             Rect contentInsets, Rect letterboxInsets, boolean isLowResolution,
             boolean isRealSnapshot, int windowingMode,
             @WindowInsetsController.Appearance int appearance, boolean isTranslucent,
-            boolean hasImeSurface, int uiMode) {
+            boolean hasImeSurface, int uiMode, @IntRange(from = 1) int densityDpi) {
         mId = id;
         mCaptureTime = captureTime;
         mTopActivityComponent = topActivityComponent;
@@ -129,6 +130,7 @@ public class TaskSnapshot implements Parcelable {
         mIsTranslucent = isTranslucent;
         mHasImeSurface = hasImeSurface;
         mUiMode = uiMode;
+        mDensityDpi = densityDpi;
     }
 
     private TaskSnapshot(Parcel source) {
@@ -152,6 +154,8 @@ public class TaskSnapshot implements Parcelable {
         mIsTranslucent = source.readBoolean();
         mHasImeSurface = source.readBoolean();
         mUiMode = source.readInt();
+        int densityDpi = source.readInt();
+        mDensityDpi = densityDpi > 0 ? densityDpi : DisplayMetrics.DENSITY_DEVICE_STABLE;
     }
 
     /**
@@ -296,6 +300,13 @@ public class TaskSnapshot implements Parcelable {
         return mUiMode;
     }
 
+    /**
+     * @return The pixel density the screenshot was taken in.
+     */
+    public int getDensityDpi() {
+        return mDensityDpi;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -319,6 +330,7 @@ public class TaskSnapshot implements Parcelable {
         dest.writeBoolean(mIsTranslucent);
         dest.writeBoolean(mHasImeSurface);
         dest.writeInt(mUiMode);
+        dest.writeInt(mDensityDpi);
         synchronized (this) {
             if ((mInternalReferences & REFERENCE_WRITE_TO_PARCEL) != 0) {
                 mWriteToParcelCount--;
@@ -359,7 +371,8 @@ public class TaskSnapshot implements Parcelable {
                 + " mHasImeSurface=" + mHasImeSurface
                 + " mInternalReferences=" + mInternalReferences
                 + " mWriteToParcelCount=" + mWriteToParcelCount
-                + " mUiMode=" + Integer.toHexString(mUiMode);
+                + " mUiMode=" + Integer.toHexString(mUiMode)
+                + " mDensityDpi=" + mDensityDpi;
     }
 
     /**
@@ -380,8 +393,7 @@ public class TaskSnapshot implements Parcelable {
      */
     public synchronized void removeReference(@ReferenceFlags int usage) {
         mInternalReferences &= ~usage;
-        if (Flags.releaseSnapshotAggressively() && mInternalReferences == 0 && mSnapshot != null
-                && !mSnapshot.isClosed()) {
+        if (mInternalReferences == 0 && mSnapshot != null && !mSnapshot.isClosed()) {
             if (mSafeSnapshotReleaser != null) {
                 mSafeSnapshotReleaser.accept(mSnapshot);
             } else {
@@ -396,9 +408,6 @@ public class TaskSnapshot implements Parcelable {
      * Only used in core.
      */
     public synchronized void setSafeRelease(Consumer<HardwareBuffer> releaser) {
-        if (!Flags.safeReleaseSnapshotAggressively()) {
-            return;
-        }
         mSafeSnapshotReleaser = releaser;
     }
 
@@ -431,6 +440,7 @@ public class TaskSnapshot implements Parcelable {
         private boolean mHasImeSurface;
         private int mPixelFormat;
         private int mUiMode;
+        private int mDensityDpi = DisplayMetrics.DENSITY_DEVICE_STABLE;
 
         public Builder setId(long id) {
             mId = id;
@@ -514,10 +524,19 @@ public class TaskSnapshot implements Parcelable {
         }
 
         /**
-         * Sets the original uiMode while capture
+         * Sets the original uiMode while capturing
          */
         public Builder setUiMode(int uiMode) {
             mUiMode = uiMode;
+            return this;
+        }
+
+        /**
+         * Sets the original density while capturing. Throws IllegalArgumentException if
+         * densityDpi is outside the range (0,100000) (exclusive).
+         */
+        public Builder setDensityDpi(@IntRange(from = 1) int densityDpi) {
+            mDensityDpi = densityDpi;
             return this;
         }
 
@@ -551,7 +570,8 @@ public class TaskSnapshot implements Parcelable {
                     mAppearance,
                     mIsTranslucent,
                     mHasImeSurface,
-                    mUiMode);
+                    mUiMode,
+                    mDensityDpi);
 
         }
     }

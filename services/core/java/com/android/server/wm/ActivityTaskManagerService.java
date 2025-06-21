@@ -226,6 +226,9 @@ import android.sysprop.DisplayProperties;
 import android.telecom.TelecomManager;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+/* QTI_BEGIN */
+import android.util.BoostFramework;
+/* QTI_END */
 import android.util.IntArray;
 import android.util.Log;
 import android.util.Slog;
@@ -377,6 +380,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     final ActivityTaskManagerInternal mInternal;
     private PowerManagerInternal mPowerManagerInternal;
     private UsageStatsManagerInternal mUsageStatsInternal;
+
+    /* QTI_BEGIN */
+    private BoostFramework mPerf = new BoostFramework();
+    private int mLegacyUiPerfHandler = -1;
+    /* QTI_END */
 
     GrammaticalInflectionManagerInternal mGrammaticalManagerInternal;
     PendingIntentController mPendingIntentController;
@@ -5279,6 +5287,37 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 // If there is no resumed activity, it will choose the pausing or focused activity.
                 : mRootWindowContainer.getTopResumedActivity();
         mTopApp = top != null ? top.app : null;
+
+        /* QTI_BEGIN */
+        if (mPerf != null) {
+            if (mTopApp != null && mTopApp.mInfo != null) {
+                mPerf.updateUiPerfState(mContext, mTopApp.mInfo.packageName,
+                                            mTopApp.getPid());
+                if (mLegacyUiPerfHandler == -1) {
+                    int hint = mPerf.getLegacyUiPerfHint(mContext,
+                                                         mTopApp.mInfo.packageName);
+                    if (hint != -1) {
+                        mLegacyUiPerfHandler = mPerf.perfHint(hint, "android",
+                                                            Integer.MAX_VALUE, -1);
+                    }
+                } else {
+                    int hint = mPerf.getLegacyUiPerfHint(mContext,
+                                                         mTopApp.mInfo.packageName);
+                    if (hint == -1) {
+                        mPerf.perfLockReleaseHandler(mLegacyUiPerfHandler);
+                        mLegacyUiPerfHandler = -1;
+                    }
+                }
+            } else {
+                mPerf.updateUiPerfState(mContext, "", 0);
+                if (mLegacyUiPerfHandler != -1) {
+                    mPerf.perfLockReleaseHandler(mLegacyUiPerfHandler);
+                    mLegacyUiPerfHandler = -1;
+                }
+            }
+        }
+        /* QTI_END */
+
         if (mTopApp == mPreviousProcess) mPreviousProcess = null;
 
         final int demoteReasons = mDemoteTopAppReasons;

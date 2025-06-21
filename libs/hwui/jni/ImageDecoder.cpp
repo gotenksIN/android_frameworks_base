@@ -55,9 +55,9 @@
 
 /* QTI_BEGIN */
 #include <cutils/properties.h>
-extern const char* __progname;
+#include <sys/types.h>
+#include <unistd.h>
 #define UI_PERFMODE "debug.ui.perfmode.enable"
-#define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
 /* QTI_END */
 
 using namespace android;
@@ -242,6 +242,15 @@ static jobject ImageDecoder_nCreateByteBuffer(JNIEnv* env, jobject /*clazz*/,
 static jobject ImageDecoder_nCreateByteArray(JNIEnv* env, jobject /*clazz*/,
         jbyteArray byteArray, jint offset, jint length,
         jboolean preferAnimation, jobject source) {
+    /* QTI_BEGIN */
+    int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
+    if (ui_perfmode > 0 && ui_perfmode == getpid()) {
+        AutoJavaByteArray ar(env, byteArray);
+        std::unique_ptr<SkStream> stream =
+            std::make_unique<SkMemoryStream>(ar.ptr() + offset, length, false);
+        return native_create(env, std::move(stream), source, preferAnimation);
+    }
+    /* QTI_END */
     std::unique_ptr<SkStream> stream(CreateByteArrayStreamAdaptor(env, byteArray, offset, length));
     return native_create(env, std::move(stream), source, preferAnimation);
 }
@@ -305,17 +314,9 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
 
     /* QTI_BEGIN */
     bool should_use_sw = false;
-    if (decoder->mCodec->getEncodedFormat() == SkEncodedImageFormat::kHEIF) {
-        char value[PROPERTY_VALUE_MAX];
-        memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
-        property_get(UI_PERFMODE, value, "false");
-        if (strncmp(value, "true", 4) == 0) {
-            memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
-            property_get(UI_PERFMODE_PROCESS, value, "");
-            if (strncmp(__progname, value, 10) == 0) {
-                should_use_sw = true;
-            }
-        }
+    int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
+    if (ui_perfmode > 0 && ui_perfmode == getpid()) {
+        should_use_sw = true;
     }
     /* QTI_END */
 

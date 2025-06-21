@@ -27,7 +27,7 @@ import android.os.StatFs;
 import android.os.SystemProperties;
 
 /* QTI_BEGIN */
-import android.os.Process;
+import android.util.BoostFramework;
 /* QTI_END */
 
 /**
@@ -100,11 +100,10 @@ public final class SQLiteGlobal {
      */
     public static @SQLiteDatabase.JournalMode String getDefaultJournalMode() {
         /* QTI_BEGIN */
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false) &&
-                SystemProperties.get(UI_PERF_PROC_PROP, "").equals(Process.myProcessName())) {
+        if (BoostFramework.shouldUseUiPerf()) {
             return SystemProperties.get("debug.sqlite.journalmode", "PERSIST");
         }
-        /* QTI_BEGIN */
+        /* QTI_END */
         return SystemProperties.get("debug.sqlite.journalmode",
                 Resources.getSystem().getString(
                 com.android.internal.R.string.db_default_journal_mode));
@@ -129,11 +128,10 @@ public final class SQLiteGlobal {
             return defaultMode;
         }
         /* QTI_BEGIN */
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false) &&
-                SystemProperties.get(UI_PERF_PROC_PROP, "").equals(Process.myProcessName())) {
+        if (BoostFramework.shouldUseUiPerf()) {
             return SystemProperties.get("debug.sqlite.syncmode", "OFF");
         }
-        /* QTI_BEGIN */
+        /* QTI_END */
         return SystemProperties.get("debug.sqlite.syncmode",
                 Resources.getSystem().getString(
                 com.android.internal.R.string.db_default_sync_mode));

@@ -1892,7 +1892,8 @@ public final class NotificationPanelViewController implements
                 || expandedHeight > mHeadsUpStartHeight);
         if (goingBetweenClosedShadeAndExpandedQs && qsShouldExpandWithHeadsUp) {
             float qsExpansionFraction;
-            if (mSplitShadeEnabled && !Flags.bouncerUiRevamp()) {
+            if (mSplitShadeEnabled && (SceneContainerFlag.isEnabled()
+                    || !Flags.bouncerUiRevamp())) {
                 qsExpansionFraction = 1;
             } else if (isKeyguardShowing()) {
                 // On Keyguard, interpolate the QS expansion linearly to the panel expansion

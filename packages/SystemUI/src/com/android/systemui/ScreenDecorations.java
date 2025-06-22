@@ -67,7 +67,6 @@ import android.widget.FrameLayout;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.util.Preconditions;
-import com.android.settingslib.Utils;
 import com.android.systemui.biometrics.data.repository.FacePropertyRepository;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.decor.CutoutDecorProviderFactory;
@@ -82,11 +81,13 @@ import com.android.systemui.decor.PrivacyDotDecorProviderFactory;
 import com.android.systemui.decor.RoundedCornerDecorProviderFactory;
 import com.android.systemui.decor.RoundedCornerResDelegateImpl;
 import com.android.systemui.decor.ScreenDecorCommand;
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.log.ScreenDecorationsLogger;
 import com.android.systemui.qs.UserSettingObserver;
 import com.android.systemui.res.R;
 import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserTracker;
+import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.statusbar.commandline.CommandRegistry;
 import com.android.systemui.statusbar.events.PrivacyDotViewController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
@@ -153,6 +154,8 @@ public class ScreenDecorations implements
     private final DecorProviderFactory mDotFactory;
     private final FaceScanningProviderFactory mFaceScanningFactory;
     private final CameraProtectionLoader mCameraProtectionLoader;
+    private final ShadeInteractor mShadeInteractor;
+    private final KeyguardInteractor mKeyguardInteractor;
     public final int mFaceScanningViewId;
 
     @VisibleForTesting
@@ -342,6 +345,8 @@ public class ScreenDecorations implements
             JavaAdapter javaAdapter,
             CameraProtectionLoader cameraProtectionLoader,
             WindowManager windowManager,
+            ShadeInteractor shadeInteractor,
+            KeyguardInteractor keyguardInteractor,
             @ScreenDecorationsThread Handler handler,
             @ScreenDecorationsThread DelayableExecutor executor) {
         mContext = context;
@@ -353,6 +358,8 @@ public class ScreenDecorations implements
         mDotFactory = dotFactory;
         mFaceScanningFactory = faceScanningFactory;
         mCameraProtectionLoader = cameraProtectionLoader;
+        mShadeInteractor = shadeInteractor;
+        mKeyguardInteractor = keyguardInteractor;
         mFaceScanningViewId = com.android.systemui.res.R.id.face_scanning_anim;
         mLogger = logger;
         mFacePropertyRepository = facePropertyRepository;
@@ -1249,9 +1256,7 @@ public class ScreenDecorations implements
         FaceScanningOverlay faceScanningOverlay =
                 (FaceScanningOverlay) getOverlayView(mFaceScanningViewId);
         if (faceScanningOverlay != null) {
-            faceScanningOverlay.setFaceScanningAnimColor(
-                    Utils.getColorAttrDefaultColor(faceScanningOverlay.getContext(),
-                            com.android.systemui.res.R.attr.wallpaperTextColorAccent));
+            faceScanningOverlay.updateColors();
         }
     }
 

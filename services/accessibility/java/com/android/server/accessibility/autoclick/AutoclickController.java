@@ -277,6 +277,11 @@ public class AutoclickController extends BaseEventStreamTransformation {
                         mAutoclickIndicatorScheduler);
             }
 
+            if (mAutoclickTypePanel != null && mAutoclickTypePanel.getIsDragging()
+                    && event.getActionMasked() == MotionEvent.ACTION_HOVER_MOVE) {
+                mAutoclickTypePanel.onDragMove(event);
+            }
+
             if (!isPaused()) {
                 scheduleClick(event, policyFlags);
 
@@ -448,6 +453,9 @@ public class AutoclickController extends BaseEventStreamTransformation {
         }
         if (mAutoclickIndicatorScheduler != null) {
             mAutoclickIndicatorScheduler.cancel();
+        }
+        if (mAutoclickTypePanel != null && mAutoclickTypePanel.getIsDragging()) {
+            mAutoclickTypePanel.onDragEnd();
         }
     }
 
@@ -928,13 +936,18 @@ public class AutoclickController extends BaseEventStreamTransformation {
             boolean moved = detectMovement(event);
             cacheLastEvent(event, policyFlags, mLastMotionEvent == null || moved /* useAsAnchor */);
 
+            if (Flags.enableAutoclickIndicator()) {
+                // Give the indicator the latest mouse coordinates for when the indicator is ready
+                // to redraw.
+                final int pointerIndex = event.getActionIndex();
+                mAutoclickIndicatorView.setCoordination(
+                        event.getX(pointerIndex), event.getY(pointerIndex));
+            }
+
             if (moved) {
                 rescheduleClick(mDelay);
 
                 if (Flags.enableAutoclickIndicator()) {
-                    final int pointerIndex = event.getActionIndex();
-                    mAutoclickIndicatorView.setCoordination(
-                            event.getX(pointerIndex), event.getY(pointerIndex));
                     mAutoclickIndicatorScheduler.update();
                 }
             }
@@ -1159,6 +1172,12 @@ public class AutoclickController extends BaseEventStreamTransformation {
                 clearLongPressState();
             }
 
+            if (mAutoclickTypePanel.isHoveringDraggableArea()
+                    && !mAutoclickTypePanel.getIsDragging()) {
+                mAutoclickTypePanel.onDragStart(mLastMotionEvent);
+                return;
+            }
+
             // Always triggers left-click when the cursor hovers over the autoclick type panel, to
             // always allow users to change a different click type. Otherwise, if one chooses the
             // right-click, this user won't be able to rely on autoclick to select other click
@@ -1211,6 +1230,12 @@ public class AutoclickController extends BaseEventStreamTransformation {
                     break;
             }
             sendMotionEventsForClick(actionButton);
+
+            // End panel drag operation if one is active (autoclick triggered after user stopped
+            // moving during drag).
+            if (mAutoclickTypePanel != null && mAutoclickTypePanel.getIsDragging()) {
+                mAutoclickTypePanel.onDragEnd();
+            }
         }
 
         /**

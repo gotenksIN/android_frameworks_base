@@ -2235,55 +2235,66 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             }
 // QTI_END: 2020-09-09: Performance: Do attach application boost when it have been auto started as favorite
 // QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-            if (mPerfBoost.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
-                mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                        r.packageName, -1, BoostFramework.Launch.BOOST_V1, 2, pkgType, wpcPid);
-                mPerfSendTapHint = true;
-                mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                        r.packageName, -1, BoostFramework.Launch.BOOST_V2, 2, pkgType, wpcPid);
-                if (wpcPid != -1) {
+            if (mPerfBoost.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
+                             mPerfBoost.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
+               if (mPerfBoost.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                        r.packageName, wpcPid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION,
-                        2, pkgType, wpcPid);
-                }
-
-                if (pkgType == BoostFramework.WorkloadType.GAME)
-                {
-                    mPerfHandle =
-                        mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                           r.packageName, -1, BoostFramework.Launch.BOOST_GAME, 2, pkgType, wpcPid);
-                } else {
-                    mPerfHandle =
-                        mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                            r.packageName, -1, BoostFramework.Launch.BOOST_V3, 2, pkgType, wpcPid);
-                }
+                           r.packageName, -1, BoostFramework.Launch.BOOST_V1, 2, pkgType, wpcPid);
+                   mPerfSendTapHint = true;
+                   mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                           r.packageName, -1, BoostFramework.Launch.BOOST_V2, 2, pkgType, wpcPid);
+                   if (wpcPid != -1) {
+                      mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                           r.packageName, wpcPid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION,
+                           2, pkgType, wpcPid);
+                   }
+                   if (pkgType == BoostFramework.WorkloadType.GAME)
+                   {
+                       mPerfHandle =
+                           mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                              r.packageName, -1, BoostFramework.Launch.BOOST_GAME, 2, pkgType, wpcPid);
+                   } else {
+                       mPerfHandle =
+                           mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                               r.packageName, -1, BoostFramework.Launch.BOOST_V3, 2, pkgType, wpcPid);
+                   }
 // QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
 // QTI_BEGIN: 2019-05-29: Performance: IOP: Fix null object de-referencing.
 
-            } else {
+               } else {
 // QTI_END: 2019-05-29: Performance: IOP: Fix null object de-referencing.
 // QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-                mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
-                                    -1, BoostFramework.Launch.BOOST_V1);
-                mPerfSendTapHint = true;
-                mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
-                    -1, BoostFramework.Launch.BOOST_V2);
-                if (wpcPid != -1) {
-                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                        r.packageName, wpcPid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
-                }
+                   mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
+                                       -1, BoostFramework.Launch.BOOST_V1);
+                   mPerfSendTapHint = true;
+                   mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
+                       -1, BoostFramework.Launch.BOOST_V2);
+                   if (wpcPid != -1) {
+                       mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                           r.packageName, wpcPid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
+                   }
 
-                if (pkgType == BoostFramework.WorkloadType.GAME)
-                {
-                    mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                                    r.packageName, -1, BoostFramework.Launch.BOOST_GAME);
-                } else {
-                    mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                        r.packageName, -1, BoostFramework.Launch.BOOST_V3);
-                }
+                   if (pkgType == BoostFramework.WorkloadType.GAME)
+                   {
+                       mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                                       r.packageName, -1, BoostFramework.Launch.BOOST_GAME);
+                   } else {
+                       mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                           r.packageName, -1, BoostFramework.Launch.BOOST_V3);
+                   }
 // QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
 // QTI_BEGIN: 2019-05-29: Performance: IOP: Fix null object de-referencing.
-            }
+               }
+       }
+       else{
+            if (mPerfBoost.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
+                mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                  r.packageName, wpcPid, BoostFramework.Launch.BOOST_V1, 2, pkgType, wpcPid);
+            }else {
+                mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
+                  wpcPid, BoostFramework.Launch.BOOST_V1);
+           }
+       }
             if (mPerfHandle > 0)
                 mIsPerfBoostAcquired = true;
             // Start IOP

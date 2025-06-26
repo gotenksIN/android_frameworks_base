@@ -36,6 +36,7 @@ import android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID
 import android.telephony.TelephonyManager
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
+import com.android.systemui.statusbar.pipeline.StatusBarInflateCarrierMerged
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType
@@ -215,7 +216,11 @@ class DemoMobileConnectionRepository(
             .logDiffsForTable(tableLogBuffer, initialValue = _resolvedNetworkType.value)
             .stateIn(scope, SharingStarted.WhileSubscribed(), _resolvedNetworkType.value)
 
-    override val numberOfLevels = createNumberOfLevelsFlow(scope,  _inflateSignalStrength)
+    private val _defaultNumberOfLevels =
+        MutableStateFlow(MobileConnectionRepository.DEFAULT_NUM_LEVELS)
+
+    override val numberOfLevels =
+        createNumberOfLevelsFlow(scope, _inflateSignalStrength, _defaultNumberOfLevels)
 
     override val dataEnabled = MutableStateFlow(true)
 
@@ -312,6 +317,12 @@ class DemoMobileConnectionRepository(
         cdmaRoaming.value = false
         _primaryLevel.value = event.level
         _cdmaLevel.value = event.level
+        _defaultNumberOfLevels.value = event.numberOfLevels
+        if (StatusBarInflateCarrierMerged.isEnabled) {
+            _inflateSignalStrength.value = event.inflateSignalStrength
+        } else {
+            _inflateSignalStrength.value = false
+        }
         _dataActivityDirection.value = event.activity.toMobileDataActivityModel()
 
         // These fields are always the same for carrier-merged networks

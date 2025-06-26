@@ -1083,7 +1083,7 @@ public class DisplayPolicy {
                 // acquire sleep token if screen is off.
                 if (!mScreenOnEarly && !mScreenOnFully && !mDisplayContent.isSleeping()) {
                     Slog.w(TAG, "Late acquire sleep token for " + mDisplayContent);
-                    mService.mRoot.mDisplayOffTokenAcquirer.acquire(mDisplayContent.mDisplayId);
+                    mDisplayContent.addSleepToken(DisplayContent.DISPLAY_OFF_SLEEP_TOKEN_TAG);
                 }
             }
         }
@@ -1132,7 +1132,7 @@ public class DisplayPolicy {
     public void screenTurningOn(ScreenOnListener screenOnListener) {
         WindowProcessController visibleDozeUiProcess = null;
         synchronized (mLock) {
-            mService.mRoot.mDisplayOffTokenAcquirer.release(mDisplayContent.mDisplayId);
+            mDisplayContent.removeSleepToken(DisplayContent.DISPLAY_OFF_SLEEP_TOKEN_TAG);
             mScreenOnEarly = true;
             mScreenOnFully = false;
             mKeyguardDrawComplete = false;
@@ -1161,7 +1161,7 @@ public class DisplayPolicy {
     public void screenTurnedOff(boolean acquireSleepToken) {
         synchronized (mLock) {
             if (acquireSleepToken) {
-                mService.mRoot.mDisplayOffTokenAcquirer.acquire(mDisplayContent.mDisplayId);
+                mDisplayContent.addSleepToken(DisplayContent.DISPLAY_OFF_SLEEP_TOKEN_TAG);
             }
             mScreenOnEarly = false;
             mScreenOnFully = false;

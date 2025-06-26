@@ -71,6 +71,7 @@ cc_library_static {
         "com_android_server_am_LowMemDetector.cpp",
         "com_android_server_pm_PackageManagerShellCommandDataLoader.cpp",
         "com_android_server_sensor_SensorService.cpp",
+        "com_android_server_utils_LongMethodTracer.cpp",
         "com_android_server_wm_TaskFpsCallbackController.cpp",
 // QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
         "com_android_server_activityTriggerService.cpp",

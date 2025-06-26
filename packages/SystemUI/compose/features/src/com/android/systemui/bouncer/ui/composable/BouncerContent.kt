@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -682,6 +683,7 @@ private fun ContentScope.FoldableScene(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun StatusMessage(viewModel: BouncerMessageViewModel, modifier: Modifier = Modifier) {
     val message: MessageViewModel? by viewModel.message.collectAsStateWithLifecycle()
@@ -705,16 +707,14 @@ private fun StatusMessage(viewModel: BouncerMessageViewModel, modifier: Modifier
                 Text(
                     text = it.text,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 18.sp,
-                    lineHeight = 24.sp,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
                     text = it.secondaryText ?: "",
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 2,
                 )

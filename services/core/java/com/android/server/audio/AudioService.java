@@ -5622,6 +5622,7 @@ public class AudioService extends IAudioService.Stub
         Set<Integer> absVolumeDeviceTypes = new ArraySet<>(
                 AudioSystem.DEVICE_OUT_ALL_A2DP_SET);
         absVolumeDeviceTypes.addAll(mAbsVolumeMultiModeCaseDevices);
+        absVolumeDeviceTypes.add(AudioSystem.DEVICE_OUT_BLE_BROADCAST);
 
         final Set<AudioDeviceAttributes> absVolumeDevices =
                 AudioSystem.intersectionAudioDeviceTypes(absVolumeDeviceTypes, devices);
@@ -9956,8 +9957,8 @@ public class AudioService extends IAudioService.Stub
     }
 
     // NOTE: Locking order for synchronized objects related to volume or ringer mode management:
-    //  1 mScoclient OR mSafeMediaVolumeState
-    //  2   mSetModeLock
+    //  1   AudioDeviceBroker#mSetModeLock
+    //  2    AudioDeviceBroker#mDeviceStateLock
     //  3     mSettingsLock
     //  4       mVolumeStateLock
     /*package*/ class VolumeStreamState {

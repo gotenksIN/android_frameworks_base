@@ -29,6 +29,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +44,8 @@ import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,8 +63,10 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -83,6 +88,7 @@ fun NavBarPill(
     modifier: Modifier = Modifier,
     visible: Boolean = true,
     expanded: Boolean = false,
+    showEducation: Boolean = false,
     onClick: () -> Unit = {},
     onCloseClick: () -> Unit = {},
 ) {
@@ -92,6 +98,13 @@ fun NavBarPill(
 
     val density = LocalDensity.current
     val collapsedWidthPx = with(density) { navBarWidth.toPx() }
+    var wasEverCollapsed by remember(actions) { mutableStateOf(false) }
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            wasEverCollapsed = true
+        }
+    }
+
     var expandedSize by remember { mutableStateOf(IntSize.Zero) }
     val visibleState = remember { MutableTransitionState(false) }
     visibleState.targetState = visible
@@ -133,8 +146,16 @@ fun NavBarPill(
             animationSpec = tween(250, delayMillis = 200),
             label = "expansion",
         )
+    val config = LocalConfiguration.current
+    val isBoldTextEnabled by remember { derivedStateOf { config.fontWeightAdjustment > 0 } }
+    val actionTextStyle =
+        MaterialTheme.typography.labelMedium.copy(
+            fontWeight = if (isBoldTextEnabled) FontWeight.Bold else FontWeight.Medium
+        )
 
-    Box(
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom,
         modifier =
             modifier.defaultMinSize(minWidth = 412.dp, minHeight = 50.dp).drawBehind {
                 // SmartScrim
@@ -156,8 +177,11 @@ fun NavBarPill(
                         )
                     }
                 }
-            }
+            },
     ) {
+        if (visible && !expanded && showEducation) {
+            FirstTimeEducation(Alignment.CenterHorizontally)
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -173,7 +197,6 @@ fun NavBarPill(
                                 1f
                             }
                     }
-                    .align(Alignment.BottomCenter)
                     .padding(bottom = 4.dp),
         ) {
             val closeButtonSize = 28.dp
@@ -227,6 +250,7 @@ fun NavBarPill(
                                 // Expanded chip for single action or MR
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier =
                                         Modifier.padding(end = 3.dp)
                                             .clip(RoundedCornerShape(16.dp))
@@ -248,10 +272,30 @@ fun NavBarPill(
                                         modifier =
                                             Modifier.size(16.dp).then(iconBorder).clip(CircleShape),
                                     )
-                                    if (!action.icon.repeated) {
+                                    if (
+                                        isMrAction &&
+                                            !(wasEverCollapsed && filteredActions.size > 1)
+                                    ) {
                                         Text(
                                             text = action.label,
-                                            style = MaterialTheme.typography.labelMedium,
+                                            style = actionTextStyle,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.widthIn(0.dp, maxPillWidth * 0.5f),
+                                        )
+                                        if (action.icon.repeatCount > 0) {
+                                            Text(
+                                                text = "+${action.icon.repeatCount}",
+                                                style = actionTextStyle,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(end = 3.dp),
+                                            )
+                                        }
+                                    } else if (action.icon.repeatCount == 0) {
+                                        Text(
+                                            text = action.label,
+                                            style = actionTextStyle,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             color = MaterialTheme.colorScheme.onSurface,

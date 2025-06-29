@@ -165,7 +165,6 @@ import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.FakeSystemClock;
 import com.android.systemui.util.time.SystemClock;
 import com.android.systemui.utils.windowmanager.WindowManagerProvider;
-import com.android.systemui.wallpapers.ui.viewmodel.WallpaperFocalAreaViewModel;
 import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor;
 import com.android.wm.shell.animation.FlingAnimationUtils;
 
@@ -264,7 +263,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
             mDreamingToLockscreenTransitionViewModel;
     @Mock protected KeyguardTransitionInteractor mKeyguardTransitionInteractor;
     @Mock protected KeyguardTouchHandlingViewModel.Factory mKeyguardTouchHandlingViewModelFactory;
-    @Mock protected WallpaperFocalAreaViewModel mWallpaperFocalAreaViewModel;
     @Mock protected AlternateBouncerInteractor mAlternateBouncerInteractor;
     @Mock protected MotionEvent mDownMotionEvent;
     @Mock protected CoroutineDispatcher mMainDispatcher;
@@ -572,7 +570,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mKeyguardTransitionInteractor,
                 mDumpManager,
                 mKeyguardTouchHandlingViewModelFactory,
-                mWallpaperFocalAreaViewModel,
                 mKeyguardInteractor,
                 mActivityStarter,
                 mSharedNotificationContainerInteractor,

@@ -45,6 +45,7 @@ import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopState
+import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.Transitions
@@ -72,6 +73,7 @@ class DesktopTilingDecorViewModel(
     private val mainExecutor: ShellExecutor,
     private val desktopState: DesktopState,
     private val shellInit: ShellInit,
+    private val shellController: ShellController,
 ) : DisplayChangeController.OnDisplayChangingListener {
     @VisibleForTesting
     var tilingHandlerByUserAndDeskId = SparseArray<SparseArray<DesktopTilingWindowDecoration>>()
@@ -120,6 +122,7 @@ class DesktopTilingDecorViewModel(
                             focusTransitionObserver,
                             mainExecutor,
                             desktopState,
+                            shellController,
                         )
                         .also { userHandlerList[deskId] = it }
                 }
@@ -165,11 +168,6 @@ class DesktopTilingDecorViewModel(
         }
     }
 
-    fun onTaskInfoChange(taskInfo: RunningTaskInfo) {
-        val deskId = getCurrentActiveDeskForDisplay(taskInfo.displayId) ?: return
-        tilingHandlerByUserAndDeskId[currentUserId]?.get(deskId)?.onTaskInfoChange(taskInfo)
-    }
-
     override fun onDisplayChange(
         displayId: Int,
         fromRotation: Int,
@@ -189,23 +187,20 @@ class DesktopTilingDecorViewModel(
      */
     fun onDisplayDisconnected(
         disconnectedDisplayId: Int,
-        desktopModeSupportedOnNewDisplay: Boolean,
     ) {
-        if (!desktopModeSupportedOnNewDisplay) {
-            resetAllDesksWithDisplayId(disconnectedDisplayId)
-            return
-        }
         // Reset the tiling session but keep the persistence data for when the moved desks
         // are activated again.
         for (userHandlerList in tilingHandlerByUserAndDeskId.valueIterator()) {
+            val desksToRemove = ArrayList<Int>()
             for (desk in userHandlerList.keyIterator()) {
                 val handler = userHandlerList[desk]
                 if (disconnectedDisplayId == handler.displayId) {
                     handler.resetTilingSession(shouldPersistTilingData = true)
-                    userHandlerList.remove(desk)
+                    desksToRemove.add(desk)
                     disconnectedDisplayDesks.add(desk)
                 }
             }
+            desksToRemove.forEach { desk -> userHandlerList.remove(desk) }
         }
     }
 
@@ -282,7 +277,8 @@ class DesktopTilingDecorViewModel(
     }
 
     /** Removes [deskId] from the previously deactivated desks to mark it's activation. */
-    fun onDeskActivated(deskId: Int): Boolean = disconnectedDisplayDesks.remove(deskId)
+    fun onDeskActivated(deskId: Int): Boolean =
+        disconnectedDisplayDesks.remove(deskId) || !tilingHandlerByUserAndDeskId.contains(deskId)
 
     /** Destroys a tiling session for a removed desk. */
     fun onDeskRemoved(deskId: Int) {

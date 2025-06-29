@@ -669,7 +669,8 @@ public class NotificationManagerService extends SystemService {
     static final long NOTIFICATION_MAX_AGE_AT_POST = Duration.ofDays(14).toMillis();
 
     // Minium number of sparse groups for a package before autogrouping them
-    private static final int AUTOGROUP_SPARSE_GROUPS_AT_COUNT = 6;
+    @VisibleForTesting
+    static final int AUTOGROUP_SPARSE_GROUPS_AT_COUNT = 6;
     // Minimum number notifications in a bundle section before autogrouping them
     private static final int AUTOGROUP_BUNDLE_SECTIONS_AT_COUNT = 1;
 
@@ -3282,7 +3283,8 @@ public class NotificationManagerService extends SystemService {
         return StatsManager.PULL_SUCCESS;
     }
 
-    private GroupHelper getGroupHelper() {
+    @VisibleForTesting
+    protected GroupHelper getGroupHelper() {
         mAutoGroupAtCount =
                 getContext().getResources().getInteger(R.integer.config_autoGroupAtCount);
         return new GroupHelper(getContext(), getContext().getPackageManager(),
@@ -10291,6 +10293,13 @@ public class NotificationManagerService extends SystemService {
 
                     int buzzBeepBlinkLoggingCode = 0;
                     if (!r.isHidden()) {
+                        if (notificationClassification()) {
+                            if (mGroupHelper.isSummaryWithAllChildrenBundled(r, mNotificationList,
+                                    mEnqueuedNotifications)) {
+                                notification.flags |= Notification.FLAG_SILENT;
+                            }
+                        }
+
                         buzzBeepBlinkLoggingCode = mAttentionHelper.buzzBeepBlinkLocked(r,
                                 new NotificationAttentionHelper.Signals(
                                         mUserProfiles.isCurrentProfile(r.getUserId()),
@@ -12275,7 +12284,7 @@ public class NotificationManagerService extends SystemService {
                     smartReplies = null;
                 }
             }
-            NotificationChannel effectiveChannel = record.getChannel().copy();
+            NotificationChannel effectiveChannel = record.getChannel();
             if (notificationClassificationUi()) {
                 // special handling for a notification's channel visibility when bundled: if the
                 // notification's original channel had a more strict visibility than the current
@@ -12285,6 +12294,7 @@ public class NotificationManagerService extends SystemService {
                     int currentChannelVis = record.getChannel().getLockscreenVisibility();
                     if (currentChannelVis == VISIBILITY_NO_OVERRIDE
                             || record.getOriginalChannelVisibility() < currentChannelVis) {
+                        effectiveChannel = record.getChannel().copy();
                         effectiveChannel.setLockscreenVisibility(
                                 record.getOriginalChannelVisibility());
                     }

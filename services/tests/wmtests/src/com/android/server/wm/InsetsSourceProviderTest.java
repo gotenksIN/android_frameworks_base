@@ -74,6 +74,8 @@ public class InsetsSourceProviderTest extends WindowTestsBase {
         statusBar.mHasSurface = true;
         mProvider.setWindow(statusBar, null, null);
         mProvider.updateSourceFrame(statusBar.getFrame());
+        // serverVisibility is updated in onPreLayout
+        mProvider.onPreLayout();
         mProvider.onPostLayout();
         assertEquals(new Rect(0, 0, 500, 100), mProvider.getSource().getFrame());
         assertEquals(Insets.of(0, 100, 0, 0), mProvider.getInsetsHint());
@@ -107,6 +109,8 @@ public class InsetsSourceProviderTest extends WindowTestsBase {
                     return 0;
                 }, null);
         mProvider.updateSourceFrame(statusBar.getFrame());
+        // serverVisibility is updated in onPreLayout
+        mProvider.onPreLayout();
         mProvider.onPostLayout();
         assertEquals(new Rect(10, 10, 20, 20), mProvider.getSource().getFrame());
     }
@@ -124,21 +128,6 @@ public class InsetsSourceProviderTest extends WindowTestsBase {
 
         // We can have the control or the control target after we have the insets source window.
         mProvider.setWindow(statusBar, null, null);
-        mProvider.updateControlForTarget(target, false /* force */, null /* statsToken */);
-        assertNotNull(mProvider.getControl(target));
-        assertNotNull(mProvider.getControlTarget());
-
-        // We must not have control or control target while we are performing seamless rotation.
-        // And the control and the control target must not be updated during that.
-        mProvider.startSeamlessRotation();
-        assertNull(mProvider.getControl(target));
-        assertNull(mProvider.getControlTarget());
-        mProvider.updateControlForTarget(target, true /* force */, null /* statsToken */);
-        assertNull(mProvider.getControl(target));
-        assertNull(mProvider.getControlTarget());
-
-        // We can have the control and the control target after seamless rotation.
-        mProvider.finishSeamlessRotation();
         mProvider.updateControlForTarget(target, false /* force */, null /* statsToken */);
         assertNotNull(mProvider.getControl(target));
         assertNotNull(mProvider.getControlTarget());
@@ -321,6 +310,8 @@ public class InsetsSourceProviderTest extends WindowTestsBase {
         statusBar.mHasSurface = true;
         mProvider.setWindow(statusBar, null, null);
         mProvider.updateSourceFrame(statusBar.getFrame());
+        // serverVisibility is updated in onPreLayout
+        mProvider.onPreLayout();
         mProvider.onPostLayout();
         assertEquals(new Rect(0, 0, 500, 100), mProvider.getSource().getFrame());
         // Still apply top insets if window overlaps even if it's top doesn't exactly match

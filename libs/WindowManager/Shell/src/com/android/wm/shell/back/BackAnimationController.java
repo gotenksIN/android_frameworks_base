@@ -30,7 +30,7 @@ import static android.window.TransitionInfo.FLAG_MOVED_TO_TOP;
 import static android.window.TransitionInfo.FLAG_SHOW_WALLPAPER;
 
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_PREDICTIVE_BACK_HOME;
-import static com.android.systemui.Flags.predictiveBackDelayWmTransition;
+import static com.android.window.flags.Flags.predictiveBackDelayWmTransition;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BACK_PREVIEW;
 
 import android.annotation.NonNull;
@@ -81,7 +81,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.LatencyTracker;
 import com.android.internal.view.AppearanceRegion;
-import com.android.systemui.animation.TransitionAnimator;
 import com.android.window.flags.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.common.ExternalInterfaceBinder;
@@ -339,11 +338,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
 
         @Override
         public void onThresholdCrossed() {
-            if (predictiveBackDelayWmTransition()) {
-                mShellExecutor.execute(BackAnimationController.this::onThresholdCrossed);
-            } else {
-                BackAnimationController.this.onThresholdCrossed();
-            }
+            BackAnimationController.this.onThresholdCrossed();
         }
 
         @Override
@@ -443,11 +438,6 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
     @VisibleForTesting
     public void onThresholdCrossed() {
         mThresholdCrossed = true;
-        BackTouchTracker activeTracker = getActiveTracker();
-        if (predictiveBackDelayWmTransition() && activeTracker != null && mActiveCallback == null
-                && mBackGestureStarted) {
-            startBackNavigation(activeTracker);
-        }
         // There was no focus window when calling startBackNavigation, still pilfer pointers so
         // the next focus window won't receive motion events.
         if (mBackNavigationInfo == null && mReceivedNullNavigationInfo) {
@@ -465,6 +455,25 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             }
         } else if (shouldDispatchToAnimator) {
             tryPilferPointers();
+        }
+
+        if (predictiveBackDelayWmTransition()) {
+            mShellExecutor.execute(() -> {
+                if (shouldDispatchToAnimator()) {
+                    try {
+                        mActivityTaskManager.startPredictiveBackAnimation();
+                    } catch (RemoteException r) {
+                        Log.e(TAG, "Failed to start predictive animation", r);
+                        finishBackNavigation(mCurrentTracker.getTriggerBack());
+                        return;
+                    }
+                    final int backType = mBackNavigationInfo.getType();
+                    if (!mShellBackAnimationRegistry.startGesture(backType)) {
+                        mActiveCallback = null;
+                    }
+                    requestTopUi(true, backType);
+                }
+            });
         }
     }
 
@@ -575,7 +584,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             mPostCommitAnimationInProgress = false;
             mShellExecutor.removeCallbacks(mAnimationTimeoutRunnable);
             startSystemAnimation();
-        } else if (!predictiveBackDelayWmTransition()) {
+        } else {
             startBackNavigation(touchTracker);
         }
     }
@@ -615,10 +624,12 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         final int backType = backNavigationInfo.getType();
         final boolean shouldDispatchToAnimator = shouldDispatchToAnimator();
         if (shouldDispatchToAnimator) {
-            if (!mShellBackAnimationRegistry.startGesture(backType)) {
-                mActiveCallback = null;
+            if (!predictiveBackDelayWmTransition()) {
+                if (!mShellBackAnimationRegistry.startGesture(backType)) {
+                    mActiveCallback = null;
+                }
+                requestTopUi(true, backType);
             }
-            requestTopUi(true, backType);
             tryPilferPointers();
         } else {
             mActiveCallback = mBackNavigationInfo.getOnBackInvokedCallback();
@@ -829,6 +840,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                             ? mBackNavigationInfo.getFocusedTaskId()
                             : INVALID_TASK_ID);
         }
+        final boolean hasRequestAnimation = mThresholdCrossed;
         // Reset gesture states.
         mThresholdCrossed = false;
         mPointersPilfered = false;
@@ -858,6 +870,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         final int backType = mBackNavigationInfo.getType();
         // Simply trigger and finish back navigation when no animator defined.
         if (!shouldDispatchToAnimator()
+                || (!hasRequestAnimation && predictiveBackDelayWmTransition())
                 || mShellBackAnimationRegistry.isAnimationCancelledOrNull(backType)) {
             ProtoLog.d(WM_SHELL_BACK_PREVIEW, "Trigger back without dispatching to animator.");
             invokeOrCancelBack(mCurrentTracker);
@@ -1298,9 +1311,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             }
 
             if (handlePrepareTransition(transition, info, st, ft, finishCallback)) {
-                if (checkTakeoverFlags()) {
-                    mTakeoverHandler = mTransitions.getHandlerForTakeover(transition, info);
-                }
+                mTakeoverHandler = mTransitions.getHandlerForTakeover(transition, info);
                 kickStartAnimation();
                 return true;
             }
@@ -1308,20 +1319,12 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         }
 
         private boolean canHandOffAnimation() {
-            if (!checkTakeoverFlags()) {
-                return false;
-            }
-
             return mTakeoverHandler != null;
         }
 
         private void handOffAnimation(
                 RemoteAnimationTarget[] targets, WindowAnimationState[] states) {
-            if (!checkTakeoverFlags()) {
-                ProtoLog.e(WM_SHELL_BACK_PREVIEW,
-                        "Trying to hand off the animation, but the required flags are disabled.");
-                return;
-            } else if (mTakeoverHandler == null) {
+            if (mTakeoverHandler == null) {
                 ProtoLog.e(WM_SHELL_BACK_PREVIEW,
                         "Missing takeover handler when trying to hand off animation.");
                 return;
@@ -1751,10 +1754,6 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                 return new WindowContainerTransaction();
             }
             return null;
-        }
-
-        private static boolean checkTakeoverFlags() {
-            return TransitionAnimator.Companion.longLivedReturnAnimationsEnabled();
         }
     }
 

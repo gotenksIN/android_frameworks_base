@@ -26,6 +26,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -52,8 +54,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
 import androidx.compose.runtime.Composable
@@ -88,7 +92,6 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.PlatformButton
@@ -253,6 +256,23 @@ fun ContentScope.BouncerContent(
         }
 
         Dialog(bouncerViewModel = viewModel, dialogFactory = dialogFactory)
+
+        if (viewModel.showBackButton) {
+            OutlinedButton(
+                onClick = viewModel::navigateBack,
+                modifier =
+                    Modifier.align(Alignment.BottomStart).padding(24.dp).testTag("BackButton"),
+                border =
+                    BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.back_button_on_bouncer),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }
 
@@ -662,6 +682,7 @@ private fun ContentScope.FoldableScene(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun StatusMessage(viewModel: BouncerMessageViewModel, modifier: Modifier = Modifier) {
     val message: MessageViewModel? by viewModel.message.collectAsStateWithLifecycle()
@@ -685,16 +706,14 @@ private fun StatusMessage(viewModel: BouncerMessageViewModel, modifier: Modifier
                 Text(
                     text = it.text,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 18.sp,
-                    lineHeight = 24.sp,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
                     text = it.secondaryText ?: "",
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 2,
                 )

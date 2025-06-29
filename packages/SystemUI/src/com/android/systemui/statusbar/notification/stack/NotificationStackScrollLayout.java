@@ -117,7 +117,6 @@ import com.android.systemui.statusbar.notification.headsup.HeadsUpAnimator;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpTouchHelper;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpUtil;
 import com.android.systemui.statusbar.notification.headsup.NotificationsHunSharedAnimationValues;
-import com.android.systemui.statusbar.notification.logging.NotificationLogger;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
@@ -128,7 +127,6 @@ import com.android.systemui.statusbar.notification.shared.NotificationContentAlp
 import com.android.systemui.statusbar.notification.shared.NotificationHeadsUpCycling;
 import com.android.systemui.statusbar.notification.shared.NotificationMinimalism;
 import com.android.systemui.statusbar.notification.shared.NotificationThrottleHun;
-import com.android.systemui.statusbar.notification.shared.NotificationsLiveDataStoreRefactor;
 import com.android.systemui.statusbar.notification.stack.shared.model.AccessibilityScrollEvent;
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds;
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape;
@@ -274,8 +272,6 @@ public class NotificationStackScrollLayout
     private float mOverScrolledBottomPixels;
     private final ListenerSet<Runnable> mStackHeightChangedListeners = new ListenerSet<>();
     private final ListenerSet<Runnable> mHeadsUpHeightChangedListeners = new ListenerSet<>();
-    // TODO(b/424001722) remove mLegacyLocationsChangedListener
-    private NotificationLogger.OnChildLocationsChangedListener mLegacyLocationsChangedListener;
     private OnNotificationLocationsChangedListener mLocationsChangedListener;
     private OnOverscrollTopChangedListener mOverscrollTopChangedListener;
     private ExpandableView.OnHeightChangedListener mOnHeightChangedListener;
@@ -1347,12 +1343,6 @@ public class NotificationStackScrollLayout
         mLocationsChangedListener = listener;
     }
 
-    public void setChildLocationsChangedListener(
-            NotificationLogger.OnChildLocationsChangedListener listener) {
-        NotificationsLiveDataStoreRefactor.assertInLegacyMode();
-        mLegacyLocationsChangedListener = listener;
-    }
-
     private void setMaxLayoutHeight(int maxLayoutHeight) {
         mMaxLayoutHeight = maxLayoutHeight;
         updateAlgorithmHeightAndPadding();
@@ -1548,9 +1538,7 @@ public class NotificationStackScrollLayout
             boolean canClip = true;
             if (child instanceof ExpandableNotificationRow row) {
                 if (row.isChildInGroup()) {
-                    ExpandableNotificationRow notifParent = row.getNotificationParent();
-                    canClip = notifParent.isGroupExpanded()
-                            && !notifParent.isGroupExpansionChanging();
+                    canClip = canClipChildRow(row);
                 }
                 if (row.isBackgroundOpaque()) {
                     canClip = false;
@@ -1576,6 +1564,18 @@ public class NotificationStackScrollLayout
             }
         }
         Collections.sort(overlappingList, mNotGoneIndexComparator);
+    }
+
+    private boolean canClipChildRow(ExpandableNotificationRow row) {
+        ExpandableNotificationRow notifParent = row.getNotificationParent();
+        if (NotificationBundleUi.isEnabled()) {
+            return notifParent.isGroupExpanded()
+                    && !notifParent.isGroupExpansionChanging()
+                    && (!notifParent.isChildInGroup() || canClipChildRow(notifParent));
+        } else {
+            return notifParent.isGroupExpanded()
+                    && !notifParent.isGroupExpansionChanging();
+        }
     }
 
     private void updateScrollStateForAddedChildren() {
@@ -6083,6 +6083,18 @@ public class NotificationStackScrollLayout
             mLogger.logAddSwipedOutView(row.getLoggingKey(), mClearAllInProgress);
         }
     }
+
+    void removeSwipedOutView(View v) {
+        logRemoveSwipedOutView(v);
+        mSwipedOutViews.remove(v);
+    }
+
+    private void logRemoveSwipedOutView(View v) {
+        if (mLogger != null && v instanceof ExpandableNotificationRow row) {
+            mLogger.logRemoveSwipedOutView(row.getLoggingKey(), mClearAllInProgress);
+        }
+    }
+
 
     void onSwipeBegin(View viewSwiped) {
         if (!(viewSwiped instanceof ExpandableNotificationRow)) {

@@ -588,7 +588,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         } else {
             decoration.relayout(taskInfo, taskInfo.isFocused, decoration.mExclusionRegion);
         }
-        mDesktopTilingDecorViewModel.onTaskInfoChange(taskInfo);
         mActivityOrientationChangeHandler.ifPresent(handler ->
                 handler.handleActivityOrientationChange(oldTaskInfo, taskInfo));
     }
@@ -967,7 +966,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         if (!mDesktopTilingDecorViewModel.onDeskActivated(deskId)) {
             return;
         }
-
         final DesktopRepository repository = mDesktopUserRepositories.getCurrent();
         final Integer leftTaskId = repository.getLeftTiledTask(deskId);
         final Integer rightTaskId =  repository.getRightTiledTask(deskId);
@@ -1024,10 +1022,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     }
 
     @Override
-    public void onDisplayDisconnected(int disconnectedDisplayId,
-            boolean desktopModeSupportedOnNewDisplay) {
-        mDesktopTilingDecorViewModel.onDisplayDisconnected(disconnectedDisplayId,
-                desktopModeSupportedOnNewDisplay);
+    public void onDisplayDisconnected(int disconnectedDisplayId) {
+        mDesktopTilingDecorViewModel.onDisplayDisconnected(disconnectedDisplayId);
     }
 
     @Override
@@ -1548,7 +1544,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             if (event instanceof MotionEvent) {
                 handled = true;
                 DesktopModeWindowDecorViewModel.this
-                        .handleReceivedMotionEvent((MotionEvent) event, mInputMonitor);
+                        .handleReceivedMotionEvent((MotionEvent) event, getToken());
             }
             finishInputEvent(event, handled);
         }
@@ -1615,7 +1611,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
      *
      * @param ev the {@link MotionEvent} received by {@link EventReceiver}
      */
-    private void handleReceivedMotionEvent(MotionEvent ev, InputMonitor inputMonitor) {
+    private void handleReceivedMotionEvent(MotionEvent ev, IBinder inputChannelToken) {
         final DesktopModeWindowDecoration relevantDecor = getRelevantWindowDecor(ev);
         if (mShellDesktopState.canEnterDesktopMode()) {
             if (!mInImmersiveMode && (relevantDecor == null
@@ -1629,7 +1625,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         // Prevent status bar from reacting to a caption drag.
         if (mShellDesktopState.canEnterDesktopMode()) {
             if (mTransitionDragActive) {
-                inputMonitor.pilferPointers();
+                final InputManager inputManager = mContext.getSystemService(InputManager.class);
+                inputManager.pilferPointers(inputChannelToken);
             }
         }
     }

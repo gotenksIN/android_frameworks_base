@@ -30,11 +30,10 @@ flag {
 }
 
 flag {
-  name: "respect_hierarchy_surface_visibility"
+  name: "wait_for_present_fence_on_display_switch"
   namespace: "windowing_frontend"
-  description: "Ensure consistent surface visibility with window hierarchy"
-  bug: "383241933"
-  is_fixed_read_only: true
+  description: "Wait for start transaction's present fence when folding/unfolding"
+  bug: "370719724"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -123,6 +122,17 @@ flag {
     description: "Enables support for dragging the assistant into multiwindow"
     bug: "371206207"
     is_fixed_read_only: true
+}
+
+flag {
+  name: "update_root_task_layer_only_with_transition"
+  namespace: "windowing_frontend"
+  description: "Avoid changing root task layer outside transition"
+  bug: "385142011"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -432,6 +442,16 @@ flag {
 }
 
 flag {
+    name: "predictive_back_delay_wm_transition"
+    namespace: "windowing_frontend"
+    description: "Separate the predictive back transition request from start navigation"
+    bug: "301195601"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "current_animator_scale_uses_shared_memory"
     namespace: "wear_system_health"
     description: "WindowManagerService.getCurrentAnimatorScale() reads the animator scale from shared memory"
@@ -457,6 +477,24 @@ flag {
     namespace: "wear_systems"
     description: "Apply screen brightness to emulator display overlay"
     bug: "418830217"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "multiple_system_navigation_observer_callbacks"
+    namespace: "windowing_frontend"
+    description: "Removes restriction that only one back callback with PRIORITY_SYSTEM_NAVIGATION_OBSERVER can be registered"
+    bug: "424146227"
+}
+
+flag {
+    name: "ensure_starting_window_remove_from_task"
+    namespace: "windowing_frontend"
+    description: "Trigger the removal of the starting window from the task in case the shared starting data is not attached to itself."
+    bug: "405253899"
+    is_fixed_read_only: true
     metadata {
         purpose: PURPOSE_BUGFIX
     }

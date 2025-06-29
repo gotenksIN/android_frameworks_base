@@ -67,6 +67,16 @@ flag {
 }
 
 flag {
+   name: "notification_row_is_removed_fix"
+   namespace: "systemui"
+   description: "Fix incorrect isRemoved value in ExpandableNotificationRow"
+   bug: "417457086"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
    name: "notification_ambient_suppression_after_inflation"
    namespace: "systemui"
    description: "Move the DND visual effects filter to the finalize stage of the pipeline when it is doze-dependent, but keep it in the pre-group stage when it is doze-independent."
@@ -138,14 +148,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "notifications_live_data_store_refactor"
-    namespace: "systemui"
-    description: "Replaces NotifLiveDataStore with ActiveNotificationListRepository, and updates consumers. "
-        "Should not bring any behavior changes."
-    bug: "308623704"
 }
 
 flag {
@@ -399,16 +401,6 @@ flag {
 }
 
 flag {
-    name: "status_bar_swipe_over_chip"
-    namespace: "systemui"
-    description: "Allow users to swipe over the status bar chip to open the shade"
-    bug: "185897191"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "status_bar_always_check_underlying_networks"
     namespace: "systemui"
     description: "For status bar connectivity UI, always check underlying networks for wifi and "
@@ -468,6 +460,16 @@ flag {
     description: "Have status bar track the location of app handles so that tappable status bar "
         "content doesn't overlap"
     bug: "397506207"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "status_bar_inflate_carrier_merged"
+    namespace: "systemui"
+    description: "Allow the status bar to inflate the levels of the carrier merged connection"
+    bug: "423686800"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1037,16 +1039,6 @@ flag {
     namespace: "systemui"
     description: "Decide whether to register the receivers in battery controller impl in the BatteryControllerStartable corestartable."
     bug: "307517093"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enforce_brightness_base_user_restriction"
-    namespace: "systemui"
-    description: "Enforce BaseUserRestriction for DISALLOW_CONFIG_BRIGHTNESS."
-    bug: "329205638"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

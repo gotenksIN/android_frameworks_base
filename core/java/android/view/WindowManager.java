@@ -38,18 +38,6 @@ import static android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
 import static android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
 import static android.view.View.SYSTEM_UI_FLAG_LOW_PROFILE;
 import static android.view.View.SYSTEM_UI_FLAG_VISIBLE;
-import static android.view.WindowInsets.Side.BOTTOM;
-import static android.view.WindowInsets.Side.LEFT;
-import static android.view.WindowInsets.Side.RIGHT;
-import static android.view.WindowInsets.Side.TOP;
-import static android.view.WindowInsets.Type.CAPTION_BAR;
-import static android.view.WindowInsets.Type.IME;
-import static android.view.WindowInsets.Type.MANDATORY_SYSTEM_GESTURES;
-import static android.view.WindowInsets.Type.NAVIGATION_BARS;
-import static android.view.WindowInsets.Type.STATUS_BARS;
-import static android.view.WindowInsets.Type.SYSTEM_GESTURES;
-import static android.view.WindowInsets.Type.TAPPABLE_ELEMENT;
-import static android.view.WindowInsets.Type.WINDOW_DECOR;
 import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.ALPHA;
 import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.APPEARANCE;
 import static android.internal.perfetto.protos.Windowlayoutparams.WindowLayoutParamsProto.BEHAVIOR;
@@ -1554,7 +1542,7 @@ public interface WindowManager extends ViewManager {
      * </pre>
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_SAFE_REGION_LETTERBOXING)
+    @FlaggedApi(Flags.FLAG_SAFE_REGION_LETTERBOXING_V1)
     String PROPERTY_COMPAT_ALLOW_SAFE_REGION_LETTERBOXING =
             "android.window.PROPERTY_COMPAT_ALLOW_SAFE_REGION_LETTERBOXING";
 
@@ -4665,12 +4653,12 @@ public interface WindowManager extends ViewManager {
          * behavior of processing system shortcuts and actions.
          * </p>
          *
-         * @param hasCapture whether the window should capture system shortcuts and actions.
+         * @param enabled whether the window should capture system shortcuts and actions.
          */
         @FlaggedApi(com.android.hardware.input.Flags.FLAG_REQUEST_KEY_CAPTURE_API)
         @RequiresPermission(permission.CAPTURE_KEYBOARD)
-        public void setHasKeyboardCapture(boolean hasCapture) {
-            if (hasCapture) {
+        public void setKeyboardCaptureEnabled(boolean enabled) {
+            if (enabled) {
                 inputFeatures |= INPUT_FEATURE_CAPTURE_KEYBOARD;
             } else {
                 inputFeatures &= ~INPUT_FEATURE_CAPTURE_KEYBOARD;
@@ -4805,62 +4793,8 @@ public interface WindowManager extends ViewManager {
          */
         public final InsetsFlags insetsFlags = new InsetsFlags();
 
-        @ViewDebug.ExportedProperty(flagMapping = {
-                @ViewDebug.FlagToString(
-                        mask = STATUS_BARS,
-                        equals = STATUS_BARS,
-                        name = "STATUS_BARS"),
-                @ViewDebug.FlagToString(
-                        mask = NAVIGATION_BARS,
-                        equals = NAVIGATION_BARS,
-                        name = "NAVIGATION_BARS"),
-                @ViewDebug.FlagToString(
-                        mask = CAPTION_BAR,
-                        equals = CAPTION_BAR,
-                        name = "CAPTION_BAR"),
-                @ViewDebug.FlagToString(
-                        mask = IME,
-                        equals = IME,
-                        name = "IME"),
-                @ViewDebug.FlagToString(
-                        mask = SYSTEM_GESTURES,
-                        equals = SYSTEM_GESTURES,
-                        name = "SYSTEM_GESTURES"),
-                @ViewDebug.FlagToString(
-                        mask = MANDATORY_SYSTEM_GESTURES,
-                        equals = MANDATORY_SYSTEM_GESTURES,
-                        name = "MANDATORY_SYSTEM_GESTURES"),
-                @ViewDebug.FlagToString(
-                        mask = TAPPABLE_ELEMENT,
-                        equals = TAPPABLE_ELEMENT,
-                        name = "TAPPABLE_ELEMENT"),
-                @ViewDebug.FlagToString(
-                        mask = WINDOW_DECOR,
-                        equals = WINDOW_DECOR,
-                        name = "WINDOW_DECOR")
-        })
         private @InsetsType int mFitInsetsTypes = Type.systemBars();
-
-        @ViewDebug.ExportedProperty(flagMapping = {
-                @ViewDebug.FlagToString(
-                        mask = LEFT,
-                        equals = LEFT,
-                        name = "LEFT"),
-                @ViewDebug.FlagToString(
-                        mask = TOP,
-                        equals = TOP,
-                        name = "TOP"),
-                @ViewDebug.FlagToString(
-                        mask = RIGHT,
-                        equals = RIGHT,
-                        name = "RIGHT"),
-                @ViewDebug.FlagToString(
-                        mask = BOTTOM,
-                        equals = BOTTOM,
-                        name = "BOTTOM")
-        })
         private @InsetsSide int mFitInsetsSides = Side.all();
-
         private boolean mFitInsetsIgnoringVisibility = false;
 
         /**
@@ -6094,13 +6028,13 @@ public interface WindowManager extends ViewManager {
             }
             if (mFitInsetsTypes != 0) {
                 sb.append(System.lineSeparator());
-                sb.append(prefix).append("  fitTypes=").append(ViewDebug.flagsToString(
-                        LayoutParams.class, "mFitInsetsTypes", mFitInsetsTypes));
+                sb.append(prefix).append("  fitTypes=").append(
+                        WindowInsets.Type.toString(mFitInsetsTypes));
             }
             if (mFitInsetsSides != Side.all()) {
                 sb.append(System.lineSeparator());
-                sb.append(prefix).append("  fitSides=").append(ViewDebug.flagsToString(
-                        LayoutParams.class, "mFitInsetsSides", mFitInsetsSides));
+                sb.append(prefix).append("  fitSides=").append(
+                        WindowInsets.Side.toString(mFitInsetsSides));
             }
             if (mFitInsetsIgnoringVisibility) {
                 sb.append(System.lineSeparator());

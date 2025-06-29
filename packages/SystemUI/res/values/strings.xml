@@ -599,6 +599,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenrecord_stop_dialog_button">Stop recording</string>
 
+    <!-- Button text in the region select box for triggering a screenshot of the selected area. [CHAR LIMIT=35] -->
+    <string name="screen_capture_region_selection_button">Capture selected area</string>
     <!-- Button text in the toolbar for choosing the screenshot type. [CHAR LIMIT=35] -->
     <string name="screen_capture_toolbar_capture_button">Capture</string>
     <!-- Button text in the toolbar for choosing the screen recording type. [CHAR LIMIT=35] -->
@@ -3300,6 +3302,7 @@
     <string name="stream_dtmf">Dual multi tone frequency</string> <!-- STREAM_DTMF -->
     <string name="stream_tts" translatable="false">Transmitted Through Speaker</string> <!-- STREAM_TTS -->
     <string name="stream_accessibility">Accessibility</string> <!-- STREAM_ACCESSIBILITY -->
+    <string name="stream_assistant">Assistant</string> <!-- STREAM_ASSISTANT -->
 
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4856,9 +4859,11 @@
     <!-- Text for the dialog title. -->
     <string name="accessibility_key_gesture_dialog_title" translatable="false">Turn on <xliff:g name="feature_name" example="Magnification">%1$s</xliff:g>?</string>
     <!-- Text for showing inside the dialog.-->
-    <string name="accessibility_key_gesture_dialog_content" translatable="false">Action + <xliff:g name="secondary_key" example="Alt">%1$s</xliff:g> + <xliff:g name="key_code" example="M">%2$s</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="Magnification">%3$s</xliff:g>. <xliff:g name="feature_intro" example="Magnification intro">%4$s</xliff:g></string>
+    <string name="accessibility_key_gesture_dialog_content" translatable="false">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="Magnification">^3</xliff:g>. <xliff:g name="feature_intro" example="Magnification intro">^4</xliff:g></string>
     <!-- The prefix string for the magnification intro -->
     <string name="accessibility_key_gesture_dialog_magnifier_intro" translatable="false">This allows you to quickly zoom in on the screen to make content larger.</string>
+    <!-- Positive button text for the dialog -->
+    <string name="accessibility_key_gesture_dialog_positive_button_text" translatable="false">Turn on</string>
 
     <!-- Plugin control section of the tuner. Non-translatable since it should
          not appear on production builds ever. -->
@@ -6563,6 +6568,26 @@
         All Quick Settings tiles will reset to the device’s original settings
     </string>
 
+    <!-- Title of the first time usage tooltip of the "ambientcue" area. [CHAR LIMIT=NONE] -->
+    <string name="ambientcue_first_time_edu_title">
+        Get helpful suggestions
+    </string>
+
+    <!-- Text of the first time usage tooltip of the "ambientcue" area. [CHAR LIMIT=NONE] -->
+    <string name="ambientcue_first_time_edu_text">
+        We use AI to proactively suggest info and actions relevant to what you’re doing on screen
+    </string>
+
+
+    <!-- Description of the icon on the educational tooltip. [CHAR LIMIT=NONE] -->
+    <string name="ambientcue_first_time_edu_icon_description">
+        Icon
+    </string>
+
+    <!-- Tooltip suggesting that user can long press on a suggestion to see data sources. [CHAR LIMIT=NONE] -->
+    <string name="ambientcue_long_press_edu_text">
+        Touch &amp; hold to see how suggestions are generated
+    </string>
 
     <!-- Content of interstitial shown after user revokes app permission to post Live Updates. [CHAR LIMIT=NONE] -->
     <string name="demote_explain_text">
@@ -6589,4 +6614,7 @@
     right edge of the display to expand the Quick Settings shade panel.
     -->
     <string name="dual_shade_educational_tooltip_qs">Swipe from the top right to open Quick Settings</string>
+
+    <!-- Content of button shown on the bouncer screen to navigate back to keyguard. [CHAR LIMIT=NONE] -->
+    <string name="back_button_on_bouncer">Back</string>
 </resources>

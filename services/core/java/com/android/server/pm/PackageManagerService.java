@@ -775,6 +775,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             ApplicationPackageManager.disableGetPackagesForUidCache();
             ApplicationPackageManager.invalidateHasSystemFeatureCache();
             PackageManager.corkPackageInfoCache();
+            ApplicationPackageManager.invalidateQueryIntentActivitiesCache();
+            ApplicationPackageManager.disableQueryIntentActivitiesCacheForCurrentProcess();
         }
 
         @Override
@@ -1586,6 +1588,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         // coalesce settings writes, this strategy would have us invalidate the cache too late.
         // Invalidating on schedule addresses this problem.
         invalidatePackageInfoCache();
+        ApplicationPackageManager.invalidateQueryIntentActivitiesCache();
         if (!mHandler.hasMessages(WRITE_SETTINGS)) {
             mHandler.sendEmptyMessageDelayed(WRITE_SETTINGS, WRITE_SETTINGS_DELAY);
         }
@@ -1593,6 +1596,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     void scheduleWritePackageListLocked(int userId) {
         invalidatePackageInfoCache();
+        ApplicationPackageManager.invalidateQueryIntentActivitiesCache();
         if (!mHandler.hasMessages(WRITE_PACKAGE_LIST)) {
             Message msg = mHandler.obtainMessage(WRITE_PACKAGE_LIST);
             msg.arg1 = userId;
@@ -3629,7 +3633,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         if (!mHandler.hasMessages(SEND_PENDING_BROADCAST)) {
             mHandler.sendMessageDelayed(
                     mHandler.obtainMessage(SEND_PENDING_BROADCAST, callingUid, 0 /* arg2 */,
-                            "reset_component_state_changed" /* obj */), BROADCAST_DELAY);
+                            PackageMetrics.STRING_RESET_COMPONENT_STATE_CHANGED), BROADCAST_DELAY);
         }
     }
 
@@ -3964,7 +3968,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         if (!mHandler.hasMessages(SEND_PENDING_BROADCAST)) {
             mHandler.sendMessageDelayed(
                     mHandler.obtainMessage(SEND_PENDING_BROADCAST, callingUid, 0 /* arg2 */,
-                            "component_label_icon_changed" /* obj */), BROADCAST_DELAY);
+                            PackageMetrics.STRING_COMPONENT_LABEL_ICON_CHANGED), BROADCAST_DELAY);
         }
     }
 
@@ -4221,7 +4225,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         : BROADCAST_DELAY_DURING_STARTUP;
                 mHandler.sendMessageDelayed(
                         mHandler.obtainMessage(SEND_PENDING_BROADCAST, callingUid,
-                                0 /* arg2 */, "component_state_changed" /* obj */),
+                                0 /* arg2 */, PackageMetrics.STRING_COMPONENT_STATE_CHANGED),
                         broadcastDelay);
             }
         }
@@ -4261,7 +4265,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         userId, pkgSettings.get(packageName).getAppId());
                 mBroadcastHelper.sendPackageChangedBroadcast(newSnapshot, packageName,
                         false /* dontKillApp */, components, packageUid, null /* reason */,
-                        "component_state_changed" /* reasonForTrace */, callingUid);
+                        PackageMetrics.STRING_COMPONENT_STATE_CHANGED, callingUid);
             }
         } finally {
             Binder.restoreCallingIdentity(callingId);
@@ -4485,7 +4489,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         true /* dontKillApp */,
                         new ArrayList<>(Collections.singletonList(pkg.getPackageName())),
                         pkg.getUid(),
-                        Intent.ACTION_OVERLAY_CHANGED, "overlay_changed" /* reasonForTrace */,
+                        Intent.ACTION_OVERLAY_CHANGED, PackageMetrics.STRING_OVERLAY_CHANGED,
                         Process.SYSTEM_UID);
             }
         }, overlayFilter);
@@ -6526,7 +6530,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                             final int packageUid = UserHandle.getUid(userIds[i], appId);
                             mBroadcastHelper.sendPackageChangedBroadcast(snapShot, packageName,
                                     true /* dontKillApp */, components, packageUid, reason,
-                                    "mime_group_changed" /* reasonForTrace */, callingUid);
+                                    PackageMetrics.STRING_MIME_GROUP_CHANGED, callingUid);
                         }
                     }
                 });

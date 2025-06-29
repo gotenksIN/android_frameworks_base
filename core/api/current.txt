@@ -11370,6 +11370,7 @@ package android.content {
     field public static final String SEARCH_SERVICE = "search";
     field @FlaggedApi("android.os.security_state_service") public static final String SECURITY_STATE_SERVICE = "security_state";
     field public static final String SENSOR_SERVICE = "sensor";
+    field @FlaggedApi("android.hardware.serial.flags.enable_serial_api") public static final String SERIAL_SERVICE = "serial";
     field public static final String SHORTCUT_SERVICE = "shortcut";
     field public static final String STATUS_BAR_SERVICE = "statusbar";
     field public static final String STORAGE_SERVICE = "storage";
@@ -21064,22 +21065,24 @@ package android.hardware.display {
     method public android.hardware.display.VirtualDisplay createVirtualDisplay(@NonNull String, @IntRange(from=1) int, @IntRange(from=1) int, @IntRange(from=1) int, @Nullable android.view.Surface, int, @Nullable android.hardware.display.VirtualDisplay.Callback, @Nullable android.os.Handler);
     method @Nullable public android.hardware.display.VirtualDisplay createVirtualDisplay(@NonNull android.hardware.display.VirtualDisplayConfig);
     method @Nullable public android.hardware.display.VirtualDisplay createVirtualDisplay(@NonNull android.hardware.display.VirtualDisplayConfig, @Nullable android.os.Handler, @Nullable android.hardware.display.VirtualDisplay.Callback);
+    method @FlaggedApi("com.android.server.display.feature.flags.set_brightness_by_unit") public float getBrightness(int, int);
     method public android.view.Display getDisplay(int);
-    method @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") @Nullable @RequiresPermission("android.permission.MANAGE_DISPLAYS") public android.hardware.display.DisplayTopology getDisplayTopology();
+    method @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") @Nullable public android.hardware.display.DisplayTopology getDisplayTopology();
     method public android.view.Display[] getDisplays();
     method public android.view.Display[] getDisplays(String);
     method @NonNull public android.hardware.display.HdrConversionMode getHdrConversionMode();
     method public int getMatchContentFrameRateUserPreference();
     method public void registerDisplayListener(android.hardware.display.DisplayManager.DisplayListener, android.os.Handler);
     method @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public void registerDisplayListener(@NonNull java.util.concurrent.Executor, long, @NonNull android.hardware.display.DisplayManager.DisplayListener);
-    method @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") @RequiresPermission("android.permission.MANAGE_DISPLAYS") public void registerTopologyListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.hardware.display.DisplayTopology>);
+    method @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") public void registerTopologyListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.hardware.display.DisplayTopology>);
     method @FlaggedApi("com.android.server.display.feature.flags.set_brightness_by_unit") @RequiresPermission(android.Manifest.permission.WRITE_SETTINGS) public void setBrightness(int, float, int);
     method public void unregisterDisplayListener(android.hardware.display.DisplayManager.DisplayListener);
-    method @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") @RequiresPermission("android.permission.MANAGE_DISPLAYS") public void unregisterTopologyListener(@NonNull java.util.function.Consumer<android.hardware.display.DisplayTopology>);
+    method @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") public void unregisterTopologyListener(@NonNull java.util.function.Consumer<android.hardware.display.DisplayTopology>);
     field @FlaggedApi("com.android.server.display.feature.flags.set_brightness_by_unit") public static final int BRIGHTNESS_UNIT_PERCENTAGE = 0; // 0x0
     field @FlaggedApi("com.android.server.display.feature.flags.display_category_built_in") public static final String DISPLAY_CATEGORY_BUILT_IN_DISPLAYS = "android.hardware.display.category.BUILT_IN_DISPLAYS";
     field public static final String DISPLAY_CATEGORY_PRESENTATION = "android.hardware.display.category.PRESENTATION";
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_ADDED = 1L; // 0x1L
+    field @FlaggedApi("com.android.server.display.feature.flags.set_brightness_by_unit") public static final long EVENT_TYPE_DISPLAY_BRIGHTNESS = 32L; // 0x20L
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_CHANGED = 4L; // 0x4L
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_REFRESH_RATE = 8L; // 0x8L
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_REMOVED = 2L; // 0x2L
@@ -21311,6 +21314,34 @@ package android.hardware.lights {
     method @NonNull public android.hardware.lights.LightsRequest.Builder addLight(@NonNull android.hardware.lights.Light, @NonNull android.hardware.lights.LightState);
     method @NonNull public android.hardware.lights.LightsRequest build();
     method @NonNull public android.hardware.lights.LightsRequest.Builder clearLight(@NonNull android.hardware.lights.Light);
+  }
+
+}
+
+package android.hardware.serial {
+
+  @FlaggedApi("android.hardware.serial.flags.enable_serial_api") public final class SerialManager {
+    method @NonNull public java.util.List<android.hardware.serial.SerialPort> getSerialPorts();
+    method public void registerSerialPortListener(@NonNull android.hardware.serial.SerialPortListener, @NonNull java.util.concurrent.Executor);
+    method public void unregisterSerialPortListener(@NonNull android.hardware.serial.SerialPortListener);
+  }
+
+  @FlaggedApi("android.hardware.serial.flags.enable_serial_api") public final class SerialPort {
+    method @NonNull public String getName();
+    method public int getProductId();
+    method public int getVendorId();
+    method public void requestOpen(int, boolean, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.hardware.serial.SerialPortResponse,java.lang.Exception>);
+    field public static final int INVALID_ID = -1; // 0xffffffff
+  }
+
+  @FlaggedApi("android.hardware.serial.flags.enable_serial_api") public interface SerialPortListener {
+    method public void onSerialPortConnected(@NonNull android.hardware.serial.SerialPort);
+    method public void onSerialPortDisconnected(@NonNull android.hardware.serial.SerialPort);
+  }
+
+  @FlaggedApi("android.hardware.serial.flags.enable_serial_api") public final class SerialPortResponse {
+    method @NonNull public android.os.ParcelFileDescriptor getFileDescriptor();
+    method @NonNull public android.hardware.serial.SerialPort getPort();
   }
 
 }
@@ -25348,6 +25379,7 @@ package android.media {
     method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public void onCreateSystemRoutingSession(long, @NonNull String, @NonNull android.media.MediaRoute2ProviderService.SystemRoutingSessionParams);
     method public abstract void onDeselectRoute(long, @NonNull String, @NonNull String);
     method public void onDiscoveryPreferenceChanged(@NonNull android.media.RouteDiscoveryPreference);
+    method @FlaggedApi("com.android.media.flags.enable_route_visibility_control_api") @RequiresPermission(value=android.Manifest.permission.MEDIA_CONTENT_CONTROL, conditional=true) public void onDiscoveryPreferenceChanged(@NonNull android.media.RouteDiscoveryPreference, @NonNull java.util.Map<java.lang.String,android.media.RouteDiscoveryPreference>);
     method public abstract void onReleaseSession(long, @NonNull String);
     method public abstract void onSelectRoute(long, @NonNull String, @NonNull String);
     method public abstract void onSetRouteVolume(long, @NonNull String, int);
@@ -41327,7 +41359,7 @@ package android.security.keystore {
     method @NonNull public java.util.List<java.security.cert.X509Certificate> getGrantedCertificateChainFromId(long) throws android.security.keystore.KeyPermanentlyInvalidatedException, java.security.UnrecoverableKeyException;
     method @NonNull public java.security.Key getGrantedKeyFromId(long) throws android.security.keystore.KeyPermanentlyInvalidatedException, java.security.UnrecoverableKeyException;
     method @NonNull public java.security.KeyPair getGrantedKeyPairFromId(long) throws android.security.keystore.KeyPermanentlyInvalidatedException, java.security.UnrecoverableKeyException;
-    method @FlaggedApi("android.security.keystore2.attest_modules") @NonNull public byte[] getSupplementaryAttestationInfo(int) throws android.security.KeyStoreException;
+    method @NonNull public byte[] getSupplementaryAttestationInfo(int) throws android.security.KeyStoreException;
     method public long grantKeyAccess(@NonNull String, int) throws android.security.KeyStoreException, java.security.UnrecoverableKeyException;
     method public void revokeKeyAccess(@NonNull String, int) throws android.security.KeyStoreException, java.security.UnrecoverableKeyException;
     field public static final int MODULE_HASH = -1879047468; // 0x900002d4
@@ -56425,8 +56457,8 @@ package android.view {
     method public void setFitInsetsTypes(int);
     method @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public void setFrameRateBoostOnTouchEnabled(boolean);
     method @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public void setFrameRatePowerSavingsBalanced(boolean);
-    method @FlaggedApi("com.android.hardware.input.request_key_capture_api") @RequiresPermission(android.Manifest.permission.CAPTURE_KEYBOARD) public void setHasKeyboardCapture(boolean);
     method public void setHdrConversionEnabled(boolean);
+    method @FlaggedApi("com.android.hardware.input.request_key_capture_api") @RequiresPermission(android.Manifest.permission.CAPTURE_KEYBOARD) public void setKeyboardCaptureEnabled(boolean);
     method public final void setTitle(CharSequence);
     method public void setWallpaperTouchEventsEnabled(boolean);
     method public void writeToParcel(android.os.Parcel, int);

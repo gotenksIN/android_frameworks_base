@@ -26,7 +26,6 @@ import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSource
 import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSourceProviderProto.FRAME;
 import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSourceProviderProto.IS_LEASH_READY_FOR_DISPATCHING;
 import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSourceProviderProto.PENDING_CONTROL_TARGET_IDENTIFIER;
-import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSourceProviderProto.SEAMLESS_ROTATING;
 import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSourceProviderProto.SERVER_VISIBLE;
 import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSourceProviderProto.SOURCE;
 import static android.internal.perfetto.protos.Windowmanagerservice.InsetsSourceProviderProto.SOURCE_WINDOW_STATE_IDENTIFIER;
@@ -127,8 +126,6 @@ class InsetsSourceProvider {
      */
     private boolean mServerVisible;
 
-    private boolean mSeamlessRotating;
-
     private final boolean mControllable;
 
     InsetsSourceProvider(@NonNull InsetsSource source,
@@ -221,7 +218,6 @@ class InsetsSourceProvider {
             // animate-out as new one animates-in.
             mWin.cancelAnimation();
             mWin.getInsetsSourceProviders().remove(mSource.getId());
-            mSeamlessRotating = false;
             mHasPendingPosition = false;
         }
         ProtoLog.d(WM_DEBUG_WINDOW_INSETS, "setWin %s for type %s",
@@ -366,28 +362,41 @@ class InsetsSourceProvider {
     }
 
     /**
-     * Called when a layout pass has occurred.
+     * Called before a layout pass will occur.
      */
-    void onPostLayout() {
+    void onPreLayout() {
         if (mWin == null) {
             return;
         }
-        final boolean isServerVisible = isSurfaceVisible();
+        setServerVisible(isSurfaceVisible());
+    }
 
-        final boolean serverVisibleChanged = mServerVisible != isServerVisible;
-        setServerVisible(isServerVisible);
+    /**
+     * Called after a layout pass has occurred.
+     *
+     * @return {@code true} if {@link InsetsStateController#notifyControlChanged} was called or
+     * was scheduled to be called within this method, else {@code false}.
+     */
+    boolean onPostLayout() {
+        if (mWin == null) {
+            return false;
+        }
         if (mControl != null && mControlTarget != null) {
             final boolean positionChanged = updateInsetsControlPosition(mWin);
-            if (!(positionChanged || mHasPendingPosition)
-                    // The insets hint would be updated while changing the position. Here updates it
-                    // for the possible change of the bounds or the server visibility.
-                    && (updateInsetsHint(mControl) || serverVisibleChanged)) {
+            if (positionChanged || mHasPendingPosition) {
+                return true;
+            }
+            // The insets hint would be updated while changing the position. Here updates it
+            // for the possible change of the bounds.
+            if (updateInsetsHint(mControl)) {
                 // Only call notifyControlChanged here when the position hasn't been or won't be
                 // changed. Otherwise, it has been called or scheduled to be called during
                 // updateInsetsControlPosition.
                 mStateController.notifyControlChanged(mControlTarget, this);
+                return true;
             }
         }
+        return false;
     }
 
     /**
@@ -459,11 +468,6 @@ class InsetsSourceProvider {
 
     void updateControlForTarget(@Nullable InsetsControlTarget target, boolean force,
             @Nullable ImeTracker.Token statsToken) {
-        if (mSeamlessRotating) {
-            // We are un-rotating the window against the display rotation. We don't want the target
-            // to control the window for now.
-            return;
-        }
         mPendingControlTarget = target;
 
         if (mWin != null && mWin.getSurfaceControl() == null) {
@@ -552,19 +556,6 @@ class InsetsSourceProvider {
         }
         mIsLeashInitialized = true;
         mStateController.notifySurfaceTransactionReady(this, 0, false);
-    }
-
-    void startSeamlessRotation() {
-        if (!mSeamlessRotating) {
-            mSeamlessRotating = true;
-            if (mWin != null) {
-                mWin.cancelAnimation();
-            }
-        }
-    }
-
-    void finishSeamlessRotation() {
-        mSeamlessRotating = false;
     }
 
     boolean updateClientVisibility(@NonNull InsetsTarget caller,
@@ -759,7 +750,6 @@ class InsetsSourceProvider {
         proto.write(IS_LEASH_READY_FOR_DISPATCHING, isLeashReadyForDispatching());
         proto.write(CLIENT_VISIBLE, mClientVisible);
         proto.write(SERVER_VISIBLE, mServerVisible);
-        proto.write(SEAMLESS_ROTATING, mSeamlessRotating);
         proto.write(CONTROLLABLE, mControllable);
         if (mWin != null) {
             mWin.writeIdentifierToProto(proto, SOURCE_WINDOW_STATE_IDENTIFIER);

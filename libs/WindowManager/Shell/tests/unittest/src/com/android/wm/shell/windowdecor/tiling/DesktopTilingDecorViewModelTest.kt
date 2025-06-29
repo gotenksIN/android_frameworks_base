@@ -16,6 +16,7 @@
 package com.android.wm.shell.windowdecor.tiling
 
 import android.content.Context
+import android.content.res.Configuration
 import android.content.res.Resources
 import android.graphics.Rect
 import android.testing.AndroidTestingRunner
@@ -36,6 +37,7 @@ import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator
 import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler
 import com.android.wm.shell.shared.desktopmode.FakeDesktopState
+import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.Transitions
@@ -86,6 +88,8 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
     private val displayLayout: DisplayLayout = mock()
     private val mainExecutor: ShellExecutor = mock()
     private val shellInit: ShellInit = mock()
+    private val shellController: ShellController = mock()
+    private val configuration: Configuration = mock()
     private lateinit var desktopTilingDecorViewModel: DesktopTilingDecorViewModel
     @Captor private lateinit var callbackCaptor: ArgumentCaptor<Runnable>
 
@@ -111,6 +115,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
                 mainExecutor,
                 desktopState,
                 shellInit,
+                shellController,
             )
         whenever(contextMock.createContextAsUser(any(), any())).thenReturn(contextMock)
         whenever(displayControllerMock.getDisplayLayout(any())).thenReturn(displayLayout)
@@ -121,6 +126,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         whenever(contextMock.resources).thenReturn(resourcesMock)
         whenever(resourcesMock.getDimensionPixelSize(any())).thenReturn(10)
         whenever(userRepositories.current).thenReturn(desktopRepository)
+        whenever(shellController.lastConfiguration).thenReturn(configuration)
     }
 
     @Test
@@ -267,7 +273,6 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
 
         desktopTilingDecorViewModel.onDisplayDisconnected(
             disconnectedDisplayId = 1,
-            desktopModeSupportedOnNewDisplay = true,
         )
 
         // Each tiling session should be reset.
@@ -279,18 +284,20 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
     @Test
     fun displayDisconnected_newDisplayDoesntSupportTiling_shouldPersistTilingData() {
         val decorationByDeskId = SparseArray<DesktopTilingWindowDecoration>()
+        val desktopTilingDecoration2: DesktopTilingWindowDecoration = mock()
         decorationByDeskId.put(1, desktopTilingDecoration)
-        decorationByDeskId.put(2, desktopTilingDecoration)
+        decorationByDeskId.put(2, desktopTilingDecoration2)
         whenever(desktopTilingDecoration.displayId).thenReturn(1)
+        whenever(desktopTilingDecoration2.displayId).thenReturn(1)
         desktopTilingDecorViewModel.tilingHandlerByUserAndDeskId.put(1, decorationByDeskId)
 
         desktopTilingDecorViewModel.onDisplayDisconnected(
             disconnectedDisplayId = 1,
-            desktopModeSupportedOnNewDisplay = false,
         )
 
         // Each tiling session should be reset.
-        verify(desktopTilingDecoration, times(2)).resetTilingSession(false)
+        verify(desktopTilingDecoration, times(1)).resetTilingSession(true)
+        verify(desktopTilingDecoration2, times(1)).resetTilingSession(true)
     }
 
     @Test

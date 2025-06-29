@@ -27,6 +27,7 @@ import android.app.smartspace.SmartspaceManager
 import android.app.smartspace.SmartspaceSession.OnTargetsAvailableListener
 import android.content.Context
 import android.graphics.Rect
+import android.provider.Settings
 import android.util.Log
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillManager
@@ -35,6 +36,7 @@ import androidx.tracing.trace
 import com.android.systemui.Dumpable
 import com.android.systemui.LauncherProxyService
 import com.android.systemui.LauncherProxyService.LauncherProxyListener
+import com.android.systemui.ambientcue.data.logger.AmbientCueLogger
 import com.android.systemui.ambientcue.shared.model.ActionModel
 import com.android.systemui.ambientcue.shared.model.IconModel
 import com.android.systemui.dagger.SysUISingleton
@@ -96,6 +98,9 @@ interface AmbientCueRepository {
 
     /* If AmbientCue is enabled. */
     val isAmbientCueEnabled: StateFlow<Boolean>
+
+    /* The timeout for Ambient Cue to disappear. */
+    val ambientCueTimeoutMs: StateFlow<Int>
 }
 
 @SysUISingleton
@@ -114,6 +119,7 @@ constructor(
     private val taskStackChangeListeners: TaskStackChangeListeners,
     @Background backgroundDispatcher: CoroutineDispatcher,
     secureSettingsRepository: SecureSettingsRepository,
+    private val ambientCueLogger: AmbientCueLogger,
 ) : AmbientCueRepository, Dumpable {
 
     init {
@@ -145,6 +151,10 @@ constructor(
                 Log.i(TAG, "SmartSpace session created")
 
                 val smartSpaceListener = OnTargetsAvailableListener { targets ->
+                    Log.i(TAG, "Receiving SmartSpace targets # ${targets.size}")
+                    if (targets.none { it.smartspaceTargetId == AMBIENT_CUE_SURFACE }) {
+                        return@OnTargetsAvailableListener
+                    }
                     val actions =
                         targets
                             .filter { it.smartspaceTargetId == AMBIENT_CUE_SURFACE }
@@ -194,7 +204,13 @@ constructor(
                                                 launchPendingIntent(pendingIntent)
                                             } else if (intent != null) {
                                                 activityStarter.startActivity(intent, false)
-                                            }
+                                            } else {}
+                                        }
+                                        if (actionType == MA_ACTION_TYPE_NAME) {
+                                            ambientCueLogger.setFulfilledWithMaStatus()
+                                        }
+                                        if (actionType == MR_ACTION_TYPE_NAME) {
+                                            ambientCueLogger.setFulfilledWithMrStatus()
                                         }
                                     },
                                     onPerformLongClick = {
@@ -300,6 +316,7 @@ constructor(
             )
 
     val targetTaskId: MutableStateFlow<Int> = MutableStateFlow(INVALID_TASK_ID)
+    var isSessionStarted = false
 
     override val isAmbientCueEnabled: StateFlow<Boolean> =
         secureSettingsRepository
@@ -323,10 +340,44 @@ constructor(
                     !isDeactivated &&
                     globallyFocusedTaskId == targetTaskId.value
             }
+            .onEach { isAttached ->
+                if (isAttached && !isSessionStarted) {
+                    isSessionStarted = true
+                    var maCount = 0
+                    var mrCount = 0
+                    actions.value.forEach { action ->
+                        when (action.actionType) {
+                            MA_ACTION_TYPE_NAME -> maCount++
+                            MR_ACTION_TYPE_NAME -> mrCount++
+                            else -> {}
+                        }
+                    }
+                    ambientCueLogger.setAmbientCueDisplayStatus(maCount, mrCount)
+                }
+                if (!isAttached && isSessionStarted) {
+                    ambientCueLogger.flushAmbientCueEventReported()
+                    ambientCueLogger.clear()
+                    isSessionStarted = false
+                }
+            }
             .stateIn(
                 scope = backgroundScope,
                 started = SharingStarted.WhileSubscribed(),
                 initialValue = false,
+            )
+
+    override val ambientCueTimeoutMs: StateFlow<Int> =
+        secureSettingsRepository
+            .intSetting(
+                name = Settings.Secure.ACCESSIBILITY_INTERACTIVE_UI_TIMEOUT_MS,
+                AMBIENT_CUE_DEFAULT_TIMEOUT_MS,
+            )
+            .map { if (it == 0) AMBIENT_CUE_DEFAULT_TIMEOUT_MS else it }
+            .flowOn(backgroundDispatcher)
+            .stateIn(
+                scope = backgroundScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = AMBIENT_CUE_DEFAULT_TIMEOUT_MS,
             )
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {
@@ -340,6 +391,7 @@ constructor(
         pw.println("isGestureNav: ${isGestureNav.value}")
         pw.println("actions: ${actions.value}")
         pw.println("isAmbientCueEnabled: ${isAmbientCueEnabled.value}")
+        pw.println("ambientCueTimeoutMs: ${ambientCueTimeoutMs.value}")
     }
 
     companion object {
@@ -350,15 +402,19 @@ constructor(
         @VisibleForTesting const val EXTRA_AUTOFILL_ID = "autofillId"
         @VisibleForTesting
         const val EXTRA_ATTRIBUTION_DIALOG_PENDING_INTENT = "attributionDialogPendingIntent"
-        private const val EXTRA_ACTION_TYPE = "actionType"
+        @VisibleForTesting const val EXTRA_ACTION_TYPE = "actionType"
 
         // Timeout to hide cuebar if it wasn't interacted with
         private const val TAG = "AmbientCueRepository"
         private const val DEBUG = false
         private const val INVALID_TASK_ID = ActivityTaskManager.INVALID_TASK_ID
         @VisibleForTesting const val AMBIENT_CUE_SETTING = "spoonBarOptedIn"
+        @VisibleForTesting const val AMBIENT_CUE_TIMEOUT_SETTING = "ambientCueTimeoutSec"
         @VisibleForTesting const val OPTED_IN = 0x10
         @VisibleForTesting const val OPTED_OUT = 0x01
         const val DEBOUNCE_DELAY_MS = 100L
+        private const val AMBIENT_CUE_DEFAULT_TIMEOUT_MS = 30_000
+        @VisibleForTesting const val MA_ACTION_TYPE_NAME = "ma"
+        @VisibleForTesting const val MR_ACTION_TYPE_NAME = "mr"
     }
 }

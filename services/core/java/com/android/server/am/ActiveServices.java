@@ -833,13 +833,17 @@ public final class ActiveServices {
         this.mActiveServiceAnrTimer = new ProcessAnrTimer(service,
                 ActivityManagerService.SERVICE_TIMEOUT_MSG,
                 "SERVICE_TIMEOUT",
-                new AnrTimer.Args());
+                new AnrTimer.Args().longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
         this.mShortFGSAnrTimer = new ServiceAnrTimer(service,
                 ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_MSG,
-                "SHORT_FGS_TIMEOUT");
+                "SHORT_FGS_TIMEOUT",
+                new AnrTimer.Args().longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
         this.mServiceFGAnrTimer = new ServiceAnrTimer(service,
                 ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG,
-                "SERVICE_FOREGROUND_TIMEOUT", new AnrTimer.Args().extend(true));
+                "SERVICE_FOREGROUND_TIMEOUT",
+                new AnrTimer.Args()
+                            .extend(true)
+                            .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
 // QTI_BEGIN: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
         try {
             if (ServiceManager.isDeclared(AIDL_SERVICE)){

@@ -111,7 +111,6 @@ import static android.internal.perfetto.protos.Windowmanagerservice.ActivityReco
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_ANIMATING;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_USER_FULLSCREEN_OVERRIDE_ENABLED;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.LAST_DROP_INPUT_MODE;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.LAST_SURFACE_SHOWING;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.MIN_ASPECT_RATIO;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NAME;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NUM_DRAWN_WINDOWS;
@@ -229,7 +228,6 @@ import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
 import static com.android.server.wm.StartingData.AFTER_TRANSITION_FINISH;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_APP_TRANSITION;
-import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_PREDICT_BACK;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
 import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_VISIBLE;
 import static com.android.server.wm.TaskPersister.DEBUG;
@@ -707,9 +705,6 @@ public final class ActivityRecord extends WindowToken {
      * @see #currentLaunchCanTurnScreenOn()
      */
     private boolean mCurrentLaunchCanTurnScreenOn = true;
-
-    /** Whether our surface was set to be showing in the last call to {@link #prepareSurfaces} */
-    boolean mLastSurfaceShowing;
 
     /**
      * The activity is opaque and fills the entire space of this task.
@@ -3708,7 +3703,10 @@ public final class ActivityRecord extends WindowToken {
             }
 
             finishActivityResults(resultCode, resultData, resultGrants);
-
+            final boolean wasVisibleRequested = mVisibleRequested;
+            if (mVisibleRequested) {
+                setVisibility(false);
+            }
             if (isState(RESUMED)) {
                 if (endTask) {
                     mAtmService.getTaskChangeNotificationController().notifyTaskRemovalStarted(
@@ -3722,8 +3720,6 @@ public final class ActivityRecord extends WindowToken {
                     Slog.v(TAG_TRANSITION, "Prepare close transition: finishing " + this);
                 }
 
-                // Tell window manager to prepare for this one to be removed.
-                setVisibility(false);
                 // Propagate the last IME visibility in the same task, so the IME can show
                 // automatically if the next activity has a focused editable view.
                 if (mLastImeShown) {
@@ -3746,10 +3742,9 @@ public final class ActivityRecord extends WindowToken {
                     mAtmService.getLockTaskController().clearLockedTask(task);
                 }
             } else if (!isState(PAUSING)) {
-                if (mVisibleRequested) {
+                if (wasVisibleRequested) {
                     // Prepare and execute close transition.
                     if (mTransitionController.isShellTransitionsEnabled()) {
-                        setVisibility(false);
                         if (newTransition != null) {
                             // This is a transition specifically for this close operation, so set
                             // ready now.
@@ -5395,6 +5390,15 @@ public final class ActivityRecord extends WindowToken {
         }
     }
 
+    @Nullable
+    private ActivityRecord getSharedStartingWindowOwnerIfTaskDrawn() {
+        if (task.getActivity(r -> r.isVisibleRequested() && !r.firstWindowDrawn) == null) {
+            // The last drawn activity may not be the one that owns the starting window.
+            return task.getActivity(ar -> ar.mStartingData != null);
+        }
+        return null;
+    }
+
     /**
      * This is the only place that writes {@link #mVisibleRequested} (except unit test). The caller
      * outside of this class should use {@link #setVisibility}.
@@ -5415,6 +5419,13 @@ public final class ActivityRecord extends WindowToken {
                     && mDisplayContent.mInputMethodWindow != null
                     && mDisplayContent.mInputMethodWindow.isVisible();
             finishOrAbortReplacingWindow();
+            if (Flags.ensureStartingWindowRemoveFromTask() && !firstWindowDrawn && task != null
+                    && task.mSharedStartingData != null) {
+                final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
+                if (r != null) {
+                    r.removeStartingWindow();
+                }
+            }
         }
         return true;
     }
@@ -6632,12 +6643,20 @@ public final class ActivityRecord extends WindowToken {
         final Task associatedTask = task.mSharedStartingData != null ? task : null;
         if (associatedTask == null) {
             removeStartingWindow();
-        } else if (associatedTask.getActivity(
-                r -> r.isVisibleRequested() && !r.firstWindowDrawn) == null) {
-            // The last drawn activity may not be the one that owns the starting window.
-            final ActivityRecord r = associatedTask.getActivity(ar -> ar.mStartingData != null);
-            if (r != null) {
-                r.removeStartingWindow();
+        } else {
+            if (Flags.ensureStartingWindowRemoveFromTask()) {
+                final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
+                if (r != null) {
+                    r.removeStartingWindow();
+                }
+            } else if (associatedTask.getActivity(
+                    r -> r.isVisibleRequested() && !r.firstWindowDrawn) == null) {
+                // The last drawn activity may not be the one that owns the starting window.
+                final ActivityRecord r = associatedTask.getActivity(
+                        ar -> ar.mStartingData != null);
+                if (r != null) {
+                    r.removeStartingWindow();
+                }
             }
         }
         updateReportedVisibilityLocked();
@@ -7430,37 +7449,11 @@ public final class ActivityRecord extends WindowToken {
 
     @Override
     void prepareSurfaces() {
-        if (mWmService.mFlags.mEnsureSurfaceVisibility) {
-            // Input sink surface is not a part of animation, so apply in a steady state
-            // (non-sync) with pending transaction.
-            if (mVisible && mSyncState == SYNC_STATE_NONE) {
-                mActivityRecordInputSink.applyChangesToSurfaceIfChanged(getPendingTransaction());
-            }
-            super.prepareSurfaces();
-            return;
+        // Input sink surface is not a part of animation, so apply in a steady state
+        // (non-sync) with pending transaction.
+        if (mVisible && mSyncState == SYNC_STATE_NONE) {
+            mActivityRecordInputSink.applyChangesToSurfaceIfChanged(getPendingTransaction());
         }
-        final boolean isDecorSurfaceBoosted =
-                getTask() != null && getTask().isDecorSurfaceBoosted();
-        final boolean show = (isVisible()
-                // Ensure that the activity content is hidden when the decor surface is boosted to
-                // prevent UI redressing attack.
-                && !isDecorSurfaceBoosted)
-                || isAnimating(PARENTS, ANIMATION_TYPE_APP_TRANSITION
-                        | ANIMATION_TYPE_PREDICT_BACK);
-
-        if (mSurfaceControl != null) {
-            if (show && !mLastSurfaceShowing) {
-                getSyncTransaction().show(mSurfaceControl);
-            } else if (!show && mLastSurfaceShowing) {
-                getSyncTransaction().hide(mSurfaceControl);
-            }
-            // Input sink surface is not a part of animation, so just apply in a steady state
-            // (non-sync) with pending transaction.
-            if (show && mSyncState == SYNC_STATE_NONE) {
-                mActivityRecordInputSink.applyChangesToSurfaceIfChanged(getPendingTransaction());
-            }
-        }
-        mLastSurfaceShowing = show;
         super.prepareSurfaces();
     }
 
@@ -7471,13 +7464,6 @@ public final class ActivityRecord extends WindowToken {
                 // prevent UI redressing attack.
                 && (task == null || !task.isDecorSurfaceBoosted());
         t.setVisibility(mSurfaceControl, visible);
-    }
-
-    /**
-     * @return Whether our {@link #getSurfaceControl} is currently showing.
-     */
-    boolean isSurfaceShowing() {
-        return mLastSurfaceShowing;
     }
 
     public @TransitionOldType int getTransit() {
@@ -9480,7 +9466,6 @@ public final class ActivityRecord extends WindowToken {
     void dumpDebug(ProtoOutputStream proto, @WindowTracingLogLevel int logLevel) {
         writeNameToProto(proto, NAME);
         super.dumpDebug(proto, WINDOW_TOKEN, logLevel);
-        proto.write(LAST_SURFACE_SHOWING, mLastSurfaceShowing);
         proto.write(IS_ANIMATING, isAnimating(PARENTS | CHILDREN,
                 ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_WINDOW_ANIMATION));
         proto.write(FILLS_PARENT, fillsParent());
@@ -9750,14 +9735,8 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean canCaptureSnapshot() {
-        if (mWmService.mFlags.mEnsureSurfaceVisibility) {
-            if (!mVisible) {
-                return false;
-            }
-        } else {
-            if (!isSurfaceShowing() || findMainWindow() == null) {
-                return false;
-            }
+        if (!mVisible) {
+            return false;
         }
         return forAllWindows(
                 // Ensure at least one window for the top app is visible before attempting to

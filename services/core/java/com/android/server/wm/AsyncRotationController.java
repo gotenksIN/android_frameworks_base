@@ -22,6 +22,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_TOKEN_TRANSFORM;
 
 import android.annotation.IntDef;
+import android.annotation.NonNull;
 import android.os.HandlerExecutor;
 import android.util.ArrayMap;
 // QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
@@ -113,7 +114,7 @@ class AsyncRotationController extends FadeAnimationController implements Consume
     private boolean mIsLatencyPerfLockAcquired = false;
 // QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 
-    AsyncRotationController(DisplayContent displayContent) {
+    AsyncRotationController(@NonNull DisplayContent displayContent) {
         super(displayContent);
         mService = displayContent.mWmService;
         mOriginalRotation = displayContent.getWindowConfiguration().getRotation();
@@ -267,7 +268,7 @@ class AsyncRotationController extends FadeAnimationController implements Consume
     }
 
     /** Lets the window fit in new rotation naturally. */
-    private void finishOp(WindowToken windowToken) {
+    private void finishOp(@NonNull WindowToken windowToken) {
         final Operation op = mTargetWindowTokens.remove(windowToken);
         if (op == null) return;
         if (op.mDrawTransaction != null) {
@@ -480,7 +481,7 @@ class AsyncRotationController extends FadeAnimationController implements Consume
         if (DEBUG) Slog.d(TAG, "hideImeImmediately " + imeWindowToken.getTopChild());
     }
 
-    private void hideImmediately(WindowToken token, @Operation.Action int action) {
+    private void hideImmediately(@NonNull WindowToken token, @Operation.Action int action) {
         final boolean original = mHideImmediately;
         mHideImmediately = true;
         final Operation op = new Operation(action);
@@ -521,7 +522,7 @@ class AsyncRotationController extends FadeAnimationController implements Consume
      * Whether the insets animation leash should use previous position when running fade animation
      * or seamless transformation in a rotated display.
      */
-    boolean shouldFreezeInsetsPosition(WindowState w) {
+    boolean shouldFreezeInsetsPosition(@NonNull WindowState w) {
         // Non-change transition (OP_APP_SWITCH) and METHOD_BLAST don't use screenshot so the
         // insets should keep original position before the window is done with new rotation.
         return mTransitionOp != OP_LEGACY && (isSeamlessTransition()
@@ -708,6 +709,7 @@ class AsyncRotationController extends FadeAnimationController implements Consume
         return true;
     }
 
+    @NonNull
     @Override
     public Animation getFadeInAnimation() {
         final Animation anim = super.getFadeInAnimation();
@@ -718,6 +720,7 @@ class AsyncRotationController extends FadeAnimationController implements Consume
         return anim;
     }
 
+    @NonNull
     @Override
     public Animation getFadeOutAnimation() {
         if (mHideImmediately) {

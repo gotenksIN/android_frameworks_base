@@ -96,6 +96,10 @@ class BackNavigationController {
     private final ArrayList<WindowContainer> mTmpOpenApps = new ArrayList<>();
     private final ArrayList<WindowContainer> mTmpCloseApps = new ArrayList<>();
 
+    // This will be set if the back navigation is in progress before the Shell request predictive
+    // back animation.
+    private AnimationHandler.ScheduleAnimationBuilder mCurrentAnimationBuilder;
+
     // This will be set if the back navigation is in progress and the current transition is still
     // running. The pending animation builder will do the animation stuff includes creating leashes,
     // re-parenting leashes and set launch behind, etc. Will be handled when transition finished.
@@ -119,6 +123,21 @@ class BackNavigationController {
     }
 
     /**
+     * Set up the necessary leashes for predictive back animation based on previous
+     * startBackNavigation state.
+     */
+    void startPredictiveBackAnimation() {
+        synchronized (mWindowManagerService.mGlobalLock) {
+            if (mCurrentAnimationBuilder == null) {
+                return;
+            }
+            final AnimationHandler.ScheduleAnimationBuilder tmp = mCurrentAnimationBuilder;
+            mCurrentAnimationBuilder = null;
+            scheduleAnimationInner(tmp);
+        }
+    }
+
+    /**
      * Set up the necessary leashes and build a {@link BackNavigationInfo} instance for an upcoming
      * back gesture animation.
      *
@@ -126,7 +145,6 @@ class BackNavigationController {
      * for the animation, or null if we don't know how to animate the current window and need to
      * fallback on dispatching the key event.
      */
-    @VisibleForTesting
     @Nullable
     BackNavigationInfo startBackNavigation(@NonNull RemoteCallback navigationObserver,
             BackAnimationAdapter adapter) {
@@ -428,12 +446,10 @@ class BackNavigationController {
                                 removedWindowContainer);
                 mBackAnimationInProgress = builder != null;
                 if (mBackAnimationInProgress) {
-                    if (removedWindowContainer.mTransitionController.inTransition()) {
-                        ProtoLog.w(WM_DEBUG_BACK_PREVIEW,
-                                "Pending back animation due to another animation is running");
-                        mPendingAnimationBuilder = builder;
+                    if (Flags.predictiveBackDelayWmTransition()) {
+                        mCurrentAnimationBuilder = builder;
                     } else {
-                        scheduleAnimation(builder);
+                        scheduleAnimationInner(builder);
                     }
                 }
             }
@@ -820,7 +836,7 @@ class BackNavigationController {
          * Notify focus window changed during back navigation. This will cancel the gesture for
          * scenarios like: a system window popup, or when an activity add a new window.
          *
-         * This method should only be used to check window-level change, otherwise it may cause
+         * <p>This method should only be used to check window-level change, otherwise it may cause
          * misjudgment in multi-window mode. For example: in split-screen, when user is
          * navigating on the top task, bottom task can start a new task, which will gain focus for
          * a short time, but we should not cancel the navigation.
@@ -867,6 +883,10 @@ class BackNavigationController {
             }
             if (isMonitorAnimationOrTransition() && canCancelAnimations()) {
                 clearBackAnimations(true /* cancel */);
+            }
+            if (mCurrentAnimationBuilder != null) {
+                notifyAnimationCanceled(mCurrentAnimationBuilder);
+                mCurrentAnimationBuilder = null;
             }
             cancelPendingAnimation();
         }
@@ -1098,13 +1118,18 @@ class BackNavigationController {
         if (mPendingAnimationBuilder == null) {
             return;
         }
+        notifyAnimationCanceled(mPendingAnimationBuilder);
+        mPendingAnimationBuilder = null;
+        mNavigationMonitor.stopMonitorTransition();
+    }
+
+    private static void notifyAnimationCanceled(
+            @NonNull AnimationHandler.ScheduleAnimationBuilder builder) {
         try {
-            mPendingAnimationBuilder.mBackAnimationAdapter.getRunner().onAnimationCancelled();
+            builder.mBackAnimationAdapter.getRunner().onAnimationCancelled();
         } catch (RemoteException e) {
             Slog.e(TAG, "Remote animation gone", e);
         }
-        mPendingAnimationBuilder = null;
-        mNavigationMonitor.stopMonitorTransition();
     }
 
     /**
@@ -1494,7 +1519,7 @@ class BackNavigationController {
 
         @NonNull private static BackWindowAnimationAdaptor createAdaptor(
                 @NonNull WindowContainer target, boolean isOpen, int switchType,
-                SurfaceControl.Transaction st) {
+                @NonNull SurfaceControl.Transaction st) {
             final BackWindowAnimationAdaptor adaptor =
                     new BackWindowAnimationAdaptor(target, isOpen, switchType);
             // Workaround to show TaskFragment which can be hide in Transitions and won't show
@@ -1526,7 +1551,7 @@ class BackNavigationController {
             private Transition mPreparedOpenTransition;
 
             BackWindowAnimationAdaptorWrapper(boolean isOpen, int switchType,
-                    SurfaceControl.Transaction st, @NonNull WindowContainer... targets) {
+                    @NonNull SurfaceControl.Transaction st, @NonNull WindowContainer... targets) {
                 mAdaptors = new BackWindowAnimationAdaptor[targets.length];
                 for (int i = targets.length - 1; i >= 0; --i) {
                     mAdaptors[i] = createAdaptor(targets[i], isOpen, switchType, st);
@@ -1557,7 +1582,8 @@ class BackNavigationController {
                 mPreparedOpenTransition = null;
             }
 
-            private RemoteAnimationTarget createWrapTarget(SurfaceControl.Transaction st) {
+            @NonNull
+            private RemoteAnimationTarget createWrapTarget(@NonNull SurfaceControl.Transaction st) {
                 // Special handle for opening two activities together.
                 // If we animate both activities separately, the animation area and rounded corner
                 // would also being handled separately. To make them seem like "open" together, wrap
@@ -1726,8 +1752,9 @@ class BackNavigationController {
             }
 
             @Override
-            public void startAnimation(SurfaceControl animationLeash, SurfaceControl.Transaction t,
-                    int type, SurfaceAnimator.OnAnimationFinishedCallback finishCallback) {
+            public void startAnimation(@NonNull SurfaceControl animationLeash,
+                    @NonNull SurfaceControl.Transaction t, @SurfaceAnimator.AnimationType int type,
+                    @NonNull SurfaceAnimator.OnAnimationFinishedCallback finishCallback) {
                 mCapturedLeash = animationLeash;
                 createRemoteAnimationTarget();
                 final WindowState win = mTarget.asWindowState();
@@ -1735,12 +1762,12 @@ class BackNavigationController {
                     final Rect frame = win.getFrame();
                     final Point position = new Point();
                     win.transformFrameToSurfacePosition(frame.left, frame.top, position);
-                    t.setPosition(mCapturedLeash, position.x, position.y);
+                    t.setPosition(animationLeash, position.x, position.y);
                 }
             }
 
             @Override
-            public void onAnimationCancelled(SurfaceControl animationLeash) {
+            public void onAnimationCancelled(@Nullable SurfaceControl animationLeash) {
                 if (mCapturedLeash == animationLeash) {
                     mCapturedLeash = null;
                 }
@@ -1757,15 +1784,14 @@ class BackNavigationController {
             }
 
             @Override
-            public void dump(PrintWriter pw, String prefix) {
+            public void dump(@NonNull PrintWriter pw, @NonNull String prefix) {
                 pw.print(prefix + "BackWindowAnimationAdaptor mCapturedLeash=");
                 pw.print(mCapturedLeash);
                 pw.println();
             }
 
             @Override
-            public void dumpDebug(ProtoOutputStream proto) {
-
+            public void dumpDebug(@NonNull ProtoOutputStream proto) {
             }
 
             RemoteAnimationTarget createRemoteAnimationTarget() {
@@ -1931,13 +1957,6 @@ class BackNavigationController {
                     // the snapshot does not exist.
                     if (mSnapshot != null || !activitiesAreDrawn) {
                         openAnimationAdaptor.createStartingSurface(mSnapshot);
-                    }
-                }
-                // Force update mLastSurfaceShowing for opening activity and its task.
-                if (mWindowManagerService.mRoot.mTransitionController.isShellTransitionsEnabled()
-                        && !mWindowManagerService.mFlags.mEnsureSurfaceVisibility) {
-                    for (int i = visibleOpenActivities.length - 1; i >= 0; --i) {
-                        WindowContainer.enforceSurfaceVisible(visibleOpenActivities[i]);
                     }
                 }
             }
@@ -2182,6 +2201,16 @@ class BackNavigationController {
         }
     }
 
+    private void scheduleAnimationInner(AnimationHandler.ScheduleAnimationBuilder builder) {
+        if (mWindowManagerService.mAtmService.getTransitionController().inTransition()) {
+            ProtoLog.w(WM_DEBUG_BACK_PREVIEW,
+                    "Pending back animation due to another animation is running");
+            mPendingAnimationBuilder = builder;
+        } else {
+            scheduleAnimation(builder);
+        }
+    }
+
     private void onBackNavigationDone(Bundle result, int backType) {
         if (result == null) {
             return;
@@ -2199,6 +2228,7 @@ class BackNavigationController {
                 // All animation should be done, clear any un-send animation.
                 mPendingAnimation = null;
                 mPendingAnimationBuilder = null;
+                mCurrentAnimationBuilder = null;
             }
         }
     }

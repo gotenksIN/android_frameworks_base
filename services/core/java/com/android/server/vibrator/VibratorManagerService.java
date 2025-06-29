@@ -18,11 +18,11 @@ package com.android.server.vibrator;
 
 import static android.os.Trace.TRACE_TAG_VIBRATOR;
 import static android.os.VibrationAttributes.USAGE_CLASS_ALARM;
-import static android.os.VibrationEffect.VibrationParameter.targetAmplitude;
-import static android.os.VibrationEffect.VibrationParameter.targetFrequency;
-import static android.os.VibrationAttributes.USAGE_UNKNOWN;
 import static android.os.VibrationAttributes.USAGE_CLASS_FEEDBACK;
 import static android.os.VibrationAttributes.USAGE_CLASS_MASK;
+import static android.os.VibrationAttributes.USAGE_UNKNOWN;
+import static android.os.VibrationEffect.VibrationParameter.targetAmplitude;
+import static android.os.VibrationEffect.VibrationParameter.targetFrequency;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -160,11 +160,9 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
     private final Handler mHandler;
     private final VibrationThread mVibrationThread;
     private final AppOpsManager mAppOps;
-    private final NativeWrapper mNativeWrapper;
+    private final HalVibratorManager mVibratorManager;
     private final VibratorManagerRecords mVibratorManagerRecords;
-    private final long mCapabilities;
-    private final int[] mVibratorIds;
-    private final SparseArray<VibratorController> mVibrators;
+    private final SparseArray<HalVibrator> mVibrators;
     private final VibrationThreadCallbacks mVibrationThreadCallbacks =
             new VibrationThreadCallbacks();
     private final ExternalVibrationCallbacks mExternalVibrationCallbacks =
@@ -234,7 +232,8 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 }
             };
 
-    static native long nativeInit(VibratorManagerNativeCallbacks listener);
+    // TODO(b/409002423): remove the native methods once remove_hidl_support flag removed
+    static native long nativeInit(HalVibratorManager.Callbacks callback);
 
     static native long nativeGetFinalizer();
 
@@ -270,9 +269,9 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 mFrameworkStatsLogger, mLock);
         mInputDeviceDelegate = new InputDeviceDelegate(mContext, mHandler);
 
-        VibrationCompleteListener listener = new VibrationCompleteListener(this);
-        mNativeWrapper = injector.getNativeWrapper();
-        mNativeWrapper.init(listener);
+        HalListener halListener = new HalListener(this);
+        mVibratorManager = injector.createHalVibratorManager();
+        mVibratorManager.init(halListener);
 
         int recentDumpSizeLimit = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_recentVibrationsDumpSizeLimit);
@@ -295,37 +294,16 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         mVibrationThread = new VibrationThread(mWakeLock, mVibrationThreadCallbacks);
         mVibrationThread.start();
 
-        // Load vibrator hardware info. The vibrator ids and manager capabilities are loaded only
-        // once and assumed unchanged for the lifecycle of this service. Each individual vibrator
-        // can still retry loading each individual vibrator hardware spec once more at systemReady.
-        mCapabilities = mNativeWrapper.getCapabilities();
-        int[] vibratorIds = mNativeWrapper.getVibratorIds();
-        if (vibratorIds == null) {
-            mVibratorIds = new int[0];
-            mVibrators = new SparseArray<>(0);
-        } else {
-            // Keep original vibrator id order, which might be meaningful.
-            mVibratorIds = vibratorIds;
-            mVibrators = new SparseArray<>(mVibratorIds.length);
-            for (int vibratorId : vibratorIds) {
-                VibratorController vibratorController =
-                        injector.createVibratorController(vibratorId, listener);
-                mVibrators.put(vibratorId, vibratorController);
-            }
+        int[] vibratorIds = mVibratorManager.getVibratorIds();
+        mVibrators = new SparseArray<>(vibratorIds.length);
+        for (int vibratorId : vibratorIds) {
+            HalVibrator vibrator = injector.createHalVibrator(vibratorId);
+            vibrator.init(halListener);
+            mVibrators.put(vibratorId, vibrator);
         }
 
         // Load vibrator adapter, that depends on hardware info.
         mDeviceAdapter = new DeviceAdapter(mVibrationSettings, mVibrators);
-
-        // Reset the hardware to a default state, in case this is a runtime restart instead of a
-        // fresh boot.
-        mNativeWrapper.cancelSynced();
-        if (Flags.vendorVibrationEffects()) {
-            mNativeWrapper.clearSessions();
-        }
-        for (int i = 0; i < mVibrators.size(); i++) {
-            mVibrators.valueAt(i).reset();
-        }
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_SCREEN_OFF);
@@ -347,13 +325,13 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         Slog.v(TAG, "Initializing VibratorManager service...");
         Trace.traceBegin(TRACE_TAG_VIBRATOR, "systemReady");
         try {
-            // Will retry to load each vibrator's info, if any request have failed.
+            mVibratorManager.onSystemReady();
             for (int i = 0; i < mVibrators.size(); i++) {
-                mVibrators.valueAt(i).reloadVibratorInfoIfNeeded();
+                mVibrators.valueAt(i).onSystemReady();
             }
 
             synchronized (mLock) {
-                mVibratorInfos = transformAllVibratorsLocked(VibratorController::getVibratorInfo);
+                mVibratorInfos = applyToAllVibratorsLocked(HalVibrator::getInfo);
                 VibratorInfo[] infos = new VibratorInfo[mVibratorInfos.size()];
                 for (int i = 0; i < mVibratorInfos.size(); i++) {
                     infos[i] = mVibratorInfos.valueAt(i);
@@ -379,49 +357,63 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
 
     @Override // Binder call
     public int[] getVibratorIds() {
-        return Arrays.copyOf(mVibratorIds, mVibratorIds.length);
+        int[] vibratorIds = mVibratorManager.getVibratorIds();
+        return Arrays.copyOf(vibratorIds, vibratorIds.length);
     }
 
     @Override // Binder call
     public int getCapabilities() {
-        return (int) mCapabilities;
+        return (int) mVibratorManager.getCapabilities();
     }
 
     @Override // Binder call
     @Nullable
     public VibratorInfo getVibratorInfo(int vibratorId) {
-        final VibratorController controller = mVibrators.get(vibratorId);
-        if (controller == null) {
+        final HalVibrator vibrator = mVibrators.get(vibratorId);
+        if (vibrator == null) {
             return null;
         }
-        final VibratorInfo info = controller.getVibratorInfo();
-        synchronized (mLock) {
-            if (mServiceReady) {
-                return info;
+        if (Flags.removeHidlSupport()) {
+            synchronized (mLock) {
+                if (!mServiceReady) {
+                    return null;
+                }
             }
+            return vibrator.getInfo();
+        } else {
+            final VibratorInfo info = vibrator.getInfo();
+            synchronized (mLock) {
+                if (mServiceReady) {
+                    return info;
+                }
+            }
+            if (vibrator instanceof VibratorController controller) {
+                // If the service is not ready and the load was unsuccessful then return null while
+                // waiting for the service to be ready. It will retry to load the complete info from
+                // the HAL.
+                return controller.isVibratorInfoLoadSuccessful() ? info : null;
+            }
+            return null;
         }
-        // If the service is not ready and the load was unsuccessful then return null while waiting
-        // for the service to be ready. It will retry to load the complete info from the HAL.
-        return controller.isVibratorInfoLoadSuccessful() ? info : null;
     }
 
     @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_VIBRATOR_STATE)
     @Override // Binder call
     public boolean isVibrating(int vibratorId) {
         isVibrating_enforcePermission();
-        VibratorController controller = mVibrators.get(vibratorId);
-        return controller != null && controller.isVibrating();
+        HalVibrator vibrator = mVibrators.get(vibratorId);
+        return vibrator != null && vibrator.isVibrating();
     }
 
     @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_VIBRATOR_STATE)
     @Override // Binder call
     public boolean registerVibratorStateListener(int vibratorId, IVibratorStateListener listener) {
         registerVibratorStateListener_enforcePermission();
-        VibratorController controller = mVibrators.get(vibratorId);
-        if (controller == null) {
+        HalVibrator vibrator = mVibrators.get(vibratorId);
+        if (vibrator == null || listener == null) {
             return false;
         }
-        return controller.registerVibratorStateListener(listener);
+        return vibrator.registerVibratorStateListener(listener);
     }
 
     @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_VIBRATOR_STATE)
@@ -429,11 +421,11 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
     public boolean unregisterVibratorStateListener(int vibratorId,
             IVibratorStateListener listener) {
         unregisterVibratorStateListener_enforcePermission();
-        VibratorController controller = mVibrators.get(vibratorId);
-        if (controller == null) {
+        HalVibrator vibrator = mVibrators.get(vibratorId);
+        if (vibrator == null || listener == null) {
             return false;
         }
-        return controller.unregisterVibratorStateListener(listener);
+        return vibrator.unregisterVibratorStateListener(listener);
     }
 
     @Override // Binder call
@@ -448,11 +440,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
             if (effect == null) {
                 synchronized (mLock) {
                     mAlwaysOnEffects.delete(alwaysOnId);
-                    onAllVibratorsLocked(v -> {
-                        if (v.hasCapability(IVibrator.CAP_ALWAYS_ON_CONTROL)) {
-                            v.updateAlwaysOn(alwaysOnId, /* effect= */ null);
-                        }
-                    });
+                    runOnAllVibratorsLocked(v -> v.setAlwaysOn(alwaysOnId, null));
                 }
                 return true;
             }
@@ -775,11 +763,11 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         enforceUpdateAppOpsStatsPermission(uid);
 
         // Create session with adapter that only uses the session vibrators.
-        SparseArray<VibratorController> sessionVibrators = new SparseArray<>(vibratorIds.length);
+        SparseArray<HalVibrator> sessionVibrators = new SparseArray<>(vibratorIds.length);
         for (int vibratorId : vibratorIds) {
-            VibratorController controller = mVibrators.get(vibratorId);
-            if (controller != null) {
-                sessionVibrators.put(vibratorId, controller);
+            HalVibrator vibrator = mVibrators.get(vibratorId);
+            if (vibrator != null) {
+                sessionVibrators.put(vibratorId, vibrator);
             }
         }
         DeviceAdapter deviceAdapter = new DeviceAdapter(mVibrationSettings, sessionVibrators);
@@ -801,7 +789,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
             CallerInfo ignoredBy = null;
 
             // Check if HAL has capability to start sessions.
-            if ((mCapabilities & IVibratorManager.CAP_START_SESSIONS) == 0) {
+            if (!mVibratorManager.hasCapability(IVibratorManager.CAP_START_SESSIONS)) {
                 if (DEBUG) {
                     Slog.d(TAG, "Missing capability to start sessions, ignoring request");
                 }
@@ -810,11 +798,11 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
 
             // Check if vibrator IDs requested are available.
             if (ignoreStatus == null) {
-                if (vibratorIds.length == 0
-                        || vibratorIds.length != deviceAdapter.getAvailableVibratorIds().length) {
+                int[] availableVibratorIds = deviceAdapter.getAvailableVibratorIds();
+                if (vibratorIds.length == 0 || vibratorIds.length != availableVibratorIds.length) {
                     Slog.e(TAG, "Bad vibrator ids to start session, ignoring request."
                             + " requested=" + Arrays.toString(vibratorIds)
-                            + " available=" + Arrays.toString(mVibratorIds));
+                            + " available=" + Arrays.toString(availableVibratorIds));
                     ignoreStatus = Status.IGNORED_UNSUPPORTED;
                 }
             }
@@ -885,7 +873,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                         mCurrentSession = null;
                         return Status.IGNORED_ERROR_TOKEN;
                     }
-                    if (!mNativeWrapper.startSession(sessionId, session.getVibratorIds())) {
+                    if (!mVibratorManager.startSession(sessionId, session.getVibratorIds())) {
                         Slog.e(TAG, "Error starting session " + sessionId + " on vibrators "
                                 + Arrays.toString(session.getVibratorIds()));
                         session.unlinkToDeath();
@@ -942,6 +930,9 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
             pw.println();
 
             mVibrationScaler.dump(pw);
+            pw.println();
+
+            mVibratorManager.dump(pw);
             pw.println();
 
             pw.println("Vibrators:");
@@ -1047,7 +1038,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
     @GuardedBy("mLock")
     private void updateAlwaysOnLocked(AlwaysOnVibration vib) {
         for (int i = 0; i < vib.effects.size(); i++) {
-            VibratorController vibrator = mVibrators.get(vib.effects.keyAt(i));
+            HalVibrator vibrator = mVibrators.get(vib.effects.keyAt(i));
             PrebakedSegment effect = vib.effects.valueAt(i);
             if (vibrator == null) {
                 continue;
@@ -1059,7 +1050,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 // Vibration should not run, use null effect to remove registered effect.
                 effect = null;
             }
-            vibrator.updateAlwaysOn(vib.alwaysOnId, effect);
+            vibrator.setAlwaysOn(vib.alwaysOnId, effect);
         }
     }
 
@@ -1634,7 +1625,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         SparseArray<VibrationEffect> effects;
         if (effect instanceof CombinedVibration.Mono) {
             VibrationEffect syncedEffect = ((CombinedVibration.Mono) effect).getEffect();
-            effects = transformAllVibratorsLocked(unused -> syncedEffect);
+            effects = applyToAllVibratorsLocked(unused -> syncedEffect);
         } else if (effect instanceof CombinedVibration.Stereo) {
             effects = ((CombinedVibration.Stereo) effect).getEffects();
         } else {
@@ -1649,8 +1640,9 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 return null;
             }
             int vibratorId = effects.keyAt(i);
-            VibratorController vibrator = mVibrators.get(vibratorId);
-            if (vibrator != null && vibrator.hasCapability(IVibrator.CAP_ALWAYS_ON_CONTROL)) {
+            HalVibrator vibrator = mVibrators.get(vibratorId);
+            if (vibrator != null
+                    && vibrator.getInfo().hasCapability(IVibrator.CAP_ALWAYS_ON_CONTROL)) {
                 result.put(vibratorId, prebaked);
             }
         }
@@ -1716,14 +1708,14 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
     }
 
     @GuardedBy("mLock")
-    private void onAllVibratorsLocked(Consumer<VibratorController> consumer) {
+    private void runOnAllVibratorsLocked(Consumer<HalVibrator> consumer) {
         for (int i = 0; i < mVibrators.size(); i++) {
             consumer.accept(mVibrators.valueAt(i));
         }
     }
 
     @GuardedBy("mLock")
-    private <T> SparseArray<T> transformAllVibratorsLocked(Function<VibratorController, T> fn) {
+    private <T> SparseArray<T> applyToAllVibratorsLocked(Function<HalVibrator, T> fn) {
         SparseArray<T> ret = new SparseArray<>(mVibrators.size());
         for (int i = 0; i < mVibrators.size(); i++) {
             ret.put(mVibrators.keyAt(i), fn.apply(mVibrators.valueAt(i)));
@@ -1734,10 +1726,6 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
     /** Point of injection for test dependencies */
     @VisibleForTesting
     static class Injector {
-
-        NativeWrapper getNativeWrapper() {
-            return new NativeWrapper();
-        }
 
         Handler createHandler(Looper looper) {
             return new Handler(looper);
@@ -1752,9 +1740,12 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
             return new VibratorFrameworkStatsLogger(handler);
         }
 
-        VibratorController createVibratorController(int vibratorId,
-                VibratorController.OnVibrationCompleteListener listener) {
-            return new VibratorController(vibratorId, listener);
+        HalVibratorManager createHalVibratorManager() {
+            return new NativeHalVibratorManager(new NativeWrapper());
+        }
+
+        HalVibrator createHalVibrator(int vibratorId) {
+            return new VibratorController(vibratorId);
         }
 
         HapticFeedbackVibrationProvider createHapticFeedbackVibrationProvider(
@@ -1785,12 +1776,11 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         public boolean prepareSyncedVibration(long requiredCapabilities, int[] vibratorIds) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "prepareSyncedVibration");
             try {
-                if ((mCapabilities & requiredCapabilities) != requiredCapabilities) {
-                    // This sync step requires capabilities this device doesn't have, skipping
-                    // sync...
+                if (!mVibratorManager.hasCapability(requiredCapabilities)) {
+                    // This sync step requires capabilities this device doesn't have, skipping...
                     return false;
                 }
-                return mNativeWrapper.prepareSynced(vibratorIds);
+                return mVibratorManager.prepareSynced(vibratorIds);
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -1800,7 +1790,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         public boolean triggerSyncedVibration(long vibrationId) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "triggerSyncedVibration");
             try {
-                return mNativeWrapper.triggerSynced(vibrationId);
+                return mVibratorManager.triggerSynced(vibrationId);
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -1810,7 +1800,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         public void cancelSyncedVibration() {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "cancelSyncedVibration");
             try {
-                mNativeWrapper.cancelSynced();
+                mVibratorManager.cancelSynced();
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -2034,7 +2024,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
             }
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "endSession");
             try {
-                mNativeWrapper.endSession(sessionId, shouldAbort);
+                mVibratorManager.endSession(sessionId, shouldAbort);
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -2078,25 +2068,14 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         }
     }
 
-    /** Listener for vibrator manager completion callbacks from native. */
-    @VisibleForTesting
-    interface VibratorManagerNativeCallbacks {
-
-        /** Callback triggered when synced vibration is complete. */
-        void onSyncedVibrationComplete(long vibrationId);
-
-        /** Callback triggered when vibration session is complete. */
-        void onVibrationSessionComplete(long sessionId);
-    }
-
     /**
      * Implementation of listeners to native vibrators with a weak reference to this service.
      */
-    private static final class VibrationCompleteListener implements
-            VibratorController.OnVibrationCompleteListener, VibratorManagerNativeCallbacks {
+    private static final class HalListener
+            implements HalVibrator.Callbacks, HalVibratorManager.Callbacks {
         private WeakReference<VibratorManagerService> mServiceRef;
 
-        VibrationCompleteListener(VibratorManagerService service) {
+        HalListener(VibratorManagerService service) {
             mServiceRef = new WeakReference<>(service);
         }
 
@@ -2117,7 +2096,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         }
 
         @Override
-        public void onComplete(int vibratorId, long vibrationId, long stepId) {
+        public void onVibrationStepComplete(int vibratorId, long vibrationId, long stepId) {
             VibratorManagerService service = mServiceRef.get();
             if (service != null) {
                 service.onVibrationComplete(vibratorId, vibrationId, stepId);
@@ -2142,15 +2121,111 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         }
     }
 
+    /** Controls the vibrator manager HAL. */
+    // TODO(b/409002423): remove this class once remove_hidl_support flag removed
+    public static class NativeHalVibratorManager implements HalVibratorManager {
+        private final NativeWrapper mNativeWrapper;
+
+        // Variables that are updated from synchronized blocks but can be read anytime
+        // for a snippet of the current known vibrator manager info.
+        private volatile long mCapabilities;
+        private volatile int[] mVibratorIds = new int[0];
+
+        NativeHalVibratorManager(NativeWrapper nativeWrapper) {
+            mNativeWrapper = nativeWrapper;
+        }
+
+        @Override
+        public void init(@NonNull Callbacks callbacks) {
+            mNativeWrapper.init(callbacks);
+
+            // Load vibrator hardware info. The vibrator ids and manager capabilities are loaded
+            // once and assumed unchanged for the lifecycle of this service. Each vibrator can still
+            // retry loading each individual vibrator hardware spec once more at systemReady.
+            mCapabilities = mNativeWrapper.getCapabilities();
+            // Keep original vibrator id order, which might be meaningful.
+            int[] vibratorIds = mNativeWrapper.getVibratorIds();
+            if (vibratorIds != null) {
+                mVibratorIds = vibratorIds;
+            }
+
+            // Reset the hardware to a default state.
+            // In case this is a runtime restart instead of a fresh boot.
+            cancelSynced();
+            if (Flags.vendorVibrationEffects()) {
+                mNativeWrapper.clearSessions();
+            }
+        }
+
+        @Override
+        public void onSystemReady() {
+        }
+
+        @Override
+        public long getCapabilities() {
+            return mCapabilities;
+        }
+
+        @NonNull
+        @Override
+        public int[] getVibratorIds() {
+            return mVibratorIds;
+        }
+
+        @Override
+        public boolean prepareSynced(@NonNull int[] vibratorIds) {
+            return mNativeWrapper.prepareSynced(vibratorIds);
+        }
+
+        @Override
+        public boolean triggerSynced(long vibrationId) {
+            return mNativeWrapper.triggerSynced(vibrationId);
+        }
+
+        @Override
+        public boolean cancelSynced() {
+            mNativeWrapper.cancelSynced();
+            return hasCapability(IVibratorManager.CAP_SYNC);
+        }
+
+        @Override
+        public boolean startSession(long sessionId, @NonNull int[] vibratorIds) {
+            return mNativeWrapper.startSession(sessionId, vibratorIds);
+        }
+
+        @Override
+        public boolean endSession(long sessionId, boolean shouldAbort) {
+            mNativeWrapper.endSession(sessionId, shouldAbort);
+            return hasCapability(IVibratorManager.CAP_START_SESSIONS);
+        }
+
+        @Override
+        public void dump(IndentingPrintWriter pw) {
+            pw.println("Native HAL VibratorManager:");
+            pw.increaseIndent();
+            pw.println("capabilitiesFlags = " + Long.toBinaryString(mCapabilities));
+            pw.println("vibratorIds = " + Arrays.toString(mVibratorIds));
+            pw.decreaseIndent();
+        }
+
+        @Override
+        public String toString() {
+            return "NativeHalVibratorManager{"
+                    + "mCapabilities flags=" + Long.toBinaryString(mCapabilities)
+                    + ", mVibratorIds=" + Arrays.toString(mVibratorIds)
+                    + '}';
+        }
+    }
+
     /** Wrapper around the static-native methods of {@link VibratorManagerService} for tests. */
-    @VisibleForTesting
+    // TODO(b/409002423): remove this class once remove_hidl_support flag removed
     public static class NativeWrapper {
 
         private long mNativeServicePtr = 0;
 
         /** Returns native pointer to newly created controller and connects with HAL service. */
-        public void init(VibratorManagerNativeCallbacks listener) {
-            mNativeServicePtr = nativeInit(listener);
+        public void init(HalVibratorManager.Callbacks callback) {
+            mNativeServicePtr = nativeInit(callback);
             long finalizerPtr = nativeGetFinalizer();
 
             if (finalizerPtr != 0) {
@@ -2172,7 +2247,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         }
 
         /** Prepare vibrators for triggering vibrations in sync. */
-        public boolean prepareSynced(@NonNull int[] vibratorIds) {
+        public boolean prepareSynced(int[] vibratorIds) {
             return nativePrepareSynced(mNativeServicePtr, vibratorIds);
         }
 
@@ -2187,7 +2262,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         }
 
         /** Start vibration session. */
-        public boolean startSession(long sessionId, @NonNull int[] vibratorIds) {
+        public boolean startSession(long sessionId, int[] vibratorIds) {
             return nativeStartSession(mNativeServicePtr, sessionId, vibratorIds);
         }
 
@@ -2561,7 +2636,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
 
         private boolean hasExternalControlCapability() {
             for (int i = 0; i < mVibrators.size(); i++) {
-                if (mVibrators.valueAt(i).hasCapability(IVibrator.CAP_EXTERNAL_CONTROL)) {
+                if (mVibrators.valueAt(i).getInfo().hasCapability(IVibrator.CAP_EXTERNAL_CONTROL)) {
                     return true;
                 }
             }
@@ -2666,10 +2741,11 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
 
         private int runListVibrators() {
             try (PrintWriter pw = getOutPrintWriter();) {
-                if (mVibratorIds.length == 0) {
+                int[] vibratorIds = mVibratorManager.getVibratorIds();
+                if (vibratorIds.length == 0) {
                     pw.println("No vibrator found");
                 } else {
-                    for (int id : mVibratorIds) {
+                    for (int id : vibratorIds) {
                         pw.println(id);
                     }
                 }

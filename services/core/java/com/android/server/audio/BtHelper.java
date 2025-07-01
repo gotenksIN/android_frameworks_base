@@ -685,6 +685,15 @@ public class BtHelper {
     }
 
     @GuardedBy("mDeviceBroker.mDeviceStateLock")
+    boolean isAudioConnected() {
+        if (mBluetoothHeadset == null || mBluetoothHeadsetDevice == null) {
+            return false;
+        }
+        return mBluetoothHeadset.isAudioConnected(mBluetoothHeadsetDevice);
+    }
+
+    // @GuardedBy("mDeviceBroker.mSetModeLock")
+    @GuardedBy("AudioDeviceBroker.this.mDeviceStateLock")
     /*package*/ synchronized boolean startBluetoothSco(int scoAudioMode,
                 @NonNull String eventSource) {
         AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(eventSource));

@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-package com.android.systemui.ambientcue.shared.model
+package com.android.wm.shell.compatui.letterbox.config
 
-import android.app.ActivityTaskManager.INVALID_TASK_ID
-import android.graphics.drawable.Drawable
+import android.window.TransitionInfo.Change
 
-data class ActionModel(
-    val icon: IconModel,
-    val label: String,
-    val attribution: String?,
-    val onPerformAction: () -> Unit,
-    // This is used to perform a long click on the expanded action chip.
-    val onPerformLongClick: () -> Unit,
-    val taskId: Int = INVALID_TASK_ID,
-    val actionType: String? = null,
-    val oneTapEnabled: Boolean = false,
-)
+/**
+ * Abstraction for the information about the dependencies between the Letterbox implementation in
+ * Shell and other features in Shell not always available.
+ */
+interface LetterboxDependenciesHelper {
 
-data class IconModel(val drawable: Drawable, val iconId: String)
+    /**
+     * Tells if the [Change] is related to Desktop Windowing.
+     */
+    fun isDesktopWindowingAction(change: Change): Boolean
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.ravenwood.common;
 
-public class RavenwoodBadIntegrityException extends RavenwoodRuntimeException {
-    public RavenwoodBadIntegrityException(String message) {
-        super(message);
-    }
+package com.android.systemui.application
 
-    public RavenwoodBadIntegrityException(String message, Throwable cause) {
-        super(message, cause);
-    }
+import android.content.Context
+import com.android.systemui.SystemUIInitializer
+
+/**
+ * An Interface for [Application] classes that can be notified when an Application Context becomes
+ * available.
+ *
+ * An instance of this will be passed to implementers of [ApplicationContextInitializer].
+ */
+fun interface ApplicationContextAvailableCallback {
+    /** Notifies when the Application Context is available. */
+    fun onContextAvailable(context: Context): SystemUIInitializer
 }

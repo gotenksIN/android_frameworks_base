@@ -30,6 +30,7 @@ import static android.media.MediaRoute2ProviderService.REASON_UNKNOWN_ERROR;
 import static com.android.settingslib.media.LocalMediaManager.MediaDeviceState.STATE_SELECTED;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -55,9 +56,11 @@ import android.media.RoutingSessionInfo;
 import android.media.SuggestedDeviceInfo;
 import android.media.session.MediaSessionManager;
 import android.os.Build;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.media.flags.Flags;
 import com.android.settingslib.bluetooth.CachedBluetoothDevice;
@@ -84,6 +87,11 @@ import org.robolectric.util.ReflectionHelpers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @RunWith(RobolectricTestRunner.class)
 public class InfoMediaManagerTest {
@@ -135,6 +143,8 @@ public class InfoMediaManagerTest {
                     .setSystemRoute(true)
                     .addFeature(MediaRoute2Info.FEATURE_LIVE_AUDIO)
                     .build();
+
+    private static final int ASYNC_TIMEOUT_SECONDS = 5;
 
     @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
@@ -362,9 +372,9 @@ public class InfoMediaManagerTest {
         assertThat(mInfoMediaManager.mMediaDevices).hasSize(4);
         assertThat(mInfoMediaManager.mMediaDevices.get(0).getId()).isEqualTo(TEST_ID);
         assertThat(mInfoMediaManager.mMediaDevices.get(1).getId()).isEqualTo(TEST_ID_1);
-        assertThat(mInfoMediaManager.mMediaDevices.get(2).getId()).isEqualTo(TEST_ID_4);
-        assertThat(mInfoMediaManager.mMediaDevices.get(2).isSuggestedDevice()).isTrue();
-        assertThat(mInfoMediaManager.mMediaDevices.get(3).getId()).isEqualTo(TEST_ID_3);
+        assertThat(mInfoMediaManager.mMediaDevices.get(2).getId()).isEqualTo(TEST_ID_3);
+        assertThat(mInfoMediaManager.mMediaDevices.get(3).getId()).isEqualTo(TEST_ID_4);
+        assertThat(mInfoMediaManager.mMediaDevices.get(3).isSuggestedDevice()).isTrue();
     }
 
     private RouteListingPreference setUpPreferenceList(boolean useSystemOrdering) {
@@ -622,7 +632,6 @@ public class InfoMediaManagerTest {
         assertThat(mInfoMediaManager.removeDeviceFromPlayMedia(device)).isFalse();
     }
 
-    @EnableFlags(Flags.FLAG_AVOID_BINDER_CALLS_DURING_RENDER)
     @Test
     public void populateDynamicRouteAttributes_checkList() {
         final CachedBluetoothDeviceManager cachedBluetoothDeviceManager =
@@ -725,7 +734,6 @@ public class InfoMediaManagerTest {
         assertThat(deselectableDevice.isDeselectable()).isTrue();
     }
 
-    @EnableFlags(Flags.FLAG_AVOID_BINDER_CALLS_DURING_RENDER)
     @Test
     public void getSelectableMediaDevice_notContainPackageName_returnEmpty() {
         final RoutingSessionInfo info = mock(RoutingSessionInfo.class);
@@ -734,42 +742,6 @@ public class InfoMediaManagerTest {
         when(info.getClientPackageName()).thenReturn("com.fake.packagename");
 
         assertThat(mInfoMediaManager.getSelectableMediaDevices()).isEmpty();
-    }
-
-    @DisableFlags(Flags.FLAG_AVOID_BINDER_CALLS_DURING_RENDER)
-    @Test
-    public void getTransferableMediaDevice_checkList() {
-        final List<MediaRoute2Info> mediaRoute2Infos = new ArrayList<>();
-        final MediaRoute2Info mediaRoute2Info = mock(MediaRoute2Info.class);
-        mediaRoute2Infos.add(mediaRoute2Info);
-        when(mediaRoute2Info.getName()).thenReturn(TEST_NAME);
-        when(mediaRoute2Info.getId()).thenReturn(TEST_ID);
-        when(mRouterManager.getRoutingSessions(TEST_PACKAGE_NAME))
-                .thenReturn(List.of(TEST_REMOTE_ROUTING_SESSION));
-        when(mRouter2.getRoutes()).thenReturn(mediaRoute2Infos);
-        when(mRoutingController.getTransferableRoutes()).thenReturn(mediaRoute2Infos);
-
-        final List<MediaDevice> mediaDevices = mInfoMediaManager.getTransferableMediaDevices();
-
-        assertThat(mediaDevices.size()).isEqualTo(1);
-        assertThat(mediaDevices.get(0).getName()).isEqualTo(TEST_NAME);
-    }
-
-    @DisableFlags(Flags.FLAG_AVOID_BINDER_CALLS_DURING_RENDER)
-    @Test
-    public void getDeselectableMediaDevice_checkList() {
-        final List<MediaRoute2Info> mediaRoute2Infos = new ArrayList<>();
-        final MediaRoute2Info mediaRoute2Info = mock(MediaRoute2Info.class);
-        mediaRoute2Infos.add(mediaRoute2Info);
-        when(mRouter2.getRoutes()).thenReturn(mediaRoute2Infos);
-        when(mRoutingController.getDeselectableRoutes()).thenReturn(mediaRoute2Infos);
-        when(mediaRoute2Info.getName()).thenReturn(TEST_NAME);
-        when(mediaRoute2Info.getId()).thenReturn(TEST_ID);
-
-        final List<MediaDevice> mediaDevices = mInfoMediaManager.getDeselectableMediaDevices();
-
-        assertThat(mediaDevices.size()).isEqualTo(1);
-        assertThat(mediaDevices.get(0).getName()).isEqualTo(TEST_NAME);
     }
 
     @Test
@@ -897,6 +869,143 @@ public class InfoMediaManagerTest {
 
         // Expecting 1st call after registerCallback() and 2nd call after onSessionUpdated().
         verify(mCallback, times(2)).onDeviceListAdded(any());
+    }
+
+    @Test
+    public void onDeviceListAdded_callingGettersInCallback_shouldNotCauseDeadlock()
+            throws InterruptedException {
+        when(mRouterManager.getRoutingSessions(anyString())).thenReturn(
+                List.of(TEST_SYSTEM_ROUTING_SESSION));
+        when(mRouterManager.getSelectedRoutes(any())).thenReturn(
+                List.of(TEST_SELECTED_SYSTEM_ROUTE));
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        final CountDownLatch callbackEnteredLatch = new CountDownLatch(1);
+        final CountDownLatch mainThreadActionLatch = new CountDownLatch(1);
+
+        final AtomicBoolean callbackCompletedSuccessfully = new AtomicBoolean(false);
+
+        InfoMediaManager.MediaDeviceCallback mediaDeviceCallback =
+                new InfoMediaManager.MediaDeviceCallback() {
+                    @Override
+                    public void onDeviceListAdded(@NonNull List<MediaDevice> devices) {
+                        try {
+                            callbackEnteredLatch.countDown();
+                            // Pausing the callback and waiting for the main thread to act.
+                            boolean mainThreadUnblocked = mainThreadActionLatch.await(
+                                    ASYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                            callbackCompletedSuccessfully.set(mainThreadUnblocked);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+
+                    @Override
+                    public void onDeviceListRemoved(@NonNull List<MediaDevice> devices) {
+                    }
+
+                    @Override
+                    public void onConnectedDeviceChanged(@Nullable String id) {
+                    }
+
+                    @Override
+                    public void onRequestFailed(int reason) {
+                    }
+                };
+
+
+        // This will invoke a callback in the background thread.
+        executor.submit(() -> mInfoMediaManager.registerCallback(mediaDeviceCallback));
+
+        if (!callbackEnteredLatch.await(ASYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            throw new AssertionError("Callback was never entered.");
+        }
+
+        // While the callback execution is on pause, make a call to a potential blocking method.
+        mInfoMediaManager.getSelectedMediaDevices();
+
+        // Signal the waiting callback thread that it can now proceed.
+        mainThreadActionLatch.countDown();
+        executor.shutdown();
+        assertWithMessage("Deadlock detected! The test timed out.").that(
+                executor.awaitTermination(ASYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(callbackCompletedSuccessfully.get()).isTrue();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_SUGGESTED_DEVICE_API)
+    public void onSuggestedDeviceUpdated_callingGettersInCallback_shouldNotCauseDeadlock()
+            throws InterruptedException {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        final CountDownLatch callbackEnteredLatch = new CountDownLatch(1);
+        final CountDownLatch mainThreadActionLatch = new CountDownLatch(1);
+
+        final AtomicBoolean callbackCompletedSuccessfully = new AtomicBoolean(false);
+
+        InfoMediaManager.MediaDeviceCallback mediaDeviceCallback =
+                new InfoMediaManager.MediaDeviceCallback() {
+                    @Override
+                    public void onDeviceListAdded(@NonNull List<MediaDevice> devices) {
+                    }
+
+                    @Override
+                    public void onDeviceListRemoved(@NonNull List<MediaDevice> devices) {
+                    }
+
+                    @Override
+                    public void onConnectedDeviceChanged(@Nullable String id) {
+                    }
+
+                    @Override
+                    public void onRequestFailed(int reason) {
+                    }
+
+                    @Override
+                    public void onSuggestedDeviceUpdated(
+                            @Nullable SuggestedDeviceState suggestedDevice) {
+                        try {
+                            callbackEnteredLatch.countDown();
+                            // Pausing the callback and waiting for the main thread to act.
+                            boolean mainThreadUnblocked = mainThreadActionLatch.await(
+                                    ASYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                            callbackCompletedSuccessfully.set(mainThreadUnblocked);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                };
+
+        SuggestedDeviceInfo suggestedDeviceInfo = new SuggestedDeviceInfo.Builder("device_name",
+                TEST_ID_3, 0).build();
+        setAvailableRoutesList(TEST_PACKAGE_NAME);
+
+        // This will invoke a callback in the background thread.
+        executor.submit(() -> {
+            mInfoMediaManager.registerCallback(mediaDeviceCallback);
+            verify(mRouter2).registerDeviceSuggestionsUpdatesCallback(any(),
+                    mDeviceSuggestionsUpdatesCallback.capture());
+
+            mDeviceSuggestionsUpdatesCallback.getValue().onSuggestionsUpdated("random_package_name",
+                    List.of(suggestedDeviceInfo));
+        });
+
+        if (!callbackEnteredLatch.await(ASYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            throw new AssertionError("Callback was never entered.");
+        }
+
+        // While the callback execution is on pause, make a call to a potential blocking method.
+        mInfoMediaManager.getSelectedMediaDevices();
+
+        // Signal the waiting callback thread that it can now proceed.
+        mainThreadActionLatch.countDown();
+        executor.shutdown();
+        assertWithMessage("Deadlock detected! The test timed out.").that(
+                executor.awaitTermination(ASYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(callbackCompletedSuccessfully.get()).isTrue();
     }
 
     @Test
@@ -1187,6 +1296,53 @@ public class InfoMediaManagerTest {
 
     @EnableFlags(Flags.FLAG_ENABLE_SUGGESTED_DEVICE_API)
     @Test
+    public void onSuggestionsUpdated_suggestedIsAlreadySelected_suggestionCleared() {
+        MediaRoute2Info selectedRoute =
+                new MediaRoute2Info.Builder(TEST_ID_2, "selected_device")
+                        .setSystemRoute(true)
+                        .addFeature(MediaRoute2Info.FEATURE_LIVE_AUDIO)
+                        .build();
+        SuggestedDeviceInfo initialSuggestedDeviceInfo =
+                new SuggestedDeviceInfo.Builder("initial_suggested_device", TEST_ID_1, 0)
+                        .build();
+        MediaRoute2Info initialSuggestionRoute =
+                new MediaRoute2Info.Builder(TEST_ID_1, "initial_suggested_device_route")
+                        .setSystemRoute(false)
+                        .addFeature(MediaRoute2Info.FEATURE_LIVE_AUDIO)
+                        .build();
+        when(mRoutingController.getSelectedRoutes()).thenReturn(List.of(selectedRoute));
+        when(mRouter2.getRoutes()).thenReturn(List.of(selectedRoute, initialSuggestionRoute));
+        RouterInfoMediaManager mediaManager = createRouterInfoMediaManager();
+        mediaManager.registerCallback(mCallback);
+        verify(mRouter2).registerDeviceSuggestionsUpdatesCallback(any(),
+                mDeviceSuggestionsUpdatesCallback.capture());
+        clearInvocations(mCallback);
+        mDeviceSuggestionsUpdatesCallback
+                .getValue()
+                .onSuggestionsUpdated(TEST_PACKAGE_NAME, List.of(initialSuggestedDeviceInfo));
+        verify(mCallback).onSuggestedDeviceUpdated(mSuggestedDeviceStateCaptor.capture());
+        assertThat(mSuggestedDeviceStateCaptor.getValue()).isNotNull();
+        assertThat(mediaManager.getSuggestedDevice().getSuggestedDeviceInfo().getRouteId())
+                .isEqualTo(TEST_ID_1);
+
+        // --- Now, trigger the scenario where the suggested device becomes selected ---
+        SuggestedDeviceInfo newSuggestedDeviceInfo =
+                new SuggestedDeviceInfo.Builder("suggested_selected_device", TEST_ID_2, 0)
+                        .build();
+        mediaManager.refreshDevices();
+        clearInvocations(mCallback);
+
+        mDeviceSuggestionsUpdatesCallback
+                .getValue()
+                .onSuggestionsUpdated(TEST_PACKAGE_NAME, List.of(newSuggestedDeviceInfo));
+
+        verify(mCallback).onSuggestedDeviceUpdated(mSuggestedDeviceStateCaptor.capture());
+        assertThat(mSuggestedDeviceStateCaptor.getValue()).isNull();
+        assertThat(mediaManager.getSuggestedDevice()).isNull();
+    }
+
+    @EnableFlags(Flags.FLAG_ENABLE_SUGGESTED_DEVICE_API)
+    @Test
     public void setDeviceState_suggestionListenerNotified() {
         SuggestedDeviceInfo suggestedDeviceInfo =
                 new SuggestedDeviceInfo.Builder("device_name", TEST_ID_3, 0).build();
@@ -1392,30 +1548,6 @@ public class InfoMediaManagerTest {
         verify(mCallback).onSuggestedDeviceUpdated(mSuggestedDeviceStateCaptor.capture());
         assertThat(mSuggestedDeviceStateCaptor.getValue().getConnectionState())
                 .isEqualTo(LocalMediaManager.MediaDeviceState.STATE_CONNECTED);
-    }
-
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_DEVICE_GROUPING)
-    @Test
-    public void composePreferenceRouteListing_useSystemOrderingIsFalse() {
-        RouteListingPreference routeListingPreference = setUpPreferenceList(false);
-
-        List<RouteListingPreference.Item> routeOrder =
-                Api34Impl.composePreferenceRouteListing(routeListingPreference);
-
-        assertThat(routeOrder.get(0).getRouteId()).isEqualTo(TEST_ID_3);
-        assertThat(routeOrder.get(1).getRouteId()).isEqualTo(TEST_ID_4);
-    }
-
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_DEVICE_GROUPING)
-    @Test
-    public void composePreferenceRouteListing_useSystemOrderingIsTrue() {
-        RouteListingPreference routeListingPreference = setUpPreferenceList(true);
-
-        List<RouteListingPreference.Item> routeOrder =
-                Api34Impl.composePreferenceRouteListing(routeListingPreference);
-
-        assertThat(routeOrder.get(0).getRouteId()).isEqualTo(TEST_ID_4);
-        assertThat(routeOrder.get(1).getRouteId()).isEqualTo(TEST_ID_3);
     }
 
     @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_DEVICE_GROUPING)

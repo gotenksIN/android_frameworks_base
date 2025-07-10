@@ -1766,8 +1766,8 @@ public class LocationManagerService extends ILocationManager.Stub implements
                     builder.add(identity.getPackageName(), identity.getAttributionTag());
                 }
             }
-            builder.add(mInjector.getSettingsHelper().getIgnoreSettingsAllowlist());
-            builder.add(mInjector.getSettingsHelper().getAdasAllowlist());
+            builder.addAll(mInjector.getSettingsHelper().getIgnoreSettingsAllowlist());
+            builder.addAll(mInjector.getSettingsHelper().getAdasAllowlist());
             allowedPackages = builder.build();
         }
 

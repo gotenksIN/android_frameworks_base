@@ -186,6 +186,9 @@ public enum DesktopExperienceFlags {
             true, Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY),
     ENABLE_PINNING_APP_WITH_CONTEXT_MENU(Flags::enablePinningAppWithContextMenu, true,
             Flags.FLAG_ENABLE_PINNING_APP_WITH_CONTEXT_MENU),
+    ENABLE_PIP_PARAMS_UPDATE_NOTIFICATION_BUGFIX(
+            Flags::enablePipParamsUpdateNotificationBugfix, false,
+            Flags.FLAG_ENABLE_PIP_PARAMS_UPDATE_NOTIFICATION_BUGFIX),
     ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS(Flags::enablePresentationForConnectedDisplays, true,
             Flags.FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS),
     ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE(Flags::enableProjectedDisplayDesktopMode, true,
@@ -221,6 +224,8 @@ public enum DesktopExperienceFlags {
             Flags::taskbarRunningTasksInSplitscreenSelect, false,
             Flags.FLAG_TASKBAR_RUNNING_TASKS_IN_SPLITSCREEN_SELECT),
     ENABLE_TILE_RESIZING(Flags::enableTileResizing, true, Flags.FLAG_ENABLE_TILE_RESIZING),
+    ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG(Flags::enableUpdatedDisplayConnectionDialog, false,
+            Flags.FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG),
     ENABLE_WINDOWING_TASK_STACK_ORDER_BUGFIX(
             Flags::enableWindowingTaskStackOrderBugfix, true,
             Flags.FLAG_ENABLE_WINDOWING_TASK_STACK_ORDER_BUGFIX),
@@ -245,6 +250,9 @@ public enum DesktopExperienceFlags {
     HANDLE_INCOMPATIBLE_TASKS_IN_DESKTOP_LAUNCH_PARAMS(
             Flags::handleIncompatibleTasksInDesktopLaunchParams, false,
             Flags.FLAG_HANDLE_INCOMPATIBLE_TASKS_IN_DESKTOP_LAUNCH_PARAMS),
+    LIMIT_SYSTEM_FULLSCREEN_OVERRIDE_TO_DEFAULT_DISPLAY(
+            Flags::limitSystemFullscreenOverrideToDefaultDisplay, false,
+            Flags.FLAG_LIMIT_SYSTEM_FULLSCREEN_OVERRIDE_TO_DEFAULT_DISPLAY),
     PRESERVE_RECENTS_TASK_CONFIGURATION_ON_RELAUNCH(
             Flags::preserveRecentsTaskConfigurationOnRelaunch, true,
             Flags.FLAG_PRESERVE_RECENTS_TASK_CONFIGURATION_ON_RELAUNCH),

@@ -103,6 +103,12 @@ interface KeyguardRepository {
     val isKeyguardDismissible: StateFlow<Boolean>
 
     /**
+     * Whether device entry believes the device is trusted. This can be true or false when keyguard
+     * has been dismissed depending on biometric and trust states.
+     */
+    val hasTrust: StateFlow<Boolean>
+
+    /**
      * Observable for the signal that keyguard is about to go away.
      *
      * TODO(b/278086361): Remove once KEYGUARD_WM_STATE_REFACTOR flag is removed.
@@ -381,6 +387,9 @@ constructor(
     override val isKeyguardDismissible: MutableStateFlow<Boolean> =
         MutableStateFlow(keyguardStateController.isUnlocked)
 
+    override val hasTrust: MutableStateFlow<Boolean> =
+        MutableStateFlow(keyguardStateController.canDismissLockScreen())
+
     @SuppressLint("SharedFlowCreation")
     override val isKeyguardGoingAway: MutableSharedFlow<Boolean> =
         MutableSharedFlow<Boolean>(
@@ -588,6 +597,7 @@ constructor(
                 }
 
                 override fun onUnlockedChanged() {
+                    hasTrust.value = keyguardStateController.canDismissLockScreen()
                     isKeyguardDismissible.value = keyguardStateController.isUnlocked
                 }
             }
@@ -661,6 +671,8 @@ constructor(
             DozeMachine.State.DOZE_AOD -> DozeStateModel.DOZE_AOD
             DozeMachine.State.DOZE_REQUEST_PULSE -> DozeStateModel.DOZE_REQUEST_PULSE
             DozeMachine.State.DOZE_PULSING -> DozeStateModel.DOZE_PULSING
+            DozeMachine.State.DOZE_PULSING_WITHOUT_UI -> DozeStateModel.DOZE_PULSING_WITHOUT_UI
+            DozeMachine.State.DOZE_PULSING_AUTH_UI -> DozeStateModel.DOZE_PULSING_AUTH_UI
             DozeMachine.State.DOZE_PULSING_BRIGHT -> DozeStateModel.DOZE_PULSING_BRIGHT
             DozeMachine.State.DOZE_PULSE_DONE -> DozeStateModel.DOZE_PULSE_DONE
             DozeMachine.State.FINISH -> DozeStateModel.FINISH

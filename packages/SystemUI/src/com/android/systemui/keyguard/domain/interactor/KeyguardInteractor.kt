@@ -232,8 +232,17 @@ constructor(
     @Deprecated("Use KeyguardTransitionInteractor + KeyguardState")
     val isKeyguardShowing: StateFlow<Boolean> = repository.isKeyguardShowing
 
-    /** Whether the keyguard is dismissible or not. */
+    /**
+     * Whether the keyguard is unlocked or not. This is always true when keyguard has been dismissed
+     * or can be dismissed by a swipe.
+     */
     val isKeyguardDismissible: StateFlow<Boolean> = repository.isKeyguardDismissible
+
+    /**
+     * Whether device entry believes the device is trusted. This can be true or false when keyguard
+     * has been dismissed depending on biometric and trust states.
+     */
+    val hasTrust: StateFlow<Boolean> = repository.hasTrust
 
     /** Whether the keyguard is occluded (covered by an activity). */
     @Deprecated("Use KeyguardTransitionInteractor + KeyguardState.OCCLUDED")
@@ -266,8 +275,24 @@ constructor(
     /** Is the ambient indication area visible? */
     val ambientIndicationVisible: Flow<Boolean> = repository.ambientIndicationVisible.asStateFlow()
 
-    /** Whether the primary bouncer is showing or not. */
-    @JvmField val primaryBouncerShowing: StateFlow<Boolean> = bouncerRepository.primaryBouncerShow
+    /** Whether the primary bouncer is showing or about to show soon. */
+    @JvmField
+    val primaryBouncerShowing: StateFlow<Boolean> =
+        if (com.android.systemui.Flags.newDozingKeyguardStates()) {
+            combine(
+                    bouncerRepository.primaryBouncerShow,
+                    bouncerRepository.primaryBouncerShowingSoon,
+                ) { showing, showingSoon ->
+                    showing || showingSoon
+                }
+                .stateIn(
+                    scope = applicationScope,
+                    started = SharingStarted.WhileSubscribed(),
+                    initialValue = false,
+                )
+        } else {
+            bouncerRepository.primaryBouncerShow
+        }
 
     /** Whether the alternate bouncer is showing or not. */
     val alternateBouncerShowing: StateFlow<Boolean> = bouncerRepository.alternateBouncerVisible

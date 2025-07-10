@@ -3079,7 +3079,15 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                         () -> {
                             clearDisplayInfoCaches(displayId);
                             if (ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                                displayContent.onDisplayInfoChangeApplied();
+                                if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                                    Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER,
+                                            "onDisplayInfoChangeApplied, displayId=" + displayId);
+                                }
+                                try {
+                                    displayContent.onDisplayInfoChangeApplied();
+                                } finally {
+                                    Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+                                }
                             }
                         });
             } else {
@@ -3410,6 +3418,13 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (!task.isAttached()) {
             Slog.w(TAG, "canLaunchOnDisplay(), Task is not attached: " + task);
             return false;
+        }
+
+        if (DesktopExperienceFlags.ENABLE_MIRROR_DISPLAY_NO_ACTIVITY.isTrue()) {
+            if (task.getTaskDisplayArea().shouldKeepNoTask()) {
+                Slog.w(TAG, "canLaunchOnDisplay(), Task display area should keep no task: " + task);
+                return false;
+            }
         }
 
         return canLaunchOnDisplay(r, task.getTaskDisplayArea().getDisplayId());

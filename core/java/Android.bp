@@ -27,6 +27,7 @@ filegroup {
     // Exactly one MessageQueue.java will be added to srcs by messagequeue-gen
     exclude_srcs: [
         "**/*_ravenwood.java",
+        ":dropboxmanager_aidl_sources",
         ":dynamic_instrumentation_manager_aidl_sources",
         "android/os/*MessageQueue/**/*.java",
         "android/ranging/**/*.java",
@@ -106,11 +107,12 @@ release_package_messagequeue_implementation_srcs {
 
 aidl_interface {
     name: "dropboxmanager_aidl",
-    srcs: ["com/android/internal/os/IDropBoxManagerService.aidl"],
+    srcs: [":dropboxmanager_aidl_sources"],
     unstable: true,
     backend: {
         java: {
-            enabled: false, // TODO(b/424186512) switch frameworks/base to using this as well, it uses core build **/*.aidl glob now
+            additional_libs: ["unsupportedappusage"],
+            enabled: true,
         },
         rust: {
             enabled: true,
@@ -120,6 +122,11 @@ aidl_interface {
             ],
         },
     },
+}
+
+filegroup {
+    name: "dropboxmanager_aidl_sources",
+    srcs: ["com/android/internal/os/IDropBoxManagerService.aidl"],
 }
 
 filegroup {
@@ -458,6 +465,13 @@ filegroup {
 }
 
 filegroup {
+    name: "activity_manager_iuidobserver_aidl",
+    srcs: [
+        "android/app/IUidObserver.aidl",
+    ],
+}
+
+filegroup {
     name: "activity_manager_runningappprocessinfo_aidl",
     srcs: [
         "android/app/RunningAppProcessInfo.aidl",
@@ -757,4 +771,24 @@ java_system_features_srcs {
     name: "systemfeatures-gen-srcs",
     full_class_name: "com.android.internal.pm.RoSystemFeatures",
     visibility: ["//visibility:private"],
+}
+
+aidl_interface {
+    name: "activitymanager_structured_aidl",
+    unstable: true,
+    srcs: [
+        "android/app/IActivityManagerStructured.aidl",
+        ":activity_manager_iprocessobserver_aidl",
+        ":activity_manager_iuidobserver_aidl",
+        ":activity_manager_runningappprocessinfo_aidl",
+    ],
+    backend: {
+        java: {
+            // java code is generated through framework-core-sources.
+            enabled: false,
+        },
+        rust: {
+            enabled: true,
+        },
+    },
 }

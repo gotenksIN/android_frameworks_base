@@ -939,6 +939,7 @@ package android.companion {
     method @NonNull public android.companion.AssociationInfo.Builder setSelfManaged(boolean);
     method @NonNull public android.companion.AssociationInfo.Builder setSystemDataSyncFlags(int);
     method @NonNull public android.companion.AssociationInfo.Builder setTimeApproved(long);
+    method @NonNull public android.companion.AssociationInfo.Builder setTransportFlags(int);
   }
 
   public final class AssociationRequest implements android.os.Parcelable {
@@ -968,6 +969,10 @@ package android.companion.virtual {
     method public int getDevicePolicy(int, int);
     method public boolean isVirtualDeviceOwnedMirrorDisplay(int);
     method public void playSoundEffect(int, int);
+  }
+
+  public final class VirtualDeviceParams implements android.os.Parcelable {
+    field public static final int DEVICE_POLICY_INVALID = -1; // 0xffffffff
   }
 
 }
@@ -1136,7 +1141,7 @@ package android.content.pm {
     field public int privateFlags;
   }
 
-  public class CrossProfileApps {
+  @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) public class CrossProfileApps {
     method public boolean canConfigureInteractAcrossProfiles(@NonNull String);
   }
 
@@ -1194,7 +1199,7 @@ package android.content.pm {
     method public boolean isVisibleToPublisher();
   }
 
-  public class ShortcutManager {
+  @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) public class ShortcutManager {
     ctor public ShortcutManager(android.content.Context);
   }
 
@@ -1798,6 +1803,28 @@ package android.hardware.display {
     field public static final int VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH = 64; // 0x40
   }
 
+  @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") public final class DisplayTopology implements android.os.Parcelable {
+    method @NonNull public android.hardware.display.DisplayTopologyGraph getGraph();
+    field public static final int POSITION_BOTTOM = 3; // 0x3
+    field public static final int POSITION_LEFT = 0; // 0x0
+    field public static final int POSITION_RIGHT = 2; // 0x2
+    field public static final int POSITION_TOP = 1; // 0x1
+  }
+
+  @FlaggedApi("com.android.server.display.feature.flags.display_topology_api") public class DisplayTopologyGraph {
+    method @NonNull public android.util.SparseArray<android.hardware.display.DisplayTopologyGraph.DisplayNode> getDisplayNodes();
+  }
+
+  public static final class DisplayTopologyGraph.AdjacentEdge {
+    method @NonNull public android.hardware.display.DisplayTopologyGraph.DisplayNode getDisplayNode();
+    method public int getPosition();
+  }
+
+  public static class DisplayTopologyGraph.DisplayNode {
+    method @NonNull public java.util.List<android.hardware.display.DisplayTopologyGraph.AdjacentEdge> getAdjacentEdges();
+    method public int getDisplayId();
+  }
+
 }
 
 package android.hardware.fingerprint {
@@ -1952,7 +1979,7 @@ package android.hardware.soundtrigger {
 
 package android.hardware.usb {
 
-  public class UsbManager {
+  @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) public class UsbManager {
     method public boolean isUvcGadgetSupportEnabled();
   }
 
@@ -2529,10 +2556,11 @@ package android.os {
 
   public final class PackageTagsList implements android.os.Parcelable {
     method public boolean contains(@NonNull String, @Nullable String);
-    method public boolean contains(@NonNull android.os.PackageTagsList);
-    method public boolean containsAll(@NonNull String);
+    method public boolean containsAll(@NonNull android.os.PackageTagsList);
+    method public boolean containsPackage(@NonNull String);
+    method public boolean containsPackageWithAllTags(@NonNull String);
     method public int describeContents();
-    method public boolean includes(@NonNull String);
+    method @NonNull public java.util.Set<java.lang.String> getPackages();
     method public boolean isEmpty();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.os.PackageTagsList> CREATOR;
@@ -2543,10 +2571,9 @@ package android.os {
     ctor public PackageTagsList.Builder(int);
     method @NonNull public android.os.PackageTagsList.Builder add(@NonNull String);
     method @NonNull public android.os.PackageTagsList.Builder add(@NonNull String, @Nullable String);
-    method @NonNull public android.os.PackageTagsList.Builder add(@NonNull android.os.PackageTagsList);
-    method @NonNull public android.os.PackageTagsList.Builder add(@NonNull java.util.Map<java.lang.String,? extends java.util.Set<java.lang.String>>);
+    method @NonNull public android.os.PackageTagsList.Builder addAll(@NonNull android.os.PackageTagsList);
+    method @NonNull public android.os.PackageTagsList.Builder addAll(@NonNull java.util.Map<java.lang.String,? extends java.util.Set<java.lang.String>>);
     method @NonNull public android.os.PackageTagsList build();
-    method @NonNull public android.os.PackageTagsList.Builder clear();
   }
 
   @FlaggedApi("android.location.flags.change_get_adas_allowlist_from_hidden_to_system") public final class PackageTagsMap implements android.os.Parcelable {

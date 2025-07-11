@@ -28,7 +28,6 @@
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 import android.content.Context
-import com.android.internal.telephony.flags.Flags
 // QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import android.telephony.CarrierConfigManager
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM
@@ -719,12 +718,8 @@ class MobileIconInteractorImpl(
     // Satellite level is unaffected by the inflateSignalStrength property
     // See b/346904529 for details
     private val satelliteShownLevel: StateFlow<Int> =
-        if (Flags.carrierRoamingNbIotNtn()) {
-                connectionRepository.satelliteLevel
-            } else {
-                combine(level, isInService) { level, isInService -> if (isInService) level else 0 }
-            }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), 0)
+        connectionRepository.satelliteLevel.stateIn(scope, SharingStarted.WhileSubscribed(), 0)
+
     private val cellularIcon: Flow<SignalIconModel.Cellular> =
         combine(
             cellularShownLevel,

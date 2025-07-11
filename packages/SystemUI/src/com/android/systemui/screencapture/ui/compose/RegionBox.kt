@@ -16,14 +16,12 @@
 
 package com.android.systemui.screencapture.ui.compose
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,15 +44,40 @@ import com.android.systemui.common.shared.model.Icon as IconModel
 import com.android.systemui.res.R
 
 /**
- * An enum to identify each of the four corners of the rectangle.
+ * Determines which zone (corner or edge) of a box is being touched based on the press offset.
  *
- * @param alignment The alignment of the corner within the box.
+ * @param boxWidth The total width of the box.
+ * @param boxHeight The total height of the box.
+ * @param startOffset The position of the initial press.
+ * @param touchAreaPx The size of the touch area in pixels.
+ * @return The ResizeZone that was pressed, or `null` if the press was not on a zone.
  */
-enum class Corner(val alignment: Alignment) {
-    TopLeft(Alignment.TopStart),
-    TopRight(Alignment.TopEnd),
-    BottomLeft(Alignment.BottomStart),
-    BottomRight(Alignment.BottomEnd),
+private fun getTouchedZone(
+    boxWidth: Float,
+    boxHeight: Float,
+    startOffset: Offset,
+    touchAreaPx: Float,
+): ResizeZone? {
+    val isTouchingTop = startOffset.y in -touchAreaPx..touchAreaPx
+    val isTouchingBottom = startOffset.y in (boxHeight - touchAreaPx)..(boxHeight + touchAreaPx)
+    val isTouchingLeft = startOffset.x in -touchAreaPx..touchAreaPx
+    val isTouchingRight = startOffset.x in (boxWidth - touchAreaPx)..(boxWidth + touchAreaPx)
+
+    return when {
+        // Corners have priority over edges, as they occupy overlapping areas.
+        isTouchingTop && isTouchingLeft -> ResizeZone.Corner.TopLeft
+        isTouchingTop && isTouchingRight -> ResizeZone.Corner.TopRight
+        isTouchingBottom && isTouchingLeft -> ResizeZone.Corner.BottomLeft
+        isTouchingBottom && isTouchingRight -> ResizeZone.Corner.BottomRight
+
+        // If not a corner, check for edges.
+        isTouchingLeft -> ResizeZone.Edge.Left
+        isTouchingTop -> ResizeZone.Edge.Top
+        isTouchingRight -> ResizeZone.Edge.Right
+        isTouchingBottom -> ResizeZone.Edge.Bottom
+
+        else -> null
+    }
 }
 
 /**
@@ -76,9 +99,8 @@ fun RegionBox(
     initialOffset: Offset = Offset.Zero,
     modifier: Modifier = Modifier,
 ) {
-    // The minimum size allowed for the rectangle.
-    // TODO(b/422565042): change when its value is finalized.
-    val minSize = 48.dp
+    // The minimum size allowed for the box.
+    val minSize = 1.dp
 
     val density = LocalDensity.current
     val minSizePx = remember(density) { with(density) { minSize.toPx() } }
@@ -92,46 +114,6 @@ fun RegionBox(
             }
         )
     }
-
-    val onCornerDrag:
-        (dragAmount: Offset, corner: Corner, maxWidth: Float, maxHeight: Float) -> Unit =
-        { dragAmount, corner, maxWidth, maxHeight ->
-            // Used for calculating the new dimensions based on which corner is dragged.
-            var newLeft = rect.left
-            var newTop = rect.top
-            var newRight = rect.right
-            var newBottom = rect.bottom
-
-            val (dragX, dragY) = dragAmount
-
-            // Handle horizontal drag for resizing.
-            if (corner == Corner.TopLeft || corner == Corner.BottomLeft) {
-                val potentialNewLeft = rect.left + dragX
-                val rightLimitForMinWidth = rect.right - minSizePx
-
-                newLeft = potentialNewLeft.coerceIn(0f, rightLimitForMinWidth)
-            } else {
-                val potentialNewRight = rect.right + dragX
-                val leftLimitForMinWidth = rect.left + minSizePx
-
-                newRight = potentialNewRight.coerceIn(leftLimitForMinWidth, maxWidth)
-            }
-
-            // Handle vertical drag for resizing.
-            if (corner == Corner.TopLeft || corner == Corner.TopRight) {
-                val potentialNewTop = rect.top + dragY
-                val bottomLimitForMinHeight = rect.bottom - minSizePx
-
-                newTop = potentialNewTop.coerceIn(0f, bottomLimitForMinHeight)
-            } else {
-                val potentialNewBottom = rect.bottom + dragY
-                val topLimitForMinHeight = rect.top + minSizePx
-
-                newBottom = potentialNewBottom.coerceIn(topLimitForMinHeight, maxHeight)
-            }
-
-            rect = Rect(newLeft, newTop, newRight, newBottom)
-        }
 
     val onBoxDrag: (dragAmount: Offset, maxWidth: Float, maxHeight: Float) -> Unit =
         { dragAmount, maxWidth, maxHeight ->
@@ -150,7 +132,9 @@ fun RegionBox(
 
     ResizableRectangle(
         rect = rect,
-        onCornerDrag = onCornerDrag,
+        onResizeDrag = { dragAmount, zone, maxWidth, maxHeight ->
+            rect = zone.processResizeDrag(rect, dragAmount, minSizePx, maxWidth, maxHeight)
+        },
         onBoxDrag = onBoxDrag,
         onDragEnd = {
             onDragEnd(
@@ -164,10 +148,11 @@ fun RegionBox(
 }
 
 /**
- * A box with border lines and centered corner knobs that can be resized and dragged.
+ * A box with a border that can be resized by dragging its zone (corner or edge), and moved by
+ * dragging its body.
  *
  * @param rect The current geometry of the region box.
- * @param onCornerDrag Callback invoked when a corner knob is dragged.
+ * @param onResizeDrag Callback invoked when a corner or edge is dragged.
  * @param onBoxDrag Callback invoked when the main body of the box is dragged.
  * @param onDragEnd Callback invoked when a drag gesture finishes.
  * @param modifier The modifier to be applied to the composable.
@@ -175,7 +160,7 @@ fun RegionBox(
 @Composable
 private fun ResizableRectangle(
     rect: Rect,
-    onCornerDrag: (dragAmount: Offset, corner: Corner, maxWidth: Float, maxHeight: Float) -> Unit,
+    onResizeDrag: (dragAmount: Offset, zone: ResizeZone, maxWidth: Float, maxHeight: Float) -> Unit,
     onBoxDrag: (dragAmount: Offset, maxWidth: Float, maxHeight: Float) -> Unit,
     onDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
@@ -185,18 +170,21 @@ private fun ResizableRectangle(
     val screenshotIcon =
         IconModel.Resource(res = R.drawable.ic_screen_capture_camera, contentDescription = null)
 
-    // The diameter of the resizable knob on each corner of the region box.
-    val knobDiameter = 8.dp
     // The width of the border stroke around the region box.
     val borderStrokeWidth = 4.dp
+    // The touch area for detecting an edge or corner resize drag.
+    val touchArea = 48.dp
 
     // Must remember the screen size for the drag logic. Initial values are set to 0.
     var screenWidth by remember { mutableStateOf(0f) }
     var screenHeight by remember { mutableStateOf(0f) }
 
     val density = LocalDensity.current
+    val touchAreaPx = with(density) { touchArea.toPx() }
 
-    // The box that contains the whole screen.
+    // The zone being dragged for resizing, if any.
+    var draggedZone by remember { mutableStateOf<ResizeZone?>(null) }
+
     Box(
         modifier =
             modifier
@@ -208,7 +196,6 @@ private fun ResizableRectangle(
                     screenHeight = sizeInPixels.height.toFloat()
                 }
     ) {
-        // The box container for the region box and its knobs.
         Box(
             modifier =
                 Modifier.graphicsLayer(translationX = rect.left, translationY = rect.top)
@@ -216,84 +203,50 @@ private fun ResizableRectangle(
                         width = with(density) { rect.width.toDp() },
                         height = with(density) { rect.height.toDp() },
                     )
-        ) {
-            // The main box for the region selection.
-            Box(
-                modifier =
-                    Modifier.fillMaxSize()
-                        .border(borderStrokeWidth, MaterialTheme.colorScheme.onSurfaceVariant)
-                        .pointerInput(screenWidth, screenHeight, onBoxDrag, onDragEnd) {
-                            detectDragGestures(
-                                onDragEnd = onDragEnd,
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    onBoxDrag(dragAmount, screenWidth, screenHeight)
-                                },
-                            )
-                        },
-                contentAlignment = Alignment.Center,
-            ) {
-                PrimaryButton(
-                    text = stringResource(id = R.string.screen_capture_region_selection_button),
-                    onClick = {
-                        // TODO(b/417534202): trigger a screenshot of the selected area.
-                    },
-                    icon = screenshotIcon,
-                )
-            }
-
-            // The offset is half of the knob diameter so that it is centered.
-            val knobOffset = knobDiameter / 2
-
-            // Create knobs by looping through the Corner enum values
-            Corner.entries.forEach { corner ->
-                val xOffset: Dp
-                val yOffset: Dp
-
-                if (corner == Corner.TopLeft || corner == Corner.BottomLeft) {
-                    xOffset = -knobOffset
-                } else {
-                    xOffset = knobOffset
-                }
-
-                if (corner == Corner.TopLeft || corner == Corner.TopRight) {
-                    yOffset = -knobOffset
-                } else {
-                    yOffset = knobOffset
-                }
-
-                Knob(
-                    diameter = knobDiameter,
-                    modifier =
-                        Modifier.align(corner.alignment)
-                            .offset(x = xOffset, y = yOffset)
-                            .pointerInput(corner, screenWidth, screenHeight, onCornerDrag, onDragEnd) {
-                                detectDragGestures(
-                                    onDragEnd = onDragEnd,
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        onCornerDrag(dragAmount, corner, screenWidth, screenHeight)
-                                    },
-                                )
+                    .border(borderStrokeWidth, MaterialTheme.colorScheme.onSurfaceVariant)
+                    .pointerInput(screenWidth, screenHeight, onResizeDrag, onBoxDrag, onDragEnd) {
+                        detectDragGestures(
+                            onDragStart = { startOffset ->
+                                draggedZone =
+                                    getTouchedZone(
+                                        boxWidth = size.width.toFloat(),
+                                        boxHeight = size.height.toFloat(),
+                                        startOffset = startOffset,
+                                        touchAreaPx = touchAreaPx,
+                                    )
                             },
-                )
-            }
+                            onDragEnd = {
+                                draggedZone = null
+                                onDragEnd()
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+
+                                // Create a stable and local copy of the draggedZone. This
+                                // ensures that the value does not change in the onResizeDrag
+                                // callback.
+                                val currentZone = draggedZone
+
+                                if (currentZone != null) {
+                                    // If currentZone has a value, it means we are dragging a zone
+                                    // for resizing.
+                                    onResizeDrag(dragAmount, currentZone, screenWidth, screenHeight)
+                                } else {
+                                    // If currentZone is null, it means we are dragging the box.
+                                    onBoxDrag(dragAmount, screenWidth, screenHeight)
+                                }
+                            },
+                        )
+                    },
+            contentAlignment = Alignment.Center,
+        ) {
+            PrimaryButton(
+                text = stringResource(id = R.string.screen_capture_region_selection_button),
+                onClick = {
+                    // TODO(b/417534202): trigger a screenshot of the selected area.
+                },
+                icon = screenshotIcon,
+            )
         }
     }
-}
-
-/**
- * The circular knob on each corner of the box used for dragging each corner.
- *
- * @param diameter The diameter of the knob.
- * @param modifier The modifier to be applied to the composable.
- */
-@Composable
-private fun Knob(diameter: Dp, modifier: Modifier = Modifier) {
-    Box(
-        modifier =
-            modifier
-                .size(diameter)
-                .background(color = MaterialTheme.colorScheme.onSurface, shape = CircleShape)
-    )
 }

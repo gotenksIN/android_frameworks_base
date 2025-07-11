@@ -66,14 +66,6 @@ flag {
 }
 
 flag {
-    namespace: "virtual_devices"
-    name: "display_power_manager_apis"
-    description: "Make relevant PowerManager APIs display aware by default"
-    bug: "365042486"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "status_bar_and_insets"
     namespace: "virtual_devices"
     description: "Allow for status bar and insets on virtual devices"
@@ -228,4 +220,14 @@ flag {
     description: "API for enabling metadata support for virtual cameras"
     bug: "371167033"
     is_exported: true
+}
+
+flag {
+    name: "handle_invalid_device_id"
+    namespace: "virtual_devices"
+    description: "Handle invalid device ids in various system services"
+    bug: "394613051"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

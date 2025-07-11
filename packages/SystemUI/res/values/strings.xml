@@ -3747,6 +3747,12 @@
     <!--  Notification bundles onboarding affordance  [CHAR LIMIT=NONE]-->
     <string name="notification_onboarding_bundles_message">Notification organizer bundles and silences lower priority notifications</string>
 
+    <!-- Number of notifications for bundles header [CHAR LIMIT=NONE] -->
+    <string name="notification_bundle_header_counter">{count, plural,
+        =1 {# notification}
+        other {# notifications}
+    }</string>
+
     <!-- Notification Inline controls: button to dismiss the blocking helper [CHAR_LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

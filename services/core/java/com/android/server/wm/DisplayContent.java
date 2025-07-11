@@ -1874,7 +1874,16 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 orientation = nextCandidate.getRequestedOrientation();
             }
         }
-        if (orientation == topOrientation || ar.inMultiWindowMode()
+        if (orientation == topOrientation) {
+            if (mFixedRotationLaunchingApp != null
+                    && orientation == mFixedRotationLaunchingApp.getRequestedOrientation()) {
+                // Reuse the transform if the non-top-visible activity has the same orientation as
+                // the rotated launching top.
+                ar.linkFixedRotationTransform(mFixedRotationLaunchingApp);
+            }
+            return;
+        }
+        if (ar.inMultiWindowMode()
                 || ar.getTask().inMultiWindowMode()
                 || ar.getRequestedConfigurationOrientation() == ORIENTATION_UNDEFINED) {
             return;
@@ -4475,6 +4484,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mWmService.dispatchImeInputTargetVisibilityChanged(targetWin.mClient.asBinder(),
                         targetWin.isVisible() /* visible */, false /* removed */, mDisplayId);
             }
+        } else if (mImeControlTarget != null && mImeControlTarget == mRemoteInsetsControlTarget) {
+            // TODO(b/421886264) Verify the case when the current display policy doesn't allow
+            //  showing the IME and use default display remoteInsetsControlTarget instead.
+            // The IME is not visible by definition of WindowInsets.Type.defaultVisible()
+            mImeControlTarget.setImeInputTargetRequestedVisibility(false /* visible */,
+                    null /* statsToken */);
         }
         if (refreshImeSecureFlag(getPendingTransaction())) {
             mWmService.requestTraversal();
@@ -4644,7 +4659,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 t.show(mSurface);
                 if (DEBUG_IME_VISIBILITY) {
                     EventLog.writeEvent(IMF_SHOW_IME_SCREENSHOT, mImeTarget.toString(),
-                            dc.mInputMethodWindow.mTransitFlags, mSurfacePosition.toString());
+                            0 /* unused transition flags */, mSurfacePosition.toString());
                 }
             } else if (!isValid) {
                 removeSurface(t);
@@ -5085,8 +5100,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if ((pendingLayoutChanges & FINISH_LAYOUT_REDO_LAYOUT) != 0) {
             setLayoutNeeded();
         }
-
-        mInsetsStateController.onPreLayout();
 
         // Perform a layout, if needed.
         performLayout(true /* initial */, false /* updateInputWindows */);

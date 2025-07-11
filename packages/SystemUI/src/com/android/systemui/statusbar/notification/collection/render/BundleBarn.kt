@@ -38,6 +38,7 @@ import com.android.systemui.statusbar.notification.collection.PipelineDumper
 import com.android.systemui.statusbar.notification.collection.coordinator.BundleCoordinator.Companion.debugBundleLog
 import com.android.systemui.statusbar.notification.icon.IconManager
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
+import com.android.systemui.statusbar.notification.row.ExpandableView
 import com.android.systemui.statusbar.notification.row.RowInflaterTask
 import com.android.systemui.statusbar.notification.row.RowInflaterTaskLogger
 import com.android.systemui.statusbar.notification.row.dagger.BundleRowComponent
@@ -74,13 +75,13 @@ constructor(
 
     /** Build view and controller for BundleEntry. */
     fun inflateBundleEntry(bundleEntry: BundleEntry) {
-        iconManager.createIcons(context, bundleEntry)
         debugBundleLog(TAG) { "inflateBundleEntry: ${bundleEntry.key}" }
         if (keyToControllerMap.containsKey(bundleEntry.key)) {
             // Skip if bundle is inflating or inflated.
             debugBundleLog(TAG) { "already in map: ${bundleEntry.key}" }
             return
         }
+        iconManager.createIcons(context, bundleEntry)
         val parent: ViewGroup = listContainer.getViewParentForNotification()
         val inflationFinishedListener: (ExpandableNotificationRow) -> Unit = { row ->
             // A subset of NotificationRowBinderImpl.inflateViews
@@ -95,7 +96,14 @@ constructor(
             val controller = component.expandableNotificationRowController
             controller.init(bundleEntry)
             keyToControllerMap[bundleEntry.key] = controller
-            row.repeatWhenAttached { repeatOnLifecycle(Lifecycle.State.CREATED) { row.reset() } }
+            row.repeatWhenAttached {
+                repeatOnLifecycle(Lifecycle.State.CREATED) {
+                    if (!row.isTransient) {
+                        row.updateBackgroundColorsOfSelf()
+                        row.reset()
+                    }
+                }
+            }
             initBundleHeaderView(bundleEntry, row)
         }
         debugBundleLog(TAG) { "calling inflate: ${bundleEntry.key}" }
@@ -185,5 +193,8 @@ private fun HeaderComposeViewContent(
         )
     }
 }
+
+private inline val ExpandableView.isTransient
+    get() = transientContainer != null
 
 private const val TAG = "BundleBarn"

@@ -371,7 +371,8 @@ public final class UsbAlsaManager {
                                       deviceAddress, hasOutput, hasInput,
                                       isInputHeadset, isOutputHeadset, isDock);
             alsaDevice.setDeviceNameAndDescription(
-                    usbDevice.getProductName(), cardRec.getCardDescription());
+                    cardRec.getCardName(), cardRec.getCardDescription());
+
             // Deselect the current active audio connection to allow the new
             // device to kick in, unless multiple connections is supported.
             if (!IS_MULTI_DEV_MULTI_CONN_MODE) {

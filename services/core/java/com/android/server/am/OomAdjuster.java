@@ -2443,9 +2443,6 @@ public abstract class OomAdjuster {
             maybeUpdateLastTopTime(state, now);
 
             state.setSetProcState(state.getCurProcState());
-            if (state.getSetProcState() >= ActivityManager.PROCESS_STATE_HOME) {
-                state.setNotCachedSinceIdle(false);
-            }
             if (!doingAll) {
                 synchronized (mService.mProcessStats.mLock) {
                     mService.setProcessTrackerStateLOSP(app,

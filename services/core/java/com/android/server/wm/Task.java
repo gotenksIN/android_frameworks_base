@@ -1939,13 +1939,26 @@ class Task extends TaskFragment {
                 -1 /* don't check PID */, -1 /* don't check UID */, this);
     }
 
+    /**
+     * Update task's force resize overrides if the system full-screen override cache has
+     * been invalidated due to activity restart.
+     */
+    void updateForceResizeOverridesIfNeeded(@NonNull ActivityRecord r) {
+        final AppCompatAspectRatioOverrides aspectRatioOverrides =
+                r.mAppCompatController.getAspectRatioOverrides();
+        if (aspectRatioOverrides.hasSystemFullscreenOverrideCache()) {
+            updateForceResizeOverrides(r);
+        }
+    }
+
     private void updateForceResizeOverrides(@NonNull ActivityRecord r) {
         final AppCompatResizeOverrides resizeOverrides = r.mAppCompatController
                 .getResizeOverrides();
+        // Pass task's displayContent as activity's displayContent is not attached yet.
         mForceResizeOverride = resizeOverrides.shouldOverrideForceResizeApp()
                 || r.isUniversalResizeable()
                 || r.mAppCompatController.getAspectRatioOverrides()
-                    .hasFullscreenOverride();
+                    .hasFullscreenOverride(mDisplayContent);
         mForceNonResizeOverride = resizeOverrides.shouldOverrideForceNonResizeApp();
     }
 
@@ -2101,7 +2114,10 @@ class Task extends TaskFragment {
         nextPersistTaskBounds &=
                 (getRequestedOverrideConfiguration().windowConfiguration.getBounds() == null
                 || getRequestedOverrideConfiguration().windowConfiguration.getBounds().isEmpty());
-        if (!prevPersistTaskBounds && nextPersistTaskBounds
+
+        final boolean disableRestoreNonFullscreenBounds =
+                Flags.disableRestoreNonFullscreenBoundsOnConfigurationChange();
+        if (!disableRestoreNonFullscreenBounds && !prevPersistTaskBounds && nextPersistTaskBounds
                 && mLastNonFullscreenBounds != null && !mLastNonFullscreenBounds.isEmpty()) {
             // Bypass onRequestedOverrideConfigurationChanged here to avoid infinite loop.
             getRequestedOverrideConfiguration().windowConfiguration
@@ -2481,10 +2497,7 @@ class Task extends TaskFragment {
      * persist task bounds if needed.
      */
     void setInitialBoundsIfNeeded() {
-        if (!com.android.window.flags.Flags.respectLeafTaskBounds()) {
-            updateOverrideConfigurationFromLaunchBounds();
-        } else if (persistTaskBounds(getWindowConfiguration())
-                && getRequestedOverrideBounds().isEmpty()) {
+        if (persistTaskBounds(getWindowConfiguration()) && getRequestedOverrideBounds().isEmpty()) {
             // Sets the Task bounds to the non-fullscreen bounds persisted last time if the Task
             // has no override bounds set.
             setBounds(mLastNonFullscreenBounds);
@@ -4643,10 +4656,6 @@ class Task extends TaskFragment {
      * @param excluded {@code true} to exclude the task, {@code false} otherwise.
      */
     void setForceExcludedFromRecents(boolean excluded) {
-        if (!Flags.excludeTaskFromRecents()) {
-            Slog.w(TAG, "Flag " + Flags.FLAG_EXCLUDE_TASK_FROM_RECENTS + " is not enabled");
-            return;
-        }
         mForceExcludedFromRecents = excluded;
     }
 

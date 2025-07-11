@@ -190,6 +190,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.hardware.SyncFence;
 import android.hardware.display.DisplayManager.DisplayListener;
 import android.hardware.display.DisplayManagerGlobal;
+import android.hardware.input.InputManager;
 import android.hardware.input.InputManagerGlobal;
 import android.hardware.input.InputSettings;
 import android.media.AudioManager;
@@ -201,6 +202,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.MessageQueue;
 import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import android.os.RemoteException;
@@ -1387,17 +1389,6 @@ public final class ViewRootImpl implements ViewParent,
         if (mWindowDrawCountDown != null) {
             mWindowDrawCountDown.countDown();
         }
-    }
-
-    // FIXME for perf testing only
-    private boolean mProfile = false;
-
-    /**
-     * Call this to profile the next traversal call.
-     * FIXME for perf testing only. Remove eventually
-     */
-    public void profile() {
-        mProfile = true;
     }
 
     private boolean isInTouchMode() {
@@ -3036,7 +3027,7 @@ public final class ViewRootImpl implements ViewParent,
     void scheduleTraversals() {
         if (!mTraversalScheduled) {
             mTraversalScheduled = true;
-            mTraversalBarrier = mHandler.getLooper().getQueue().postSyncBarrier();
+            mTraversalBarrier = mQueue.postSyncBarrier();
             mChoreographer.postCallback(
                     Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, null);
             notifyRendererOfFramePending();
@@ -3047,7 +3038,7 @@ public final class ViewRootImpl implements ViewParent,
     void unscheduleTraversals() {
         if (mTraversalScheduled) {
             mTraversalScheduled = false;
-            mHandler.getLooper().getQueue().removeSyncBarrier(mTraversalBarrier);
+            mQueue.removeSyncBarrier(mTraversalBarrier);
             mChoreographer.removeCallbacks(
                     Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, null);
         }
@@ -3056,18 +3047,8 @@ public final class ViewRootImpl implements ViewParent,
     void doTraversal() {
         if (mTraversalScheduled) {
             mTraversalScheduled = false;
-            mHandler.getLooper().getQueue().removeSyncBarrier(mTraversalBarrier);
-
-            if (mProfile) {
-                Debug.startMethodTracing("ViewAncestor");
-            }
-
+            mQueue.removeSyncBarrier(mTraversalBarrier);
             performTraversals();
-
-            if (mProfile) {
-                Debug.stopMethodTracing();
-                mProfile = false;
-            }
         }
     }
 
@@ -6461,9 +6442,12 @@ public final class ViewRootImpl implements ViewParent,
             Log.e(mTag, "No input channel to request Pointer Capture.");
             return;
         }
-        InputManagerGlobal
-                .getInstance()
-                .requestPointerCapture(inputToken, enabled);
+        final InputManager inputManager = mContext.getSystemService(InputManager.class);
+        if (inputManager == null) {
+            Log.e(mTag, "Missing InputManager; cannot request pointer capture.");
+            return;
+        }
+        inputManager.requestPointerCapture(inputToken, enabled);
     }
 
     private void handlePointerCaptureChanged(boolean hasCapture) {
@@ -7208,6 +7192,8 @@ public final class ViewRootImpl implements ViewParent,
     final Executor mExecutor = (Runnable r) -> {
         mHandler.post(r);
     };
+    final Looper mLooper = mHandler.getLooper();
+    final MessageQueue mQueue = mLooper.getQueue();
 
     /**
      * Something in the current window tells us we need to change the touch mode.  For
@@ -11751,7 +11737,7 @@ public final class ViewRootImpl implements ViewParent,
             }
             // If the UI thread is the same as the current thread that is dispatching
             // WindowStateResizeItem, then it can run directly.
-            if (isFromResizeItem && viewAncestor.mHandler.getLooper()
+            if (isFromResizeItem && viewAncestor.mLooper
                     == ActivityThread.currentActivityThread().getLooper()) {
                 viewAncestor.handleResized(layout.frames, reportDraw, layout.mergedConfiguration,
                         layout.insetsState, forceLayout, displayId, layout.syncSeqId,
@@ -11789,7 +11775,7 @@ public final class ViewRootImpl implements ViewParent,
             }
             // If the UI thread is the same as the current thread that is dispatching
             // WindowStateInsetsControlChangeItem, then it can run directly.
-            if (isFromInsetsControlChangeItem && viewAncestor.mHandler.getLooper()
+            if (isFromInsetsControlChangeItem && viewAncestor.mLooper
                     == ActivityThread.currentActivityThread().getLooper()) {
                 viewAncestor.handleInsetsControlChanged(insetsState, activeControls);
                 return;
@@ -12456,7 +12442,7 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         public void runOrPost(View source, int changeType) {
-            if (mHandler.getLooper() != Looper.myLooper()) {
+            if (mLooper != Looper.myLooper()) {
                 CalledFromWrongThreadException e = new CalledFromWrongThreadException("Only the "
                         + "original thread that created a view hierarchy can touch its views.");
                 // TODO: Throw the exception

@@ -32,10 +32,12 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.compose.ui.platform.ComposeView;
 
+import com.android.app.displaylib.PerDisplayRepository;
 import com.android.systemui.ambient.statusbar.shared.flag.OngoingActivityChipsOnDream;
 import com.android.systemui.ambient.statusbar.ui.binder.AmbientStatusBarViewBinder;
 import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor;
 import com.android.systemui.dagger.qualifiers.Main;
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent;
 import com.android.systemui.dreams.DreamLogger;
 import com.android.systemui.dreams.DreamOverlayNotificationCountProvider;
 import com.android.systemui.dreams.DreamOverlayStateController;
@@ -72,6 +74,7 @@ import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
+
 /**
  * View controller for {@link AmbientStatusBarView}.
  */
@@ -99,6 +102,8 @@ public class AmbientStatusBarViewController extends ViewController<AmbientStatus
     private final AmbientStatusBarViewModel.Factory mAmbientStatusBarViewModelFactory;
     private final ConnectedDisplaysStatusBarNotificationIconViewStore.Factory mIconViewStoreFactory;
     private final DreamLogger mLogger;
+    private final PerDisplayRepository<SystemUIDisplaySubcomponent>
+            mPerDisplayDisplaySubcomponentRepo;
 
     private boolean mIsAttached;
     private boolean mCommunalVisible;
@@ -160,7 +165,7 @@ public class AmbientStatusBarViewController extends ViewController<AmbientStatus
             IndividualSensorPrivacyController sensorPrivacyController,
             Optional<DreamOverlayNotificationCountProvider> dreamOverlayNotificationCountProvider,
             ZenModeController zenModeController,
-            StatusBarWindowStateController statusBarWindowStateController,
+            PerDisplayRepository<SystemUIDisplaySubcomponent> perDisplaySubcomponentRepository,
             DreamOverlayStatusBarItemsProvider statusBarItemsProvider,
             DreamOverlayStateController dreamOverlayStateController,
             UserTracker userTracker,
@@ -169,7 +174,8 @@ public class AmbientStatusBarViewController extends ViewController<AmbientStatus
             CommunalSceneInteractor communalSceneInteractor,
             AmbientStatusBarViewModel.Factory ambientStatusBarViewModelFactory,
             ConnectedDisplaysStatusBarNotificationIconViewStore.Factory iconViewStoreFactory,
-            @DreamLog LogBuffer logBuffer) {
+            @DreamLog LogBuffer logBuffer,
+            PerDisplayRepository<SystemUIDisplaySubcomponent> perDisplayDisplaySubcomponentRepo) {
         super(view);
         mResources = resources;
         mMainExecutor = mainExecutor;
@@ -178,7 +184,10 @@ public class AmbientStatusBarViewController extends ViewController<AmbientStatus
         mDateFormatUtil = dateFormatUtil;
         mSensorPrivacyController = sensorPrivacyController;
         mDreamOverlayNotificationCountProvider = dreamOverlayNotificationCountProvider;
-        mStatusBarWindowStateController = statusBarWindowStateController;
+        int displayId = view.getContext().getDisplayId();
+        SystemUIDisplaySubcomponent displaySubComponent =
+                perDisplaySubcomponentRepository.getOrDefault(displayId);
+        mStatusBarWindowStateController = displaySubComponent.getStatusBarWindowStateController();
         mStatusBarItemsProvider = statusBarItemsProvider;
         mZenModeController = zenModeController;
         mDreamOverlayStateController = dreamOverlayStateController;
@@ -189,6 +198,7 @@ public class AmbientStatusBarViewController extends ViewController<AmbientStatus
         mAmbientStatusBarViewModelFactory = ambientStatusBarViewModelFactory;
         mIconViewStoreFactory = iconViewStoreFactory;
         mLogger = new DreamLogger(logBuffer, TAG);
+        mPerDisplayDisplaySubcomponentRepo = perDisplayDisplaySubcomponentRepo;
     }
 
     @Override
@@ -220,7 +230,8 @@ public class AmbientStatusBarViewController extends ViewController<AmbientStatus
                     getContext(),
                     ongoingActivityChipsView,
                     mAmbientStatusBarViewModelFactory,
-                    mIconViewStoreFactory);
+                    mIconViewStoreFactory,
+                    mPerDisplayDisplaySubcomponentRepo);
         }
 
         mFlows.add(collectFlow(

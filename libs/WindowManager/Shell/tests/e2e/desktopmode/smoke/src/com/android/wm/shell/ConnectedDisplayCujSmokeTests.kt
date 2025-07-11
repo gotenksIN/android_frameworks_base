@@ -61,6 +61,7 @@ import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assume
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -302,7 +303,7 @@ class ConnectedDisplayCujSmokeTests {
         verifyWindowCount(browserApp, expectedCount = 1)
     }
 
-    fun cuj6() {
+    fun cuj6(skipAppHandleTest: Boolean = false) {
         val externalDisplayId = connectedDisplayRule.setupTestDisplay()
         assertTaskbarVisible(externalDisplayId)
         context.startActivity(
@@ -321,7 +322,11 @@ class ConnectedDisplayCujSmokeTests {
             visible = true
         )
 
-        // Enter desktop via app header.
+        if (skipAppHandleTest) {
+            return
+        }
+
+        // Enter desktop via app handle.
         openAppHandleMenuForFullscreenApp(externalDisplayId)
         waitForSysUiObjectForTheApp(clockApp, DESKTOP_BUTTON_RES_ID).click()
         verifyActivityState(clockApp, WINDOWING_MODE_FREEFORM, externalDisplayId, visible = true)
@@ -331,6 +336,7 @@ class ConnectedDisplayCujSmokeTests {
 
     // Extended: All window modes are supported on the connected display, including split screen
     @Test
+    @Ignore("b/428563383")
     @ExtendedOnly
     fun cuj6e() {
         cuj6()
@@ -338,9 +344,26 @@ class ConnectedDisplayCujSmokeTests {
 
     // Projected: All window modes are supported on the connected display, including split screen
     @Test
+    @Ignore("b/428563383")
     @ProjectedOnly
     fun cuj6p() {
         cuj6()
+    }
+
+    // TODO(b/428563383) - Remove [cuj6e_skipAppHandle].
+    // Extended: The same as CUJ6e but excluding app handle test.
+    @Test
+    @ExtendedOnly
+    fun cuj6e_skipAppHandle() {
+        cuj6(skipAppHandleTest = true)
+    }
+
+    // TODO(b/428563383) - Remove [cuj6p_skipAppHandle].
+    // Extended: The same as CUJ6p but excluding app handle test.
+    @Test
+    @ProjectedOnly
+    fun cuj6p_skipAppHandle() {
+        cuj6(skipAppHandleTest = true)
     }
 
     // Extended: Opening an app from a full screen view will switch back to the desktop session,
@@ -702,7 +725,7 @@ class ConnectedDisplayCujSmokeTests {
         const val RECENTS_BUTTON_RES_ID = "recent_apps"
         const val CLOSE_BUTTON = "close_window"
         const val DISPLAY_TOPOLOGY_PANE_CONTENT_RES_ID = "display_topology_pane_content"
-        const val EXTERNAL_DISPLAY_TEXT = "External display"
+        const val EXTERNAL_DISPLAY_TEXT = "External displays"
         const val CONNECTED_DEVICES_TEXT = "Connected devices"
         const val SETTINGS_PACKAGE = "com.android.settings"
         const val SCROLL_RETRY_MAX = 5

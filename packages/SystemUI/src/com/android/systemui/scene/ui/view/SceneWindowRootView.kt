@@ -5,6 +5,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
+import com.android.systemui.common.ui.data.repository.ConfigurationRepository
 import com.android.systemui.qs.ui.adapter.QSSceneAdapter
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
@@ -13,6 +14,7 @@ import com.android.systemui.scene.ui.composable.Scene
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.shade.TouchLogger
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
+import com.android.systemui.statusbar.phone.ui.TintedIconManager
 import javax.inject.Provider
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -30,10 +32,12 @@ class SceneWindowRootView(context: Context, attrs: AttributeSet?) : WindowRootVi
         scenes: Set<Scene>,
         overlays: Set<Overlay>,
         layoutInsetController: LayoutInsetsController,
+        configurationRepository: ConfigurationRepository,
         sceneDataSourceDelegator: SceneDataSourceDelegator,
         qsSceneAdapter: Provider<QSSceneAdapter>,
         sceneJankMonitorFactory: SceneJankMonitor.Factory,
         windowRootViewKeyEventHandler: WindowRootViewKeyEventHandler,
+        tintedIconManagerFactory: TintedIconManager.Factory,
     ) {
         setLayoutInsetsController(layoutInsetController)
         SceneWindowRootViewBinder.bind(
@@ -51,8 +55,10 @@ class SceneWindowRootView(context: Context, attrs: AttributeSet?) : WindowRootVi
                 super.setVisibility(if (isVisible) View.VISIBLE else View.INVISIBLE)
             },
             dataSourceDelegator = sceneDataSourceDelegator,
+            configurationRepository = configurationRepository,
             qsSceneAdapter = qsSceneAdapter,
             sceneJankMonitorFactory = sceneJankMonitorFactory,
+            tintedIconManagerFactory = tintedIconManagerFactory,
         )
         setWindowRootViewKeyEventHandler(windowRootViewKeyEventHandler)
     }

@@ -72,6 +72,7 @@ import static com.android.server.am.ProcessList.SCHED_GROUP_TOP_APP;
 import static com.android.server.am.ProcessList.SCHED_GROUP_TOP_APP_BOUND;
 import static com.android.server.am.ProcessList.SERVICE_ADJ;
 import static com.android.server.am.ProcessList.SERVICE_B_ADJ;
+import static com.android.server.am.ProcessList.SYSTEM_ADJ;
 import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
 import static com.android.server.am.ProcessList.VISIBLE_APP_ADJ;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_PAUSING_OR_PAUSED;
@@ -115,6 +116,7 @@ import android.os.PowerManagerInternal;
 import android.os.Process;
 import android.os.SystemClock;
 import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.flag.junit.SetFlagsRule;
@@ -188,6 +190,7 @@ public class MockingOomAdjusterTests {
 
     private Context mContext;
     private ProcessStateController mProcessStateController;
+    private ProcessStateController.ActivityStateAsyncUpdater mActivityStateAsyncUpdater;
     private ActiveUids mActiveUids;
     private PackageManagerInternal mPackageManagerInternal;
     private ActivityManagerService mService;
@@ -273,8 +276,9 @@ public class MockingOomAdjusterTests {
                 mService.mProcessList, mActiveUids)
                 .setCachedAppOptimizer(mTestCachedAppOptimizer)
                 .setOomAdjusterInjector(mInjector)
-                .setActivityStateLooper(mActivityStateHandlerThread.getLooper())
                 .build();
+        mActivityStateAsyncUpdater = mProcessStateController.createActivityStateAsyncUpdater(
+                mActivityStateHandlerThread.getLooper());
         mService.mProcessStateController = mProcessStateController;
         mService.mOomAdjuster = mService.mProcessStateController.getOomAdjuster();
         mService.mOomAdjuster.mAdjSeq = 10000;
@@ -613,9 +617,8 @@ public class MockingOomAdjusterTests {
         assertEquals("vis-multi-window-activity", app.mState.getAdjType());
         assertCpuTime(app);
 
-        doReturn(ACTIVITY_STATE_FLAG_IS_VISIBLE
-                | WindowProcessController.ACTIVITY_STATE_FLAG_OCCLUDED_FREEFORM)
-                .when(wpc).getActivityStateFlags();
+        setActivityStateFlags(wpc, ACTIVITY_STATE_FLAG_IS_VISIBLE
+                | WindowProcessController.ACTIVITY_STATE_FLAG_OCCLUDED_FREEFORM);
         updateOomAdj(app);
         assertProcStates(app, PROCESS_STATE_TOP, VISIBLE_APP_ADJ, SCHED_GROUP_BACKGROUND);
         assertEquals("occluded-freeform-activity", app.mState.getAdjType());
@@ -656,7 +659,7 @@ public class MockingOomAdjusterTests {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
         WindowProcessController wpc = app.getWindowProcessController();
-        doReturn(true).when(wpc).hasRecentTasks();
+        setHasRecentTasks(wpc, true);
         app.mState.setLastTopTime(SystemClock.uptimeMillis());
         setWakefulness(PowerManagerInternal.WAKEFULNESS_AWAKE);
         updateOomAdj(app);
@@ -810,8 +813,8 @@ public class MockingOomAdjusterTests {
         ProcessRecord app = spy(makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID,
                 MOCKAPP_PROCESSNAME, MOCKAPP_PACKAGENAME, true));
         WindowProcessController wpc = app.getWindowProcessController();
-        doReturn(true).when(wpc).hasActivities();
-        doReturn(ACTIVITY_STATE_FLAG_IS_VISIBLE).when(wpc).getActivityStateFlags();
+        setHasActivity(wpc, true);
+        setActivityStateFlags(wpc, ACTIVITY_STATE_FLAG_IS_VISIBLE);
 
         final ProcessRecord app2 = spy(makeDefaultProcessRecord(MOCKAPP3_PID, MOCKAPP3_UID,
                 MOCKAPP3_PROCESSNAME, MOCKAPP3_PACKAGENAME, false));
@@ -3655,6 +3658,7 @@ public class MockingOomAdjusterTests {
 
     @SuppressWarnings("GuardedBy")
     @Test
+    @EnableFlags(Flags.FLAG_CPU_TIME_CAPABILITY_BASED_FREEZE_POLICY)
     public void testUpdateOomAdj_DoAll_BindUiServiceFromClientHome() {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
@@ -3671,9 +3675,18 @@ public class MockingOomAdjusterTests {
                 ? sFirstUiCachedAdj : sFirstCachedAdj;
         assertProcStates(app, PROCESS_STATE_HOME, expectedAdj, SCHED_GROUP_BACKGROUND,
                 "cch-bound-ui-services");
-        // This UI service oom score was elevated above the freeze cutoff, but the client is not
-        // frozen, so neither should the service.
-        assertImplicitCpuTime(app);
+        // CPU_TIME is not granted to the client and so cannot be propagated to the service.
+        assertNoCpuTime(client);
+        assertNoCpuTime(app);
+        // Granting of IMPLICIT_CPU_TIME will depend on the freezer oomAdj cutoff and will be
+        // propagated to the service from the client when available.
+        if (Flags.prototypeAggressiveFreezing()) {
+            assertNoImplicitCpuTime(client);
+            assertNoImplicitCpuTime(app);
+        } else {
+            assertImplicitCpuTime(client);
+            assertImplicitCpuTime(app);
+        }
     }
 
     @SuppressWarnings("GuardedBy")
@@ -3760,6 +3773,90 @@ public class MockingOomAdjusterTests {
                 SCHED_GROUP_RESTRICTED);
     }
 
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_bindScheduleLikeTopApp_systemClient_hostGetsTopSchedGroup() {
+        // When system client binds a service with BIND_SCHEDULE_LIKE_TOP_APP, the service should
+        // will be prioritized as top app.
+        ProcessRecord host = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
+                MOCKAPP_PACKAGENAME, true);
+        host.mState.setCurrentSchedulingGroup(SCHED_GROUP_DEFAULT);
+        ProcessRecord client = makeDefaultProcessRecord(MOCKAPP2_PID, MOCKAPP2_UID,
+                MOCKAPP2_PROCESSNAME, MOCKAPP2_PACKAGENAME, false);
+        mProcessStateController.setMaxAdj(client, SYSTEM_ADJ);
+
+        bindService(host, client, null, null, Context.BIND_SCHEDULE_LIKE_TOP_APP,
+                mock(IBinder.class));
+        updateOomAdj(client);
+
+        assertTrue(host.mState.shouldScheduleLikeTopApp());
+        assertEquals(SCHED_GROUP_TOP_APP, host.mState.getCurrentSchedulingGroup());
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_bindScheduleLikeTopApp_nonSystemClient_hostNotGetTopSchedGroup() {
+        ProcessRecord host = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
+                MOCKAPP_PACKAGENAME, true);
+        ProcessRecord client = makeDefaultProcessRecord(MOCKAPP2_PID, MOCKAPP2_UID,
+                MOCKAPP2_PROCESSNAME, MOCKAPP2_PACKAGENAME, false);
+        mProcessStateController.setMaxAdj(client, PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ);
+
+        bindService(host, client, null, null, Context.BIND_SCHEDULE_LIKE_TOP_APP,
+                mock(IBinder.class));
+        updateOomAdj(client);
+
+        assertFalse(host.mState.shouldScheduleLikeTopApp());
+        assertNotEquals(SCHED_GROUP_TOP_APP, host.mState.getCurrentSchedulingGroup());
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    @DisableFlags(Flags.FLAG_NOT_SKIP_CONNECTION_RECOMPUTE_FOR_BIND_SCHEDULE_LIKE_TOP_APP)
+    public void testUpdateOomAdj_bindScheduleLikeTopApp_systemClient_hostPrivileged_skipConnectionCompute_hostNotGetTopSchedGroup() {
+        // Similar to testUpdateOomAdj_bindScheduleLikeTopApp_systemClient_hostGetsTopSchedGroup,
+        // but now the host process is already marked as privileged(see
+        // OomAdjusterImpl#isHighPriorityProcess for detail). In this case, connection evaluation
+        // will be skipped, as a result, the scheduling group stays default.
+        ProcessRecord host = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
+                MOCKAPP_PACKAGENAME, true);
+        mProcessStateController.setMaxAdj(host, PERSISTENT_SERVICE_ADJ);
+        ProcessRecord client = makeDefaultProcessRecord(MOCKAPP2_PID, MOCKAPP2_UID,
+                MOCKAPP2_PROCESSNAME, MOCKAPP2_PACKAGENAME, false);
+        mProcessStateController.setMaxAdj(client, SYSTEM_ADJ);
+
+        bindService(host, client, null, null, Context.BIND_SCHEDULE_LIKE_TOP_APP,
+                mock(IBinder.class));
+        updateOomAdj(client);
+
+        // The update for host by its client connection evaluation is skipped.
+        assertFalse(host.mState.shouldScheduleLikeTopApp());
+        assertNotEquals(SCHED_GROUP_TOP_APP, host.mState.getSetSchedGroup());
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    @EnableFlags(Flags.FLAG_NOT_SKIP_CONNECTION_RECOMPUTE_FOR_BIND_SCHEDULE_LIKE_TOP_APP)
+    public void testUpdateOomAdj_bindScheduleLikeTopApp_systemClient_hostPrivileged_notSkipConnectionCompute_hostGetsTopSchedGroup() {
+        // Similar to its counter-part "withoutFlag" but when the feature flag
+        // "not_skip_connection_recompute_for_bind_schedule_like_top_app" is enabled, the evaluation
+        // of connection with BIND_SCHEDULE_LIKE_TOP_APP will not be skipped if the corresponding
+        // flag has not yet been set.
+        ProcessRecord host = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
+                MOCKAPP_PACKAGENAME, true);
+        mProcessStateController.setMaxAdj(host, PERSISTENT_SERVICE_ADJ);
+        ProcessRecord client = makeDefaultProcessRecord(MOCKAPP2_PID, MOCKAPP2_UID,
+                MOCKAPP2_PROCESSNAME, MOCKAPP2_PACKAGENAME, false);
+        mProcessStateController.setMaxAdj(client, SYSTEM_ADJ);
+
+        bindService(host, client, null, null, Context.BIND_SCHEDULE_LIKE_TOP_APP,
+                mock(IBinder.class));
+        updateOomAdj(client);
+
+        assertTrue(host.mState.shouldScheduleLikeTopApp());
+        assertEquals(SCHED_GROUP_TOP_APP, host.mState.getCurrentSchedulingGroup());
+    }
+
     private ProcessRecord makeDefaultProcessRecord(int pid, int uid, String processName,
             String packageName, boolean hasShownUi) {
         return new ProcessRecordBuilder(pid, uid, processName, packageName).setHasShownUi(
@@ -3830,7 +3927,7 @@ public class MockingOomAdjusterTests {
 
     private void setTopProcessState(int procState) {
         if (Flags.pushActivityStateToOomadjuster()) {
-            mProcessStateController.setTopProcessStateAsync(procState);
+            mActivityStateAsyncUpdater.setTopProcessStateAsync(procState);
             flushActivityStateHandler();
         } else {
             doReturn(procState).when(mService.mAtmInternal).getTopProcessState();
@@ -3838,11 +3935,11 @@ public class MockingOomAdjusterTests {
     }
 
     private void setDeviceUnlocking(boolean unlocking) {
-        mProcessStateController.setDeviceUnlocking(unlocking);
+        mActivityStateAsyncUpdater.setDeviceUnlocking(unlocking);
     }
 
     private void setExpandedNotificationShade(boolean expandedShade) {
-        mProcessStateController.setExpandedNotificationShadeAsync(expandedShade);
+        mActivityStateAsyncUpdater.setExpandedNotificationShadeAsync(expandedShade);
         flushActivityStateHandler();
     }
 
@@ -3850,7 +3947,7 @@ public class MockingOomAdjusterTests {
         if (Flags.pushActivityStateToOomadjuster()) {
             final WindowProcessController wpc =
                     proc == null ? null : proc.getWindowProcessController();
-            mProcessStateController.setTopProcessAsync(wpc, false,
+            mActivityStateAsyncUpdater.setTopProcessAsync(wpc, false,
                     false);
             flushActivityStateHandler();
         } else {
@@ -3861,7 +3958,7 @@ public class MockingOomAdjusterTests {
 
     private void setPreviousProcess(WindowProcessController wpc) {
         if (Flags.pushActivityStateToOomadjuster()) {
-            mProcessStateController.setPreviousProcessAsync(wpc);
+            mActivityStateAsyncUpdater.setPreviousProcessAsync(wpc);
             flushActivityStateHandler();
         } else {
             if (wpc == null) return;
@@ -3871,7 +3968,7 @@ public class MockingOomAdjusterTests {
 
     private void setHomeProcess(WindowProcessController wpc) {
         if (Flags.pushActivityStateToOomadjuster()) {
-            mProcessStateController.setHomeProcessAsync(wpc);
+            mActivityStateAsyncUpdater.setHomeProcessAsync(wpc);
             flushActivityStateHandler();
         } else {
             if (wpc == null) return;
@@ -3881,7 +3978,7 @@ public class MockingOomAdjusterTests {
 
     private void setHeavyWeightProcess(WindowProcessController wpc) {
         if (Flags.pushActivityStateToOomadjuster()) {
-            mProcessStateController.setHeavyWeightProcessAsync(wpc);
+            mActivityStateAsyncUpdater.setHeavyWeightProcessAsync(wpc);
             flushActivityStateHandler();
         } else {
             if (wpc == null) return;
@@ -3890,7 +3987,7 @@ public class MockingOomAdjusterTests {
     }
 
     private void setVisibleDozeUiProcess(WindowProcessController wpc) {
-        mProcessStateController.setVisibleDozeUiProcessAsync(wpc);
+        mActivityStateAsyncUpdater.setVisibleDozeUiProcessAsync(wpc);
         flushActivityStateHandler();
     }
 
@@ -3915,7 +4012,7 @@ public class MockingOomAdjusterTests {
 
     private void setHasActivity(WindowProcessController wpc, boolean hasActivity) {
         if (Flags.pushActivityStateToOomadjuster()) {
-            mProcessStateController.setHasActivityAsync(wpc, hasActivity);
+            mActivityStateAsyncUpdater.setHasActivityAsync(wpc, hasActivity);
             flushActivityStateHandler();
         } else {
             if (wpc == null) return;
@@ -3925,7 +4022,7 @@ public class MockingOomAdjusterTests {
 
     private void setActivityStateFlags(WindowProcessController wpc, int flags) {
         if (Flags.pushActivityStateToOomadjuster()) {
-            mProcessStateController.setActivityStateAsync(wpc, flags, Long.MIN_VALUE);
+            mActivityStateAsyncUpdater.setActivityStateAsync(wpc, flags, Long.MIN_VALUE);
             flushActivityStateHandler();
         } else {
             if (wpc == null) return;
@@ -3936,12 +4033,22 @@ public class MockingOomAdjusterTests {
     private void setActivityState(WindowProcessController wpc, int flags,
             long perceptibleStopTimeMs) {
         if (Flags.pushActivityStateToOomadjuster()) {
-            mProcessStateController.setActivityStateAsync(wpc, flags, perceptibleStopTimeMs);
+            mActivityStateAsyncUpdater.setActivityStateAsync(wpc, flags, perceptibleStopTimeMs);
             flushActivityStateHandler();
         } else {
             if (wpc == null) return;
             doReturn(flags).when(wpc).getActivityStateFlags();
             doReturn(perceptibleStopTimeMs).when(wpc).getPerceptibleTaskStoppedTimeMillis();
+        }
+    }
+
+    private void setHasRecentTasks(WindowProcessController wpc, boolean hasRecentTasks) {
+        if (Flags.pushActivityStateToOomadjuster()) {
+            mActivityStateAsyncUpdater.setHasRecentTasksAsync(wpc, hasRecentTasks);
+            flushActivityStateHandler();
+        } else {
+            if (wpc == null) return;
+            doReturn(hasRecentTasks).when(wpc).hasRecentTasks();
         }
     }
 

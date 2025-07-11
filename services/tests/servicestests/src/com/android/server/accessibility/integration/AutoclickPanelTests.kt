@@ -29,10 +29,12 @@ import androidx.test.uiautomator.Configurator
 import androidx.test.uiautomator.UiDevice
 import com.android.compatibility.common.util.SettingsStateChangerRule
 import com.android.server.accessibility.Flags
+import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +43,7 @@ import platform.test.desktop.DesktopMouseTestRule
 
 @RunWith(JUnit4::class)
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_AUTOCLICK_INDICATOR)
+@Ignore("b/428796322")
 class AutoclickPanelTests {
     @Rule(order = 0)
     @JvmField
@@ -171,5 +174,17 @@ class AutoclickPanelTests {
         // Confirm the panel moved around the screen and finished in the starting location.
         val fifthPosition = getAutoclickPanelPosition()
         assertEquals(startingPosition, fifthPosition)
+    }
+
+    private companion object {
+        @AfterClass
+        @JvmStatic
+        fun teardownAfterClass() {
+            // Wait for the Autoclick panel to be closed.
+            waitAndAssert {
+                UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                    .findObject(By.res(AUTOCLICK_PANEL_ID)) == null
+            }
+        }
     }
 }

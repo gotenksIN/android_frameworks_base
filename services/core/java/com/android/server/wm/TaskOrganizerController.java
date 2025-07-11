@@ -115,11 +115,14 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         void onTaskAppeared(Task task) {
             ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Task appeared taskId=%d", task.mTaskId);
             final RunningTaskInfo taskInfo = task.getTaskInfo();
+            final SurfaceControl leash = prepareLeash(task,
+                    "TaskOrganizerController.onTaskAppeared");
             try {
-                mTaskOrganizer.onTaskAppeared(taskInfo, prepareLeash(task,
-                        "TaskOrganizerController.onTaskAppeared"));
+                mTaskOrganizer.onTaskAppeared(taskInfo, leash);
             } catch (RemoteException e) {
                 Slog.e(TAG, "Exception sending onTaskAppeared callback", e);
+            } finally {
+                leash.release();
             }
         }
 
@@ -616,9 +619,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
             return null;
         }
         t.setPosition(leash, window.mSurfacePosition.x, window.mSurfacePosition.y);
-        if (com.android.window.flags.Flags.splashScreenViewSyncTransaction()) {
-            t.apply();
-        }
+        t.apply();
         return leash;
     }
 

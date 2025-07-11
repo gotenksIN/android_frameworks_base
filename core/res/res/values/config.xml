@@ -4399,6 +4399,31 @@
     <!-- The default vibration strength, must be between 1 and 255 inclusive. -->
     <integer name="config_defaultVibrationAmplitude">255</integer>
 
+    <!-- The scale factor to be applied at each vibration intensity level supported by the device,
+     defined by a positive float value.
+     The default framework scaling will be applied if this is not set, based on the user and the
+     default scales for each usage.
+     The number of entries here must be the device supported scale levels for LOW/MEDIUM/HIGH.
+     Example:
+     <string-array name="config_vibrationIntensityScaleFactors" translatable="false">
+       <item>0.5</item> -> Vibrator.VIBRATION_INTENSITY_LOW
+       <item>0.7</item> -> Vibrator.VIBRATION_INTENSITY_MEDIUM
+       <item>1.0</item> -> Vibrator.VIBRATION_INTENSITY_HIGH
+     </string-array> -->
+    <string-array name="config_vibrationIntensityScaleFactors" translatable="false" />
+
+    <!-- The scale factor to be applied for external vibrations only (i.e. audio-coupled haptics),
+         defined by a positive float value.
+         The values from config_vibrationIntensityScaleFactors will be used if this is not set.
+         The number of entries here must be the device supported scale levels for LOW/MEDIUM/HIGH.
+         Example:
+         <string-array name="config_externalVibrationIntensityScaleFactors" translatable="false">
+           <item>0.3</item> -> Vibrator.VIBRATION_INTENSITY_LOW
+           <item>0.5</item> -> Vibrator.VIBRATION_INTENSITY_MEDIUM
+           <item>1.0</item> -> Vibrator.VIBRATION_INTENSITY_HIGH
+         </string-array> -->
+    <string-array name="config_externalVibrationIntensityScaleFactors" translatable="false" />
+
     <!-- The max vibration strength allowed in audio haptic channels, must be positive or zero if
          limit is unknown. -->
     <item name="config_hapticChannelMaxVibrationAmplitude" format="float" type="dimen">0</item>
@@ -4850,7 +4875,7 @@
     <bool name="config_allow3rdPartyAppOnInternal">true</bool>
 
     <!-- Specifies the path that is used by AdaptiveIconDrawable class to crop launcher icons. -->
-    <string name="config_icon_mask" translatable="false">"M50,0L92,0C96.42,0 100,4.58 100 8L100,92C100, 96.42 96.42 100 92 100L8 100C4.58, 100 0 96.42 0 92L0 8 C 0 4.42 4.42 0 8 0L50 0Z"</string>
+    <string name="config_icon_mask" translatable="false">"M 50 0 L 92 0 A 8 8 0 0 1 100 8 L 100 92 A 8 8 0 0 1 92 100 L 8 100 A 8 8 0 0 1 0 92 L 0 8 A 8 8 0 0 1 8 0 L 50 0 Z"</string>
     <!-- Specifies the path that is used by AdaptiveIconDrawable class to crop launcher banners. -->
     <string name="config_banner_mask" translatable="false">@string/config_icon_mask</string>
 
@@ -7627,14 +7652,21 @@
     <!-- Maximum number of devices that allows for audio sharing. -->
     <integer name="config_audio_sharing_maximum_sinks">2</integer>
 
-    <!--For App Functions, this configuration lists package names grouped as "Device Settings".
+    <!-- Whether ResolverActivity should highlight the last used app.
+         When false, ResolverActivity shows a list of apps instead of highlighting the last used app
+         and displaying other apps separately. -->
+    <bool name="config_resolverActivityFilterLastUsed">true</bool>
+
+    <!--For App Function, this configuration lists package names grouped as "Device Settings".
         Packages in this list share the same App Function access settings. In the UI, they are
         presented as a single "Device Settings" item rather than individually. -->
-    <string-array name="config_appFunctionsDeviceSettingsPackages" translatable="false">
+    <string-array name="config_appFunctionDeviceSettingsPackages" translatable="false">
     </string-array>
 
     <!-- Package name for developer verification service provider app [DO NOT TRANSLATE] -->
     <string name="config_developerVerificationServiceProviderPackageName" translatable="false"></string>
+    <!-- Package name for developer verification policy delegate app [DO NOT TRANSLATE] -->
+    <string name="config_developerVerificationPolicyDelegatePackageName" translatable="false"></string>
 
     <!-- Whether the system package installer supports the material design. -->
     <bool name="config_enableMaterialDesignInPackageInstaller">true</bool>

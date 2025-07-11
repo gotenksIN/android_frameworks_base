@@ -3,6 +3,16 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes
 flag {
+    name: "close_task_keyboard_shortcut"
+    namespace: "lse_desktop_experience"
+    description: "Enable keyboard shortcut to close a task"
+    bug: "416437920"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "default_desk_without_warmup_migration"
     namespace: "lse_desktop_experience"
     description: "Moves desk creation to coroutines to guarantee non-null default desk"
@@ -28,6 +38,26 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Stops non-resizable app desktop windows from being snap resized"
     bug: "325240072"
+}
+
+flag {
+    name: "disable_restore_non_fullscreen_bounds_on_configuration_change"
+    namespace: "lse_desktop_experience"
+    description: "Disable restoring bounds to mLastNonFullscreenBounds on configuration change."
+    bug: "372315420"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "empty_roots_never_top"
+    namespace: "lse_desktop_experience"
+    description: "Prevents empty roots from becoming top/focused"
+    bug: "420858253"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -196,6 +226,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enable window drag between connected displays."
     bug: "381172172"
+}
+
+flag {
+    name: "enable_crash_logging_for_desktop"
+    namespace: "lse_desktop_experience"
+    description: "Enables crash reporting indicating activity was in desktop."
+    bug: "331162483"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -507,6 +547,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables enter desktop windowing transition & motion polish changes"
     bug: "369763947"
+}
+
+flag {
+    name: "enable_desktop_windowing_enterprise_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables fixes in desktop windowing related to enterprise"
+    bug: "413607166"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1403,6 +1453,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Limit system full-screen override to apps first launched on default display"
     bug: "423802240"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "move_to_next_display_shortcut_with_projected_mode"
+    namespace: "lse_desktop_experience"
+    description: "Enable the 'move to next display' shortcut to work with the projected mode"
+    bug: "424748132"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

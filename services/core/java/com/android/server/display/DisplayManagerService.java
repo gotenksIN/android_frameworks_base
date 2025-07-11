@@ -172,6 +172,8 @@ import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.RefreshRateRange;
 import android.window.DisplayWindowPolicyController;
+import android.window.ScreenCapture;
+import android.window.ScreenCapture.ScreenCaptureParams;
 import android.window.ScreenCaptureInternal;
 
 import com.android.internal.annotations.GuardedBy;
@@ -1988,7 +1990,8 @@ public final class DisplayManagerService extends SystemService {
 
         if (callingUid != Process.SYSTEM_UID
                 && (flags & VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP) != 0) {
-            if (!checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")) {
+            if (!(checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")
+                    || checkCallingPermission(ACCESS_COMPUTER_CONTROL, "createVirtualDisplay()"))) {
                 throw new SecurityException("Requires ADD_TRUSTED_DISPLAY permission to "
                         + "create a virtual display which is not in the default DisplayGroup.");
             }
@@ -2002,10 +2005,11 @@ public final class DisplayManagerService extends SystemService {
             flags &= ~VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
         }
 
-        if ((flags & VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED) != 0) {
-            if (callingUid != Process.SYSTEM_UID
-                    && !checkCallingPermission(ADD_ALWAYS_UNLOCKED_DISPLAY,
-                    "createVirtualDisplay()")) {
+        if (callingUid != Process.SYSTEM_UID
+                && (flags & VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED) != 0) {
+            if (!(checkCallingPermission(ADD_ALWAYS_UNLOCKED_DISPLAY, "createVirtualDisplay()")
+                     || checkCallingPermission(ACCESS_COMPUTER_CONTROL,
+                    "createVirtualDisplay()"))) {
                 throw new SecurityException(
                         "Requires ADD_ALWAYS_UNLOCKED_DISPLAY permission to "
                                 + "create an always unlocked virtual display.");
@@ -3395,11 +3399,30 @@ public final class DisplayManagerService extends SystemService {
             captureArgs =
                     new ScreenCaptureInternal.DisplayCaptureArgs.Builder(token)
                             .setSize(displayInfo.getNaturalWidth(), displayInfo.getNaturalHeight())
-                            .setCaptureSecureLayers(true)
-                            .setAllowProtected(true)
+                            .setSecureContentPolicy(
+                                    ScreenCaptureParams.SECURE_CONTENT_POLICY_CAPTURE)
+                            .setProtectedContentPolicy(
+                                    ScreenCaptureParams.PROTECTED_CONTENT_POLICY_CAPTURE)
                             .build();
         }
         return ScreenCaptureInternal.captureDisplay(captureArgs);
+    }
+
+    private void systemScreenshotInternal(
+            int displayId,
+            ScreenCaptureInternal.DisplayCaptureArgs.Builder argsBuilder,
+            ScreenCaptureInternal.ScreenCaptureListener listener) {
+        final ScreenCaptureInternal.DisplayCaptureArgs captureArgs;
+        final IBinder token;
+        synchronized (mSyncRoot) {
+            token = getDisplayToken(displayId);
+        }
+        if (token == null) {
+            listener.onError(ScreenCapture.SCREEN_CAPTURE_ERROR_CODE_UNKNOWN);
+            return;
+        }
+        captureArgs = argsBuilder.setDisplayToken(token).build();
+        ScreenCaptureInternal.captureDisplay(captureArgs, listener);
     }
 
     private ScreenCaptureInternal.ScreenshotHardwareBuffer userScreenshotInternal(int displayId) {
@@ -5788,6 +5811,14 @@ public final class DisplayManagerService extends SystemService {
         @Override
         public ScreenCaptureInternal.ScreenshotHardwareBuffer systemScreenshot(int displayId) {
             return systemScreenshotInternal(displayId);
+        }
+
+        @Override
+        public void systemScreenshot(
+                int displayId,
+                @NonNull ScreenCaptureInternal.DisplayCaptureArgs.Builder argsBuilder,
+                @NonNull ScreenCaptureInternal.ScreenCaptureListener callback) {
+            systemScreenshotInternal(displayId, argsBuilder, callback);
         }
 
         @Override

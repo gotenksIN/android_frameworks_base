@@ -456,15 +456,16 @@ class DesktopTasksController(
     }
 
     /**
-     * Returns all focused tasks in full screen or split screen mode in [displayId] when it is not
-     * the home activity.
+     * Returns all focused tasks in full screen or split screen mode in [displayId] excluding home
+     * activity and desk roots.
      */
     private fun getFocusedNonDesktopTasks(displayId: Int): List<RunningTaskInfo> =
         shellTaskOrganizer.getRunningTasks(displayId).filter { taskInfo ->
             val focused = taskInfo.isFocused
             val isNotDesktop =
                 if (DesktopExperienceFlags.EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS.isTrue) {
-                    !taskRepository.isActiveTask(taskInfo.taskId)
+                    !taskRepository.isActiveTask(taskInfo.taskId) &&
+                        !taskRepository.getAllDeskIds().contains(taskInfo.taskId)
                 } else {
                     taskInfo.windowingMode == WINDOWING_MODE_FULLSCREEN ||
                         taskInfo.windowingMode == WINDOWING_MODE_MULTI_WINDOW
@@ -752,6 +753,7 @@ class DesktopTasksController(
                             destDisplayLayout?.densityDpi()?.let {
                                 wct.setDensityDpi(task.token, it)
                             }
+                            applyFreeformDisplayChange(wct, task, destinationDisplayId, deskId)
                         }
                         desksTransitionObserver.addPendingTransition(
                             DeskTransition.ChangeDeskDisplay(
@@ -3082,6 +3084,9 @@ class DesktopTasksController(
         val options = createNewWindowOptions(callingTaskInfo, deskId)
         when (options.launchWindowingMode) {
             WINDOWING_MODE_MULTI_WINDOW -> {
+                val wct = WindowContainerTransaction()
+                wct.setWindowingMode(callingTaskInfo.token, WINDOWING_MODE_UNDEFINED)
+                    .setBounds(callingTaskInfo.token, Rect())
                 val splitPosition =
                     splitScreenController.determineNewInstancePosition(callingTaskInfo)
                 // TODO(b/349828130) currently pass in index_undefined until we can revisit these
@@ -3097,6 +3102,7 @@ class DesktopTasksController(
                     splitPosition,
                     options.toBundle(),
                     /* hideTaskToken= */ null,
+                    wct,
                     /* forceLaunchNewTask= */ true,
                     splitIndex,
                     if (ENABLE_NON_DEFAULT_DISPLAY_SPLIT.isTrue) callingTaskInfo.displayId
@@ -3735,7 +3741,7 @@ class DesktopTasksController(
                     )
                 }
             } else {
-                getInitialBounds(destLayout, taskInfo, destDeskId)
+                calculateMaximizeBounds(destLayout, taskInfo)
             }
         wct.setBounds(taskInfo.token, boundsWithinDisplay)
     }

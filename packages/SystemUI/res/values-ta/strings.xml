@@ -138,8 +138,7 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"இப்போது உங்கள் முழுத்திரையையும் ரெக்கார்டு செய்கிறீர்கள்"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"இப்போது நீங்கள் <xliff:g id="APP_NAME">%1$s</xliff:g> ஐ ரெக்கார்டு செய்கிறீர்கள்"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"ரெக்கார்டிங்கை நிறுத்து"</string>
-    <!-- no translation found for screen_capture_region_selection_button (4437546351856914639) -->
-    <skip />
+    <string name="screen_capture_region_selection_button" msgid="4437546351856914639">"தேர்ந்தெடுத்த பகுதியைப் படமெடு"</string>
     <string name="screen_capture_toolbar_capture_button" msgid="8512731007891496030">"படமெடு"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"ரெக்கார்டு செய்"</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"திரையைப் பகிர்கிறது"</string>
@@ -844,7 +843,8 @@
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"இயக்கு"</string>
     <string name="rotation_lock_camera_rotation_on" msgid="789434807790534274">"ஆன் - முகம் அடிப்படையிலானது"</string>
     <string name="notification_guts_bundle_title" msgid="5252530007273079591">"ஒலியடக்குதல் மற்றும் தொகுப்பு"</string>
-    <string name="notification_guts_single_bundle_notif_title" msgid="3186784466618443494">"அறிவிப்பு ஒருங்கிணைப்பைப் பயன்படுத்துதல்"</string>
+    <!-- no translation found for notification_guts_single_bundle_notif_title (5397951402211886396) -->
+    <skip />
     <string name="notification_guts_bundle_summary" msgid="3971530802237393600">"<xliff:g id="APP_NAME">%1$s</xliff:g>க்கானவை:"</string>
     <string name="notification_guts_promotions_summary" msgid="1565750619813325885">"விற்பனை, புதிய அம்சங்கள் மற்றும் பல"</string>
     <string name="notification_guts_news_summary" msgid="638697931043407835">"முதன்மைச் செய்திகள், சிறப்புக் கட்டுரைகள் மற்றும் பல"</string>
@@ -853,8 +853,7 @@
     <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"ஆன் செய்"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"உங்களின் நீண்ட உரையாடல்களை இப்போது சுருக்கி, விரைவு ரீகேப்களை உங்களுக்கு வழங்கலாம்"</string>
     <string name="notification_onboarding_bundles_message" msgid="9038023612294384832">"அறிவிப்பு ஒருங்கிணைப்பு குறைந்த முன்னுரிமை இருக்கும் அறிவிப்புகளைத் தொகுத்து ஒலியடக்குகிறது"</string>
-    <!-- no translation found for notification_bundle_header_counter (5515532701569242265) -->
-    <skip />
+    <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# அறிவிப்பு}other{# அறிவிப்புகள்}}"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"முடிந்தது"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"பயன்படுத்து"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"ஆஃப் செய்"</string>
@@ -1096,6 +1095,16 @@
     <string name="accessibility_quick_settings_edit" msgid="6544873823850165">"விரைவு அமைப்புகளின் வரிசையை மாற்றலாம்."</string>
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"பவர் மெனு"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"பக்கம் <xliff:g id="ID_1">%1$d</xliff:g> / <xliff:g id="ID_2">%2$d</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_title (7614965716626605518) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_content (4519838108423437794) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_magnifier_intro (627023269951856071) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_talkback_intro (1617808784388544741) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_positive_button_text (3670746017523589293) -->
+    <skip />
     <string name="tuner_lock_screen" msgid="2267383813241144544">"லாக் ஸ்கிரீன்"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"ஷட் டவுன் ஆகிறது…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"மேலும் விவரங்களுக்கு இதைப் பார்க்கவும்"</string>
@@ -1656,14 +1665,10 @@
     <string name="qs_edit_mode_category_unknown" msgid="509314252124053550">"தெரியவில்லை"</string>
     <string name="qs_edit_mode_reset_dialog_title" msgid="5344853290033761627">"அனைத்துக் கட்டங்களையும் மீட்டமைக்கவா?"</string>
     <string name="qs_edit_mode_reset_dialog_content" msgid="7474773130622653653">"விரைவு அமைப்புகளின் கட்டங்கள் அனைத்தும் சாதனத்தின் அசல் அமைப்புகளுக்கு மீட்டமைக்கப்படும்"</string>
-    <!-- no translation found for ambientcue_first_time_edu_title (4786708463521594957) -->
-    <skip />
-    <!-- no translation found for ambientcue_first_time_edu_text (7541905631076606020) -->
-    <skip />
-    <!-- no translation found for ambientcue_first_time_edu_icon_description (1776865320146246305) -->
-    <skip />
-    <!-- no translation found for ambientcue_long_press_edu_text (8424250358721947938) -->
-    <skip />
+    <string name="ambientcue_first_time_edu_title" msgid="4786708463521594957">"உதவிகரமான பரிந்துரைகளைப் பெறுங்கள்"</string>
+    <string name="ambientcue_first_time_edu_text" msgid="7541905631076606020">"திரையில் நீங்கள் செய்பவற்றுக்குப் பொருத்தமான தகவல்களையும் செயல்களையும் முன்கூட்டியே பரிந்துரைக்க AIயைப் பயன்படுத்துகிறோம்"</string>
+    <string name="ambientcue_first_time_edu_icon_description" msgid="1776865320146246305">"ஐகான்"</string>
+    <string name="ambientcue_long_press_edu_text" msgid="8424250358721947938">"பரிந்துரைகள் எப்படி உருவாகின்றன என்பதைப் பார்க்க தொட்டுப் பிடியுங்கள்"</string>
     <string name="demote_explain_text" msgid="3942301497888762295">"<xliff:g id="APPLICATION">%1$s</xliff:g> இனி நேரலை அறிவிப்புகளைக் காட்டாது. இதை எப்போது வேண்டுமானாலும் அமைப்புகளில் மாற்றலாம்."</string>
     <string name="volume_slider_disabled_message_template" msgid="1305088816797803460">"<xliff:g id="STREAM_NAME">%1$s</xliff:g>, <xliff:g id="DISABLED_MESSAGE">%2$s</xliff:g>"</string>
     <string name="underlay_close_button_content_description" msgid="6518481455548869894">"மூடும்"</string>
@@ -1671,4 +1676,8 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"அறிவிப்புகளைத் திறக்க மேல் இடதுபுறத்தில் இருந்து ஸ்வைப் செய்யலாம்"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"விரைவு அமைப்புகளைத் திறக்க மேல் வலதுபுறத்தில் இருந்து ஸ்வைப் செய்யுங்கள்"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"பின்செல்"</string>
+    <!-- no translation found for pager_dots_previous_content_description (26963508904918908) -->
+    <skip />
+    <!-- no translation found for pager_dots_next_content_description (613943992626163120) -->
+    <skip />
 </resources>

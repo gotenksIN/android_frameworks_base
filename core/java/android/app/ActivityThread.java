@@ -305,7 +305,9 @@ import java.util.function.Consumer;
  * {@hide}
  */
 @android.ravenwood.annotation.RavenwoodPartiallyAllowlisted
-@android.ravenwood.annotation.RavenwoodKeepPartialClass
+@android.ravenwood.annotation.RavenwoodKeepPartialClass(
+        comment = "We use Objenesis to instantiate it. No member fields are initialized."
+)
 @android.ravenwood.annotation.RavenwoodRedirectionClass("ActivityThread_ravenwood")
 public final class ActivityThread extends ClientTransactionHandler
         implements ActivityThreadInternal {
@@ -4978,11 +4980,7 @@ public final class ActivityThread extends ClientTransactionHandler
         final SurfaceControl.Transaction transaction = new SurfaceControl.Transaction();
         transaction.hide(startingWindowLeash);
         startingWindowLeash.release();
-        final boolean syncTransactionOnDraw =
-                com.android.window.flags.Flags.splashScreenViewSyncTransaction();
-        if (syncTransactionOnDraw) {
-            decorView.getViewRootImpl().applyTransactionOnDraw(transaction);
-        }
+        decorView.getViewRootImpl().applyTransactionOnDraw(transaction);
         view.syncTransferSurfaceOnDraw();
 
         if (decorView.isHardwareAccelerated()) {
@@ -4995,9 +4993,6 @@ public final class ActivityThread extends ClientTransactionHandler
                                 int syncResult, long frame) {
                             return didProduceBuffer -> {
                                 Trace.instant(Trace.TRACE_TAG_VIEW, "transferSplashscreenView");
-                                if (!syncTransactionOnDraw) {
-                                    transaction.apply();
-                                }
                                 // Tell server we can remove the starting window after frame commit.
                                 decorView.postOnAnimation(() ->
                                         reportSplashscreenViewShown(token, view));
@@ -5006,9 +5001,6 @@ public final class ActivityThread extends ClientTransactionHandler
                     });
         } else {
             Trace.instant(Trace.TRACE_TAG_VIEW, "transferSplashscreenView_software");
-            if (!syncTransactionOnDraw) {
-                decorView.getViewRootImpl().applyTransactionOnDraw(transaction);
-            }
             // Tell server we can remove the starting window after frame commit.
             decorView.postOnAnimation(() -> reportSplashscreenViewShown(token, view));
         }

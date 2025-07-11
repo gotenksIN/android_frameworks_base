@@ -43,7 +43,9 @@ import android.view.View;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
+import com.android.app.displaylib.PerDisplayRepository;
 import com.android.systemui.SysuiTestCase;
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent;
 import com.android.systemui.dreams.DreamOverlayNotificationCountProvider;
 import com.android.systemui.dreams.DreamOverlayStateController;
 import com.android.systemui.dreams.DreamOverlayStatusBarItemsProvider;
@@ -103,6 +105,9 @@ public class AmbientStatusBarViewControllerTest extends SysuiTestCase {
     DreamOverlayNotificationCountProvider mDreamOverlayNotificationCountProvider;
     @Mock
     StatusBarWindowStateController mStatusBarWindowStateController;
+    @Mock private SystemUIDisplaySubcomponent mSystemUIDisplaySubcomponent;
+    @Mock
+    private PerDisplayRepository<SystemUIDisplaySubcomponent> mPerDisplaySubcomponentRepository;
     @Mock
     DreamOverlayStatusBarItemsProvider mDreamOverlayStatusBarItemsProvider;
     @Mock
@@ -143,6 +148,11 @@ public class AmbientStatusBarViewControllerTest extends SysuiTestCase {
         doCallRealMethod().when(mView).getVisibility();
         when(mUserTracker.getUserId()).thenReturn(ActivityManager.getCurrentUser());
 
+        when(mSystemUIDisplaySubcomponent.getStatusBarWindowStateController())
+                .thenReturn(mStatusBarWindowStateController);
+        when(mPerDisplaySubcomponentRepository.getOrDefault(anyInt()))
+                .thenReturn(mSystemUIDisplaySubcomponent);
+        when(mView.getContext()).thenReturn(getContext());
         mController = new AmbientStatusBarViewController(
                 mView,
                 mResources,
@@ -153,7 +163,7 @@ public class AmbientStatusBarViewControllerTest extends SysuiTestCase {
                 mSensorPrivacyController,
                 Optional.of(mDreamOverlayNotificationCountProvider),
                 mZenModeController,
-                mStatusBarWindowStateController,
+                mPerDisplaySubcomponentRepository,
                 mDreamOverlayStatusBarItemsProvider,
                 mDreamOverlayStateController,
                 mUserTracker,
@@ -162,7 +172,8 @@ public class AmbientStatusBarViewControllerTest extends SysuiTestCase {
                 mKosmos.getCommunalSceneInteractor(),
                 mAmbientStatusBarViewModelFactory,
                 mIconViewStoreFactory,
-                mLogBuffer);
+                mLogBuffer,
+                mKosmos.getSystemUiDisplaySubcomponentRepository());
         mController.onInit();
     }
 
@@ -333,7 +344,7 @@ public class AmbientStatusBarViewControllerTest extends SysuiTestCase {
                 mSensorPrivacyController,
                 Optional.empty(),
                 mZenModeController,
-                mStatusBarWindowStateController,
+                mPerDisplaySubcomponentRepository,
                 mDreamOverlayStatusBarItemsProvider,
                 mDreamOverlayStateController,
                 mUserTracker,
@@ -342,7 +353,8 @@ public class AmbientStatusBarViewControllerTest extends SysuiTestCase {
                 mKosmos.getCommunalSceneInteractor(),
                 mAmbientStatusBarViewModelFactory,
                 mIconViewStoreFactory,
-                mLogBuffer);
+                mLogBuffer,
+                mKosmos.getSystemUiDisplaySubcomponentRepository());
         controller.onViewAttached();
         verify(mView, never()).showIcon(
                 eq(AmbientStatusBarView.STATUS_ICON_NOTIFICATIONS), eq(true), any());

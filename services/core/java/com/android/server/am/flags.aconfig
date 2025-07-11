@@ -38,17 +38,6 @@ flag {
 }
 
 flag {
-    namespace: "backstage_power"
-    name: "avoid_repeated_bcast_re_enqueues"
-    description: "Avoid re-enqueueing a broadcast repeatedly"
-    bug: "319225224"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "skip_unimportant_connections"
     namespace: "backstage_power"
     description: "Avoid OomAdjuster calculations for connections that won't change importance"
@@ -77,17 +66,6 @@ flag {
     description: "Add watchdog-specific dropbox headers"
     bug: "330682397"
     is_fixed_read_only: true
-}
-
-flag {
-    name: "log_broadcast_sent_event"
-    namespace: "backstage_power"
-    description: "Log the broadcast send event to Statsd"
-    bug: "355261986"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -127,6 +105,14 @@ flag {
     is_fixed_read_only: true
     description: "Fix the iteration direction of process LRU list when applying oom adj"
     bug: "378580264"
+}
+
+flag {
+    name: "remove_lru_spam_prevention"
+    namespace: "backstage_power"
+    is_fixed_read_only: true
+    description: "Remove LRU spam prevention, as it's breaking the LRU"
+    bug: "421872956"
 }
 
 flag {
@@ -257,4 +243,11 @@ flag {
     namespace: "system_performance"
     description: "Enable ActivityManagerStructured Service"
     bug: "419409018"
+}
+
+flag {
+    name: "not_skip_connection_recompute_for_bind_schedule_like_top_app"
+    namespace: "wear_frameworks"
+    description: "If a connection has flag BIND_SCHEDULE_LIKE_TOP_APP but the host process has not set the corresponding flag, do not skip the connection recompute."
+    bug: "417720000"
 }

@@ -16,13 +16,23 @@
 
 package com.android.systemui.media.remedia.domain.interactor
 
+import android.app.ActivityOptions
+import android.app.BroadcastOptions
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.session.MediaSession
 import android.provider.Settings
+import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.android.internal.jank.Cuj
 import com.android.internal.logging.InstanceId
 import com.android.settingslib.media.LocalMediaManager.MediaDeviceState
+import com.android.systemui.ActivityIntentHelper
+import com.android.systemui.animation.DialogCuj
+import com.android.systemui.animation.DialogTransitionAnimator
+import com.android.systemui.animation.Expandable
 import com.android.systemui.biometrics.Utils.toBitmap
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
@@ -33,6 +43,7 @@ import com.android.systemui.media.controls.domain.pipeline.MediaDataProcessor
 import com.android.systemui.media.controls.domain.pipeline.getNotificationActions
 import com.android.systemui.media.controls.shared.model.MediaAction
 import com.android.systemui.media.controls.shared.model.SuggestionData
+import com.android.systemui.media.dialog.MediaOutputDialogManager
 import com.android.systemui.media.remedia.data.model.MediaDataModel
 import com.android.systemui.media.remedia.data.repository.MediaRepository
 import com.android.systemui.media.remedia.domain.model.MediaActionModel
@@ -43,6 +54,8 @@ import com.android.systemui.media.remedia.shared.model.MediaColorScheme
 import com.android.systemui.media.remedia.shared.model.MediaSessionState
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.NotificationLockscreenUserManager
+import com.android.systemui.statusbar.policy.KeyguardStateController
 import javax.inject.Inject
 
 /**
@@ -71,7 +84,11 @@ constructor(
     @Application val applicationContext: Context,
     val repository: MediaRepository,
     val mediaDataProcessor: MediaDataProcessor,
+    private val keyguardStateController: KeyguardStateController,
     private val activityStarter: ActivityStarter,
+    private val activityIntentHelper: ActivityIntentHelper,
+    private val lockscreenUserManager: NotificationLockscreenUserManager,
+    private val mediaOutputDialogManager: MediaOutputDialogManager,
 ) : MediaInteractor {
 
     override val sessions: List<MediaSessionModel>
@@ -115,8 +132,10 @@ constructor(
             override val subtitle: String
                 get() = dataModel.subtitle
 
-            override val onClick: () -> Unit
-                get() = TODO("Not yet implemented")
+            override val onClick: (Expandable) -> Unit
+                get() = { expandable ->
+                    dataModel.clickIntent?.let { startClickIntent(expandable, it) }
+                }
 
             override val isActive: Boolean
                 get() = dataModel.isActive
@@ -149,6 +168,9 @@ constructor(
                                         contentDescription = null,
                                     ),
                             isInProgress = false,
+                            onClick = { expandable ->
+                                startOutputSwitcherClick(dataModel, expandable)
+                            },
                         )
                     }
 
@@ -225,10 +247,91 @@ constructor(
             suggestedMediaDeviceData.name,
             suggestedMediaDeviceData.icon.asIcon(),
             suggestedMediaDeviceData.connectionState == MediaDeviceState.STATE_CONNECTING,
+            onClick = { suggestedMediaDeviceData.connect() },
         )
     }
 
+    fun startClickIntent(expandable: Expandable, clickIntent: PendingIntent) {
+        if (!launchOverLockscreen(expandable, clickIntent)) {
+            activityStarter.postStartActivityDismissingKeyguard(
+                clickIntent,
+                expandable.activityTransitionController(Cuj.CUJ_SHADE_APP_LAUNCH_FROM_MEDIA_PLAYER),
+            )
+        }
+    }
+
+    private fun launchOverLockscreen(
+        expandable: Expandable?,
+        pendingIntent: PendingIntent,
+    ): Boolean {
+        val showOverLockscreen =
+            keyguardStateController.isShowing &&
+                activityIntentHelper.wouldPendingShowOverLockscreen(
+                    pendingIntent,
+                    lockscreenUserManager.currentUserId,
+                )
+        if (showOverLockscreen) {
+            try {
+                if (expandable != null) {
+                    activityStarter.startPendingIntentMaybeDismissingKeyguard(
+                        pendingIntent,
+                        /* intentSentUiThreadCallback = */ null,
+                        expandable.activityTransitionController(
+                            Cuj.CUJ_SHADE_APP_LAUNCH_FROM_MEDIA_PLAYER
+                        ),
+                    )
+                } else {
+                    val options = BroadcastOptions.makeBasic()
+                    options.isInteractive = true
+                    options.pendingIntentBackgroundActivityStartMode =
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                    pendingIntent.send(options.toBundle())
+                }
+            } catch (e: PendingIntent.CanceledException) {
+                Log.e(TAG, "pending intent was canceled")
+            }
+            return true
+        }
+        return false
+    }
+
+    private fun startOutputSwitcherClick(dataModel: MediaDataModel, expandable: Expandable) {
+        dataModel.outputDevice?.intent?.let { startDeviceIntent(dataModel.instanceId, it) }
+            ?: startMediaOutputDialog(expandable, dataModel.packageName, dataModel.token)
+    }
+
+    private fun startMediaOutputDialog(
+        expandable: Expandable,
+        packageName: String,
+        token: MediaSession.Token? = null,
+    ) {
+        mediaOutputDialogManager.createAndShowWithController(
+            packageName,
+            true,
+            expandable.dialogController(),
+            token = token,
+        )
+    }
+
+    private fun Expandable.dialogController(): DialogTransitionAnimator.Controller? {
+        return dialogTransitionController(
+            cuj =
+                DialogCuj(Cuj.CUJ_SHADE_DIALOG_OPEN, MediaOutputDialogManager.INTERACTION_JANK_TAG)
+        )
+    }
+
+    private fun startDeviceIntent(instanceId: InstanceId, deviceIntent: PendingIntent) {
+        if (deviceIntent.isActivity) {
+            if (!launchOverLockscreen(expandable = null, deviceIntent)) {
+                activityStarter.postStartActivityDismissingKeyguard(deviceIntent)
+            }
+        } else {
+            Log.w(TAG, "Device pending intent of instanceId=$instanceId is not an activity.")
+        }
+    }
+
     companion object {
+        private const val TAG = "MediaInteractor"
         private val settingsIntent: Intent = Intent(Settings.ACTION_MEDIA_CONTROLS_SETTINGS)
     }
 }

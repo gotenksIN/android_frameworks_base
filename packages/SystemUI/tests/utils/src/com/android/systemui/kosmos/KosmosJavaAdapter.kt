@@ -40,6 +40,7 @@ import com.android.systemui.deviceentry.domain.interactor.deviceEntryFingerprint
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryUdfpsInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
+import com.android.systemui.display.data.repository.displaySubcomponentPerDisplayRepository
 import com.android.systemui.globalactions.domain.interactor.globalActionsInteractor
 import com.android.systemui.haptics.msdl.bouncerHapticPlayer
 import com.android.systemui.haptics.msdl.fakeMSDLPlayer
@@ -124,6 +125,8 @@ import com.android.systemui.topui.topUiController
 import com.android.systemui.util.kotlin.javaAdapter
 import com.android.systemui.util.time.systemClock
 import com.android.systemui.volume.domain.interactor.volumeDialogInteractor
+import com.android.systemui.wallpapers.domain.interactor.fakeWallpaperRepository
+import com.android.systemui.wallpapers.domain.interactor.wallpaperInteractorFaked
 import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
 
 /**
@@ -168,6 +171,9 @@ class KosmosJavaAdapter() {
     val simBouncerInteractor by lazy { kosmos.simBouncerInteractor }
     val statusBarStateController by lazy { kosmos.statusBarStateController }
     val statusBarModePerDisplayRepository by lazy { kosmos.fakeStatusBarModePerDisplayRepository }
+    val systemUiDisplaySubcomponentRepository by lazy {
+        kosmos.displaySubcomponentPerDisplayRepository
+    }
     val shadeLayoutParams by lazy { kosmos.shadeLayoutParams }
     val autoHideControllerStore by lazy { kosmos.fakeAutoHideControllerStore }
     val interactionJankMonitor by lazy { kosmos.interactionJankMonitor }
@@ -239,7 +245,7 @@ class KosmosJavaAdapter() {
     val sysUIStateDispatcher by lazy { kosmos.sysUIStateDispatcher }
     val sysUIStateInteractor by lazy { kosmos.sysuiStateInteractor }
     val entryAdapterFactory by lazy { kosmos.entryAdapterFactory }
-    val bundleHeaderViewModel by lazy { kosmos.bundleHeaderViewModelFactory.create()  }
+    val bundleHeaderViewModel by lazy { kosmos.bundleHeaderViewModelFactory.create() }
     val mockNotificationDismissibilityProvider by lazy {
         kosmos.mockNotificationDismissibilityProvider
     }
@@ -250,6 +256,8 @@ class KosmosJavaAdapter() {
     val topUiController by lazy { kosmos.topUiController }
     val groupExpansionManager by lazy { kosmos.groupExpansionManager }
     val sysuiStateInteractor by lazy { kosmos.sysuiStateInteractor }
+    val wallpaperInteractor by lazy { kosmos.wallpaperInteractorFaked }
+    val wallpaperRepository by lazy { kosmos.fakeWallpaperRepository }
 
     /** Use if you need a unique or mutate-able row */
     fun createRow(): ExpandableNotificationRow {

@@ -16,8 +16,6 @@
 
 package android.platform.test.ravenwood;
 
-import static com.android.ravenwood.common.RavenwoodInternalUtils.RAVENWOOD_RESOURCE_APK;
-
 import android.app.Application;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -25,13 +23,10 @@ import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
-import android.hardware.ISerialManager;
-import android.hardware.SerialManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.PermissionEnforcer;
-import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.ravenwood.annotation.RavenwoodSupported.RavenwoodProvidingImplementation;
 import android.ravenwood.example.BlueManager;
@@ -46,7 +41,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -62,9 +56,6 @@ public class RavenwoodContext extends RavenwoodBaseContext {
 
     private final ArrayMap<Class<?>, String> mClassToName = new ArrayMap<>();
     private final ArrayMap<String, Supplier<?>> mNameToFactory = new ArrayMap<>();
-
-    private final File mDataDir;
-    private final Supplier<Resources> mResourcesSupplier;
 
     private Application mAppContext;
 
@@ -83,13 +74,9 @@ public class RavenwoodContext extends RavenwoodBaseContext {
         mNameToFactory.put(serviceName, serviceSupplier);
     }
 
-    public RavenwoodContext(String packageName, HandlerThread mainThread,
-            Supplier<Resources> resourcesSupplier) throws IOException {
+    public RavenwoodContext(String packageName, HandlerThread mainThread) {
         mPackageName = packageName;
         mMainThread = mainThread;
-        mResourcesSupplier = resourcesSupplier;
-
-        mDataDir = RavenwoodDriver.sAppDataDir;
 
         // Services provided by a typical shipping device
         registerService(ClipboardManager.class,
@@ -97,11 +84,6 @@ public class RavenwoodContext extends RavenwoodBaseContext {
                         new ClipboardManager(this, getMainThreadHandler())));
         registerService(PermissionEnforcer.class,
                 Context.PERMISSION_ENFORCER_SERVICE, () -> mEnforcer);
-        registerService(SerialManager.class,
-                Context.SERIAL_SERVICE, memoize(() ->
-                        new SerialManager(this, ISerialManager.Stub.asInterface(
-                                ServiceManager.getService(Context.SERIAL_SERVICE)))
-                ));
 
         // Additional services we provide for testing purposes
         registerService(BlueManager.class,
@@ -212,7 +194,9 @@ public class RavenwoodContext extends RavenwoodBaseContext {
 
     @Override
     public File getDataDir() {
-        return mDataDir;
+        // Create the dir lazily upon request. Note, "android" package doesn't have a
+        // data dir. This would throw.
+        return RavenwoodEnvironment.getInstance().getAppDataDir(mPackageName);
     }
 
     @Override
@@ -267,12 +251,7 @@ public class RavenwoodContext extends RavenwoodBaseContext {
 
     @Override
     public Resources getResources() {
-        synchronized (mLock) {
-            if (mResources == null) {
-                mResources = mResourcesSupplier.get();
-            }
-            return mResources;
-        }
+        return RavenwoodEnvironment.getInstance().loadResources(getPackageName());
     }
 
     @Override
@@ -299,7 +278,8 @@ public class RavenwoodContext extends RavenwoodBaseContext {
 
     @Override
     public String getPackageResourcePath() {
-        return new File(RAVENWOOD_RESOURCE_APK).getAbsolutePath();
+        return RavenwoodEnvironment.getInstance()
+                .getResourcesApkFile(this.getPackageName()).getAbsolutePath();
     }
 
     final void attachApplicationContext(Application appContext) {

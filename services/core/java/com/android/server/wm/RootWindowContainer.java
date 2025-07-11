@@ -45,10 +45,8 @@ import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_FOCUS_LIGHT;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_KEEP_SCREEN_ON;
-import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ORIENTATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_STATES;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_TASKS;
-import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WALLPAPER;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_SHOW_SURFACE_ALLOC;
 import static com.android.server.policy.PhoneWindowManager.SYSTEM_DIALOG_REASON_ASSIST;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_LAYOUT;
@@ -110,7 +108,6 @@ import android.hardware.display.DisplayManagerInternal.DisplayBrightnessOverride
 import android.hardware.power.Mode;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Debug;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
@@ -197,7 +194,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     private final SparseArray<DisplayBrightnessOverrideRequest> mDisplayBrightnessOverrides =
             new SparseArray<>();
     private long mUserActivityTimeout = -1;
-    private boolean mUpdateRotation = false;
+
     // Only set while traversing the default display based on its content.
     // Affects the behavior of mirroring on secondary displays.
     private boolean mObscureApplicationContentOnSecondaryDisplays = false;
@@ -753,20 +750,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      * check and {@link WindowSurfacePlacer#isInLayout()} won't take effect.
      */
     void performSurfacePlacement() {
-        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "performSurfacePlacement");
-        try {
-            performSurfacePlacementNoTrace();
-        } finally {
-            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
-        }
-    }
-
-    // "Something has changed!  Let's make it correct now."
-    // TODO: Super long method that should be broken down...
-    void performSurfacePlacementNoTrace() {
         if (DEBUG_WINDOW_TRACE) {
-            Slog.v(TAG, "performSurfacePlacementInner: entry. Called by "
-                    + Debug.getCallers(3));
+            Slog.v(TAG, "performSurfacePlacement: entry");
         }
 
         int i;
@@ -810,18 +795,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         mWmService.mAtmService.mBackNavigationController
                 .checkAnimationReady(defaultDisplay.mWallpaperController);
-
-        for (int displayNdx = 0; displayNdx < mChildren.size(); ++displayNdx) {
-            final DisplayContent displayContent = mChildren.get(displayNdx);
-            if (displayContent.mWallpaperMayChange) {
-                ProtoLog.v(WM_DEBUG_WALLPAPER, "Wallpaper may change!  Adjusting");
-                displayContent.pendingLayoutChanges |= FINISH_LAYOUT_REDO_WALLPAPER;
-                if (DEBUG_LAYOUT_REPEATS) {
-                    surfacePlacer.debugLayoutRepeats("WallpaperMayChange",
-                            displayContent.pendingLayoutChanges);
-                }
-            }
-        }
 
         if (mWmService.mFocusMayChange) {
             mWmService.mFocusMayChange = false;
@@ -877,13 +850,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     mSustainedPerformanceModeEnabled);
         }
 
-        if (mUpdateRotation) {
-            ProtoLog.d(WM_DEBUG_ORIENTATION, "Performing post-rotate rotation");
-            mUpdateRotation = updateRotationUnchecked();
-        }
-
-        if (!mWmService.mWaitingForDrawnCallbacks.isEmpty()
-                || (!isLayoutNeeded() && !mUpdateRotation)) {
+        if (!mWmService.mWaitingForDrawnCallbacks.isEmpty() || !isLayoutNeeded()) {
             mWmService.checkDrawnWindowsLocked();
         }
 
@@ -2175,6 +2142,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 rootTask = new Task.Builder(mService)
                         .setActivityType(r.getActivityType())
                         .setOnTop(true)
+                        .setTaskId(taskDisplayArea.getNextRootTaskId())
                         .setActivityInfo(r.info)
                         .setIntent(r.intent)
                         .setDeferTaskAppear(true)
@@ -3186,14 +3154,18 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (mTmpOccludingRegion != null) {
             mTmpOccludingRegion.setEmpty();
         }
-        boolean changed = false;
-        if (!mTaskSupervisor.inActivityVisibilityUpdate()) {
-            changed = mTaskSupervisor.computeProcessActivityStateBatch();
-        }
-        if (mRankTaskLayersRunnable.mCheckUpdateOomAdj) {
-            mRankTaskLayersRunnable.mCheckUpdateOomAdj = false;
-            if (changed) {
-                mService.updateOomAdj();
+        // Multiple OomAdjuster affecting state changes can occur, wrap those state changes in a
+        // BatchSession.
+        try (var unused = mService.mActivityStateUpdater.startBatchSession()) {
+            boolean changed = false;
+            if (!mTaskSupervisor.inActivityVisibilityUpdate()) {
+                changed = mTaskSupervisor.computeProcessActivityStateBatch();
+            }
+            if (mRankTaskLayersRunnable.mCheckUpdateOomAdj) {
+                mRankTaskLayersRunnable.mCheckUpdateOomAdj = false;
+                if (changed) {
+                    mService.updateOomAdj();
+                }
             }
         }
     }

@@ -270,6 +270,7 @@ import com.android.server.selinux.SelinuxAuditLogsService;
 import com.android.server.sensorprivacy.SensorPrivacyService;
 import com.android.server.sensors.SensorService;
 import com.android.server.serial.SerialManagerService;
+import com.android.server.signalcollector.SignalCollectorService;
 import com.android.server.signedconfig.SignedConfigService;
 import com.android.server.slice.SliceManagerService;
 import com.android.server.smartspace.SmartspaceManagerService;
@@ -844,11 +845,9 @@ public final class SystemServer implements Dumpable {
     private void run() {
         TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         try {
-            if (android.tracing.Flags.systemServerLargePerfettoShmemBuffer()) {
-                // Explicitly initialize a 4 MB shmem buffer for Perfetto producers (b/382369925)
-                android.tracing.perfetto.Producer.init(new InitArguments(
-                        InitArguments.PERFETTO_BACKEND_SYSTEM, 4 * 1024));
-            }
+            // Explicitly initialize a 4 MB shmem buffer for Perfetto producers (b/382369925)
+            android.tracing.perfetto.Producer.init(new InitArguments(
+                    InitArguments.PERFETTO_BACKEND_SYSTEM, 4 * 1024));
 
             t.traceBegin("InitBeforeStartServices");
 
@@ -2692,8 +2691,7 @@ public final class SystemServer implements Dumpable {
                 reportWtf("starting RuntimeService", e);
             }
             t.traceEnd();
-            if (!disableNetworkTime && (!isWatch || (isWatch
-                    && android.server.Flags.allowNetworkTimeUpdateService()))) {
+            if (!disableNetworkTime) {
                 t.traceBegin("StartNetworkTimeUpdateService");
                 try {
                     networkTimeUpdater = new NetworkTimeUpdateService(context);
@@ -3148,13 +3146,9 @@ public final class SystemServer implements Dumpable {
                     DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_CREDENTIAL,
                     CredentialManager.DEVICE_CONFIG_ENABLE_CREDENTIAL_MANAGER, true);
             if (credentialManagerEnabled) {
-                if (isWatch && !android.credentials.flags.Flags.wearCredentialManagerEnabled()) {
-                    Slog.d(TAG, "CredentialManager disabled on wear.");
-                } else {
-                    t.traceBegin("StartCredentialManagerService");
-                    mSystemServiceManager.startService(CredentialManagerService.class);
-                    t.traceEnd();
-                }
+                t.traceBegin("StartCredentialManagerService");
+                mSystemServiceManager.startService(CredentialManagerService.class);
+                t.traceEnd();
             } else {
                 Slog.d(TAG, "CredentialManager disabled.");
             }
@@ -3708,6 +3702,19 @@ public final class SystemServer implements Dumpable {
             reportWtf("starting System UI", e);
         }
         t.traceEnd();
+
+        // TODO(b/421229308): The collector service should only be running if
+        // the anomaly detection service APIs are enabled.
+        // Replace this flag with the exported API flag after it's ready.
+        if (com.android.server.signalcollector.Flags.enableBinderCallSignalCollector()) {
+            t.traceBegin("StartSignalCollectorService");
+            try {
+                mSystemServiceManager.startService(SignalCollectorService.class);
+            } catch (Throwable e) {
+                reportWtf("starting SignalCollectorService", e);
+            }
+            t.traceEnd();
+        }
 
         t.traceEnd(); // startOtherServices
     }

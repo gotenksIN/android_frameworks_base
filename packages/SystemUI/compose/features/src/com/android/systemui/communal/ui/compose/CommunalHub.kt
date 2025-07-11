@@ -186,6 +186,7 @@ import com.android.systemui.Flags
 import com.android.systemui.Flags.communalResponsiveGrid
 import com.android.systemui.Flags.communalTimerFlickerFix
 import com.android.systemui.Flags.communalWidgetResizing
+import com.android.systemui.Flags.hubEditModeTransition
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.model.CommunalContentSize
 import com.android.systemui.communal.shared.model.CommunalScenes
@@ -206,6 +207,10 @@ import com.android.systemui.communal.widgets.SmartspaceAppWidgetHostView
 import com.android.systemui.communal.widgets.WidgetConfigurator
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.media.controls.ui.composable.MediaCarousel
+import com.android.systemui.media.remedia.ui.compose.Media
+import com.android.systemui.media.remedia.ui.compose.MediaPresentationStyle
+import com.android.systemui.media.remedia.ui.compose.MediaUiBehavior
+import com.android.systemui.media.remedia.ui.viewmodel.MediaCarouselVisibility
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
@@ -252,7 +257,7 @@ fun CommunalHub(
     val isEmptyState by viewModel.isEmptyState.collectAsStateWithLifecycle(initialValue = false)
     val isCommunalContentVisible by
         viewModel.isCommunalContentVisible.collectAsStateWithLifecycle(
-            initialValue = !viewModel.isEditMode
+            initialValue = hubEditModeTransition() || !viewModel.isEditMode
         )
 
     val minContentPadding = gridContentPadding(viewModel.isEditMode, toolbarSize)
@@ -1825,6 +1830,23 @@ private fun Umo(
                 mediaHost = viewModel.mediaHost,
                 carouselController = viewModel.mediaCarouselController,
             )
+        } else if (Flags.mediaControlsInCompose()) {
+            Media(
+                viewModelFactory = viewModel.mediaViewModelFactory,
+                presentationStyle = MediaPresentationStyle.Large,
+                behavior =
+                    MediaUiBehavior(
+                        isCarouselDismissible = false,
+                        isCarouselScrollingEnabled = false,
+                        carouselVisibility = MediaCarouselVisibility.WhenAnyCardIsActive,
+                    ),
+                modifier =
+                    modifier.background(
+                        MaterialTheme.colorScheme.primary,
+                        RoundedCornerShape(dimensionResource(R.dimen.notification_corner_radius)),
+                    ),
+                onDismissed = { viewModel.mediaCarouselInteractor.onSwipeToDismiss() },
+            )
         } else {
             UmoLegacy(viewModel, modifier)
         }
@@ -2012,14 +2034,13 @@ private fun toolbarPadding(): PaddingValues {
         )
     }
     val displayCutoutPaddings = WindowInsets.displayCutout.asPaddingValues()
+    // Depending on camera location, there can be no cutout paddings, set a min value
+    val topPadding =
+        displayCutoutPaddings.calculateTopPadding().coerceAtLeast(Dimensions.ToolbarPaddingTop)
     val horizontalPadding = hubDimensions.toolbarHorizontalPadding
     val bottomPadding = hubDimensions.toolbarBottomPadding
 
-    return remember(displayCutoutPaddings, horizontalPadding, bottomPadding) {
-        // Depending on camera location, there can be no cutout paddings, set a min value
-        val topPadding =
-            displayCutoutPaddings.calculateTopPadding().coerceAtLeast(Dimensions.ToolbarPaddingTop)
-
+    return remember(topPadding, horizontalPadding, bottomPadding) {
         PaddingValues(
             start = horizontalPadding,
             top = topPadding,

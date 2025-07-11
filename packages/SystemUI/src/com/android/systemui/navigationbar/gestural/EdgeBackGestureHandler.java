@@ -143,7 +143,7 @@ public class EdgeBackGestureHandler {
     private static final int MAX_NUM_LOGGED_PREDICTIONS = 10;
     private static final int MAX_NUM_LOGGED_GESTURES = 10;
 
-    static final boolean DEBUG_MISSING_GESTURE = false;
+    static final boolean DEBUG_MISSING_GESTURE = true;
     public static final String DEBUG_MISSING_GESTURE_TAG = "NoBackGesture";
 
     private ISystemGestureExclusionListener mGestureExclusionListener =
@@ -1242,7 +1242,9 @@ public class EdgeBackGestureHandler {
                     QuickStepContract.isBackGestureDisabled(mSysUiFlags,
                             mIsTrackpadThreeFingerSwipe), mDisabledForQuickstep,
                     mGestureBlockingActivityRunning.get(), mIsInPip, mDisplaySize,
-                    mEdgeWidthLeft, mLeftInset, mEdgeWidthRight, mRightInset, mExcludeRegion));
+                    mEdgeWidthLeft, mLeftInset, mEdgeWidthRight, mRightInset,
+                    DesktopExperienceFlags.ENABLE_MULTIDISPLAY_TRACKPAD_BACK_GESTURE.isTrue()
+                            ? displayBackGestureHandler.getExcludeRegion() : mExcludeRegion));
         } else if (mAllowGesture || mLogGesture) {
             boolean mLastFrameThresholdCrossed = mThresholdCrossed;
             if (!mThresholdCrossed) {

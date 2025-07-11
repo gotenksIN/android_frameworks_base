@@ -140,26 +140,10 @@ flag {
 }
 
 flag {
-    name: "enable_restrict_display_modes"
-    namespace: "display_manager"
-    description: "Feature flag for restriction display modes api"
-    bug: "284866750"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "enable_vsync_low_power_vote"
     namespace: "display_manager"
     description: "Feature flag for vsync low power vote"
     bug: "314920284"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "enable_vsync_low_light_vote"
-    namespace: "display_manager"
-    description: "Feature flag for vsync low light vote"
-    bug: "314921657"
     is_fixed_read_only: true
 }
 
@@ -296,30 +280,11 @@ flag {
 }
 
 flag {
-    name: "new_hdr_brightness_modifier"
-    namespace: "display_manager"
-    description: "Flag for new HDR brightness clamper."
-    bug: "331275392"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "virtual_display_limit"
     namespace: "display_manager"
     description: "Limit the number of virtual displays that can be created."
     bug: "261791612"
     is_fixed_read_only: true
-}
-
-flag {
-    name: "enable_waiting_confirmation_before_mirroring"
-    namespace: "display_manager"
-    description: "Allow ContentRecorder checking whether user confirmed mirroring after boot"
-    bug: "361698995"
-    is_fixed_read_only: true
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

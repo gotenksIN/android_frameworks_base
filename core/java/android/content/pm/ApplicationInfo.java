@@ -51,6 +51,7 @@ import android.util.SparseArray;
 import android.util.proto.ProtoOutputStream;
 import android.window.OnBackInvokedCallback;
 
+import com.android.internal.content.LibraryAlignmentInfo;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.Parcelling;
 import com.android.internal.util.Parcelling.BuiltIn.ForBoolean;
@@ -1560,6 +1561,13 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     @Retention(RetentionPolicy.SOURCE)
     public @interface PageSizeAppCompatFlags {}
 
+    /**
+     * If mPageSizeCompatFlags indicates a mismatch, this will contain detailed
+     * information for each native library that was found to be unaligned.
+     * @hide
+     */
+    public LibraryAlignmentInfo[] unalignedNativeLibraries;
+
     /** @hide */
     public String classLoaderName;
 
@@ -2144,6 +2152,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         allowCrossUidActivitySwitchFromBelow = orig.allowCrossUidActivitySwitchFromBelow;
         createTimestamp = SystemClock.uptimeMillis();
         mPageSizeAppCompatFlags = orig.mPageSizeAppCompatFlags;
+        this.unalignedNativeLibraries = orig.unalignedNativeLibraries;
     }
 
     public String toString() {
@@ -2253,6 +2262,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(localeConfigRes);
         dest.writeInt(allowCrossUidActivitySwitchFromBelow ? 1 : 0);
         dest.writeInt(mPageSizeAppCompatFlags);
+        dest.writeTypedArray(unalignedNativeLibraries, parcelableFlags);
 
         sForStringSet.parcel(mKnownActivityEmbeddingCerts, dest, flags);
     }
@@ -2358,6 +2368,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         localeConfigRes = source.readInt();
         allowCrossUidActivitySwitchFromBelow = source.readInt() != 0;
         mPageSizeAppCompatFlags = source.readInt();
+        unalignedNativeLibraries = source.createTypedArray(LibraryAlignmentInfo.CREATOR);
 
         mKnownActivityEmbeddingCerts = sForStringSet.unparcel(source);
         if (mKnownActivityEmbeddingCerts.isEmpty()) {

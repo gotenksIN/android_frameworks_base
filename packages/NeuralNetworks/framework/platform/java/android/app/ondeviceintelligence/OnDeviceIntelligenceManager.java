@@ -40,8 +40,15 @@ import android.os.OutcomeReceiver;
 import android.os.PersistableBundle;
 import android.os.RemoteCallback;
 import android.os.RemoteException;
+import android.service.ondeviceintelligence.OnDeviceSandboxedInferenceService;
 import android.system.OsConstants;
 import android.util.Log;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 
 import com.android.internal.infra.AndroidFuture;
 
@@ -79,9 +86,22 @@ public final class OnDeviceIntelligenceManager {
     public static final String AUGMENT_REQUEST_CONTENT_BUNDLE_KEY =
             "AugmentRequestContentBundleKey";
 
+    /**
+     * The key for a boolean extra in the request {@link Bundle} to indicate if the caller wants to
+     * receive {@link InferenceInfo} in the {@link ProcessingCallback#onInferenceInfo} callback.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_25Q4)
+    public static final String KEY_REQUEST_INFERENCE_INFO = "request_inference_info";
+
     private static final String TAG = "OnDeviceIntelligence";
     private final Context mContext;
     private final IOnDeviceIntelligenceManager mService;
+
+    private final Map<OnDeviceSandboxedInferenceService.LifecycleListener, ILifecycleListener.Stub>
+            mLifecycleListeners = new ConcurrentHashMap<>();
 
     /**
      * @hide
@@ -202,6 +222,46 @@ public final class OnDeviceIntelligenceManager {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /**
+     * Asynchronously get a list of features that are supported for the caller, with an option to
+     * filter the features based on the provided params.
+     *
+     * @param featureParamsFilter params to be used for filtering the features.
+     * @param callbackExecutor    executor to run the callback on.
+     * @param featureListReceiver callback to populate the list of features.
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_25Q4)
+    public void listFeatures(
+            @NonNull PersistableBundle featureParamsFilter,
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull OutcomeReceiver<List<Feature>,
+                    OnDeviceIntelligenceException> featureListReceiver) {
+        try {
+            IListFeaturesCallback callback =
+                    new IListFeaturesCallback.Stub() {
+                        @Override
+                        public void onSuccess(List<Feature> result) {
+                            Binder.withCleanCallingIdentity(() -> callbackExecutor.execute(
+                                    () -> featureListReceiver.onResult(result)));
+                        }
+
+                        @Override
+                        public void onFailure(int errorCode, String errorMessage,
+                                PersistableBundle errorParams) {
+                            Binder.withCleanCallingIdentity(() -> callbackExecutor.execute(
+                                    () -> featureListReceiver.onError(
+                                            new OnDeviceIntelligenceException(
+                                                    errorCode, errorMessage, errorParams))));
+                        }
+                    };
+            mService.listFeaturesWithFilter(featureParamsFilter, callback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
 
     /**
      * This method should be used to fetch details about a feature which need some additional
@@ -400,6 +460,13 @@ public final class OnDeviceIntelligenceManager {
                                 callbackExecutor.execute(() -> contentCallback.sendResult(bundle));
                             })));
                 }
+
+                @Override
+                public void onInferenceInfo(InferenceInfo info) {
+                    Binder.withCleanCallingIdentity(
+                            () -> callbackExecutor.execute(
+                                    () -> processingCallback.onInferenceInfo(info)));
+                }
             };
 
 
@@ -485,6 +552,14 @@ public final class OnDeviceIntelligenceManager {
                                                 () -> contentCallback.sendResult(bundle));
                                     })));
                 }
+
+                @Override
+                public void onInferenceInfo(InferenceInfo info) {
+                    Binder.withCleanCallingIdentity(() -> {
+                        callbackExecutor.execute(
+                                () -> streamingProcessingCallback.onInferenceInfo(info));
+                    });
+                }
             };
 
             mService.processRequestStreaming(
@@ -514,6 +589,62 @@ public final class OnDeviceIntelligenceManager {
         }
     }
 
+    /**
+     * Registers a listener for inference service lifecycle events of the
+     * configured {@link OnDeviceSandboxedInferenceService}. This method is
+     * thread-safe.
+     *
+     * @param executor The executor to run the listener callbacks on.
+     * @param listener The listener to register.
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_25Q4)
+    public void registerInferenceServiceLifecycleListener(
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull OnDeviceSandboxedInferenceService.LifecycleListener listener) {
+        Objects.requireNonNull(executor, "Executor must not be null");
+        Objects.requireNonNull(listener, "Listener must not be null");
+        ILifecycleListener.Stub stub = new ILifecycleListener.Stub() {
+            @Override
+            public void onLifecycleEvent(int event, @NonNull Feature feature) {
+                Binder.withCleanCallingIdentity(
+                        () -> executor.execute(() -> listener.onLifecycleEvent(event, feature)));
+            }
+        };
+
+        mLifecycleListeners.put(listener, stub);
+        try {
+            mService.registerInferenceServiceLifecycleListener(stub);
+        } catch (RemoteException e) {
+            mLifecycleListeners.remove(listener);
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Unregisters a {@link OnDeviceSandboxedInferenceService.LifecycleListener}
+     * if previous registered with
+     * {@link #registerInferenceServiceLifecycleListener}, otherwise no-op.
+     * This method is thread-safe.
+     *
+     * @param listener The listener to unregister.
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_25Q4)
+    public void unregisterInferenceServiceLifecycleListener(
+            @NonNull OnDeviceSandboxedInferenceService.LifecycleListener listener) {
+        Objects.requireNonNull(listener, "Listener must not be null");
+        ILifecycleListener.Stub stub = mLifecycleListeners.remove(listener);
+        if (stub == null) {
+            // Listener not registered or already unregistered.
+            return;
+        }
+        try {
+            mService.unregisterInferenceServiceLifecycleListener(stub);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
 
     /** Request inference with provided Bundle and Params. */
     public static final int REQUEST_TYPE_INFERENCE = 0;

@@ -299,6 +299,13 @@ flag {
 }
 
 flag {
+    name: "reschedule_stop_if_visible_activities"
+    namespace: "multiuser"
+    description: "Don't automatically stop a background user that has a top visible activity; instead, reschedule it to stop later"
+    bug: "423731424"
+}
+
+flag {
     name: "stop_previous_user_apps"
     namespace: "multiuser"
     description: "Stop the previous user apps early in a user switch"
@@ -389,16 +396,6 @@ flag {
 }
 
 flag {
-  name: "private_space_search_illustration_config"
-  namespace: "profile_experiences"
-  description: "Check config to show/hide the private space search illustration and search tile content in Hide Private Space settings page"
-  bug: "346612477"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "show_different_creation_error_for_unsupported_devices"
   namespace: "profile_experiences"
   description: "On private space create error due to child account added/fully managed user show message with link to the Help Center to find out more."
@@ -449,6 +446,7 @@ flag {
     namespace: "profile_experiences"
     description: "Enable moving content into the Private Space"
     bug: "360066001"
+    is_exported: true
 }
 
 flag {

@@ -5347,6 +5347,7 @@
 
          @FlaggedApi(android.xr.Flags.FLAG_XR_MANIFEST_ENTRIES) -->
     <permission-group android:name="android.permission-group.XR_TRACKING"
+                      android:icon="@drawable/perm_group_xr_tracking"
                       android:label="@string/permgrouplab_xr_tracking"
                       android:description="@string/permgroupdesc_xr_tracking"
                       android:priority="100"
@@ -5406,6 +5407,7 @@
 
          @FlaggedApi(android.xr.Flags.FLAG_XR_MANIFEST_ENTRIES) -->
     <permission-group android:name="android.permission-group.XR_EYE_SENSITIVE"
+                      android:icon="@drawable/perm_group_xr_eye_sensitive"
                       android:label="@string/permgrouplab_xr_eye_sensitive"
                       android:description="@string/permgroupdesc_xr_eye_sensitive"
                       android:priority="100"
@@ -5428,6 +5430,7 @@
 
          @FlaggedApi(android.xr.Flags.FLAG_XR_MANIFEST_ENTRIES) -->
     <permission-group android:name="android.permission-group.XR_TRACKING_SENSITIVE"
+                      android:icon="@drawable/perm_group_xr_tracking_sensitive"
                       android:label="@string/permgrouplab_xr_tracking_sensitive"
                       android:description="@string/permgroupdesc_xr_tracking_sensitive"
                       android:priority="100"
@@ -6595,6 +6598,14 @@
     <permission android:name="android.permission.MANAGE_ONE_TIME_PERMISSION_SESSIONS"
                 android:protectionLevel="signature|installer" />
 
+    <!-- @SystemApi Allows an application to get the package names of the
+        holders of a role.
+        @FlaggedApi(android.permission.flags.Flags.FLAG_SUPERVISION_ROLE_ENABLED)
+        @hide -->
+    <permission android:name="android.permission.GET_ROLE_HOLDERS"
+                android:protectionLevel="signature|privileged"
+                android:featureFlag="android.permission.flags.supervision_role_enabled"/>
+
     <!-- @SystemApi Allows an application to manage the holders of a role.
          @hide -->
     <permission android:name="android.permission.MANAGE_ROLE_HOLDERS"
@@ -6619,7 +6630,14 @@
     <!-- @SystemApi Allows an application to observe role holder changes.
          @hide -->
     <permission android:name="android.permission.OBSERVE_ROLE_HOLDERS"
-                android:protectionLevel="signature|installer|module" />
+                android:protectionLevel="signature|installer|module"
+                android:featureFlag="!android.permission.flags.supervision_role_enabled" />
+
+    <!-- @SystemApi Allows an application to observe role holder changes.
+         @hide -->
+    <permission android:name="android.permission.OBSERVE_ROLE_HOLDERS"
+                android:protectionLevel="signature|privileged|installer|module"
+                android:featureFlag="android.permission.flags.supervision_role_enabled" />
 
     <!-- Allows an application to manage the companion devices.
          @hide -->
@@ -7509,7 +7527,15 @@
         processes.
         @hide -->
     <permission android:name="android.permission.MANAGE_NOTIFICATIONS"
-                android:protectionLevel="signature" />
+        android:protectionLevel="signature"
+        android:featureFlag="!android.companion.enable_medical_profile" />
+
+    <!-- @SystemApi Allows modification of do not disturb rules and policies.
+        @FlaggedApi(android.companion.Flags.FLAG_ENABLE_MEDICAL_PROFILE)
+        @hide -->
+    <permission android:name="android.permission.MANAGE_NOTIFICATIONS"
+                android:protectionLevel="signature|installer"
+                android:featureFlag="android.companion.enable_medical_profile"/>
 
     <!-- @SystemApi @TestApi Allows adding/removing enabled notification listener components.
         @hide -->
@@ -8166,8 +8192,7 @@
         android:label="@string/permlab_foregroundServiceFileManagement"
         android:protectionLevel="normal|instant" />
 
-    <!-- @FlaggedApi("android.content.pm.introduce_media_processing_type")
-         Allows a regular application to use {@link android.app.Service#startForeground
+    <!-- Allows a regular application to use {@link android.app.Service#startForeground
          Service.startForeground} with the type "mediaProcessing".
          <p>Protection level: normal|instant
     -->
@@ -8474,11 +8499,11 @@
                 android:protectionLevel="signature|role"/>
 
     <!-- Allows an application to create displays that mirror other displays' content.
-         @FlaggedApi(android.companion.virtualdevice.flags.Flags.FLAG_ENABLE_LIMITED_VDM_ROLE)
+         @FlaggedApi(android.companion.virtualdevice.flags.Flags.FLAG_VDM_MIRROR_DISPLAY_PERMISSION)
          @hide @SystemApi -->
     <permission android:name="android.permission.ADD_MIRROR_DISPLAY"
         android:protectionLevel="internal|role"
-        android:featureFlag="android.companion.virtualdevice.flags.enable_limited_vdm_role" />
+        android:featureFlag="android.companion.virtualdevice.flags.vdm_mirror_display_permission" />
 
     <!-- @hide @SystemApi Allows an application to access locusId events in the usage stats. -->
     <permission android:name="android.permission.ACCESS_LOCUS_ID_USAGE_STATS"

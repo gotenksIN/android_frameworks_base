@@ -61,7 +61,6 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -80,6 +79,7 @@ import com.android.compose.animation.scene.animateElementFloatAsState
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.colorAttr
+import com.android.internal.policy.SystemBarUtils
 import com.android.settingslib.Utils
 import com.android.systemui.battery.BatteryMeterView
 import com.android.systemui.battery.BatteryMeterViewController
@@ -100,7 +100,6 @@ import com.android.systemui.shade.ui.composable.ShadeHeader.Values.ClockScale
 import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.statusbar.core.NewStatusBarIcons
 import com.android.systemui.statusbar.phone.StatusBarLocation
-import com.android.systemui.statusbar.phone.StatusIconContainer
 import com.android.systemui.statusbar.pipeline.battery.ui.composable.BatteryWithEstimate
 import com.android.systemui.statusbar.pipeline.mobile.StatusBarMobileIconKairos
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernShadeCarrierGroupMobileView
@@ -138,9 +137,12 @@ object ShadeHeader {
         val ChipPaddingVertical = 4.dp
 
         val StatusBarHeight: Dp
-            // TODO(b/414737230): This is a temporary workaround, until we fix the zero padding
-            //  issue given by WindowInsets.statusBars.asPaddingValues().calculateTopPadding().
-            @Composable get() = dimensionResource(R.dimen.status_bar_height)
+            @Composable
+            get() {
+                return with(LocalDensity.current) {
+                    SystemBarUtils.getStatusBarHeight(LocalContext.current).toDp()
+                }
+            }
     }
 
     object TestTags {
@@ -724,10 +726,9 @@ private fun ContentScope.StatusIcons(
     val micSlot = stringResource(id = com.android.internal.R.string.status_bar_microphone)
     val locationSlot = stringResource(id = com.android.internal.R.string.status_bar_location)
 
-    val iconContainer = remember { StatusIconContainer(themedContext, null) }
-    val iconManager = remember {
-        viewModel.createTintedIconManager(iconContainer, StatusBarLocation.QS)
-    }
+    val statusIconContext = LocalStatusIconContext.current
+    val iconContainer = statusIconContext.iconContainer(contentKey)
+    val iconManager = statusIconContext.iconManager(contentKey)
 
     // TODO(408001821): Use composable system status icons here instead.
     AndroidView(
@@ -737,6 +738,7 @@ private fun ContentScope.StatusIcons(
 
             iconContainer
         },
+        onRelease = { viewModel.statusBarIconController.removeIconGroup(iconManager) },
         update = { iconContainer ->
             iconContainer.setQsExpansionTransitioning(
                 layoutState.isTransitioningBetween(Scenes.Shade, Scenes.QuickSettings)

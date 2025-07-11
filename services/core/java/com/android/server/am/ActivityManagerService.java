@@ -2543,7 +2543,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         final Looper activityTaskLooper = DisplayThread.get().getLooper();
         mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
                 .setLockObject(this)
-                .setActivityStateLooper(activityTaskLooper)
                 .setTopProcessChangeCallback(this::updateTopAppListeners)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
@@ -5994,7 +5993,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                         intent, matchFlags, uid, userId));
             case ActivityManager.INTENT_SENDER_BROADCAST:
                 return new ParceledListSlice<>(mPackageManagerInt.queryIntentReceivers(
-                        intent, resolvedType, matchFlags, uid, Process.INVALID_PID, userId, false));
+                        intent, resolvedType, matchFlags, uid, Process.INVALID_PID, userId,
+                        false /* forSend */, null /* includedPackages */));
             default: // ActivityManager.INTENT_SENDER_ACTIVITY_RESULT
                 throw new IllegalStateException("Unsupported intent sender type: " + res.key.type);
         }
@@ -7934,6 +7934,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                 break;
             case BugreportParams.BUGREPORT_MODE_ONBOARDING:
                 type = "bugreportonboarding";
+                break;
+            case BugreportParams.BUGREPORT_MODE_BLUETOOTH:
+                type = "bugreportbluetooth";
                 break;
             default:
                 throw new IllegalArgumentException(

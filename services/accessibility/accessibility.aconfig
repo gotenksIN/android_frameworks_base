@@ -110,14 +110,14 @@ flag {
     name: "enable_low_vision_generic_feedback"
     namespace: "accessibility"
     description: "Use generic feedback for low vision."
-    bug: "393981463"
+    bug: "398736573"
 }
 
 flag {
     name: "enable_low_vision_hats"
     namespace: "accessibility"
     description: "Use HaTS for low vision feedback."
-    bug: "380346799"
+    bug: "397794341"
 }
 
 flag {
@@ -153,13 +153,6 @@ flag {
     namespace: "accessibility"
     description: "Whether to enable magnify navigation bar and ime on full screen"
     bug: "342509709"
-}
-
-flag {
-    name: "enable_magnification_keyboard_control"
-    namespace: "accessibility"
-    description: "Whether to enable keyboard control for magnification"
-    bug: "355487062"
 }
 
 flag {

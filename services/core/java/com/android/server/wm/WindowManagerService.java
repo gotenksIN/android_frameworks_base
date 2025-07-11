@@ -108,6 +108,9 @@ import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ER
 import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
+import static android.window.ScreenCapture.ScreenCaptureParams.CAPTURE_MODE_REQUIRE_OPTIMIZED;
+import static android.window.ScreenCapture.ScreenCaptureParams.PROTECTED_CONTENT_POLICY_THROW_EXCEPTION;
+import static android.window.ScreenCapture.ScreenCaptureParams.SECURE_CONTENT_POLICY_THROW_EXCEPTION;
 import static android.window.WindowProviderService.isWindowProviderService;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
@@ -192,6 +195,7 @@ import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Region;
+import android.hardware.HardwareBuffer;
 import android.hardware.configstore.V1_0.OptionalBool;
 import android.hardware.configstore.V1_1.ISurfaceFlingerConfigs;
 import android.hardware.devicestate.DeviceState;
@@ -314,11 +318,13 @@ import android.window.ConfigurationChangeSetting;
 import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
 import android.window.IGlobalDragListener;
+import android.window.IScreenCaptureCallback;
 import android.window.IScreenRecordingCallback;
 import android.window.ISurfaceSyncGroupCompletedListener;
 import android.window.ITaskFpsCallback;
 import android.window.ITrustedPresentationListener;
 import android.window.InputTransferToken;
+import android.window.ScreenCapture;
 import android.window.ScreenCaptureInternal;
 import android.window.ScreenCaptureInternal.ScreenshotHardwareBuffer;
 import android.window.SystemPerformanceHinter;
@@ -3645,16 +3651,10 @@ public class WindowManagerService extends IWindowManager.Stub
     private void dispatchKeyguardLockedState() {
         mH.post(() -> {
             final boolean isKeyguardLocked = mPolicy.isKeyguardShowing();
-            if (mFlags.mDispatchFirstKeyguardLockedState) {
-                // Ensure we don't skip the call for the first dispatch
-                if (mFirstKeyguardLockedStateDispatched
-                        && mDispatchedKeyguardLockedState == isKeyguardLocked) {
-                    return;
-                }
-            } else {
-                if (mDispatchedKeyguardLockedState == isKeyguardLocked) {
-                    return;
-                }
+            // Ensure we don't skip the call for the first dispatch
+            if (mFirstKeyguardLockedStateDispatched
+                    && mDispatchedKeyguardLockedState == isKeyguardLocked) {
+                return;
             }
             final int n = mKeyguardLockedStateListeners.beginBroadcast();
             for (int i = 0; i < n; i++) {
@@ -7999,7 +7999,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     && (demoteTopAppReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) == 0) {
                 mAtmService.mDemoteTopAppReasons =
                         demoteTopAppReasons | DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
-                mAtmService.mProcessStateController.setExpandedNotificationShadeAsync(true);
+                mAtmService.mActivityStateUpdater.setExpandedNotificationShadeAsync(true);
                 Trace.instant(TRACE_TAG_WINDOW_MANAGER, "demote-top-for-ns");
                 if (topApp != null) {
                     topApp.scheduleUpdateOomAdj();
@@ -8008,7 +8008,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     && (demoteTopAppReasons & DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE) != 0) {
                 mAtmService.mDemoteTopAppReasons =
                         demoteTopAppReasons & ~DEMOTE_TOP_REASON_EXPANDED_NOTIFICATION_SHADE;
-                mAtmService.mProcessStateController.setExpandedNotificationShadeAsync(false);
+                mAtmService.mActivityStateUpdater.setExpandedNotificationShadeAsync(false);
                 Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancel-demote-top-for-ns");
                 if (topApp != null) {
                     topApp.scheduleUpdateOomAdj();
@@ -10276,11 +10276,18 @@ public class WindowManagerService extends IWindowManager.Stub
             Binder.restoreCallingIdentity(token);
         }
 
-        if (taskSnapshot == null || taskSnapshot.getHardwareBuffer() == null) {
+        if (taskSnapshot == null) {
             return null;
         }
-        return Bitmap.wrapHardwareBuffer(taskSnapshot.getHardwareBuffer(),
-                taskSnapshot.getColorSpace());
+        if (Flags.reduceTaskSnapshotMemoryUsage()) {
+            return taskSnapshot.wrapToBitmap();
+        } else {
+            if (taskSnapshot.getHardwareBuffer() == null) {
+                return null;
+            }
+            return Bitmap.wrapHardwareBuffer(taskSnapshot.getHardwareBuffer(),
+                    taskSnapshot.getColorSpace());
+        }
     }
 
     @Override
@@ -10352,6 +10359,74 @@ public class WindowManagerService extends IWindowManager.Stub
             // parcelling occurs in this case.
             layerCaptureArgs.release();
         }
+    }
+
+    @Override
+    public void screenCapture(
+            @NonNull ScreenCapture.ScreenCaptureParams params,
+            @NonNull IScreenCaptureCallback callback) {
+        if (!checkCallingPermission(READ_FRAME_BUFFER, "screenCapture()")) {
+            try {
+                callback.onFailure(ScreenCapture.SCREEN_CAPTURE_ERROR_MISSING_PERMISSIONS);
+            } catch (RemoteException remoteException) {
+                Slog.e(
+                        TAG,
+                        "Failed to deliver screenshot permission error to client",
+                        remoteException);
+            }
+            return;
+        }
+
+        // Translate ScreenCaptureParams to DisplayCaptureArgs.
+        ScreenCaptureInternal.DisplayCaptureArgs.Builder argsBuilder =
+                new ScreenCaptureInternal.DisplayCaptureArgs.Builder()
+                        .setPixelFormat(params.getPixelFormat())
+                        .setSecureContentPolicy(params.getSecureContentPolicy())
+                        .setProtectedContentPolicy(params.getProtectedContentPolicy())
+                        .setCaptureMode(params.getCaptureMode())
+                        .setPreserveDisplayColors(params.isPreserveDisplayColors())
+                        .setUseDisplayInstallationOrientation(
+                                params.isUseDisplayInstallationOrientation())
+                        .setIncludeSystemOverlays(params.isIncludeSystemOverlays());
+
+        // Capture mode REQUIRE_OPTIMIZED only support a fixed set of params.
+        if (params.getCaptureMode() == CAPTURE_MODE_REQUIRE_OPTIMIZED) {
+            // Must error out if there is protected or secure content.
+            // Must preserve the content appears on the display.
+            argsBuilder = argsBuilder.setSecureContentPolicy(SECURE_CONTENT_POLICY_THROW_EXCEPTION)
+                    .setProtectedContentPolicy(PROTECTED_CONTENT_POLICY_THROW_EXCEPTION)
+                    .setPreserveDisplayColors(true)
+                    .setUseDisplayInstallationOrientation(true)
+                    .setIncludeSystemOverlays(true);
+        }
+
+        ScreenCaptureInternal.ScreenCaptureListener listener =
+                new ScreenCaptureInternal.ScreenCaptureListener(
+                        (screenshotHardwareBuffer, status) -> {
+                            try {
+                                if (screenshotHardwareBuffer == null) {
+                                    Slog.w(TAG, "Screenshot failed. error: " + status);
+                                    callback.onFailure(status);
+                                } else {
+                                    callback.onSuccess(
+                                            new ScreenCapture.ScreenCaptureResult(
+                                                    screenshotHardwareBuffer.getColorSpace(),
+                                                    screenshotHardwareBuffer.getHardwareBuffer()));
+                                }
+                            } catch (RemoteException remoteException) {
+                                Slog.e(TAG, "Failed to deliver screenshot result to client",
+                                        remoteException);
+                                // clean up hardware buffer
+                                if (screenshotHardwareBuffer != null) {
+                                    HardwareBuffer hwBuffer =
+                                            screenshotHardwareBuffer.getHardwareBuffer();
+                                    if (hwBuffer != null) {
+                                        hwBuffer.close();
+                                    }
+                                }
+                            }
+                        });
+        mDisplayManagerInternal.systemScreenshot(params.getDisplayId(), argsBuilder, listener);
     }
 
     @VisibleForTesting

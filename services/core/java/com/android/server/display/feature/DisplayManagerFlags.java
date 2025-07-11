@@ -16,6 +16,8 @@
 
 package com.android.server.display.feature;
 
+import static com.android.window.flags.Flags.FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG;
+
 import android.content.Context;
 import android.os.Build;
 import android.os.SystemProperties;
@@ -99,10 +101,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_BRIGHTNESS_INT_RANGE_USER_PERCEPTION,
             Flags::brightnessIntRangeUserPerception);
 
-    private final FlagState mRestrictDisplayModes = new FlagState(
-            Flags.FLAG_ENABLE_RESTRICT_DISPLAY_MODES,
-            Flags::enableRestrictDisplayModes);
-
     private final FlagState mResolutionBackupRestore = new FlagState(
             Flags.FLAG_RESOLUTION_BACKUP_RESTORE,
             Flags::resolutionBackupRestore);
@@ -110,10 +108,6 @@ public class DisplayManagerFlags {
     private final FlagState mVsyncLowPowerVote = new FlagState(
             Flags.FLAG_ENABLE_VSYNC_LOW_POWER_VOTE,
             Flags::enableVsyncLowPowerVote);
-
-    private final FlagState mVsyncLowLightVote = new FlagState(
-            Flags.FLAG_ENABLE_VSYNC_LOW_LIGHT_VOTE,
-            Flags::enableVsyncLowLightVote);
 
     private final FlagState mBrightnessWearBedtimeModeClamperFlagState = new FlagState(
             Flags.FLAG_BRIGHTNESS_WEAR_BEDTIME_MODE_CLAMPER,
@@ -179,10 +173,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_OFFLOAD_SESSION_CANCEL_BLOCK_SCREEN_ON,
             Flags::offloadSessionCancelBlockScreenOn);
 
-    private final FlagState mNewHdrBrightnessModifier = new FlagState(
-            Flags.FLAG_NEW_HDR_BRIGHTNESS_MODIFIER,
-            Flags::newHdrBrightnessModifier);
-
     private final FlagState mVirtualDisplayLimit =
             new FlagState(
                     Flags.FLAG_VIRTUAL_DISPLAY_LIMIT,
@@ -199,11 +189,6 @@ public class DisplayManagerFlags {
     private final FlagState mIsUserRefreshRateForExternalDisplayEnabled = new FlagState(
             Flags.FLAG_ENABLE_USER_REFRESH_RATE_FOR_EXTERNAL_DISPLAY,
             Flags::enableUserRefreshRateForExternalDisplay
-    );
-
-    private final FlagState mEnableWaitingConfirmationBeforeMirroring = new FlagState(
-            Flags.FLAG_ENABLE_WAITING_CONFIRMATION_BEFORE_MIRRORING,
-            Flags::enableWaitingConfirmationBeforeMirroring
     );
 
     private final FlagState mEnableApplyDisplayChangedDuringDisplayAdded = new FlagState(
@@ -243,6 +228,11 @@ public class DisplayManagerFlags {
     private final FlagState mEnableDisplayContentModeManagementFlagState = new FlagState(
             Flags.FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
             DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT::isTrue
+    );
+
+    private final FlagState mEnableUpdatedDisplayConnectionDialogFlagState = new FlagState(
+            FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG,
+            DesktopExperienceFlags.ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG::isTrue
     );
 
     private final FlagState mSubscribeGranularDisplayEvents = new FlagState(
@@ -406,20 +396,12 @@ public class DisplayManagerFlags {
         return mBrightnessIntRangeUserPerceptionFlagState.isEnabled();
     }
 
-    public boolean isRestrictDisplayModesEnabled() {
-        return mRestrictDisplayModes.isEnabled();
-    }
-
     public boolean isResolutionBackupRestoreEnabled() {
         return mResolutionBackupRestore.isEnabled();
     }
 
     public boolean isVsyncLowPowerVoteEnabled() {
         return mVsyncLowPowerVote.isEnabled();
-    }
-
-    public boolean isVsyncLowLightVoteEnabled() {
-        return mVsyncLowLightVote.isEnabled();
     }
 
     public boolean isBrightnessWearBedtimeModeClamperEnabled() {
@@ -488,13 +470,6 @@ public class DisplayManagerFlags {
         return mSynthetic60hzModes.isEnabled();
     }
 
-    /**
-     * @return Whether to use new HDR brightness modifier or not
-     */
-    public boolean useNewHdrBrightnessModifier() {
-        return mNewHdrBrightnessModifier.isEnabled();
-    }
-
     public boolean isVirtualDisplayLimitEnabled() {
         return mVirtualDisplayLimit.isEnabled();
     }
@@ -505,14 +480,6 @@ public class DisplayManagerFlags {
     public boolean isNormalBrightnessForDozeParameterEnabled(Context context) {
         return mNormalBrightnessForDozeParameter.isEnabled() && context.getResources().getBoolean(
                 com.android.internal.R.bool.config_allowNormalBrightnessForDozePolicy);
-    }
-
-    /**
-      * @return {@code true} if mirroring won't be enabled until boot completes and the user enables
-      * the display.
-      */
-    public boolean isWaitingConfirmationBeforeMirroringEnabled() {
-        return mEnableWaitingConfirmationBeforeMirroring.isEnabled();
     }
 
     /**
@@ -580,6 +547,10 @@ public class DisplayManagerFlags {
 
     public boolean isDisplayContentModeManagementEnabled() {
         return mEnableDisplayContentModeManagementFlagState.isEnabled();
+    }
+
+    public boolean isUpdatedDisplayConnectionDialogEnabled() {
+        return mEnableUpdatedDisplayConnectionDialogFlagState.isEnabled();
     }
 
     /**
@@ -683,7 +654,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mDisplayConfigErrorHalFlagState);
         pw.println(" " + mSyncedResolutionSwitch);
         pw.println(" " + mBrightnessIntRangeUserPerceptionFlagState);
-        pw.println(" " + mRestrictDisplayModes);
         pw.println(" " + mBrightnessWearBedtimeModeClamperFlagState);
         pw.println(" " + mAutoBrightnessModesFlagState);
         pw.println(" " + mFastHdrTransitions);
@@ -699,10 +669,8 @@ public class DisplayManagerFlags {
         pw.println(" " + mIgnoreAppPreferredRefreshRate);
         pw.println(" " + mSynthetic60hzModes);
         pw.println(" " + mOffloadSessionCancelBlockScreenOn);
-        pw.println(" " + mNewHdrBrightnessModifier);
         pw.println(" " + mVirtualDisplayLimit);
         pw.println(" " + mNormalBrightnessForDozeParameter);
-        pw.println(" " + mEnableWaitingConfirmationBeforeMirroring);
         pw.println(" " + mEnableBatteryStatsForAllDisplays);
         pw.println(" " + mEnableApplyDisplayChangedDuringDisplayAdded);
         pw.println(" " + mBlockAutobrightnessChangesOnStylusUsage);
@@ -726,6 +694,7 @@ public class DisplayManagerFlags {
         pw.println(" " + mModeSwitchWithoutSaving);
         pw.println(" " + mEnsureColorFadeWhenTurningOn);
         pw.println(" " + mIsOnDisplayAddedInObserverEnabled);
+        pw.println(" " + mEnableUpdatedDisplayConnectionDialogFlagState);
     }
 
     private static class FlagState {

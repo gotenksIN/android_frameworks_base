@@ -117,7 +117,14 @@ constructor(
     val firstMobileSubShowingNetworkTypeIcon: StateFlow<Boolean> =
         firstMobileSubViewModel
             .flatMapLatest { firstMobileSubViewModel ->
-                firstMobileSubViewModel?.networkTypeIcon?.map { it != null } ?: flowOf(false)
+                firstMobileSubViewModel?.let {
+                    combine(
+                        it.networkTypeIcon,
+                        it.showHd
+                    ) { networkTypeIcon, showHd ->
+                        networkTypeIcon != null || showHd
+                    }
+                } ?: flowOf(false)
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     /** Whether all of [mobileSubViewModels] are visible or not. */

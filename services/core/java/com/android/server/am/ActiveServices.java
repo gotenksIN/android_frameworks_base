@@ -2532,7 +2532,6 @@ public final class ActiveServices {
                         }
                     } else if (CompatChanges.isChangeEnabled(
                                     FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)
-                                && android.app.Flags.introduceNewServiceOntimeoutCallback()
                                 && getTimeLimitedFgsType(foregroundServiceType)
                                         != ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
                         // Calling startForeground on a FGS type which has a time limit will only be
@@ -2835,8 +2834,7 @@ public final class ActiveServices {
                     mAm.notifyPackageUse(r.serviceInfo.packageName,
                             PackageManager.NOTIFY_PACKAGE_USE_FOREGROUND_SERVICE);
 
-                    if (CompatChanges.isChangeEnabled(FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)
-                            && android.app.Flags.introduceNewServiceOntimeoutCallback()) {
+                    if (CompatChanges.isChangeEnabled(FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)) {
                         maybeUpdateFgsTrackingLocked(r, previousFgsType);
                     }
                 } else {

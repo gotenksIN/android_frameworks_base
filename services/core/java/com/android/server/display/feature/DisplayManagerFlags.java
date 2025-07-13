@@ -41,10 +41,6 @@ public class DisplayManagerFlags {
     // 'adb shell setprop persist.log.tag.DisplayManagerFlags DEBUG && adb reboot'
     private static final boolean DEBUG = DebugUtils.isDebuggable(TAG);
 
-    private final FlagState mPortInDisplayLayoutFlagState = new FlagState(
-            Flags.FLAG_ENABLE_PORT_IN_DISPLAY_LAYOUT,
-            Flags::enablePortInDisplayLayout);
-
     private final FlagState mAdaptiveToneImprovements1 = new FlagState(
             Flags.FLAG_ENABLE_ADAPTIVE_TONE_IMPROVEMENTS_1,
             Flags::enableAdaptiveToneImprovements1);
@@ -121,10 +117,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_FAST_HDR_TRANSITIONS,
             Flags::fastHdrTransitions);
 
-    private final FlagState mAlwaysRotateDisplayDevice = new FlagState(
-            Flags.FLAG_ALWAYS_ROTATE_DISPLAY_DEVICE,
-            Flags::alwaysRotateDisplayDevice);
-
     private final FlagState mPixelAnisotropyCorrectionEnabled = new FlagState(
             Flags.FLAG_ENABLE_PIXEL_ANISOTROPY_CORRECTION,
             Flags::enablePixelAnisotropyCorrection
@@ -185,10 +177,6 @@ public class DisplayManagerFlags {
     private final FlagState mBlockAutobrightnessChangesOnStylusUsage = new FlagState(
             Flags.FLAG_BLOCK_AUTOBRIGHTNESS_CHANGES_ON_STYLUS_USAGE,
             Flags::blockAutobrightnessChangesOnStylusUsage
-    );
-    private final FlagState mIsUserRefreshRateForExternalDisplayEnabled = new FlagState(
-            Flags.FLAG_ENABLE_USER_REFRESH_RATE_FOR_EXTERNAL_DISPLAY,
-            Flags::enableUserRefreshRateForExternalDisplay
     );
 
     private final FlagState mEnableApplyDisplayChangedDuringDisplayAdded = new FlagState(
@@ -304,13 +292,6 @@ public class DisplayManagerFlags {
             Flags::enableOnDisplayAddedInObserver
     );
 
-    /**
-     * @return {@code true} if 'port' is allowed in display layout configuration file.
-     */
-    public boolean isPortInDisplayLayoutEnabled() {
-        return mPortInDisplayLayoutFlagState.isEnabled();
-    }
-
     /** Returns whether power throttling clamper is enabled on not. */
     public boolean isPowerThrottlingClamperEnabled() {
         return mPowerThrottlingClamperFlagState.isEnabled();
@@ -419,10 +400,6 @@ public class DisplayManagerFlags {
         return mFastHdrTransitions.isEnabled();
     }
 
-    public boolean isAlwaysRotateDisplayDeviceEnabled() {
-        return mAlwaysRotateDisplayDevice.isEnabled();
-    }
-
     public boolean isPixelAnisotropyCorrectionInLogicalDisplayEnabled() {
         return mPixelAnisotropyCorrectionEnabled.isEnabled();
     }
@@ -502,14 +479,6 @@ public class DisplayManagerFlags {
      */
     public boolean isBlockAutobrightnessChangesOnStylusUsage() {
         return mBlockAutobrightnessChangesOnStylusUsage.isEnabled();
-    }
-
-    /**
-     * @return {@code true} if need to use user refresh rate settings for
-     * external displays.
-     */
-    public boolean isUserRefreshRateForExternalDisplayEnabled() {
-        return mIsUserRefreshRateForExternalDisplayEnabled.isEnabled();
     }
 
     /**
@@ -657,7 +626,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mBrightnessWearBedtimeModeClamperFlagState);
         pw.println(" " + mAutoBrightnessModesFlagState);
         pw.println(" " + mFastHdrTransitions);
-        pw.println(" " + mAlwaysRotateDisplayDevice);
         pw.println(" " + mPixelAnisotropyCorrectionEnabled);
         pw.println(" " + mSensorBasedBrightnessThrottling);
         pw.println(" " + mRefactorDisplayPowerController);
@@ -674,7 +642,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mEnableBatteryStatsForAllDisplays);
         pw.println(" " + mEnableApplyDisplayChangedDuringDisplayAdded);
         pw.println(" " + mBlockAutobrightnessChangesOnStylusUsage);
-        pw.println(" " + mIsUserRefreshRateForExternalDisplayEnabled);
         pw.println(" " + mHasArrSupport);
         pw.println(" " + mAutoBrightnessModeBedtimeWearFlagState);
         pw.println(" " + mGetSupportedRefreshRatesFlagState);

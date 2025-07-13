@@ -30,6 +30,7 @@ import static android.view.WindowManager.TRANSIT_FLAG_APP_CRASHED;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_CONFIGURATION;
 import static com.android.internal.util.Preconditions.checkArgument;
 import static com.android.server.am.ProcessList.INVALID_ADJ;
+import static com.android.server.am.ProcessList.PERCEPTIBLE_APP_ADJ;
 import static com.android.server.wm.ActivityRecord.State.DESTROYED;
 import static com.android.server.wm.ActivityRecord.State.DESTROYING;
 import static com.android.server.wm.ActivityRecord.State.PAUSED;
@@ -88,6 +89,9 @@ import com.android.internal.app.HeavyWeightSwitcherActivity;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.Watchdog;
+import com.android.server.am.Flags;
+import com.android.server.am.ProcessStateController;
+import com.android.server.am.ProcessStateRecord;
 import com.android.server.art.ReasonMapping;
 import com.android.server.grammaticalinflection.GrammaticalInflectionManagerInternal;
 import com.android.server.wm.ActivityTaskManagerService.HotPath;
@@ -112,7 +116,7 @@ import java.util.List;
  * calls are allowed to proceed.
  */
 public class WindowProcessController extends ConfigurationContainer<ConfigurationContainer>
-        implements ConfigurationContainerListener {
+        implements ConfigurationContainerListener, ProcessStateRecord.Observer {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "WindowProcessController" : TAG_ATM;
     private static final String TAG_RELEASE = TAG + POSTFIX_RELEASE;
     private static final String TAG_CONFIGURATION = TAG + POSTFIX_CONFIGURATION;
@@ -412,24 +416,16 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mThread != null;
     }
 
-    public void setCurrentSchedulingGroup(int curSchedGroup) {
-        mCurSchedGroup = curSchedGroup;
-    }
-
     int getCurrentSchedulingGroup() {
         return mCurSchedGroup;
     }
 
-    public void setCurrentProcState(int curProcState) {
+    void setCurrentProcState(int curProcState) {
         mCurProcState = curProcState;
     }
 
     int getCurrentProcState() {
         return mCurProcState;
-    }
-
-    public void setCurrentAdj(int curAdj) {
-        mCurAdj = curAdj;
     }
 
     int getCurrentAdj() {
@@ -535,16 +531,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mHasClientActivities;
     }
 
-    public void setHasTopUi(boolean hasTopUi) {
-        mHasTopUi = hasTopUi;
-    }
-
     boolean hasTopUi() {
         return mHasTopUi;
-    }
-
-    public void setHasOverlayUi(boolean hasOverlayUi) {
-        mHasOverlayUi = hasOverlayUi;
     }
 
     boolean hasOverlayUi() {
@@ -577,24 +565,12 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mAtm.mH.sendMessage(m);
     }
 
-    public void setInteractionEventTime(long interactionEventTime) {
-        mInteractionEventTime = interactionEventTime;
-    }
-
     long getInteractionEventTime() {
         return mInteractionEventTime;
     }
 
-    public void setFgInteractionTime(long fgInteractionTime) {
-        mFgInteractionTime = fgInteractionTime;
-    }
-
     long getFgInteractionTime() {
         return mFgInteractionTime;
-    }
-
-    public void setWhenUnimportant(long whenUnimportant) {
-        mWhenUnimportant = whenUnimportant;
     }
 
     long getWhenUnimportant() {
@@ -774,10 +750,6 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mInstrumentationSourceUid;
     }
 
-    public void setPerceptible(boolean perceptible) {
-        mPerceptible = perceptible;
-    }
-
     boolean isPerceptible() {
         return mPerceptible;
     }
@@ -836,7 +808,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mActivities.add(r);
         if (!mHasActivities) {
-            mAtm.mProcessStateController.setHasActivityAsync(this, true);
+            mAtm.mActivityStateUpdater.setHasActivityAsync(this, true);
         }
         mHasActivities = true;
         if (mInactiveActivities != null) {
@@ -869,7 +841,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mActivities.remove(r);
         mHasActivities = !mActivities.isEmpty();
         if (!mHasActivities) {
-            mAtm.mProcessStateController.setHasActivityAsync(this, false);
+            mAtm.mActivityStateUpdater.setHasActivityAsync(this, false);
         }
         updateActivityConfigurationListener();
     }
@@ -878,7 +850,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mInactiveActivities = null;
         mActivities.clear();
         mHasActivities = false;
-        mAtm.mProcessStateController.setHasActivityAsync(this, false);
+        mAtm.mActivityStateUpdater.setHasActivityAsync(this, false);
         updateActivityConfigurationListener();
     }
 
@@ -1367,9 +1339,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mActivityStateFlags = stateFlags;
         mPerceptibleTaskStoppedTimeMillis = perceptibleTaskStoppedTimeMillis;
-        // TODO: b/399680824 - batch these state changes when called from
-        //  computeProcessActivityStateBatch
-        mAtm.mProcessStateController.setActivityStateAsync(this, stateFlags,
+        mAtm.mActivityStateUpdater.setActivityStateAsync(this, stateFlags,
                 perceptibleTaskStoppedTimeMillis);
 
         final boolean anyVisible = (stateFlags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0;
@@ -1427,13 +1397,29 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         if (addPendingTopUid) {
             addToPendingTop();
         }
-        if (updateOomAdj) {
-            prepareOomAdjustment();
+
+        // Multiple OomAdjuster affecting state changes can occur, wrap those state changes in a
+        // BatchSession.
+        try (ProcessStateController.AsyncBatchSession batchSession =
+                     mAtm.mActivityStateUpdater.startBatchSession()) {
+            if (updateOomAdj) {
+                prepareOomAdjustment();
+            }
+
+            // Posting on handler so WM lock isn't held when we call into AM.
+            if (Flags.pushActivityStateToOomadjuster()) {
+                // updateProcessInfo can trigger an OomAdjuster update, let the
+                // ProcessStateController batch session handle it.
+                batchSession.enqueue(
+                        () -> mListener.updateProcessInfo(updateServiceConnectionActivities,
+                                activityChange, updateOomAdj));
+            } else {
+                final Message m = PooledLambda.obtainMessage(
+                        WindowProcessListener::updateProcessInfo,
+                        mListener, updateServiceConnectionActivities, activityChange, updateOomAdj);
+                mAtm.mH.sendMessage(m);
+            }
         }
-        // Posting on handler so WM lock isn't held when we call into AM.
-        final Message m = PooledLambda.obtainMessage(WindowProcessListener::updateProcessInfo,
-                mListener, updateServiceConnectionActivities, activityChange, updateOomAdj);
-        mAtm.mH.sendMessage(m);
     }
 
     /** Refreshes oom adjustment and process state of this process. */
@@ -1488,26 +1474,41 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     }
 
     void onStartActivity(int topProcessState, ActivityInfo info) {
-        String packageName = null;
+        final String packageName;
         if ((info.flags & ActivityInfo.FLAG_MULTIPROCESS) == 0
                 || !"android".equals(info.packageName)) {
             // Don't add this if it is a platform component that is marked to run in multiple
             // processes, because this is actually part of the framework so doesn't make sense
             // to track as a separate apk in the process.
             packageName = info.packageName;
+        } else {
+            packageName = null;
         }
         // update ActivityManagerService.PendingStartActivityUids list.
         if (topProcessState == ActivityManager.PROCESS_STATE_TOP) {
             mAtm.mAmInternal.addPendingTopUid(mUid, mPid, mThread);
         }
-        prepareOomAdjustment();
-        // Posting the message at the front of queue so WM lock isn't held when we call into AM,
-        // and the process state of starting activity can be updated quicker which will give it a
-        // higher scheduling group.
-        final Message m = PooledLambda.obtainMessage(WindowProcessListener::onStartActivity,
-                mListener, topProcessState, shouldSetProfileProc(), packageName,
-                info.applicationInfo.longVersionCode);
-        mAtm.mH.sendMessageAtFrontOfQueue(m);
+
+        // Multiple OomAdjuster affecting state changes can occur, wrap those state changes in a
+        // BatchSession.
+        try (ProcessStateController.AsyncBatchSession batchSession =
+                     mAtm.mActivityStateUpdater.startBatchSession()) {
+            prepareOomAdjustment();
+            // Posting the message at the front of queue so WM lock isn't held when we call into AM,
+            // and the process state of starting activity can be updated quicker which will give it
+            // a higher scheduling group.
+            if (Flags.pushActivityStateToOomadjuster()) {
+                batchSession.postToHead();
+                batchSession.enqueue(
+                        () -> mListener.onStartActivity(topProcessState, shouldSetProfileProc(),
+                                packageName, info.applicationInfo.longVersionCode));
+            } else {
+                final Message m = PooledLambda.obtainMessage(WindowProcessListener::onStartActivity,
+                        mListener, topProcessState, shouldSetProfileProc(), packageName,
+                        info.applicationInfo.longVersionCode);
+                mAtm.mH.sendMessageAtFrontOfQueue(m);
+            }
+        }
     }
 
     void appDied(String reason) {
@@ -1887,7 +1888,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     void addRecentTask(Task task) {
         mRecentTasks.add(task);
         mHasRecentTasks = true;
-        mAtm.mProcessStateController.setHasRecentTasksAsync(this, true);
+        mAtm.mActivityStateUpdater.setHasRecentTasksAsync(this, true);
     }
 
     void removeRecentTask(Task task) {
@@ -1895,7 +1896,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         final boolean hasRecentTask = !mRecentTasks.isEmpty();
         mHasRecentTasks = hasRecentTask;
         if (!hasRecentTask) {
-            mAtm.mProcessStateController.setHasRecentTasksAsync(this, false);
+            mAtm.mActivityStateUpdater.setHasRecentTasksAsync(this, false);
         }
     }
 
@@ -1910,7 +1911,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mRecentTasks.clear();
         mHasRecentTasks = false;
-        mAtm.mProcessStateController.setHasRecentTasksAsync(this, false);
+        mAtm.mActivityStateUpdater.setHasRecentTasksAsync(this, false);
     }
 
     public void appEarlyNotResponding(String annotation, Runnable killAppCallback) {
@@ -2002,6 +2003,56 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             default:
                 break;
         }
+    }
+
+    @Override
+    public void onCurRawAdjChanged(int curRawAdj) {
+        mPerceptible = (curRawAdj <= PERCEPTIBLE_APP_ADJ);
+    }
+
+    @Override
+    public void onCurAdjChanged(int curAdj) {
+        mCurAdj = curAdj;
+    }
+
+    @Override
+    public void onCurrentSchedulingGroupChanged(int curSchedGroup) {
+        mCurSchedGroup = curSchedGroup;
+    }
+
+    @Override
+    public void onCurProcStateChanged(int curProcState) {
+        mCurProcState = curProcState;
+    }
+
+    @Override
+    public void onReportedProcStateChanged(int repProcState) {
+        setReportedProcState(repProcState);
+    }
+
+    @Override
+    public void onHasTopUiChanged(boolean hasTopUi) {
+        mHasTopUi = hasTopUi;
+    }
+
+    @Override
+    public void onHasOverlayUiChanged(boolean hasOverlayUi) {
+        mHasOverlayUi = hasOverlayUi;
+    }
+
+    @Override
+    public void onInteractionEventTimeChanged(long interactionEventTime) {
+        mInteractionEventTime = interactionEventTime;
+    }
+
+    @Override
+    public void onFgInteractionTimeChanged(long fgInteractionTime) {
+        mFgInteractionTime = fgInteractionTime;
+    }
+
+    @Override
+    public void onWhenUnimportantChanged(long whenUnimportant) {
+        mWhenUnimportant = whenUnimportant;
     }
 
     /** Returns {@code true} if the process prefers to use fifo scheduling. */

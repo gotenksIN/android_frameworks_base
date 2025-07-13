@@ -149,9 +149,9 @@ filegroup {
         "tests/src/**/systemui/qs/external/TileServicesTest.java",
         "tests/src/**/systemui/ambient/touch/TouchMonitorTest.java",
         "tests/src/**/systemui/accessibility/WindowMagnificationSettingsTest.java",
+        "tests/src/**/systemui/application/impl/SystemUIApplicationImplTest.kt",
         "tests/src/**/systemui/CameraProtectionLoaderImplTest.kt",
         "tests/src/**/systemui/SliceBroadcastRelayHandlerTest.java",
-        "tests/src/**/systemui/SystemUIApplicationTest.kt",
         "tests/src/**/systemui/SysUICutoutProviderTest.kt",
         "tests/src/**/keyguard/AdminSecondaryLockScreenControllerTest.java",
         "tests/src/**/keyguard/KeyguardStatusViewControllerTest.java",
@@ -977,6 +977,16 @@ android_robolectric_test {
     strict_mode: false,
 }
 
+filegroup {
+    name: "SystemUI-tests-multivalent-dagger",
+    srcs: [
+        "multivalentTests/src/**/NotificationAlertsInteractorTest.kt",
+        "multivalentTests/src/**/NotificationsKeyguardInteractorTest.kt",
+        "multivalentTests/src/**/NotifPipelineChoreographerTest.kt",
+        "multivalentTests/src/**/KeyguardNotificationVisibilityProviderTest.java"
+    ],
+}
+
 android_ravenwood_test {
     name: "SystemUiRavenTests",
     srcs: [
@@ -985,6 +995,10 @@ android_ravenwood_test {
         // TODO(b/294256649): pivot to using {.aapt.jar} and re-enable
         // use_resource_processor: true when better supported by soong
         ":SystemUI-tests-res{.aapt.srcjar}",
+    ],
+    exclude_srcs: [
+        // TODO(b/429013941): kapt is way too slow, so disable them for now.
+        ":SystemUI-tests-multivalent-dagger",
     ],
     static_libs: [
         "SystemUI-core",
@@ -1005,9 +1019,6 @@ android_ravenwood_test {
     resource_apk: "SystemUI-tests-res",
     auto_gen_config: true,
     team: "trendy_team_ravenwood",
-    plugins: [
-        "dagger2-compiler",
-    ],
 }
 
 // Opt-out config for optimizing the SystemUI target using R8.

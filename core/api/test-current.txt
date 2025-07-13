@@ -772,6 +772,7 @@ package android.app.admin {
 package android.app.appfunctions {
 
   @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public final class AppFunctionManager {
+    method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull public java.util.Set<java.lang.String> getDeviceSettingPackages();
     field public static final int ACCESS_FLAG_MASK_ALL = 31; // 0x1f
     field public static final int ACCESS_FLAG_MASK_OTHER = 6; // 0x6
     field public static final int ACCESS_FLAG_MASK_USER = 24; // 0x18
@@ -922,7 +923,7 @@ package android.appwidget {
 
 package android.companion {
 
-  @FlaggedApi("android.companion.new_association_builder") public static final class AssociationInfo.Builder {
+  public static final class AssociationInfo.Builder {
     ctor public AssociationInfo.Builder(int, int, @NonNull String);
     ctor public AssociationInfo.Builder(@NonNull android.companion.AssociationInfo);
     method @NonNull public android.companion.AssociationInfo build();
@@ -934,7 +935,7 @@ package android.companion {
     method @NonNull public android.companion.AssociationInfo.Builder setDisplayName(@Nullable CharSequence);
     method @NonNull public android.companion.AssociationInfo.Builder setLastTimeConnected(long);
     method @NonNull public android.companion.AssociationInfo.Builder setNotifyOnDeviceNearby(boolean);
-    method @NonNull public android.companion.AssociationInfo.Builder setPackagesToNotify(@Nullable java.util.List<java.lang.String>);
+    method @FlaggedApi("android.companion.association_verification") @NonNull public android.companion.AssociationInfo.Builder setPackagesToNotify(@Nullable java.util.List<java.lang.String>);
     method @NonNull public android.companion.AssociationInfo.Builder setRevoked(boolean);
     method @NonNull public android.companion.AssociationInfo.Builder setSelfManaged(boolean);
     method @NonNull public android.companion.AssociationInfo.Builder setSystemDataSyncFlags(int);
@@ -951,7 +952,7 @@ package android.companion {
   }
 
   public final class CompanionDeviceManager {
-    method @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public void enableSecureTransport(boolean);
+    method @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public void overrideTransportType(int);
   }
 
   public abstract class CompanionDeviceService extends android.app.Service {
@@ -2083,6 +2084,7 @@ package android.media {
     method @NonNull public android.media.VolumePolicy getVolumePolicy();
     method public boolean hasRegisteredDynamicPolicy();
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED) public boolean isCsdEnabled();
+    method @FlaggedApi("android.media.audio.audio_focus_desktop") public boolean isMultiAudioFocusEnabled();
     method @RequiresPermission(android.Manifest.permission.CALL_AUDIO_INTERCEPTION) public boolean isPstnCallAudioInterceptable();
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED) public boolean isVolumeControlUsingVolumeGroups();
     method public void permissionUpdateBarrier();
@@ -2443,7 +2445,7 @@ package android.os {
   }
 
   public final class BugreportParams {
-    field public static final int BUGREPORT_MODE_MAX_VALUE = 7; // 0x7
+    field public static final int BUGREPORT_MODE_MAX_VALUE = 8; // 0x8
   }
 
   public class Build {
@@ -2552,50 +2554,6 @@ package android.os {
 
   public final class NewUserResponse {
     ctor public NewUserResponse(@Nullable android.os.UserHandle, int);
-  }
-
-  public final class PackageTagsList implements android.os.Parcelable {
-    method public boolean contains(@NonNull String, @Nullable String);
-    method public boolean containsAll(@NonNull android.os.PackageTagsList);
-    method public boolean containsPackage(@NonNull String);
-    method public boolean containsPackageWithAllTags(@NonNull String);
-    method public int describeContents();
-    method @NonNull public java.util.Set<java.lang.String> getPackages();
-    method public boolean isEmpty();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.os.PackageTagsList> CREATOR;
-  }
-
-  public static final class PackageTagsList.Builder {
-    ctor public PackageTagsList.Builder();
-    ctor public PackageTagsList.Builder(int);
-    method @NonNull public android.os.PackageTagsList.Builder add(@NonNull String);
-    method @NonNull public android.os.PackageTagsList.Builder add(@NonNull String, @Nullable String);
-    method @NonNull public android.os.PackageTagsList.Builder addAll(@NonNull android.os.PackageTagsList);
-    method @NonNull public android.os.PackageTagsList.Builder addAll(@NonNull java.util.Map<java.lang.String,? extends java.util.Set<java.lang.String>>);
-    method @NonNull public android.os.PackageTagsList build();
-  }
-
-  @FlaggedApi("android.location.flags.change_get_adas_allowlist_from_hidden_to_system") public final class PackageTagsMap implements android.os.Parcelable {
-    method public boolean contains(@NonNull String, @Nullable String);
-    method public boolean containsAll(@NonNull android.os.PackageTagsMap);
-    method public boolean containsPackage(@NonNull String);
-    method public boolean containsPackageWithAllTags(@NonNull String);
-    method public int describeContents();
-    method @NonNull public java.util.Set<java.lang.String> getPackages();
-    method public boolean isEmpty();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.os.PackageTagsMap> CREATOR;
-  }
-
-  public static final class PackageTagsMap.Builder {
-    ctor public PackageTagsMap.Builder();
-    ctor public PackageTagsMap.Builder(int);
-    method @NonNull public android.os.PackageTagsMap.Builder add(@NonNull String);
-    method @NonNull public android.os.PackageTagsMap.Builder add(@NonNull String, @Nullable String);
-    method @NonNull public android.os.PackageTagsMap.Builder addAll(@NonNull android.os.PackageTagsMap);
-    method @NonNull public android.os.PackageTagsMap.Builder addAll(@NonNull java.util.Map<java.lang.String,? extends java.util.Set<java.lang.String>>);
-    method @NonNull public android.os.PackageTagsMap build();
   }
 
   public final class Parcel {
@@ -3602,6 +3560,8 @@ package android.telephony {
   public final class SmsManager {
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public int checkSmsShortCodeDestination(String, String);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void clearStorageMonitorMemoryStatusOverride();
+    method @NonNull @RequiresPermission(allOf={android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE, "android.permission.MANAGE_COMPANION_DEVICES", android.Manifest.permission.MANAGE_ROLE_HOLDERS}) public static java.util.Set<java.lang.String> getSmsOtpTrustedPackages(@NonNull android.content.Context);
+    method @RequiresPermission(allOf={android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE, "android.permission.MANAGE_COMPANION_DEVICES", android.Manifest.permission.MANAGE_ROLE_HOLDERS}) public static boolean isAppTrustedForSmsOtp(@NonNull android.content.Context, @NonNull String, int);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setStorageMonitorMemoryStatusOverride(boolean);
     field public static final int SMS_CATEGORY_FREE_SHORT_CODE = 1; // 0x1
     field public static final int SMS_CATEGORY_NOT_SHORT_CODE = 0; // 0x0

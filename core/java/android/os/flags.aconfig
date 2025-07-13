@@ -203,6 +203,14 @@ flag {
 }
 
 flag {
+    name: "bluetooth_bugreport_mode"
+    is_exported: true
+    namespace: "bluetooth"
+    description: "Add bluetooth bugreport mode containing subset of log sections only related to bluetooth debugging."
+    bug: "410692617"
+}
+
+flag {
     name: "bugreport_multi_display_screenshot_enabled"
     namespace: "crumpet"
     description: "Enable a flag taking screenshots of all displays in bugreport."
@@ -236,13 +244,6 @@ flag {
     namespace: "cellular_security"
     description: "Guards a new UserManager user restriction that admins can use to require cellular encryption on their managed devices."
     bug: "276752881"
-}
-
-flag {
-    name: "enable_binder_call_signal_collector"
-    namespace: "backstage_power"
-    description: "Enable binder call signal collector for anomaly detection."
-    bug: "421243909"
 }
 
 flag {
@@ -406,6 +407,16 @@ flag {
 }
 
 flag {
+    namespace: "system_performance"
+    name: "binder_cache_transaction_trace_names"
+    description: "Reuse transaction names caches across binder instances of the same interface."
+    bug: "330738126"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
      namespace: "system_performance"
      name: "enable_has_binders"
      is_exported: true
@@ -434,6 +445,13 @@ flag {
      namespace: "system_performance"
      name: "perfetto_sdk_tracing_v2"
      description: "Tracing using Perfetto SDK API."
+     bug: "303199244"
+}
+
+flag {
+     namespace: "system_performance"
+     name: "perfetto_sdk_tracing_v3"
+     description: "Tracing using Perfetto SDK API from the 'dev.perfetto.sdk' package."
      bug: "303199244"
 }
 

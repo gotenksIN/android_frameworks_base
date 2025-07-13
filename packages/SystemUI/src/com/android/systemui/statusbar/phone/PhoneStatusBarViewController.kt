@@ -25,7 +25,7 @@ import android.view.ViewConfiguration
 import androidx.annotation.VisibleForTesting
 import com.android.systemui.Gefingerpoken
 import com.android.systemui.battery.BatteryMeterView
-import com.android.systemui.dagger.qualifiers.DisplaySpecific
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
@@ -372,7 +372,7 @@ private constructor(
         private val progressProvider: Optional<ScopedUnfoldTransitionProgressProvider>,
         private val userChipViewModel: StatusBarUserChipViewModel,
         private val centralSurfaces: CentralSurfaces,
-        private val statusBarWindowStateController: StatusBarWindowStateController,
+        @DisplayAware private val statusBarWindowStateController: StatusBarWindowStateController,
         private val shadeController: ShadeController,
         private val shadeViewController: ShadeViewController,
         private val shadeModeInteractor: ShadeModeInteractor,
@@ -383,7 +383,7 @@ private constructor(
         private val viewUtil: ViewUtil,
         private val statusBarConfigurationController: StatusBarConfigurationController,
         private val statusOverlayHoverListenerFactory: StatusOverlayHoverListenerFactory,
-        @DisplaySpecific private val darkIconDispatcher: DarkIconDispatcher,
+        @DisplayAware private val darkIconDispatcher: DarkIconDispatcher,
         private val statusBarContentInsetsProviderStore: StatusBarContentInsetsProviderStore,
         private val lazyStatusBarShadeDisplayPolicy: Lazy<StatusBarTouchShadeDisplayPolicy>,
         private val lazyShadeDisplaysRepository: Lazy<ShadeDisplaysRepository>,

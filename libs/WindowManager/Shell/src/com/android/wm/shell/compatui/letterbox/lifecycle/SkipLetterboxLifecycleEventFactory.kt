@@ -16,10 +16,8 @@
 
 package com.android.wm.shell.compatui.letterbox.lifecycle
 
-import android.window.TransitionInfo
+import android.window.TransitionInfo.Change
 import com.android.wm.shell.dagger.WMSingleton
-import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
-import com.android.wm.shell.shared.TransitionUtil.isClosingType
 import javax.inject.Inject
 
 /**
@@ -27,20 +25,13 @@ import javax.inject.Inject
  * if not related to Letterboxing.
  */
 @WMSingleton
-class SkipLetterboxLifecycleEventFactory @Inject constructor(
-    private val desksOrganizer: DesksOrganizer
-) : LetterboxLifecycleEventFactory {
+class SkipLetterboxLifecycleEventFactory @Inject constructor() : LetterboxLifecycleEventFactory {
 
-    // A root task desk transition should be ignored because it's not related to Letterboxing. This
-    // prevents any operations on the Letterbox Surfaces (e.g. resize) which can cause unwanted
-    // behaviour (e.g. Adding Letterbox Surfaces on the wrong Task surface).
-    // TODO(b/421188466): Improve heuristics for Activities dealing with Camera.
-    // We also ignore closing Changes.
-    override fun canHandle(change: TransitionInfo.Change): Boolean =
-        isClosingType(change.mode) || desksOrganizer.isDeskChange(change)
+    // We also ignore closing Changes or changes related to Tasks without any activity.
+    override fun canHandle(change: Change): Boolean = change.shouldSkipForLetterbox()
 
     // Although this LetterboxLifecycleEventFactory is able to handle the specific Change
     // it returns an empty LetterboxLifecycleEvent to basically ignore the Change.
-    override fun createLifecycleEvent(change: TransitionInfo.Change): LetterboxLifecycleEvent? =
+    override fun createLifecycleEvent(change: Change): LetterboxLifecycleEvent? =
         null
 }

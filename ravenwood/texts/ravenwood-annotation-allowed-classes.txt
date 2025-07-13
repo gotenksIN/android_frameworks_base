@@ -13,17 +13,21 @@ android.accounts.Account
 android.app.ActivityManager
 android.app.ActivityOptions
 android.app.AppCompatCallbacks
+android.app.AppComponentFactory
 android.app.Application
 android.app.ApplicationPackageManager
 android.app.BroadcastOptions
 android.app.ComponentOptions
+android.app.ContextImpl
 android.app.Instrumentation
+android.app.LoadedApk
 android.app.LocaleConfig
 android.app.PropertyInvalidatedCache
 android.app.ResourcesManager
 android.app.UiAutomation
 android.app.WindowConfiguration
 
+android.content.AttributionSource
 android.content.ClipData
 android.content.ClipDescription
 android.content.ClipboardManager
@@ -33,6 +37,7 @@ android.content.ContentProvider
 android.content.ContentUris
 android.content.ContentValues
 android.content.Context
+android.content.ContextParams
 android.content.ContextWrapper
 android.content.Intent
 android.content.IntentFilter
@@ -240,9 +245,6 @@ android.graphics.text.MeasuredText
 android.graphics.text.PositionedGlyphs
 android.graphics.text.TextRunShaper
 
-android.hardware.SerialManager
-android.hardware.SerialManagerInternal
-
 android.metrics.LogMaker
 
 android.os.AggregateBatteryConsumer
@@ -277,7 +279,6 @@ android.os.Message
 android.os.MessageHeap
 android.os.MessageQueue
 android.os.PackageTagsList
-android.os.PackageTagsMap
 android.os.Parcel
 android.os.ParcelFileDescriptor
 android.os.ParcelFormatException
@@ -670,7 +671,6 @@ com.android.modules.utils.ravenwood.RavenwoodHelper
 
 com.android.server.FgThread
 com.android.server.LocalServices
-com.android.server.SerialService
 com.android.server.ServiceThread
 com.android.server.SystemService
 com.android.server.SystemServiceManager

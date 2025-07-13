@@ -138,8 +138,7 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"फ़िलहाल, पूरी स्क्रीन रिकॉर्ड की जा रही है"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"फ़िलहाल, <xliff:g id="APP_NAME">%1$s</xliff:g> की रिकॉर्डिंग की जा रही है"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"रिकॉर्ड करना बंद करें"</string>
-    <!-- no translation found for screen_capture_region_selection_button (4437546351856914639) -->
-    <skip />
+    <string name="screen_capture_region_selection_button" msgid="4437546351856914639">"चुने गए हिस्से का स्क्रीनशॉट लें"</string>
     <string name="screen_capture_toolbar_capture_button" msgid="8512731007891496030">"कैप्चर करें"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"रिकॉर्डिंग टाइप चुनें"</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"स्क्रीन शेयर की जा रही है"</string>
@@ -844,7 +843,8 @@
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"चालू करें"</string>
     <string name="rotation_lock_camera_rotation_on" msgid="789434807790534274">"चालू है - चेहरे की गतिविधि के हिसाब से कैमरे को घुमाने की सुविधा"</string>
     <string name="notification_guts_bundle_title" msgid="5252530007273079591">"साइलेंट मोड और बंडल में भेजी जाने वाली सूचना"</string>
-    <string name="notification_guts_single_bundle_notif_title" msgid="3186784466618443494">"सूचनाओं को व्यवस्थित करने की सेटिंग का इस्तेमाल करें"</string>
+    <!-- no translation found for notification_guts_single_bundle_notif_title (5397951402211886396) -->
+    <skip />
     <string name="notification_guts_bundle_summary" msgid="3971530802237393600">"<xliff:g id="APP_NAME">%1$s</xliff:g> के लिए"</string>
     <string name="notification_guts_promotions_summary" msgid="1565750619813325885">"सेल, नई सुविधाएं वगैरह"</string>
     <string name="notification_guts_news_summary" msgid="638697931043407835">"लोकप्रिय खबरें, एडिटोरियल वगैरह"</string>
@@ -853,8 +853,7 @@
     <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"चालू करें"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"अब आपको अपनी लंबी बातचीत की खास जानकारी, रीकैप के तौर पर तुरंत मिल सकती है"</string>
     <string name="notification_onboarding_bundles_message" msgid="9038023612294384832">"सूचनाओं को व्यवस्थित करने की सेटिंग, सूचनाओं को बंडल करती है और उनकी आवाज़ बंद करती है. ये ऐसी सूचनाएं होती हैं जो ज़्यादा अहम नहीं होती हैं"</string>
-    <!-- no translation found for notification_bundle_header_counter (5515532701569242265) -->
-    <skip />
+    <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# सूचना}one{# सूचना}other{# सूचनाएं}}"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"हो गया"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"लागू करें"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"बंद करें"</string>
@@ -1096,6 +1095,16 @@
     <string name="accessibility_quick_settings_edit" msgid="6544873823850165">"क्विक सेटिंग के क्रम में बदलाव करें."</string>
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"पावर मेन्यू"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"पेज <xliff:g id="ID_2">%2$d</xliff:g> में से <xliff:g id="ID_1">%1$d</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_title (7614965716626605518) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_content (4519838108423437794) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_magnifier_intro (627023269951856071) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_talkback_intro (1617808784388544741) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_positive_button_text (3670746017523589293) -->
+    <skip />
     <string name="tuner_lock_screen" msgid="2267383813241144544">"लॉक स्‍क्रीन"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"बंद हो रहा है…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"डिवाइस के रखरखाव के तरीके देखें"</string>
@@ -1656,14 +1665,10 @@
     <string name="qs_edit_mode_category_unknown" msgid="509314252124053550">"कोई जानकारी नहीं है"</string>
     <string name="qs_edit_mode_reset_dialog_title" msgid="5344853290033761627">"क्या सभी टाइल रीसेट करनी हैं?"</string>
     <string name="qs_edit_mode_reset_dialog_content" msgid="7474773130622653653">"क्विक सेटिंग से जुड़ी सभी टाइल, डिवाइस की ओरिजनल सेटिंग पर रीसेट हो जाएंगी"</string>
-    <!-- no translation found for ambientcue_first_time_edu_title (4786708463521594957) -->
-    <skip />
-    <!-- no translation found for ambientcue_first_time_edu_text (7541905631076606020) -->
-    <skip />
-    <!-- no translation found for ambientcue_first_time_edu_icon_description (1776865320146246305) -->
-    <skip />
-    <!-- no translation found for ambientcue_long_press_edu_text (8424250358721947938) -->
-    <skip />
+    <string name="ambientcue_first_time_edu_title" msgid="4786708463521594957">"मददगार सुझाव पाएं"</string>
+    <string name="ambientcue_first_time_edu_text" msgid="7541905631076606020">"हम एआई का इस्तेमाल करके, स्क्रीन पर की जा रही आपकी गतिविधि के हिसाब से जानकारी और ज़रूरी कार्रवाइयों के सुझाव देते हैं"</string>
+    <string name="ambientcue_first_time_edu_icon_description" msgid="1776865320146246305">"आइकॉन"</string>
+    <string name="ambientcue_long_press_edu_text" msgid="8424250358721947938">"सुझाव जनरेट होने का तरीका जानने के लिए, चिप को दबाकर रखें"</string>
     <string name="demote_explain_text" msgid="3942301497888762295">"<xliff:g id="APPLICATION">%1$s</xliff:g> अब लाइव अपडेट नहीं दिखाएगा. सेटिंग में जाकर, इस विकल्प को कभी भी बदला जा सकता है."</string>
     <string name="volume_slider_disabled_message_template" msgid="1305088816797803460">"<xliff:g id="STREAM_NAME">%1$s</xliff:g>, <xliff:g id="DISABLED_MESSAGE">%2$s</xliff:g>"</string>
     <string name="underlay_close_button_content_description" msgid="6518481455548869894">"बंद करें"</string>
@@ -1671,4 +1676,8 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"सूचनाएं देखने के लिए, सबसे ऊपर बाईं ओर से नीचे की ओर स्वाइप करें"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"क्विक सेटिंग खोलने के लिए, सबसे ऊपर दाईं ओर से नीचे की ओर स्वाइप करें"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"वापस जाएं"</string>
+    <!-- no translation found for pager_dots_previous_content_description (26963508904918908) -->
+    <skip />
+    <!-- no translation found for pager_dots_next_content_description (613943992626163120) -->
+    <skip />
 </resources>

@@ -138,8 +138,7 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Ви зараз записуєте вміст усього екрана"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Ви зараз записуєте вміст екрана додатка <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Зупинити запис"</string>
-    <!-- no translation found for screen_capture_region_selection_button (4437546351856914639) -->
-    <skip />
+    <string name="screen_capture_region_selection_button" msgid="4437546351856914639">"Зробити знімок вибраної області"</string>
     <string name="screen_capture_toolbar_capture_button" msgid="8512731007891496030">"Зробити знімок"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Записати"</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Показ екрана"</string>
@@ -846,7 +845,8 @@
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"Увімкнути"</string>
     <string name="rotation_lock_camera_rotation_on" msgid="789434807790534274">"Увімкнути (за обличчям)"</string>
     <string name="notification_guts_bundle_title" msgid="5252530007273079591">"Вимкнути звук і групувати"</string>
-    <string name="notification_guts_single_bundle_notif_title" msgid="3186784466618443494">"Використовуйте Органайзер сповіщень"</string>
+    <!-- no translation found for notification_guts_single_bundle_notif_title (5397951402211886396) -->
+    <skip />
     <string name="notification_guts_bundle_summary" msgid="3971530802237393600">"Для додатка <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="notification_guts_promotions_summary" msgid="1565750619813325885">"Розпродажі, нові функції тощо"</string>
     <string name="notification_guts_news_summary" msgid="638697931043407835">"Головні новини, редакційні статті тощо"</string>
@@ -855,8 +855,7 @@
     <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Увімкнути"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Тепер ви можете отримувати короткі перекази довгих розмов"</string>
     <string name="notification_onboarding_bundles_message" msgid="9038023612294384832">"Органайзер сповіщень групує сповіщення з низьким пріоритетом і вимикає їх звук"</string>
-    <!-- no translation found for notification_bundle_header_counter (5515532701569242265) -->
-    <skip />
+    <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# сповіщення}one{# сповіщення}few{# сповіщення}many{# сповіщень}other{# сповіщення}}"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"Готово"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Застосувати"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Вимкнути"</string>
@@ -1098,6 +1097,16 @@
     <string name="accessibility_quick_settings_edit" msgid="6544873823850165">"Змінити порядок швидких налаштувань."</string>
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Меню кнопки живлення"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Сторінка <xliff:g id="ID_1">%1$d</xliff:g> з <xliff:g id="ID_2">%2$d</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_title (7614965716626605518) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_content (4519838108423437794) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_magnifier_intro (627023269951856071) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_talkback_intro (1617808784388544741) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_dialog_positive_button_text (3670746017523589293) -->
+    <skip />
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Заблокований екран"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Вимкнення…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Переглянути запобіжні заходи"</string>
@@ -1658,14 +1667,10 @@
     <string name="qs_edit_mode_category_unknown" msgid="509314252124053550">"Невідомо"</string>
     <string name="qs_edit_mode_reset_dialog_title" msgid="5344853290033761627">"Скинути всі плитки?"</string>
     <string name="qs_edit_mode_reset_dialog_content" msgid="7474773130622653653">"Усі плитки швидких налаштувань буде скинуто до стандартних налаштувань пристрою"</string>
-    <!-- no translation found for ambientcue_first_time_edu_title (4786708463521594957) -->
-    <skip />
-    <!-- no translation found for ambientcue_first_time_edu_text (7541905631076606020) -->
-    <skip />
-    <!-- no translation found for ambientcue_first_time_edu_icon_description (1776865320146246305) -->
-    <skip />
-    <!-- no translation found for ambientcue_long_press_edu_text (8424250358721947938) -->
-    <skip />
+    <string name="ambientcue_first_time_edu_title" msgid="4786708463521594957">"Отримуйте корисні пропозиції"</string>
+    <string name="ambientcue_first_time_edu_text" msgid="7541905631076606020">"Ми використовуємо штучний інтелект, щоб завчасно пропонувати інформацію і дії залежно від ваших дій на екрані"</string>
+    <string name="ambientcue_first_time_edu_icon_description" msgid="1776865320146246305">"Значок"</string>
+    <string name="ambientcue_long_press_edu_text" msgid="8424250358721947938">"Натисніть і втримуйте, щоб дізнатися, як створюються пропозиції"</string>
     <string name="demote_explain_text" msgid="3942301497888762295">"Додаток <xliff:g id="APPLICATION">%1$s</xliff:g> більше не показуватиме новини в реальному часі. Це можна будь-коли змінити в налаштуваннях."</string>
     <string name="volume_slider_disabled_message_template" msgid="1305088816797803460">"<xliff:g id="STREAM_NAME">%1$s</xliff:g>, <xliff:g id="DISABLED_MESSAGE">%2$s</xliff:g>"</string>
     <string name="underlay_close_button_content_description" msgid="6518481455548869894">"Закрити"</string>
@@ -1673,4 +1678,8 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Щоб відкрити сповіщення, проведіть пальцем від верхнього лівого кута екрана"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Щоб відкрити Швидкі налаштування, проведіть пальцем від правого верхнього кута екрана"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Назад"</string>
+    <!-- no translation found for pager_dots_previous_content_description (26963508904918908) -->
+    <skip />
+    <!-- no translation found for pager_dots_next_content_description (613943992626163120) -->
+    <skip />
 </resources>

@@ -27,10 +27,8 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.display.data.repository.DisplayWindowPropertiesRepository
-import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.data.repository.ShadeDisplaysRepository
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
-import com.android.window.flags.Flags
 import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
@@ -47,7 +45,6 @@ interface ShadeDialogContextInteractor {
 class ShadeDialogContextInteractorImpl
 @Inject
 constructor(
-    @ShadeDisplayAware private val shadeContext: Context,
     @Main private val defaultContext: Context,
     private val displayWindowPropertyRepository: Provider<DisplayWindowPropertiesRepository>,
     private val shadeDisplaysRepository: Provider<ShadeDisplaysRepository>,
@@ -56,34 +53,30 @@ constructor(
 
     override fun start() {
         if (ShadeWindowGoesAround.isUnexpectedlyInLegacyMode()) return
-        if (!Flags.enableWindowContextOverrideType()) {
-            bgScope.launchTraced(TAG) {
-                shadeDisplaysRepository
-                    .get()
-                    .displayId
-                    // No need for default display pre-warming.
-                    .filter { it != Display.DEFAULT_DISPLAY }
-                    .collectLatest { displayId ->
-                        // Prewarms the context in the background every time the display changes.
-                        // In this way, there will be no main thread delays when a dialog is shown.
-                        getContextOrDefault(displayId)
-                    }
-            }
+        bgScope.launchTraced(TAG) {
+            shadeDisplaysRepository
+                .get()
+                .displayId
+                // No need for default display pre-warming.
+                .filter { it != Display.DEFAULT_DISPLAY }
+                .collectLatest { displayId ->
+                    // Prewarms the context in the background every time the display changes.
+                    // In this way, there will be no main thread delays when a dialog is shown.
+                    getContextOrDefault(displayId)
+                }
         }
     }
 
     override val context: Context
-        get() {
-            if (Flags.enableWindowContextOverrideType()) {
-                return shadeContext
+        get() = getContextOrDefault(shadeDisplayId)
+
+    private val shadeDisplayId: Int
+        get() =
+            if (!ShadeWindowGoesAround.isEnabled) {
+                Display.DEFAULT_DISPLAY
             } else {
-                if (!ShadeWindowGoesAround.isEnabled) {
-                    return defaultContext
-                }
-                val displayId = shadeDisplaysRepository.get().displayId.value
-                return getContextOrDefault(displayId)
+                shadeDisplaysRepository.get().displayId.value
             }
-        }
 
     private fun getContextOrDefault(displayId: Int): Context {
         return try {

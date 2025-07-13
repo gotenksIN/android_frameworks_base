@@ -50,6 +50,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.os.Binder;
@@ -115,6 +116,8 @@ import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.KeyguardUpdateMonitor;
+import com.android.systemui.Flags;
+import com.android.systemui.FontStyles;
 import com.android.systemui.MultiListLayout;
 import com.android.systemui.MultiListLayout.MultiListAdapter;
 import com.android.systemui.animation.DialogCuj;
@@ -136,7 +139,6 @@ import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeDisplayAware;
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround;
-import com.android.systemui.topui.TopUiController;
 import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.statusbar.phone.LightBarController;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
@@ -145,6 +147,7 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
 import com.android.systemui.telephony.TelephonyListenerManager;
+import com.android.systemui.topui.TopUiController;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 import com.android.systemui.user.domain.interactor.UserLogoutInteractor;
 import com.android.systemui.util.EmergencyDialerConstants;
@@ -932,7 +935,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     @VisibleForTesting
     final class ShutDownAction extends SinglePressAction implements LongPressAction {
         ShutDownAction() {
-            super(R.drawable.ic_lock_power_off,
+            super(com.android.systemui.res.R.drawable.ic_global_actions_power_off,
                     R.string.global_action_power_off);
         }
 
@@ -1045,7 +1048,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     @VisibleForTesting
     class EmergencyDialerAction extends EmergencyAction {
         private EmergencyDialerAction() {
-            super(com.android.systemui.res.R.drawable.ic_emergency_star,
+            super(com.android.systemui.res.R.drawable.ic_global_actions_emergency,
                     R.string.global_action_emergency);
         }
 
@@ -1076,7 +1079,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     @VisibleForTesting
     final class RestartAction extends SinglePressAction implements LongPressAction {
         RestartAction() {
-            super(R.drawable.ic_restart, R.string.global_action_restart);
+            super(com.android.systemui.res.R.drawable.ic_global_actions_restart,
+                    R.string.global_action_restart);
         }
 
         @Override
@@ -1119,7 +1123,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     @VisibleForTesting
     class ScreenshotAction extends SinglePressAction {
         ScreenshotAction() {
-            super(R.drawable.ic_screenshot, R.string.global_action_screenshot);
+            super(com.android.systemui.res.R.drawable.ic_global_actions_screenshot,
+                    R.string.global_action_screenshot);
         }
 
         @Override
@@ -1170,7 +1175,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     class BugReportAction extends SinglePressAction implements LongPressAction {
 
         BugReportAction() {
-            super(R.drawable.ic_lock_bugreport, R.string.bugreport_title);
+            super(com.android.systemui.res.R.drawable.ic_global_actions_bugreport,
+                    R.string.bugreport_title);
         }
 
         @Override
@@ -1245,7 +1251,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
     private final class LogoutAction extends SinglePressAction {
         private LogoutAction() {
-            super(R.drawable.ic_logout, R.string.global_action_logout);
+            super(com.android.systemui.res.R.drawable.ic_global_actions_logout,
+                    R.string.global_action_logout);
         }
 
         @Override
@@ -1402,7 +1409,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     @VisibleForTesting
     class LockDownAction extends SinglePressAction {
         LockDownAction() {
-            super(R.drawable.ic_lock_lockdown, R.string.global_action_lockdown);
+            super(com.android.systemui.res.R.drawable.ic_global_actions_lockdown,
+                    R.string.global_action_lockdown);
         }
 
         @Override
@@ -1700,7 +1708,10 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             ImageView icon = view.findViewById(R.id.icon);
             TextView messageView = view.findViewById(R.id.message);
             messageView.setSelected(true); // necessary for marquee to work
-
+            if (Flags.globalActionsEmphasizedFont()) {
+                messageView.setTypeface(
+                        Typeface.create(FontStyles.GSF_LABEL_LARGE_EMPHASIZED, Typeface.NORMAL));
+            }
             icon.setImageDrawable(action.getIcon(mContext));
             icon.setScaleType(ScaleType.CENTER_CROP);
 
@@ -1780,6 +1791,10 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                 textView.setText(action.getMessageResId());
             } else {
                 textView.setText(action.getMessage());
+            }
+            if (Flags.globalActionsEmphasizedFont()) {
+                textView.setTypeface(
+                        Typeface.create(FontStyles.GSF_LABEL_LARGE_EMPHASIZED, Typeface.NORMAL));
             }
             return textView;
         }
@@ -1973,8 +1988,11 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
             mIconView = v.findViewById(R.id.icon);
             TextView messageView = v.findViewById(R.id.message);
+            if (Flags.globalActionsEmphasizedFont()) {
+                messageView.setTypeface(
+                        Typeface.create(FontStyles.GSF_LABEL_LARGE_EMPHASIZED, Typeface.NORMAL));
+            }
             messageView.setSelected(true); // necessary for marquee to work
-
             mIconView.setImageDrawable(getIcon(context));
             mIconView.setScaleType(ScaleType.CENTER_CROP);
             if (com.android.systemui.Flags.tvGlobalActionsFocus()) {
@@ -2128,6 +2146,10 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
             ImageView icon = (ImageView) v.findViewById(R.id.icon);
             TextView messageView = (TextView) v.findViewById(R.id.message);
+            if (Flags.globalActionsEmphasizedFont()) {
+                messageView.setTypeface(
+                        Typeface.create(FontStyles.GSF_LABEL_LARGE_EMPHASIZED, Typeface.NORMAL));
+            }
             final boolean enabled = isEnabled();
 
             if (messageView != null) {

@@ -23,6 +23,7 @@ import android.companion.datatransfer.continuity.ITaskContinuityManager;
 import android.companion.datatransfer.continuity.IRemoteTaskListener;
 import android.companion.datatransfer.continuity.RemoteTask;
 import android.content.Context;
+import android.os.Binder;
 import android.util.Slog;
 
 import com.android.server.companion.datatransfer.continuity.handoff.InboundHandoffRequestController;
@@ -32,6 +33,7 @@ import com.android.server.companion.datatransfer.continuity.messages.HandoffRequ
 import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestResultMessage;
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskAddedMessage;
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskRemovedMessage;
+import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskUpdatedMessage;
 import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessage;
 import com.android.server.companion.datatransfer.continuity.tasks.RemoteTaskStore;
 
@@ -69,7 +71,9 @@ public final class TaskContinuityManagerService extends SystemService {
 
         mTaskContinuityMessageReceiver = new TaskContinuityMessageReceiver(context);
         mRemoteTaskStore = new RemoteTaskStore(mConnectedAssociationStore);
-        mOutboundHandoffRequestController = new OutboundHandoffRequestController(context);
+        mOutboundHandoffRequestController = new OutboundHandoffRequestController(
+            context,
+            mConnectedAssociationStore);
         mInboundHandoffRequestController = new InboundHandoffRequestController(context);
     }
 
@@ -102,10 +106,15 @@ public final class TaskContinuityManagerService extends SystemService {
             int associationId,
             int remoteTaskId,
             @NonNull IHandoffRequestCallback callback) {
-            mOutboundHandoffRequestController.requestHandoff(
-                associationId,
-                remoteTaskId,
-                callback);
+            final long ident = Binder.clearCallingIdentity();
+            try {
+                mOutboundHandoffRequestController.requestHandoff(
+                    associationId,
+                    remoteTaskId,
+                    callback);
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
         }
     }
 
@@ -130,6 +139,11 @@ public final class TaskContinuityManagerService extends SystemService {
                 mRemoteTaskStore.removeTask(
                     associationId,
                     remoteTaskRemovedMessage.taskId());
+                break;
+            case RemoteTaskUpdatedMessage remoteTaskUpdatedMessage:
+                mRemoteTaskStore.updateTask(
+                    associationId,
+                    remoteTaskUpdatedMessage.getTask());
                 break;
             case HandoffRequestResultMessage handoffRequestResultMessage:
                 mOutboundHandoffRequestController.onHandoffRequestResultMessageReceived(

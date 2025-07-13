@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.toComposeRect
 import androidx.core.content.edit
 import com.android.app.tracing.coroutines.coroutineScopeTraced
 import com.android.systemui.Dumpable
+import com.android.systemui.ambientcue.shared.logger.AmbientCueLogger
 import com.android.systemui.ambientcue.domain.interactor.AmbientCueInteractor
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.domain.interactor.SharedPreferencesInteractor
@@ -66,6 +67,7 @@ constructor(
     private val systemClock: SystemClock,
     private val dumpManager: DumpManager,
     private val sharedPreferencesInteractor: SharedPreferencesInteractor,
+    private val ambientCueLogger: AmbientCueLogger,
     @Application scope: CoroutineScope,
 ) : ExclusiveActivatable(), Dumpable {
 
@@ -113,7 +115,9 @@ constructor(
     private val firstTimeEducationShownAt: Flow<Long?> =
         sharedPreferences
             .flatMapLatestConflated { prefs ->
-                prefs?.observeLong(KEY_FIRST_TIME_ONBOARDING_SHOWN_AT, -1L) ?: flowOf(null)
+                // If the shared preference is not initialized, set the default value to 0L to avoid
+                // showing the first time education.
+                prefs?.observeLong(KEY_FIRST_TIME_ONBOARDING_SHOWN_AT, -1L) ?: flowOf(0L)
             }
             .map { if (it == -1L) null else it }
             .distinctUntilChanged()
@@ -214,6 +218,7 @@ constructor(
                                     else -> ActionType.Unknown
                                 },
                             oneTapEnabled = action.oneTapEnabled,
+                            oneTapDelayMs = action.oneTapDelayMs,
                         )
                     }
                 },
@@ -232,10 +237,10 @@ constructor(
     }
 
     fun hide() {
-        // TODO(b/425279501) Log ambient cue close button click status.
         ambientCueInteractor.setDeactivated(true)
         isExpanded = false
         disableFirstTimeHint()
+        ambientCueLogger.setClickedCloseButtonStatus()
     }
 
     private var deactivateCueBarJob: Job? = null
@@ -250,8 +255,8 @@ constructor(
         coroutineScopeTraced("AmbientCueViewModel") {
             deactivateCueBarJob = launch {
                 delay(ambientCueTimeoutMs.milliseconds)
-                // TODO(b/425279501) Log ambient cue timeout status.
                 ambientCueInteractor.setDeactivated(true)
+                ambientCueLogger.setReachedTimeoutStatus()
             }
         }
     }

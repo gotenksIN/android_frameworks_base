@@ -22,6 +22,7 @@ import android.app.smartspace.SmartspaceConfig
 import android.app.smartspace.SmartspaceManager
 import android.app.smartspace.SmartspaceSession
 import android.app.smartspace.SmartspaceTarget
+import android.app.smartspace.SmartspaceTargetEvent
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -88,7 +89,7 @@ class LockscreenSmartspaceController
 @Inject
 constructor(
     @ShadeDisplayAware private val context: Context,
-    private val featureFlags: FeatureFlags,
+    featureFlags: FeatureFlags,
     private val activityStarter: ActivityStarter,
     private val falsingManager: FalsingManager,
     private val systemClock: SystemClock,
@@ -101,7 +102,7 @@ constructor(
     private val bypassController: KeyguardBypassController,
     private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
     private val smartspaceViewModelFactory: SmartspaceViewModel.Factory,
-    private val dumpManager: DumpManager,
+    dumpManager: DumpManager,
     private val execution: Execution,
     @Main private val uiExecutor: Executor,
     @Background private val bgExecutor: Executor,
@@ -133,7 +134,6 @@ constructor(
     private var regionSamplers = mutableMapOf<SmartspaceView, RegionSampler>()
 
     private val regionSamplingEnabled = featureFlags.isEnabled(Flags.REGION_SAMPLING)
-    private var isRegionSamplersCreated = false
     private var showNotifications = false
     private var showSensitiveContentForCurrentUser = false
     private var showSensitiveContentForManagedUser = false
@@ -507,17 +507,18 @@ constructor(
         statusBarStateController.addCallback(statusBarStateListener)
         bypassController.registerOnBypassStateChangedListener(bypassStateChangedListener)
 
-        datePlugin?.setEventDispatcher { e -> session?.notifySmartspaceEvent(e) }
-        weatherPlugin?.setEventDispatcher { e -> session?.notifySmartspaceEvent(e) }
-        plugin?.setEventDispatcher { e -> session?.notifySmartspaceEvent(e) }
+        datePlugin?.setEventDispatcher { e -> notifySmartspaceEvent(e) }
+        weatherPlugin?.setEventDispatcher { e -> notifySmartspaceEvent(e) }
+        plugin?.setEventDispatcher { e -> notifySmartspaceEvent(e) }
 
         updateBypassEnabled()
         reloadSmartspace()
     }
 
-    fun setSplitShadeEnabled(enabled: Boolean) {
-        mSplitShadeEnabled = enabled
-        smartspaceViews.forEach { it.setSplitShadeEnabled(enabled) }
+    /** Pushes a given SmartspaceTargetEvent to the SmartspaceSession. */
+    private fun notifySmartspaceEvent(targetEvent: SmartspaceTargetEvent) {
+        Log.d(TAG, "notifySmartspaceEvent: $targetEvent")
+        session?.notifySmartspaceEvent(targetEvent)
     }
 
     /** Requests the smartspace session for an update. */

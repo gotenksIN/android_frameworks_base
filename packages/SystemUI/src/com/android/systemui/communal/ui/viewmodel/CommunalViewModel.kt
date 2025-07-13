@@ -32,6 +32,7 @@ import com.android.systemui.communal.shared.log.CommunalMetricsLogger
 import com.android.systemui.communal.shared.log.CommunalSceneLogger
 import com.android.systemui.communal.shared.model.CommunalBackgroundType
 import com.android.systemui.communal.shared.model.CommunalScenes
+import com.android.systemui.communal.shared.model.EditModeState
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
@@ -43,11 +44,13 @@ import com.android.systemui.keyguard.ui.transitions.BlurConfig
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.Logger
 import com.android.systemui.log.dagger.CommunalLog
+import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
 import com.android.systemui.media.controls.ui.controller.MediaCarouselController
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
 import com.android.systemui.media.controls.ui.view.MediaHost
 import com.android.systemui.media.controls.ui.view.MediaHostState
 import com.android.systemui.media.dagger.MediaModule
+import com.android.systemui.media.remedia.ui.viewmodel.MediaViewModel
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.KeyguardIndicationController
@@ -101,12 +104,16 @@ constructor(
     @Named(SWIPE_TO_HUB) private val swipeToHub: Boolean,
     private val communalSceneLogger: CommunalSceneLogger,
     private val falsingInteractor: FalsingInteractor,
+    mediaViewModelFactory: MediaViewModel.Factory,
+    mediaCarouselInteractor: MediaCarouselInteractor,
 ) :
     BaseCommunalViewModel(
         communalSceneInteractor,
         communalInteractor,
         mediaHost,
         mediaCarouselController,
+        mediaViewModelFactory,
+        mediaCarouselInteractor,
     ) {
 
     private val logger = Logger(logBuffer, "CommunalViewModel")
@@ -162,7 +169,7 @@ constructor(
                 logger.d({ "Content updated: $str1" }) { str1 = models.joinToString { it.key } }
             }
 
-    override val isCommunalContentVisible: Flow<Boolean> = MutableStateFlow(true)
+    override val isCommunalContentVisible: Flow<Boolean> = flowOf(true)
 
     /**
      * Freeze the content flow, when an activity is about to show, like starting a timer via voice:
@@ -421,6 +428,17 @@ constructor(
     /** The type of background to use for the hub. */
     val communalBackground: Flow<CommunalBackgroundType> =
         communalSettingsInteractor.communalBackground
+
+    /**
+     * Whether to show a temporary background for edit mode transition.
+     *
+     * This is for coordinating the transition to and from edit mode; the background hides the
+     * activity entry and exit animations below the SystemUI window.
+     */
+    val showBackgroundForEditModeTransition: Flow<Boolean> =
+        if (Flags.hubEditModeTransition())
+            communalSceneInteractor.editModeState.map { it != null && it > EditModeState.STARTING }
+        else flowOf(false)
 
     /** See [CommunalSettingsInteractor.isV2FlagEnabled] */
     fun v2FlagEnabled(): Boolean = communalSettingsInteractor.isV2FlagEnabled()

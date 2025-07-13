@@ -701,6 +701,7 @@
     <style name="Theme.SystemUI.QuickSettings.Header">
         <item name="lightIconTheme">@style/DualToneLightTheme</item>
         <item name="darkIconTheme">@style/QSHeaderDarkTheme</item>
+        <item name="android:fontFamily">variable-body-medium-emphasized</item>
     </style>
 
     <style name="QSIconTheme">
@@ -1031,6 +1032,11 @@
         <item name="android:minHeight">48dp</item>
         <item name="android:track">@drawable/settingslib_switch_track</item>
         <item name="android:thumb">@drawable/settingslib_switch_thumb</item>
+    </style>
+
+    <style name="ScreenCapture" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
     <style name="TextAppearance.ScreenRecord" />

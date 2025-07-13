@@ -119,6 +119,7 @@ import android.view.WindowManager;
 import android.window.ActivityTransitionInfo;
 import android.window.AppCompatTransitionInfo;
 import android.window.DesktopExperienceFlags;
+import android.window.ScreenCapture.ScreenCaptureParams;
 import android.window.ScreenCaptureInternal;
 import android.window.StartingWindowRemovalInfo;
 import android.window.TaskFragmentAnimationParams;
@@ -2226,14 +2227,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         final List<TransitionInfo.Change> changes = info.getChanges();
         for (int i = changes.size() - 1; i >= 0; --i) {
             final WindowContainer<?> container = mTargets.get(i).mContainer;
+            final TransitionInfo.Change change = changes.get(i);
             if (container.asActivityRecord() != null
-                    || shouldApplyAnimOptionsToTask(container.asTask())) {
-                changes.get(i).setAnimationOptions(mOverrideOptions);
-                changes.get(i).setBackgroundColor(mOverrideBackgroundColor);
+                    || shouldApplyAnimOptionsToTask(container.asTask())
+                    || shouldApplyAnimOptionsToFillParentTf(container.asTaskFragment(), change)) {
+                change.setAnimationOptions(mOverrideOptions);
+                change.setBackgroundColor(mOverrideBackgroundColor);
             } else if (shouldApplyAnimOptionsToEmbeddedTf(container.asTaskFragment())) {
                 // We only override AnimationOptions because backgroundColor should be from
                 // TaskFragmentAnimationParams.
-                changes.get(i).setAnimationOptions(mOverrideOptions);
+                change.setAnimationOptions(mOverrideOptions);
             }
         }
         updateActivityTargetForCrossProfileAnimation(info);
@@ -2247,6 +2250,17 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // Only apply AnimationOptions to Task if it is specified in #getOverrideTaskTransition
         // or it's ANIM_SCENE_TRANSITION.
         return animType == ANIM_SCENE_TRANSITION || mOverrideOptions.getOverrideTaskTransition();
+    }
+
+    private boolean shouldApplyAnimOptionsToFillParentTf(
+            @Nullable TaskFragment taskFragment, @NonNull TransitionInfo.Change change) {
+        if (taskFragment == null || !taskFragment.isEmbedded() || mOverrideOptions == null) {
+            return false;
+        }
+        // Apply AnimationOptions to TaskFragment if it fills parent and the animation is a scene
+        // transition.
+        return change.hasFlags(FLAG_FILLS_TASK)
+                && mOverrideOptions.getType() == ANIM_SCENE_TRANSITION;
     }
 
     private boolean shouldApplyAnimOptionsToEmbeddedTf(@Nullable TaskFragment taskFragment) {
@@ -2977,7 +2991,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 continue;
             }
             // The level of transition target should be at least window token.
-            if (wc.asWindowState() != null) continue;
+            if (wc.asWindowState() != null) {
+                continue;
+            }
 
             final ChangeInfo changeInfo = changes.get(wc);
             // Reject no-ops
@@ -3119,8 +3135,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // There needs to be a root on each display.
         for (int i = 0; i < sortedTargets.size(); ++i) {
             final WindowContainer<?> wc = sortedTargets.get(i).mContainer;
-            // Don't include wallpapers since they are in a different DA.
-            if (isWallpaper(wc)) continue;
             final DisplayContent dc = wc.getDisplayContent();
             if (dc == null) continue;
             final int endDisplayId = dc.getDisplayId();
@@ -3149,8 +3163,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 // meant to be always-on-top throughout a transition.
                 leashReference = ancestor.getTopChild();
             }
-            final SurfaceControl rootLeash = leashReference.makeAnimationLeash().setName(
-                    "Transition Root: " + leashReference.getName())
+            final SurfaceControl rootLeash = leashReference.makeAnimationLeash()
+                    .setName("Transition Root: " + leashReference.getName())
                     .setCallsite("Transition.calculateTransitionRoots").build();
             rootLeash.setUnreleasedWarningCallSite("Transition.calculateTransitionRoots");
             // Update layers to start transaction because we prevent assignment during collect, so
@@ -3360,7 +3374,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             topApp = sortedTargets.get(i).mContainer;
             break;
         }
-        if (topApp.asActivityRecord() != null) {
+        if (topApp instanceof ActivityRecord) {
             final ActivityRecord topActivity = topApp.asActivityRecord();
             animOptions = addCustomActivityTransition(topActivity, true/* open */,
                     null /* animOptions */);
@@ -3477,16 +3491,20 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     @NonNull
     static WindowContainer<?> findCommonAncestor(
             @NonNull ArrayList<ChangeInfo> targets,
-            @NonNull WindowContainer<?> topApp) {
-        final int displayId = getDisplayId(topApp);
-        WindowContainer<?> ancestor = topApp.getParent();
+            @NonNull WindowContainer<?> topWc) {
+        final int displayId = getDisplayId(topWc);
+        WindowContainer<?> ancestor = topWc.getParent();
         // Go up ancestor parent chain until all targets are descendants. Ancestor should never be
         // null because all targets are attached.
         for (int i = targets.size() - 1; i >= 0; i--) {
             final ChangeInfo change = targets.get(i);
             final WindowContainer wc = change.mContainer;
-            if (isWallpaper(wc) || getDisplayId(wc) != displayId) {
-                // Skip the non-app window or windows on a different display
+            if (getDisplayId(wc) != displayId) {
+                // Skip windows on a different display
+                continue;
+            }
+            if (isWallpaper(wc) != isWallpaper(topWc)) {
+                // Skip windows in a different DisplayArea.
                 continue;
             }
             // Skip order-only display-level changes since the display itself isn't changing.
@@ -4453,11 +4471,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             ScreenCaptureInternal.LayerCaptureArgs captureArgs =
                     new ScreenCaptureInternal.LayerCaptureArgs.Builder(wc.getSurfaceControl())
                             .setSourceCrop(cropBounds)
-                            .setCaptureSecureLayers(true)
-                            .setAllowProtected(true)
-                            // We always reroute this screenshot to the display, so this transition
-                            // is ALWAYS seamless
-                            .setHintForSeamlessTransition(true)
+                            .setSecureContentPolicy(
+                                    ScreenCaptureParams.SECURE_CONTENT_POLICY_CAPTURE)
+                            .setProtectedContentPolicy(
+                                    ScreenCaptureParams.PROTECTED_CONTENT_POLICY_CAPTURE)
+                            // Capture layers in the display's native color space. This avoids color
+                            // conversion and helps maintain visual consistency during the
+                            // transition.
+                            .setPreserveDisplayColors(true)
                             .build();
             ScreenCaptureInternal.ScreenshotHardwareBuffer screenshotBuffer =
                     ScreenCaptureInternal.captureLayers(captureArgs);

@@ -397,7 +397,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     PendingIntentController mPendingIntentController;
     IntentFirewall mIntentFirewall;
 
-    ProcessStateController mProcessStateController;
+    ProcessStateController.ActivityStateAsyncUpdater mActivityStateUpdater;
 
     final VisibleActivityProcessTracker mVisibleActivityProcessTracker;
 
@@ -875,13 +875,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         int caller() default NONE;
     }
 
-    private final Runnable mUpdateOomAdjRunnable = new Runnable() {
-        @Override
-        public void run() {
-            mAmInternal.updateOomAdj(ActivityManagerInternal.OOM_ADJ_REASON_ACTIVITY);
-        }
-    };
-
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public ActivityTaskManagerService(Context context) {
         mContext = context;
@@ -1034,7 +1027,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mAppWarnings = createAppWarnings(mUiContext, mH, mUiHandler, systemDir);
         mCompatModePackages = new CompatModePackages(this, systemDir, mH);
         mPendingIntentController = intentController;
-        mProcessStateController = processStateController;
+        mActivityStateUpdater = processStateController.createActivityStateAsyncUpdater(looper);
         mTaskSupervisor = createTaskSupervisor();
         mActivityClientController = new ActivityClientController(this);
 
@@ -3156,7 +3149,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         // unlock is either completed or canceled.
         if ((mDemoteTopAppReasons & DEMOTE_TOP_REASON_DURING_UNLOCKING) != 0) {
             mDemoteTopAppReasons &= ~DEMOTE_TOP_REASON_DURING_UNLOCKING;
-            mProcessStateController.setDeviceUnlocking(false);
+            mActivityStateUpdater.setDeviceUnlocking(false);
             // The scheduling group of top process was demoted by unlocking, so recompute
             // to restore its real top priority if possible.
             if (mTopApp != null) {
@@ -3217,7 +3210,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         final WindowProcessController proc;
         synchronized (mGlobalLockWithoutBoost) {
             mDemoteTopAppReasons &= ~DEMOTE_TOP_REASON_DURING_UNLOCKING;
-            mProcessStateController.setDeviceUnlocking(false);
+            mActivityStateUpdater.setDeviceUnlocking(false);
             final WindowState notificationShade = mRootWindowContainer.getDefaultDisplay()
                     .getDisplayPolicy().getNotificationShade();
             proc = notificationShade != null ? notificationShade.getProcess() : null;
@@ -4011,7 +4004,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 } else if (mKeyguardShown) {
                     // Only set if it is not unlocking to launcher which may also animate.
                     mDemoteTopAppReasons |= DEMOTE_TOP_REASON_DURING_UNLOCKING;
-                    mProcessStateController.setDeviceUnlocking(true);
+                    mActivityStateUpdater.setDeviceUnlocking(true);
                 }
 
                 final boolean wasNoResumed = mTopApp == null || !mTopApp.hasResumedActivity();
@@ -5240,7 +5233,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 mH.removeMessages(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG);
             }
             mRetainPowerModeAndTopProcessState = true;
-            mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
+            mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
             mH.sendEmptyMessageDelayed(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG,
                     POWER_MODE_UNKNOWN_VISIBILITY_TIMEOUT_MS);
             Slog.d(TAG, "Temporarily retain top process state for launching app");
@@ -5275,7 +5268,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             if (allResolved) {
                 mPowerModeReasons &= ~POWER_MODE_REASON_UNKNOWN_VISIBILITY;
                 mRetainPowerModeAndTopProcessState = false;
-                mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
+                mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
                 mH.removeMessages(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG);
             }
         }
@@ -5527,49 +5520,50 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     void updateSleepIfNeededLocked() {
         final boolean shouldSleep = !mRootWindowContainer.hasAwakeDisplay();
         final boolean wasSleeping = mSleeping;
-        boolean updateOomAdj = false;
 
-        if (!shouldSleep) {
-            // If wasSleeping is true, we need to wake up activity manager state from when
-            // we started sleeping. In either case, we need to apply the sleep tokens, which
-            // will wake up root tasks or put them to sleep as appropriate.
-            if (wasSleeping) {
-                mSleeping = false;
-                FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
-                        FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__AWAKE);
-                startTimeTrackingFocusedActivityLocked();
-                if (mTopApp != null) {
-                    mTopApp.addToPendingTop();
+        try (var unused = mActivityStateUpdater.startBatchSession()) {
+            boolean updateOomAdj = false;
+            if (!shouldSleep) {
+                // If wasSleeping is true, we need to wake up activity manager state from when
+                // we started sleeping. In either case, we need to apply the sleep tokens, which
+                // will wake up root tasks or put them to sleep as appropriate.
+                if (wasSleeping) {
+                    mSleeping = false;
+                    FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
+                            FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__AWAKE);
+                    startTimeTrackingFocusedActivityLocked();
+                    if (mTopApp != null) {
+                        mTopApp.addToPendingTop();
+                    }
+                    mTopProcessState = ActivityManager.PROCESS_STATE_TOP;
+                    mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
+                    Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP");
+                    mTaskSupervisor.comeOutOfSleepIfNeededLocked();
+                    updateOomAdj = true;
                 }
-                mTopProcessState = ActivityManager.PROCESS_STATE_TOP;
-                mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
-                Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP");
-                mTaskSupervisor.comeOutOfSleepIfNeededLocked();
+                mRootWindowContainer.applySleepTokens(true /* applyToRootTasks */);
+            } else if (!mSleeping && shouldSleep) {
+                mSleeping = true;
+                FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
+                        FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__ASLEEP);
+                if (mCurAppTimeTracker != null) {
+                    mCurAppTimeTracker.stop();
+                }
+                mTopProcessState = ActivityManager.PROCESS_STATE_TOP_SLEEPING;
+                mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
+                Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP_SLEEPING");
+                mTaskSupervisor.goingToSleepLocked();
+                updateResumedAppTrace(null /* resumed */);
                 updateOomAdj = true;
             }
-            mRootWindowContainer.applySleepTokens(true /* applyToRootTasks */);
-        } else if (!mSleeping && shouldSleep) {
-            mSleeping = true;
-            FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
-                    FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__ASLEEP);
-            if (mCurAppTimeTracker != null) {
-                mCurAppTimeTracker.stop();
+            if (updateOomAdj) {
+                updateOomAdj();
             }
-            mTopProcessState = ActivityManager.PROCESS_STATE_TOP_SLEEPING;
-            mProcessStateController.setTopProcessStateAsync(mInternal.getTopProcessState());
-            Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP_SLEEPING");
-            mTaskSupervisor.goingToSleepLocked();
-            updateResumedAppTrace(null /* resumed */);
-            updateOomAdj = true;
-        }
-        if (updateOomAdj) {
-            updateOomAdj();
         }
     }
 
     void updateOomAdj() {
-        mH.removeCallbacks(mUpdateOomAdjRunnable);
-        mH.post(mUpdateOomAdjRunnable);
+        mActivityStateUpdater.runUpdateAsync();
     }
 
     void updateCpuStats() {
@@ -5602,7 +5596,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         } else {
             cancelExpandedShade = false;
         }
-        mProcessStateController.setTopProcessAsync(topApp, clearPrevious, cancelExpandedShade);
+        mActivityStateUpdater.setTopProcessAsync(topApp, clearPrevious, cancelExpandedShade);
     }
 
     /**
@@ -5624,7 +5618,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             final WindowProcessController previousProcess = stoppedActivity.app;
             mPreviousProcess = previousProcess;
             mPreviousProcessVisibleTime = stoppedActivity.lastVisibleTime;
-            mProcessStateController.setPreviousProcessAsync(previousProcess);
+            mActivityStateUpdater.setPreviousProcessAsync(previousProcess);
         }
     }
 
@@ -5709,7 +5703,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 ActivityTaskManagerService::postHeavyWeightProcessNotification, this,
                 wpc, root.intent, root.mUserId);
         mH.sendMessage(m);
-        mProcessStateController.setHeavyWeightProcessAsync(wpc);
+        mActivityStateUpdater.setHeavyWeightProcessAsync(wpc);
     }
 
     void clearHeavyWeightProcessIfEquals(WindowProcessController proc) {
@@ -5722,7 +5716,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 ActivityTaskManagerService::cancelHeavyWeightProcessNotification, this,
                 proc.mUserId);
         mH.sendMessage(m);
-        mProcessStateController.setHeavyWeightProcessAsync(null);
+        mActivityStateUpdater.setHeavyWeightProcessAsync(null);
     }
 
     private void cancelHeavyWeightProcessNotification(int userId) {
@@ -6332,7 +6326,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 case END_POWER_MODE_UNKNOWN_VISIBILITY_MSG: {
                     synchronized (mGlobalLock) {
                         mRetainPowerModeAndTopProcessState = false;
-                        mProcessStateController.setTopProcessStateAsync(
+                        mActivityStateUpdater.setTopProcessStateAsync(
                                 mInternal.getTopProcessState());
                         endPowerMode(POWER_MODE_REASON_UNKNOWN_VISIBILITY);
                         if (mTopApp != null
@@ -6677,11 +6671,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLockWithoutBoost) {
                 if (proc == mHomeProcess) {
                     mHomeProcess = null;
-                    mProcessStateController.setHomeProcessAsync(null);
+                    mActivityStateUpdater.setHomeProcessAsync(null);
                 }
                 if (proc == mPreviousProcess) {
                     mPreviousProcess = null;
-                    mProcessStateController.setPreviousProcessAsync(null);
+                    mActivityStateUpdater.setPreviousProcessAsync(null);
                 }
             }
         }

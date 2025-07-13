@@ -552,6 +552,9 @@ interface IAudioService {
     void cacheParameters(in String keyValuePairs);
 
 // QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
+
+    boolean isMultiAudioFocusEnabled();
+
     int setPreferredDevicesForCapturePreset(
             in int capturePreset, in List<AudioDeviceAttributes> devices);
 

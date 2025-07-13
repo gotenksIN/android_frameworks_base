@@ -826,9 +826,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
 
             // If this receiver is going to be skipped, skip it now itself and don't even enqueue
             // it.
-            final String skipReason = Flags.avoidNoteOpAtEnqueue()
-                    ? mSkipPolicy.shouldSkipAtEnqueueMessage(r, receiver)
-                    : mSkipPolicy.shouldSkipMessage(r, receiver);
+            final String skipReason = mSkipPolicy.shouldSkipAtEnqueueMessage(r, receiver);
             if (skipReason != null) {
                 setDeliveryState(null, null, r, i, receiver, BroadcastRecord.DELIVERY_SKIPPED,
                         "skipped by policy at enqueue: " + skipReason);
@@ -2101,7 +2099,8 @@ class BroadcastQueueImpl extends BroadcastQueue {
             mService.mProcessStateController.noteBroadcastDeliveryStarted(queue.app,
                     queue.getPreferredSchedulingGroupLocked());
             if (queue.runningOomAdjusted) {
-                queue.app.mState.forceProcessStateUpTo(ActivityManager.PROCESS_STATE_RECEIVER);
+                mService.mProcessStateController.forceProcessStateUpTo(queue.app,
+                        ActivityManager.PROCESS_STATE_RECEIVER);
                 mService.enqueueOomAdjTargetLocked(queue.app);
             }
         }

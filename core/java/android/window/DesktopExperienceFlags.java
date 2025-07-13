@@ -117,6 +117,9 @@ public enum DesktopExperienceFlags {
     ENABLE_DESKTOP_TASK_LIMIT_SEPARATE_TRANSITION(
             Flags::enableDesktopTaskLimitSeparateTransition, true,
             Flags.FLAG_ENABLE_DESKTOP_TASK_LIMIT_SEPARATE_TRANSITION),
+    ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX(
+            Flags::enableDesktopWindowingEnterpriseBugfix,
+            false, Flags.FLAG_ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX),
     ENABLE_DESKTOP_WINDOWING_PIP(Flags::enableDesktopWindowingPip, true,
             Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP),
     ENABLE_DESKTOP_WINDOWING_PIP_IN_OVERVIEW_BUGFIX(
@@ -131,7 +134,7 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION),
     ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS(Flags::enableDisplayFocusInShellTransitions, true,
             Flags.FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS),
-    ENABLE_DISPLAY_RECONNECT_INTERACTION(Flags::enableDisplayReconnectInteraction, false,
+    ENABLE_DISPLAY_RECONNECT_INTERACTION(Flags::enableDisplayReconnectInteraction, true,
             Flags.FLAG_ENABLE_DISPLAY_RECONNECT_INTERACTION),
     ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING(Flags::enableDisplayWindowingModeSwitching, true,
             Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING),
@@ -142,6 +145,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX),
     ENABLE_EMPTY_DESK_ON_MINIMIZE(Flags::enableEmptyDeskOnMinimize, true,
             Flags.FLAG_ENABLE_EMPTY_DESK_ON_MINIMIZE),
+    ENABLE_EMPTY_ROOTS_NEVER_TOP(Flags::emptyRootsNeverTop, false,
+            Flags.FLAG_EMPTY_ROOTS_NEVER_TOP),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS),
     ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS(Flags::enableFreeformDisplayLaunchParams, true,

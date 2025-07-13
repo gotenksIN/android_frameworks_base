@@ -21,14 +21,13 @@ import android.view.WindowManager.TRANSIT_CLOSE
 import android.view.WindowManager.TRANSIT_OPEN
 import androidx.test.filters.SmallTest
 import com.android.wm.shell.ShellTestCase
-import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
 import com.android.wm.shell.util.testLetterboxLifecycleEventFactory
 import java.util.function.Consumer
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.mock
 
 /**
  * Tests for [SkipLetterboxLifecycleEventFactory].
@@ -48,53 +47,67 @@ class SkipLetterboxLifecycleEventFactoryTest : ShellTestCase() {
                     mode = TRANSIT_CLOSE
                 }
                 validateCanHandle { canHandle ->
-                    assert(canHandle)
+                    assertTrue(canHandle)
                 }
                 validateCreateLifecycleEvent { event ->
-                    assert(event == null)
+                    assertNull(event)
                 }
             }
         }
     }
 
     @Test
-    fun `Factory is active when Change is not closing and a DesksOrganizer change`() {
+    fun `Factory is active when Change is for a Task which is NOT a leaf`() {
         runTestScenario { r ->
             testLetterboxLifecycleEventFactory(r.getLetterboxLifecycleEventFactory()) {
                 inputChange {
                     mode = TRANSIT_OPEN
-                    activityTransitionInfo {
-                        taskId = 10
+                    runningTaskInfo { ti ->
+                        ti.appCompatTaskInfo.setIsLeafTask(false)
                     }
                 }
-                r.configureDesksOrganizer(isDeskChange = true)
                 validateCanHandle { canHandle ->
-                    assert(canHandle)
+                    assertTrue(canHandle)
                 }
                 validateCreateLifecycleEvent { event ->
-                    assert(event == null)
+                    assertNull(event)
                 }
             }
         }
     }
 
     @Test
-    fun `Factory is skipped when Change is not closing one and is NOT a DesksOrganizer change`() {
+    fun `Factory is active when Change is not closing for a Task which is NOT a leaf`() {
+        runTestScenario { r ->
+            testLetterboxLifecycleEventFactory(r.getLetterboxLifecycleEventFactory()) {
+                inputChange {
+                    mode = TRANSIT_OPEN
+                    runningTaskInfo { ti ->
+                        ti.appCompatTaskInfo.setIsLeafTask(false)
+                    }
+                }
+                validateCanHandle { canHandle ->
+                    assertTrue(canHandle)
+                }
+                validateCreateLifecycleEvent { event ->
+                    assertNull(event)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Factory is NOT active when Change is not closing for an Activity Transition`() {
         runTestScenario { r ->
             testLetterboxLifecycleEventFactory(r.getLetterboxLifecycleEventFactory()) {
                 inputChange {
                     mode = TRANSIT_OPEN
                     activityTransitionInfo {
-                        taskId = 10
+                        this.taskId = 10
                     }
                 }
-                r.configureDesksOrganizer(isDeskChange = false)
                 validateCanHandle { canHandle ->
-                    assert(!canHandle)
-                }
-                validateCreateLifecycleEvent { event ->
-                    assert(event != null)
-                    assert(event?.type == LetterboxLifecycleEventType.NONE)
+                    assertFalse(canHandle)
                 }
             }
         }
@@ -113,14 +126,8 @@ class SkipLetterboxLifecycleEventFactoryTest : ShellTestCase() {
      */
     class DisableLetterboxLifecycleEventFactoryRobotTest {
 
-        private val desksOrganizer: DesksOrganizer = mock<DesksOrganizer>()
-
-        fun configureDesksOrganizer(isDeskChange: Boolean) {
-            doReturn(isDeskChange).`when`(desksOrganizer).isDeskChange(any())
-        }
-
         fun getLetterboxLifecycleEventFactory(): () -> LetterboxLifecycleEventFactory = {
-            SkipLetterboxLifecycleEventFactory(desksOrganizer)
+            SkipLetterboxLifecycleEventFactory()
         }
     }
 }

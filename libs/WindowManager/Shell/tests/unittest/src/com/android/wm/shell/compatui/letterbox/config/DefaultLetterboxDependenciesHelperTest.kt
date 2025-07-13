@@ -19,14 +19,16 @@ package com.android.wm.shell.compatui.letterbox.config
 import android.testing.AndroidTestingRunner
 import androidx.test.filters.SmallTest
 import com.android.wm.shell.ShellTestCase
-import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
+import com.android.wm.shell.desktopmode.DesktopRepository
 import com.android.wm.shell.util.testLetterboxDependenciesHelper
+import java.util.function.Consumer
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
-import java.util.function.Consumer
 
 /**
  * Tests for [DefaultLetterboxDependenciesHelper].
@@ -39,26 +41,26 @@ import java.util.function.Consumer
 class DefaultLetterboxDependenciesHelperTest : ShellTestCase() {
 
     @Test
-    fun `Default implementation returns true if isDeskChange is true`() {
+    fun `Should not destroy letterbox surfaces if not isAnyDeskActive`() {
         runTestScenario { r ->
             testLetterboxDependenciesHelper(r.getLetterboxLifecycleEventFactory()) {
                 inputChange { }
-                r.configureDeskChangeChecker(isDeskChange = true)
-                validateIsDesktopWindowingAction { isDeskChange ->
-                    assert(isDeskChange)
+                r.configureDesktopRepository(isAnyDeskActive = false)
+                validateIsDesktopWindowingAction { shouldDestroy ->
+                    assertFalse(shouldDestroy)
                 }
             }
         }
     }
 
     @Test
-    fun `Default implementation returns false if isDeskChange is false`() {
+    fun `Should destroy letterbox surfaces if isAnyDeskActive`() {
         runTestScenario { r ->
             testLetterboxDependenciesHelper(r.getLetterboxLifecycleEventFactory()) {
                 inputChange { }
-                r.configureDeskChangeChecker(isDeskChange = true)
-                validateIsDesktopWindowingAction { isDeskChange ->
-                    assert(!isDeskChange)
+                r.configureDesktopRepository(isAnyDeskActive = true)
+                validateIsDesktopWindowingAction { shouldDestroy ->
+                    assertTrue(shouldDestroy)
                 }
             }
         }
@@ -77,14 +79,14 @@ class DefaultLetterboxDependenciesHelperTest : ShellTestCase() {
      */
     class LetterboxDependenciesHelperRobotTest {
 
-        private val desksOrganizer = mock<DesksOrganizer>()
+        private val desktopRepository = mock<DesktopRepository>()
 
-        fun configureDeskChangeChecker(isDeskChange: Boolean) {
-            doReturn(isDeskChange).`when`(desksOrganizer).isDeskChange(any())
+        fun configureDesktopRepository(isAnyDeskActive: Boolean) {
+            doReturn(isAnyDeskActive).`when`(desktopRepository).isAnyDeskActive(any())
         }
 
         fun getLetterboxLifecycleEventFactory(): () -> LetterboxDependenciesHelper = {
-            DefaultLetterboxDependenciesHelper(desksOrganizer)
+            DefaultLetterboxDependenciesHelper(desktopRepository)
         }
     }
 }

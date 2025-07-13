@@ -82,7 +82,7 @@ public class RemoteTaskStore implements ConnectedAssociationStore.Observer {
                 return;
             }
 
-            Slog.v(TAG, "Adding task: " + taskInfo.getId() + " for association: " + associationId);
+            Slog.v(TAG, "Adding task: " + taskInfo.id() + " for association: " + associationId);
             mRemoteDeviceTaskLists.get(associationId).addTask(taskInfo);
         }
     }
@@ -94,6 +94,16 @@ public class RemoteTaskStore implements ConnectedAssociationStore.Observer {
             }
 
             mRemoteDeviceTaskLists.get(associationId).removeTask(taskId);
+        }
+    }
+
+    public void updateTask(int associationId, RemoteTaskInfo taskInfo) {
+        synchronized (mRemoteDeviceTaskLists) {
+            if (!mRemoteDeviceTaskLists.containsKey(associationId)) {
+                return;
+            }
+
+            mRemoteDeviceTaskLists.get(associationId).updateTask(taskInfo);
         }
     }
 

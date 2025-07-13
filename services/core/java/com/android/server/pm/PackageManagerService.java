@@ -771,7 +771,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             // disable all package caches that shouldn't apply within system server
             PackageManager.disableApplicationInfoCache();
             PackageManager.disablePackageInfoCache();
-            ApplicationPackageManager.invalidateGetPackagesForUidCache();
+            invalidateGetPackagesForUidCache(
+                    PackageMetrics.INVALIDATION_REASON_DISABLE_PACKAGE_CACHES);
             ApplicationPackageManager.disableGetPackagesForUidCache();
             ApplicationPackageManager.invalidateHasSystemFeatureCache();
             PackageManager.corkPackageInfoCache();
@@ -1004,6 +1005,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     final boolean mShouldStopSystemPackagesByDefault;
     private final @NonNull String mRequiredSdkSandboxPackage;
     private final @Nullable ComponentName mDeveloperVerificationServiceProvider;
+    private final @Nullable String mDeveloperVerificationPolicyDelegatePackage;
     @GuardedBy("mLock")
     private final PackageUsage mPackageUsage = new PackageUsage();
     final CompilerStats mCompilerStats = new CompilerStats();
@@ -1056,9 +1058,21 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      * Invalidate the package info cache, which includes updating the cached computer.
      * @hide
      */
-    public static void invalidatePackageInfoCache() {
+    public static void invalidatePackageInfoCache(int invalidationReason) {
         PackageManager.invalidatePackageInfoCache();
         onChanged();
+        PackageMetrics.reportCacheInvalidationEvent(
+                PackageMetrics.CACHE_TYPE_APPLICATION_AND_PACKAGE_INFO, invalidationReason);
+    }
+
+    /**
+     * Invalidate the get packages for UID cache, which includes updating the cached computer.
+     * @hide
+     */
+    public static void invalidateGetPackagesForUidCache(int invalidationReason) {
+        ApplicationPackageManager.invalidateGetPackagesForUidCache();
+        PackageMetrics.reportCacheInvalidationEvent(
+                PackageMetrics.CACHE_TYPE_GET_PACKAGES_FOR_UID, invalidationReason);
     }
 
     private final Watcher mWatcher = new Watcher() {
@@ -1587,7 +1601,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         // We normally invalidate when we write settings, but in cases where we delay and
         // coalesce settings writes, this strategy would have us invalidate the cache too late.
         // Invalidating on schedule addresses this problem.
-        invalidatePackageInfoCache();
+        invalidatePackageInfoCache(
+                PackageMetrics.INVALIDATION_REASON_SCHEDULE_WRITE_SETTINGS);
         ApplicationPackageManager.invalidateQueryIntentActivitiesCache();
         if (!mHandler.hasMessages(WRITE_SETTINGS)) {
             mHandler.sendEmptyMessageDelayed(WRITE_SETTINGS, WRITE_SETTINGS_DELAY);
@@ -1595,7 +1610,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     void scheduleWritePackageListLocked(int userId) {
-        invalidatePackageInfoCache();
+        invalidatePackageInfoCache(
+                PackageMetrics.INVALIDATION_REASON_SCHEDULE_WRITE_PACKAGE_LIST);
         ApplicationPackageManager.invalidateQueryIntentActivitiesCache();
         if (!mHandler.hasMessages(WRITE_PACKAGE_LIST)) {
             Message msg = mHandler.obtainMessage(WRITE_PACKAGE_LIST);
@@ -1610,7 +1626,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     void scheduleWritePackageRestrictions(@CanBeALL @UserIdInt int userId) {
-        invalidatePackageInfoCache();
+        invalidatePackageInfoCache(
+                PackageMetrics.INVALIDATION_REASON_SCHEDULE_WRITE_PACKAGE_RESTRICTIONS);
         if (userId == USER_ALL) {
             synchronized (mDirtyUsers) {
                 for (int aUserId : mUserManager.getUserIds()) {
@@ -1960,6 +1977,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mShouldStopSystemPackagesByDefault = testParams.shouldStopSystemPackagesByDefault;
         mDeveloperVerificationServiceProvider =
                 testParams.developerVerificationServiceProvider;
+        mDeveloperVerificationPolicyDelegatePackage =
+                testParams.developerVerificationPolicyDelegatePackage;
 
         mLiveComputer = createLiveComputer();
         mSnapshotStatistics = null;
@@ -1992,7 +2011,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mPackageMonitorCallbackHelper = testParams.packageMonitorCallbackHelper;
 
         registerObservers(false);
-        invalidatePackageInfoCache();
+        invalidatePackageInfoCache(
+                PackageMetrics.INVALIDATION_REASON_PACKAGE_MANAGER_SERVICE_INIT);
     }
 
     public PackageManagerService(PackageManagerServiceInjector injector, boolean factoryTest,
@@ -2519,6 +2539,12 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                             R.string.config_developerVerificationServiceProviderPackageName));
             mProtectedPackages.setDeveloperVerificationServiceProviderPackage(
                     mDeveloperVerificationServiceProvider);
+            // Remember the developer verification policy delegate which is allowed to change the
+            // developer verification policy on behalf of the developer verification service
+            // provider defined above.
+            mDeveloperVerificationPolicyDelegatePackage =
+                    getVerificationPolicyDelegate(computer, mContext.getString(
+                            R.string.config_developerVerificationPolicyDelegatePackageName));
 
             // Initialize InstantAppRegistry's Instant App list for all users.
             forEachPackageState(computer, packageState -> {
@@ -3828,6 +3854,21 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return null;
         }
         return ri.getComponentInfo().getComponentName();
+    }
+
+    @Nullable
+    private String getVerificationPolicyDelegate(@NonNull Computer computer,
+            @Nullable String packageName) {
+        if (TextUtils.isEmpty(packageName)) {
+            return null;
+        }
+        // It should be a system and privileged app installed on the device
+        final PackageStateInternal psi = computer.getPackageStateInternal(
+                packageName, Process.SYSTEM_UID);
+        if (psi != null && psi.isSystem() && psi.isPrivileged()) {
+            return packageName;
+        }
+        return null;
     }
 
     @Nullable
@@ -7595,7 +7636,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
         }
 
-        invalidatePackageInfoCache();
+        invalidatePackageInfoCache(
+                PackageMetrics.INVALIDATION_REASON_ENABLE_OVERLAY_PACKAGES);
     }
 
     private boolean canSetOverlayPaths(OverlayPaths origPaths, OverlayPaths newPaths) {
@@ -7782,7 +7824,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
 
         if (accessGranted) {
-            ApplicationPackageManager.invalidateGetPackagesForUidCache();
+            invalidateGetPackagesForUidCache(
+                    PackageMetrics.INVALIDATION_REASON_GRANT_IMPLICIT_ACCESS);
         }
     }
 
@@ -8446,5 +8489,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
         }
         return sRestrictedPermissions;
+    }
+
+    @Nullable
+    String getDeveloperVerificationPolicyDelegatePackageName() {
+        return mDeveloperVerificationPolicyDelegatePackage;
     }
 }

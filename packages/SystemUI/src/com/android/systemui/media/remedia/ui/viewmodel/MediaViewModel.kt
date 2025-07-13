@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import com.android.systemui.animation.Expandable
 import com.android.systemui.classifier.Classifier
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
@@ -226,12 +227,11 @@ constructor(
                                         it.name,
                                     ),
                                 isConnecting = it.isInProgress,
-                                onClick = {
+                                onClick = { expandable ->
                                     falsingSystem.runIfNotFalseTap(
                                         FalsingManager.MODERATE_PENALTY
                                     ) {
-                                        // TODO(b/397989775): Perform selection of the suggested
-                                        // device
+                                        it.onClick(expandable)
                                     }
                                 },
                             )
@@ -245,10 +245,9 @@ constructor(
                             text =
                                 if (session.suggestedOutputDevice == null) session.outputDevice.name
                                 else null,
-                            onClick = {
+                            onClick = { expandable ->
                                 falsingSystem.runIfNotFalseTap(FalsingManager.MODERATE_PENALTY) {
-                                    // TODO(b/397989775): tell the UI to show the output
-                                    // switcher.
+                                    session.outputDevice.onClick(expandable)
                                 }
                             },
                         )
@@ -266,8 +265,10 @@ constructor(
                         )
                     }
 
-                override val onClick = {
-                    falsingSystem.runIfNotFalseTap(FalsingManager.LOW_PENALTY) { session.onClick() }
+                override val onClick = { expandable: Expandable ->
+                    falsingSystem.runIfNotFalseTap(FalsingManager.LOW_PENALTY) {
+                        session.onClick(expandable)
+                    }
                 }
                 override val onClickLabel =
                     context.getString(R.string.controls_media_playing_item_description)

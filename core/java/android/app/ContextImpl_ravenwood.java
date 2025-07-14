@@ -15,5 +15,29 @@
  */
 package android.app;
 
+import android.content.pm.PackageManager;
+import android.os.FileUtils;
+import android.platform.test.ravenwood.RavenwoodPackageManager;
+
+import java.io.File;
+
 public class ContextImpl_ravenwood {
+    private static final String TAG = "ContextImpl_ravenwood";
+
+    static PackageManager getPackageManagerInner(ContextImpl contextImpl) {
+        return new RavenwoodPackageManager(contextImpl);
+    }
+
+    static File ensurePrivateDirExists(File file, int mode, int gid, String xattr) {
+        if (!file.exists()) {
+            final String path = file.getAbsolutePath();
+            file.mkdirs();
+
+            // setPermissions() may fail and return an error status, but we just ignore
+            // it just like the real method ignores exceptions.
+            // setPermissions() does a log though.
+            FileUtils.setPermissions(path, mode, -1, -1);
+        }
+        return file;
+    }
 }

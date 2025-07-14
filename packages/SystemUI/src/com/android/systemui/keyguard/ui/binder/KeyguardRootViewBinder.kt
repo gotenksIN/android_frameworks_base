@@ -73,6 +73,7 @@ import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager
 import com.android.systemui.temporarydisplay.ViewPriority
 import com.android.systemui.temporarydisplay.chipbar.ChipbarCoordinator
 import com.android.systemui.temporarydisplay.chipbar.ChipbarInfo
+import com.android.systemui.util.WallpaperController
 import com.android.systemui.util.kotlin.DisposableHandles
 import com.android.systemui.util.ui.AnimatedValue
 import com.android.systemui.util.ui.isAnimating
@@ -109,6 +110,7 @@ object KeyguardRootViewBinder {
         msdlPlayer: MSDLPlayer?,
         @KeyguardBlueprintLog blueprintLog: LogBuffer,
         wallpaperFocalAreaViewModel: WallpaperFocalAreaViewModel,
+        wallpaperController: WallpaperController,
     ): DisposableHandle {
         val disposables = DisposableHandles()
         val childViews = mutableMapOf<Int, View>()
@@ -202,6 +204,18 @@ object KeyguardRootViewBinder {
                         viewModel.alpha(viewState).collect { alpha ->
                             view.alpha = alpha
                             childViews[burnInLayerId]?.alpha = alpha
+                        }
+                    }
+
+                    if (Flags.newDozingKeyguardStates()) {
+                        launch("$TAG#nonAuthUIAlpha") {
+                            viewModel.nonAuthUIAlpha.collect { alpha ->
+                                for (childView in childViews) {
+                                    if (!authUiIds.contains(childView.key)) {
+                                        childView.value.alpha = alpha
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -355,6 +369,14 @@ object KeyguardRootViewBinder {
                     launch {
                         wallpaperFocalAreaViewModel.wallpaperFocalAreaBounds.collect {
                             wallpaperFocalAreaViewModel.setFocalAreaBounds(it)
+                        }
+                    }
+
+                    if (Flags.gestureBetweenHubAndLockscreenMotion()) {
+                        launch {
+                            viewModel.wallpaperZoomOut.collect { zoomOutToApply ->
+                                wallpaperController.setWallpaperZoom(zoomOutToApply)
+                            }
                         }
                     }
                 }
@@ -587,6 +609,7 @@ object KeyguardRootViewBinder {
     private val deviceEntryIcon = R.id.device_entry_icon_view
     private val nsslPlaceholderId = R.id.nssl_placeholder
     private val authInteractionProperties = AuthInteractionProperties()
+    private val authUiIds = setOf(deviceEntryIcon, indicationArea)
 
     private const val ID = "occluding_app_device_entry_unlock_msg"
     private const val AOD_ICONS_APPEAR_DURATION: Long = 200

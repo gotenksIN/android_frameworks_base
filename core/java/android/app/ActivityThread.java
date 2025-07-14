@@ -18,8 +18,8 @@ package android.app;
 
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.app.ConfigurationController.createNewConfigAndUpdateIfNotNull;
-import static android.app.Flags.skipBgMemTrimOnFgApp;
 import static android.app.Flags.earlyRenderThreadPriorityBoost;
+import static android.app.Flags.skipBgMemTrimOnFgApp;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.app.servertransaction.ActivityLifecycleItem.ON_CREATE;
@@ -45,8 +45,6 @@ import static com.android.internal.os.SafeZipPathValidatorCallback.VALIDATE_ZIP_
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityOptions.SceneTransitionInfo;
-import android.app.HandoffActivityData;
-import android.app.HandoffActivityDataRequestInfo;
 import android.app.RemoteServiceException.BadForegroundServiceNotificationException;
 import android.app.RemoteServiceException.BadUserInitiatedJobNotificationException;
 import android.app.RemoteServiceException.CannotPostForegroundServiceNotificationException;
@@ -182,6 +180,12 @@ import android.provider.DeviceConfigServiceManager;
 import android.provider.Downloads;
 import android.provider.FontsContract;
 import android.provider.Settings;
+import android.ravenwood.annotation.RavenwoodIgnore;
+import android.ravenwood.annotation.RavenwoodKeep;
+import android.ravenwood.annotation.RavenwoodKeepPartialClass;
+import android.ravenwood.annotation.RavenwoodKeepWholeClass;
+import android.ravenwood.annotation.RavenwoodReplace;
+import android.ravenwood.annotation.RavenwoodThrow;
 import android.renderscript.RenderScriptCacheDir;
 import android.se.omapi.SeFrameworkInitializer;
 import android.se.omapi.SeServiceManager;
@@ -304,15 +308,21 @@ import java.util.function.Consumer;
  *
  * {@hide}
  */
-@android.ravenwood.annotation.RavenwoodPartiallyAllowlisted
-@android.ravenwood.annotation.RavenwoodKeepPartialClass(
-        comment = "We use Objenesis to instantiate it. No member fields are initialized."
+@android.ravenwood.annotation.RavenwoodKeepPartialClass(comment =
+        "Initialization logic is in ActivityThread_ravenwood and RavenwoodAppDriver."
+        + " Only very basic initialization is done."
+        + " Most of its logic is not ported to Ravenwood yet."
 )
 @android.ravenwood.annotation.RavenwoodRedirectionClass("ActivityThread_ravenwood")
 public final class ActivityThread extends ClientTransactionHandler
         implements ActivityThreadInternal {
 
-    private final DdmSyncStageUpdater mDdmSyncStageUpdater = new DdmSyncStageUpdater();
+    private final DdmSyncStageUpdater mDdmSyncStageUpdater = newDdmSyncStageUpdater();
+
+    @RavenwoodIgnore
+    private static DdmSyncStageUpdater newDdmSyncStageUpdater() {
+        return new DdmSyncStageUpdater();
+    }
 
     /** @hide */
     public static final String TAG = "ActivityThread";
@@ -521,7 +531,12 @@ public final class ActivityThread extends ClientTransactionHandler
             publicAlternatives = "Use {@code Context#getResources()#getConfiguration()} instead.")
     Configuration mPendingConfiguration = null;
     // An executor that performs multi-step transactions.
-    private final TransactionExecutor mTransactionExecutor = new TransactionExecutor(this);
+    private final TransactionExecutor mTransactionExecutor = newTransactionExecutor(this);
+
+    @RavenwoodIgnore
+    private static TransactionExecutor newTransactionExecutor(ActivityThread at) {
+        return new TransactionExecutor(at);
+    }
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private final ResourcesManager mResourcesManager;
@@ -1147,7 +1162,12 @@ public final class ActivityThread extends ClientTransactionHandler
         int index;
     }
 
+    @RavenwoodKeepPartialClass
     private class ApplicationThread extends IApplicationThread.Stub {
+        @RavenwoodKeep
+        ApplicationThread() {
+        }
+
         private static final String DB_CONNECTION_INFO_HEADER = "  %8s %8s %14s %5s %5s %5s  %s";
         private static final String DB_CONNECTION_INFO_FORMAT = "  %8s %8s %14s %5d %5d %5d  %s";
         private static final String DB_POOL_INFO_HEADER = "  %13s %13s %13s  %s";
@@ -1325,6 +1345,7 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         @Override
+        @RavenwoodThrow(comment = "See ActivityThread_ravenwood for initialization on Ravenwood")
         public final void bindApplication(
                 String processName,
                 ApplicationInfo appInfo,
@@ -2472,7 +2493,12 @@ public final class ActivityThread extends ClientTransactionHandler
         throw new ForegroundServiceDidNotStopInTimeException(message, inner);
     }
 
+    @RavenwoodKeepPartialClass
     class H extends Handler {
+        @RavenwoodKeep
+        H() {
+        }
+
         public static final int BIND_APPLICATION        = 110;
         @UnsupportedAppUsage
         public static final int EXIT_APPLICATION        = 111;
@@ -2966,8 +2992,10 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
+    @RavenwoodKeepWholeClass(comment = "needed by ActivityThread constructor")
     final class GcIdler implements MessageQueue.IdleHandler {
         @Override
+        @RavenwoodIgnore
         public final boolean queueIdle() {
             doGcIfNeeded();
             purgePendingResources();
@@ -2975,15 +3003,32 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
+    @RavenwoodKeepWholeClass(comment = "needed by ActivityThread constructor")
     final class PurgeIdler implements MessageQueue.IdleHandler {
         @Override
+        @RavenwoodIgnore
         public boolean queueIdle() {
             purgePendingResources();
             return false;
         }
     }
 
+    /** Backdoor to set private static fields */
+    @RavenwoodReplace
+    static void staticInitForRavenwood(
+            ActivityThread instance
+    ) {
+        throw new IllegalStateException(); // shouldn't be called on a real device.
+    }
+
+    static void staticInitForRavenwood$ravenwood(
+            ActivityThread instance
+    ) {
+        sCurrentActivityThread = instance;
+    }
+
     @UnsupportedAppUsage
+    @RavenwoodKeep
     public static ActivityThread currentActivityThread() {
         return sCurrentActivityThread;
     }
@@ -3019,7 +3064,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
-    @android.ravenwood.annotation.RavenwoodRedirect
+    @RavenwoodKeep
     public static Application currentApplication() {
         ActivityThread am = currentActivityThread();
         return am != null ? am.mInitialApplication : null;
@@ -3029,7 +3074,7 @@ public final class ActivityThread extends ClientTransactionHandler
      * Same as {@code ActivityThread.currentActivityThread().getSystemContext()}, but
      * it'll return a {@link Context} (not a {@link ContextImpl}) and is supported on Ravenwood.
      */
-    @android.ravenwood.annotation.RavenwoodRedirect
+    @RavenwoodKeep
     public static Context currentSystemContext() {
         ActivityThread am = currentActivityThread();
         return am != null ? am.getSystemContext() : null;
@@ -3068,6 +3113,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
+    @RavenwoodKeep
     public Handler getHandler() {
         return mH;
     }
@@ -3266,6 +3312,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
+    @RavenwoodKeep
     ActivityThread() {
         mResourcesManager = ResourcesManager.getInstance();
     }
@@ -3290,6 +3337,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
+    @RavenwoodKeep
     public Instrumentation getInstrumentation()
     {
         return mInstrumentation;
@@ -3305,10 +3353,12 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
+    @RavenwoodKeep
     public Looper getLooper() {
         return mLooper;
     }
 
+    @RavenwoodKeep
     public Executor getExecutor() {
         return mExecutor;
     }
@@ -3326,17 +3376,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
     @Override
     @UnsupportedAppUsage
-    // It returns a ContextImpl, which is not supported on Ravenwood yet, and it might never be
-    // supported. We want to change the return type to Context so support it on Ravenwood,
-    // but the @UnsupportedAppUsage prevents us from doing it, so for now we just update
-    // clients to use currentSystemContext() instead.
-    // If any clients need to use getSystemContext() on a non-"current" ActivityThread, we'd need
-    // add another getter with the return type of Context.
-    //
-    // (Class is only partially allow-listed, and this method can't have a ravenwood annotation.)
-    // @android.ravenwood.annotation.RavenwoodThrow(
-    //        reason = "ContextImpl is not supported on Ravenwood. You may wan to use "
-    //        + " ActivityThread.currentSystemContext() instead")
+    @RavenwoodKeep
     public ContextImpl getSystemContext() {
         synchronized (this) {
             if (mSystemContext == null) {
@@ -7670,6 +7710,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
+    @RavenwoodThrow(comment = "See ActivityThread_ravenwood for initialization on Ravenwood")
     private void handleBindApplication(AppBindData data) {
 // QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         long st_bindApp = SystemClock.uptimeMillis();
@@ -9160,6 +9201,7 @@ public final class ActivityThread extends ClientTransactionHandler
         return mCoreSettings;
     }
 
+    @RavenwoodThrow(comment = "See ActivityThread_ravenwood for initialization on Ravenwood")
     public static void main(String[] args) {
         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "ActivityThreadMain");
 
@@ -9301,6 +9343,7 @@ public final class ActivityThread extends ClientTransactionHandler
         return false;
     }
 
+    @RavenwoodIgnore(reason = "LoadedApk calls it, but we don't need to keep track of it yet")
     void addApplication(@NonNull Application app) {
         mAllApplications.add(app);
         VMDebug.addApplication(app.mLoadedApk.mPackageName);

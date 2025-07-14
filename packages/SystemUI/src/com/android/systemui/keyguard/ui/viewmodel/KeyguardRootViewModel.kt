@@ -20,6 +20,7 @@ package com.android.systemui.keyguard.ui.viewmodel
 import android.graphics.Point
 import android.util.MathUtils
 import android.view.View.VISIBLE
+import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.coroutines.flow.traceAs
 import com.android.systemui.Flags
 import com.android.systemui.common.shared.model.NotificationContainerBounds
@@ -68,6 +69,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.combineTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -229,6 +231,31 @@ constructor(
                 .onStart { emit(false) },
         )
 
+    private val zoomOutFromGlanceableHub: Flow<Float> =
+        if (!Flags.gestureBetweenHubAndLockscreenMotion()) {
+            emptyFlow()
+        } else {
+            combine(
+                    communalInteractor.isCommunalVisible,
+                    merge(
+                        lockscreenToGlanceableHubTransitionViewModel.zoomOut,
+                        glanceableHubToLockscreenTransitionViewModel.zoomOut,
+                        aodToGlanceableHubTransitionViewModel.zoomOut,
+                        glanceableHubToAodTransitionViewModel.zoomOut,
+                    ),
+                ) { isCommunalVisible, zoomOut ->
+                    if (!isCommunalVisible) {
+                        // reset zoom out once we've exited the communal scene
+                        0f
+                    } else {
+                        // rate limit the zoom out by 5% step to avoid jank
+                        ((zoomOut * 20).toInt() / 20f).coerceIn(0f, 1f)
+                    }
+                }
+                .distinctUntilChanged()
+                .dumpWhileCollecting("zoomOutFromGlanceableHub")
+        }
+
     /** Last point that the root view was tapped */
     val lastRootViewTapPosition: Flow<Point?> =
         keyguardInteractor.lastRootViewTapPosition.dumpWhileCollecting("lastRootViewTapPosition")
@@ -244,6 +271,26 @@ constructor(
                 if (isShadeAnyExpanded) topClippingBounds else null
             }
             .dumpWhileCollecting("topClippingBounds")
+
+    /**
+     * Alpha for the non-authentication related views. While DOZING, the pulsing auth state may
+     * request for non-authentication related views to hide. Therefore, use this flow to update the
+     * opacity of non-auth views.
+     */
+    val nonAuthUIAlpha: Flow<Float> =
+        merge(
+            alternateBouncerToDozingTransitionViewModel.nonAuthUIAlpha,
+            glanceableHubToDozingTransitionViewModel.nonAuthUIAlpha,
+            goneToDozingTransitionViewModel.nonAuthUIAlpha,
+            lockscreenToDozingTransitionViewModel.nonAuthUIAlpha,
+            occludedToDozingTransitionViewModel.nonAuthUIAlpha,
+            primaryBouncerToDozingTransitionViewModel.nonAuthUIAlpha,
+            dozingToDreamingTransitionViewModel.nonAuthUIAlpha,
+            dozingToGoneTransitionViewModel.nonAuthUIAlpha,
+            dozingToLockscreenTransitionViewModel.nonAuthUIAlpha,
+            dozingToOccludedTransitionViewModel.nonAuthUIAlpha,
+            dozingToPrimaryBouncerTransitionViewModel.nonAuthUIAlpha,
+        )
 
     /** An observable for the alpha level for the entire keyguard root view. */
     fun alpha(viewState: ViewStateAccessor): Flow<Float> {
@@ -320,7 +367,7 @@ constructor(
     }
 
     val scaleFromZoomOut: Flow<Float> =
-        keyguardInteractor.zoomOut
+        merge(keyguardInteractor.zoomOut, zoomOutFromGlanceableHub)
             .map { 1 - it * PUSHBACK_SCALE_FOR_LOCKSCREEN }
             .dumpWhileCollecting("scaleFromZoomOut")
 
@@ -338,6 +385,9 @@ constructor(
                 glanceableHubToLockscreenTransitionViewModel.keyguardTranslationX,
             )
             .dumpWhileCollecting("translationX")
+
+    val wallpaperZoomOut: Flow<Float> =
+        zoomOutFromGlanceableHub.map { it * DEPTH_PUSH_WALLPAPER_FROM_GLANCEABLE_HUB }
 
     fun updateBurnInParams(params: BurnInParameters) {
         aodBurnInViewModel.updateBurnInParams(params)
@@ -474,6 +524,7 @@ constructor(
 
     companion object {
         private const val TAG = "KeyguardRootViewModel"
-        private const val PUSHBACK_SCALE_FOR_LOCKSCREEN = 0.05f
+        @VisibleForTesting const val PUSHBACK_SCALE_FOR_LOCKSCREEN = 0.05f
+        @VisibleForTesting const val DEPTH_PUSH_WALLPAPER_FROM_GLANCEABLE_HUB = 0.5f
     }
 }

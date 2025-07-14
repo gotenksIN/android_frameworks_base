@@ -993,7 +993,7 @@ public class Cuj {
             case CUJ_LAUNCHER_OVERVIEW_CLEAR_ALL:
                 return "LAUNCHER_OVERVIEW_CLEAR_ALL";
             case CUJ_DESKTOP_MODE_TILE_RESIZING:
-                return "CUJ_DESKTOP_MODE_TILE_RESIZING";
+                return "DESKTOP_MODE_TILE_RESIZING";
         }
         return "UNKNOWN";
     }

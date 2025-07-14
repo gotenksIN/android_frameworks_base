@@ -97,10 +97,8 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
-import android.os.storage.ICeStorageLockEventListener;
 import android.os.storage.IStorageManager;
 import android.os.storage.StorageManager;
-import android.os.storage.StorageManagerInternal;
 import android.provider.Settings;
 import android.security.AndroidKeyStoreMaintenance;
 import android.security.KeyStoreAuthorization;
@@ -341,8 +339,6 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private final CopyOnWriteArrayList<LockSettingsStateListener> mLockSettingsStateListeners =
             new CopyOnWriteArrayList<>();
-
-    private final StorageManagerInternal mStorageManagerInternal;
 
     private final Object mGcWorkToken = new Object();
 
@@ -596,10 +592,6 @@ public class LockSettingsService extends ILockSettings.Stub {
             return null;
         }
 
-        public StorageManagerInternal getStorageManagerInternal() {
-            return LocalServices.getService(StorageManagerInternal.class);
-        }
-
         public SyntheticPasswordManager getSyntheticPasswordManager(LockSettingsStorage storage) {
             return new SyntheticPasswordManager(getContext(), storage, getUserManager(),
                     new PasswordSlotManager());
@@ -730,7 +722,6 @@ public class LockSettingsService extends ILockSettings.Stub {
         mNotificationManager = injector.getNotificationManager();
         mUserManager = injector.getUserManager();
         mStorageManager = injector.getStorageManager();
-        mStorageManagerInternal = injector.getStorageManagerInternal();
         mStrongAuthTracker = injector.getStrongAuthTracker();
         mStrongAuthTracker.register(mStrongAuth);
         mGatekeeperPasswords = new LongSparseArray<>();
@@ -976,24 +967,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         mStorage.prefetchUser(UserHandle.USER_SYSTEM);
         mBiometricDeferredQueue.systemReady(mInjector.getFingerprintManager(),
                 mInjector.getFaceManager(), mInjector.getBiometricManager());
-        mStorageManagerInternal.registerStorageLockEventListener(mCeStorageLockEventListener);
     }
-
-    private final ICeStorageLockEventListener mCeStorageLockEventListener =
-            new ICeStorageLockEventListener() {
-                @Override
-                public void onStorageLocked(int userId) {
-                    Slog.i(TAG, "Storage lock event received for " + userId);
-                    mHandler.post(() -> {
-                        UserProperties userProperties = getUserProperties(userId);
-                        if (userProperties != null && userProperties
-                                .getAllowStoppingUserWithDelayedLocking()) {
-                            int strongAuthRequired = LockPatternUtils.StrongAuthTracker
-                                    .getDefaultFlags(mContext);
-                            requireStrongAuth(strongAuthRequired, userId);
-                        }
-                    });
-                }};
 
     private void loadEscrowData() {
         mRebootEscrowManager.loadRebootEscrowDataIfAvailable(mHandler);
@@ -1602,6 +1576,10 @@ public class LockSettingsService extends ILockSettings.Stub {
         } finally {
             ArrayUtils.zeroize(password);
         }
+    }
+
+    private void lockKeystore(int userId) {
+        mKeyStoreAuthorization.onUserStorageLocked(userId);
     }
 
     @VisibleForTesting /** Note: this method is overridden in unit tests */
@@ -3578,6 +3556,32 @@ public class LockSettingsService extends ILockSettings.Stub {
         return true;
     }
 
+    private void lockUser(@UserIdInt int userId) {
+        // Lock the user's credential-encrypted storage.
+        try {
+            Slogf.i(TAG, "Locking CE storage for user #" + userId);
+            mInjector.getStorageManager().lockCeStorage(userId);
+        } catch (RemoteException re) {
+            throw re.rethrowAsRuntimeException();
+        }
+
+        // Lock user's Keystore by wiping the user's super key cache.
+        if (com.android.server.flags.Flags.keystoreInMemoryCleanup()) {
+            lockKeystore(userId);
+        }
+
+        // Reset user's strong auth flags
+        mHandler.post(() -> {
+            UserProperties userProperties = getUserProperties(userId);
+            if (userProperties != null && userProperties
+                    .getAllowStoppingUserWithDelayedLocking()) {
+                int strongAuthRequired = LockPatternUtils.StrongAuthTracker
+                        .getDefaultFlags(mContext);
+                requireStrongAuth(strongAuthRequired, userId);
+            }
+        });
+    }
+
     @Override
     public boolean tryUnlockWithCachedUnifiedChallenge(int userId) {
         checkPasswordReadPermission();
@@ -3912,6 +3916,11 @@ public class LockSettingsService extends ILockSettings.Stub {
         @Override
         public boolean unlockUserWithToken(long tokenHandle, byte[] token, int userId) {
             return LockSettingsService.this.unlockUserWithToken(tokenHandle, token, userId);
+        }
+
+        @Override
+        public void lockUser(@UserIdInt int userId) {
+            LockSettingsService.this.lockUser(userId);
         }
 
         @Override

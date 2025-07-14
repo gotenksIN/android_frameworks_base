@@ -115,7 +115,6 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
-import android.os.storage.StorageManagerInternal;
 import android.provider.DeviceConfig;
 import android.system.Os;
 import android.system.OsConstants;
@@ -144,6 +143,7 @@ import com.android.internal.util.MemInfoReader;
 import com.android.server.AppStateTracker;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
+import com.android.server.StorageManagerInternal;
 import com.android.server.SystemConfig;
 import com.android.server.Watchdog;
 import com.android.server.am.ActivityManagerService.ProcessChangeItem;
@@ -267,6 +267,9 @@ public final class ProcessList {
     // This is a process only hosting activities that are visible to the
     // user, so we'd prefer they don't disappear.
     public static final int VISIBLE_APP_ADJ = 100;
+    public static final int VISIBLE_APP_MAX_ADJ = Flags.oomadjusterVisLaddering()
+            && Flags.removeLruSpamPrevention() ? 199 : 100;
+
     static final int VISIBLE_APP_LAYER_MAX = PERCEPTIBLE_APP_ADJ - VISIBLE_APP_ADJ - 1;
 
     // This is a process that was recently TOP and moved to FGS. Continue to treat it almost

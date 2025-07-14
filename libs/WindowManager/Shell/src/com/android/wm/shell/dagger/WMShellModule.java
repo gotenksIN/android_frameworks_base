@@ -82,6 +82,7 @@ import com.android.wm.shell.common.DisplayLayout;
 import com.android.wm.shell.common.FloatingContentCoordinator;
 import com.android.wm.shell.common.HomeIntentProvider;
 import com.android.wm.shell.common.LaunchAdjacentController;
+import com.android.wm.shell.common.LockTaskChangeListener;
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController;
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorSurface;
 import com.android.wm.shell.common.MultiInstanceHelper;
@@ -137,6 +138,9 @@ import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler
 import com.android.wm.shell.desktopmode.VisualIndicatorUpdateScheduler;
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository;
 import com.android.wm.shell.desktopmode.compatui.SystemModalsTransitionHandler;
+import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer;
+import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializerImpl;
+import com.android.wm.shell.desktopmode.data.persistence.DesktopPersistentRepository;
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopDisplayModeController;
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopFirstListenerManager;
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
@@ -149,9 +153,6 @@ import com.android.wm.shell.desktopmode.education.data.AppToWebEducationDatastor
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
 import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver;
 import com.android.wm.shell.desktopmode.multidesks.RootTaskDesksOrganizer;
-import com.android.wm.shell.desktopmode.persistence.DesktopPersistentRepository;
-import com.android.wm.shell.desktopmode.persistence.DesktopRepositoryInitializer;
-import com.android.wm.shell.desktopmode.persistence.DesktopRepositoryInitializerImpl;
 import com.android.wm.shell.draganddrop.DragAndDropController;
 import com.android.wm.shell.draganddrop.GlobalDragListener;
 import com.android.wm.shell.freeform.FreeformComponents;
@@ -562,7 +563,8 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             Optional<DesktopImeHandler> desktopImeHandler,
             Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver,
-            Optional<DesktopInOrderTransitionObserver> desktopInOrderTransitionObserver) {
+            Optional<DesktopInOrderTransitionObserver> desktopInOrderTransitionObserver,
+            DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver) {
         return new FreeformTaskTransitionObserver(
                 shellInit,
                 transitions,
@@ -575,7 +577,8 @@ public abstract class WMShellModule {
                 desktopState,
                 desktopImeHandler,
                 desktopBackNavTransitionObserver,
-                desktopInOrderTransitionObserver);
+                desktopInOrderTransitionObserver,
+                desktopModeLoggerTransitionObserver);
     }
 
     @WMSingleton
@@ -1043,7 +1046,8 @@ public abstract class WMShellModule {
             Optional<DesksTransitionObserver> desksTransitionObserver,
             DesktopState desktopState,
             Optional<DesktopImeHandler> desktopImeHandler,
-            Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver) {
+            Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver,
+            DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver) {
         if (enableInorderTransitionCallbacksForDesktop()
                 && ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
                 && desktopState.canEnterDesktopMode()) {
@@ -1052,7 +1056,8 @@ public abstract class WMShellModule {
                     focusTransitionObserver,
                     desksTransitionObserver,
                     desktopImeHandler,
-                    desktopBackNavTransitionObserver));
+                    desktopBackNavTransitionObserver,
+                    desktopModeLoggerTransitionObserver));
         }
         return Optional.empty();
     }
@@ -1190,7 +1195,7 @@ public abstract class WMShellModule {
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories,
                     inputManager, shellTaskOrganizer, focusTransitionObserver,
-                    mainExecutor, displayController));
+                    mainExecutor, displayController, desktopState));
         }
         return Optional.empty();
     }
@@ -1242,7 +1247,8 @@ public abstract class WMShellModule {
             DesksOrganizer desksOrganizer,
             ShellDesktopState shelldesktopState,
             DesktopConfig desktopConfig,
-            UserProfileContexts userProfileContexts
+            UserProfileContexts userProfileContexts,
+            LockTaskChangeListener lockTaskChangeListener
     ) {
         if (!shelldesktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.empty();
@@ -1261,7 +1267,15 @@ public abstract class WMShellModule {
                 desktopModeUiEventLogger, taskResourceLoader, recentsTransitionHandler,
                 desktopModeCompatPolicy, desktopTilingDecorViewModel,
                 multiDisplayDragMoveIndicatorController, compatUI.orElse(null),
-                desksOrganizer, shelldesktopState, desktopConfig, userProfileContexts));
+                desksOrganizer, shelldesktopState, desktopConfig, userProfileContexts,
+                lockTaskChangeListener));
+    }
+
+    @WMSingleton
+    @Provides
+    static LockTaskChangeListener provideLockTaskChangeListener(ShellInit shellInit,
+            TaskStackListenerImpl taskStackListenerImpl) {
+        return new LockTaskChangeListener(shellInit, taskStackListenerImpl);
     }
 
     @WMSingleton
@@ -1562,13 +1576,12 @@ public abstract class WMShellModule {
     @Provides
     static DesktopModeLoggerTransitionObserver provideDesktopModeLoggerTransitionObserver(
             ShellInit shellInit,
-            Transitions transitions,
             DesktopModeEventLogger desktopModeEventLogger,
             Optional<DesktopTasksLimiter> desktopTasksLimiter,
             DesktopState desktopState,
             DesksOrganizer desksOrganizer) {
         return new DesktopModeLoggerTransitionObserver(
-                shellInit, transitions, desktopModeEventLogger,
+                shellInit, desktopModeEventLogger,
                 desktopTasksLimiter, desktopState, desksOrganizer);
     }
 

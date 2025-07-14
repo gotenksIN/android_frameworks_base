@@ -94,6 +94,8 @@ public class InstallConfirmationFragment extends DialogFragment {
 
         Log.i(LOG_TAG, "Creating " + LOG_TAG + "\n" + mDialogData);
 
+        // There is no root view here. Ok to pass null view root
+        @SuppressWarnings("InflateParams")
         View dialogView = getLayoutInflater().inflate(
                 UiUtil.getInstallationLayoutResId(requireContext()), null);
         dialogView.requireViewById(R.id.app_snippet).setVisibility(View.VISIBLE);
@@ -103,9 +105,11 @@ public class InstallConfirmationFragment extends DialogFragment {
 
         int positiveBtnTextRes;
         String title;
+        int themeResId = 0;
         if (mDialogData.isAppUpdating()) {
             if (mDialogData.getExistingUpdateOwnerLabel() != null
                     && mDialogData.getRequestedUpdateOwnerLabel() != null) {
+                themeResId = UiUtil.getTextButtonThemeResId(requireContext());
                 title = getString(R.string.title_update_ownership_change,
                     mDialogData.getRequestedUpdateOwnerLabel());
                 positiveBtnTextRes = R.string.button_update_anyway;
@@ -130,7 +134,7 @@ public class InstallConfirmationFragment extends DialogFragment {
                 (dialogInt, which) -> mInstallActionListener.onPositiveResponse(
                         InstallUserActionRequired.USER_ACTION_REASON_INSTALL_CONFIRMATION),
                 (dialogInt, which) -> mInstallActionListener.onNegativeResponse(
-                                mDialogData.getStageCode()));
+                                mDialogData.getStageCode()), themeResId);
 
         return mDialog;
     }

@@ -32,13 +32,13 @@ import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer.RootTaskDisplayAreaListener
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayController.OnDisplaysChangedListener
+import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopDisplayModeController
 import com.android.wm.shell.desktopmode.desktopfirst.isDisplayDesktopFirst
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
 import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver
 import com.android.wm.shell.desktopmode.multidesks.OnDeskRemovedListener
 import com.android.wm.shell.desktopmode.multidesks.PreserveDisplayRequestHandler
-import com.android.wm.shell.desktopmode.persistence.DesktopRepositoryInitializer
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.sysui.ShellController
@@ -69,7 +69,10 @@ class DesktopDisplayEventHandler(
         val uniqueDisplayId = displayController.getDisplay(displayId)?.uniqueId
         uniqueDisplayId?.let {
             uniqueIdByDisplayId[displayId] = it
-            if (desktopUserRepositories.current.hasPreservedDisplayForUniqueDisplayId(it)) {
+            if (
+                DesktopExperienceFlags.ENABLE_DISPLAY_RECONNECT_INTERACTION.isTrue &&
+                    desktopUserRepositories.current.hasPreservedDisplayForUniqueDisplayId(it)
+            ) {
                 desktopTasksController.restoreDisplay(displayId, it)
                 return@OnDisplayAreaChangeListener
             }
@@ -99,7 +102,9 @@ class DesktopDisplayEventHandler(
                     }
                 }
             )
-            desktopTasksController.preserveDisplayRequestHandler = this
+            if (DesktopExperienceFlags.ENABLE_DISPLAY_RECONNECT_INTERACTION.isTrue) {
+                desktopTasksController.preserveDisplayRequestHandler = this
+            }
         }
     }
 

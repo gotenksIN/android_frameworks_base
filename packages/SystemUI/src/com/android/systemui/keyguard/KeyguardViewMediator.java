@@ -4406,6 +4406,7 @@ public class KeyguardViewMediator implements CoreStartable,
                     throws RemoteException {
                 if (!isViewRootReady()) {
                     Log.w(TAG, "Skipping remote animation - view root not ready");
+                    finishedCallback.onAnimationFinished();
                     return;
                 }
 

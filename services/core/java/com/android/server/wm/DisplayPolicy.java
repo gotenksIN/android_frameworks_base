@@ -794,19 +794,35 @@ public class DisplayPolicy {
                             if (SILKY_SCROLLS_ENABLE) {
 // QTI_END: 2022-11-16: Performance: perf: Send pre-fling boost only at the start of drag
 // QTI_BEGIN: 2022-03-01: Performance: perf: Add drag start end perf event
-                                mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_START, currentPackage);
+                                if(mPerfBoostDrag.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
+                                    mPerfBoostDrag.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
+                                        mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_START, currentPackage);
+                                    } else {
+                                        mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_START, currentActivity);
+                                    }
                             }
 // QTI_END: 2022-03-01: Performance: perf: Add drag start end perf event
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-                            mPerfBoostDrag.perfHint(BoostFramework.VENDOR_HINT_DRAG_BOOST,
+                            if(mPerfBoostDrag.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
+                               mPerfBoostDrag.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
+                                    mPerfBoostDrag.perfHint(BoostFramework.VENDOR_HINT_DRAG_BOOST,
                                             currentPackage, -1, 1);
+                            } else {
+                                mPerfBoostDrag.perfHint(BoostFramework.VENDOR_HINT_DRAG_BOOST,
+                                            currentActivity, -1, 1);
+                            }
                         } else {
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 // QTI_BEGIN: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
                             if (SILKY_SCROLLS_ENABLE || SILKY_SCROLLS_LITE_ENABLE){
 // QTI_END: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
 // QTI_BEGIN: 2022-03-01: Performance: perf: Add drag start end perf event
-                                mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_END, currentPackage);
+                            if(mPerfBoostDrag.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
+                               mPerfBoostDrag.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
+                                    mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_END, currentPackage);
+                               } else {
+                                   mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_END, currentActivity);
+                               }
 // QTI_END: 2022-03-01: Performance: perf: Add drag start end perf event
 // QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
                             } else if (mPerfBoostDrag.board_first_api_lvl >= BoostFramework.VENDOR_V_API_LEVEL) {

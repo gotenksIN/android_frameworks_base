@@ -7286,27 +7286,37 @@ public class NotificationManagerService extends SystemService {
         @Override
         public void applyEnqueuedAdjustmentFromAssistant(INotificationListener token,
                 Adjustment adjustment) {
-            boolean foundEnqueued = false;
             final long identity = Binder.clearCallingIdentity();
             try {
                 synchronized (mNotificationLock) {
-                    ManagedServiceInfo info = mAssistants.checkServiceTokenLocked(token);
-                    int N = mEnqueuedNotifications.size();
-                    for (int i = 0; i < N; i++) {
+                    mAssistants.checkServiceTokenLocked(token);
+                    ArrayList<NotificationRecord> enqueuedRecords = new ArrayList<>();
+                    for (int i = 0; i < mEnqueuedNotifications.size(); i++) {
                         final NotificationRecord r = mEnqueuedNotifications.get(i);
                         if (Objects.equals(adjustment.getKey(), r.getKey())
-                                && Objects.equals(adjustment.getUser(), r.getUserId())
+                                && adjustment.getUser() == r.getUserId()
                                 && mAssistants.isSameUser(token, r.getUserId())) {
-                            applyAdjustmentLocked(r, adjustment, false);
-                            r.applyAdjustments();
-                            // importance is checked at the beginning of the
-                            // PostNotificationRunnable, before the signal extractors are run, so
-                            // calculate the final importance here
-                            r.calculateImportance();
-                            foundEnqueued = true;
+                            enqueuedRecords.add(r);
                         }
                     }
-                    if (!foundEnqueued) {
+
+                    for (NotificationRecord r : enqueuedRecords) {
+                        // Adjustment might be tweaked when applying, and is also associated
+                        // with the particular NotificationRecord, so don't share them.
+                        Adjustment recordAdjustment = enqueuedRecords.size() > 1
+                                ? new Adjustment(adjustment)
+                                : adjustment;
+                        applyAdjustmentLocked(r, recordAdjustment, false);
+                        r.applyAdjustments();
+                        // importance is checked at the beginning of the
+                        // PostNotificationRunnable, before the signal extractors are run, so
+                        // calculate the final importance here
+                        r.calculateImportance();
+                    }
+
+                    if (enqueuedRecords.isEmpty()) {
+                        // Notification was posted before the NAS came with the adjustment, so
+                        // adjust that one.
                         applyAdjustmentsFromAssistant(token, List.of(adjustment));
                     }
                 }
@@ -7390,25 +7400,6 @@ public class NotificationManagerService extends SystemService {
 
             return mPreferencesHelper.getConversationNotificationChannel(
                     pkg, uid, parentId, conversationId, false, false).copy();
-        }
-
-        @Override
-        public void updateNotificationChannelGroupFromPrivilegedListener(
-                INotificationListener token, String pkg, UserHandle user,
-                NotificationChannelGroup group) throws RemoteException {
-            Objects.requireNonNull(user);
-            verifyPrivilegedListener(token, user, false);
-            int packageUid = getUidForPackageAndUser(pkg, user);
-            if (packageUid == INVALID_UID) {
-                return;
-            }
-            NotificationChannelGroup previous = mPreferencesHelper.getNotificationChannelGroup(
-                    group.getId(), pkg, packageUid);
-            if (previous == null) {
-                return;
-            }
-            createNotificationChannelGroup(pkg, packageUid, group, false, true);
-            handleSavePolicyFile();
         }
 
         @Override

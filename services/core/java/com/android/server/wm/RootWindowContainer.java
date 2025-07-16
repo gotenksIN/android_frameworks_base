@@ -543,8 +543,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (displayContent.isDefaultDisplay) {
                 final Configuration newConfig = mWmService.computeNewConfiguration(
                         displayContent.getDisplayId());
-                mWmService.mAtmService.updateConfigurationLocked(newConfig, null /* starting */,
-                        false /* initLocale */);
+                mWmService.mAtmService.updateConfigurationLocked(newConfig, false /* initLocale */);
             }
         }
     }

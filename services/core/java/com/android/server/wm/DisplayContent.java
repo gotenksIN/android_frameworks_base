@@ -5072,6 +5072,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             setLayoutNeeded();
         }
 
+        if (android.view.inputmethod.Flags.setServerVisibilityOnprelayout()) {
+            mInsetsStateController.onPreLayout();
+        }
+
         // Perform a layout, if needed.
         performLayout(true /* initial */, false /* updateInputWindows */);
         pendingLayoutChanges = 0;
@@ -6287,9 +6291,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mDisplayId));
 
         Settings.System.clearConfiguration(values);
-        updateDisplayOverrideConfigurationLocked(values, null /* starting */,
+        return updateDisplayOverrideConfigurationLocked(values, null /* starting */,
                 false /* deferResume */);
-        return mAtmService.mTmpUpdateConfigurationResult.changes != 0;
     }
 
     /**
@@ -6300,7 +6303,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             ActivityRecord starting, boolean deferResume) {
 
         int changes = 0;
-        boolean kept = true;
 
         mAtmService.deferWindowLayout();
         try {
@@ -6315,18 +6317,16 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 } else {
                     changes = performDisplayOverrideConfigUpdate(values);
                 }
-                mAtmService.mTmpUpdateConfigurationResult.changes = changes;
             }
 
             if (!deferResume) {
-                kept = mAtmService.ensureConfigAndVisibilityAfterUpdate(starting, changes);
+                mAtmService.ensureConfigAndVisibilityAfterUpdate(starting, changes);
             }
         } finally {
             mAtmService.continueWindowLayout();
         }
 
-        mAtmService.mTmpUpdateConfigurationResult.activityRelaunched = !kept;
-        return kept;
+        return changes != 0;
     }
 
     int performDisplayOverrideConfigUpdate(Configuration values) {

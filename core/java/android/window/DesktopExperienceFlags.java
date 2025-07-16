@@ -147,6 +147,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_EMPTY_DESK_ON_MINIMIZE),
     ENABLE_EMPTY_ROOTS_NEVER_TOP(Flags::emptyRootsNeverTop, false,
             Flags.FLAG_EMPTY_ROOTS_NEVER_TOP),
+    ENABLE_EXCLUSIVE_FLOATING_WINDOW(Flags::enableExclusiveFloatingWindow, false,
+            Flags.FLAG_ENABLE_EXCLUSIVE_FLOATING_WINDOW),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS),
     ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS(Flags::enableFreeformDisplayLaunchParams, true,
@@ -261,6 +263,9 @@ public enum DesktopExperienceFlags {
     LIMIT_SYSTEM_FULLSCREEN_OVERRIDE_TO_DEFAULT_DISPLAY(
             Flags::limitSystemFullscreenOverrideToDefaultDisplay, false,
             Flags.FLAG_LIMIT_SYSTEM_FULLSCREEN_OVERRIDE_TO_DEFAULT_DISPLAY),
+    MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE(
+            Flags::moveToNextDisplayShortcutWithProjectedMode, false,
+            Flags.FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE),
     PRESERVE_RECENTS_TASK_CONFIGURATION_ON_RELAUNCH(
             Flags::preserveRecentsTaskConfigurationOnRelaunch, true,
             Flags.FLAG_PRESERVE_RECENTS_TASK_CONFIGURATION_ON_RELAUNCH),

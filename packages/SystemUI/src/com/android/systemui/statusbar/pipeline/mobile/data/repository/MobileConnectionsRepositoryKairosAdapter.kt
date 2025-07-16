@@ -79,11 +79,10 @@ constructor(
 
     private val reposBySubIdK: Incremental<Int, MobileConnectionRepositoryKairosAdapter> = buildIncremental {
         kairosRepo.mobileConnectionsBySubId
-            .mapValues<Int, MobileConnectionRepositoryKairos, BuildSpec<MobileConnectionRepositoryKairosAdapter>> { (subId, repo) ->
+            .mapValues<Int, MobileConnectionRepositoryKairos, BuildSpec<MobileConnectionRepositoryKairosAdapter>> { (_, repo) ->
                 buildSpec<MobileConnectionRepositoryKairosAdapter> {
                     MobileConnectionRepositoryKairosAdapter(
                         kairosRepo = repo,
-                        carrierConfig = carrierConfigRepo.getOrCreateConfigForSubId(subId),
                     )
                 }
             }

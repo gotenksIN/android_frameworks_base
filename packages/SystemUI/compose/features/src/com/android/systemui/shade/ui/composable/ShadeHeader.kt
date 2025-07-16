@@ -147,6 +147,8 @@ object ShadeHeader {
 
     object TestTags {
         const val Root = "shade_header_root"
+        const val BatteryTestTag = "battery_meter_composable_view"
+        const val BatteryTestTagLegacy = "battery_percentage_view"
     }
 
     /** Represents the background highlighting of a header icons chip. */
@@ -182,7 +184,7 @@ fun ContentScope.CollapsedShadeHeader(
     isSplitShade: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val cutoutLocation = LocalDisplayCutout.current.location
+    val cutoutLocation = LocalDisplayCutout.current().location
     val horizontalPadding =
         max(LocalScreenCornerRadius.current / 2f, Shade.Dimensions.HorizontalPadding)
 
@@ -196,7 +198,7 @@ fun ContentScope.CollapsedShadeHeader(
 
     // This layout assumes it is globally positioned at (0, 0) and is the same size as the screen.
     CutoutAwareShadeHeader(
-        modifier = modifier,
+        modifier = modifier.sysuiResTag(ShadeHeader.TestTags.Root),
         startContent = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -459,16 +461,19 @@ private fun CutoutAwareShadeHeader(
     startContent: @Composable () -> Unit,
     endContent: @Composable () -> Unit,
 ) {
-    val cutoutWidth = LocalDisplayCutout.current.width()
-    val cutoutHeight = LocalDisplayCutout.current.height()
-    val cutoutTop = LocalDisplayCutout.current.top
-    val cutoutLocation = LocalDisplayCutout.current.location
+    val cutoutProvider = LocalDisplayCutout.current
     val statusBarHeight = ShadeHeader.Dimensions.StatusBarHeight
-
     Layout(
         modifier = modifier.sysuiResTag(ShadeHeader.TestTags.Root),
         contents = listOf(startContent, endContent),
     ) { measurables, constraints ->
+        val cutout = cutoutProvider()
+
+        val cutoutWidth = cutout.width()
+        val cutoutHeight = cutout.height()
+        val cutoutTop = cutout.top
+        val cutoutLocation = cutout.location
+
         check(constraints.hasBoundedWidth)
         check(measurables.size == 2)
         check(measurables[0].size == 1)
@@ -564,13 +569,13 @@ private fun BatteryInfo(
             showIcon = showIcon,
             showEstimate = useExpandedFormat,
             textColor = textColor,
-            modifier = modifier,
+            modifier = modifier.sysuiResTag(ShadeHeader.TestTags.BatteryTestTag),
         )
     } else {
         BatteryIconLegacy(
             createBatteryMeterViewController = viewModel.createBatteryMeterViewController,
             useExpandedFormat = useExpandedFormat,
-            modifier = modifier,
+            modifier = modifier.sysuiResTag(ShadeHeader.TestTags.BatteryTestTagLegacy),
             isHighlighted = isHighlighted,
         )
     }
@@ -593,7 +598,7 @@ private fun BatteryIconLegacy(
     val inverseColor =
         Utils.getColorAttrDefaultColor(themedContext, android.R.attr.textColorPrimaryInverse)
 
-    val cutoutLocation = LocalDisplayCutout.current.location
+    val cutoutLocation = LocalDisplayCutout.current().location
 
     AndroidView(
         factory = { context ->

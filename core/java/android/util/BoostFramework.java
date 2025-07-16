@@ -46,6 +46,8 @@ import dalvik.system.PathClassLoader;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** @hide */
 public class BoostFramework {
@@ -203,6 +205,8 @@ public class BoostFramework {
         public static final int GAME = 2;
         public static final int BROWSER = 3;
         public static final int PREPROAPP = 4;
+        public static final int VIDEO = 5;
+        public static final int APP_OF_INTEREST = 6;
     };
 
 /** @hide */
@@ -903,10 +907,24 @@ public class BoostFramework {
     }
 
     //UI PERF START
+    private static class LRUMap<K,V> extends LinkedHashMap<K,V> {
+        private final int maxSize;
+
+        LRUMap(int maxSize) {
+            super(100, 0.75f, true);
+            this.maxSize = maxSize;
+        }
+
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<K,V> eldest) {
+            return size() > maxSize;
+        }
+    }
+
     private static class UIPerfMode {
         private static UIPerfMode instance = null;
         private static String UI_PERF_ENABLE = "sys.ui.perfmode.enable";
-        private static String UI_PERF_ENHANCEMENT = "ro.vendor.ui.perf_enhance";
+        private static String UI_PERF_ENHANCEMENT = "ro.vendor.ui.perfmode_enhance";
         private Context mContext;
         private String[] mUIPerfProcs = null;
         private String[] mLegacyUIPerfProcs = null;
@@ -919,6 +937,7 @@ public class BoostFramework {
         private UiPerfProcsObserver observer = null;
         private boolean mUIPerfEnhance = false;
         private BoostFramework mPerf = new BoostFramework();
+        private LRUMap<String,Boolean> mLRUMap = new LRUMap(30);
 
         private class UiPerfProcsObserver extends ContentObserver {
             private Context mContext = null;
@@ -1061,15 +1080,8 @@ public class BoostFramework {
             return enhance(pkgName);
         }
 
-        //Todo, will update when WLC is ready
         private boolean enhance(String pkgName) {
             if (mUIPerfEnhance) {
-                if (mPerf != null) {
-                    int type = mPerf.perfGetFeedback(VENDOR_FEEDBACK_WORKLOAD_TYPE, pkgName);
-                    if (type != WorkloadType.APP) {
-                       return false;
-                    }
-                }
                 if (mContext != null) {
                     PackageManager pm = mContext.getPackageManager();
                     if (pm != null) {
@@ -1102,7 +1114,17 @@ public class BoostFramework {
                         }
                     }
                 }
-                return true;
+                if (mLRUMap.containsKey(pkgName)) {
+                    return mLRUMap.get(pkgName);
+                }
+                if (mPerf != null) {
+                    int type = mPerf.perfGetFeedback(VENDOR_FEEDBACK_WORKLOAD_TYPE, pkgName);
+                    if (type == WorkloadType.APP_OF_INTEREST) {
+                       mLRUMap.put(pkgName, true);
+                       return true;
+                    }
+                }
+                mLRUMap.put(pkgName, false);
             }
             return false;
         }

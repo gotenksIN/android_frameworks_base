@@ -1346,6 +1346,7 @@ public class Instrumentation {
      * 
      * @return The newly instantiated Application object.
      */
+    @RavenwoodKeep
     public Application newApplication(ClassLoader cl, String className, Context context)
             throws InstantiationException, IllegalAccessException, 
             ClassNotFoundException {
@@ -1364,6 +1365,7 @@ public class Instrumentation {
      * 
      * @return The newly instantiated Application object.
      */
+    @RavenwoodKeep
     static public Application newApplication(Class<?> clazz, Context context)
             throws InstantiationException, IllegalAccessException, 
             ClassNotFoundException {
@@ -1383,6 +1385,7 @@ public class Instrumentation {
      *
      * @param app The application being created.
      */
+    @RavenwoodKeep
     public void callApplicationOnCreate(Application app) {
         app.onCreate();
     }
@@ -1449,6 +1452,7 @@ public class Instrumentation {
         return getFactory(pkg).instantiateActivity(cl, className, intent);
     }
 
+    @RavenwoodReplace(reason = "Custom AppComponentFactory not supported")
     private AppComponentFactory getFactory(String pkg) {
         if (pkg == null) {
             Log.e(TAG, "No pkg specified, disabling AppComponentFactory");
@@ -1463,6 +1467,10 @@ public class Instrumentation {
         // This is in the case of starting up "android".
         if (apk == null) apk = mThread.getSystemContext().mPackageInfo;
         return apk.getAppFactory();
+    }
+
+    private AppComponentFactory getFactory$ravenwood(String pkg) {
+        return AppComponentFactory.DEFAULT;
     }
 
     /**
@@ -2436,6 +2444,9 @@ public class Instrumentation {
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public static void checkStartActivityResult(int res, Object intent) {
         if (!ActivityManager.isStartResultFatalError(res)) {
+            if (res == ActivityManager.START_ABORTED && Build.isDebuggable()) {
+                Log.w(TAG, new StackTrace("Activity start aborted"));
+            }
             return;
         }
 

@@ -66,10 +66,13 @@ public class TelephonyFrameworkInitializer {
     /**
      * Sets an instance of {@link TelephonyServiceManager} that allows
      * the telephony mainline module to register/obtain telephony binder services. This is called
-     * by the platform during the system initialization.
+     * by ActivityThread on app startup and sets the app's instance of
+     * TelephonyServiceManager.
      *
      * @param telephonyServiceManager instance of {@link TelephonyServiceManager} that allows
      * the telephony mainline module to register/obtain telephony binder services.
+     *
+     * @hide
      */
     public static void setTelephonyServiceManager(
             @NonNull TelephonyServiceManager telephonyServiceManager) {
@@ -101,6 +104,8 @@ public class TelephonyFrameworkInitializer {
      *
      * @throws IllegalStateException if this is called from anywhere besides
      * {@link SystemServiceRegistry}
+     *
+     * @hide
      */
     public static void registerServiceWrappers() {
         SystemServiceRegistry.registerContextAwareService(

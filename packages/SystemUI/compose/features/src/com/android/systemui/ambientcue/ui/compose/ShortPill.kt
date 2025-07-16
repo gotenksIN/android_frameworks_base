@@ -16,6 +16,7 @@
 
 package com.android.systemui.ambientcue.ui.compose
 
+import android.view.Surface.ROTATION_90
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloat
@@ -87,6 +88,7 @@ fun ShortPill(
     horizontal: Boolean = true,
     visible: Boolean = true,
     expanded: Boolean = false,
+    rotation: Int = 0,
     onClick: () -> Unit = {},
     onCloseClick: () -> Unit = {},
 ) {
@@ -169,7 +171,11 @@ fun ShortPill(
                         radius = if (horizontal) halfWidth else halfHeight,
                     )
                 translate(
-                    left = if (horizontal) halfWidth else size.width,
+                    left =
+                        if (horizontal) halfWidth
+                        else {
+                            if (rotation == ROTATION_90) size.width else 0f
+                        },
                     top = if (horizontal) size.height else halfHeight,
                 ) {
                     scale(
@@ -201,6 +207,7 @@ fun ShortPill(
                 .padding(4.dp)
 
         val filteredActions = FilterUtils.filterActions(actions)
+        val expandActionLabel = stringResource(id = R.string.ambient_cue_expand_action)
 
         // The layout for the un-expanded state (pill + side button)
         if (horizontal) {
@@ -222,6 +229,16 @@ fun ShortPill(
                                     Modifier.clickable(
                                         indication = null,
                                         interactionSource = null,
+                                        // Set expand action when the action is not one-tap action.
+                                        onClickLabel =
+                                            if (
+                                                filteredActions.size == 1 &&
+                                                    filteredActions[0].actionType ==
+                                                        ActionType.MA &&
+                                                    filteredActions[0].oneTapEnabled
+                                            )
+                                                null
+                                            else expandActionLabel,
                                     ) {
                                         onClick()
                                     }

@@ -13,9 +13,6 @@
       "name": "FunctionalTestsDesktopMode-AltTabSwitchOutDesktopModeTest"
     },
     {
-      "name": "FunctionalTestsDesktopMode-BringDesktopAppsToFrontTest"
-    },
-    {
       "name": "FunctionalTestsDesktopMode-CatchAll"
     },
     {
@@ -88,9 +85,6 @@
       "name": "FunctionalTestsDesktopMode-OpenUnlimitedAppsTest"
     },
     {
-      "name": "FunctionalTestsDesktopMode-SwitchToOverviewFromDesktopTest"
-    },
-    {
       "name": "FunctionalTestsDesktopMode-TabTearingDesktopWindowingLimitTest"
     },
     {
@@ -143,6 +137,9 @@
     },
     {
       "name": "FunctionalTestsDesktopMode-fundamentals-SwitchFocusBetweenAppsTest"
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-fundamentals-SwitchToOverviewFromDesktopTest"
     },
     {
       "name": "FunctionalTestsDesktopMode-fundamentals-SwitchToHomeFromDesktopTest"

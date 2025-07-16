@@ -494,7 +494,7 @@ public class Header extends Operation implements RemoteComposeOperation {
         if (majorVersion == 1 && minorVersion == 0) {
             return 6;
         }
-        if (majorVersion == 0 && minorVersion == 1) {
+        if (majorVersion == 0 && minorVersion <= 3) {
             // Cts tests
             return 6;
         }

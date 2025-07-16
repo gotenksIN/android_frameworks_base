@@ -15,23 +15,31 @@
  */
 package android.app;
 
-import android.content.Context;
-import android.platform.test.ravenwood.RavenwoodAppDriver;
+import static org.junit.Assert.assertEquals;
+
+import android.os.Looper;
 
 /**
  * Inject Ravenwood methods to {@link ActivityThread}.
+ *
+ * TODO: Move the initialization logic from {@link RavenwoodAppDriver} to this class.
+ * TODO: Port more initialization logic from {@link ActivityThread}.
  */
-public class ActivityThread_ravenwood {
+public final class ActivityThread_ravenwood {
     private ActivityThread_ravenwood() {
     }
 
-    /** Override the corresponding ActivityThread method. */
-    public static Context currentSystemContext() {
-        return RavenwoodAppDriver.getInstance().getAndroidAppBridge().getSystemContext();
-    }
+    /**
+     * Create a new instance, and also set it to sCurrentActivityThread.
+     * @return
+     */
+    public static ActivityThread createInstance() {
+        // This must be called on the main thread.
+        assertEquals(Looper.getMainLooper().getThread(), Thread.currentThread());
+        final var at = new ActivityThread();
 
-    /** Override the corresponding ActivityThread method. */
-    public static Application currentApplication() {
-        return RavenwoodAppDriver.getInstance().getApplication();
+        ActivityThread.staticInitForRavenwood(at);
+
+        return at;
     }
 }

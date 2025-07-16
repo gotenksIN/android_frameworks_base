@@ -5617,65 +5617,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    public void updateNotificationChannelGroupFromPrivilegedListener_cdm_success()
-            throws Exception {
-        NotificationChannelGroup createByApp = new NotificationChannelGroup("grp", "Group");
-        mService.mPreferencesHelper.createNotificationChannelGroup(mPkg, mUid, createByApp, true,
-                mUid, false);
-        NotificationChannelGroup updateByNls = new NotificationChannelGroup("grp", "Updated");
-        when(mCompanionMgr.getAssociations(mPkg, mUserId))
-                .thenReturn(singletonList(mock(AssociationInfo.class)));
-
-        mBinderService.updateNotificationChannelGroupFromPrivilegedListener(
-                null, mPkg, mUser, updateByNls);
-
-        NotificationChannelGroup result = mService.mPreferencesHelper.getNotificationChannelGroup(
-                "grp", mPkg, mUid);
-        assertThat(result.getName().toString()).isEqualTo("Updated");
-    }
-
-    @Test
-    public void updateNotificationChannelGroupFromPrivilegedListener_noCdm_throws()
-            throws Exception {
-        when(mCompanionMgr.getAssociations(mPkg, mUserId)).thenReturn(Lists.newArrayList());
-        NotificationChannelGroup updateByNls = new NotificationChannelGroup("grp", "Updated");
-
-        SecurityException exception = assertThrows(SecurityException.class, () ->
-                mBinderService.updateNotificationChannelGroupFromPrivilegedListener(
-                        null, mPkg, mUser, updateByNls));
-
-        assertThat(exception).hasMessageThat().contains("does not have access");
-    }
-
-    @Test
-    public void updateNotificationChannelGroupFromPrivilegedListener_wrongPackage_ignored()
-            throws Exception {
-        NotificationChannelGroup updateByNls = new NotificationChannelGroup("grp", "Updated");
-        when(mCompanionMgr.getAssociations(mPkg, mUserId))
-                .thenReturn(singletonList(mock(AssociationInfo.class)));
-
-        mBinderService.updateNotificationChannelGroupFromPrivilegedListener(
-                null, "com.package.does.not.exist", mUser, updateByNls);
-
-        verify(mService.mPreferencesHelper, never()).createNotificationChannelGroup(any(), anyInt(),
-                any(), anyBoolean(), anyInt(), anyBoolean());
-    }
-
-    @Test
-    public void updateNotificationChannelGroupFromPrivilegedListener_notAnUpdate_ignored()
-            throws Exception {
-        NotificationChannelGroup createByNls = new NotificationChannelGroup("grp", "New");
-        when(mCompanionMgr.getAssociations(mPkg, mUserId))
-                .thenReturn(singletonList(mock(AssociationInfo.class)));
-
-        mBinderService.updateNotificationChannelGroupFromPrivilegedListener(
-                null, mPkg, mUser, createByNls);
-
-        verify(mService.mPreferencesHelper, never()).createNotificationChannelGroup(any(), anyInt(),
-                any(), anyBoolean(), anyInt(), anyBoolean());
-    }
-
-    @Test
     public void testGetPackagesWithChannels_blocked() throws Exception {
         // While we mostly rely on the PreferencesHelper implementation of channels, we filter in
         // NMS so that we do not return blocked packages.
@@ -18398,6 +18339,45 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_NOTIFICATION_CLASSIFICATION)
+    public void applyAdjustment_classify_withUpdatesEnqueued_appliesChannel() throws Exception {
+        when(mAssistants.isClassificationTypeAllowed(anyInt(), anyInt())).thenReturn(true);
+        when(mAssistants.isAdjustmentAllowedForPackage(anyInt(), anyString(),
+                anyString())).thenReturn(true);
+        when(mAssistants.isSameUser(any(), anyInt())).thenReturn(true);
+        NotificationRecord sample = generateNotificationRecord(mTestNotificationChannel);
+
+        // App rapidly posts the same notification multiple times
+        int times = 2;
+        for (int i = 0; i < times; i++) {
+            NotificationRecord copy = generateNotificationRecord(mTestNotificationChannel);
+            mService.addEnqueuedNotification(copy);
+        }
+        // Assistant gets all the enqueues, so classifies the same notification multiple times too,
+        // before actual post has occurred.
+        for (int i = 0; i < times; i++) {
+            Bundle signals = new Bundle();
+            signals.putInt(KEY_TYPE, TYPE_NEWS);
+            Adjustment adjustment = new Adjustment(
+                    sample.getSbn().getPackageName(), sample.getKey(), signals, "",
+                    sample.getUser().getIdentifier());
+            mBinderService.applyEnqueuedAdjustmentFromAssistant(null, adjustment);
+        }
+        // Process and post all enqueues.
+        for (int i = 0; i < times; i++) {
+            mService.new PostNotificationRunnable(sample.getKey(), sample.getSbn().getPackageName(),
+                    sample.getUid(), mPostNotificationTrackerFactory.newTracker(null)).run();
+        }
+        waitForIdle();
+
+        assertThat(mService.mEnqueuedNotifications).isEmpty();
+        NotificationRecord posted = mService.mNotificationsByKey.get(sample.getKey());
+        assertThat(posted).isNotNull();
+        assertThat(posted.getChannel().getId()).isEqualTo(NEWS_ID);
+        assertThat(mService.mNotificationList).hasSize(2); // Bundle header + notif
+    }
+
+    @Test
     @EnableFlags({android.service.notification.Flags.FLAG_NOTIFICATION_CLASSIFICATION,
             android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI})
     public void testApplyAdjustment_keyTypeForDisallowedPackage_DoesNotApply() throws Exception {
@@ -20073,6 +20053,119 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 summary.getSbn().getTag(), summary.getSbn().getId(), summary.getSbn().getUserId());
         assertThat(s).isNotNull();
         assertThat(s.getNotification().flags & FLAG_SILENT).isEqualTo(FLAG_SILENT);
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_CLASSIFICATION)
+    public void testAllChildrenBundled_summaryCanceled() throws Exception {
+        when(mAssistants.isClassificationTypeAllowed(anyInt(), anyInt())).thenReturn(true);
+        when(mAssistants.isAdjustmentAllowedForPackage(anyInt(), anyString(),
+                anyString())).thenReturn(true);
+        when(mAssistants.isSameUser(any(), anyInt())).thenReturn(true);
+        when(mAssistants.isServiceTokenValidLocked(any())).thenReturn(true);
+
+        // Create a group with 2 children and a summary
+        final String originalGroupName = "originalGroup";
+        final int summaryId = 0;
+
+        // Post the child notifications first and bundle them immediately
+        final NotificationRecord r1 = generateNotificationRecord(mTestNotificationChannel,
+                summaryId + 1, originalGroupName, false);
+        mService.addNotification(r1);
+        Bundle signals = new Bundle();
+        signals.putInt(KEY_TYPE, TYPE_NEWS);
+        Adjustment adjustment = new Adjustment(r1.getSbn().getPackageName(), r1.getKey(), signals,
+                "", r1.getUser().getIdentifier());
+        mBinderService.applyAdjustmentFromAssistant(null, adjustment);
+        waitForIdle();
+        r1.applyAdjustments();
+        r1.setOverrideGroupKey("newsBundleGroup");
+        assertThat(r1.getChannel().getId()).isEqualTo(NEWS_ID);
+
+        final NotificationRecord r2 = generateNotificationRecord(mTestNotificationChannel,
+                summaryId + 2, originalGroupName, false);
+        mService.addNotification(r2);
+        signals.putInt(KEY_TYPE, TYPE_PROMOTION);
+        adjustment = new Adjustment(r2.getSbn().getPackageName(), r2.getKey(), signals,
+                "", r2.getUser().getIdentifier());
+        mBinderService.applyAdjustmentFromAssistant(null, adjustment);
+        waitForIdle();
+        r2.applyAdjustments();
+        r2.setOverrideGroupKey("promotionsBundleGroup");
+        assertThat(r2.getChannel().getId()).isEqualTo(PROMOTIONS_ID);
+
+        // Post summary
+        final NotificationRecord summary = generateNotificationRecord(mTestNotificationChannel,
+                summaryId, originalGroupName, true);
+        mService.addEnqueuedNotification(summary);
+        mService.new PostNotificationRunnable(summary.getKey(), summary.getSbn().getPackageName(),
+                summary.getUid(), mPostNotificationTrackerFactory.newTracker(null)).run();
+        waitForIdle();
+
+        // Check that the summary has FLAG_SILENT set
+        NotificationRecord s = mService.findNotificationLocked(summary.getSbn().getPackageName(),
+                summary.getSbn().getTag(), summary.getSbn().getId(), summary.getSbn().getUserId());
+        assertThat(s).isNotNull();
+        assertThat(s.getNotification().flags & FLAG_SILENT).isEqualTo(FLAG_SILENT);
+
+        // Advance DELAY_FORCE_REGROUP_TIME: calls GroupHelper.onNotificationPostedWithDelay
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        // Check that the summary was canceled and cached in GroupHelper
+        s = mService.findNotificationLocked(summary.getSbn().getPackageName(),
+                summary.getSbn().getTag(), summary.getSbn().getId(), summary.getSbn().getUserId());
+        assertThat(s).isNull();
+        assertThat(mGroupHelper.findCanceledSummary(summary.getSbn().getPackageName(),
+                summary.getSbn().getTag(), summary.getSbn().getId(),
+                summary.getSbn().getUserId(),
+                summary.getSbn().getNotification().getGroup())).isNotNull();
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_CLASSIFICATION)
+    public void testSomeChildrenBundled_summaryNotCanceled() throws Exception {
+        when(mAssistants.isClassificationTypeAllowed(anyInt(), anyInt())).thenReturn(true);
+        when(mAssistants.isAdjustmentAllowedForPackage(anyInt(), anyString(),
+                anyString())).thenReturn(true);
+        when(mAssistants.isSameUser(any(), anyInt())).thenReturn(true);
+        when(mAssistants.isServiceTokenValidLocked(any())).thenReturn(true);
+
+        // Create a group with 2 children and a summary
+        final String originalGroupName = "originalGroup";
+        final int summaryId = 0;
+
+        // Post the child notifications first and bundle one of them
+        final NotificationRecord r1 = generateNotificationRecord(mTestNotificationChannel,
+                summaryId + 1, originalGroupName, false);
+        mService.addNotification(r1);
+        Bundle signals = new Bundle();
+        signals.putInt(KEY_TYPE, TYPE_NEWS);
+        Adjustment adjustment = new Adjustment(r1.getSbn().getPackageName(), r1.getKey(), signals,
+                "", r1.getUser().getIdentifier());
+        mBinderService.applyAdjustmentFromAssistant(null, adjustment);
+        waitForIdle();
+        r1.applyAdjustments();
+        r1.setOverrideGroupKey("newsBundleGroup");
+        assertThat(r1.getChannel().getId()).isEqualTo(NEWS_ID);
+
+        final NotificationRecord r2 = generateNotificationRecord(mTestNotificationChannel,
+                summaryId + 2, originalGroupName, false);
+        mService.addNotification(r2);
+        waitForIdle();
+
+        // Post summary
+        final NotificationRecord summary = generateNotificationRecord(mTestNotificationChannel,
+                summaryId, originalGroupName, true);
+        mService.addEnqueuedNotification(summary);
+        mService.new PostNotificationRunnable(summary.getKey(), summary.getSbn().getPackageName(),
+                summary.getUid(), mPostNotificationTrackerFactory.newTracker(null)).run();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        // Check that the summary was not canceled and does NOT have FLAG_SILENT set
+        NotificationRecord s = mService.findNotificationLocked(summary.getSbn().getPackageName(),
+                summary.getSbn().getTag(), summary.getSbn().getId(), summary.getSbn().getUserId());
+        assertThat(s).isEqualTo(summary);
+        assertThat(s.getNotification().flags & FLAG_SILENT).isEqualTo(0);
     }
 
     @Test

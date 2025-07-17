@@ -2107,6 +2107,10 @@ public abstract class OomAdjuster {
             // Process has user perceptible activities.
             return PROCESS_CAPABILITY_CPU_TIME;
         }
+        if (app.mServices.numberOfExecutingServices() > 0) {
+            // Ensure that services get cpu time during start-up and tear-down.
+            return PROCESS_CAPABILITY_CPU_TIME;
+        }
         if (app.mServices.hasForegroundServices()) {
             return PROCESS_CAPABILITY_CPU_TIME;
         }

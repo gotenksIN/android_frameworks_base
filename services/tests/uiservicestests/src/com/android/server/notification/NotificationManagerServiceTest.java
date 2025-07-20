@@ -431,6 +431,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                     .setOwner(new ComponentName("pkg", "cls"))
                     .build();
 
+    private static final int MAX_CHANNELS_CREATED_BY_NLS_FOR_TESTING = 10;
+
     @ClassRule
     public static final LimitDevicesRule sLimitDevicesRule = new LimitDevicesRule();
 
@@ -517,16 +519,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     NotificationChannel mSilentChannel = new NotificationChannel("low", "low", IMPORTANCE_LOW);
 
     NotificationChannel mMinChannel = new NotificationChannel("min", "min", IMPORTANCE_MIN);
-
-    private final NotificationChannel mParentChannel =
-            new NotificationChannel(PARENT_CHANNEL_ID, "parentName", IMPORTANCE_DEFAULT);
-    private final NotificationChannel mConversationChannel =
-            new NotificationChannel(
-                    CONVERSATION_CHANNEL_ID, "conversationName", IMPORTANCE_DEFAULT);
-
-    private static final String PARENT_CHANNEL_ID = "parentChannelId";
-    private static final String CONVERSATION_CHANNEL_ID = "conversationChannelId";
-    private static final String CONVERSATION_ID = "conversationId";
 
     private static final int NOTIFICATION_LOCATION_UNKNOWN = 0;
 
@@ -691,7 +683,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // MockPackageManager - default returns ApplicationInfo with matching calling UID
         mContext.setMockPackageManager(mPackageManagerClient);
 
-        when(mPackageManager.getPackageUid(mPkg, 0, mUserId)).thenReturn(mUid);
+        when(mPackageManager.getPackageUid(eq(mPkg), anyLong(), eq(mUserId))).thenReturn(mUid);
         when(mPackageManager.getApplicationInfo(anyString(), anyLong(), anyInt()))
                 .thenAnswer((Answer<ApplicationInfo>) invocation -> {
                     Object[] args = invocation.getArguments();
@@ -842,7 +834,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mAppOpsManager, mUm, mHistoryManager, mStatsManager, mAmi, mToastRateLimiter,
                 mPermissionHelper, mock(UsageStatsManagerInternal.class), mTelecomManager, mLogger,
                 mTestFlagResolver, mPermissionManager, mPowerManager,
-                mPostNotificationTrackerFactory, mUiEventLogger, mBitmapOffloader);
+                mPostNotificationTrackerFactory, mUiEventLogger, mBitmapOffloader,
+                new NotificationListenerStats(MAX_CHANNELS_CREATED_BY_NLS_FOR_TESTING));
 
         mService.setAttentionHelper(mAttentionHelper);
         mService.setLockPatternUtils(mock(LockPatternUtils.class));
@@ -2701,6 +2694,108 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 GROUP_ALERT_CHILDREN);
 
         assertThat(summary.getChannel().getId()).isEqualTo(newChannelId);
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void testAggregatedSummary_updateUngroupedChildFlags_updatesSummary() throws Exception {
+        // Add 2 ungrouped notifications
+        NotificationRecord nr0 = generateNotificationRecord(mTestNotificationChannel, 0, mUserId);
+        mService.addEnqueuedNotification(nr0);
+        NotificationManagerService.PostNotificationRunnable runnable =
+                mService.new PostNotificationRunnable(nr0.getKey(), nr0.getSbn().getPackageName(),
+                    nr0.getUid(), mPostNotificationTrackerFactory.newTracker(null));
+        runnable.run();
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        NotificationRecord nr1 = generateNotificationRecord(mTestNotificationChannel, 1, mUserId);
+        mService.addEnqueuedNotification(nr1);
+        runnable = mService.new PostNotificationRunnable(nr1.getKey(),
+                nr1.getSbn().getPackageName(), nr1.getUid(),
+                mPostNotificationTrackerFactory.newTracker(null));
+        runnable.run();
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        // Check that the aggregate group summary was created
+        nr0.applyAdjustments();
+        nr1.applyAdjustments();
+        final String fullAggregateGroupKey = nr0.getGroupKey();
+        NotificationRecord aggregateSummary = mService.mSummaryByGroupKey.get(
+                fullAggregateGroupKey);
+        assertThat(aggregateSummary).isNotNull();
+        assertThat(aggregateSummary.getNotification().getGroup()).isEqualTo(fullAggregateGroupKey);
+        assertThat(aggregateSummary.getNotification().getChannelId()).isEqualTo(
+                nr0.getChannel().getId());
+        assertThat(aggregateSummary.getSbn().isOngoing()).isFalse();
+
+        // Update first child's flags
+        final NotificationRecord updatedNotification = generateNotificationRecord(
+                mTestNotificationChannel, 0, mUserId);
+        updatedNotification.getNotification().flags |= FLAG_ONGOING_EVENT;
+        mBinderService.enqueueNotificationWithTag(mPkg, mPkg, nr0.getSbn().getTag(),
+                nr0.getSbn().getId(), updatedNotification.getNotification(),
+                nr0.getSbn().getUserId());
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        // Check that summary has FLAG_ONGOING_EVENT
+        assertThat(aggregateSummary.getSbn().isOngoing()).isTrue();
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void testAggregatedSummary_updateForceGroupedChildFlags_updatesSummary()
+            throws Exception {
+        // Add 2 summary notifications without children
+        final String originalGroupName = "originalGroup";
+        final NotificationRecord nr0 =
+                generateNotificationRecord(mTestNotificationChannel, 0, originalGroupName, true);
+        mService.addEnqueuedNotification(nr0);
+        NotificationManagerService.PostNotificationRunnable runnable =
+                mService.new PostNotificationRunnable(nr0.getKey(), nr0.getSbn().getPackageName(),
+                    nr0.getUid(), mPostNotificationTrackerFactory.newTracker(null));
+        runnable.run();
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        final NotificationRecord nr1 =
+                generateNotificationRecord(mTestNotificationChannel, 1, originalGroupName, true);
+        mService.addEnqueuedNotification(nr1);
+        runnable = mService.new PostNotificationRunnable(nr1.getKey(),
+                nr1.getSbn().getPackageName(), nr1.getUid(),
+                    mPostNotificationTrackerFactory.newTracker(null));
+        runnable.run();
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        // Check that the aggregate group summary was created
+        nr0.applyAdjustments();
+        nr1.applyAdjustments();
+        final String fullAggregateGroupKey = nr0.getGroupKey();
+        NotificationRecord aggregateSummary = mService.mSummaryByGroupKey.get(
+                fullAggregateGroupKey);
+        assertThat(aggregateSummary).isNotNull();
+        assertThat(aggregateSummary.getNotification().getGroup()).isEqualTo(fullAggregateGroupKey);
+        assertThat(aggregateSummary.getNotification().getChannelId()).isEqualTo(
+                nr0.getChannel().getId());
+        assertThat(aggregateSummary.getSbn().isOngoing()).isFalse();
+        assertThat(nr0.getNotification().isGroupSummary()).isFalse();
+        assertThat(nr1.getNotification().isGroupSummary()).isFalse();
+
+        // Update first child's flags
+        final NotificationRecord updatedNotification =
+                generateNotificationRecord(mTestNotificationChannel, 0, originalGroupName, true);
+        updatedNotification.getNotification().flags |= FLAG_ONGOING_EVENT;
+        mBinderService.enqueueNotificationWithTag(mPkg, mPkg, nr0.getSbn().getTag(),
+                nr0.getSbn().getId(), updatedNotification.getNotification(),
+                nr0.getSbn().getUserId());
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+
+        // Check that summary has FLAG_ONGOING_EVENT
+        assertThat(aggregateSummary.getSbn().isOngoing()).isTrue();
     }
 
     @Test
@@ -5084,46 +5179,22 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mAmi).hasForegroundServiceNotification(anyString(), anyInt(), anyString());
     }
 
-    private void setUpChannelsForConversationChannelTest() throws RemoteException {
-        when(mPreferencesHelper.getNotificationChannel(
-                eq(mPkg), eq(mUid), eq(PARENT_CHANNEL_ID), eq(false)))
-                .thenReturn(mParentChannel);
-        when(mPreferencesHelper.getConversationNotificationChannel(
-                eq(mPkg), eq(mUid), eq(PARENT_CHANNEL_ID), eq(CONVERSATION_ID), eq(false), eq(false)))
-                .thenReturn(mConversationChannel);
-        when(mPackageManager.getPackageUid(mPkg, 0, mUserId)).thenReturn(mUid);
-    }
-
     @Test
     @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
     public void createConversationChannelForPkgFromPrivilegedListener_cdm_success() throws Exception {
-        // Set up cdm
-        mService.setPreferencesHelper(mPreferencesHelper);
         when(mCompanionMgr.getAssociations(mPkg, mUserId))
                 .thenReturn(singletonList(mock(AssociationInfo.class)));
+        mService.mPreferencesHelper.createNotificationChannel(mPkg, mUid,
+                new NotificationChannel("parent", "parentName", IMPORTANCE_DEFAULT),
+                true, false, mUid, false);
 
-        // Set up parent channel
-        setUpChannelsForConversationChannelTest();
-        final NotificationChannel parentChannelCopy = mParentChannel.copy();
+        NotificationChannel createdChannel = mBinderService
+                .createConversationNotificationChannelForPackageFromPrivilegedListener(
+                    null, mPkg, mUser, "parent", "convo");
 
-        NotificationChannel createdChannel =
-                mBinderService.createConversationNotificationChannelForPackageFromPrivilegedListener(
-                    null, mPkg, mUser, PARENT_CHANNEL_ID, CONVERSATION_ID);
-
-        // Verify that a channel is created and a copied channel is returned.
-        verify(mPreferencesHelper, times(1)).createNotificationChannel(
-                eq(mPkg), eq(mUid), any(), anyBoolean(), anyBoolean(),
-                eq(mUid), anyBoolean());
-        assertThat(createdChannel).isNotSameInstanceAs(mConversationChannel);
-        assertThat(createdChannel).isEqualTo(mConversationChannel);
-
-        // Verify that the channel creation is not directly use the parent channel.
-        verify(mPreferencesHelper, never()).createNotificationChannel(
-                anyString(), anyInt(), eq(mParentChannel), anyBoolean(), anyBoolean(),
-                anyInt(), anyBoolean());
-
-        // Verify that the content of parent channel is not changed.
-        assertThat(parentChannelCopy).isEqualTo(mParentChannel);
+        assertThat(createdChannel).isNotNull();
+        assertThat(createdChannel.getParentChannelId()).isEqualTo("parent");
+        assertThat(createdChannel.getConversationId()).isEqualTo("convo");
     }
 
     @Test
@@ -5133,25 +5204,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     })
     public void createConversationChannelForPkgFromPrivilegedListener_classified_fail()
             throws Exception {
-        // Set up cdm
-        mService.setPreferencesHelper(mPreferencesHelper);
         when(mCompanionMgr.getAssociations(mPkg, mUserId))
                 .thenReturn(singletonList(mock(AssociationInfo.class)));
-
-        // Set up parent channel
-        setUpChannelsForConversationChannelTest();
-        final NotificationChannel parentChannelCopy = mParentChannel.copy();
 
         for (String channelId : NotificationChannel.SYSTEM_RESERVED_IDS) {
             NotificationChannel createdChannel = mBinderService
                     .createConversationNotificationChannelForPackageFromPrivilegedListener(
-                            null, mPkg, mUser, channelId, CONVERSATION_ID);
+                            null, mPkg, mUser, channelId, "convo");
 
-            // Verify that no channel is created and null is returned.
-            verify(mPreferencesHelper, never()).createNotificationChannel(
-                    eq(mPkg), eq(mUid), any(), anyBoolean(), anyBoolean(),
-                    eq(mUid), anyBoolean());
-            assertThat(createdChannel).isEqualTo(null);
+            assertWithMessage("Trying with " + channelId).that(createdChannel).isNull();
         }
     }
 
@@ -5159,89 +5220,56 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
     public void createConversationChannelForPkgFromPrivilegedListener_cdm_noAccess() throws Exception {
         // Set up cdm without access
-        mService.setPreferencesHelper(mPreferencesHelper);
-        when(mCompanionMgr.getAssociations(mPkg, mUserId))
-                .thenReturn(emptyList());
+        when(mCompanionMgr.getAssociations(mPkg, mUserId)).thenReturn(emptyList());
+        mService.mPreferencesHelper.createNotificationChannel(mPkg, mUid,
+                new NotificationChannel("parent", "parentName", IMPORTANCE_DEFAULT),
+                true, false, mUid, false);
 
-        // Set up parent channel
-        setUpChannelsForConversationChannelTest();
-
-        try {
-            mBinderService.createConversationNotificationChannelForPackageFromPrivilegedListener(
-                null, mPkg, mUser, "parentId", "conversationId");
-            fail("listeners that don't have a companion device shouldn't be able to call this");
-        } catch (SecurityException e) {
-            // pass
-        }
-
-        verify(mPreferencesHelper, never()).createNotificationChannel(
-                anyString(), anyInt(), any(), anyBoolean(), anyBoolean(),
-                anyInt(), anyBoolean());
+        assertThrows(SecurityException.class, () ->
+                mBinderService
+                        .createConversationNotificationChannelForPackageFromPrivilegedListener(null,
+                                mPkg, mUser, "parent", "convo"));
     }
 
     @Test
     @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
     public void createConversationChannelForPkgFromPrivilegedListener_assistant_success() throws Exception {
         // Set up assistant
-        mService.setPreferencesHelper(mPreferencesHelper);
         when(mCompanionMgr.getAssociations(mPkg, mUserId))
                 .thenReturn(emptyList());
         when(mAssistants.isServiceTokenValidLocked(any())).thenReturn(true);
-
-        // Set up parent channel
-        setUpChannelsForConversationChannelTest();
-        final NotificationChannel parentChannelCopy = mParentChannel.copy();
+        mService.mPreferencesHelper.createNotificationChannel(mPkg, mUid,
+                new NotificationChannel("parent", "parentName", IMPORTANCE_DEFAULT),
+                true, false, mUid, false);
 
         NotificationChannel createdChannel =
                 mBinderService.createConversationNotificationChannelForPackageFromPrivilegedListener(
-                    null, mPkg, mUser, PARENT_CHANNEL_ID, CONVERSATION_ID);
+                    null, mPkg, mUser, "parent", "convo");
 
-        // Verify that a channel is created and a copied channel is returned.
-        verify(mPreferencesHelper, times(1)).createNotificationChannel(
-                eq(mPkg), eq(mUid), any(), anyBoolean(), anyBoolean(),
-                eq(mUid), anyBoolean());
-        assertThat(createdChannel).isNotSameInstanceAs(mConversationChannel);
-        assertThat(createdChannel).isEqualTo(mConversationChannel);
-
-        // Verify that the channel creation is not directly use the parent channel.
-        verify(mPreferencesHelper, never()).createNotificationChannel(
-                anyString(), anyInt(), eq(mParentChannel), anyBoolean(), anyBoolean(),
-                anyInt(), anyBoolean());
-
-        // Verify that the content of parent channel is not changed.
-        assertThat(parentChannelCopy).isEqualTo(mParentChannel);
+        assertThat(createdChannel).isNotNull();
     }
 
     @Test
     @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
     public void createConversationChannelForPkgFromPrivilegedListener_assistant_noAccess() throws Exception {
         // Set up assistant without access
-        mService.setPreferencesHelper(mPreferencesHelper);
         when(mCompanionMgr.getAssociations(mPkg, mUserId))
                 .thenReturn(emptyList());
         when(mAssistants.isServiceTokenValidLocked(any())).thenReturn(false);
+        mService.mPreferencesHelper.createNotificationChannel(mPkg, mUid,
+                new NotificationChannel("parent", "parentName", IMPORTANCE_DEFAULT),
+                true, false, mUid, false);
 
-        // Set up parent channel
-        setUpChannelsForConversationChannelTest();
-
-        try {
-            mBinderService.createConversationNotificationChannelForPackageFromPrivilegedListener(
-                null, mPkg, mUser, "parentId", "conversationId");
-            fail("listeners that don't have a companion device shouldn't be able to call this");
-        } catch (SecurityException e) {
-            // pass
-        }
-
-        verify(mPreferencesHelper, never()).createNotificationChannel(
-                anyString(), anyInt(), any(), anyBoolean(), anyBoolean(),
-                anyInt(), anyBoolean());
+        assertThrows(SecurityException.class, () ->
+                mBinderService
+                        .createConversationNotificationChannelForPackageFromPrivilegedListener(null,
+                                mPkg, mUser, "parent", "convo"));
     }
 
     @Test
     @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
     public void createConversationChannelForPkgFromPrivilegedListener_badUser() throws Exception {
         // Set up bad user
-        mService.setPreferencesHelper(mPreferencesHelper);
         when(mCompanionMgr.getAssociations(mPkg, mUserId))
                 .thenReturn(singletonList(mock(AssociationInfo.class)));
         mListener = mock(ManagedServices.ManagedServiceInfo.class);
@@ -5249,20 +5277,78 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         when(mListener.enabledAndUserMatches(anyInt())).thenReturn(false);
         when(mListeners.checkServiceTokenLocked(any())).thenReturn(mListener);
 
-        // Set up parent channel
-        setUpChannelsForConversationChannelTest();
+        assertThrows(SecurityException.class, () ->
+                mBinderService
+                        .createConversationNotificationChannelForPackageFromPrivilegedListener(null,
+                                mPkg, mUser, "parent", "convo"));
+    }
 
-        try {
-            mBinderService.createConversationNotificationChannelForPackageFromPrivilegedListener(
-                null, mPkg, mUser, "parentId", "conversationId");
-            fail("listener getting channels from a user they cannot see");
-        } catch (SecurityException e) {
-            // pass
+    @Test
+    @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
+    public void createConversationChannelForPkgFromPrivilegedListener_tooManyChannels_ignored()
+            throws Exception {
+        NotificationChannel parentChannel = mTestNotificationChannel.copy();
+        mService.mPreferencesHelper.createNotificationChannel(mPkg, mUid, parentChannel, true,
+                false, mUid, false);
+        when(mCompanionMgr.getAssociations(mPkg, mUserId))
+                .thenReturn(singletonList(mock(AssociationInfo.class)));
+
+        for (int i = 1; i <= MAX_CHANNELS_CREATED_BY_NLS_FOR_TESTING; i++) {
+            NotificationChannel createdConversation = mBinderService
+                    .createConversationNotificationChannelForPackageFromPrivilegedListener(
+                            null, mPkg, mUser, parentChannel.getId(), "conversation #" + i);
+            assertThat(createdConversation).isNotNull();
+            assertThat(createdConversation.getParentChannelId()).isEqualTo(parentChannel.getId());
         }
+        ParceledListSlice<NotificationChannel> packageChannels =
+                mService.mPreferencesHelper.getNotificationChannels(mPkg, mUid, false, false);
+        assertThat(packageChannels.getList().stream().filter(c -> c.isConversation()))
+                .hasSize(MAX_CHANNELS_CREATED_BY_NLS_FOR_TESTING);
 
-        verify(mPreferencesHelper, never()).createNotificationChannel(
-                anyString(), anyInt(), any(), anyBoolean(), anyBoolean(),
-                anyInt(), anyBoolean());
+        // And finally, monsieur, a wafer-thin mint.
+        NotificationChannel oneTooMany = mBinderService
+                .createConversationNotificationChannelForPackageFromPrivilegedListener(
+                        null, mPkg, mUser, parentChannel.getId(), "another conversation");
+
+        assertThat(oneTooMany).isNull();
+        ParceledListSlice<NotificationChannel> unchangedPackageChannels =
+                mService.mPreferencesHelper.getNotificationChannels(mPkg, mUid, false, false);
+        assertThat(unchangedPackageChannels.getList()).isEqualTo(packageChannels.getList());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
+    public void createConversationChannelForPkgFromPrivilegedListener_noParentChannel_ignored()
+            throws Exception {
+        when(mCompanionMgr.getAssociations(mPkg, mUserId))
+                .thenReturn(singletonList(mock(AssociationInfo.class)));
+
+        NotificationChannel attempted = mBinderService
+                .createConversationNotificationChannelForPackageFromPrivilegedListener(
+                        null, mPkg, mUser, "missing_parent", "convo");
+        assertThat(attempted).isNull();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT)
+    public void createConversationChannelForPkgFromPrivilegedListener_existingChannel_returnsSame()
+            throws Exception {
+        NotificationChannel parentChannel = mTestNotificationChannel.copy();
+        mService.mPreferencesHelper.createNotificationChannel(mPkg, mUid, parentChannel, true,
+                false, mUid, false);
+        when(mCompanionMgr.getAssociations(mPkg, mUserId))
+                .thenReturn(singletonList(mock(AssociationInfo.class)));
+
+        NotificationChannel created = mBinderService
+                .createConversationNotificationChannelForPackageFromPrivilegedListener(
+                        null, mPkg, mUser, parentChannel.getId(), "convo");
+        assertThat(created).isNotNull();
+
+        NotificationChannel again =  mBinderService
+                .createConversationNotificationChannelForPackageFromPrivilegedListener(
+                        null, mPkg, mUser, parentChannel.getId(), "convo");
+
+        assertThat(again).isSameInstanceAs(created);
     }
 
     @Test

@@ -2848,9 +2848,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (mBatteryStats != null) {
             try {
                 // TODO(brightnessfloat): change BatteryStats to use float
-                int brightnessInt = mFlags.isBrightnessIntRangeUserPerceptionEnabled()
-                        ? BrightnessSynchronizer.brightnessFloatToIntSetting(mContext, brightness)
-                        : BrightnessSynchronizer.brightnessFloatToInt(brightness);
+                int brightnessInt = BrightnessSynchronizer.brightnessFloatToInt(brightness);
                 mBatteryStats.noteScreenBrightness(mDisplayId, brightnessInt);
             } catch (RemoteException e) {
                 // same process
@@ -3288,6 +3286,20 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         msg.what = MSG_SET_DWBC_COLOR_OVERRIDE;
         msg.arg1 = Float.floatToIntBits(cct);
         msg.sendToTarget();
+    }
+
+    /**
+     * @see DisplayBrightnessController#convertToAdjustedNits
+     */
+    float convertToAdjustedNits(float brightness) {
+        return mDisplayBrightnessController.convertToAdjustedNits(brightness);
+    }
+
+    /**
+     * @see DisplayBrightnessController#getBrightnessFromAdjustedNits
+     */
+    float getBrightnessFromAdjustedNits(float nits) {
+        return mDisplayBrightnessController.getBrightnessFromAdjustedNits(nits);
     }
 
     /** Functional interface for providing time. */

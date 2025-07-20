@@ -27,6 +27,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.hardware.biometrics.BiometricAuthenticator.Modality;
@@ -158,6 +159,7 @@ public class AuthContainerView extends LinearLayout
     private final Set<Integer> mFailedModalities = new HashSet<Integer>();
     private final OnBackInvokedCallback mBackCallback = this::onBackInvoked;
     private final PromptFallbackViewModel.Factory mFallbackViewModelFactory;
+    private final boolean mIsWatch;
 
 
     private final MSDLPlayer mMSDLPlayer;
@@ -342,6 +344,8 @@ public class AuthContainerView extends LinearLayout
         mLinearOutSlowIn = Interpolators.LINEAR_OUT_SLOW_IN;
         mBiometricCallback = new BiometricCallback();
         mMSDLPlayer = msdlPlayer;
+        mIsWatch =
+                config.mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH);
 
         final BiometricModalities biometricModalities = new BiometricModalities(
                 Utils.findFirstSensorProperties(fpProps, mConfig.mSensorIds),
@@ -350,9 +354,10 @@ public class AuthContainerView extends LinearLayout
         final boolean isLandscape = mContext.getResources().getConfiguration().orientation
                 == Configuration.ORIENTATION_LANDSCAPE;
         mPromptSelectorInteractorProvider = promptSelectorInteractorProvider;
+        // If the intro (animation) is being skipped, don't reset the prompt
         mPromptSelectorInteractorProvider.get().setPrompt(mConfig.mPromptInfo, mConfig.mUserId,
                 getRequestId(), biometricModalities, mConfig.mOperationId, mConfig.mOpPackageName,
-                false /*onSwitchToCredential*/, isLandscape);
+                false /*onSwitchToCredential*/, isLandscape, !mConfig.mSkipIntro);
 
         final LayoutInflater layoutInflater = LayoutInflater.from(mContext);
         final PromptKind kind = mPromptViewModel.getPromptKind().getValue();
@@ -364,10 +369,16 @@ public class AuthContainerView extends LinearLayout
                 mLayout = (ConstraintLayout) layoutInflater.inflate(
                         R.layout.biometric_prompt_one_pane_layout, this, false /* attachToRoot */);
             }
+
+            // Setting visibility here to avoid unflagged layout changes
+            if (Flags.bpFallbackOptions()) {
+                mLayout.findViewById(R.id.auth_screen).setVisibility(View.GONE);
+            }
         } else {
             mLayout = (FrameLayout) layoutInflater.inflate(
                     R.layout.auth_container_view, this, false /* attachToRoot */);
         }
+
         addView(mLayout);
         mBackgroundView = mLayout.findViewById(R.id.background);
 
@@ -499,7 +510,7 @@ public class AuthContainerView extends LinearLayout
             return;
         }
 
-        if (Flags.bpFallbackOptions() || Flags.bpInitializeComposeWatch()) {
+        if (Flags.bpFallbackOptions() || (mIsWatch && Flags.bpInitializeComposeWatch())) {
             ComposeInitializer.INSTANCE.onAttachedToWindow(this);
         }
 
@@ -574,7 +585,7 @@ public class AuthContainerView extends LinearLayout
             findOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(mBackCallback);
         }
         super.onDetachedFromWindow();
-        if (Flags.bpFallbackOptions() || Flags.bpInitializeComposeWatch()) {
+        if (Flags.bpFallbackOptions() || (mIsWatch && Flags.bpInitializeComposeWatch())) {
             ComposeInitializer.INSTANCE.onDetachedFromWindow(this);
         }
         mWakefulnessLifecycle.removeObserver(this);

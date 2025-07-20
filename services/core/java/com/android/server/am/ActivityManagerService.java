@@ -6849,7 +6849,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         // that here (pre-V versions will be checked in the conditional below)
                         // Starting Android V, only allow the app to schedule a user-initiated job
                         // if it's granted the permission and currently showing an overlay window
-                        if (pr != null && pr.mState.hasOverlayUi()) {
+                        if (pr != null && pr.mState.getHasOverlayUi()) {
                             return true;
                         }
                     }
@@ -17040,7 +17040,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                             continue;
                         }
                         if (app.isRemoved()
-                                || (app.userId == userId && app.mState.hasForegroundActivities())) {
+                                || (app.userId == userId
+                                        && app.mState.getHasForegroundActivities())) {
                             procs.add(app);
                         }
                     }
@@ -17346,7 +17347,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     final ProcessRecord pr = (ProcessRecord) wpc.mOwner;
                     if (ActivityManager.isProcStateBackground(pr.mState.getSetProcState())
                             && !pr.mReceivers.isReceivingBroadcast()
-                            && !pr.mState.hasStartedServices()) {
+                            && !pr.mState.getHasStartedServices()) {
                         pr.killLocked("remove task", ApplicationExitInfo.REASON_USER_REQUESTED,
                                 ApplicationExitInfo.SUBREASON_REMOVE_TASK, true);
                     } else {

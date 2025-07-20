@@ -524,13 +524,13 @@ public class MockingOomAdjusterTests {
 
         assertProcStates(app, PROCESS_STATE_TOP_SLEEPING, FOREGROUND_APP_ADJ,
                 SCHED_GROUP_BACKGROUND);
-        assertTrue(app.mState.hasForegroundActivities());
+        assertTrue(app.mState.getHasForegroundActivities());
 
         setIsReceivingBroadcast(app, true, SCHED_GROUP_BACKGROUND);
         updateOomAdj(app);
 
         assertProcStates(app, PROCESS_STATE_RECEIVER, FOREGROUND_APP_ADJ, SCHED_GROUP_BACKGROUND);
-        assertTrue(app.mState.hasForegroundActivities());
+        assertTrue(app.mState.getHasForegroundActivities());
     }
 
     @SuppressWarnings("GuardedBy")
@@ -894,6 +894,25 @@ public class MockingOomAdjusterTests {
         assertCpuTime(app);
 
         mProcessStateController.noteBroadcastDeliveryEnded(app);
+        updateOomAdj(app);
+        assertNoCpuTime(app);
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    @EnableFlags(Flags.FLAG_CPU_TIME_CAPABILITY_BASED_FREEZE_POLICY)
+    public void testUpdateOomAdjFreezeState_executingServices() {
+        final ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID,
+                MOCKAPP_PROCESSNAME, MOCKAPP_PACKAGENAME, true);
+
+        updateOomAdj(app);
+        assertNoCpuTime(app);
+
+        mProcessStateController.startExecutingService(app.mServices, mock(ServiceRecord.class));
+        updateOomAdj(app);
+        assertCpuTime(app);
+
+        mProcessStateController.stopAllExecutingServices(app.mServices);
         updateOomAdj(app);
         assertNoCpuTime(app);
     }
@@ -3844,7 +3863,7 @@ public class MockingOomAdjusterTests {
                 mock(IBinder.class));
         updateOomAdj(client);
 
-        assertTrue(host.mState.shouldScheduleLikeTopApp());
+        assertTrue(host.mState.getScheduleLikeTopApp());
         assertEquals(SCHED_GROUP_TOP_APP, host.mState.getCurrentSchedulingGroup());
     }
 
@@ -3861,7 +3880,7 @@ public class MockingOomAdjusterTests {
                 mock(IBinder.class));
         updateOomAdj(client);
 
-        assertFalse(host.mState.shouldScheduleLikeTopApp());
+        assertFalse(host.mState.getScheduleLikeTopApp());
         assertNotEquals(SCHED_GROUP_TOP_APP, host.mState.getCurrentSchedulingGroup());
     }
 
@@ -3885,7 +3904,7 @@ public class MockingOomAdjusterTests {
         updateOomAdj(client);
 
         // The update for host by its client connection evaluation is skipped.
-        assertFalse(host.mState.shouldScheduleLikeTopApp());
+        assertFalse(host.mState.getScheduleLikeTopApp());
         assertNotEquals(SCHED_GROUP_TOP_APP, host.mState.getSetSchedGroup());
     }
 
@@ -3908,7 +3927,7 @@ public class MockingOomAdjusterTests {
                 mock(IBinder.class));
         updateOomAdj(client);
 
-        assertTrue(host.mState.shouldScheduleLikeTopApp());
+        assertTrue(host.mState.getScheduleLikeTopApp());
         assertEquals(SCHED_GROUP_TOP_APP, host.mState.getCurrentSchedulingGroup());
     }
 

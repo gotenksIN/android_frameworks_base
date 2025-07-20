@@ -340,8 +340,6 @@ public class LockSettingsService extends ILockSettings.Stub {
     private final CopyOnWriteArrayList<LockSettingsStateListener> mLockSettingsStateListeners =
             new CopyOnWriteArrayList<>();
 
-    private final Object mGcWorkToken = new Object();
-
     // This class manages life cycle events for encrypted users on File Based Encryption (FBE)
     // devices. The most basic of these is to show/hide notifications about missing features until
     // the user unlocks the account and credential-encrypted storage is available.
@@ -1335,17 +1333,25 @@ public class LockSettingsService extends ILockSettings.Stub {
     public void setSeparateProfileChallengeEnabled(int userId, boolean enabled,
             LockscreenCredential profileUserPassword) {
         checkWritePermission();
-        if (!mHasSecureLockScreen
-                && profileUserPassword != null
-                && profileUserPassword.getType() != CREDENTIAL_TYPE_NONE) {
-            throw new UnsupportedOperationException(
-                    "This operation requires secure lock screen feature.");
+        try {
+            if (!mHasSecureLockScreen
+                    && profileUserPassword != null
+                    && profileUserPassword.getType() != CREDENTIAL_TYPE_NONE) {
+                throw new UnsupportedOperationException(
+                        "This operation requires secure lock screen feature.");
+            }
+            synchronized (mSeparateChallengeLock) {
+                setSeparateProfileChallengeEnabledLocked(
+                        userId,
+                        enabled,
+                        profileUserPassword != null
+                                ? profileUserPassword
+                                : LockscreenCredential.createNone());
+            }
+            notifySeparateProfileChallengeChanged(userId);
+        } finally {
+            LockscreenCredential.zeroizeIfFromParcel(profileUserPassword);
         }
-        synchronized (mSeparateChallengeLock) {
-            setSeparateProfileChallengeEnabledLocked(userId, enabled, profileUserPassword != null
-                    ? profileUserPassword : LockscreenCredential.createNone());
-        }
-        notifySeparateProfileChallengeChanged(userId);
     }
 
     @GuardedBy("mSeparateChallengeLock")
@@ -1829,8 +1835,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
         // Send credentials for the user and any child profiles that share its lock screen.
         for (int profileId : getProfilesWithSameLockScreen(userId)) {
-            mRecoverableKeyStoreManager.lockScreenSecretAvailable(
-                    credential.getType(), credential.getCredential(), profileId);
+            mRecoverableKeyStoreManager.lockScreenSecretAvailable(credential, profileId);
         }
     }
 
@@ -1847,12 +1852,9 @@ public class LockSettingsService extends ILockSettings.Stub {
             return;
         }
 
-        // RecoverableKeyStoreManager expects null for empty credential.
-        final byte[] secret = credential.isNone() ? null : credential.getCredential();
         // Send credentials for the user and any child profiles that share its lock screen.
         for (int profileId : getProfilesWithSameLockScreen(userId)) {
-            mRecoverableKeyStoreManager.lockScreenSecretChanged(
-                    credential.getType(), secret, profileId);
+            mRecoverableKeyStoreManager.lockScreenSecretChanged(credential, profileId);
         }
     }
 
@@ -1893,10 +1895,11 @@ public class LockSettingsService extends ILockSettings.Stub {
                                 + "ACCESS_KEYGUARD_SECURE_STORAGE");
             }
         }
-        credential.validateBasicRequirements();
 
         final long identity = Binder.clearCallingIdentity();
         try {
+            credential.validateBasicRequirements();
+
             enforceFrpNotActive();
             // When changing credential for profiles with unified challenge, some callers
             // will pass in empty credential while others will pass in the credential of
@@ -1921,7 +1924,6 @@ public class LockSettingsService extends ILockSettings.Stub {
             synchronized (mSeparateChallengeLock) {
                 if (!setLockCredentialInternal(credential, savedCredential,
                         userId, /* isLockTiedToParent= */ false)) {
-                    scheduleGc();
                     return false;
                 }
                 setSeparateProfileChallengeEnabledLocked(userId, true, /* unused */ null);
@@ -1933,10 +1935,11 @@ public class LockSettingsService extends ILockSettings.Stub {
             }
             notifySeparateProfileChallengeChanged(userId);
             onPostPasswordChanged(credential, userId);
-            scheduleGc();
             return true;
         } finally {
             Binder.restoreCallingIdentity(identity);
+            LockscreenCredential.zeroizeIfFromParcel(credential);
+            LockscreenCredential.zeroizeIfFromParcel(savedCredential);
         }
     }
 
@@ -2411,7 +2414,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             return response;
         } finally {
             Binder.restoreCallingIdentity(identity);
-            scheduleGc();
+            LockscreenCredential.zeroizeIfFromParcel(credential);
 // QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
         }
 // QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
@@ -2432,7 +2435,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             return doVerifyCredential(credential, userId, null /* progressCallback */, flags);
         } finally {
             Binder.restoreCallingIdentity(identity);
-            scheduleGc();
+            LockscreenCredential.zeroizeIfFromParcel(credential);
         }
     }
 
@@ -2605,10 +2608,8 @@ public class LockSettingsService extends ILockSettings.Stub {
         }
     }
 
-    @Override
-    public VerifyCredentialResponse verifyTiedProfileChallenge(LockscreenCredential credential,
-            int userId, @LockPatternUtils.VerifyFlag int flags) {
-        checkPasswordReadPermission();
+    private VerifyCredentialResponse doVerifyTiedProfileChallenge(
+            LockscreenCredential credential, int userId, @LockPatternUtils.VerifyFlag int flags) {
         Slogf.i(TAG, "Verifying tied profile challenge for user %d", userId);
 
         if (!isProfileWithUnifiedLock(userId)) {
@@ -2636,8 +2637,17 @@ public class LockSettingsService extends ILockSettings.Stub {
                 | BadPaddingException | CertificateException | IOException e) {
             Slog.e(TAG, "Failed to decrypt child profile key", e);
             throw new IllegalStateException("Unable to get tied profile token");
+        }
+    }
+
+    @Override
+    public VerifyCredentialResponse verifyTiedProfileChallenge(
+            LockscreenCredential credential, int userId, @LockPatternUtils.VerifyFlag int flags) {
+        checkPasswordReadPermission();
+        try {
+            return doVerifyTiedProfileChallenge(credential, userId, flags);
         } finally {
-            scheduleGc();
+            LockscreenCredential.zeroizeIfFromParcel(credential);
         }
     }
 
@@ -3398,14 +3408,17 @@ public class LockSettingsService extends ILockSettings.Stub {
             if (profilePassword != null) {
                 profilePassword.zeroize();
             }
-            scheduleGc();
         }
     }
 
     @Override
     public byte[] getHashFactor(LockscreenCredential currentCredential, int userId) {
         checkPasswordReadPermission();
-        return getHashFactorInternal(currentCredential, userId);
+        try {
+            return getHashFactorInternal(currentCredential, userId);
+        } finally {
+            LockscreenCredential.zeroizeIfFromParcel(currentCredential);
+        }
     }
 
     private long addEscrowToken(@NonNull byte[] token, @TokenType int type, int userId,
@@ -3754,30 +3767,6 @@ public class LockSettingsService extends ILockSettings.Stub {
         // Disable escrow token permanently on all other device/user types.
         Slogf.i(TAG, "Permanently disabling support for escrow tokens on user %d", userId);
         mSpManager.destroyEscrowData(userId);
-    }
-
-    /**
-     * Schedules garbage collection to sanitize lockscreen credential remnants in memory.
-     *
-     * One source of leftover lockscreen credentials is the unmarshalled binder method arguments.
-     * Since this method will be called within the binder implementation method, a small delay is
-     * added before the GC operation to allow the enclosing binder proxy code to complete and
-     * release references to the argument.
-     */
-    private void scheduleGc() {
-        // Cancel any existing GC request first, so that GC requests don't pile up if lockscreen
-        // credential operations are happening very quickly, e.g. as sometimes happens during tests.
-        //
-        // This delays the already-requested GC, but that is fine in practice where lockscreen
-        // operations don't happen very quickly.  And the precise time that the sanitization happens
-        // isn't very important; doing it within a minute can be fine, for example.
-        mHandler.removeCallbacksAndMessages(mGcWorkToken);
-
-        mHandler.postDelayed(() -> {
-            System.gc();
-            System.runFinalization();
-            System.gc();
-        }, mGcWorkToken, 2000);
     }
 
     private class DeviceProvisionedObserver extends ContentObserver {

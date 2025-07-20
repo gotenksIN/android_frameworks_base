@@ -30,6 +30,7 @@ import static android.Manifest.permission.RESTRICT_DISPLAY_MODES;
 import static android.Manifest.permission.WRITE_SETTINGS;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE;
+import static android.hardware.display.DisplayManager.BRIGHTNESS_UNIT_NITS;
 import static android.hardware.display.DisplayManager.BRIGHTNESS_UNIT_PERCENTAGE;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR;
@@ -64,6 +65,7 @@ import static android.text.TextUtils.formatSimple;
 import static android.view.Display.HdrCapabilities.HDR_TYPE_INVALID;
 
 import static com.android.server.display.PersistentDataStore.DEFAULT_CONNECTION_PREFERENCE;
+import static com.android.server.display.brightness.BrightnessUtils.isValidBrightnessValue;
 import static com.android.server.display.layout.Layout.Display.POSITION_REAR;
 
 import android.Manifest;
@@ -666,8 +668,7 @@ public final class DisplayManagerService extends SystemService {
                 mDisplayDeviceRepo, new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags);
         mDisplayModeDirector = new DisplayModeDirector(
                 context, mHandler, mFlags, mDisplayDeviceConfigProvider);
-        mBrightnessSynchronizer = new BrightnessSynchronizer(mContext, displayThreadLooper,
-                mFlags.isBrightnessIntRangeUserPerceptionEnabled());
+        mBrightnessSynchronizer = new BrightnessSynchronizer(mContext, displayThreadLooper);
         Resources resources = mContext.getResources();
         mDefaultDisplayDefaultColorMode = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_defaultDisplayDefaultColorMode);
@@ -5377,8 +5378,7 @@ public final class DisplayManagerService extends SystemService {
                     BrightnessInfo info = getBrightnessInfoInternal(displayId);
                     if (info == null) {
                         Slog.w(TAG,
-                                "setBrightnessByUnit: no BrightnessInfo for display "
-                                        + displayId);
+                                "setBrightnessByUnit: no BrightnessInfo for display " + displayId);
                         return;
                     }
 
@@ -5388,6 +5388,16 @@ public final class DisplayManagerService extends SystemService {
                     // Interpolate to the range [currentlyAllowedMin, currentlyAllowedMax]
                     brightnessFloat = MathUtils.lerp(info.brightnessMinimum, info.brightnessMaximum,
                             linearBrightness);
+                } else if (unit == BRIGHTNESS_UNIT_NITS) {
+                    DisplayPowerController dpc = mDisplayPowerControllers.get(displayId);
+                    if (dpc == null) {
+                        throw new IllegalArgumentException(
+                                "No DisplayPowerController for display " + displayId);
+                    }
+                    brightnessFloat = dpc.getBrightnessFromAdjustedNits(value);
+                    if (!isValidBrightnessValue(brightnessFloat)) {
+                        throw new IllegalArgumentException("This device does not support nits");
+                    }
                 } else {
                     throw new IllegalArgumentException("Invalid brightness unit: " + unit);
                 }
@@ -5410,6 +5420,7 @@ public final class DisplayManagerService extends SystemService {
         @Override // Binder call
         public float getBrightnessByUnit(int displayId, @DisplayManager.BrightnessUnit int unit) {
             synchronized (mSyncRoot) {
+                float brightnessFloat = getBrightnessInternal(displayId);
                 if (unit == BRIGHTNESS_UNIT_PERCENTAGE) {
                     BrightnessInfo info = getBrightnessInfoInternal(displayId);
                     if (info == null) {
@@ -5418,7 +5429,6 @@ public final class DisplayManagerService extends SystemService {
                                         + displayId);
                         return PowerManager.BRIGHTNESS_INVALID;
                     }
-                    float brightnessFloat = getBrightnessInternal(displayId);
                     float normalizedBrightness = MathUtils.norm(info.brightnessMinimum,
                             info.brightnessMaximum, brightnessFloat);
 
@@ -5427,6 +5437,13 @@ public final class DisplayManagerService extends SystemService {
                             normalizedBrightness);
 
                     return gammaBrightness * 100;
+                } else if (unit == BRIGHTNESS_UNIT_NITS) {
+                    DisplayPowerController dpc = mDisplayPowerControllers.get(displayId);
+                    if (dpc == null) {
+                        throw new IllegalArgumentException(
+                                "No DisplayPowerController for display " + displayId);
+                    }
+                    return dpc.convertToAdjustedNits(brightnessFloat);
                 } else {
                     throw new IllegalArgumentException("Invalid brightness unit: " + unit);
                 }

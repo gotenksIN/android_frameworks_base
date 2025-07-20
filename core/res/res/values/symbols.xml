@@ -435,6 +435,7 @@
   <java-symbol type="bool" name="config_guestUserAutoCreated" />
   <java-symbol type="bool" name="config_guestUserAllowEphemeralStateChange" />
   <java-symbol type="bool" name="config_localDisplaysMirrorContent" />
+  <java-symbol type="bool" name="config_allowPresentationOnInternalDisplay" />
   <java-symbol type="bool" name="config_ignoreUdfpsVote" />
   <java-symbol type="bool" name="config_enableProximityService" />
   <java-symbol type="bool" name="config_enableVirtualDeviceManager" />
@@ -1796,6 +1797,7 @@
   <java-symbol type="attr" name="pointerIconVectorStrokeInverse" />
   <java-symbol type="style" name="TextAppearance.DeviceDefault.Notification.Title" />
   <java-symbol type="style" name="TextAppearance.DeviceDefault.Notification.Info" />
+  <java-symbol type="style" name="TextAppearance.DeviceDefault.Notification" />
 
   <java-symbol type="attr" name="mediaRouteButtonStyle" />
   <java-symbol type="attr" name="externalRouteEnabledDrawable" />
@@ -3350,6 +3352,9 @@
   <java-symbol type="dimen" name="notification_2025_content_margin_end" />
   <java-symbol type="dimen" name="notification_2025_content_margin_top" />
   <java-symbol type="dimen" name="notification_2025_content_margin_start" />
+  <java-symbol type="dimen" name="notification_2025_content_margin_start_summarization" />
+  <java-symbol type="dimen" name="notification_text_message_start_padding_summarization" />
+  <java-symbol type="dimen" name="notification_text_message_start_padding" />
   <java-symbol type="dimen" name="notification_2025_expand_button_horizontal_icon_padding" />
   <java-symbol type="dimen" name="notification_2025_expand_button_reduced_end_padding" />
   <java-symbol type="dimen" name="notification_2025_expand_button_right_icon_spacing" />
@@ -5308,6 +5313,12 @@
   <java-symbol type="bool" name="config_cecQuerySadMaxDisabled_allowed" />
   <java-symbol type="bool" name="config_cecQuerySadMaxDisabled_default" />
 
+  <java-symbol type="bool" name="config_cecTvBehaviorOnStandbyMessage_userConfigurable" />
+  <java-symbol type="bool" name="config_cecTvBehaviorOnStandbyMessageGoToSleep_allowed" />
+  <java-symbol type="bool" name="config_cecTvBehaviorOnStandbyMessageGoToSleep_default" />
+  <java-symbol type="bool" name="config_cecTvBehaviorOnStandbyMessageGoToDream_allowed" />
+  <java-symbol type="bool" name="config_cecTvBehaviorOnStandbyMessageGoToDream_default" />
+
   <!-- eARC Configuration -->
   <java-symbol type="bool" name="config_earcEnabled_userConfigurable" />
   <java-symbol type="bool" name="config_earcFeatureEnabled_allowed" />
@@ -5742,6 +5753,7 @@
   <java-symbol name="materialColorSecondary" type="color"/>
   <java-symbol name="materialColorSecondaryContainer" type="color"/>
   <java-symbol name="materialColorSecondaryDim" type="color"/>
+  <java-symbol name="materialColorSemanticRedContainerHigh" type="color"/>
   <java-symbol name="materialColorShadow" type="color"/>
   <java-symbol name="materialColorSurface" type="color"/>
   <java-symbol name="materialColorSurfaceBright" type="color"/>
@@ -6333,4 +6345,7 @@
 
   <!-- For App Functions -->
   <java-symbol type="array" name="config_appFunctionDeviceSettingsPackages" />
+
+  <!-- Action for opening trusted location settings page -->
+  <java-symbol type="string" name="trusted_location_settings_action" />
 </resources>

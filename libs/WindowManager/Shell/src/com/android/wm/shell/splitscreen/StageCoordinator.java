@@ -159,9 +159,9 @@ import com.android.wm.shell.common.split.SplitDecorManager;
 import com.android.wm.shell.common.split.SplitLayout;
 import com.android.wm.shell.common.split.SplitState;
 import com.android.wm.shell.common.split.SplitWindowManager;
-import com.android.wm.shell.desktopmode.DesktopRepository;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
+import com.android.wm.shell.desktopmode.data.DesktopRepository;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.recents.RecentTasksController;
 import com.android.wm.shell.shared.TransactionPool;
@@ -3371,16 +3371,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
     }
 
-    /** @return whether the transition-request implies entering bubbles from split. */
-    public boolean requestImpliesSplitToBubble(TransitionRequestInfo request) {
-        final TaskInfo triggerTask = request.getTriggerTask();
+    /** @return whether the opening task implies entering bubbles from split. */
+    public boolean requestImpliesSplitToBubble(TaskInfo openingTask) {
         if (!isSplitActive()
-                || triggerTask == null
-                || triggerTask.displayId != mDisplayId) {
+                || openingTask == null
+                || openingTask.displayId != mDisplayId) {
             return false;
         }
 
-        int stageForTask = getStageOfTask(triggerTask.taskId);
+        int stageForTask = getStageOfTask(openingTask.taskId);
         if (stageForTask == STAGE_TYPE_UNDEFINED) {
             return false;
         }

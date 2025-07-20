@@ -3397,6 +3397,12 @@
          mirror the content of the default display. -->
     <bool name="config_localDisplaysMirrorContent">true</bool>
 
+    <!-- When true, the {@link Display#FLAG_PRESENTATION} flag is set to all internal displays.
+         When false, presentations are not allowed on internal displays by default, but vendors can
+         still explicitly override this by explicitly adding the flag to the internal display(s).
+    -->
+    <bool name="config_allowPresentationOnInternalDisplay">true</bool>
+
     <!-- When true, udfps vote is ignored. This feature is disabled by default. -->
     <bool name="config_ignoreUdfpsVote">false</bool>
 
@@ -6824,6 +6830,12 @@
     <bool name="config_cecQuerySadMaxDisabled_allowed">true</bool>
     <bool name="config_cecQuerySadMaxDisabled_default">false</bool>
 
+    <bool name="config_cecTvBehaviorOnStandbyMessage_userConfigurable">false</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToSleep_allowed">true</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToSleep_default">true</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToDream_allowed">true</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToDream_default">false</bool>
+
     <!-- eARC Configuration -->
     <bool name="config_earcEnabled_userConfigurable">true</bool>
     <bool name="config_earcFeatureEnabled_allowed">true</bool>
@@ -7674,5 +7686,8 @@
     <!-- Package and class info to bind to ProximityProviderService -->
     <string name="proximity_provider_service_package_name" translatable="false">android</string>
     <string name="proximity_provider_service_class_name" translatable="false">android.proximity.DefaultProximityProviderService</string>
+
+    <!-- Action for opening trusted location settings page [CHAR LIMIT=NONE] [DO NOT TRANSLATE] -->
+    <string name="trusted_location_settings_action" translatable="false"></string>
 
 </resources>

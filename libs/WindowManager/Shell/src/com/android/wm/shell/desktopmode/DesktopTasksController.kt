@@ -118,12 +118,13 @@ import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.Unminim
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger.DesktopUiEventEnum
 import com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.DragStartState
 import com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.IndicatorType
-import com.android.wm.shell.desktopmode.DesktopRepository.DeskChangeListener
-import com.android.wm.shell.desktopmode.DesktopRepository.VisibleTasksListener
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler.Companion.DRAG_TO_DESKTOP_FINISH_ANIM_DURATION_MS
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler.DragToDesktopStateListener
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler.FULLSCREEN_ANIMATION_DURATION
 import com.android.wm.shell.desktopmode.common.ToggleTaskSizeInteraction
+import com.android.wm.shell.desktopmode.data.DesktopRepository
+import com.android.wm.shell.desktopmode.data.DesktopRepository.DeskChangeListener
+import com.android.wm.shell.desktopmode.data.DesktopRepository.VisibleTasksListener
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer.DeskRecreationFactory
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopFirstListenerManager
@@ -691,19 +692,42 @@ class DesktopTasksController(
             createDeskRoot(displayId, userId) { deskId -> cont.resumeWith(Result.success(deskId)) }
         }
 
+    /** Start a disconnect transition directly in Shell. */
+    fun disconnectDisplay(disconnectedDisplayId: Int) {
+        logD("disconnectDisplay: disconnectedDisplayId=$disconnectedDisplayId")
+        val disconnectReparentDisplay =
+            UserManager.get(userProfileContexts.userContext).mainDisplayIdAssignedToUser
+        val wct = WindowContainerTransaction()
+        val runOnTransitStart =
+            addOnDisplayDisconnectChanges(wct, disconnectedDisplayId, disconnectReparentDisplay)
+        val transition = transitions.startTransition(TRANSIT_CLOSE, wct, null)
+        runOnTransitStart(transition)
+    }
+
     private fun onDisplayDisconnect(
         disconnectedDisplayId: Int,
         destinationDisplayId: Int,
         transition: IBinder,
     ): WindowContainerTransaction {
+        val wct = WindowContainerTransaction()
+        addOnDisplayDisconnectChanges(wct, disconnectedDisplayId, destinationDisplayId)
+            .invoke(transition)
+        return wct
+    }
+
+    private fun addOnDisplayDisconnectChanges(
+        wct: WindowContainerTransaction,
+        disconnectedDisplayId: Int,
+        destinationDisplayId: Int,
+    ): RunOnTransitStart {
         logD(
             "onDisplayDisconnect: disconnectedDisplayId=$disconnectedDisplayId, " +
                 "destinationDisplayId=$destinationDisplayId"
         )
+        val runOnTransitStartSet = mutableListOf<RunOnTransitStart>()
         preserveDisplayRequestHandler?.requestPreserveDisplay(disconnectedDisplayId)
         // TODO: b/406320371 - Verify this works with non-system users once the underlying bug is
         //  resolved.
-        val wct = WindowContainerTransaction()
         // TODO: b/391652399 - Investigate why sometimes disconnect results in a black background.
         //  Additionally, investigate why wallpaper goes to front for inactive users.
         val desktopModeSupportedOnDisplay =
@@ -728,16 +752,18 @@ class DesktopTasksController(
                     if (deskTasks.isEmpty()) {
                         logD("onDisplayDisconnect: removing empty desk=$deskId")
                         desksOrganizer.removeDesk(wct, deskId, desktopRepository.userId)
-                        desksTransitionObserver.addPendingTransition(
-                            DeskTransition.RemoveDesk(
-                                token = transition,
-                                displayId = disconnectedDisplayId,
-                                deskId = deskId,
-                                tasks = emptySet(),
-                                onDeskRemovedListener = onDeskRemovedListener,
-                                runOnTransitEnd = { snapEventHandler.onDeskRemoved(deskId) },
+                        runOnTransitStartSet.add { transition ->
+                            desksTransitionObserver.addPendingTransition(
+                                DeskTransition.RemoveDesk(
+                                    token = transition,
+                                    displayId = disconnectedDisplayId,
+                                    deskId = deskId,
+                                    tasks = emptySet(),
+                                    onDeskRemovedListener = onDeskRemovedListener,
+                                    runOnTransitEnd = { snapEventHandler.onDeskRemoved(deskId) },
+                                )
                             )
-                        )
+                        }
                     } else {
                         logD(
                             "onDisplayDisconnect: reparenting desk=$deskId to " +
@@ -755,20 +781,22 @@ class DesktopTasksController(
                             }
                             applyFreeformDisplayChange(wct, task, destinationDisplayId, deskId)
                         }
-                        desksTransitionObserver.addPendingTransition(
-                            DeskTransition.ChangeDeskDisplay(
-                                transition,
-                                deskId,
-                                destinationDisplayId,
+                        runOnTransitStartSet.add { transition ->
+                            desksTransitionObserver.addPendingTransition(
+                                DeskTransition.ChangeDeskDisplay(
+                                    transition,
+                                    deskId,
+                                    destinationDisplayId,
+                                )
                             )
-                        )
+                        }
                         updateDesksActivationOnDisconnection(
                                 deskId,
                                 destinationDisplayId,
                                 wct,
                                 toTop,
                             )
-                            ?.invoke(transition)
+                            ?.let { runOnTransitStartSet.add(it) }
                     }
                 }
             } else {
@@ -792,23 +820,29 @@ class DesktopTasksController(
                         destDisplayLayout?.densityDpi()?.let { wct.setDensityDpi(task.token, it) }
                     }
                     desksOrganizer.removeDesk(wct, deskId, userId)
-                    desksTransitionObserver.addPendingTransition(
-                        DeskTransition.RemoveDesk(
-                            token = transition,
-                            displayId = disconnectedDisplayId,
-                            deskId = deskId,
-                            tasks = emptySet(),
-                            onDeskRemovedListener = onDeskRemovedListener,
-                            runOnTransitEnd = { snapEventHandler.onDeskRemoved(deskId) },
+                    runOnTransitStartSet.add { transition ->
+                        desksTransitionObserver.addPendingTransition(
+                            DeskTransition.RemoveDesk(
+                                token = transition,
+                                displayId = disconnectedDisplayId,
+                                deskId = deskId,
+                                tasks = emptySet(),
+                                onDeskRemovedListener = onDeskRemovedListener,
+                                runOnTransitEnd = { snapEventHandler.onDeskRemoved(deskId) },
+                            )
                         )
-                    )
-                    desksTransitionObserver.addPendingTransition(
-                        DeskTransition.RemoveDisplay(transition, disconnectedDisplayId)
-                    )
+                        desksTransitionObserver.addPendingTransition(
+                            DeskTransition.RemoveDisplay(transition, disconnectedDisplayId)
+                        )
+                    }
                 }
             }
         }
-        return wct
+        return { transition ->
+            for (runOnTransitStart in runOnTransitStartSet) {
+                runOnTransitStart(transition)
+            }
+        }
     }
 
     /**
@@ -993,7 +1027,7 @@ class DesktopTasksController(
             DesktopExperienceFlags.ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE.isTrue &&
                 !desktopState.isDesktopModeSupportedOnDisplay(displayId) &&
                 transitionSource != DesktopModeTransitionSource.ADB_COMMAND &&
-                transitionSource != DesktopModeTransitionSource.APP_FROM_OVERVIEW
+                transitionSource != DesktopModeTransitionSource.OVERVIEW_TASK_MENU
         ) {
             logW("moveTaskToDefaultDeskAndActivate display=$displayId does not support desk")
             return false
@@ -1073,6 +1107,8 @@ class DesktopTasksController(
         remoteTransition: RemoteTransition? = null,
         callback: IMoveToDesktopCallback? = null,
     ): Boolean {
+        val targetDisplayId = taskRepository.getDisplayForDesk(deskId)
+        val displayLayout = displayController.getDisplayLayout(targetDisplayId) ?: return false
         val task = recentTasksController?.findTaskInBackground(taskId)
         if (task == null) {
             logW("moveBackgroundTaskToDesktop taskId=%d not found", taskId)
@@ -1091,7 +1127,10 @@ class DesktopTasksController(
         wct.startTask(
             taskId,
             ActivityOptions.makeBasic()
-                .apply { launchWindowingMode = WINDOWING_MODE_FREEFORM }
+                .apply {
+                    launchWindowingMode = WINDOWING_MODE_FREEFORM
+                    launchBounds = getInitialBounds(displayLayout, task, deskId)
+                }
                 .toBundle(),
         )
 
@@ -3774,7 +3813,7 @@ class DesktopTasksController(
 
     private fun getInitialBounds(
         displayLayout: DisplayLayout,
-        taskInfo: RunningTaskInfo,
+        taskInfo: TaskInfo,
         deskId: Int,
     ): Rect {
         val bounds =
@@ -3866,17 +3905,29 @@ class DesktopTasksController(
             displayLayout.getStableBoundsForDesktopMode(stableBounds)
         }
 
-        val activeTasks = taskRepository.getExpandedTasksIdsInDeskOrdered(deskId)
-        activeTasks
+        val expandedTasks = taskRepository.getExpandedTasksIdsInDeskOrdered(deskId)
+        expandedTasks
             .firstOrNull { !taskRepository.isClosingTask(it) }
-            ?.let { activeTask ->
-                shellTaskOrganizer.getRunningTaskInfo(activeTask)?.let {
-                    cascadeWindow(
-                        context.resources,
-                        stableBounds,
-                        it.configuration.windowConfiguration.bounds,
-                        bounds,
-                    )
+            ?.let { taskId: Int ->
+                val taskInfo =
+                    shellTaskOrganizer.getRunningTaskInfo(taskId)
+                        ?: recentTasksController?.findTaskInBackground(taskId)
+                taskInfo?.let {
+                    val taskBounds = it.configuration.windowConfiguration.bounds
+                    if (!taskBounds.isEmpty()) {
+                        cascadeWindow(context.resources, stableBounds, taskBounds, bounds)
+                        return@let
+                    }
+                    // RecentsTaskInfo might not have configuration bounds populated yet so use
+                    // task lastNonFullscreenBounds if available. If null or empty bounds are found
+                    // do not cascade.
+                    if (it is RecentTaskInfo) {
+                        it.lastNonFullscreenBounds?.let {
+                            if (!it.isEmpty()) {
+                                cascadeWindow(context.resources, stableBounds, it, bounds)
+                            }
+                        }
+                    }
                 }
             }
     }

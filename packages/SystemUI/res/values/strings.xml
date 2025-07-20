@@ -602,6 +602,8 @@
     <!-- Header for the carousel to choose an app for screen recording. [CHAR LIMIT=50] -->
     <string name="screen_record_capture_target_choose_app">Choose an app to record</string>
 
+    <!-- Button text for taking a fullscreen screenshot [CHAR LIMIT=35] -->
+    <string name="screen_capture_fullscreen_screenshot_button">Capture entire screen</string>
     <!-- Button text in the region select box for triggering a screenshot of the selected area. [CHAR LIMIT=35] -->
     <string name="screen_capture_region_selection_button">Capture selected area</string>
     <!-- Button text in the toolbar for choosing the screenshot type. [CHAR LIMIT=35] -->
@@ -2466,9 +2468,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="label_for_button_in_empty_state_cta">Add widgets</string>
     <!-- Title for the empty state call-to-action when no widgets are available in the hub. [CHAR LIMIT=NONE] -->
+    <string name="title_for_empty_state_cta">Get quick access to your favorite app widgets without unlocking your device.</string>
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="title_for_empty_state_cta">Get quick access to your favorite app widgets without unlocking your tablet.</string>
     <!-- Title for the dialog that redirects users to change allowed widget category in settings. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -2513,10 +2515,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="communal_widget_picker_title">Lock screen widgets</string>
-    <!-- Text displayed below the title in the communal widget picker providing additional details about the communal surface. [CHAR LIMIT=80] -->
+    <!-- Text displayed below the title in the communal widget picker providing additional details about the communal surface. [CHAR LIMIT=100] -->
+    <string name="communal_widget_picker_description">Anyone can view widgets on your lock screen, even if your device\'s locked.</string>
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="communal_widget_picker_description">Anyone can view widgets on your lock screen, even if your tablet\'s locked.</string>
     <!-- Label for accessibility action to unselect a widget in edit mode. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -2538,9 +2540,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="communal_widgets_disclaimer_title">Lock screen widgets</string>
     <!-- Information about lock screen widgets presented to the user. [CHAR LIMIT=NONE] -->
+    <string name="communal_widgets_disclaimer_text">To open an app using a widget, you\u2019ll need to verify it\u2019s you. Also, keep in mind that anyone can view them, even when your device\u2019s locked. Some widgets may not have been intended for your lock screen and may be unsafe to add here.</string>
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="communal_widgets_disclaimer_text">To open an app using a widget, you\u2019ll need to verify it\u2019s you. Also, keep in mind that anyone can view them, even when your tablet\u2019s locked. Some widgets may not have been intended for your lock screen and may be unsafe to add here.</string>
     <!-- Button for user to verify they understand the information presented. [CHAR LIMIT=50] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -6501,12 +6503,12 @@
     <!-- Education toast text for All Apps [CHAR_LIMIT=100] -->
     <string name="all_apps_edu_toast_content">To view all your apps, press the action key on your keyboard</string>
 
-    <!-- Title of the one line view of a redacted notification -->
-    <string name="redacted_notification_single_line_title">Redacted</string>
-    <!-- Main text of the one line view of a public notification -->
-    <string name="public_notification_single_line_text">Unlock to view</string>
+    <!-- Placeholder title for the one line view of a public notification -->
+    <string name="public_notification_single_line_title">Unlock to view</string>
     <!-- Main text of the one line view of a redacted OTP notification -->
     <string name="redacted_otp_notification_single_line_text">Unlock to view code</string>
+    <!-- Placeholder title for the one line view of a notification with no title or text set -->
+    <string name="empty_notification_single_line_title">Expand to view</string>
 
     <!-- Content description for contextual education dialog [CHAR LIMIT=NONE] -->
     <string name="contextual_education_dialog_title">Contextual education</string>

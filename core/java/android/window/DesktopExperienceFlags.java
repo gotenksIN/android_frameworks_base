@@ -64,6 +64,9 @@ public enum DesktopExperienceFlags {
     ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS(
             Flags::enableActivityEmbeddingSupportForConnectedDisplays, true,
             Flags.FLAG_ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS),
+    ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH(
+            Flags::applyDeskActivationOnUserSwitch, false,
+            Flags.FLAG_APPLY_DESK_ACTIVATION_ON_USER_SWITCH),
     ENABLE_APP_HANDLE_POSITION_REPORTING(Flags::enableAppHandlePositionReporting, false,
             Flags.FLAG_ENABLE_APP_HANDLE_POSITION_REPORTING),
     ENABLE_BLOCK_NON_DESKTOP_DISPLAY_WINDOW_DRAG_BUGFIX(
@@ -145,8 +148,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX),
     ENABLE_EMPTY_DESK_ON_MINIMIZE(Flags::enableEmptyDeskOnMinimize, true,
             Flags.FLAG_ENABLE_EMPTY_DESK_ON_MINIMIZE),
-    ENABLE_EMPTY_ROOTS_NEVER_TOP(Flags::emptyRootsNeverTop, false,
-            Flags.FLAG_EMPTY_ROOTS_NEVER_TOP),
     ENABLE_EXCLUSIVE_FLOATING_WINDOW(Flags::enableExclusiveFloatingWindow, false,
             Flags.FLAG_ENABLE_EXCLUSIVE_FLOATING_WINDOW),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
@@ -157,6 +158,9 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_FULLSCREEN_WINDOW_CONTROLS),
     ENABLE_INDEPENDENT_BACK_IN_PROJECTED(Flags::enableIndependentBackInProjected, true,
             Flags.FLAG_ENABLE_INDEPENDENT_BACK_IN_PROJECTED),
+    ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP(
+            Flags::enableInorderTransitionCallbacksForDesktop, false,
+            Flags.FLAG_ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP),
     ENABLE_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS(Flags::keyboardShortcutsToSwitchDesks, true,
             Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS),
     ENABLE_MIRROR_DISPLAY_NO_ACTIVITY(Flags::enableMirrorDisplayNoActivity, false,
@@ -248,7 +252,7 @@ public enum DesktopExperienceFlags {
     ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS(Flags::enterDesktopByDefaultOnFreeformDisplays,
             true, Flags.FLAG_ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS),
     EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS(Flags::excludeDeskRootsFromDesktopTasks,
-            false, Flags.FLAG_EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS),
+            true, Flags.FLAG_EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS),
     FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK(
             Flags::forceCloseTopTransparentFullscreenTask, true,
             Flags.FLAG_FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK),
@@ -271,6 +275,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_PRESERVE_RECENTS_TASK_CONFIGURATION_ON_RELAUNCH),
     REPARENT_WINDOW_TOKEN_API(Flags::reparentWindowTokenApi, true,
             Flags.FLAG_REPARENT_WINDOW_TOKEN_API),
+    REPOSITORY_BASED_PERSISTENCE(Flags::repositoryBasedPersistence, false,
+            Flags.FLAG_REPOSITORY_BASED_PERSISTENCE),
     RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS(
             Flags::respectFullscreenActivityOptionInDesktopLaunchParams, true,
             Flags.FLAG_RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS),

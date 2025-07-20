@@ -18,6 +18,7 @@ package com.android.wm.shell.desktopmode
 
 import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
+import android.view.Display
 import android.view.Display.DEFAULT_DISPLAY
 import android.window.DisplayAreaInfo
 import androidx.test.filters.SmallTest
@@ -29,6 +30,7 @@ import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayController.OnDisplaysChangedListener
 import com.android.wm.shell.common.ShellExecutor
+import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer
 import com.android.wm.shell.desktopmode.desktopfirst.DESKTOP_FIRST_DISPLAY_WINDOWING_MODE
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopDisplayModeController
@@ -114,6 +116,9 @@ class DesktopDisplayEventHandlerTest : ShellTestCase() {
         shellInit.init()
         verify(displayController)
             .addDisplayWindowListener(onDisplaysChangedListenerCaptor.capture())
+        val mockDisplay = mock<Display>()
+        whenever(mockDisplay.uniqueId).thenReturn(UNIQUE_DISPLAY_ID)
+        whenever(displayController.getDisplay(externalDisplayId)).thenReturn(mockDisplay)
     }
 
     @After
@@ -422,6 +427,25 @@ class DesktopDisplayEventHandlerTest : ShellTestCase() {
         verify(mockDesktopDisplayModeController).updateDefaultDisplayWindowingMode()
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION)
+    fun testDesktopModeEligibleChanged_performsDisconnect() {
+        desktopState.overrideDesktopModeSupportPerDisplay[externalDisplayId] = false
+        onDisplaysChangedListenerCaptor.lastValue.onDesktopModeEligibleChanged(externalDisplayId)
+        verify(mockDesktopTasksController).disconnectDisplay(externalDisplayId)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DISPLAY_RECONNECT_INTERACTION)
+    fun testDesktopModeEligibleChanged_performsReconnect() {
+        desktopState.overrideDesktopModeSupportPerDisplay[externalDisplayId] = true
+        whenever(mockDesktopRepository.hasPreservedDisplayForUniqueDisplayId(UNIQUE_DISPLAY_ID))
+            .thenReturn(true)
+        onDisplaysChangedListenerCaptor.lastValue.onDesktopModeEligibleChanged(externalDisplayId)
+        verify(mockDesktopTasksController)
+            .restoreDisplay(eq(externalDisplayId), eq(UNIQUE_DISPLAY_ID))
+    }
+
     private fun addDisplay(displayId: Int, withTda: Boolean = false) {
         onDisplaysChangedListenerCaptor.lastValue.onDisplayAdded(displayId)
         if (withTda) {
@@ -469,5 +493,6 @@ class DesktopDisplayEventHandlerTest : ShellTestCase() {
     companion object {
         private const val SECOND_DISPLAY = 2
         private const val PRIMARY_USER_ID = 10
+        private const val UNIQUE_DISPLAY_ID = "unique_id"
     }
 }

@@ -5039,8 +5039,14 @@ public class AudioService extends IAudioService.Stub
                 new DeviceVolumeEvent(streamType, vi.getVolumeIndex(), ada, callingPackage,
                         currDevIsAda));
 
-        setDeviceVolumeInt(vi, vss, ada, callingPackage, FLAG_ABSOLUTE_VOLUME, /*changeMute=*/
-                currDevIsAda, "notifyAbsoluteVolumeChanged");
+        int flags = FLAG_ABSOLUTE_VOLUME;
+        int index = rescaleVolumeInfoIndex(vi, vss);
+        if (currDevIsAda && index != VolumeInfo.INDEX_NOT_SET && (vss.getIndex(
+                ada.getInternalType()) + 5) / 10 != index) {
+            flags |= AudioManager.FLAG_SHOW_UI;
+        }
+        setDeviceVolumeInt(vi, vss, ada, callingPackage, flags, /*changeMute=*/currDevIsAda,
+                "notifyAbsoluteVolumeChanged");
     }
 
     private static boolean isVolumeInfoValid(VolumeInfo vi, boolean forAdjust) {
@@ -5108,18 +5114,29 @@ public class AudioService extends IAudioService.Stub
                         + " not between min/max for stream " + vi.getStreamType());
             }
         } else {
-            // check if index needs to be rescaled
-            final int min = (vss.getMinIndex() + 5) / 10;
-            final int max = (vss.getMaxIndex() + 5) / 10;
-            if (vi.getMinVolumeIndex() != min || vi.getMaxVolumeIndex() != max) {
-                index = rescaleIndex(index,
-                        /*srcMin*/ vi.getMinVolumeIndex(), /*srcMax*/ vi.getMaxVolumeIndex(),
-                        /*dstMin*/ min, /*dstMax*/ max);
-            }
+            index = rescaleVolumeInfoIndex(vi, vss);
         }
         setStreamVolumeWithAttributionInt(streamType, index, flags,
                 ada, callingPackage, null,
                 changeMute);
+    }
+
+    private int rescaleVolumeInfoIndex(VolumeInfo vi, VolumeStreamState vss) {
+        int index = vi.getVolumeIndex();
+        if (vi.getMinVolumeIndex() == VolumeInfo.INDEX_NOT_SET
+                || vi.getMaxVolumeIndex() == VolumeInfo.INDEX_NOT_SET) {
+            // no rescaling if the min max are not set
+            return index;
+        }
+        // check if index needs to be rescaled
+        final int min = (vss.getMinIndex() + 5) / 10;
+        final int max = (vss.getMaxIndex() + 5) / 10;
+        if (vi.getMinVolumeIndex() != min || vi.getMaxVolumeIndex() != max) {
+            index = rescaleIndex(index,
+                    /*srcMin*/ vi.getMinVolumeIndex(), /*srcMax*/ vi.getMaxVolumeIndex(),
+                    /*dstMin*/ min, /*dstMax*/ max);
+        }
+        return index;
     }
 
     /** Retain API for unsupported app usage */
@@ -8037,6 +8054,15 @@ public class AudioService extends IAudioService.Stub
                 .record();
     }
 
+    /**
+     * @see AudioManager#isScoManagedByAudio()
+     * @return true if SCO is managed by audio, false otherwise
+     */
+    @android.annotation.EnforcePermission(BLUETOOTH_PRIVILEGED)
+    public boolean isScoManagedByAudio() {
+        super.isScoManagedByAudio_enforcePermission();
+        return mDeviceBroker.isScoManagedByAudio();
+    }
 
     /*package*/ ContentResolver getContentResolver() {
         return mContentResolver;

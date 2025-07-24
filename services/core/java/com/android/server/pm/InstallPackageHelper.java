@@ -4020,6 +4020,15 @@ final class InstallPackageHelper {
                 Log.w(TAG, "Dropping cache of " + file.getAbsolutePath());
                 cacher.cleanCachedResult(file);
             }
+
+            if (mPackagesToBeDisabled.values() != null &&
+                    (mPackagesToBeDisabled.values().contains(file.toString()) ||
+                    mPackagesToBeDisabled.values().stream().anyMatch(file.toString()::contains))) {
+                // Ignore entries contained in {@link #mPackagesToBeDisabled}
+                Slog.d(TAG, "ignoring packages: " + file);
+                continue;
+            }
+
             orderedResults.add(parallelPackageParser.orderedSubmit(file, scanParams));
         }
         return orderedResults;

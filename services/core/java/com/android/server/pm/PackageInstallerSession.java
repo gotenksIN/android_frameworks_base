@@ -61,6 +61,7 @@ import static android.content.pm.PackageManager.INSTALL_FAILED_VERIFICATION_FAIL
 import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_NO_CERTIFICATES;
 import static android.content.pm.PackageManager.INSTALL_STAGED;
 import static android.content.pm.PackageManager.INSTALL_SUCCEEDED;
+import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_ADB;
 import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_INCOMPLETE_NETWORK_UNAVAILABLE;
 import static android.os.Process.INVALID_UID;
 import static android.provider.DeviceConfig.NAMESPACE_PACKAGE_MANAGER_SERVICE;
@@ -1409,7 +1410,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                         userId);
             }
             synchronized (mMetrics) {
-                mMetrics.onDeveloperVerificationBindStarted();
+                mMetrics.onDeveloperVerificationBindStarted(
+                        mDeveloperVerifierController.getVerifierUidIfBound(userId));
             }
         }
     }
@@ -3117,7 +3119,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // adb installs are exempted from verification unless explicitly requested
             if (!params.forceVerification) {
                 synchronized (mMetrics) {
-                    mMetrics.onDeveloperVerificationBypassedByAdb();
+                    mMetrics.onDeveloperVerificationBypassed(
+                            DEVELOPER_VERIFICATION_BYPASSED_REASON_ADB);
                 }
                 return false;
             }
@@ -3126,6 +3129,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         synchronized (mLock) {
             if (TextUtils.equals(verifierPackageName, mPackageName)) {
                 // The verifier itself is being updated. Skip.
+                // TODO(b/360129657): log bypass reason and this bypass should only happen if the
+                // current verifier cannot be connected or isn't responding.
                 Slog.w(TAG, "Skipping verification service because the verifier is being updated");
                 return false;
             }
@@ -3232,9 +3237,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
          * Called by the VerifierController to indicate that the verifier has been connected. Only
          * used for metrics logging for now.
          */
-        public void onConnectionEstablished(int verifierUid) {
+        public void onConnectionEstablished() {
             synchronized (mMetrics) {
-                mMetrics.onDeveloperVerifierConnectionEstablished(verifierUid);
+                mMetrics.onDeveloperVerifierConnectionEstablished();
             }
         }
 
@@ -3438,10 +3443,25 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             });
         }
 
+        /**
+         * Called by the VerifierController when the verification request has been bypassed by the
+         * verifier.
+         */
+        public void onVerificationBypassedReceived(int bypassReason) {
+            mHandler.post(() -> {
+                synchronized (mMetrics) {
+                    mMetrics.onDeveloperVerificationBypassed(bypassReason);
+                }
+                // The verifier informed the system to bypass the verification. Continue with the
+                // rest of the verification and installation.
+                resumeVerify();
+            });
+        }
+
         private void maybeSendUserActionForVerification(boolean blockingFailure,
                 @Nullable PersistableBundle extensionResponse) {
             Intent intent = getUserNotificationIntent();
-            if (shouldSendUserNotificationIntent(blockingFailure)) {
+            if (shouldSendUserActionForVerification(blockingFailure)) {
                 mVerificationUserActionNeeded = true;
                 sendOnUserActionRequired(mContext, getRemoteStatusReceiver(), sessionId,
                         intent);
@@ -3469,23 +3489,34 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         }
 
         /**
-         * User will be notified about a failed or incomplete install in the following scenarios:
-         * 1. If it's a non-blocking failure and the installer targets Baklava or above
-         * 2. If the installer targets less than Baklava and the installer is not a privileged app.
+         * User will be notified about a failed or incomplete developer verification in the
+         * following scenarios:
+         * 1. The installer is the system package installer.
+         * 2. If it's a non-blocking failure and the installer targets Baklava or above.
+         * 3. If the installer targets less than Baklava and the installer is not a privileged app.
          * For other cases, the installer will receive a failure status code in its IntentSender
          */
-        private boolean shouldSendUserNotificationIntent(boolean blockingFailure) {
+        private boolean shouldSendUserActionForVerification(boolean blockingFailure) {
             final Computer snapshot = mPm.snapshotComputer();
             final String installerPackageName;
             synchronized (mLock) {
                 installerPackageName = mInstallSource.mInstallerPackageName;
             }
+            if (installerPackageName == null) {
+                // This can only happen if the installer intentionally set the installer package
+                // name of the session to be null.
+                return false;
+            }
             ApplicationInfo installerInfo = snapshot.getApplicationInfo(
                     installerPackageName, 0, userId);
             if (installerInfo == null) {
-                Log.w(TAG, "Could not find ApplicationInfo for "
-                        + installerPackageName);
+                Log.w(TAG, "Could not find ApplicationInfo for " + installerPackageName);
                 return false;
+            }
+            // If the installer is the system package installer, always notify user for developer
+            // verification failures or issues.
+            if (installerPackageName.equals(mPm.getPackageInstallerPackageName())) {
+                return true;
             }
 
             if (CompatChanges.isChangeEnabled(NOTIFY_USER_VERIFICATION_INCOMPLETE,

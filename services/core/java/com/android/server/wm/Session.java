@@ -205,6 +205,10 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
                     Manifest.permission.SYSTEM_APPLICATION_OVERLAY,
                     new AttributionSource(mUid, mPackageName, null))
                     == PermissionManager.PERMISSION_GRANTED;
+
+            for (int i = 0; i < mAddedWindows.size(); i++) {
+                mAddedWindows.get(i).updateTrustedOverlay();
+            }
         } else {
             mCanCreateSystemApplicationOverlay = mService.mContext.checkCallingOrSelfPermission(
                     SYSTEM_APPLICATION_OVERLAY)
@@ -573,8 +577,10 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
 
     private void actionOnWallpaper(IBinder window,
             BiConsumer<WallpaperController, WindowState> action) {
-        final WindowState windowState = mService.windowForClientLocked(this, window, true);
-        action.accept(windowState.getDisplayContent().mWallpaperController, windowState);
+        final WindowState windowState = mService.windowForClient(this, window);
+        if (windowState != null) {
+            action.accept(windowState.mDisplayContent.mWallpaperController, windowState);
+        }
     }
 
     @Override
@@ -642,7 +648,8 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         synchronized (mService.mGlobalLock) {
             final long ident = Binder.clearCallingIdentity();
             try {
-                final WindowState windowState = mService.windowForClientLocked(this, window, true);
+                final WindowState windowState = mService.windowForClient(this, window);
+                if (windowState == null) return;
                 WallpaperController wallpaperController =
                         windowState.getDisplayContent().mWallpaperController;
                 if (mCanAlwaysUpdateWallpaper
@@ -707,8 +714,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
     public void updateRequestedVisibleTypes(IWindow window, @InsetsType int requestedVisibleTypes,
             @Nullable ImeTracker.Token imeStatsToken) {
         synchronized (mService.mGlobalLock) {
-            final WindowState win = mService.windowForClientLocked(this, window,
-                    false /* throwOnError */);
+            final WindowState win = mService.windowForClient(this, window);
             if (win != null) {
                 ImeTracker.forLogging().onProgress(imeStatsToken,
                         ImeTracker.PHASE_WM_UPDATE_REQUESTED_VISIBLE_TYPES);
@@ -746,8 +752,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
     public void updateAnimatingTypes(IWindow window, @InsetsType int animatingTypes,
             @Nullable ImeTracker.Token statsToken) {
         synchronized (mService.mGlobalLock) {
-            final WindowState win = mService.windowForClientLocked(this, window,
-                    false /* throwOnError */);
+            final WindowState win = mService.windowForClient(this, window);
             if (win != null) {
                 ImeTracker.forLogging().onProgress(statsToken,
                         ImeTracker.PHASE_WM_UPDATE_ANIMATING_TYPES);
@@ -920,18 +925,6 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
             IBinder clientToken, @Nullable InputTransferToken hostInputTransferToken, int flags,
             int privateFlags, int inputFeatures, int type, IBinder windowToken,
             InputTransferToken inputTransferToken, String inputHandleName) {
-        if (!Flags.updateHostInputTransferToken()) {
-            // This is not a valid security check, callers can pass in a bogus token. If the
-            // token is not known to wm, then input APIs is request focus or transferTouchGesture
-            // will fail. Removing this check allows SCVH to be created before associating with a
-            // host window.
-            if (hostInputTransferToken == null && !mCanAddInternalSystemWindow) {
-                // Callers without INTERNAL_SYSTEM_WINDOW permission cannot grant input channel to
-                // embedded windows without providing a host window input token
-                throw new SecurityException("Requires INTERNAL_SYSTEM_WINDOW permission");
-            }
-        }
-
         final long identity = Binder.clearCallingIdentity();
         try {
             return mService.grantInputChannel(this, mUid, mPid, displayId, surface, clientToken,
@@ -982,8 +975,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         final long identity = Binder.clearCallingIdentity();
         try {
             synchronized (mService.mGlobalLock) {
-                final WindowState win =
-                        mService.windowForClientLocked(this, fromWindow, false /* throwOnError */);
+                final WindowState win = mService.windowForClient(this, fromWindow);
                 if (win == null) {
                     return false;
                 }
@@ -1010,7 +1002,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
             IWindow window,
             OnBackInvokedCallbackInfo callbackInfo) {
         synchronized (mService.mGlobalLock) {
-            WindowState windowState = mService.windowForClientLocked(this, window, false);
+            final WindowState windowState = mService.windowForClient(this, window);
             if (windowState == null) {
                 Slog.i(TAG_WM,
                         "setOnBackInvokedCallback(): No window state for package:" + mPackageName);
@@ -1026,8 +1018,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         synchronized (mService.mGlobalLock) {
             // TODO(b/353463205) check if we can use mService.getDefaultDisplayContentLocked()
             //  instead of window
-            final WindowState win = mService.windowForClientLocked(this, window,
-                    false /* throwOnError */);
+            final WindowState win = mService.windowForClient(this, window);
             if (win != null) {
                 final InsetsStateController insetsStateController =
                         win.getDisplayContent().getInsetsStateController();

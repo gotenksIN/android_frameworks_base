@@ -399,6 +399,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
         mLogger.mCreateWallTimeMs = System.currentTimeMillis();
         mLogger.mCreateTimeNs = SystemClock.elapsedRealtimeNanos();
+       if (!mController.useFullReadyTracking()) {
+            mReadyTracker.add(mReadyTrackerOld);
+        }
 // QTI_BEGIN: 2023-05-15: Core: perf: Add Rotation boosts, based on ShellTransitions.
 
         if (mPerf == null) {
@@ -1138,17 +1141,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     void setReady(WindowContainer wc, boolean ready) {
         if (!isCollecting() || mSyncId < 0) return;
         mReadyTrackerOld.setReadyFrom(wc, ready);
-        applyReady();
     }
 
     private void applyReady() {
         if (mState < STATE_STARTED) return;
-        final boolean ready;
-        if (mController.useFullReadyTracking()) {
-            ready = mReadyTracker.isReady();
-        } else {
-            ready = mReadyTrackerOld.allReady();
-        }
+        // Since some legacy behavior relies on being able to "unready" the old tracker, we need
+        // to always re-check the old tracker here even if it had become ready previously.
+        final boolean ready = mReadyTracker.isReady()
+                && (mController.useFullReadyTracking() || mReadyTrackerOld.allReady());
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
                 "Set transition ready=%b %d", ready, mSyncId);
         boolean changed = mSyncEngine.setReady(mSyncId, ready);
@@ -1171,7 +1171,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     void setAllReady() {
         if (!isCollecting() || mSyncId < 0) return;
         mReadyTrackerOld.setAllReady();
-        applyReady();
     }
 
     @VisibleForTesting
@@ -1886,7 +1885,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         for (int i = mReadyTracker.mConditions.size() - 1; i >= 0; --i) {
             mReadyTracker.mConditions.get(i).meetAlternate("play-now");
         }
-        final ReadyCondition forcePlay = new ReadyCondition("force-play-now");
+        final ReadyCondition forcePlay = new ReadyCondition("force-play-now",
+                true /* newTrackerOnly */);
         mReadyTracker.add(forcePlay);
         forcePlay.meet();
         setAllReady();
@@ -1934,11 +1934,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             return;
         }
 
-        if (mController.useFullReadyTracking()) {
-            for (int i = 0; i < mReadyTracker.mMet.size(); ++i) {
-                ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "#%d: Met condition: %s",
-                        mSyncId, mReadyTracker.mMet.get(i));
-            }
+        for (int i = 0; i < mReadyTracker.mMet.size(); ++i) {
+            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "#%d: Met condition: %s",
+                    mSyncId, mReadyTracker.mMet.get(i));
         }
 
         // Commit the visibility of visible activities before calculateTransitionInfo(), so the
@@ -4068,7 +4066,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 mReadyTrackerOld.mDeferReadyDepth, Debug.getCallers(5));
 
         // Apply ready in case it is waiting for the previous defer call.
-        applyReady();
+        mReadyTrackerOld.checkReady();
     }
 
     @Override
@@ -4077,15 +4075,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (!isReadinessTimeout) {
             return;
         }
-        if (!mController.useFullReadyTracking()) {
-            Slog.e(TAG, "#" + mSyncId + " readiness timeout, used=" + mReadyTrackerOld.mUsed
-                    + " deferReadyDepth=" + mReadyTrackerOld.mDeferReadyDepth
-                    + " group=" + mReadyTrackerOld.mReadyGroups
-                    + " state=" + mState);
-        } else {
-            Slog.e(TAG, "#" + mSyncId + " met conditions: " + mReadyTracker.mMet);
-            Slog.e(TAG, "#" + mSyncId + " unmet conditions: " + mReadyTracker.mConditions);
-        }
+        Slog.e(TAG, "#" + mSyncId + " readiness timeout. state=" + mState);
+        Slog.e(TAG, "   met conditions: " + mReadyTracker.mMet);
+        Slog.e(TAG, "   unmet conditions: " + mReadyTracker.mConditions);
         // Make sure the pending display change can be applied (especially DC#mWaitingForConfig)
         // in case shell hasn't called WindowOrganizerController#startTransition yet.
         if (mState < STATE_STARTED && this == mController.getCollectingTransition()) {
@@ -4135,14 +4127,32 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         /** If set (non-null), then this is met by another reason besides state (eg. timeout). */
         String mAlternate = null;
 
-        ReadyCondition(@NonNull String name) {
+        /**
+         * If {@code true}, this condition is only checked when
+         * {@link TransitionController#useFullReadyTracking()} is enabled. Initially, any conditions
+         * that are already tracked by {@link ReadyTrackerOld} will have this property; however,
+         * as we migrate conditions away from the old tracker or add new conditions, they will
+         * always be checked so this will eventually become {@code false} for everything.
+         */
+        final boolean mNewTrackerOnly;
+
+        ReadyCondition(@NonNull String name, @Nullable Object debugTarget,
+                boolean newTrackerOnly) {
             mName = name;
-            mDebugTarget = null;
+            mDebugTarget = debugTarget;
+            mNewTrackerOnly = newTrackerOnly;
+        }
+
+        ReadyCondition(@NonNull String name, boolean newTrackerOnly) {
+            this(name, null /* debugTarget */, newTrackerOnly);
+        }
+
+        ReadyCondition(@NonNull String name) {
+            this(name, null /* debugTarget */, false /* replaceLegacy */);
         }
 
         ReadyCondition(@NonNull String name, @Nullable Object debugTarget) {
-            mName = name;
-            mDebugTarget = debugTarget;
+            this(name, debugTarget, false /* replaceLegacy */);
         }
 
         protected String getDebugRep() {
@@ -4154,7 +4164,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
         @Override
         public String toString() {
-            return "{" + getDebugRep() + (mAlternate != null ? " (" + mAlternate + ")" : "") + "}";
+            return "{" + getDebugRep() + (mAlternate != null ? " (" + mAlternate + ")" : "")
+                    + (mNewTrackerOnly && mTracker != null && mTracker.mTransition != null
+                            && !mTracker.mTransition.mController.useFullReadyTracking()
+                            ? "IGNORED" : "") + "}";
         }
 
         /**
@@ -4205,7 +4218,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         void add(@NonNull ReadyCondition condition) {
-            if (mTransition == null || !mTransition.mController.useFullReadyTracking()) {
+            if (mTransition == null) {
                 condition.mTracker = NULL_TRACKER;
                 return;
             }
@@ -4217,7 +4230,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         void meet(@NonNull ReadyCondition condition) {
-            if (mTransition == null || !mTransition.mController.useFullReadyTracking()) return;
+            if (mTransition == null) {
+                return;
+            }
             if (mTransition.mState >= STATE_PLAYING) {
                 Slog.w(TAG, "#%d: Condition met too late, already in state=" + mTransition.mState
                         + ": " + condition);
@@ -4236,11 +4251,22 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, " Met condition %s for #%d (%d"
                     + " left)", condition, mTransition.mSyncId, mConditions.size());
             mMet.add(condition);
+            if (condition.mNewTrackerOnly && !mTransition.mController.useFullReadyTracking()) {
+                return;
+            }
             mTransition.applyReady();
         }
 
         boolean isReady() {
-            return mConditions.isEmpty() && !mMet.isEmpty();
+            if (mTransition.mController.useFullReadyTracking()) {
+                return mConditions.isEmpty() && !mMet.isEmpty();
+            }
+            if (mMet.isEmpty()) return false;
+            for (int i = mConditions.size() - 1; i >= 0; --i) {
+                if (mConditions.get(i).mNewTrackerOnly) continue;
+                return false;
+            }
+            return true;
         }
     }
 
@@ -4257,7 +4283,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
      * of readiness across the multiple groups. Currently, we assume that each display is a group
      * since that is how it has been until now.
      */
-    private static class ReadyTrackerOld {
+    private static class ReadyTrackerOld extends ReadyCondition {
         private final ArrayMap<WindowContainer, Boolean> mReadyGroups = new ArrayMap<>();
 
         /**
@@ -4280,6 +4306,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
          * isn't known.
          */
         private int mDeferReadyDepth = 0;
+
+        ReadyTrackerOld() {
+            super("Legacy");
+        }
 
         /**
          * Adds a ready-group. Any setReady calls in this subtree will be tracked together. For
@@ -4308,6 +4338,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 }
                 current = current.getParent();
             }
+            checkReady();
         }
 
         /** Marks everything as ready by default. */
@@ -4318,6 +4349,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             for (int i = 0; i < mReadyGroups.size(); ++i) {
                 mReadyGroups.setValueAt(i, true);
             }
+            checkReady();
         }
 
         /** @return true if all tracked subtrees are ready. */
@@ -4339,6 +4371,17 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             return true;
         }
 
+        void checkReady() {
+            if (mMet) {
+                // Since "legacy" tracking relies on brief spats of "being ready but might still
+                // be made unready", we need to repeatedly check even after this became ready.
+                mTracker.mTransition.applyReady();
+                return;
+            }
+            if (!allReady()) return;
+            meet();
+        }
+
         private String groupsToString() {
             StringBuilder b = new StringBuilder();
             for (int i = 0; i < mReadyGroups.size(); ++i) {
@@ -4347,6 +4390,17 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         .append(mReadyGroups.valueAt(i));
             }
             return b.toString();
+        }
+
+        @Override
+        public String toString() {
+            return "{Legacy: used=" + mUsed
+                    + " deferDepth=" + mDeferReadyDepth
+                    + " group=" + mReadyGroups + "}";
+        }
+
+        @Override
+        void startTracking() {
         }
     }
 

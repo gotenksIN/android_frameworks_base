@@ -103,6 +103,7 @@ import static android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
 import static android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
+import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_ADDITIONAL;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
@@ -3050,6 +3051,24 @@ public final class ViewRootImpl implements ViewParent,
     void scheduleTraversals() {
         if (!mTraversalScheduled) {
             mTraversalScheduled = true;
+            // The following behavior is load-bearing for public API correctness.
+            // For example, the following code is defined to be correct and the
+            // MessageQueue sync barrier mechanism and its usage here is
+            // responsible for ensuring it:
+            //
+            //   textView.setText("Hello, world!");
+            //   textView.getHandler().post(new Runnable() {
+            //     public void run() {
+            //       // This code will run after traversals have happened
+            //       // and the TextView has been measured with its new text.
+            //       reportNewTextWidth(textView.getWidth());
+            //     }
+            //   });
+            //
+            // Any message posted after scheduling traversals (e.g. via
+            // View#requestLayout or View#invalidate) is guaranteed to run after
+            // the scheduled traversals have occurred unless the message is
+            // specifically "asynchronous" - see Message#setAsynchronous
             mTraversalBarrier = mQueue.postSyncBarrier();
             mChoreographer.postCallback(
                     Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, null);
@@ -3443,11 +3462,19 @@ public final class ViewRootImpl implements ViewParent,
     /* package */ WindowInsets getWindowInsets(boolean forceConstruct) {
         if (mLastWindowInsets == null || forceConstruct) {
             final Configuration config = getConfiguration();
-            mLastWindowInsets = mInsetsController.calculateInsets(
+            final WindowInsets insets = mInsetsController.calculateInsets(
                     config.isScreenRound(), mWindowAttributes.type,
                     config.windowConfiguration.getActivityType(), mWindowAttributes.softInputMode,
                     mWindowAttributes.flags, (mWindowAttributes.systemUiVisibility
                             | mWindowAttributes.subtreeSystemUiVisibility));
+            // TODO(b/432205389): Remove this when bugs of the insets dispatching are gone.
+            if (mWindowAttributes.type == TYPE_BASE_APPLICATION && !mDragResizing) {
+                final String diffString = insets.toDiffString(mLastWindowInsets);
+                if (!diffString.isEmpty()) {
+                    Log.d(mTag, "WindowInsets changed: " + diffString);
+                }
+            }
+            mLastWindowInsets = insets;
 
             mAttachInfo.mContentInsets.set(mLastWindowInsets.getSystemWindowInsets().toRect());
             mAttachInfo.mStableInsets.set(mLastWindowInsets.getStableInsets().toRect());

@@ -16,6 +16,7 @@
 
 package com.android.server.pm.verify.developer;
 
+import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_UNSPECIFIED;
 import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_INCOMPLETE_NETWORK_UNAVAILABLE;
 import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_INCOMPLETE_UNKNOWN;
 import static android.os.Process.INVALID_UID;
@@ -185,6 +186,20 @@ public class DeveloperVerifierController {
     }
 
     /**
+     * Return the UID of the verifier that is bound to the system. If the verifier has not been
+     * bound, return INVALID_UID.
+     */
+    public int getVerifierUidIfBound(int userId) {
+        synchronized (mRemoteServices) {
+            var remoteService = mRemoteServices.get(userId);
+            if (remoteService == null) {
+                return INVALID_UID;
+            }
+            return remoteService.getUid();
+        }
+    }
+
+    /**
      * Called to start querying and binding to a qualified verifier agent.
      *
      * @return False if a qualified verifier agent doesn't exist on device, so that the system can
@@ -247,7 +262,7 @@ public class DeveloperVerifierController {
                         Slog.i(TAG, "Verifier " + verifierPackageName + " is connected"
                                 + " on user " + userId);
                         // Logging the success of connecting to the verifier.
-                        callback.onConnectionEstablished(verifierUid);
+                        callback.onConnectionEstablished();
                         // Aggressively auto-disconnect until verification requests are sent out
                         startAutoDisconnectCountdown(
                                 remoteServiceWrapper.getAutoDisconnectCallback());
@@ -642,6 +657,26 @@ public class DeveloperVerifierController {
                 }
             }
             mCallback.onVerificationCompleteReceived(verificationStatus, extensionResponse);
+            // Remove status tracking and stop the timeout countdown
+            removeStatusTracker(id);
+        }
+
+        @Override
+        public void reportVerificationBypassed(int id, int bypassReason) {
+            assertCallerIsCurrentVerifier(getCallingUid());
+            final DeveloperVerificationRequestStatusTracker tracker;
+            synchronized (mVerificationStatusTrackers) {
+                tracker = mVerificationStatusTrackers.get(id);
+                if (tracker == null) {
+                    throw new IllegalStateException("Verification session " + id
+                            + " doesn't exist or has finished");
+                }
+            }
+            if (bypassReason <= DEVELOPER_VERIFICATION_BYPASSED_REASON_UNSPECIFIED) {
+                throw new IllegalArgumentException("Verification session " + id
+                        + " reported invalid bypass_reason code " + bypassReason);
+            }
+            mCallback.onVerificationBypassedReceived(bypassReason);
             // Remove status tracking and stop the timeout countdown
             removeStatusTracker(id);
         }

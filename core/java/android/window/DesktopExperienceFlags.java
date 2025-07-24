@@ -24,8 +24,8 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityThread;
 import android.content.Context;
-import android.os.Build;
 import android.os.SystemProperties;
+import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.util.ArrayMap;
 import android.util.Log;
 
@@ -52,6 +52,7 @@ import java.util.function.BooleanSupplier;
  *
  * @hide
  */
+@RavenwoodKeepWholeClass
 public enum DesktopExperienceFlags {
     // go/keep-sorted start
     BASE_DENSITY_FOR_EXTERNAL_DISPLAYS(
@@ -69,6 +70,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_APPLY_DESK_ACTIVATION_ON_USER_SWITCH),
     ENABLE_APP_HANDLE_POSITION_REPORTING(Flags::enableAppHandlePositionReporting, false,
             Flags.FLAG_ENABLE_APP_HANDLE_POSITION_REPORTING),
+    ENABLE_APP_TO_WEB_EDUCATION_ANIMATION(Flags::enableAppToWebEducationAnimation, false,
+            Flags.FLAG_ENABLE_APP_TO_WEB_EDUCATION_ANIMATION),
     ENABLE_BLOCK_NON_DESKTOP_DISPLAY_WINDOW_DRAG_BUGFIX(
             Flags::enableBlockNonDesktopDisplayWindowDragBugfix, false,
             Flags.FLAG_ENABLE_BLOCK_NON_DESKTOP_DISPLAY_WINDOW_DRAG_BUGFIX),
@@ -107,8 +110,13 @@ public enum DesktopExperienceFlags {
             false, Flags.FLAG_ENABLE_DESKTOP_FIRST_FULLSCREEN_REFOCUS_BUGFIX),
     ENABLE_DESKTOP_FIRST_LISTENER(Flags::enableDesktopFirstListener, false,
             Flags.FLAG_ENABLE_DESKTOP_FIRST_LISTENER),
+    ENABLE_DESKTOP_FIRST_POLICY_IN_LPM(Flags::enableDesktopFirstPolicyInLpm, false,
+            Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM),
     ENABLE_DESKTOP_IME_BUGFIX(Flags::enableDesktopImeBugfix, true,
             Flags.FLAG_ENABLE_DESKTOP_IME_BUGFIX),
+    ENABLE_DESKTOP_INVISIBLE_TASK_REMOVAL_CLEANUP_BUGFIX(
+            Flags::enableDesktopInvisibleTaskRemovalCleanupBugfix, false,
+            Flags.FLAG_ENABLE_DESKTOP_INVISIBLE_TASK_REMOVAL_CLEANUP_BUGFIX),
     ENABLE_DESKTOP_SPLITSCREEN_TRANSITION_BUGFIX(
             Flags::enableDesktopSplitscreenTransitionBugfix,false,
             Flags.FLAG_ENABLE_DESKTOP_SPLITSCREEN_TRANSITION_BUGFIX),
@@ -148,8 +156,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX),
     ENABLE_EMPTY_DESK_ON_MINIMIZE(Flags::enableEmptyDeskOnMinimize, true,
             Flags.FLAG_ENABLE_EMPTY_DESK_ON_MINIMIZE),
-    ENABLE_EXCLUSIVE_FLOATING_WINDOW(Flags::enableExclusiveFloatingWindow, false,
-            Flags.FLAG_ENABLE_EXCLUSIVE_FLOATING_WINDOW),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS),
     ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS(Flags::enableFreeformDisplayLaunchParams, true,
@@ -161,6 +167,8 @@ public enum DesktopExperienceFlags {
     ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP(
             Flags::enableInorderTransitionCallbacksForDesktop, false,
             Flags.FLAG_ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP),
+    ENABLE_INTERACTIVE_PICTURE_IN_PICTURE(Flags::enableInteractivePictureInPicture, false,
+            Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE),
     ENABLE_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS(Flags::keyboardShortcutsToSwitchDesks, true,
             Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS),
     ENABLE_MIRROR_DISPLAY_NO_ACTIVITY(Flags::enableMirrorDisplayNoActivity, false,
@@ -212,6 +220,9 @@ public enum DesktopExperienceFlags {
     ENABLE_REQUEST_FULLSCREEN_REFACTOR(
             Flags::enableRequestFullscreenRefactor, false,
             Flags.FLAG_ENABLE_REQUEST_FULLSCREEN_REFACTOR),
+    ENABLE_REQUEST_FULLSCREEN_RESTORE_FREEFORM_BUGFIX(
+            Flags::enableRequestFullscreenRestoreFreeformBugfix, false,
+            Flags.FLAG_ENABLE_REQUEST_FULLSCREEN_RESTORE_FREEFORM_BUGFIX),
     ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS(Flags::enableRestartMenuForConnectedDisplays, true,
             Flags.FLAG_ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS),
     ENABLE_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS(
@@ -321,16 +332,14 @@ public enum DesktopExperienceFlags {
         // Name of the flag, used for adb commands.
         private final String mFlagName;
         // Whether the flag state should be affected by developer option.
-        private final boolean mShouldOverrideByDevOptionDefault;
-        // Cached value for that flag: null if not read yet.
-        private Boolean mCachedIsOverrideByDevOption;
+        private final boolean mShouldOverrideByDevOption;
 
         public DesktopExperienceFlag(BooleanSupplier flagFunction,
                 boolean shouldOverrideByDevOption,
                 @Nullable String flagName) {
             this.mFlagFunction = flagFunction;
             this.mFlagName = flagName;
-            this.mShouldOverrideByDevOptionDefault = shouldOverrideByDevOption;
+            this.mShouldOverrideByDevOption = shouldOverrideByDevOption;
             if (Flags.showDesktopExperienceDevOption()) {
                 registerFlag(flagName, this);
             }
@@ -344,11 +353,7 @@ public enum DesktopExperienceFlags {
          * user will reboot very soon so being inconsistent across threads is ok.
          */
         public boolean isTrue() {
-            if (mCachedIsOverrideByDevOption == null) {
-                mCachedIsOverrideByDevOption = checkIfFlagShouldBeOverridden(mFlagName,
-                        mShouldOverrideByDevOptionDefault);
-            }
-            return isFlagTrue(mFlagFunction, mCachedIsOverrideByDevOption);
+            return isFlagTrue(mFlagFunction, mShouldOverrideByDevOption);
         }
 
         public String getFlagName() {
@@ -360,7 +365,7 @@ public enum DesktopExperienceFlags {
         }
 
         public boolean isOverridable() {
-            return mShouldOverrideByDevOptionDefault;
+            return mShouldOverrideByDevOption;
         }
     }
 
@@ -370,9 +375,7 @@ public enum DesktopExperienceFlags {
     // Name of the flag, used for adb commands.
     private final String mFlagName;
     // Whether the flag state should be affected by developer option.
-    private final boolean mShouldOverrideByDevOptionDefault;
-    // Cached value for that flag: null if not read yet.
-    private Boolean mCachedIsOverrideByDevOption;
+    private final boolean mShouldOverrideByDevOption;
 
     // Local cache for toggle override, which is initialized once on its first access. It needs to
     // be refreshed only on reboots as overridden state is expected to take effect on reboots.
@@ -398,7 +401,7 @@ public enum DesktopExperienceFlags {
             @NonNull String flagName) {
         this.mFlagFunction = flagFunction;
         this.mFlagName = flagName;
-        this.mShouldOverrideByDevOptionDefault = shouldOverrideByDevOption;
+        this.mShouldOverrideByDevOption = shouldOverrideByDevOption;
     }
 
     /**
@@ -409,11 +412,7 @@ public enum DesktopExperienceFlags {
      * user will reboot very soon so being inconsistent across threads is ok.
      */
     public boolean isTrue() {
-        if (mCachedIsOverrideByDevOption == null) {
-            mCachedIsOverrideByDevOption = checkIfFlagShouldBeOverridden(mFlagName,
-                    mShouldOverrideByDevOptionDefault);
-        }
-        return isFlagTrue(mFlagFunction, mCachedIsOverrideByDevOption);
+        return isFlagTrue(mFlagFunction, mShouldOverrideByDevOption);
     }
 
     public boolean getFlagValue() {
@@ -426,7 +425,7 @@ public enum DesktopExperienceFlags {
 
     /** Returns whether or not the developer option can override that flag. */
     public boolean isOverridable() {
-        return mShouldOverrideByDevOptionDefault;
+        return mShouldOverrideByDevOption;
     }
 
     private static boolean isFlagTrue(
@@ -443,23 +442,6 @@ public enum DesktopExperienceFlags {
 
     public static List<DesktopExperienceFlag> getRegisteredFlags() {
         return new ArrayList<>(sDynamicFlags.values());
-    }
-
-    private static boolean checkIfFlagShouldBeOverridden(@Nullable String flagName,
-            boolean defaultValue) {
-        if (!Build.IS_ENG && !Build.IS_USERDEBUG) {
-            return defaultValue;
-        }
-        if (!Flags.showDesktopExperienceDevOption() || enableDisplayContentModeManagement()) {
-            return false;
-        }
-        if (flagName == null || flagName.isEmpty()) {
-            return defaultValue;
-        }
-        int lastDot = flagName.lastIndexOf('.');
-        String baseName = lastDot >= 0 ? flagName.substring(lastDot + 1) : flagName;
-        return SystemProperties.getBoolean(SYSTEM_PROPERTY_OVERRIDE_PREFIX + baseName,
-                defaultValue);
     }
 
     /** Check whether the flags are overridden to true or not. */

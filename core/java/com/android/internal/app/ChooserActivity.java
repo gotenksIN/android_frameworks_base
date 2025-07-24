@@ -23,7 +23,6 @@ import static android.app.admin.DevicePolicyResources.Strings.Core.RESOLVER_CANT
 import static android.app.admin.DevicePolicyResources.Strings.Core.RESOLVER_CROSS_PROFILE_BLOCKED_TITLE;
 import static android.content.ContentProvider.getUriWithoutUserId;
 import static android.content.ContentProvider.getUserIdFromUri;
-import static android.service.chooser.Flags.notifySingleItemChangeOnIconLoad;
 import static android.stats.devicepolicy.DevicePolicyEnums.RESOLVER_EMPTY_STATE_NO_SHARING_TO_PERSONAL;
 import static android.stats.devicepolicy.DevicePolicyEnums.RESOLVER_EMPTY_STATE_NO_SHARING_TO_WORK;
 
@@ -493,11 +492,9 @@ public class ChooserActivity extends ResolverActivity implements
     private final ChooserHandler mChooserHandler = new ChooserHandler();
 
     private class ChooserHandler extends Handler {
-        private static final int LIST_VIEW_UPDATE_MESSAGE = 6;
         private static final int SHORTCUT_MANAGER_ALL_SHARE_TARGET_RESULTS = 7;
 
         private void removeAllMessages() {
-            removeMessages(LIST_VIEW_UPDATE_MESSAGE);
             removeMessages(SHORTCUT_MANAGER_ALL_SHARE_TARGET_RESULTS);
         }
 
@@ -508,16 +505,6 @@ public class ChooserActivity extends ResolverActivity implements
             }
 
             switch (msg.what) {
-                case LIST_VIEW_UPDATE_MESSAGE:
-                    if (DEBUG) {
-                        Log.d(TAG, "LIST_VIEW_UPDATE_MESSAGE; ");
-                    }
-
-                    UserHandle userHandle = (UserHandle) msg.obj;
-                    mChooserMultiProfilePagerAdapter.getListAdapterForUserHandle(userHandle)
-                            .refreshListView();
-                    break;
-
                 case SHORTCUT_MANAGER_ALL_SHARE_TARGET_RESULTS:
                     if (DEBUG) Log.d(TAG, "SHORTCUT_MANAGER_ALL_SHARE_TARGET_RESULTS");
                     final ServiceResultInfo[] resultInfos = (ServiceResultInfo[]) msg.obj;
@@ -2831,14 +2818,6 @@ public class ChooserActivity extends ResolverActivity implements
         return mMaxTargetsPerRow;
     }
 
-    @Override // ChooserListCommunicator
-    public void sendListViewUpdateMessage(UserHandle userHandle) {
-        Message msg = Message.obtain();
-        msg.what = ChooserHandler.LIST_VIEW_UPDATE_MESSAGE;
-        msg.obj = userHandle;
-        mChooserHandler.sendMessageDelayed(msg, mListViewUpdateDelayMs);
-    }
-
     @Override
     public void onListRebuilt(ResolverListAdapter listAdapter, boolean rebuildComplete) {
         setupScrollListener();
@@ -3242,9 +3221,7 @@ public class ChooserActivity extends ResolverActivity implements
                     notifyDataSetChanged();
                 }
             });
-            if (notifySingleItemChangeOnIconLoad()) {
-                wrappedAdapter.setOnIconLoadedListener(this::onTargetIconLoaded);
-            }
+            wrappedAdapter.setOnIconLoadedListener(this::onTargetIconLoaded);
         }
 
         private void onTargetIconLoaded(DisplayResolveInfo info) {
@@ -3417,9 +3394,7 @@ public class ChooserActivity extends ResolverActivity implements
 
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            if (notifySingleItemChangeOnIconLoad()) {
-                mBoundViewHolders.add((ViewHolderBase) holder);
-            }
+            mBoundViewHolders.add((ViewHolderBase) holder);
             int viewType = ((ViewHolderBase) holder).getViewType();
             switch (viewType) {
                 case VIEW_TYPE_DIRECT_SHARE:
@@ -3435,17 +3410,13 @@ public class ChooserActivity extends ResolverActivity implements
 
         @Override
         public void onViewRecycled(RecyclerView.ViewHolder holder) {
-            if (notifySingleItemChangeOnIconLoad()) {
-                mBoundViewHolders.remove((ViewHolderBase) holder);
-            }
+            mBoundViewHolders.remove((ViewHolderBase) holder);
             super.onViewRecycled(holder);
         }
 
         @Override
         public boolean onFailedToRecycleView(RecyclerView.ViewHolder holder) {
-            if (notifySingleItemChangeOnIconLoad()) {
-                mBoundViewHolders.remove((ViewHolderBase) holder);
-            }
+            mBoundViewHolders.remove((ViewHolderBase) holder);
             return super.onFailedToRecycleView(holder);
         }
 

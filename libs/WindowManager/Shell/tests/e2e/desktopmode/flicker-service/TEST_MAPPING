@@ -49,6 +49,15 @@
       "name": "WMShellFlickerTestsDesktopMode-keyboardshortcuts-AltTabSwitchInDesktopModeFlickerTest"
     },
     {
+      "name": "WMShellFlickerTestsDesktopMode-keyboardshortcuts-EnterDesktopFromKeyboardShortcutFlickerTest"
+    },
+    {
+      "name": "WMShellFlickerTestsDesktopMode-keyboardshortcuts-ExitDesktopToFullScreenWithKeyboardShortcutFlickerTest"
+    },
+    {
+      "name": "WMShellFlickerTestsDesktopMode-maximize-ExitDesktopToFullScreenWithDragToTopDragZoneFlickerTest"
+    },
+    {
       "name": "WMShellFlickerTestsDesktopMode-maximize-MaximizeAppDoubleTapAppHeaderFlickerTest"
     },
     {

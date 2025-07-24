@@ -610,11 +610,9 @@ public final class QuotaController extends StateController {
             ActivityManager.getService().registerUidObserver(new QcUidObserver(),
                     ActivityManager.UID_OBSERVER_PROCSTATE,
                     ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, null);
-            if (Flags.enforceQuotaPolicyToFgsJobs()) {
-                ActivityManager.getService().registerUidObserver(new QcUidObserver(),
-                        ActivityManager.UID_OBSERVER_PROCSTATE,
-                        ActivityManager.PROCESS_STATE_BOUND_TOP, null);
-            }
+            ActivityManager.getService().registerUidObserver(new QcUidObserver(),
+                    ActivityManager.UID_OBSERVER_PROCSTATE,
+                    ActivityManager.PROCESS_STATE_BOUND_TOP, null);
             ActivityManager.getService().registerUidObserver(new QcUidObserver(),
                     ActivityManager.UID_OBSERVER_PROCSTATE,
                     ActivityManager.PROCESS_STATE_TOP, null);
@@ -669,10 +667,8 @@ public final class QuotaController extends StateController {
         }
 
         final int uid = jobStatus.getSourceUid();
-        if ((!Flags.enforceQuotaPolicyToTopStartedJobs()
-                || mPlatformCompat.isChangeEnabledByUid(
-                        OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS, uid))
-                && mTopAppCache.get(uid)) {
+        if ((mPlatformCompat.isChangeEnabledByUid(
+                OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS, uid)) && mTopAppCache.get(uid)) {
             if (DEBUG) {
                 Slog.d(TAG, jobStatus.toShortString() + " is top started job");
             }
@@ -709,9 +705,8 @@ public final class QuotaController extends StateController {
                 timer.stopTrackingJob(jobStatus);
             }
         }
-        if (!Flags.enforceQuotaPolicyToTopStartedJobs()
-                || mPlatformCompat.isChangeEnabledByUid(
-                        OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS, jobStatus.getSourceUid())) {
+        if (mPlatformCompat.isChangeEnabledByUid(
+                OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS, jobStatus.getSourceUid())) {
             mTopStartedJobs.remove(jobStatus);
         }
     }
@@ -824,9 +819,8 @@ public final class QuotaController extends StateController {
 
     /** @return true if the job was started while the app was in the TOP state. */
     private boolean isTopStartedJobLocked(@NonNull final JobStatus jobStatus) {
-        if (!Flags.enforceQuotaPolicyToTopStartedJobs()
-                || mPlatformCompat.isChangeEnabledByUid(
-                        OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS, jobStatus.getSourceUid())) {
+        if (mPlatformCompat.isChangeEnabledByUid(
+                OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS, jobStatus.getSourceUid())) {
             return mTopStartedJobs.contains(jobStatus);
         }
 
@@ -2713,9 +2707,7 @@ public final class QuotaController extends StateController {
 
     @VisibleForTesting
     int getProcessStateQuotaFreeThreshold(int uid) {
-        if (Flags.enforceQuotaPolicyToFgsJobs()
-                && !mPlatformCompat.isChangeEnabledByUid(
-                        OVERRIDE_QUOTA_ENFORCEMENT_TO_FGS_JOBS, uid)) {
+        if (!mPlatformCompat.isChangeEnabledByUid(OVERRIDE_QUOTA_ENFORCEMENT_TO_FGS_JOBS, uid)) {
             return ActivityManager.PROCESS_STATE_BOUND_TOP;
         }
 
@@ -4593,10 +4585,6 @@ public final class QuotaController extends StateController {
         pw.println("Aconfig Flags:");
         pw.println("    " + Flags.FLAG_ADJUST_QUOTA_DEFAULT_CONSTANTS
                 + ": " + Flags.adjustQuotaDefaultConstants());
-        pw.println("    " + Flags.FLAG_ENFORCE_QUOTA_POLICY_TO_FGS_JOBS
-                + ": " + Flags.enforceQuotaPolicyToFgsJobs());
-        pw.println("    " + Flags.FLAG_ENFORCE_QUOTA_POLICY_TO_TOP_STARTED_JOBS
-                + ": " + Flags.enforceQuotaPolicyToTopStartedJobs());
         pw.println("    " + Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER
                 + ": " + Flags.additionalQuotaForSystemInstaller());
         pw.println();

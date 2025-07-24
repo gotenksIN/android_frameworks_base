@@ -248,6 +248,7 @@ import com.android.server.am.ActivityManagerService.ItemMatcher;
 import com.android.server.am.LowMemDetector.MemFactor;
 import com.android.server.am.ServiceRecord.ShortFgsInfo;
 import com.android.server.am.ServiceRecord.TimeLimitedFgsInfo;
+import com.android.server.am.psc.ProcessStateRecord;
 import com.android.server.pm.KnownPackages;
 import com.android.server.uri.NeededUriGrants;
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -4731,8 +4732,8 @@ public final class ActiveServices {
                 }
 
                 serviceDoneExecutingLocked(r, mDestroyingServices.contains(r), false, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_EXECUTING_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_EXECUTING_SERVICE
+                                : OOM_ADJ_REASON_NONE);
             }
         } finally {
             mAm.mInjector.restoreCallingIdentity(origId);
@@ -4915,8 +4916,7 @@ public final class ActiveServices {
                 }
 
                 serviceDoneExecutingLocked(r, inDestroying, false, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
             }
         } finally {
             mAm.mInjector.restoreCallingIdentity(origId);
@@ -5527,16 +5527,14 @@ public final class ActiveServices {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while binding " + r, e);
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
                 throw e;
             } catch (RemoteException e) {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while binding " + r);
                 // Keep the executeNesting count accurate.
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
                 return false;
             }
         }
@@ -6353,7 +6351,7 @@ public final class ActiveServices {
     private int getServiceBindingOomAdjPolicyForAddLocked(ProcessRecord clientApp,
             ProcessRecord hostApp, ConnectionRecord cr) {
         @ServiceBindingOomAdjPolicy int policy = SERVICE_BIND_OOMADJ_POLICY_LEGACY;
-        if (Flags.serviceBindingOomAdjPolicy() && clientApp != null && hostApp != null) {
+        if (clientApp != null && hostApp != null) {
             if (clientApp == hostApp) {
                 policy = DEFAULT_SERVICE_NO_BUMP_BIND_POLICY_FLAG;
             } else if (clientApp.isCached()) {
@@ -6387,7 +6385,7 @@ public final class ActiveServices {
     private int getServiceBindingOomAdjPolicyForRemovalLocked(ProcessRecord clientApp,
             ProcessRecord hostApp, ConnectionRecord cr) {
         @ServiceBindingOomAdjPolicy int policy = SERVICE_BIND_OOMADJ_POLICY_LEGACY;
-        if (Flags.serviceBindingOomAdjPolicy() && clientApp != null && hostApp != null
+        if (clientApp != null && hostApp != null
                 && cr != null) {
             if (clientApp == hostApp) {
                 policy = DEFAULT_SERVICE_NO_BUMP_BIND_POLICY_FLAG;
@@ -6507,8 +6505,7 @@ public final class ActiveServices {
                 // Keep the executeNesting count accurate.
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_STOP_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_STOP_SERVICE : OOM_ADJ_REASON_NONE);
 
                 // Cleanup.
                 if (newService) {
@@ -6764,7 +6761,7 @@ public final class ActiveServices {
             }
         }
 
-        boolean oomAdjusted = Flags.serviceBindingOomAdjPolicy() && r.wasOomAdjUpdated();
+        boolean oomAdjusted = r.wasOomAdjUpdated();
 
         // Tell the service that it has been unbound.
         if (r.app != null && r.app.isThreadReady()) {
@@ -7224,8 +7221,8 @@ public final class ActiveServices {
             }
             final long origId = mAm.mInjector.clearCallingIdentity();
             serviceDoneExecutingLocked(r, inDestroying, inDestroying, enqueueOomAdj,
-                    !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated() || needOomAdj
-                    ? OOM_ADJ_REASON_EXECUTING_SERVICE : OOM_ADJ_REASON_NONE);
+                    r.wasOomAdjUpdated() || needOomAdj ? OOM_ADJ_REASON_EXECUTING_SERVICE
+                            : OOM_ADJ_REASON_NONE);
             mAm.mInjector.restoreCallingIdentity(origId);
         } else {
             Slog.w(TAG, "Done executing unknown service from pid "

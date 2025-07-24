@@ -23,9 +23,11 @@ import com.android.internal.protolog.ProtoLog
 import com.android.window.flags.Flags.appCompatRefactoring
 import com.android.wm.shell.compatui.letterbox.lifecycle.LetterboxLifecycleController
 import com.android.wm.shell.compatui.letterbox.lifecycle.LetterboxLifecycleEventFactory
+import com.android.wm.shell.compatui.letterbox.lifecycle.isChangeForALeafTask
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_APP_COMPAT
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
+import com.android.wm.shell.transition.Transitions.TRANSIT_MOVE_LETTERBOX_REACHABILITY
 
 /**
  * The [TransitionObserver] to handle Letterboxing events in Shell delegating to a
@@ -58,8 +60,12 @@ class DelegateLetterboxTransitionObserver(
         startTransaction: SurfaceControl.Transaction,
         finishTransaction: SurfaceControl.Transaction
     ) {
+        if (info.type == TRANSIT_MOVE_LETTERBOX_REACHABILITY) {
+            // Reachability transitions are handled in LetterboxAnimationHandler
+            return
+        }
         info.changes.forEach { change ->
-            if (letterboxLifecycleEventFactory.canHandle(change)) {
+            if (change.isChangeForALeafTask() && letterboxLifecycleEventFactory.canHandle(change)) {
                 letterboxLifecycleEventFactory.createLifecycleEvent(change)?.let { event ->
                     letterboxLifecycleController.onLetterboxLifecycleEvent(
                         event,

@@ -11,6 +11,7 @@ import static com.android.server.cpu.CpuAvailabilityMonitoringConfig.CPUSET_BACK
 
 import com.android.server.am.ProcessRecord;
 import com.android.server.am.ProcessList;
+import com.android.server.am.psc.ProcessStateRecord;
 import com.android.server.ServiceThread;
 import com.android.server.LocalServices;
 import com.android.server.cpu.CpuMonitorInternal;

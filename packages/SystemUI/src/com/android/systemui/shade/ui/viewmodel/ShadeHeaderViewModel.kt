@@ -18,10 +18,7 @@
 
 package com.android.systemui.shade.ui.viewmodel
 
-import android.content.Context
 import android.content.Intent
-import android.icu.text.DateFormat
-import android.icu.text.DisplayContext
 import android.provider.Settings
 import android.view.ViewGroup
 import androidx.compose.runtime.derivedStateOf
@@ -30,6 +27,7 @@ import androidx.compose.ui.unit.IntRect
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.battery.BatteryMeterViewController
 import com.android.systemui.clock.domain.interactor.ClockInteractor
+import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.KairosNetwork
 import com.android.systemui.lifecycle.ExclusiveActivatable
@@ -37,14 +35,12 @@ import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.privacy.OngoingPrivacyChip
 import com.android.systemui.privacy.PrivacyItem
-import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.DualShadeEducationInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.domain.model.DualShadeEducationModel
 import com.android.systemui.scene.shared.model.DualShadeEducationElement
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.TransitionKeys.SlightlyFasterShadeCollapse
-import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.domain.interactor.PrivacyChipInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
@@ -58,21 +54,17 @@ import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsVi
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModelKairos
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
-import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 
 /** Models UI state for the shade header. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShadeHeaderViewModel
 @AssistedInject
 constructor(
-    @ShadeDisplayAware private val context: Context,
     private val activityStarter: ActivityStarter,
     private val sceneInteractor: SceneInteractor,
     private val shadeInteractor: ShadeInteractor,
@@ -88,6 +80,7 @@ constructor(
     val kairosNetwork: KairosNetwork,
     val mobileIconsViewModelKairos: dagger.Lazy<MobileIconsViewModelKairos>,
     private val dualShadeEducationInteractor: DualShadeEducationInteractor,
+    private val desktopInteractor: DesktopInteractor,
 ) : ExclusiveActivatable() {
 
     private val hydrator = Hydrator("ShadeHeaderViewModel.hydrator")
@@ -159,20 +152,14 @@ constructor(
         get() =
             dualShadeEducationInteractor.education == DualShadeEducationModel.ForQuickSettingsShade
 
-    private val longerPattern = context.getString(R.string.abbrev_wday_month_day_no_year_alarm)
-    private val shorterPattern = context.getString(R.string.abbrev_month_day_no_year)
-
-    private val longerDateFormat: Flow<DateFormat> =
-        clockInteractor.onTimezoneOrLocaleChanged.mapLatest { getFormatFromPattern(longerPattern) }
-    private val shorterDateFormat: Flow<DateFormat> =
-        clockInteractor.onTimezoneOrLocaleChanged.mapLatest { getFormatFromPattern(shorterPattern) }
-
     val longerDateText: String by
         hydrator.hydratedStateOf(
             traceName = "longerDateText",
             initialValue = "",
             source =
-                combine(longerDateFormat, clockInteractor.currentTime) { format, time ->
+                combine(clockInteractor.longerDateFormat, clockInteractor.currentTime) {
+                    format,
+                    time ->
                     format.format(time)
                 },
         )
@@ -182,9 +169,18 @@ constructor(
             traceName = "shorterDateText",
             initialValue = "",
             source =
-                combine(shorterDateFormat, clockInteractor.currentTime) { format, time ->
+                combine(clockInteractor.shorterDateFormat, clockInteractor.currentTime) {
+                    format,
+                    time ->
                     format.format(time)
                 },
+        )
+
+    private val isDesktopFeatureSetEnabled: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isDesktopFeatureSetEnabled",
+            initialValue = desktopInteractor.isDesktopFeatureSetEnabled.value,
+            source = desktopInteractor.isDesktopFeatureSetEnabled,
         )
 
     override suspend fun onActivated(): Nothing {
@@ -202,7 +198,7 @@ constructor(
 
     /** Notifies that the clock was clicked. */
     fun onClockClicked() {
-        if (shadeModeInteractor.isDualShade && isDesktopFeatureSetEnabled()) {
+        if (shadeModeInteractor.isDualShade && isDesktopFeatureSetEnabled) {
             toggleNotificationShade(
                 loggingReason = "ShadeHeaderViewModel.onClockChipClicked",
                 launchClockActivityOnCollapse = false,
@@ -219,12 +215,8 @@ constructor(
         }
         toggleNotificationShade(
             loggingReason = "ShadeHeaderViewModel.onNotificationIconChipClicked",
-            launchClockActivityOnCollapse = !isDesktopFeatureSetEnabled(),
+            launchClockActivityOnCollapse = !isDesktopFeatureSetEnabled,
         )
-    }
-
-    private fun isDesktopFeatureSetEnabled(): Boolean {
-        return context.resources.getBoolean(R.bool.config_enableDesktopFeatureSet)
     }
 
     private fun toggleNotificationShade(
@@ -279,12 +271,6 @@ constructor(
         bounds: IntRect,
     ) {
         dualShadeEducationInteractor.onDualShadeEducationElementBoundsChange(element, bounds)
-    }
-
-    private fun getFormatFromPattern(pattern: String?): DateFormat {
-        return DateFormat.getInstanceForSkeleton(pattern, Locale.getDefault()).apply {
-            setContext(DisplayContext.CAPITALIZATION_FOR_STANDALONE)
-        }
     }
 
     @AssistedFactory

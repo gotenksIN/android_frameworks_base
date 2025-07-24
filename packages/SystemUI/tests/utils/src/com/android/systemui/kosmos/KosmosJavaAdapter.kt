@@ -73,6 +73,8 @@ import com.android.systemui.scene.domain.startable.scrimStartable
 import com.android.systemui.scene.sceneContainerConfig
 import com.android.systemui.scene.shared.model.sceneDataSource
 import com.android.systemui.scene.ui.view.mockWindowRootViewProvider
+import com.android.systemui.securelockdevice.data.repository.fakeSecureLockDeviceRepository
+import com.android.systemui.securelockdevice.domain.interactor.secureLockDeviceInteractor
 import com.android.systemui.settings.brightness.data.repository.brightnessMirrorShowingRepository
 import com.android.systemui.settings.displayTracker
 import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
@@ -126,6 +128,7 @@ import com.android.systemui.statusbar.ui.viewmodel.keyguardStatusBarViewModel
 import com.android.systemui.topui.topUiController
 import com.android.systemui.util.kotlin.javaAdapter
 import com.android.systemui.util.time.systemClock
+import com.android.systemui.volume.dialog.captions.domain.volumeDialogCaptionsButtonInteractor
 import com.android.systemui.volume.domain.interactor.volumeDialogInteractor
 import com.android.systemui.wallpapers.domain.interactor.fakeWallpaperRepository
 import com.android.systemui.wallpapers.domain.interactor.wallpaperInteractorFaked
@@ -219,6 +222,7 @@ class KosmosJavaAdapter() {
     val wifiInteractor by lazy { kosmos.wifiInteractor }
     val fakeWifiRepository by lazy { kosmos.fakeWifiRepository }
     val volumeDialogInteractor by lazy { kosmos.volumeDialogInteractor }
+    val volumeDialogCaptionsButtonInteractor by lazy { kosmos.volumeDialogCaptionsButtonInteractor }
     val alternateBouncerInteractor by lazy { kosmos.alternateBouncerInteractor }
 
     val ongoingActivityChipsViewModel by lazy { kosmos.ongoingActivityChipsViewModel }
@@ -260,6 +264,8 @@ class KosmosJavaAdapter() {
     val sysuiStateInteractor by lazy { kosmos.sysuiStateInteractor }
     val wallpaperInteractor by lazy { kosmos.wallpaperInteractorFaked }
     val wallpaperRepository by lazy { kosmos.fakeWallpaperRepository }
+    val fakeSecureLockDeviceRepository by lazy { kosmos.fakeSecureLockDeviceRepository }
+    val secureLockDeviceInteractor by lazy { kosmos.secureLockDeviceInteractor }
 
     /** Use if you need a unique or mutate-able row */
     fun createRow(): ExpandableNotificationRow {

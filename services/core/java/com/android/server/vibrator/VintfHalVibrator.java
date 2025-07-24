@@ -22,9 +22,17 @@ import static android.os.VibrationEffect.effectStrengthToString;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.hardware.vibrator.ActivePwle;
+import android.hardware.vibrator.CompositeEffect;
+import android.hardware.vibrator.CompositePwleV2;
 import android.hardware.vibrator.FrequencyAccelerationMapEntry;
 import android.hardware.vibrator.IVibrator;
+import android.hardware.vibrator.PrimitivePwle;
+import android.hardware.vibrator.PwleV2Primitive;
+import android.hardware.vibrator.VendorEffect;
+import android.os.BadParcelableException;
 import android.os.Binder;
+import android.os.Handler;
 import android.os.IVibratorStateListener;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
@@ -44,6 +52,7 @@ import com.android.server.vibrator.VintfUtils.VintfSupplier;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /** Implementations for {@link HalVibrator} backed by VINTF objects. */
@@ -56,10 +65,14 @@ class VintfHalVibrator {
         private final Object mLock = new Object();
         private final int mVibratorId;
         private final VintfSupplier<IVibrator> mHalSupplier;
+        private final Handler mHandler;
+        private final HalNativeHandler mNativeHandler;
 
         @GuardedBy("mLock")
         private final RemoteCallbackList<IVibratorStateListener> mVibratorStateListeners =
                 new RemoteCallbackList<>();
+
+        private Callbacks mCallbacks;
 
         // Vibrator state variables that are updated from synchronized blocks but can be read
         // anytime for a snippet of the current known vibrator state/info.
@@ -67,9 +80,12 @@ class VintfHalVibrator {
         private volatile State mCurrentState;
         private volatile float mCurrentAmplitude;
 
-        DefaultHalVibrator(int vibratorId, VintfSupplier<IVibrator> supplier) {
+        DefaultHalVibrator(int vibratorId, VintfSupplier<IVibrator> supplier, Handler handler,
+                HalNativeHandler nativeHandler) {
             mVibratorId = vibratorId;
             mHalSupplier = supplier;
+            mHandler = handler;
+            mNativeHandler = nativeHandler;
             mVibratorInfo = new VibratorInfo.Builder(vibratorId).build();
             mCurrentState = State.IDLE;
             mCurrentAmplitude = 0;
@@ -79,6 +95,7 @@ class VintfHalVibrator {
         public void init(@NonNull Callbacks callbacks) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "DefaultHalVibrator#init");
             try {
+                mCallbacks = callbacks;
                 int capabilities = getValue(IVibrator::getCapabilities,
                         "Error loading capabilities during init").orElse(0);
 
@@ -170,7 +187,9 @@ class VintfHalVibrator {
                     boolean result = VintfUtils.runNoThrow(mHalSupplier,
                             hal -> hal.setExternalControl(enabled),
                             e -> logError("Error setting external control to " + enabled, e));
-                    updateStateAndNotifyListenersLocked(newState);
+                    if (result) {
+                        updateStateAndNotifyListenersLocked(newState);
+                    }
                     return result;
                 }
             } finally {
@@ -234,8 +253,30 @@ class VintfHalVibrator {
         public long on(long vibrationId, long stepId, long milliseconds) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "DefaultHalVibrator#on");
             try {
-                // TODO(b/422944962): implement
-                return 0;
+                synchronized (mLock) {
+                    int result;
+                    if (mVibratorInfo.hasCapability(IVibrator.CAP_ON_CALLBACK)) {
+                        // Delegate vibrate with callback to native, to avoid creating a new
+                        // callback instance for each call, overloading the GC.
+                        result = mNativeHandler.vibrateWithCallback(mVibratorId, vibrationId,
+                                stepId, (int) milliseconds);
+                    } else {
+                        // Vibrate callback not supported, avoid unnecessary JNI round trip and
+                        // simulate HAL callback here using a Handler.
+                        result = vibrateNoThrow(
+                                hal -> hal.on((int) milliseconds, null),
+                                (int) milliseconds,
+                                e -> logError("Error turning on for " + milliseconds + "ms", e));
+                        if (result > 0) {
+                            mHandler.postDelayed(newVibrationCallback(vibrationId, stepId),
+                                    milliseconds);
+                        }
+                    }
+                    if (result > 0) {
+                        updateStateAndNotifyListenersLocked(State.VIBRATING);
+                    }
+                    return result > 0 ? milliseconds : result;
+                }
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -245,8 +286,25 @@ class VintfHalVibrator {
         public long on(long vibrationId, long stepId, VibrationEffect.VendorEffect effect) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "DefaultHalVibrator#on (vendor)");
             try {
-                // TODO(b/422944962): implement
-                return 0;
+                synchronized (mLock) {
+                    if (!mVibratorInfo.hasCapability(IVibrator.CAP_PERFORM_VENDOR_EFFECTS)) {
+                        return 0;
+                    }
+                    // Delegate vibrate with callback to native, to avoid creating a new
+                    // callback instance for each call, overloading the GC.
+                    VendorEffect vendorEffect = new VendorEffect();
+                    vendorEffect.vendorData = effect.getVendorData();
+                    vendorEffect.vendorScale = effect.getAdaptiveScale();
+                    vendorEffect.scale = effect.getScale();
+                    vendorEffect.strength = (byte) effect.getEffectStrength();
+                    int result = mNativeHandler.vibrateWithCallback(mVibratorId, vibrationId,
+                            stepId, vendorEffect);
+                    if (result > 0) {
+                        updateStateAndNotifyListenersLocked(State.VIBRATING);
+                    }
+                    // Vendor effect durations are unknown to the framework.
+                    return result > 0 ? Long.MAX_VALUE : result;
+                }
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -256,8 +314,33 @@ class VintfHalVibrator {
         public long on(long vibrationId, long stepId, PrebakedSegment prebaked) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "DefaultHalVibrator#on (prebaked)");
             try {
-                // TODO(b/422944962): implement
-                return 0;
+                synchronized (mLock) {
+                    int result;
+                    if (mVibratorInfo.hasCapability(IVibrator.CAP_PERFORM_CALLBACK)) {
+                        // Delegate vibrate with callback to native, to avoid creating a new
+                        // callback instance for each call, overloading the GC.
+                        result = mNativeHandler.vibrateWithCallback(mVibratorId, vibrationId,
+                                stepId, prebaked.getEffectId(), prebaked.getEffectStrength());
+                    } else {
+                        // Vibrate callback not supported, avoid unnecessary JNI round trip and
+                        // simulate HAL callback here using a Handler.
+                        int effectId = prebaked.getEffectId();
+                        byte strength = (byte) prebaked.getEffectStrength();
+                        result = vibrateNoThrow(
+                                hal -> hal.perform(effectId, strength, null),
+                                e -> logError("Error performing effect "
+                                        + VibrationEffect.effectIdToString(effectId)
+                                        + " with strength "
+                                        + VibrationEffect.effectStrengthToString(strength), e));
+                        if (result > 0) {
+                            mHandler.postDelayed(newVibrationCallback(vibrationId, stepId), result);
+                        }
+                    }
+                    if (result > 0) {
+                        updateStateAndNotifyListenersLocked(State.VIBRATING);
+                    }
+                    return result;
+                }
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -267,8 +350,32 @@ class VintfHalVibrator {
         public long on(long vibrationId, long stepId, PrimitiveSegment[] primitives) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "DefaultHalVibrator#on (primitives)");
             try {
-                // TODO(b/422944962): implement
-                return 0;
+                synchronized (mLock) {
+                    if (!mVibratorInfo.hasCapability(IVibrator.CAP_COMPOSE_EFFECTS)) {
+                        return 0;
+                    }
+                    // Delegate vibrate with callback to native, to avoid creating a new
+                    // callback instance for each call, overloading the GC.
+                    CompositeEffect[] effects = new CompositeEffect[primitives.length];
+                    long durationMs = 0;
+                    for (int i = 0; i < primitives.length; i++) {
+                        effects[i] = new CompositeEffect();
+                        effects[i].primitive = primitives[i].getPrimitiveId();
+                        effects[i].scale = primitives[i].getScale();
+                        effects[i].delayMs = primitives[i].getDelay();
+                        durationMs += mVibratorInfo.getPrimitiveDuration(effects[i].primitive);
+                        durationMs += effects[i].delayMs;
+                    }
+                    int result = mNativeHandler.vibrateWithCallback(mVibratorId, vibrationId,
+                            stepId, effects);
+                    if (result > 0) {
+                        updateStateAndNotifyListenersLocked(State.VIBRATING);
+                    }
+                    return result > 0 ? durationMs : result;
+                }
+            } catch (BadParcelableException e) {
+                logError("Error sending parcelable to JNI", e);
+                return -1;
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -278,8 +385,34 @@ class VintfHalVibrator {
         public long on(long vibrationId, long stepId, RampSegment[] primitives) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "DefaultHalVibrator#on (pwle v1)");
             try {
-                // TODO(b/422944962): implement
-                return 0;
+                synchronized (mLock) {
+                    if (!mVibratorInfo.hasCapability(IVibrator.CAP_COMPOSE_PWLE_EFFECTS)) {
+                        return 0;
+                    }
+                    // Delegate vibrate with callback to native, to avoid creating a new
+                    // callback instance for each call, overloading the GC.
+                    PrimitivePwle[] effects = new PrimitivePwle[primitives.length];
+                    long durationMs = 0;
+                    for (int i = 0; i < primitives.length; i++) {
+                        ActivePwle pwle = new ActivePwle();
+                        pwle.startAmplitude = primitives[i].getStartAmplitude();
+                        pwle.startFrequency = primitives[i].getStartFrequencyHz();
+                        pwle.endAmplitude = primitives[i].getEndAmplitude();
+                        pwle.endFrequency = primitives[i].getEndFrequencyHz();
+                        pwle.duration = (int) primitives[i].getDuration();
+                        effects[i] = PrimitivePwle.active(pwle);
+                        durationMs += pwle.duration;
+                    }
+                    int result = mNativeHandler.vibrateWithCallback(mVibratorId, vibrationId,
+                            stepId, effects);
+                    if (result > 0) {
+                        updateStateAndNotifyListenersLocked(State.VIBRATING);
+                    }
+                    return result > 0 ? durationMs : result;
+                }
+            } catch (BadParcelableException e) {
+                logError("Error sending parcelable to JNI", e);
+                return -1;
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -289,8 +422,32 @@ class VintfHalVibrator {
         public long on(long vibrationId, long stepId, PwlePoint[] pwlePoints) {
             Trace.traceBegin(TRACE_TAG_VIBRATOR, "DefaultHalVibrator#on (pwle v2)");
             try {
-                // TODO(b/422944962): implement
-                return 0;
+                synchronized (mLock) {
+                    if (!mVibratorInfo.hasCapability(IVibrator.CAP_COMPOSE_PWLE_EFFECTS_V2)) {
+                        return 0;
+                    }
+                    // Delegate vibrate with callback to native, to avoid creating a new
+                    // callback instance for each call, overloading the GC.
+                    CompositePwleV2 composite = new CompositePwleV2();
+                    composite.pwlePrimitives = new PwleV2Primitive[pwlePoints.length];
+                    long durationMs = 0;
+                    for (int i = 0; i < pwlePoints.length; i++) {
+                        composite.pwlePrimitives[i] = new PwleV2Primitive();
+                        composite.pwlePrimitives[i].amplitude = pwlePoints[i].getAmplitude();
+                        composite.pwlePrimitives[i].frequencyHz = pwlePoints[i].getFrequencyHz();
+                        composite.pwlePrimitives[i].timeMillis = pwlePoints[i].getTimeMillis();
+                        durationMs += pwlePoints[i].getTimeMillis();
+                    }
+                    int result = mNativeHandler.vibrateWithCallback(mVibratorId, vibrationId,
+                            stepId, composite);
+                    if (result > 0) {
+                        updateStateAndNotifyListenersLocked(State.VIBRATING);
+                    }
+                    return result > 0 ? durationMs : result;
+                }
+            } catch (BadParcelableException e) {
+                logError("Error sending parcelable to JNI", e);
+                return -1;
             } finally {
                 Trace.traceEnd(TRACE_TAG_VIBRATOR);
             }
@@ -364,6 +521,32 @@ class VintfHalVibrator {
             } catch (RemoteException | RuntimeException e) {
                 logError("Vibrator state listener failed to call", e);
             }
+        }
+
+        private int vibrateNoThrow(VintfUtils.VintfRunnable<IVibrator> fn, int successResult,
+                Consumer<Throwable> errorHandler) {
+            return vibrateNoThrow(
+                    hal -> {
+                        fn.run(hal);
+                        return successResult;
+                    }, errorHandler);
+        }
+
+        private int vibrateNoThrow(VintfUtils.VintfGetter<IVibrator, Integer> fn,
+                Consumer<Throwable> errorHandler) {
+            try {
+                return VintfUtils.get(mHalSupplier, fn);
+            } catch (RuntimeException e) {
+                errorHandler.accept(e);
+                if (e instanceof UnsupportedOperationException) {
+                    return 0;
+                }
+                return -1;
+            }
+        }
+
+        private Runnable newVibrationCallback(long vibrationId, long stepId) {
+            return () -> mCallbacks.onVibrationStepComplete(mVibratorId, vibrationId, stepId);
         }
 
         private VibratorInfo loadVibratorInfo(int vibratorId) {

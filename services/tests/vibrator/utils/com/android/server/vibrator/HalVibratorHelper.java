@@ -18,12 +18,15 @@ package com.android.server.vibrator;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.hardware.vibrator.ActivePwle;
 import android.hardware.vibrator.CompositeEffect;
 import android.hardware.vibrator.CompositePwleV2;
 import android.hardware.vibrator.FrequencyAccelerationMapEntry;
+import android.hardware.vibrator.IVibrationSession;
 import android.hardware.vibrator.IVibrator;
 import android.hardware.vibrator.IVibratorCallback;
 import android.hardware.vibrator.PrimitivePwle;
+import android.hardware.vibrator.PwleV2Primitive;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
@@ -58,18 +61,18 @@ public final class HalVibratorHelper {
 
     private final Handler mHandler;
 
-    // Iterate over maps in key order (i.e. vibration id) by using TreeMap.
     private final Map<Long, PrebakedSegment> mEnabledAlwaysOnEffects = new TreeMap<>();
-    private final Map<Long, List<VibrationEffectSegment>> mEffectSegments = new TreeMap<>();
-    private final Map<Long, List<VendorEffect>> mVendorEffects = new TreeMap<>();
-    private final Map<Long, List<PwlePoint>> mEffectPwlePoints = new TreeMap<>();
-    private final Map<Long, List<Integer>> mBraking = new TreeMap<>();
+    private final List<VibrationEffectSegment> mEffectSegments = new ArrayList<>();
+    private final List<VendorEffect> mVendorEffects = new ArrayList<>();
+    private final List<PwlePoint> mEffectPwlePoints = new ArrayList<>();
+    private final List<Integer> mBraking = new ArrayList<>();
     private final List<Float> mAmplitudes = new ArrayList<>();
     private final List<Boolean> mExternalControlStates = new ArrayList<>();
     private int mConnectCount;
     private int mOffCount;
 
     private boolean mLoadInfoShouldFail = false;
+    private boolean mExternalControlShouldFail = false;
     private boolean mOnShouldFail = false;
     private boolean mPrebakedShouldFail = false;
     private boolean mVendorEffectsShouldFail = false;
@@ -112,27 +115,34 @@ public final class HalVibratorHelper {
     }
 
     /** Return new {@link DefaultHalVibrator} instance. */
-    public DefaultHalVibrator newDefaultVibrator(int vibratorId) {
+    public DefaultHalVibrator newDefaultVibrator(int vibratorId, HalNativeHandler nativeHandler) {
         FakeVibratorSupplier supplier = new FakeVibratorSupplier(new FakeVibrator());
-        return new DefaultHalVibrator(vibratorId, supplier);
+        return new DefaultHalVibrator(vibratorId, supplier, mHandler, nativeHandler);
     }
 
-    /** Return new {@link HalVibrator} instance. */
-    public HalVibrator newHalVibrator(int vibratorId) {
-        return newVibratorController(vibratorId);
-    }
-
-    /** Return new {@link HalVibrator} instance after initializing it. */
+    /** Return new and initialized {@link HalVibrator} instance. */
     public HalVibrator newInitializedHalVibrator(int vibratorId, HalVibrator.Callbacks callbacks) {
-        HalVibrator vibrator = newHalVibrator(vibratorId);
+        HalVibrator vibrator = newVibratorController(vibratorId);
         vibrator.init(callbacks);
         vibrator.onSystemReady();
         return vibrator;
     }
 
+    /** Return an initialized {@link HalNativeHandler} instance. */
+    public HalNativeHandler newInitializedNativeHandler(HalVibrator.Callbacks callbacks) {
+        FakeHalNativeHandler handler = new FakeHalNativeHandler();
+        handler.init(null, callbacks);
+        return handler;
+    }
+
     /** Makes get info calls fail. */
     public void setLoadInfoToFail() {
         mLoadInfoShouldFail = true;
+    }
+
+    /** Makes vibrator ON(millis) calls fail. */
+    public void setExternalControlToFail() {
+        mExternalControlShouldFail = true;
     }
 
     /** Makes vibrator ON(millis) calls fail. */
@@ -303,42 +313,23 @@ public final class HalVibratorHelper {
     }
 
     /** Return the braking values passed to the compose PWLE method. */
-    public synchronized List<Integer> getBraking(long vibrationId) {
-        return copyRecordsForVibration(mBraking, vibrationId);
+    public synchronized List<Integer> getBraking() {
+        return new ArrayList<>(mBraking);
     }
 
     /** Return list of {@link VibrationEffectSegment} played by this controller, in order. */
-    public synchronized List<VibrationEffectSegment> getEffectSegments(long vibrationId) {
-        return copyRecordsForVibration(mEffectSegments, vibrationId);
-    }
-
-    /** Returns a list of all effect segments, for all vibration ID. */
-    public synchronized List<VibrationEffectSegment> getAllEffectSegments() {
-        // Returns segments in order of vibrationId, which increases over time. TreeMap gives order.
-        ArrayList<VibrationEffectSegment> result = new ArrayList<>();
-        for (List<VibrationEffectSegment> subList : mEffectSegments.values()) {
-            result.addAll(subList);
-        }
-        return result;
+    public synchronized List<VibrationEffectSegment> getEffectSegments() {
+        return new ArrayList<>(mEffectSegments);
     }
 
     /** Return list of {@link VendorEffect} played by this controller, in order. */
-    public synchronized List<VendorEffect> getVendorEffects(long vibrationId) {
-        return copyRecordsForVibration(mVendorEffects, vibrationId);
-    }
-
-    /** Returns a list of all vendor effects, for all vibration IDs. */
-    public synchronized List<VendorEffect> getAllVendorEffects() {
-        ArrayList<VendorEffect> result = new ArrayList<>();
-        for (List<VendorEffect> subList : mVendorEffects.values()) {
-            result.addAll(subList);
-        }
-        return result;
+    public synchronized List<VendorEffect> getVendorEffects() {
+        return new ArrayList<>(mVendorEffects);
     }
 
     /** Return list of {@link PwlePoint} played by this controller, in order. */
-    public synchronized List<PwlePoint> getEffectPwlePoints(long vibrationId) {
-        return copyRecordsForVibration(mEffectPwlePoints, vibrationId);
+    public synchronized List<PwlePoint> getEffectPwlePoints() {
+        return new ArrayList<>(mEffectPwlePoints);
     }
 
     /** Return list of states set for external control to the fake vibrator hardware. */
@@ -357,31 +348,107 @@ public final class HalVibratorHelper {
         return mEnabledAlwaysOnEffects.get((long) id);
     }
 
-    private synchronized void recordEffectSegment(long vibrationId,
-            VibrationEffectSegment segment) {
-        getRecordsForVibration(mEffectSegments, vibrationId).add(segment);
+    int vibrate(int durationMs) {
+        if (mOnShouldFail) {
+            return -1;
+        }
+        recordEffectSegment(new StepSegment(VibrationEffect.DEFAULT_AMPLITUDE,
+                /* frequencyHz= */ 0, durationMs));
+        applyLatency(mOnLatency);
+        return durationMs;
     }
 
-    private synchronized void recordVendorEffect(long vibrationId, VendorEffect vendorEffect) {
-        getRecordsForVibration(mVendorEffects, vibrationId).add(vendorEffect);
+    int vibrate(int effectId, byte strength) {
+        if (mPrebakedShouldFail) {
+            return -1;
+        }
+        if (mSupportedEffects == null || Arrays.binarySearch(mSupportedEffects, effectId) < 0) {
+            return 0;
+        }
+        recordEffectSegment(new PrebakedSegment(effectId, false, strength));
+        applyLatency(mOnLatency);
+        return (int) EFFECT_DURATION;
     }
 
-    private synchronized void recordEffectPwlePoint(long vibrationId, PwlePoint pwlePoint) {
-        getRecordsForVibration(mEffectPwlePoints, vibrationId).add(pwlePoint);
+    int vibrate(VendorEffect effect) {
+        if (mVendorEffectsShouldFail) {
+            return -1;
+        }
+        if ((mCapabilities & IVibrator.CAP_PERFORM_VENDOR_EFFECTS) == 0) {
+            return 0;
+        }
+        recordVendorEffect(effect);
+        applyLatency(mOnLatency);
+        return (int) mVendorEffectDuration;
     }
 
-    private synchronized void recordBraking(long vibrationId, int braking) {
-        getRecordsForVibration(mBraking, vibrationId).add(braking);
+    int vibrate(PrimitiveSegment[] primitives) {
+        if (mPrimitivesShouldFail) {
+            return -1;
+        }
+        if (mSupportedPrimitives == null || (mCapabilities & IVibrator.CAP_COMPOSE_EFFECTS) == 0) {
+            return 0;
+        }
+        for (PrimitiveSegment primitive : primitives) {
+            if (Arrays.binarySearch(mSupportedPrimitives, primitive.getPrimitiveId()) < 0) {
+                return 0;
+            }
+        }
+        long duration = 0;
+        for (PrimitiveSegment primitive : primitives) {
+            duration += mPrimitiveDuration + primitive.getDelay();
+            recordEffectSegment(primitive);
+        }
+        applyLatency(mOnLatency);
+        return (int) duration;
     }
 
-    private static <T> List<T> copyRecordsForVibration(
-            Map<Long, List<T>> records, long vibrationId) {
-        return new ArrayList<>(getRecordsForVibration(records, vibrationId));
+    int vibrate(RampSegment[] primitives) {
+        if (mPwleV1ShouldFail) {
+            return -1;
+        }
+        if ((mCapabilities & IVibrator.CAP_COMPOSE_PWLE_EFFECTS) == 0) {
+            return 0;
+        }
+        int duration = 0;
+        for (RampSegment primitive : primitives) {
+            duration += (int) primitive.getDuration();
+            recordEffectSegment(primitive);
+        }
+        applyLatency(mOnLatency);
+        return duration;
     }
 
-    private static <T> List<T> getRecordsForVibration(
-            Map<Long, List<T>> records, long vibrationId) {
-        return records.computeIfAbsent(vibrationId, unused -> new ArrayList<>());
+    int vibrate(PwlePoint[] pwlePoints) {
+        if (mPwleV2ShouldFail) {
+            return -1;
+        }
+        if ((mCapabilities & IVibrator.CAP_COMPOSE_PWLE_EFFECTS_V2) == 0) {
+            return 0;
+        }
+        int duration = 0;
+        for (PwlePoint pwlePoint: pwlePoints) {
+            duration += pwlePoint.getTimeMillis();
+            recordEffectPwlePoint(pwlePoint);
+        }
+        applyLatency(mOnLatency);
+        return duration;
+    }
+
+    private synchronized void recordEffectSegment(VibrationEffectSegment segment) {
+        mEffectSegments.add(segment);
+    }
+
+    private synchronized void recordVendorEffect(VendorEffect vendorEffect) {
+        mVendorEffects.add(vendorEffect);
+    }
+
+    private synchronized void recordEffectPwlePoint(PwlePoint pwlePoint) {
+        mEffectPwlePoints.add(pwlePoint);
+    }
+
+    private synchronized void recordBraking(int braking) {
+        mBraking.add(braking);
     }
 
     private void applyLatency(long latencyMillis) {
@@ -392,6 +459,13 @@ public final class HalVibratorHelper {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void scheduleVibrationCallback(HalVibrator.Callbacks callbacks, int vibratorId,
+            long vibrationId, long stepId, long durationMs) {
+        mHandler.postDelayed(
+                () -> callbacks.onVibrationStepComplete(vibratorId, vibrationId, stepId),
+                durationMs + mCompletionCallbackLatency);
     }
 
     /** Fake {@link VibratorController.NativeWrapper} implementation for testing. */
@@ -408,14 +482,11 @@ public final class HalVibratorHelper {
 
         @Override
         public long on(long milliseconds, long vibrationId, long stepId) {
-            if (mOnShouldFail) {
-                return -1;
+            int result = vibrate((int) milliseconds);
+            if (result > 0) {
+                scheduleCallback(vibrationId, stepId, milliseconds);
             }
-            recordEffectSegment(vibrationId, new StepSegment(VibrationEffect.DEFAULT_AMPLITUDE,
-                    /* frequencyHz= */ 0, (int) milliseconds));
-            applyLatency(mOnLatency);
-            scheduleListener(milliseconds, vibrationId, stepId);
-            return milliseconds;
+            return result;
         }
 
         @Override
@@ -432,104 +503,59 @@ public final class HalVibratorHelper {
 
         @Override
         public long perform(long effect, long strength, long vibrationId, long stepId) {
-            if (mPrebakedShouldFail) {
-                return -1;
+            long duration = vibrate((int) effect, (byte) strength);
+            if (duration > 0) {
+                scheduleCallback(vibrationId, stepId, duration);
             }
-            if (mSupportedEffects == null
-                    || Arrays.binarySearch(mSupportedEffects, (int) effect) < 0) {
-                return 0;
-            }
-            recordEffectSegment(vibrationId,
-                    new PrebakedSegment((int) effect, false, (int) strength));
-            applyLatency(mOnLatency);
-            scheduleListener(EFFECT_DURATION, vibrationId, stepId);
-            return EFFECT_DURATION;
+            return duration;
         }
 
         @Override
         public long performVendorEffect(Parcel vendorData, long strength, float scale,
                 float adaptiveScale, long vibrationId, long stepId) {
-            if (mVendorEffectsShouldFail) {
-                return -1;
-            }
-            if ((mCapabilities & IVibrator.CAP_PERFORM_VENDOR_EFFECTS) == 0) {
-                return 0;
-            }
             PersistableBundle bundle = PersistableBundle.CREATOR.createFromParcel(vendorData);
-            recordVendorEffect(vibrationId,
-                    new VendorEffect(bundle, (int) strength, scale, adaptiveScale));
-            applyLatency(mOnLatency);
-            scheduleListener(mVendorEffectDuration, vibrationId, stepId);
-            // HAL has unknown duration for vendor effects.
-            return Long.MAX_VALUE;
+            long duration = vibrate(new VendorEffect(bundle, (int) strength, scale, adaptiveScale));
+            if (duration > 0) {
+                scheduleCallback(vibrationId, stepId, mVendorEffectDuration);
+                // HAL has unknown duration for vendor effects.
+                return Long.MAX_VALUE;
+            }
+            return duration;
         }
 
         @Override
         public long compose(PrimitiveSegment[] primitives, long vibrationId, long stepId) {
-            if (mPrimitivesShouldFail) {
-                return -1;
+            long duration = vibrate(primitives);
+            if (duration > 0) {
+                scheduleCallback(vibrationId, stepId, duration);
             }
-            if (mSupportedPrimitives == null
-                    || (mCapabilities & IVibrator.CAP_COMPOSE_EFFECTS) == 0) {
-                return 0;
-            }
-            for (PrimitiveSegment primitive : primitives) {
-                if (Arrays.binarySearch(mSupportedPrimitives, primitive.getPrimitiveId()) < 0) {
-                    return 0;
-                }
-            }
-            long duration = 0;
-            for (PrimitiveSegment primitive : primitives) {
-                duration += mPrimitiveDuration + primitive.getDelay();
-                recordEffectSegment(vibrationId, primitive);
-            }
-            applyLatency(mOnLatency);
-            scheduleListener(duration, vibrationId, stepId);
             return duration;
         }
 
         @Override
         public long composePwle(RampSegment[] primitives, int braking, long vibrationId,
                 long stepId) {
-            if (mPwleV1ShouldFail) {
-                return -1;
+            long duration = vibrate(primitives);
+            if (duration > 0) {
+                scheduleCallback(vibrationId, stepId, duration);
             }
-            if ((mCapabilities & IVibrator.CAP_COMPOSE_PWLE_EFFECTS) == 0) {
-                return 0;
-            }
-            long duration = 0;
-            for (RampSegment primitive : primitives) {
-                duration += primitive.getDuration();
-                recordEffectSegment(vibrationId, primitive);
-            }
-            recordBraking(vibrationId, braking);
-            applyLatency(mOnLatency);
-            scheduleListener(duration, vibrationId, stepId);
             return duration;
         }
 
         @Override
         public long composePwleV2(PwlePoint[] pwlePoints, long vibrationId, long stepId) {
-            if (mPwleV2ShouldFail) {
-                return -1;
+            long duration = vibrate(pwlePoints);
+            if (duration > 0) {
+                scheduleCallback(vibrationId, stepId, duration);
             }
-            if ((mCapabilities & IVibrator.CAP_COMPOSE_PWLE_EFFECTS_V2) == 0) {
-                return 0;
-            }
-            long duration = 0;
-            for (PwlePoint pwlePoint: pwlePoints) {
-                duration += pwlePoint.getTimeMillis();
-                recordEffectPwlePoint(vibrationId, pwlePoint);
-            }
-            applyLatency(mOnLatency);
-            scheduleListener(duration, vibrationId, stepId);
-
             return duration;
         }
 
         @Override
         public void setExternalControl(boolean enabled) {
-            mExternalControlStates.add(enabled);
+            if (!mExternalControlShouldFail) {
+                mExternalControlStates.add(enabled);
+            }
         }
 
         @Override
@@ -590,16 +616,118 @@ public final class HalVibratorHelper {
             return !mLoadInfoShouldFail;
         }
 
-        private void scheduleListener(long vibrationDuration, long vibrationId, long stepId) {
-            mHandler.postDelayed(
-                    () -> listener.onVibrationStepComplete(vibratorId, vibrationId, stepId),
-                    vibrationDuration + mCompletionCallbackLatency);
+        private void scheduleCallback(long vibrationId, long stepId, long durationMs) {
+            scheduleVibrationCallback(listener, vibratorId, vibrationId, stepId, durationMs);
+        }
+    }
+
+    /** Provides fake implementation of {@link HalNativeHandler} for testing. */
+    public final class FakeHalNativeHandler implements HalNativeHandler {
+        private HalVibrator.Callbacks mVibratorCallbacks;
+
+        @Override
+        public void init(HalVibratorManager.Callbacks unused, HalVibrator.Callbacks cb) {
+            mVibratorCallbacks = cb;
+        }
+
+        @Override
+        public boolean triggerSyncedWithCallback(long vibrationId) {
+            return false;
+        }
+
+        @Override
+        public IVibrationSession startSessionWithCallback(long sessionId, int[] vibratorIds) {
+            return null;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                int durationMs) {
+            int result = vibrate(durationMs);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, durationMs);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                android.hardware.vibrator.VendorEffect effect) {
+            VendorEffect vendorEffect = new VendorEffect(effect.vendorData, effect.strength,
+                    effect.scale, effect.vendorScale);
+            int result = vibrate(vendorEffect);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId, int effectId,
+                int effectStrength) {
+            int result = vibrate(effectId, (byte) effectStrength);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                CompositeEffect[] effects) {
+            PrimitiveSegment[] primitives = new PrimitiveSegment[effects.length];
+            for (int i = 0; i < primitives.length; i++) {
+                primitives[i] = new PrimitiveSegment(effects[i].primitive, effects[i].scale,
+                        effects[i].delayMs);
+            }
+            int result = vibrate(primitives);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                PrimitivePwle[] effects) {
+            RampSegment[] primitives = new RampSegment[effects.length];
+            for (int i = 0; i < primitives.length; i++) {
+                ActivePwle pwle = effects[i].getActive();
+                primitives[i] = new RampSegment(pwle.startAmplitude, pwle.endAmplitude,
+                        pwle.startFrequency, pwle.endFrequency, pwle.duration);
+            }
+            int result = vibrate(primitives);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                CompositePwleV2 composite) {
+            PwlePoint[] points = new PwlePoint[composite.pwlePrimitives.length];
+            for (int i = 0; i < points.length; i++) {
+                PwleV2Primitive primitive = composite.pwlePrimitives[i];
+                points[i] = new PwlePoint(primitive.amplitude, primitive.frequencyHz,
+                        primitive.timeMillis);
+            }
+            int result = vibrate(points);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        private void scheduleCallback(int vibratorId, long vibrationId, long stepId,
+                int durationMs) {
+            mHandler.postDelayed(() -> mVibratorCallbacks.onVibrationStepComplete(
+                    vibratorId, vibrationId, stepId), durationMs);
         }
     }
 
     /** Provides fake implementation of {@link IVibrator} for testing. */
     public final class FakeVibrator extends IVibrator.Stub {
-
         @Override
         public int getCapabilities() throws RemoteException {
             return mCapabilities;
@@ -618,6 +746,9 @@ public final class HalVibratorHelper {
 
         @Override
         public void setExternalControl(boolean enabled) throws RemoteException {
+            if (mExternalControlShouldFail) {
+                throw new RemoteException();
+            }
             mExternalControlStates.add(enabled);
         }
 
@@ -730,37 +861,60 @@ public final class HalVibratorHelper {
 
         @Override
         public void on(int timeoutMs, IVibratorCallback callback) throws RemoteException {
-            throw new UnsupportedOperationException();
+            if (callback != null) {
+                throw new IllegalArgumentException("HAL java client should not receive callbacks");
+            }
+            int result = vibrate(timeoutMs);
+            if (result < 0) {
+                throw new RemoteException();
+            }
+            if (result == 0) {
+                throw new UnsupportedOperationException();
+            }
         }
 
         @Override
         public int perform(int effect, byte strength, IVibratorCallback callback)
                 throws RemoteException {
-            throw new UnsupportedOperationException();
+            if (callback != null) {
+                throw new IllegalArgumentException("HAL java client should not receive callbacks");
+            }
+            int duration = vibrate(effect, strength);
+            if (duration < 0) {
+                throw new RemoteException();
+            }
+            if (duration == 0) {
+                throw new UnsupportedOperationException();
+            }
+            return duration;
         }
 
         @Override
         public void performVendorEffect(android.hardware.vibrator.VendorEffect vendorEffect,
                 IVibratorCallback callback) throws RemoteException {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(
+                    "HAL java client should not be used to play vendor effects");
         }
 
         @Override
         public void compose(CompositeEffect[] composite, IVibratorCallback callback)
                 throws RemoteException {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(
+                    "HAL java client should not be used to play primitive compositions");
         }
 
         @Override
         public void composePwle(PrimitivePwle[] composite, IVibratorCallback callback)
                 throws RemoteException {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(
+                    "HAL java client should not be used to play pwle");
         }
 
         @Override
         public void composePwleV2(CompositePwleV2 composite, IVibratorCallback callback)
                 throws RemoteException {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(
+                    "HAL java client should not be used to play pwle v2");
         }
 
         @Override

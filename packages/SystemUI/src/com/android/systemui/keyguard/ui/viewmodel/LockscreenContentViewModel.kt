@@ -60,6 +60,7 @@ constructor(
         KeyguardTransitionAnimationCallbackDelegator,
     keyguardMediaViewModelFactory: KeyguardMediaViewModel.Factory,
     keyguardSmartspaceViewModel: KeyguardSmartspaceViewModel,
+    keyguardClockViewModel: KeyguardClockViewModel,
     activeNotificationsInteractor: ActiveNotificationsInteractor,
     @Assisted private val keyguardTransitionAnimationCallback: KeyguardTransitionAnimationCallback,
     private val wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
@@ -130,6 +131,9 @@ constructor(
                         clockInteractor.currentClock.value.isDateAndWeatherVisibleWithLargeClock(),
                 )
 
+            override val isDateAndWeatherVisible: Boolean =
+                keyguardSmartspaceViewModel.isDateWeatherDecoupled
+
             private fun ClockController?.isDateAndWeatherVisibleWithLargeClock(): Boolean {
                 return this?.largeClock?.config?.hasCustomWeatherDataDisplay == false
             }
@@ -146,8 +150,8 @@ constructor(
                     initialValue = activeNotificationsInteractor.areAnyNotificationsPresentValue,
                 )
 
-            override val isUdfpsSupported: Boolean
-                get() = authController.isUdfpsSupported
+            override val isAmbientIndicationVisible: Boolean
+                get() = !authController.isUdfpsSupported
 
             override val unfoldTranslations: UnfoldTranslations =
                 object : UnfoldTranslations {
@@ -167,6 +171,13 @@ constructor(
                                 unfoldTransitionInteractor.unfoldTranslationX(isOnStartSide = false),
                         )
                 }
+
+            override val shouldDateWeatherBeBelowSmallClock: Boolean by
+                hydrator.hydratedStateOf(
+                    traceName = "shouldDateWeatherBeBelowSmallClock",
+                    source = keyguardClockViewModel.shouldDateWeatherBeBelowSmallClock,
+                    initialValue = keyguardClockViewModel.shouldDateWeatherBeBelowSmallClock.value,
+                )
         }
 
     override suspend fun onActivated(): Nothing {

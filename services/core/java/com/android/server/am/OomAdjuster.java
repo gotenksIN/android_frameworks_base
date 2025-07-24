@@ -163,6 +163,8 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.psc.PlatformCompatCache;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
+import com.android.server.am.psc.ProcessStateRecord;
+import com.android.server.am.psc.UidStateRecord;
 import com.android.server.wm.WindowProcessController;
 
 import java.io.PrintWriter;
@@ -391,7 +393,7 @@ public abstract class OomAdjuster {
     private final int mNumSlots;
     protected final ArrayList<ProcessRecord> mTmpProcessList = new ArrayList<ProcessRecord>();
     protected final ArrayList<ProcessRecord> mTmpProcessList2 = new ArrayList<ProcessRecord>();
-    protected final ArrayList<UidRecord> mTmpBecameIdle = new ArrayList<UidRecord>();
+    protected final ArrayList<UidStateRecord> mTmpBecameIdle = new ArrayList<UidStateRecord>();
     protected final ActiveUids mTmpUidRecords;
     protected final ArrayDeque<ProcessRecord> mTmpQueue;
     protected final ArraySet<ProcessRecord> mTmpProcessSet = new ArraySet<>();
@@ -1479,7 +1481,7 @@ public abstract class OomAdjuster {
 
     @GuardedBy({"mService", "mProcLock"})
     private void updateAppUidRecLSP(ProcessRecord app) {
-        final UidRecord uidRec = app.getUidRecord();
+        final UidStateRecord uidRec = app.getUidRecord();
         if (uidRec != null) {
             final ProcessStateRecord state = app.mState;
             uidRec.setEphemeral(app.info.isInstantApp());
@@ -1487,7 +1489,7 @@ public abstract class OomAdjuster {
                 uidRec.setCurProcState(state.getCurProcState());
             }
             if (app.mServices.hasForegroundServices()) {
-                uidRec.setForegroundServices(true);
+                uidRec.setHasForegroundServices(true);
             }
             uidRec.setCurCapability(uidRec.getCurCapability() | state.getCurCapability());
         }
@@ -1500,7 +1502,7 @@ public abstract class OomAdjuster {
         // we update the UidRecord's procstate by calling {@link UidRecord#setSetProcState}.
         mProcessList.incrementProcStateSeqAndNotifyAppsLOSP(activeUids);
 
-        ArrayList<UidRecord> becameIdle = mTmpBecameIdle;
+        ArrayList<UidStateRecord> becameIdle = mTmpBecameIdle;
         becameIdle.clear();
 
         // Update from any uid changes.
@@ -1596,7 +1598,7 @@ public abstract class OomAdjuster {
                     uidRec.setSetCapability(uidRec.getCurCapability());
                     uidRec.setSetAllowListed(uidRec.isCurAllowListed());
                     uidRec.setSetIdle(uidRec.isIdle());
-                    uidRec.clearProcAdjChanged();
+                    uidRec.setProcAdjChanged(false);
                     if (shouldLog
                             && ((uidRec.getSetProcState() != oldProcState)
                             || (uidRec.getSetCapability() != oldCapability))) {
@@ -1625,7 +1627,7 @@ public abstract class OomAdjuster {
                     if ((uidChange & UidRecord.CHANGE_PROCSTATE) != 0) {
                         mService.noteUidProcessState(uidRec.getUid(), uidRec.getCurProcState());
                     }
-                    if (uidRec.hasForegroundServices()) {
+                    if (uidRec.getHasForegroundServices()) {
                         mService.mServices.foregroundServiceProcStateChangedLocked(uidRec);
                     }
                 }
@@ -2096,7 +2098,7 @@ public abstract class OomAdjuster {
     protected static int getCpuCapability(ProcessRecord app, long nowUptime,
             boolean hasForegroundActivities) {
         // Note: persistent processes get all capabilities, including CPU_TIME.
-        final UidRecord uidRec = app.getUidRecord();
+        final UidStateRecord uidRec = app.getUidRecord();
         if (uidRec != null && uidRec.isCurAllowListed()) {
             // Process is in the power allowlist.
             return PROCESS_CAPABILITY_CPU_TIME;
@@ -2223,7 +2225,7 @@ public abstract class OomAdjuster {
             long nowElapsed, @OomAdjReason int oomAdjReson, boolean isBatchingOomAdj) {
         boolean success = true;
         final ProcessStateRecord state = app.mState;
-        final UidRecord uidRec = app.getUidRecord();
+        final UidStateRecord uidRec = app.getUidRecord();
 
         if (state.getCurRawAdj() != state.getSetRawAdj()) {
             state.setSetRawAdj(state.getCurRawAdj());
@@ -2326,7 +2328,7 @@ public abstract class OomAdjuster {
             }
             state.setSetAdj(state.getCurAdj());
             if (uidRec != null) {
-                uidRec.noteProcAdjChanged();
+                uidRec.setProcAdjChanged(true);
             }
             state.setVerifiedAdj(INVALID_ADJ);
         }
@@ -2497,8 +2499,6 @@ public abstract class OomAdjuster {
                     mService.setProcessTrackerStateLOSP(app,
                             mService.mProcessStats.getMemFactorLocked());
                 }
-            } else {
-                state.setHasProcStateChanged(true);
             }
         } else if (state.getHasReportedInteraction()) {
             final boolean fgsInteractionChangeEnabled = state.getCachedCompatChange(

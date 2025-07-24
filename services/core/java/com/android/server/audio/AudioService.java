@@ -613,7 +613,8 @@ public class AudioService extends IAudioService.Stub
         if (groupId != AudioVolumeGroup.DEFAULT_VOLUME_GROUP) {
             return groupId;
         }
-        return mAudioSystem.getVolumeGroupIdFromStreamType(stream);
+        return AudioProductStrategy.getVolumeGroupIdForStreamType(
+                getAudioProductStrategies(/* filterInternal= */ true), stream);
     }
 
     /**
@@ -1517,7 +1518,8 @@ public class AudioService extends IAudioService.Stub
                 int minVolume = -1;
 
                 if (volumeGroupManagementUpdate()) {
-                    int groupId = mAudioSystem.getVolumeGroupIdFromStreamType(streamType);
+                    int groupId = AudioProductStrategy.getVolumeGroupIdForStreamType(
+                            getAudioProductStrategies(/* filterInternal= */ true), streamType);
                     if (groupId != AudioVolumeGroup.DEFAULT_VOLUME_GROUP) {
                         maxVolume = AudioSystem.getMaxVolumeIndexForGroup(groupId);
                         minVolume = AudioSystem.getMinVolumeIndexForGroup(groupId);
@@ -1525,7 +1527,8 @@ public class AudioService extends IAudioService.Stub
                 } else {
                     AudioAttributes attr =
                             AudioProductStrategy.getAudioAttributesForStrategyWithLegacyStreamType(
-                                    streamType);
+                                    mAudioSystem.getAudioProductStrategies(
+                                            /* filterInternal*/ true), streamType);
                     maxVolume = AudioSystem.getMaxVolumeIndexForAttributes(attr);
                     minVolume = AudioSystem.getMinVolumeIndexForAttributes(attr);
                 }
@@ -4256,14 +4259,17 @@ public class AudioService extends IAudioService.Stub
             return;
         }
 
-        // If the stream is STREAM_ASSISTANT,
-        // make sure that the calling app have the MODIFY_AUDIO_ROUTING permission.
+        // If the stream is STREAM_ASSISTANT, make sure that the calling app have the
+        // MODIFY_AUDIO_ROUTING or MODIFY_AUDIO_SETTINGS_PRIVILEGED permissions.
         if (streamType == AudioSystem.STREAM_ASSISTANT &&
-                mContext.checkPermission(
-                MODIFY_AUDIO_ROUTING, pid, uid)
-                    != PackageManager.PERMISSION_GRANTED) {
-            Log.w(TAG, "MODIFY_AUDIO_ROUTING Permission Denial: adjustStreamVolume from pid="
-                    + Binder.getCallingPid() + ", uid=" + Binder.getCallingUid());
+                (mContext.checkPermission(MODIFY_AUDIO_ROUTING, pid, uid)
+                        != PackageManager.PERMISSION_GRANTED
+                        || mContext.checkPermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED, pid, uid)
+                        != PackageManager.PERMISSION_GRANTED)) {
+            Log.w(TAG, "Permission Denial: adjustStreamVolume from pid="
+                    + Binder.getCallingPid() + ", uid=" + Binder.getCallingUid()
+                    + " requires permission MODIFY_AUDIO_ROUTING or "
+                    + "MODIFY_AUDIO_SETTINGS_PRIVILEGED");
             return;
         }
 
@@ -5261,11 +5267,13 @@ public class AudioService extends IAudioService.Stub
                     + " MODIFY_PHONE_STATE  callingPackage=" + callingPackage);
             return;
         }
-        if ((streamType == AudioManager.STREAM_ASSISTANT)
-                && (mContext.checkCallingOrSelfPermission(MODIFY_AUDIO_ROUTING)
-                    != PackageManager.PERMISSION_GRANTED)) {
+        if ((streamType == AudioManager.STREAM_ASSISTANT) && (mContext.checkCallingOrSelfPermission(
+                MODIFY_AUDIO_ROUTING) != PackageManager.PERMISSION_GRANTED
+                || mContext.checkCallingOrSelfPermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
+                != PackageManager.PERMISSION_GRANTED)) {
             Log.w(TAG, "Trying to call setStreamVolume() for STREAM_ASSISTANT without"
-                    + " MODIFY_AUDIO_ROUTING  callingPackage=" + callingPackage);
+                    + " MODIFY_AUDIO_ROUTING or MODIFY_AUDIO_SETTINGS_PRIVILEGED from "
+                    + "callingPackage=" + callingPackage);
             return;
         }
 
@@ -8788,10 +8796,12 @@ public class AudioService extends IAudioService.Stub
      */
     @NonNull
     private Set<AudioDeviceAttributes> getDeviceSetForStreamDirect(int stream) {
-        return AudioSystem.generateAudioDeviceTypesSet(
-                getDevicesForAttributesInt(
-                        AudioProductStrategy.getAudioAttributesForStrategyWithLegacyStreamType(
-                                stream), true /* forVolume */));
+        AudioAttributes attributes =
+                AudioProductStrategy.getAudioAttributesForStrategyWithLegacyStreamType(
+                        mAudioSystem.getAudioProductStrategies(/* filterInternal*/ true),
+                        stream);
+        return AudioSystem.generateAudioDeviceTypesSet(getDevicesForAttributesInt(attributes,
+                /* forVolume= */ true));
     }
 
     /**

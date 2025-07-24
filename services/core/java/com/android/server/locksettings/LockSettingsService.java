@@ -652,6 +652,10 @@ public class LockSettingsService extends ILockSettings.Stub {
         public boolean isHeadlessSystemUserMode() {
             return UserManager.isHeadlessSystemUserMode();
         }
+
+        public Duration getTimeSinceBoot() {
+            return Duration.ofMillis(SystemClock.elapsedRealtime());
+        }
     }
 
     private class SoftwareRateLimiterInjector implements SoftwareRateLimiter.Injector {
@@ -668,7 +672,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
         @Override
         public Duration getTimeSinceBoot() {
-            return Duration.ofMillis(SystemClock.elapsedRealtime());
+            return mInjector.getTimeSinceBoot();
         }
 
         @Override

@@ -1145,6 +1145,10 @@ public class Transitions implements RemoteCallable<Transitions>,
      */
     private void releaseSurfaces(@Nullable TransitionInfo info) {
         if (info == null) return;
+        if (com.android.window.flags.Flags.releaseAllTransitionSurfaces()) {
+            info.releaseAllSurfaces();
+            return;
+        }
         info.releaseAnimSurfaces();
     }
 

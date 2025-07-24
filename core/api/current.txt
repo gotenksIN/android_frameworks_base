@@ -4849,6 +4849,7 @@ package android.app {
   public static class ActivityManager.AppTask {
     method public void finishAndRemoveTask();
     method public android.app.ActivityManager.RecentTaskInfo getTaskInfo();
+    method @FlaggedApi("com.android.window.flags.enable_window_repositioning_api") @RequiresPermission(android.Manifest.permission.REPOSITION_SELF_WINDOWS) public void moveTaskTo(@NonNull android.app.TaskLocation, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.app.TaskLocation,java.lang.Exception>);
     method public void moveToFront();
     method public void setExcludeFromRecents(boolean);
     method public void startActivity(android.content.Context, android.content.Intent, android.os.Bundle);
@@ -6988,7 +6989,7 @@ package android.app {
     method public android.app.Notification.MessagingStyle.Message setData(String, android.net.Uri);
   }
 
-  @FlaggedApi("android.app.api_metric_style") public static class Notification.Metric {
+  @FlaggedApi("android.app.api_metric_style") public static final class Notification.Metric {
     ctor public Notification.Metric(@NonNull android.app.Notification.Metric.MetricValue, @NonNull String, int);
     method @NonNull public String getLabel();
     method public int getMeaning();
@@ -7090,9 +7091,12 @@ package android.app {
     method @NonNull public static android.app.Notification.Metric.TimeDifference forPausedStopwatch(@NonNull java.time.Duration, int);
     method @NonNull public static android.app.Notification.Metric.TimeDifference forPausedTimer(@NonNull java.time.Duration, int);
     method @NonNull public static android.app.Notification.Metric.TimeDifference forStopwatch(@NonNull java.time.Instant, int);
+    method @NonNull public static android.app.Notification.Metric.TimeDifference forStopwatch(long, int);
     method @NonNull public static android.app.Notification.Metric.TimeDifference forTimer(@NonNull java.time.Instant, int);
+    method @NonNull public static android.app.Notification.Metric.TimeDifference forTimer(long, int);
     method public int getFormat();
     method @Nullable public java.time.Duration getPausedDuration();
+    method @Nullable public Long getZeroElapsedRealtime();
     method @Nullable public java.time.Instant getZeroTime();
     method public boolean isStopwatch();
     method public boolean isTimer();
@@ -7101,7 +7105,7 @@ package android.app {
     field public static final int FORMAT_CHRONOMETER = 3; // 0x3
   }
 
-  @FlaggedApi("android.app.api_metric_style") public static class Notification.MetricStyle extends android.app.Notification.Style {
+  @FlaggedApi("android.app.api_metric_style") public static final class Notification.MetricStyle extends android.app.Notification.Style {
     ctor public Notification.MetricStyle();
     method @NonNull public android.app.Notification.MetricStyle addMetric(@NonNull android.app.Notification.Metric);
     method @NonNull public java.util.List<android.app.Notification.Metric> getMetrics();
@@ -7853,6 +7857,12 @@ package android.app {
     field @Nullable public android.app.ActivityManager.TaskDescription taskDescription;
     field public int taskId;
     field @Nullable public android.content.ComponentName topActivity;
+  }
+
+  @FlaggedApi("com.android.window.flags.enable_window_repositioning_api") public class TaskLocation {
+    ctor public TaskLocation(int, @NonNull android.graphics.Rect);
+    method @NonNull public android.graphics.Rect getBounds();
+    method public int getDisplayId();
   }
 
   public class TaskStackBuilder {
@@ -9426,6 +9436,7 @@ package android.app.blob {
 package android.app.contextualsearch {
 
   @FlaggedApi("android.app.contextualsearch.flags.self_invocation") public final class ContextualSearchManager {
+    method @FlaggedApi("android.app.contextualsearch.flags.self_invocation") public boolean isContextualSearchAvailable();
     method @FlaggedApi("android.app.contextualsearch.flags.self_invocation") public void startContextualSearch();
   }
 
@@ -13773,6 +13784,7 @@ package android.content.pm {
     field public static final String FEATURE_FINGERPRINT = "android.hardware.fingerprint";
     field public static final String FEATURE_FREEFORM_WINDOW_MANAGEMENT = "android.software.freeform_window_management";
     field public static final String FEATURE_GAMEPAD = "android.hardware.gamepad";
+    field @FlaggedApi("com.android.microxr.flags.xr_glasses_feature") public static final String FEATURE_GLASSES = "android.hardware.type.glasses";
     field public static final String FEATURE_HARDWARE_KEYSTORE = "android.hardware.hardware_keystore";
     field public static final String FEATURE_HIFI_SENSORS = "android.hardware.sensor.hifi_sensors";
     field public static final String FEATURE_HOME_SCREEN = "android.software.home_screen";
@@ -42044,7 +42056,6 @@ package android.service.chooser {
     method public int getState();
     method @NonNull public android.service.chooser.ChooserSessionToken getToken();
     method public void removeStateListener(@NonNull android.service.chooser.ChooserSession.StateListener);
-    method public void setMinimized(boolean);
     method public void setTargetsEnabled(boolean);
     method public void updateIntent(@NonNull android.content.Intent);
     field public static final int STATE_CLOSED = 2; // 0x2
@@ -44335,6 +44346,7 @@ package android.telecom {
     method public final void destroy();
     method @Deprecated public final android.telecom.CallAudioState getCallAudioState();
     method public final java.util.List<android.telecom.Connection> getConferenceableConnections();
+    method @FlaggedApi("com.android.server.telecom.flags.multi_party_anchor_conf") @NonNull public final java.util.List<android.telecom.Conferenceable> getConferenceables();
     method public final int getConnectionCapabilities();
     method public final int getConnectionProperties();
     method public final long getConnectionStartElapsedRealtimeMillis();
@@ -44359,6 +44371,7 @@ package android.telecom {
     method public void onExtrasChanged(android.os.Bundle);
     method public void onHold();
     method public void onMerge(android.telecom.Connection);
+    method @FlaggedApi("com.android.server.telecom.flags.multi_party_anchor_conf") public void onMerge(@NonNull android.telecom.Conference);
     method public void onMerge();
     method public void onMuteStateChanged(boolean);
     method public void onPlayDtmfTone(char);
@@ -44373,7 +44386,8 @@ package android.telecom {
     method public final void removeExtras(java.lang.String...);
     method public void sendConferenceEvent(@NonNull String, @Nullable android.os.Bundle);
     method public final void setActive();
-    method public final void setConferenceableConnections(java.util.List<android.telecom.Connection>);
+    method @Deprecated @FlaggedApi("com.android.server.telecom.flags.multi_party_anchor_conf") public final void setConferenceableConnections(java.util.List<android.telecom.Connection>);
+    method @FlaggedApi("com.android.server.telecom.flags.multi_party_anchor_conf") public final void setConferenceables(@NonNull java.util.List<android.telecom.Conferenceable>);
     method public final void setConnectionCapabilities(int);
     method public final void setConnectionProperties(int);
     method @Deprecated public final void setConnectionStartElapsedRealTime(long);
@@ -45726,6 +45740,7 @@ package android.telephony {
     field public static final String KEY_SUPPORT_EMERGENCY_SMS_OVER_IMS_BOOL = "support_emergency_sms_over_ims_bool";
     field public static final String KEY_SUPPORT_ENHANCED_CALL_BLOCKING_BOOL = "support_enhanced_call_blocking_bool";
     field public static final String KEY_SUPPORT_IMS_CONFERENCE_EVENT_PACKAGE_BOOL = "support_ims_conference_event_package_bool";
+    field @FlaggedApi("com.android.server.telecom.flags.multi_party_anchor_conf") public static final String KEY_SUPPORT_MULTI_PARTY_ANCHOR_CONFERENCE_BOOL = "support_multi_anchor_conf_bool";
     field public static final String KEY_SUPPORT_PAUSE_IMS_VIDEO_CALLS_BOOL = "support_pause_ims_video_calls_bool";
     field @Deprecated public static final String KEY_SUPPORT_SWAP_AFTER_MERGE_BOOL = "support_swap_after_merge_bool";
     field public static final String KEY_SUPPORT_TDSCDMA_BOOL = "support_tdscdma_bool";

@@ -93,6 +93,7 @@ fun NavBarPill(
     showEducation: Boolean = false,
     onClick: () -> Unit = {},
     onCloseClick: () -> Unit = {},
+    onCloseEducation: () -> Unit = {},
 ) {
     val maxPillWidth = 248.dp
     val backgroundColor = if (isSystemInDarkTheme()) Color.Black else Color.White
@@ -187,7 +188,7 @@ fun NavBarPill(
             },
     ) {
         if (visible && !expanded && showEducation) {
-            FirstTimeEducation(Alignment.CenterHorizontally)
+            FirstTimeEducation(Alignment.CenterHorizontally, onCloseClick = onCloseEducation)
         }
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -288,7 +289,7 @@ fun NavBarPill(
                                                     Color.Transparent
                                                 }
                                             )
-                                            .height(28.dp)
+                                            .height(24.dp)
                                             .padding(start = 6.dp, end = 6.dp),
                                 ) {
                                     Image(
@@ -345,7 +346,7 @@ fun NavBarPill(
                                                     else -> Modifier
                                                 }
                                             )
-                                            .padding(3.dp)
+                                            .padding(horizontal = 3.dp, vertical = 4.dp)
                                             .size(16.dp)
                                             .then(iconBorder)
                                             .clip(CircleShape),

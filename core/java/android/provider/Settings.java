@@ -12750,7 +12750,7 @@ public final class Settings {
          * 1 = right-to-left (recent, home, back)
          * @hide
          */
-        public static final String NAV_BAR_ORDER = "nav_bar_order";
+        public static final String NAVIGATIONBAR_KEY_ORDER = "navigationbar_key_order";
 
         /**
          * Navigation bar mode.
@@ -13177,7 +13177,10 @@ public final class Settings {
          *
          * @hide
          */
+        @TestApi
         @Readable
+        @FlaggedApi(android.view.accessibility.Flags.FLAG_FORCE_INVERT_COLOR)
+        @SuppressLint("NoSettingsProvider")
         public static final String ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED =
                 "accessibility_force_invert_color_enabled";
 
@@ -19054,6 +19057,17 @@ public final class Settings {
                 "hearing_device_local_notification";
 
         /**
+         * This defines the order in which the 3-button navigation bar's buttons are displayed.
+         * 0 = left-to-right (back, home, recent)
+         * 1 = right-to-left (recent, home, back)
+         * @hide
+         * @deprecated Use
+         * {@link Secure#NAVIGATIONBAR_KEY_ORDER} instead.
+         */
+        @Deprecated
+        public static final String NAVIGATIONBAR_KEY_ORDER = "navigationbar_key_order";
+
+        /**
          * Global settings that shouldn't be persisted.
          *
          * @hide
@@ -19101,6 +19115,7 @@ public final class Settings {
             MOVED_TO_SECURE.add(Global.BUGREPORT_IN_POWER_MENU);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_APP);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_USER);
+            MOVED_TO_SECURE.add(Global.NAVIGATIONBAR_KEY_ORDER);
         }
 
         // Certain settings have been moved from global to the per-user system namespace

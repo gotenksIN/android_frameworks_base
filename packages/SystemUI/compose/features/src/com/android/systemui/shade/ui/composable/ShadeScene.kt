@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -279,10 +280,10 @@ private fun ContentScope.SingleShade(
     val navBarHeight = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
     val mediaOffsetProvider = remember {
-        ShadeMediaOffsetProvider.Qqs(
-            { @Suppress("UNUSED_EXPRESSION") tileSquishiness },
-            viewModel.qsSceneAdapter,
-        )
+        object : ShadeMediaOffsetProvider {
+            override val offset: IntOffset
+                get() = IntOffset.Zero
+        }
     }
     val shadeHorizontalPadding =
         dimensionResource(id = R.dimen.notification_panel_margin_horizontal)
@@ -325,27 +326,29 @@ private fun ContentScope.SingleShade(
                     modifier = Modifier.layoutId(SingleShadeMeasurePolicy.LayoutId.ShadeHeader),
                 )
 
+                val qqsLayoutPaddingBottom = 16.dp
+
                 Box(
                     Modifier.element(QuickSettings.Elements.QuickQuickSettings)
                         .layoutId(SingleShadeMeasurePolicy.LayoutId.QuickSettings)
                         .padding(
                             horizontal =
                                 shadeHorizontalPadding +
-                                        dimensionResource(id = R.dimen.qs_horizontal_margin)
+                                    dimensionResource(id = R.dimen.qs_horizontal_margin)
                         )
+                        .padding(bottom = qqsLayoutPaddingBottom)
                 ) {
-                    val qqsViewModel = rememberViewModel(traceName = "shade_scene_qqs") {
-                        viewModel.quickQuickSettingsViewModel.create()
-                    }
+                    val qqsViewModel =
+                        rememberViewModel(traceName = "shade_scene_qqs") {
+                            viewModel.quickQuickSettingsViewModel.create()
+                        }
                     QuickQuickSettings(
                         qqsViewModel,
                         listening = { true },
-                        modifier = Modifier.sysuiResTag("quick_qs_panel")
+                        modifier = Modifier.sysuiResTag("quick_qs_panel"),
                     )
                 }
 
-                val qqsLayoutPaddingBottom =
-                    dimensionResource(id = R.dimen.qqs_layout_padding_bottom)
                 ShadeMediaCarousel(
                     isVisible = viewModel.isMediaVisible,
                     isInRow = mediaInRow,
@@ -359,9 +362,7 @@ private fun ContentScope.SingleShade(
                                     shadeHorizontalPadding +
                                         dimensionResource(id = R.dimen.qs_horizontal_margin)
                             )
-                            .thenIf(!mediaInRow) {
-                                Modifier.padding(bottom = qqsLayoutPaddingBottom)
-                            },
+                            .padding(bottom = qqsLayoutPaddingBottom),
                     usingCollapsedLandscapeMedia = usingCollapsedLandscapeMedia,
                     isQsEnabled = viewModel.isQsEnabled,
                     isInSplitShade = false,
@@ -428,8 +429,6 @@ private fun ContentScope.SplitShade(
             key = QuickSettings.SharedValues.TilesSquishiness,
             canOverflow = false,
         )
-    val unfoldTranslationXForStartSide by
-        viewModel.unfoldTranslationX(isOnStartSide = true).collectAsStateWithLifecycle(0f)
 
     val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings)
     val navBarBottomHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -494,6 +493,8 @@ private fun ContentScope.SplitShade(
         )
 
         Column(modifier = Modifier.fillMaxSize()) {
+            val unfoldTranslationXForStartSide = viewModel.unfoldTranslationXForStartSide
+
             CollapsedShadeHeader(
                 viewModel = headerViewModel,
                 isSplitShade = true,

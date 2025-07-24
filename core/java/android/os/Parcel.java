@@ -16,6 +16,8 @@
 
 package android.os;
 
+import static android.security.Flags.failOnParcelSizeMismatch;
+
 import static com.android.internal.util.Preconditions.checkArgument;
 
 import static java.util.Objects.requireNonNull;
@@ -28,7 +30,6 @@ import android.annotation.SuppressLint;
 import android.annotation.TestApi;
 import android.app.AppOpsManager;
 import android.compat.annotation.UnsupportedAppUsage;
-import android.os.Flags;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.ravenwood.annotation.RavenwoodReplace;
 import android.ravenwood.annotation.RavenwoodThrow;
@@ -54,8 +55,6 @@ import dalvik.annotation.optimization.CriticalNative;
 import dalvik.annotation.optimization.FastNative;
 import dalvik.annotation.optimization.NeverInline;
 
-import java.nio.BufferOverflowException;
-import java.nio.ReadOnlyBufferException;
 import libcore.util.SneakyThrow;
 
 import java.io.ByteArrayInputStream;
@@ -66,12 +65,14 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -4715,9 +4716,14 @@ public final class Parcel {
             object = readValue(type, loader, clazz, itemTypes);
             int actual = dataPosition() - start;
             if (actual != length) {
-                Slog.wtfStack(TAG,
-                        "Unparcelling of " + object + " of type " + Parcel.valueTypeToString(type)
-                                + "  consumed " + actual + " bytes, but " + length + " expected.");
+                boolean failOnMismatch = failOnParcelSizeMismatch();
+                String msg = "Unparcelling of " + object + " of type " + Parcel.valueTypeToString(
+                        type) + "  consumed " + actual + " bytes, but " + length + " expected."
+                        + (failOnMismatch ? " [throwing]" : " [ignored]");
+                Slog.wtfStack(TAG, msg);
+                if (failOnMismatch) {
+                    throw new BadParcelableException(msg);
+                }
             }
         } else {
             object = readValue(type, loader, clazz, itemTypes);

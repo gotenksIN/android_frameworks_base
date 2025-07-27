@@ -17,12 +17,14 @@
 package com.android.systemui.screencapture.ui
 
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.Window
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
+import com.android.compose.theme.PlatformTheme
 import com.android.systemui.screencapture.common.ScreenCaptureComponent
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureActivityIntentParameters
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
@@ -54,14 +56,32 @@ constructor(
             componentBuilders[intentParameters.screenCaptureType] ?: defaultBuilder.get()
 
         component =
-            builder.setParameters(intentParameters).setScope(lifecycleScope).build().also {
-                setContent { it.screenCaptureContent.Content() }
-            }
+            builder
+                .setParameters(intentParameters)
+                .setScope(lifecycleScope)
+                .setScreenCaptureActivity(this)
+                .build()
+                .also { setContent { PlatformTheme { it.screenCaptureContent.Content() } } }
     }
 
     override fun onDestroy() {
         component = null
         super.onDestroy()
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        val noModifierKeys =
+            !event.isShiftPressed &&
+                !event.isCtrlPressed &&
+                !event.isAltPressed &&
+                !event.isMetaPressed
+        return when {
+            (keyCode == KeyEvent.KEYCODE_ESCAPE && noModifierKeys) -> {
+                finish()
+                true
+            }
+            else -> super.onKeyUp(keyCode, event)
+        }
     }
 }
 

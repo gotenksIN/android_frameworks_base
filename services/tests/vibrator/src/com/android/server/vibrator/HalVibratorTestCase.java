@@ -329,7 +329,32 @@ public abstract class HalVibratorTestCase {
         assertThat(vibrator.on(1, 1, /* milliseconds= */ 100)).isEqualTo(100L);
         assertThat(vibrator.isVibrating()).isTrue();
         assertThat(vibrator.getCurrentAmplitude()).isEqualTo(-1f);
-        assertThat(mHelper.getEffectSegments(1)).containsExactly(createStep(100)).inOrder();
+        assertThat(mHelper.getEffectSegments()).containsExactly(createStep(100)).inOrder();
+    }
+
+    @Test
+    public void on_withDurationAndCallbackSupported_triggersCallbackFromHal() {
+        long durationMs = 10;
+        mHelper.setCapabilities(IVibrator.CAP_ON_CALLBACK);
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+
+        assertThat(vibrator.on(10, 100, durationMs)).isEqualTo(durationMs);
+        mTestLooper.moveTimeForward(durationMs);
+        mTestLooper.dispatchAll();
+
+        verify(mCallbacksMock).onVibrationStepComplete(eq(VIBRATOR_ID), eq(10L), eq(100L));
+    }
+
+    @Test
+    public void on_withDurationAndCallbackNotSupported_triggersCallbackFromHandler() {
+        long durationMs = 10;
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+
+        assertThat(vibrator.on(1, 2, durationMs)).isEqualTo(durationMs);
+        mTestLooper.moveTimeForward(durationMs);
+        mTestLooper.dispatchAll();
+
+        verify(mCallbacksMock).onVibrationStepComplete(eq(VIBRATOR_ID), eq(1L), eq(2L));
     }
 
     @Test
@@ -341,7 +366,42 @@ public abstract class HalVibratorTestCase {
         assertThat(vibrator.on(1, 1, prebaked)).isEqualTo(HalVibratorHelper.EFFECT_DURATION);
         assertThat(vibrator.isVibrating()).isTrue();
         assertThat(vibrator.getCurrentAmplitude()).isEqualTo(-1f);
-        assertThat(mHelper.getEffectSegments(1)).containsExactly(prebaked).inOrder();
+        assertThat(mHelper.getEffectSegments()).containsExactly(prebaked).inOrder();
+    }
+
+    @Test
+    public void on_withPrebakedAndCallbackSupported_triggersCallbackFromHal() {
+        mHelper.setCapabilities(IVibrator.CAP_PERFORM_CALLBACK);
+        mHelper.setSupportedEffects(EFFECT_CLICK);
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PrebakedSegment prebaked = createPrebaked(EFFECT_CLICK, EFFECT_STRENGTH_MEDIUM);
+
+        assertThat(vibrator.on(123, 456, prebaked)).isEqualTo(HalVibratorHelper.EFFECT_DURATION);
+        mTestLooper.moveTimeForward(HalVibratorHelper.EFFECT_DURATION);
+        mTestLooper.dispatchAll();
+
+        verify(mCallbacksMock).onVibrationStepComplete(eq(VIBRATOR_ID), eq(123L), eq(456L));
+    }
+
+    @Test
+    public void on_withPrebakedAndCallbackNotSupported_triggersCallbackFromHandler() {
+        mHelper.setSupportedEffects(EFFECT_CLICK);
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PrebakedSegment prebaked = createPrebaked(EFFECT_CLICK, EFFECT_STRENGTH_MEDIUM);
+
+        assertThat(vibrator.on(3, 4, prebaked)).isEqualTo(HalVibratorHelper.EFFECT_DURATION);
+        mTestLooper.moveTimeForward(HalVibratorHelper.EFFECT_DURATION);
+        mTestLooper.dispatchAll();
+
+        verify(mCallbacksMock).onVibrationStepComplete(eq(VIBRATOR_ID), eq(3L), eq(4L));
+    }
+
+    @Test
+    public void on_withPrebakedNotSupported_fail() {
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PrebakedSegment prebaked = createPrebaked(EFFECT_CLICK, EFFECT_STRENGTH_MEDIUM);
+
+        assertThat(vibrator.on(1, 1, prebaked)).isEqualTo(0L);
     }
 
     @Test
@@ -358,7 +418,48 @@ public abstract class HalVibratorTestCase {
         assertThat(vibrator.on(1, 1, primitives)).isEqualTo(expectedDuration);
         assertThat(vibrator.isVibrating()).isTrue();
         assertThat(vibrator.getCurrentAmplitude()).isEqualTo(-1f);
-        assertThat(mHelper.getEffectSegments(1)).containsExactlyElementsIn(primitives).inOrder();
+        assertThat(mHelper.getEffectSegments()).containsExactlyElementsIn(primitives).inOrder();
+    }
+
+    @Test
+    public void on_withComposedAndCallbackSupported_triggersCallbackFromHal() {
+        mHelper.setCapabilities(IVibrator.CAP_COMPOSE_EFFECTS);
+        mHelper.setSupportedPrimitives(PRIMITIVE_CLICK, PRIMITIVE_TICK);
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PrimitiveSegment[] primitives = new PrimitiveSegment[]{
+                new PrimitiveSegment(PRIMITIVE_CLICK, 0.5f, 10),
+                new PrimitiveSegment(PRIMITIVE_TICK, 0.7f, 100),
+        };
+
+        long expectedDuration = 2 * HalVibratorHelper.EFFECT_DURATION + 10 + 100;
+        assertThat(vibrator.on(5, 6, primitives)).isEqualTo(expectedDuration);
+        mTestLooper.moveTimeForward(expectedDuration);
+        mTestLooper.dispatchAll();
+
+        verify(mCallbacksMock).onVibrationStepComplete(eq(VIBRATOR_ID), eq(5L), eq(6L));
+    }
+
+    @Test
+    public void on_withComposedUnsupported_fail() {
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PrimitiveSegment[] primitives = new PrimitiveSegment[]{
+                new PrimitiveSegment(PRIMITIVE_TICK, 0.5f, 10),
+        };
+
+        assertThat(vibrator.on(1, 1, primitives)).isEqualTo(0L);
+        assertThat(vibrator.getCurrentAmplitude()).isEqualTo(0f);
+    }
+
+    @Test
+    public void on_withComposedUnsupportedPrimitive_fail() {
+        mHelper.setCapabilities(IVibrator.CAP_COMPOSE_EFFECTS);
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PrimitiveSegment[] primitives = new PrimitiveSegment[]{
+                new PrimitiveSegment(PRIMITIVE_TICK, 0.5f, 10),
+        };
+
+        assertThat(vibrator.on(1, 1, primitives)).isEqualTo(0L);
+        assertThat(vibrator.getCurrentAmplitude()).isEqualTo(0f);
     }
 
     @Test
@@ -374,7 +475,35 @@ public abstract class HalVibratorTestCase {
         assertThat(vibrator.on(1, 1, ramps)).isEqualTo(10L);
         assertThat(vibrator.isVibrating()).isTrue();
         assertThat(vibrator.getCurrentAmplitude()).isEqualTo(-1f);
-        assertThat(mHelper.getEffectSegments(1)).containsExactlyElementsIn(ramps).inOrder();
+        assertThat(mHelper.getEffectSegments()).containsExactlyElementsIn(ramps).inOrder();
+    }
+
+    @Test
+    public void on_withComposedPwleAndCallbackSupported_triggersCallbackFromHal() {
+        mHelper.setCapabilities(IVibrator.CAP_GET_RESONANT_FREQUENCY,
+                IVibrator.CAP_FREQUENCY_CONTROL, IVibrator.CAP_COMPOSE_PWLE_EFFECTS);
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        RampSegment[] ramps = new RampSegment[]{
+                new RampSegment(/* startAmplitude= */ 0, /* endAmplitude= */ 1,
+                        /* startFrequencyHz= */ 100, /* endFrequencyHz= */ 200, /* duration= */ 10)
+        };
+
+        assertThat(vibrator.on(7, 8, ramps)).isEqualTo(10L);
+        mTestLooper.moveTimeForward(10);
+        mTestLooper.dispatchAll();
+
+        verify(mCallbacksMock).onVibrationStepComplete(eq(VIBRATOR_ID), eq(7L), eq(8L));
+    }
+
+    @Test
+    public void on_withComposedPwleNotSupported_fail() {
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        RampSegment[] ramps = new RampSegment[]{
+                new RampSegment(/* startAmplitude= */ 0, /* endAmplitude= */ 1,
+                        /* startFrequencyHz= */ 100, /* endFrequencyHz= */ 200, /* duration= */ 10)
+        };
+
+        assertThat(vibrator.on(1, 1, ramps)).isEqualTo(0L);
     }
 
     @Test
@@ -390,7 +519,35 @@ public abstract class HalVibratorTestCase {
         assertThat(vibrator.on(1, 1, points)).isEqualTo(30L);
         assertThat(vibrator.isVibrating()).isTrue();
         assertThat(vibrator.getCurrentAmplitude()).isEqualTo(-1f);
-        assertThat(mHelper.getEffectPwlePoints(1)).containsExactlyElementsIn(points).inOrder();
+        assertThat(mHelper.getEffectPwlePoints()).containsExactlyElementsIn(points).inOrder();
+    }
+
+    @Test
+    public void on_withComposedPwleV2AndCallbackSupported_triggersCallbackFromHal() {
+        mHelper.setCapabilities(IVibrator.CAP_GET_RESONANT_FREQUENCY,
+                IVibrator.CAP_FREQUENCY_CONTROL, IVibrator.CAP_COMPOSE_PWLE_EFFECTS_V2);
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PwlePoint[] points = new PwlePoint[]{
+                new PwlePoint(/*amplitude=*/ 0, /*frequencyHz=*/ 100, /*timeMillis=*/ 0),
+                new PwlePoint(/*amplitude=*/ 1, /*frequencyHz=*/ 200, /*timeMillis=*/ 30)
+        };
+
+        assertThat(vibrator.on(1, 1, points)).isEqualTo(30L);
+        mTestLooper.moveTimeForward(30);
+        mTestLooper.dispatchAll();
+
+        verify(mCallbacksMock).onVibrationStepComplete(eq(VIBRATOR_ID), eq(1L), eq(1L));
+    }
+
+    @Test
+    public void on_withComposedPwleV2NotSupported_performsEffect() {
+        HalVibrator vibrator = newInitializedVibrator(VIBRATOR_ID);
+        PwlePoint[] points = new PwlePoint[]{
+                new PwlePoint(/*amplitude=*/ 0, /*frequencyHz=*/ 100, /*timeMillis=*/ 0),
+                new PwlePoint(/*amplitude=*/ 1, /*frequencyHz=*/ 200, /*timeMillis=*/ 30)
+        };
+
+        assertThat(vibrator.on(1, 1, points)).isEqualTo(0L);
     }
 
     @Test
@@ -441,7 +598,7 @@ public abstract class HalVibratorTestCase {
         verifyNoMoreInteractions(mVibratorStateListenerMock);
     }
 
-    private PrebakedSegment createPrebaked(int effectId, int effectStrength) {
+    PrebakedSegment createPrebaked(int effectId, int effectStrength) {
         return new PrebakedSegment(effectId, /* shouldFallback= */ false, effectStrength);
     }
 

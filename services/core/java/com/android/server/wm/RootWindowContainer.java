@@ -2068,7 +2068,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         final TransitionController transitionController = task.mTransitionController;
 
         transitionController.deferTransitionReady();
-        Transition.ReadyCondition pipChangesApplied = new Transition.ReadyCondition("movedToPip");
+        final Transition.ReadyCondition pipChangesApplied =
+                new Transition.ReadyCondition("movedToPip", true /* newTrackerOnly */);
         transitionController.waitFor(pipChangesApplied);
         mService.deferWindowLayout();
         boolean localVisibilityDeferred = false;
@@ -4103,10 +4104,5 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 }
             }
         }
-    }
-
-    boolean isTaskMoveAllowedOnDisplay(int displayId) {
-        DisplayContent dc = getDisplayContent(displayId);
-        return dc == null ? false : dc.isTaskMoveAllowedOnDisplay();
     }
 }

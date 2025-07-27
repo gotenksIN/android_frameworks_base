@@ -28,6 +28,7 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.lifecycle.activateIn
+import com.android.systemui.screencapture.ui.mockScreenCaptureActivity
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.assertFailsWith
@@ -96,7 +97,23 @@ class PreCaptureViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_DESKTOP_SCREEN_CAPTURE_APP_WINDOW)
+    fun updateCaptureType_usesCorrectIconWhenSelected() =
+        testScope.runTest {
+            val (screenRecordButton, screenshotButton) = viewModel.captureTypeButtonViewModels
+            assertThat(screenRecordButton.icon).isEqualTo(viewModel.icons?.screenRecord)
+            // Screenshot is selected by default.
+            assertThat(screenshotButton.icon).isEqualTo(viewModel.icons?.screenshotToolbar)
+
+            viewModel.updateCaptureType(ScreenCaptureType.SCREEN_RECORD)
+
+            val (screenRecordButton2, screenshotButton2) = viewModel.captureTypeButtonViewModels
+            assertThat(screenRecordButton2.icon).isEqualTo(viewModel.icons?.screenRecord)
+            assertThat(screenshotButton2.icon)
+                .isEqualTo(viewModel.icons?.screenshotToolbarUnselected)
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW)
     fun updateCaptureRegion_updatesSelectedCaptureRegionButtonViewModel() =
         testScope.runTest {
             // Default region is fullscreen
@@ -160,7 +177,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(Flags.FLAG_DESKTOP_SCREEN_CAPTURE_APP_WINDOW)
+    @DisableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW)
     fun captureRegionButtonViewModels_excludesAppWindowWithFeatureDisabled() =
         testScope.runTest {
             // TODO(b/430364500) Once a11y label is available, use it for a more robust assertion.
@@ -169,11 +186,19 @@ class PreCaptureViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_DESKTOP_SCREEN_CAPTURE_APP_WINDOW)
+    @EnableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW)
     fun captureRegionButtonViewModels_includesAppWindowWithFeatureEnabled() =
         testScope.runTest {
             // TODO(b/430364500) Once a11y label is available, use it for a more robust assertion.
             viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
             assertThat(viewModel.captureRegionButtonViewModels.count { it.isSelected }).isEqualTo(1)
+        }
+
+    @Test
+    fun closeUI_finishesActivity() =
+        testScope.runTest {
+            viewModel.closeUI()
+
+            verify(kosmos.mockScreenCaptureActivity, times(1)).finish()
         }
 }

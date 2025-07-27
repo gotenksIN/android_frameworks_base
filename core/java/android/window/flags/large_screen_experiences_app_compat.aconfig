@@ -73,6 +73,13 @@ flag {
 }
 
 flag {
+    name: "camera_compat_unify_camera_policies"
+    namespace: "large_screen_experiences_app_compat"
+    description: "Whether to use simulate-requested-orientation camera compat treatment instead of a force-rotate one."
+    bug: "432218134"
+}
+
+flag {
   name: "scrolling_from_letterbox"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether to enable app scrolling from gestures from letterbox area"
@@ -107,6 +114,26 @@ flag {
   namespace: "large_screen_experiences_app_compat"
   description: "Whether the rounded corners refactoring for letterboxing in shell is enabled./n"
   bug: "375124280"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "app_compat_refactoring_fix_multiwindow_task_hierarchy"
+  namespace: "large_screen_experiences_app_compat"
+  description: "Whether Task id detection for split screen should be enabled."
+  bug: "432244895"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "app_compat_refactoring_force_change_for_letterbox_transitions"
+  namespace: "large_screen_experiences_app_compat"
+  description: "Whether a Change should always sent for Letterbox transition."
+  bug: "432347028"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

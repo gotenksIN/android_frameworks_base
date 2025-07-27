@@ -95,6 +95,16 @@ flag {
 }
 
 flag {
+    name: "enable_app_to_web_education_animation"
+    namespace: "lse_desktop_experience"
+    description: "Show the App-to-web education animation."
+    bug: "359226240"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_block_non_desktop_display_window_drag_bugfix"
     namespace: "lse_desktop_experience"
     description: "Block window drag to a non-desktop-mode display."
@@ -229,6 +239,13 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables PiP features in connected displays."
     bug: "362721131"
+}
+
+flag {
+    name: "enable_connected_displays_wallpaper_presentations"
+    namespace: "lse_desktop_experience"
+    description: "Enables wallpaper presentations shown in connected displays."
+    bug: "429395688"
 }
 
 flag {
@@ -370,6 +387,16 @@ flag {
 }
 
 flag {
+    name: "enable_desktop_first_policy_in_lpm"
+    namespace: "lse_desktop_experience"
+    description: "Enables desktop-first policy in DesktopModeLaunchParamsModifier."
+    bug: "427828063"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_desktop_ime_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enables bugfix to handle IME interactions in desktop windowing."
@@ -394,6 +421,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables running visual indicator view operations in ShellDesktopThread."
     bug: "366413536"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_invisible_task_removal_cleanup_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables bugfix to properly clean up task data when an invisible task gets removed in desktop windowing."
+    bug: "427869488"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -797,13 +834,6 @@ flag {
 }
 
 flag {
-    name: "enable_exclusive_floating_window"
-    namespace: "lse_desktop_experience"
-    description: "Enables the exclusive floating-on-top freeform window API."
-    bug: "399376001"
-}
-
-flag {
     name: "enable_freeform_box_shadows"
     namespace: "lse_desktop_experience"
     description: "Enables box shadows for freeform windows."
@@ -893,6 +923,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_interactive_picture_in_picture"
+    namespace: "web_apps_on_chromeos_and_android"
+    description: "Enables the Interactive Picture-in-Picture window API."
+    bug: "399376001"
 }
 
 flag {
@@ -1107,6 +1144,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Refactors Activity#requestFullscreenMode internal implementation."
     bug: "296268915"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_request_fullscreen_restore_freeform_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fixes freeform to fullscreen restoration using the Activity#requestFullscreenMode API."
+    bug: "414334135"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

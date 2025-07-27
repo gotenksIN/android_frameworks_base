@@ -1040,7 +1040,8 @@ public class NotificationChildrenContainer extends ViewGroup
         if (isBundle()) {
             return NUMBER_OF_CHILDREN_BUNDLE_COLLAPSED;
         } else {
-            if (getContainingNotification().getEntryAdapter().isBundled()) {
+            if (NotificationBundleUi.isEnabled()
+                    && getContainingNotification().getEntryAdapter().isBundled()) {
                 return NUMBER_OF_CHILDREN_WHEN_COLLAPSED_BUNDLED;
             }
             return NUMBER_OF_CHILDREN_WHEN_COLLAPSED;

@@ -279,7 +279,6 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.server.SystemTimeZone.TIME_ZONE_CONFIDENCE_HIGH;
 import static com.android.server.am.ActivityManagerService.STOCK_PM_FLAGS;
 import static com.android.server.devicepolicy.DevicePolicyEngine.DEFAULT_POLICY_SIZE_LIMIT;
-import static com.android.server.devicepolicy.DevicePolicyEngine.SYSTEM_SUPERVISION_ROLE;
 import static com.android.server.devicepolicy.DevicePolicyStatsLog.DEVICE_POLICY_MANAGEMENT_MODE;
 import static com.android.server.devicepolicy.DevicePolicyStatsLog.DEVICE_POLICY_MANAGEMENT_MODE__MANAGEMENT_MODE__COPE;
 import static com.android.server.devicepolicy.DevicePolicyStatsLog.DEVICE_POLICY_MANAGEMENT_MODE__MANAGEMENT_MODE__DEVICE_OWNER;
@@ -338,6 +337,7 @@ import android.app.admin.DeviceAdminReceiver;
 import android.app.admin.DevicePolicyCache;
 import android.app.admin.DevicePolicyDrawableResource;
 import android.app.admin.DevicePolicyEventLogger;
+import android.app.admin.DevicePolicyIdentifiers;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManager.AppFunctionsPolicy;
 import android.app.admin.DevicePolicyManager.DeviceOwnerType;
@@ -934,6 +934,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     private static final int RETRY_COPY_ACCOUNT_ATTEMPTS = 3;
 
     private static final int BOOT_TO_HSU_FOR_PROVISIONED_DEVICE = 1;
+
 
     /**
      * For apps targeting U+
@@ -16671,8 +16672,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             return admins.iterator().next().getParcelableAdmin();
         }
         Optional<EnforcingAdmin> supervision = admins.stream()
-                .filter(a -> a.hasAuthority(
-                        EnforcingAdmin.getRoleAuthorityOf(SYSTEM_SUPERVISION_ROLE)))
+                .filter(EnforcingAdmin::isSupervisionAdmin)
                 .findFirst();
         if (supervision.isPresent()) {
             return supervision.get().getParcelableAdmin();
@@ -16839,6 +16839,115 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             intent.putExtra(DevicePolicyManager.EXTRA_RESTRICTION, restriction);
         }
         return intent;
+    }
+
+    @Override
+    public List<android.app.admin.EnforcingAdmin> getEnforcingAdminsForPolicy(
+            String policyIdentifier, int userId) {
+        Preconditions.checkCallAuthorization(canQueryAdminPolicy(getCallerIdentity()));
+
+        return Binder.withCleanCallingIdentity(() -> {
+            if (PolicyDefinition.LEGACY_POLICIES.contains(policyIdentifier)) {
+                android.app.admin.EnforcingAdmin legacyAdmin =
+                        getEnforcingAdminForLegacyPolicies(policyIdentifier, userId);
+                if (legacyAdmin == null) {
+                    return Collections.emptyList();
+                }
+                return Collections.singletonList(legacyAdmin);
+            }
+
+            PolicyDefinition<?> policyDefinition =
+                    PolicyDefinition.getPolicyDefinitionForIdentifier(policyIdentifier);
+            if (policyDefinition == null) {
+                throw new IllegalArgumentException(
+                        "Unknown policy identifier: " + policyIdentifier);
+            }
+            // Generic policy definitions are never set directly. They're set through
+            // parameterized policy keys, thus the callers need to query them using the
+            // corresponding  {@code PolicyKey}.
+            if (policyDefinition.isGenericDefinition()) {
+                throw new IllegalArgumentException(
+                        "Generic policies are not supported. Call DPM"
+                                + ".getEnforcingAdminsForPolicyKey "
+                                + "instead.");
+            }
+
+            Set<EnforcingAdmin> admins =
+                    mDevicePolicyEngine.getEnforcingAdminsForResolvedPolicy(policyDefinition,
+                            userId);
+
+            // The user restrictions that are set by the admins are already included in the
+            // EnforcingAdmin set that DevicePolicyEngine returns in the previous line.
+            if (policyDefinition.isUserRestrictionPolicy()
+                    && isUserRestrictionPolicyEnforcedBySystem(policyDefinition, userId)) {
+                admins.add(
+                        EnforcingAdmin.createSystemEnforcingAdmin(PLATFORM_PACKAGE_NAME));
+            }
+
+            // Convert the internal EnforcingAdmin instances to external parcelable EnforcingAdmin
+            // list.
+            return admins.stream().map(EnforcingAdmin::getParcelableAdmin).toList();
+        });
+    }
+
+    /**
+     * Checks for legacy policies that are stored in {@link ActiveAdmin} and returns the enforcing
+     * admin encapsulated in {@link android.app.admin.EnforcingAdmin}.
+     * If the policy is not enforced, returns {@code null}.
+     */
+    @Nullable
+    private android.app.admin.EnforcingAdmin getEnforcingAdminForLegacyPolicies(String identifier,
+            int userId) {
+        ActiveAdmin admin = null;
+        switch (identifier) {
+            case DevicePolicyIdentifiers.MANAGED_PROFILE_CALLER_ID_ACCESS_POLICY:
+                if (getCrossProfileCallerIdDisabledForUser(userId)) {
+                    synchronized (getLockObject()) {
+                        // If the policy is set, only PO can set it.
+                        admin = getProfileOwnerAdminLocked(userId);
+                    }
+                }
+                break;
+            case DevicePolicyIdentifiers.MANAGED_PROFILE_CONTACTS_ACCESS_POLICY:
+                if (getCrossProfileContactsSearchDisabledForUser(userId)) {
+                    synchronized (getLockObject()) {
+                        // If the policy is set, only PO can set it.
+                        admin = getProfileOwnerAdminLocked(userId);
+                    }
+                }
+                break;
+            case DevicePolicyIdentifiers.MAX_TIME_TO_LOCK_POLICY:
+                // Return the strictest policy across all participating admins.
+                final List<ActiveAdmin> admins = getActiveAdminsForLockscreenPoliciesLocked(userId);
+                long time = Long.MAX_VALUE;
+                for (final ActiveAdmin activeAdmin : admins) {
+                    if (activeAdmin.maximumTimeToUnlock > 0
+                            && activeAdmin.maximumTimeToUnlock < time) {
+                        time = activeAdmin.maximumTimeToUnlock;
+                        admin = activeAdmin;
+                    }
+                }
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Legacy policy " + identifier + " is not handled.");
+        }
+        if (admin != null) {
+            return EnforcingAdmin.createEnterpriseEnforcingAdmin(admin.info.getComponent(),
+                    admin.getUserHandle().getIdentifier()).getParcelableAdmin();
+        }
+        return null;
+    }
+
+
+    private boolean isUserRestrictionPolicyEnforcedBySystem(
+            PolicyDefinition<?> policyDefinition, int userId) {
+        // User restriction can be enforced by the system aside from admins, until they're
+        // migrated to DevicePolicyEngine, DPMS should read them from UserManager.
+        UserRestrictionPolicyKey policyKey =
+                (UserRestrictionPolicyKey) policyDefinition.getPolicyKey();
+        return mUserManager.hasBaseUserRestriction(policyKey.getRestriction(),
+                UserHandle.of(userId));
     }
 
     /**

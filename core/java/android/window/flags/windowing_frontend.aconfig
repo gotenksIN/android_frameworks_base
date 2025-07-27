@@ -19,10 +19,10 @@ flag {
 }
 
 flag {
-  name: "release_surface_on_transition_finish"
+  name: "release_all_transition_surfaces"
   namespace: "windowing_frontend"
   description: "Reduce offscreen layers which rely on GC to release"
-  bug: "407719374"
+  bug: "429548260"
   is_fixed_read_only: true
   metadata {
     purpose: PURPOSE_BUGFIX
@@ -243,6 +243,16 @@ flag {
   description: "Prevent sync timeout from setShowWhenLocked(false) by setting the DisplayContent ready"
   bug: "411544184"
   is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "keyguard_remove_default_display_usage"
+  namespace: "windowing_frontend"
+  description: "Execute transitions on affected DisplayContent(s) instead of Default DisplayContent"
+  bug: "430227391"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

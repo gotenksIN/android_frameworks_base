@@ -23,6 +23,7 @@ import android.annotation.Nullable;
 import android.content.pm.DataLoaderType;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
+import android.content.pm.verify.developer.DeveloperVerificationSession;
 import android.content.pm.verify.developer.DeveloperVerificationStatus;
 import android.os.Handler;
 
@@ -84,7 +85,8 @@ final class SessionMetrics {
     private long mDeveloperVerificationRetryDurationMillis;
 
     private int mDeveloperVerifierUid = INVALID_UID;
-    private boolean mIsDeveloperVerificationBypassedByAdb = false;
+    private int mIsDeveloperVerificationBypassedReason =
+            DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_UNSPECIFIED;
     private boolean mIsDeveloperVerificationTimeoutExtensionRequested = false;
     private final boolean mHasDeveloperVerificationExtensionParams;
     private boolean mIsDeveloperVerificationPolicyOverridden = false;
@@ -197,13 +199,13 @@ final class SessionMetrics {
         reportStats();
     }
 
-    public void onDeveloperVerificationBindStarted() {
+    public void onDeveloperVerificationBindStarted(int verifierUid) {
         mDeveloperVerifierBindStartedMillis = System.currentTimeMillis();
+        mDeveloperVerifierUid = verifierUid;
     }
 
-    public void onDeveloperVerifierConnectionEstablished(int verifierUid) {
+    public void onDeveloperVerifierConnectionEstablished() {
         mDeveloperVerifierConnectedMillis = System.currentTimeMillis();
-        mDeveloperVerifierUid = verifierUid;
     }
 
     public void onDeveloperVerificationRequestSent() {
@@ -215,8 +217,8 @@ final class SessionMetrics {
         mDeveloperVerificationRetryCount = retryCount;
     }
 
-    public void onDeveloperVerificationBypassedByAdb() {
-        mIsDeveloperVerificationBypassedByAdb = true;
+    public void onDeveloperVerificationBypassed(int bypassReason) {
+        mIsDeveloperVerificationBypassedReason = bypassReason;
     }
 
     public void onDeveloperVerificationTimeoutExtensionRequested() {
@@ -234,7 +236,7 @@ final class SessionMetrics {
         final long responseReceivedMillis = System.currentTimeMillis();
         if (mDeveloperVerifierRequestSentMillis != 0
                 && mDeveloperVerifierRetryRequestSentMillis == 0) {
-            mDeveloperVerifierRequestSentMillis =
+            mDeveloperVerificationDurationMillis =
                     responseReceivedMillis - mDeveloperVerifierRequestSentMillis;
         } else if (mDeveloperVerifierRetryRequestSentMillis != 0) {
             // Calculate the last retry duration
@@ -278,9 +280,11 @@ final class SessionMetrics {
                 mInternalInstallationFinished - mInternalInstallationStarted;
         final long sessionLifetimeMillis = mFinishedMillis - mCreatedMillis;
         final long developerVerifierConnectionDurationMillis =
-                mDeveloperVerifierConnectedMillis - mDeveloperVerifierBindStartedMillis;
+                mDeveloperVerifierConnectedMillis == 0
+                        ? 0 // Binding was already established before ths installation
+                        : mDeveloperVerifierConnectedMillis - mDeveloperVerifierBindStartedMillis;
         final long developerVerificationPrepDurationMillis =
-                mDeveloperVerifierRequestSentMillis - mDeveloperVerifierBindStartedMillis;
+                        mDeveloperVerifierRequestSentMillis - mDeveloperVerifierBindStartedMillis;
         // Do this on a handler so that we don't block anything critical
         mHandler.post(() ->
                 FrameworkStatsLog.write(
@@ -308,7 +312,7 @@ final class SessionMetrics {
                         mIsPreapproval,
                         mIsUnarchive,
                         mIsAutoInstallDependenciesEnabled,
-                        mApksSizeBytes, // TODO: compute apks size bytes
+                        mApksSizeBytes, // TODO(b/418283971): compute apks size bytes
                         getTranslatedStatusCodeForStats(installStatusToPublicStatus(mStatusCode)),
                         mWasUserActionIntentSent,
                         mIsExpired,
@@ -320,7 +324,7 @@ final class SessionMetrics {
                         sessionLifetimeMillis,
                         getTranslatedPolicyCodeForStats(mDefaultDeveloperVerificationPolicy),
                         mDeveloperVerifierUid,
-                        getTranslatedBypassedReasonForStats(mIsDeveloperVerificationBypassedByAdb),
+                        mIsDeveloperVerificationBypassedReason,
                         mIsDeveloperVerificationTimeoutExtensionRequested,
                         mHasDeveloperVerificationExtensionParams,
                         mIsDeveloperVerificationPolicyOverridden,
@@ -415,14 +419,6 @@ final class SessionMetrics {
             default ->
                     FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__STATUS_CODE__STATUS_UNSPECIFIED;
         };
-    }
-
-    private static int getTranslatedBypassedReasonForStats(boolean isBypassedByAdb) {
-        if (isBypassedByAdb) {
-            return FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_BYPASSED_REASON__BYPASSED_REASON_ADB;
-        } else {
-            return FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_BYPASSED_REASON__BYPASSED_REASON_UNSPECIFIED;
-        }
     }
 
     private static int getTranslatedPolicyCodeForStats(

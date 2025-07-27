@@ -289,6 +289,7 @@ public abstract class InfoMediaManager {
     }
 
     public void startScan() {
+        Log.i(TAG, "startScan()");
         startScanOnRouter();
     }
 
@@ -302,6 +303,7 @@ public abstract class InfoMediaManager {
     }
 
     public final void stopScan() {
+        Log.i(TAG, "stopScan()");
         stopScanOnRouter();
     }
 
@@ -436,18 +438,26 @@ public abstract class InfoMediaManager {
     }
 
     private void dispatchDeviceListAdded(@NonNull List<MediaDevice> devices) {
+        Log.i(TAG, "dispatchDeviceListAdded()");
+        if (DEBUG) {
+            for (MediaDevice device : devices) {
+                Log.d(TAG, device.toString());
+            }
+        }
         for (MediaDeviceCallback callback : getCallbacks()) {
             callback.onDeviceListAdded(new ArrayList<>(devices));
         }
     }
 
     private void dispatchConnectedDeviceChanged(String id) {
+        Log.i(TAG, "dispatchConnectedDeviceChanged(), id = " + id);
         for (MediaDeviceCallback callback : getCallbacks()) {
             callback.onConnectedDeviceChanged(id);
         }
     }
 
     protected void dispatchOnRequestFailed(int reason) {
+        Log.i(TAG, "dispatchOnRequestFailed(), reason = " + reason);
         for (MediaDeviceCallback callback : getCallbacks()) {
             callback.onRequestFailed(reason);
         }
@@ -466,6 +476,7 @@ public abstract class InfoMediaManager {
     }
 
     /* package */ void connectToDevice(MediaDevice device) {
+        Log.i(TAG, "connectToDevice(), device = " + device.getName() + "/" + device.getId());
         if (device.mRouteInfo == null) {
             Log.w(TAG, "Unable to connect. RouteInfo is empty");
             return;
@@ -482,6 +493,7 @@ public abstract class InfoMediaManager {
      * @return If add device successful return {@code true}, otherwise return {@code false}
      */
     boolean addDeviceToPlayMedia(MediaDevice device) {
+        Log.i(TAG, "addDeviceToPlayMedia(), device = " + device.getName() + "/" + device.getId());
         final RoutingSessionInfo info = getActiveRoutingSession();
         if (!info.getSelectableRoutes().contains(device.mRouteInfo.getId())) {
             Log.w(TAG, "addDeviceToPlayMedia() Ignoring selecting a non-selectable device : "
@@ -562,6 +574,8 @@ public abstract class InfoMediaManager {
      * @return If device stop successful return {@code true}, otherwise return {@code false}
      */
     boolean removeDeviceFromPlayMedia(MediaDevice device) {
+        Log.i(TAG,
+                "removeDeviceFromPlayMedia(), device = " + device.getName() + "/" + device.getId());
         final RoutingSessionInfo info = getActiveRoutingSession();
         if (!info.getSelectedRoutes().contains(device.mRouteInfo.getId())) {
             Log.w(TAG, "removeDeviceFromMedia() Ignoring deselecting a non-deselectable device : "
@@ -591,52 +605,9 @@ public abstract class InfoMediaManager {
         return true;
     }
 
-
-    /**
-     * Returns the list of {@link MediaDevice media devices} that can be added to the current {@link
-     * RoutingSessionInfo routing session}.
-     */
-    @NonNull
-    List<MediaDevice> getSelectableMediaDevices() {
-        synchronized (mLock) {
-            return mMediaDevices.stream().filter(MediaDevice::isSelectable).toList();
-        }
-    }
-
-    /**
-     * Returns the list of {@link MediaDevice media devices} that can be transferred to with the
-     * current {@link RoutingSessionInfo routing session} by the media route provider.
-     */
-    @NonNull
-    List<MediaDevice> getTransferableMediaDevices() {
-        synchronized (mLock) {
-            return mMediaDevices.stream().filter(MediaDevice::isTransferable).toList();
-        }
-    }
-
-    /**
-     * Returns the list of {@link MediaDevice media devices} that can be deselected from the current
-     * {@link RoutingSessionInfo routing session}.
-     */
-    @NonNull
-    List<MediaDevice> getDeselectableMediaDevices() {
-        synchronized (mLock) {
-            return mMediaDevices.stream().filter(MediaDevice::isDeselectable).toList();
-        }
-    }
-
-    /**
-     * Returns the list of {@link MediaDevice media devices} that are selected in the current {@link
-     * RoutingSessionInfo routing session}.
-     */
-    @NonNull
-    List<MediaDevice> getSelectedMediaDevices() {
-        synchronized (mLock) {
-            return mMediaDevices.stream().filter(MediaDevice::isSelected).toList();
-        }
-    }
-
     /* package */ void adjustDeviceVolume(MediaDevice device, int volume) {
+        Log.i(TAG, "adjustDeviceVolume(), device = " + device.getName() + "/" + device.getId()
+                + " volume = " + volume);
         if (device.mRouteInfo == null) {
             Log.w(TAG, "Unable to set volume. RouteInfo is empty");
             return;
@@ -765,8 +736,9 @@ public abstract class InfoMediaManager {
 
     private boolean isSuggestedDeviceSelected(
             @NonNull SuggestedDeviceState newSuggestedDeviceState) {
-        return getSelectedMediaDevices().stream().anyMatch(device ->
-                Objects.equals(
+        return mMediaDevices.stream().anyMatch(device ->
+                device.isSelected()
+                && Objects.equals(
                         device.getId(),
                         newSuggestedDeviceState
                                 .getSuggestedDeviceInfo()
@@ -798,6 +770,7 @@ public abstract class InfoMediaManager {
     }
 
     private void dispatchOnSuggestedDeviceUpdated() {
+        Log.i(TAG, "dispatchOnSuggestedDeviceUpdated(), state: " + mSuggestedDeviceState);
         for (MediaDeviceCallback callback : getCallbacks()) {
             callback.onSuggestedDeviceUpdated(mSuggestedDeviceState);
         }
@@ -884,10 +857,6 @@ public abstract class InfoMediaManager {
         RoutingSessionInfo activeSession = getActiveRoutingSession();
 
         for (MediaRoute2Info route : getAvailableRoutes(activeSession)) {
-            if (DEBUG) {
-                Log.d(TAG, "buildAvailableRoutes() route : " + route.getName() + ", volume : "
-                        + route.getVolume() + ", type : " + route.getType());
-            }
             addMediaDevice(route, activeSession);
         }
 
@@ -1208,6 +1177,17 @@ public abstract class InfoMediaManager {
         static void onRouteListingPreferenceUpdated(
                 RouteListingPreference routeListingPreference,
                 Map<String, RouteListingPreference.Item> preferenceItemMap) {
+            Log.i(TAG, "onRouteListingPreferenceUpdated(), hasRLP: " + (routeListingPreference
+                    != null));
+            if (DEBUG) {
+                if (routeListingPreference != null) {
+                    Log.d(TAG, "RouteListingPreference. useSystemOrder = "
+                            + routeListingPreference.getUseSystemOrdering());
+                    for (RouteListingPreference.Item rlpItem : routeListingPreference.getItems()) {
+                        Log.d(TAG, rlpItem.toString());
+                    }
+                }
+            }
             preferenceItemMap.clear();
             if (routeListingPreference != null) {
                 routeListingPreference.getItems().forEach((item) ->

@@ -331,6 +331,7 @@ import android.window.ScreenCaptureInternal.ScreenshotHardwareBuffer;
 import android.window.SystemPerformanceHinter;
 import android.window.TaskSnapshot;
 import android.window.TaskSnapshotManager;
+import android.window.TransitionRequestInfo;
 import android.window.TrustedPresentationThresholds;
 import android.window.WindowContainerToken;
 import android.window.WindowContextInfo;
@@ -1118,8 +1119,12 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    private float mWindowAnimationScaleSetting = 1.0f;
-    private float mTransitionAnimationScaleSetting = 1.0f;
+    private static final float DEFAULT_ANIMATION_SCALE = 1.0f;
+
+    @GuardedBy("mGlobalLock")
+    private float mWindowAnimationScaleSetting = DEFAULT_ANIMATION_SCALE;
+    @GuardedBy("mGlobalLock")
+    private float mTransitionAnimationScaleSetting = DEFAULT_ANIMATION_SCALE;
     boolean mPointerLocationEnabled = false;
 
     private final SharedMemoryBackedCurrentAnimatorScale mAnimatorScale =
@@ -1484,7 +1489,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }, UserHandle.ALL, suspendPackagesFilter, null, null);
 
         // Get persisted window scale setting
-        mWindowAnimationScaleSetting = getWindowAnimationScaleSetting();
+        mWindowAnimationScaleSetting = getWindowAnimationScaleSetting(DEFAULT_ANIMATION_SCALE);
         mTransitionAnimationScaleSetting = getTransitionAnimationScaleSetting();
 
         setAnimatorDurationScale(getAnimatorDurationScaleSetting());
@@ -1590,9 +1595,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 Settings.Global.ANIMATOR_DURATION_SCALE, mAnimatorScale.getCurrentScale()));
     }
 
-    private float getWindowAnimationScaleSetting() {
+    private float getWindowAnimationScaleSetting(float defaultValue) {
         return fixScale(Settings.Global.getFloat(mContext.getContentResolver(),
-                Settings.Global.WINDOW_ANIMATION_SCALE, mWindowAnimationScaleSetting));
+                Settings.Global.WINDOW_ANIMATION_SCALE, defaultValue));
     }
 
     /**
@@ -1678,7 +1683,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             if (type >= FIRST_SUB_WINDOW && type <= LAST_SUB_WINDOW) {
-                parentWindow = windowForClientLocked(null, attrs.token, false);
+                parentWindow = windowForClient(null /* session */, attrs.token);
                 if (parentWindow == null) {
                     ProtoLog.w(WM_ERROR, "Attempted to add window with token that is not a window: "
                             + "%s.  Aborting.", attrs.token);
@@ -2240,7 +2245,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     void removeClientToken(Session session, IBinder client) {
         synchronized (mGlobalLock) {
-            WindowState win = windowForClientLocked(session, client, false);
+            final WindowState win = windowForClient(session, client);
             if (win != null) {
                 win.removeIfPossible();
                 return;
@@ -2346,8 +2351,10 @@ public class WindowManagerService extends IWindowManager.Stub
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
-                WindowState w = windowForClientLocked(session, client, false);
-                w.clearClientTouchableRegion();
+                final WindowState w = windowForClient(session, client);
+                if (w != null) {
+                    w.clearClientTouchableRegion();
+                }
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -2360,7 +2367,7 @@ public class WindowManagerService extends IWindowManager.Stub
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
-                WindowState w = windowForClientLocked(session, client, false);
+                final WindowState w = windowForClient(session, client);
                 if (DEBUG_LAYOUT) Slog.d(TAG, "setInsetsWindow " + w
                         + ", contentInsets=" + w.mGivenContentInsets + " -> " + contentInsets
                         + ", visibleInsets=" + w.mGivenVisibleInsets + " -> " + visibleInsets
@@ -2429,7 +2436,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     public void pokeDrawLock(Session session, IBinder token) {
         synchronized (mGlobalLock) {
-            WindowState window = windowForClientLocked(session, token, false);
+            final WindowState window = windowForClient(session, token);
             if (window != null) {
                 window.pokeDrawLockLw(mDrawLockTimeoutMillis);
             }
@@ -2446,7 +2453,7 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     public boolean cancelDraw(Session session, IWindow client, int seqId) {
         synchronized (mGlobalLock) {
-            final WindowState win = windowForClientLocked(session, client, false);
+            final WindowState win = windowForClient(session, client);
             if (win == null) {
                 return false;
             }
@@ -2485,7 +2492,7 @@ public class WindowManagerService extends IWindowManager.Stub
         final int uid = Binder.getCallingUid();
         final long origId = Binder.clearCallingIdentity();
         synchronized (mGlobalLock) {
-            final WindowState win = windowForClientLocked(session, client, false);
+            final WindowState win = windowForClient(session, client);
             if (win == null) {
                 return 0;
             }
@@ -2978,7 +2985,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
         try {
             synchronized (mGlobalLock) {
-                WindowState win = windowForClientLocked(session, client, false);
+                final WindowState win = windowForClient(session, client);
                 if (win == null) {
                     return false;
                 }
@@ -3008,7 +3015,7 @@ public class WindowManagerService extends IWindowManager.Stub
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
-                WindowState win = windowForClientLocked(session, client, false);
+                final WindowState win = windowForClient(session, client);
                 ProtoLog.d(WM_DEBUG_ADD_REMOVE, "finishDrawingWindow: %s mDrawState=%s",
                         win, (win != null ? win.mWinAnimator.drawStateToString() : "null"));
                 if (win != null && win.finishDrawing(postDrawTransaction, seqId)) {
@@ -3144,8 +3151,10 @@ public class WindowManagerService extends IWindowManager.Stub
                 // registration in DisplayContent#onParentChanged at DisplayContent initialization.
                 final DisplayContent dc = mRoot.getDisplayContent(displayId);
                 if (dc == null) {
-                    ProtoLog.w(WM_ERROR, "attachWindowContextToDisplayContent: trying"
-                            + " to attach to a non-existing display:" + displayId);
+                    ProtoLog.w(WM_ERROR,
+                            "attachWindowContextToDisplayContent: "
+                                    + "trying to attach to a non-existing display:%d",
+                            displayId);
                     return null;
                 }
                 mWindowContextListenerController.registerWindowContainerListener(wpc, clientToken,
@@ -3435,7 +3444,6 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     // TODO(multi-display): remove when no default display use case.
-    // (i.e. KeyguardController)
     public void executeAppTransition() {
         if (!checkCallingPermission(MANAGE_APP_TOKENS, "executeAppTransition()")) {
             throw new SecurityException("Requires MANAGE_APP_TOKENS permission");
@@ -3767,8 +3775,16 @@ public class WindowManagerService extends IWindowManager.Stub
 
         scale = fixScale(scale);
         switch (which) {
-            case 0: mWindowAnimationScaleSetting = scale; break;
-            case 1: mTransitionAnimationScaleSetting = scale; break;
+            case 0:
+                synchronized (mGlobalLock) {
+                    mWindowAnimationScaleSetting = scale;
+                }
+                break;
+            case 1:
+                synchronized (mGlobalLock) {
+                    mTransitionAnimationScaleSetting = scale;
+                }
+                break;
             case 2:
                 mAnimatorScale.setCurrentScale(scale);
                 break;
@@ -3787,10 +3803,14 @@ public class WindowManagerService extends IWindowManager.Stub
 
         if (scales != null) {
             if (scales.length >= 1) {
-                mWindowAnimationScaleSetting = fixScale(scales[0]);
+                synchronized (mGlobalLock) {
+                    mWindowAnimationScaleSetting = fixScale(scales[0]);
+                }
             }
             if (scales.length >= 2) {
-                mTransitionAnimationScaleSetting = fixScale(scales[1]);
+                synchronized (mGlobalLock) {
+                    mTransitionAnimationScaleSetting = fixScale(scales[1]);
+                }
             }
             if (scales.length >= 3) {
                 mAnimatorScale.setCurrentScale(fixScale(scales[2]));
@@ -3840,8 +3860,14 @@ public class WindowManagerService extends IWindowManager.Stub
     @Override
     public float getAnimationScale(int which) {
         switch (which) {
-            case 0: return mWindowAnimationScaleSetting;
-            case 1: return mTransitionAnimationScaleSetting;
+            case 0:
+                synchronized (mGlobalLock) {
+                    return mWindowAnimationScaleSetting;
+                }
+            case 1:
+                synchronized (mGlobalLock) {
+                    return mTransitionAnimationScaleSetting;
+                }
             case 2: return mAnimatorScale.getCurrentScale();
         }
         return 0;
@@ -3849,7 +3875,13 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @Override
     public float[] getAnimationScales() {
-        return new float[] { mWindowAnimationScaleSetting, mTransitionAnimationScaleSetting,
+        float windowAnimationScale;
+        float transitionAnimationScale;
+        synchronized (mGlobalLock) {
+            windowAnimationScale = mWindowAnimationScaleSetting;
+            transitionAnimationScale = mTransitionAnimationScaleSetting;
+        }
+        return new float[] { windowAnimationScale, transitionAnimationScale,
                 mAnimatorScale.getCurrentScale() };
     }
 
@@ -3951,48 +3983,71 @@ public class WindowManagerService extends IWindowManager.Stub
     public void setCurrentUser(@UserIdInt int newUserId) {
         synchronized (mGlobalLock) {
             final TransitionController controller = mAtmService.getTransitionController();
-            final ActionChain chain = mAtmService.mChainTracker.startTransit("setUser");
-            if (!chain.isCollecting() && controller.isShellTransitionsEnabled()) {
-                chain.attachTransition(controller.createTransition(TRANSIT_OPEN));
-                controller.requestStartTransition(chain.getTransition(),
-                        null /* trigger */, null /* remote */, null /* disp */);
-            }
-            mCurrentUserId = newUserId;
-            mDisplayWindowSettingsProvider.setOverrideSettingsForUser(newUserId);
-            mPolicy.setCurrentUserLw(newUserId);
-            mKeyguardDisableHandler.setCurrentUser(newUserId);
+            final Runnable applyUserChange = () -> {
+                mCurrentUserId = newUserId;
+                mDisplayWindowSettingsProvider.setOverrideSettingsForUser(newUserId);
+                mPolicy.setCurrentUserLw(newUserId);
+                mKeyguardDisableHandler.setCurrentUser(newUserId);
 
-            // Hide windows that should not be seen by the new user.
-            mRoot.switchUser(newUserId);
-            mWindowPlacerLocked.performSurfacePlacement();
+                // Hide windows that should not be seen by the new user.
+                mRoot.switchUser(newUserId);
+                mWindowPlacerLocked.performSurfacePlacement();
 
-            // Notify whether the root docked task exists for the current user
-            final DisplayContent displayContent = getDefaultDisplayContentLocked();
+                // Notify whether the root docked task exists for the current user
+                final DisplayContent displayContent = getDefaultDisplayContentLocked();
 
-            if (mDisplayReady) {
-                // If the display is already prepared, update the density.
-                // Otherwise, we'll update it when it's prepared.
-                final int forcedDensity = getForcedDisplayDensityForUserLocked(newUserId);
-                final int targetDensity = forcedDensity != 0
-                        ? forcedDensity : displayContent.getInitialDisplayDensity();
-                displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
+                if (mDisplayReady) {
+                    // If the display is already prepared, update the density.
+                    // Otherwise, we'll update it when it's prepared.
+                    final int forcedDensity = getForcedDisplayDensityForUserLocked(newUserId);
+                    final int targetDensity = forcedDensity != 0
+                            ? forcedDensity : displayContent.getInitialDisplayDensity();
+                    displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
 
-                // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for the
-                // new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors to
-                // ensure it reflects the latest value.
-                if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                    final int displayCount = mRoot.mChildren.size();
-                    for (int i = 0; i < displayCount; ++i) {
-                        final DisplayContent dc = mRoot.mChildren.get(i);
-                        dc.updateShouldShowSystemDecorations();
+                    // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
+                    // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
+                    // to ensure it reflects the latest value.
+                    if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+                        final int displayCount = mRoot.mChildren.size();
+                        for (int i = 0; i < displayCount; ++i) {
+                            final DisplayContent dc = mRoot.mChildren.get(i);
+                            dc.updateShouldShowSystemDecorations();
+                        }
                     }
                 }
-            }
 
-            // This call is crucial on user switch to ensure the Magnify IME state
-            // is correctly re-evaluated and applied for the new user.
-            mSettingsObserver.updateMagnifyIme();
-            mAtmService.mChainTracker.end();
+                // This call is crucial on user switch to ensure the Magnify IME state
+                // is correctly re-evaluated and applied for the new user.
+                mSettingsObserver.updateMagnifyIme();
+                mAtmService.mChainTracker.end();
+            };
+            if (!controller.isShellTransitionsEnabled()) {
+                applyUserChange.run();
+                return;
+            }
+            if (!DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) {
+                final ActionChain chain = mAtmService.mChainTracker.startTransit("setUser");
+                if (!chain.isCollecting()) {
+                    chain.attachTransition(controller.createTransition(TRANSIT_OPEN));
+                    controller.requestStartTransition(chain.getTransition(),
+                            null /* trigger */, null /* remote */, null /* disp */);
+                }
+                applyUserChange.run();
+                return;
+            }
+            final Transition transition = new Transition(TRANSIT_OPEN, 0 /* flags */,
+                    controller, mAtmService.mWindowManager.mSyncEngine);
+            controller.startCollectOrQueue(transition, (deferred) -> {
+                final ActionChain chain = mAtmService.mChainTracker.start("setUser",
+                        transition);
+                final TransitionRequestInfo.UserChange userChange =
+                        DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()
+                                ? new TransitionRequestInfo.UserChange(mCurrentUserId,
+                                newUserId)
+                                : null;
+                controller.requestStartUserTransition(chain.getTransition(), userChange);
+                applyUserChange.run();
+            });
         }
     }
 
@@ -5199,8 +5254,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     void reportDecorViewGestureChanged(Session session, IWindow window, boolean intercepted) {
         synchronized (mGlobalLock) {
-            final WindowState win =
-                    windowForClientLocked(session, window, false /* throwOnError */);
+            final WindowState win = windowForClient(session, window);
             if (win == null) {
                 return;
             }
@@ -5212,8 +5266,7 @@ public class WindowManagerService extends IWindowManager.Stub
     void reportSystemGestureExclusionChanged(Session session, IWindow window,
             List<Rect> exclusionRects) {
         synchronized (mGlobalLock) {
-            final WindowState win = windowForClientLocked(session, window,
-                    false /* throwOnError */);
+            final WindowState win = windowForClient(session, window);
             if (win == null) {
                 Slog.i(TAG_WM,
                         "reportSystemGestureExclusionChanged(): No window state for package:"
@@ -5229,8 +5282,7 @@ public class WindowManagerService extends IWindowManager.Stub
     void reportKeepClearAreasChanged(Session session, IWindow window,
             List<Rect> restricted, List<Rect> unrestricted) {
         synchronized (mGlobalLock) {
-            final WindowState win = windowForClientLocked(session, window,
-                    false /* throwOnError */);
+            final WindowState win = windowForClient(session, window);
             if (win == null) {
                 Slog.i(TAG_WM,
                         "reportKeepClearAreasChanged(): No window state for package:"
@@ -6010,11 +6062,16 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             switch (msg.what) {
                 case PERSIST_ANIMATION_SCALE: {
+                    float windowAnimationScale;
+                    float transitionAnimationScale;
+                    synchronized (mGlobalLock) {
+                        windowAnimationScale = mWindowAnimationScaleSetting;
+                        transitionAnimationScale = mTransitionAnimationScaleSetting;
+                    }
                     Settings.Global.putFloat(mContext.getContentResolver(),
-                            Settings.Global.WINDOW_ANIMATION_SCALE, mWindowAnimationScaleSetting);
+                            Settings.Global.WINDOW_ANIMATION_SCALE, windowAnimationScale);
                     Settings.Global.putFloat(mContext.getContentResolver(),
-                            Settings.Global.TRANSITION_ANIMATION_SCALE,
-                            mTransitionAnimationScaleSetting);
+                            Settings.Global.TRANSITION_ANIMATION_SCALE, transitionAnimationScale);
                     Settings.Global.putFloat(mContext.getContentResolver(),
                             Settings.Global.ANIMATOR_DURATION_SCALE,
                             mAnimatorScale.getCurrentScale());
@@ -6026,12 +6083,22 @@ public class WindowManagerService extends IWindowManager.Stub
                     final int mode = msg.arg1;
                     switch (mode) {
                         case WINDOW_ANIMATION_SCALE: {
-                            mWindowAnimationScaleSetting = getWindowAnimationScaleSetting();
+                            float windowAnimationScale;
+                            synchronized (mGlobalLock) {
+                                windowAnimationScale = mWindowAnimationScaleSetting;
+                            }
+                            windowAnimationScale = getWindowAnimationScaleSetting(
+                                    windowAnimationScale);
+                            synchronized (mGlobalLock) {
+                                mWindowAnimationScaleSetting = windowAnimationScale;
+                            }
                             break;
                         }
                         case TRANSITION_ANIMATION_SCALE: {
-                            mTransitionAnimationScaleSetting =
-                                    getTransitionAnimationScaleSetting();
+                            float transitionAnimationScale = getTransitionAnimationScaleSetting();
+                            synchronized (mGlobalLock) {
+                                mTransitionAnimationScaleSetting = transitionAnimationScale;
+                            }
                             break;
                         }
                         case ANIMATION_DURATION_SCALE: {
@@ -6658,27 +6725,23 @@ public class WindowManagerService extends IWindowManager.Stub
     // Internals
     // -------------------------------------------------------------
 
-    final WindowState windowForClientLocked(Session session, IWindow client, boolean throwOnError) {
-        return windowForClientLocked(session, client.asBinder(), throwOnError);
+    @Nullable
+    @GuardedBy("mGlobalLock")
+    final WindowState windowForClient(@Nullable Session session, @NonNull IWindow client) {
+        return windowForClient(session, client.asBinder());
     }
 
-    final WindowState windowForClientLocked(Session session, IBinder client, boolean throwOnError) {
+    @Nullable
+    @GuardedBy("mGlobalLock")
+    final WindowState windowForClient(@Nullable Session session, @NonNull IBinder client) {
         WindowState win = mWindowMap.get(client);
         if (DEBUG) Slog.v(TAG_WM, "Looking up client " + client + ": " + win);
         if (win == null) {
-            if (throwOnError) {
-                throw new IllegalArgumentException(
-                        "Requested window " + client + " does not exist");
-            }
             ProtoLog.w(WM_ERROR, "Failed looking up window session=%s callers=%s", session,
                     Debug.getCallers(3));
             return null;
         }
         if (session != null && win.mSession != session) {
-            if (throwOnError) {
-                throw new IllegalArgumentException("Requested window " + client + " is in session "
-                        + win.mSession + ", not " + session);
-            }
             ProtoLog.w(WM_ERROR, "Failed looking up window session=%s callers=%s", session,
                     Debug.getCallers(3));
             return null;
@@ -7694,7 +7757,7 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     void updateTapExcludeRegion(IWindow client, Region region) {
         synchronized (mGlobalLock) {
-            final WindowState callingWin = windowForClientLocked(null, client, false);
+            final WindowState callingWin = windowForClient(null /* session */, client);
             if (callingWin == null) {
                 ProtoLog.w(WM_ERROR, "Bad requesting window %s", client);
                 return;
@@ -7730,7 +7793,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 WindowState topWindow = null;
                 if (behindClient != null) {
-                    topWindow = windowForClientLocked(null, behindClient, /* throwOnError*/ false);
+                    topWindow = windowForClient(null /* session */, behindClient);
                 }
                 WindowState targetWindow = dc.findScrollCaptureTargetWindow(topWindow, taskId);
                 if (targetWindow == null) {
@@ -9646,11 +9709,9 @@ public class WindowManagerService extends IWindowManager.Stub
             name = win.toString();
             applicationHandle = win.getApplicationHandle();
             win.setIsFocusable((flags & FLAG_NOT_FOCUSABLE) == 0);
-            if (Flags.updateHostInputTransferToken()) {
-                WindowState hostWindowState = hostInputTransferToken != null
-                        ? mInputToWindowMap.get(hostInputTransferToken.getToken()) : null;
-                win.updateHost(hostWindowState);
-            }
+            WindowState hostWindowState = hostInputTransferToken != null
+                    ? mInputToWindowMap.get(hostInputTransferToken.getToken()) : null;
+            win.updateHost(hostWindowState);
         }
 
         updateInputChannel(channelToken, win.mOwnerUid, win.mOwnerPid, displayId, surface, name,
@@ -10058,8 +10119,7 @@ public class WindowManagerService extends IWindowManager.Stub
     void grantEmbeddedWindowFocus(Session session, IWindow callingWindow,
             InputTransferToken inputTransferToken, boolean grantFocus) {
         synchronized (mGlobalLock) {
-            final WindowState hostWindow =
-                    windowForClientLocked(session, callingWindow, false /* throwOnError*/);
+            final WindowState hostWindow = windowForClient(session, callingWindow);
             if (hostWindow == null) {
                 Slog.e(TAG, "Host window not found");
                 return;
@@ -10139,7 +10199,7 @@ public class WindowManagerService extends IWindowManager.Stub
         final SurfaceControl displaySurfaceControl;
         final Rect boundsInDisplay = new Rect(boundsInWindow);
         synchronized (mGlobalLock) {
-            final WindowState win = windowForClientLocked(session, window, false);
+            final WindowState win = windowForClient(session, window);
             if (win == null) {
                 Slog.w(TAG, "Failed to generate DisplayHash. Invalid window");
                 mDisplayHashController.sendDisplayHashError(callback,

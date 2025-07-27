@@ -232,10 +232,13 @@ public class LocalMediaManager implements BluetoothCallback {
             }
             SuggestedDeviceState currentSuggestion = mInfoMediaManager.getSuggestedDevice();
             if (!Objects.equals(suggestion, currentSuggestion)) {
+                Log.w(TAG, "Suggestion got changed, aborting connection.");
                 return;
             }
             for (MediaDevice device : mMediaDevices) {
                 if (suggestion.getSuggestedDeviceInfo().getRouteId().equals(device.getId())) {
+                    Log.i(TAG, "Suggestion: device is available, connecting. deviceId = "
+                            + device.getId());
                     connectDevice(device);
                     return;
                 }
@@ -251,13 +254,13 @@ public class LocalMediaManager implements BluetoothCallback {
         long currentRequestTime = System.currentTimeMillis();
         if (currentRequestTime - mLastSuggestionRequestTime
                 > MIN_DURATION_BETWEEN_SUGGESTION_REQUESTS_MILLIS) {
-            Log.d(TAG, "requesting device suggestion");
+            Log.i(TAG, "requesting device suggestion");
             mLastSuggestionRequestTime = currentRequestTime;
             mInfoMediaManager.requestDeviceSuggestion();
         } else {
             Log.d(
                     TAG,
-                    "requestDeviceSuggestion() ignored due to difference between requests: "
+                    "requesting device suggestion throttled, elapsed time: "
                             + (currentRequestTime - mLastSuggestionRequestTime));
         }
     }
@@ -413,35 +416,6 @@ public class LocalMediaManager implements BluetoothCallback {
     }
 
     /**
-     * Get the MediaDevice list that can be added to current media.
-     *
-     * @return list of MediaDevice
-     */
-    public List<MediaDevice> getSelectableMediaDevice() {
-        return mInfoMediaManager.getSelectableMediaDevices();
-    }
-
-    /**
-     * Gets the MediaDevice list that can be transferred to with the current media session by the
-     * media route provider.
-     *
-     * @return list of MediaDevice
-     */
-    @NonNull
-    public List<MediaDevice> getTransferableMediaDevices() {
-        return mInfoMediaManager.getTransferableMediaDevices();
-    }
-
-    /**
-     * Get the MediaDevice list that can be removed from current media session.
-     *
-     * @return list of MediaDevice
-     */
-    public List<MediaDevice> getDeselectableMediaDevice() {
-        return mInfoMediaManager.getDeselectableMediaDevices();
-    }
-
-    /**
      * Get the current session's release type.
      *
      * @return release type of the current session
@@ -455,15 +429,6 @@ public class LocalMediaManager implements BluetoothCallback {
      */
     public boolean releaseSession() {
         return mInfoMediaManager.releaseSession();
-    }
-
-    /**
-     * Get the MediaDevice list that has been selected to current media.
-     *
-     * @return list of MediaDevice
-     */
-    public List<MediaDevice> getSelectedMediaDevice() {
-        return mInfoMediaManager.getSelectedMediaDevices();
     }
 
     /**
@@ -895,7 +860,7 @@ public class LocalMediaManager implements BluetoothCallback {
         boolean mIsConnectionAttemptActive = false;
         boolean mDidAttemptCompleteSuccessfully = false;
 
-        ConnectingSuggestedDeviceState(SuggestedDeviceState suggestedDeviceState) {
+        ConnectingSuggestedDeviceState(@NonNull SuggestedDeviceState suggestedDeviceState) {
             mSuggestedDeviceState = suggestedDeviceState;
             mDeviceCallback =
                     new DeviceCallback() {
@@ -904,6 +869,10 @@ public class LocalMediaManager implements BluetoothCallback {
                             synchronized (mMediaDevicesLock) {
                                 for (MediaDevice mediaDevice : mediaDevices) {
                                     if (isSuggestedDevice(mediaDevice)) {
+                                        Log.i(TAG,
+                                                "Suggestion: scan found matched device, "
+                                                        + "connecting. deviceId = "
+                                                        + mediaDevice.getId());
                                         connectDevice(mediaDevice);
                                         mIsConnectionAttemptActive = true;
                                         break;
@@ -948,6 +917,8 @@ public class LocalMediaManager implements BluetoothCallback {
                         }
                         unregisterCallback(mDeviceCallback);
                         stopScan();
+                        Log.i(TAG, "Suggestion: scan stopped. success = "
+                                + mDidAttemptCompleteSuccessfully);
                         mInfoMediaManager.onConnectionAttemptCompletedForSuggestion(
                                 mSuggestedDeviceState, mDidAttemptCompleteSuccessfully);
                     };
@@ -958,6 +929,7 @@ public class LocalMediaManager implements BluetoothCallback {
             if (mIsConnectionAttemptActive) {
                 return;
             }
+            Log.i(TAG, "Suggestion: scanning for devices.");
             // Reset mDidAttemptCompleteSuccessfully at the start of each connection attempt.
             mDidAttemptCompleteSuccessfully = false;
             registerCallback(mDeviceCallback);

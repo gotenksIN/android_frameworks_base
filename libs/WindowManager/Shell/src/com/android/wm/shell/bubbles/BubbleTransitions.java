@@ -214,6 +214,8 @@ public class BubbleTransitions {
         // the bubble bar flag, but once these are combined we should be able to remove this.
         if (com.android.wm.shell.Flags.enableBubbleBar()
                 && mBubbleData.getSelectedBubble() instanceof Bubble) {
+            ProtoLog.d(
+                    WM_SHELL_BUBBLES, "notifyUnfoldTransitionStarting transition=%s", transition);
             Bubble bubble = (Bubble) mBubbleData.getSelectedBubble();
             mTaskViewTransitions.enqueueExternal(
                     bubble.getTaskView().getController(), () -> transition);
@@ -223,6 +225,8 @@ public class BubbleTransitions {
     /** Notifies when the unfold transition has finished. */
     public void notifyUnfoldTransitionFinished(@NonNull IBinder transition) {
         if (com.android.wm.shell.Flags.enableBubbleBar()) {
+            ProtoLog.d(
+                    WM_SHELL_BUBBLES, "notifyUnfoldTransitionFinished transition=%s", transition);
             mTaskViewTransitions.onExternalDone(transition);
         }
     }
@@ -535,9 +539,7 @@ public class BubbleTransitions {
             // Remove any intermediate queued transitions that were started as a result of the
             // inflation (the task view will be in the right bounds)
             mTaskViewTransitions.removePendingTransitions(tv.getController());
-            mTaskViewTransitions.enqueueExternal(tv.getController(), () -> {
-                return mTransition;
-            });
+            mTaskViewTransitions.enqueueExternal(tv.getController(), () -> mTransition);
         }
 
         @Override
@@ -639,7 +641,6 @@ public class BubbleTransitions {
             }
             startTransaction.apply();
 
-            mTaskViewTransitions.onExternalDone(mTransition);
             mTransitionProgress.setTransitionReady();
             startExpandAnim();
             return true;
@@ -684,6 +685,7 @@ public class BubbleTransitions {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
                     "LaunchNewTaskBubble.playAnimation(): playConvert=%b",
                     mPlayConvertTaskAnimation);
+            mTaskViewTransitions.onExternalDone(mTransition);
             final TaskViewTaskController tv = mBubble.getTaskView().getController();
             final SurfaceControl.Transaction startT = new SurfaceControl.Transaction();
             // Set task position to 0,0 as it will be placed inside the TaskView

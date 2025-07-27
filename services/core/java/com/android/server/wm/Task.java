@@ -1449,7 +1449,12 @@ class Task extends TaskFragment {
 
     /** Returns the user id associated with the current task. */
     int getUserId() {
-        return isLeafTask() ? mUserId : mCurrentUser;
+        if (!isLeafTask()) return mCurrentUser;
+        if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()
+                && showForAllUsers()) {
+            return mCurrentUser;
+        }
+        return mUserId;
     }
 
     /**
@@ -2039,7 +2044,7 @@ class Task extends TaskFragment {
 
     private static boolean setTaskDescriptionFromActivityAboveRoot(
             ActivityRecord r, ActivityRecord root, TaskDescription td) {
-        if (!r.isTaskOverlay() && r.taskDescription != null) {
+        if (!r.isTaskOverlay() && !r.isNoDisplay() && r.taskDescription != null) {
             final TaskDescription atd = r.taskDescription;
             if (td.getLabel() == null) {
                 td.setLabel(atd.getLabel());
@@ -2880,6 +2885,8 @@ class Task extends TaskFragment {
 
         super.removeImmediately();
         mDisplayContent = null;
+        // Reset in case the Task may be reused by apps.
+        setHasBeenVisible(false);
         mRemoving = false;
     }
 
@@ -6024,7 +6031,7 @@ class Task extends TaskFragment {
 
     private void moveTaskToBackInner(@NonNull Task task, @Nullable Transition transition) {
         final Transition.ReadyCondition movedToBack =
-                new Transition.ReadyCondition("moved-to-back", task);
+                new Transition.ReadyCondition("moved-to-back", task, true /* newTrackerOnly */);
         if (transition != null) {
             // Preventing from update surface position for WindowState if configuration changed,
             // because the position is depends on WindowFrame, so update the position before
@@ -6326,6 +6333,12 @@ class Task extends TaskFragment {
     void onChildPositionChanged(WindowContainer child) {
         if (!mChildren.contains(child)) {
             dispatchTaskInfoChangedIfNeeded(false /* force */);
+            if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()
+                    && mCreatedByOrganizer && mChildren.isEmpty() && getDisplayArea() != null
+                    && getDisplayArea().mPreferredTopFocusableRootTask == this) {
+                // An empty task cannot be focusable.
+                getDisplayArea().clearPreferredTopFocusableRootTask();
+            }
             return;
         }
         if (child.asTask() != null) {

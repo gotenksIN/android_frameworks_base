@@ -123,6 +123,7 @@ import com.android.settingslib.WirelessUtils;
 import com.android.settingslib.fuelgauge.BatteryStatus;
 import com.android.systemui.CoreStartable;
 import com.android.systemui.Flags;
+import com.android.systemui.ambient.statusbar.shared.flag.OngoingActivityChipsOnDream;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.FingerprintInteractiveToAuthProvider;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
@@ -141,6 +142,7 @@ import com.android.systemui.deviceentry.shared.model.FaceDetectionStatus;
 import com.android.systemui.deviceentry.shared.model.FailedFaceAuthenticationStatus;
 import com.android.systemui.deviceentry.shared.model.HelpFaceAuthenticationStatus;
 import com.android.systemui.deviceentry.shared.model.SuccessFaceAuthenticationStatus;
+import com.android.systemui.dreams.DreamOverlayCallbackController;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.dump.DumpsysTableLogger;
 import com.android.systemui.keyguard.KeyguardWmStateRefactor;
@@ -383,6 +385,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private final SensorPrivacyManager mSensorPrivacyManager;
     private final ActiveUnlockConfig mActiveUnlockConfig;
     private final IDreamManager mDreamManager;
+    private final DreamOverlayCallbackController mDreamOverlayCallbackController;
     private final TelephonyManager mTelephonyManager;
     @Nullable
     private final FingerprintManager mFpm;
@@ -411,6 +414,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     protected int mFingerprintRunningState = BIOMETRIC_STATE_STOPPED;
     private boolean mFingerprintDetectRunning;
     private boolean mIsDreaming;
+    private boolean mIsDreamingWithOverlay = false;
     private boolean mCommunalShowing;
     private int mActiveMobileDataSubscription = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
     private final FingerprintInteractiveToAuthProvider mFingerprintInteractiveToAuthProvider;
@@ -861,6 +865,13 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
      */
     public boolean isDreaming() {
         return mIsDreaming;
+    }
+
+    /**
+     * @return whether the device is currently dreaming with overlay (not doze).
+     */
+    public boolean isDreamingWithOverlay() {
+        return mIsDreamingWithOverlay;
     }
 
     /**
@@ -2210,6 +2221,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
             SubscriptionManager subscriptionManager,
             UserManager userManager,
             IDreamManager dreamManager,
+            DreamOverlayCallbackController dreamOverlayCallbackController,
             DevicePolicyManager devicePolicyManager,
             SensorPrivacyManager sensorPrivacyManager,
             TelephonyManager telephonyManager,
@@ -2254,6 +2266,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
         mTrustManager = trustManager;
         mUserManager = userManager;
         mDreamManager = dreamManager;
+        mDreamOverlayCallbackController = dreamOverlayCallbackController;
         mTelephonyManager = telephonyManager;
         mDevicePolicyManager = devicePolicyManager;
         mPackageManager = packageManager;
@@ -2404,6 +2417,19 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
             }
         };
     }
+
+    private final DreamOverlayCallbackController.Callback mDreamOverlayCallback =
+            new DreamOverlayCallbackController.Callback() {
+                @Override
+                public void onWakeUp() {
+                    mIsDreamingWithOverlay = false;
+                }
+
+                @Override
+                public void onStartDream() {
+                    mIsDreamingWithOverlay = true;
+                }
+            };
 
     @Override
     public void start() {
@@ -2572,6 +2598,10 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
                     mKeyguardServiceShowLockscreenInteractor.get().getShowNowEvents(),
                     this::onKeyguardServiceShowLockscreenNowEvents
             );
+        }
+
+        if (OngoingActivityChipsOnDream.isEnabled()) {
+            mDreamOverlayCallbackController.addCallback(mDreamOverlayCallback);
         }
 
         if (glanceableHubV2()) {

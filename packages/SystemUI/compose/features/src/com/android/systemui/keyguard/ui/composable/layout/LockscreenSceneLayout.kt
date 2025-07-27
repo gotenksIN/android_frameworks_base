@@ -63,6 +63,8 @@ interface LockscreenLayoutViewModel {
      * This value is meaningless if [isDynamicClockEnabled] is `false`.
      */
     val isDateAndWeatherVisibleWithLargeClock: Boolean
+    /** Whether date and weather should currently be visible. */
+    val isDateAndWeatherVisible: Boolean
     /** Whether smart space should currently be showing. */
     val isSmartSpaceVisible: Boolean
     /** Whether media should currently be showing. */
@@ -72,10 +74,15 @@ interface LockscreenLayoutViewModel {
      * `false` if only heads-up notifications are showing).
      */
     val isNotificationsVisible: Boolean
-    /** Whether udfps is supported. */
-    val isUdfpsSupported: Boolean
+    /** Whether the ambient indication UI should currently be showing. */
+    val isAmbientIndicationVisible: Boolean
     /** Amount of horizontal translation that should be applied to elements in the scene. */
     val unfoldTranslations: UnfoldTranslations
+    /**
+     * Whether date and weather should be below the small clock. If `false`, the date and weather
+     * should be next to the small clock.
+     */
+    val shouldDateWeatherBeBelowSmallClock: Boolean
 }
 
 @Immutable
@@ -189,6 +196,8 @@ fun LockscreenSceneLayout(
             ContentColumn(
                 isSmallClockVisible = layout.isSmallClockVisible,
                 smallClock = smallClock,
+                isDateAndWeatherVisible = viewModel.isDateAndWeatherVisible,
+                shouldDateWeatherBeBelowSmallClock = viewModel.shouldDateWeatherBeBelowSmallClock,
                 dateAndWeather = dateAndWeather,
                 isSmartSpaceVisible = viewModel.isSmartSpaceVisible,
                 smartSpace = smartSpace,
@@ -222,25 +231,13 @@ fun LockscreenSceneLayout(
         }
     }
 
-    /**
-     * Convenience function to draw the ambient indication without needing to pass a lot of
-     * parameters.
-     */
+    /** Convenience function to draw the bottom area without needing to pass a lot of parameters. */
     @Composable
-    fun ambientIndication(modifier: Modifier = Modifier) {
-        AmbientIndication(
-            ambientIndication = ambientIndication,
-            modifier = modifier.navigationBarsPadding(),
-        )
-    }
-
-    /**
-     * Convenience function to draw the shortcut area without needing to pass a lot of parameters.
-     */
-    @Composable
-    fun shortcutArea(modifier: Modifier = Modifier) {
-        ShortcutArea(
+    fun bottomArea(modifier: Modifier = Modifier) {
+        BottomArea(
             startShortcut = startShortcut,
+            isAmbientIndicationVisible = viewModel.isAmbientIndicationVisible,
+            ambientIndication = ambientIndication,
             bottomIndication = bottomIndication,
             endShortcut = endShortcut,
             unfoldTranslations = viewModel.unfoldTranslations,
@@ -267,38 +264,19 @@ fun LockscreenSceneLayout(
             Box(Modifier.graphicsLayer { translationX = viewModel.unfoldTranslations.end }) {
                 largeClock()
             }
-
-            if (viewModel.isUdfpsSupported) {
-                lockIcon()
-                ambientIndication()
-            } else {
-                ambientIndication()
-                lockIcon()
-            }
-
-            shortcutArea()
+            bottomArea()
+            lockIcon()
             settingsMenu()
         },
         modifier = modifier,
     ) { measurables, constraints ->
-        check(measurables.size == 7)
+        check(measurables.size == 6)
         val statusBarMeasurable = measurables[0]
         val contentColumnMeasurable = measurables[1]
         val largeClockMeasurable = measurables[2]
-        val ambientIndicationMeasurable =
-            if (viewModel.isUdfpsSupported) {
-                measurables[4]
-            } else {
-                measurables[3]
-            }
-        val lockIconMeasurable =
-            if (viewModel.isUdfpsSupported) {
-                measurables[3]
-            } else {
-                measurables[4]
-            }
-        val shortcutAreaMeasurable = measurables[5]
-        val settingsMenuMeasurable = measurables[6]
+        val bottomAreaMeasurable = measurables[3]
+        val lockIconMeasurable = measurables[4]
+        val settingsMenuMeasurable = measurables[5]
 
         val statusBarPlaceable =
             statusBarMeasurable.measure(constraints = Constraints.fixedWidth(constraints.maxWidth))
@@ -380,15 +358,8 @@ fun LockscreenSceneLayout(
                 else -> null
             }
 
-        val ambientIndicationPlaceable =
-            ambientIndicationMeasurable.measure(
-                constraints = Constraints.fixedWidth(constraints.maxWidth)
-            )
-
-        val shortcutAreaPlaceable =
-            shortcutAreaMeasurable.measure(
-                constraints = Constraints.fixedWidth(constraints.maxWidth)
-            )
+        val bottomAreaPlaceable =
+            bottomAreaMeasurable.measure(constraints = Constraints.fixedWidth(constraints.maxWidth))
 
         val settingsMenuPleaceable = settingsMenuMeasurable.measure(constraints)
 
@@ -427,25 +398,8 @@ fun LockscreenSceneLayout(
                     },
             )
 
-            if (viewModel.isUdfpsSupported) {
-                lockIconPlaceable.place(x = lockIconBounds.left, y = lockIconBounds.top)
-                ambientIndicationPlaceable.place(
-                    0,
-                    constraints.maxHeight - ambientIndicationPlaceable.measuredHeight,
-                )
-            } else {
-                ambientIndicationPlaceable.place(
-                    0,
-                    constraints.maxHeight - ambientIndicationPlaceable.measuredHeight,
-                )
-                lockIconPlaceable.place(x = lockIconBounds.left, y = lockIconBounds.top)
-            }
-
-            shortcutAreaPlaceable.place(
-                0,
-                constraints.maxHeight - shortcutAreaPlaceable.measuredHeight,
-            )
-
+            bottomAreaPlaceable.place(0, constraints.maxHeight - bottomAreaPlaceable.measuredHeight)
+            lockIconPlaceable.place(x = lockIconBounds.left, y = lockIconBounds.top)
             settingsMenuPleaceable.placeRelative(
                 x = (constraints.maxWidth - settingsMenuPleaceable.measuredWidth) / 2,
                 y = constraints.maxHeight - settingsMenuPleaceable.measuredHeight,
@@ -454,36 +408,33 @@ fun LockscreenSceneLayout(
     }
 }
 
+/** Draws the bottom area of the layout. */
 @Composable
-private fun AmbientIndication(
-    ambientIndication: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
-    ) {
-        ambientIndication()
-    }
-}
-
-/** Draws the shortcut area of the layout. */
-@Composable
-private fun ShortcutArea(
+private fun BottomArea(
     startShortcut: @Composable () -> Unit,
+    isAmbientIndicationVisible: Boolean,
+    ambientIndication: @Composable () -> Unit,
     bottomIndication: @Composable () -> Unit,
     endShortcut: @Composable () -> Unit,
     unfoldTranslations: UnfoldTranslations,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
     ) {
-        Box(Modifier.graphicsLayer { translationX = unfoldTranslations.start }) { startShortcut() }
-        Box(Modifier.weight(1f)) { bottomIndication() }
-        Box(Modifier.graphicsLayer { translationX = unfoldTranslations.end }) { endShortcut() }
+        if (isAmbientIndicationVisible) {
+            ambientIndication()
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Box(Modifier.graphicsLayer { translationX = unfoldTranslations.start }) {
+                startShortcut()
+            }
+            Box(Modifier.weight(1f)) { bottomIndication() }
+            Box(Modifier.graphicsLayer { translationX = unfoldTranslations.end }) { endShortcut() }
+        }
     }
 }
 
@@ -497,6 +448,8 @@ private fun ShortcutArea(
 private fun ContentColumn(
     isSmallClockVisible: Boolean,
     smallClock: @Composable () -> Unit,
+    isDateAndWeatherVisible: Boolean,
+    shouldDateWeatherBeBelowSmallClock: Boolean,
     dateAndWeather: @Composable (Orientation) -> Unit,
     isSmartSpaceVisible: Boolean,
     smartSpace: @Composable () -> Unit,
@@ -514,8 +467,15 @@ private fun ContentColumn(
                 modifier = Modifier.padding(bottom = 24.dp),
             ) {
                 smallClock()
-                dateAndWeather(Orientation.Vertical)
+
+                if (isDateAndWeatherVisible && !shouldDateWeatherBeBelowSmallClock) {
+                    dateAndWeather(Orientation.Vertical)
+                }
             }
+        }
+
+        if (isDateAndWeatherVisible && shouldDateWeatherBeBelowSmallClock) {
+            dateAndWeather(Orientation.Horizontal)
         }
 
         AnimatedVisibility(isSmartSpaceVisible) {

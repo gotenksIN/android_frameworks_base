@@ -132,6 +132,11 @@ java_library {
         "ravenwood-androidx",
         "ravenwood-common-utils",
         "ravenwood-libcore",
+        "ow2-asm",
+        "ow2-asm-analysis",
+        "ow2-asm-commons",
+        "ow2-asm-tree",
+        "ow2-asm-util",
     ],
     libs: [
         "framework-configinfrastructure.ravenwood",
@@ -571,6 +576,12 @@ java_import {
 }
 
 java_import {
+    name: "200-json-prebuilt",
+    jars: [":json-prebuilt"],
+    visibility: ["//visibility:private"],
+}
+
+java_import {
     name: "z00-50-framework-updatable-stubs-module_libs_api",
     jars: [":framework-updatable-stubs-module_libs_api-for-host"],
     visibility: ["//visibility:private"],
@@ -622,6 +633,7 @@ android_ravenwood_libgroup {
     libs: [
         "100-framework-minus-apex.ravenwood",
         "200-kxml2-android",
+        "200-json-prebuilt",
         "ext-ravenwood",
 
         "android.test.mock.ravenwood",

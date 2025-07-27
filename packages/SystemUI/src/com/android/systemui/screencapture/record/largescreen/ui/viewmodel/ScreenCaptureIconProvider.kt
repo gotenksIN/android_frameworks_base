@@ -32,7 +32,7 @@ import kotlinx.coroutines.withContext
 
 data class ScreenCaptureIcons(
     val screenshotToolbar: Icon,
-    val screenshotButton: Icon,
+    val screenshotToolbarUnselected: Icon,
     val screenRecord: Icon,
     val fullscreen: Icon,
     val region: Icon,
@@ -57,7 +57,8 @@ constructor(
                 emit(
                     ScreenCaptureIcons(
                         screenshotToolbar = loadIcon(R.drawable.ic_screen_capture_camera),
-                        screenshotButton = loadIcon(R.drawable.ic_screen_capture_camera),
+                        screenshotToolbarUnselected =
+                            loadIcon(R.drawable.ic_screen_capture_camera_outline),
                         screenRecord = loadIcon(R.drawable.ic_screenrecord),
                         fullscreen = loadIcon(R.drawable.ic_screen_capture_fullscreen),
                         region = loadIcon(R.drawable.ic_screen_capture_region),

@@ -133,7 +133,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -176,7 +175,6 @@ class SceneContainerStartableTest : SysuiTestCase() {
         MockitoAnnotations.initMocks(this)
         whenever(kosmos.keyguardUpdateMonitor.isUnlockingWithBiometricAllowed(anyBoolean()))
             .thenReturn(true)
-        runBlocking { kosmos.displayRepository.addDisplay(Display.DEFAULT_DISPLAY) }
         underTest = kosmos.sceneContainerStartable
     }
 
@@ -2383,6 +2381,8 @@ class SceneContainerStartableTest : SysuiTestCase() {
     fun switchFromDreamToLockscreen_whenLockedAndDreamStopped() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+
             prepareState(initialSceneKey = Scenes.Dream)
             underTest.start()
             testScope.advanceTimeBy(KeyguardInteractor.IS_ABLE_TO_DREAM_DELAY_MS)
@@ -2391,11 +2391,19 @@ class SceneContainerStartableTest : SysuiTestCase() {
             testScope.advanceTimeBy(KeyguardInteractor.IS_ABLE_TO_DREAM_DELAY_MS)
             runCurrent()
             assertThat(currentScene).isEqualTo(Scenes.Dream)
+            emulateOverlayTransition(
+                transitionStateFlow =
+                    MutableStateFlow(ObservableTransitionState.Idle(Scenes.Dream)),
+                toOverlay = Overlays.Bouncer,
+            )
+            assertThat(currentOverlays).contains(Overlays.Bouncer)
+            runCurrent()
 
             keyguardInteractor.setDreaming(false)
             testScope.advanceTimeBy(KeyguardInteractor.IS_ABLE_TO_DREAM_DELAY_MS)
             runCurrent()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+            assertThat(currentOverlays).contains(Overlays.Bouncer)
         }
 
     @Test

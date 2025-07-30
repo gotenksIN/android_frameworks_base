@@ -599,6 +599,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenrecord_stop_dialog_button">Stop recording</string>
 
+    <!-- Screen recording should record device audio setting [CHAR LIMIT=35] -->
+    <string name="screen_record_record_device_audio_label">Record device audio</string>
+    <!-- Screen recording should record microphone setting [CHAR LIMIT=35] -->
+    <string name="screen_record_record_microphone_label">Record microphone</string>
+    <!-- Screen recording should show touches setting [CHAR LIMIT=35] -->
+    <string name="screen_record_should_show_touches_label">Show touches</string>
     <!-- Header for the carousel to choose an app for screen recording. [CHAR LIMIT=50] -->
     <string name="screen_record_capture_target_choose_app">Choose an app to record</string>
 
@@ -3145,15 +3151,18 @@
     <!-- Message asking the user to authenticate with primary authentication methods (PIN/pattern/password) or biometrics after the device is locked by adaptive auth. [CHAR LIMIT=70] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="kg_prompt_after_adaptive_auth_lock">Device was locked, too many authentication attempts</string>
+    <string name="kg_prompt_after_adaptive_auth_lock">Screen locked. Too many authentication attempts.</string>
 
     <!-- Indication on the keyguard that appears after the device is locked by adaptive auth. [CHAR LIMIT=60] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="keyguard_indication_after_adaptive_auth_lock">Device locked\nFailed authentication</string>
+    <string name="keyguard_indication_after_adaptive_auth_lock">Screen locked\nFailed authentication</string>
 
     <!-- Indication on the keyguard that appears after the device is locked by adaptive auth. [CHAR LIMIT=60] -->
     <string name="keyguard_indication_after_watch_disconnected">Locked by your watch</string>
+
+    <!-- Indication on the keyguard that appears after the device is locked by secure lock device. [CHAR LIMIT=48] -->
+    <string name="keyguard_indication_after_secure_lock_device">Locked with 2-step verification</string>
 
     <!-- Accessibility string for current zen mode and selected exit condition. A template that simply concatenates existing mode string and the current condition description. [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4683,6 +4692,12 @@
     <!-- Tooltip for the edit mode button indicating that tiles can be resized [CHAR LIMIT=60] -->
     <string name="qs_edit_mode_tooltip">Resize Quick Settings tiles</string>
 
+    <!-- Edit mode menu entry for Settings [CHAR LIMIT=20] -->
+    <string name="qs_edit_settings">Settings</string>
+
+    <!-- Edit mode menu for extra options -->
+    <string name="qs_edit_menu_content_description">Options</string>
+
     <!-- SysUI Tuner: Options for how clock is displayed [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -6120,8 +6135,19 @@
     <!--- Label of the dismiss button of the dialog appearing when an external display is connected [CHAR LIMIT=NONE]-->
     <string name="dismiss_dialog">Dismiss</string>
 
+    <!--- Title of the dialog appearing when an external display is connected, asking whether to start desktop mode or mirroring [CHAR LIMIT=NONE]-->
+    <string name="connected_display_dialog_title">Connect to external display</string>
+    <!--- Label of the "don't ask me again" checkbox of the dialog appearing when an external display is connected [CHAR LIMIT=NONE]-->
+    <string name="remember_choice">Don\'t ask me again</string>
+    <!--- Label of the "enable display for desktop" button of the dialog appearing when an external display is connected [CHAR LIMIT=NONE]-->
+    <string name="start_desktop_mode">Desktop</string>
+    <!--- Label of the "enable display for mirroring" button of the dialog appearing when an external display is connected [CHAR LIMIT=NONE]-->
+    <string name="start_mirroring">Mirror</string>
     <!--- Content description of the connected display status bar icon that appears every time a display is connected [CHAR LIMIT=NONE]-->
     <string name="connected_display_icon_desc">Display connected</string>
+    <!--- Text for toast that appears every time an extended display is connected (skipping connection dialog) [CHAR LIMIT=NONE]-->
+    <string name="connected_display_extended_mode_text">Connected to external display</string>
+
 
     <!-- Title of the privacy dialog, shown for active / recent app usage of some phone sensors [CHAR LIMIT=30] -->
     <string name="privacy_dialog_title">Microphone, Camera &amp; Location</string>

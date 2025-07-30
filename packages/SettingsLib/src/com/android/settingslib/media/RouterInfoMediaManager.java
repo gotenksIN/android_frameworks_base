@@ -25,6 +25,7 @@ import android.media.MediaRouter2.RoutingController;
 import android.media.MediaRouter2Manager;
 import android.media.RouteDiscoveryPreference;
 import android.media.RouteListingPreference;
+import android.media.RoutingChangeInfo;
 import android.media.RoutingSessionInfo;
 import android.media.SuggestedDeviceInfo;
 import android.media.session.MediaController;
@@ -97,7 +98,7 @@ public final class RouterInfoMediaManager extends InfoMediaManager {
                 public void onSuggestionsRequested() {} // no-op
             };
 
-    @GuardedBy("this")
+    @GuardedBy("InfoMediaManager.this.fieldName")
     @Nullable
     private MediaRouter2.ScanToken mScanToken;
 
@@ -149,7 +150,7 @@ public final class RouterInfoMediaManager extends InfoMediaManager {
     @Override
     protected void startScanOnRouter() {
         if (Flags.enableScreenOffScanning()) {
-            synchronized (this) {
+            synchronized (super.mLock) {
                 if (mScanToken == null) {
                     MediaRouter2.ScanRequest request =
                             new MediaRouter2.ScanRequest.Builder().build();
@@ -181,7 +182,7 @@ public final class RouterInfoMediaManager extends InfoMediaManager {
     @Override
     protected void stopScanOnRouter() {
         if (Flags.enableScreenOffScanning()) {
-            synchronized (this) {
+            synchronized (super.mLock) {
                 if (mScanToken != null) {
                     mRouter.cancelScanRequest(mScanToken);
                     mScanToken = null;
@@ -202,8 +203,9 @@ public final class RouterInfoMediaManager extends InfoMediaManager {
     }
 
     @Override
-    protected void transferToRoute(@NonNull MediaRoute2Info route) {
-        mRouter.transferTo(route);
+    protected void transferToRoute(
+            @NonNull MediaRoute2Info route, @NonNull RoutingChangeInfo routingChangeInfo) {
+        mRouter.transferTo(route, routingChangeInfo);
     }
 
     @Override

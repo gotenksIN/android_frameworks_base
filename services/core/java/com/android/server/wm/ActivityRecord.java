@@ -107,11 +107,8 @@ import static android.internal.perfetto.protos.Windowmanagerservice.ActivityReco
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.ENABLE_RECENTS_SCREENSHOT;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.FILLS_PARENT;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.FRONT_OF_TASK;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IN_SIZE_COMPAT_MODE;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_ANIMATING;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_USER_FULLSCREEN_OVERRIDE_ENABLED;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.LAST_DROP_INPUT_MODE;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.MIN_ASPECT_RATIO;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NAME;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NUM_DRAWN_WINDOWS;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NUM_INTERESTING_WINDOWS;
@@ -122,15 +119,6 @@ import static android.internal.perfetto.protos.Windowmanagerservice.ActivityReco
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REPORTED_DRAWN;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REPORTED_VISIBLE;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REQUEST_OPEN_IN_BROWSER_EDUCATION_TIMESTAMP;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_ALLOW_SIMULATE_REQUESTED_ORIENTATION_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_OVERRIDE_FORCE_RESIZE_APP;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_OVERRIDE_MIN_ASPECT_RATIO;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_SEND_COMPAT_FAKE_FOCUS;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_DISPLAYED;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_MOVED;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_WINDOW;
@@ -561,7 +549,6 @@ public final class ActivityRecord extends WindowToken {
     public boolean translucentWindowLaunch; // a translucent window launch?
 // QTI_END: 2021-03-11: Performance: DSR: Fix broken DSR
     boolean nowVisible;     // is this activity's window visible?
-    boolean mClientVisibilityDeferred;// was the visibility change message to client deferred?
     boolean idle;           // has the activity gone idle?
     boolean hasBeenLaunched;// has this activity ever been launched?
     boolean immersive;      // immersive mode (don't interrupt if possible)
@@ -3637,7 +3624,8 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final Task rootTask = getRootTask();
-        final boolean mayAdjustTop = (isState(RESUMED) || rootTask.getTopResumedActivity() == null)
+        final boolean mayAdjustTop = !Flags.polishCloseWallpaperIncludesOpenChange()
+                && (isState(RESUMED) || rootTask.getTopResumedActivity() == null)
                 && rootTask.isFocusedRootTaskOnDisplay()
                 // Do not adjust focus task because the task will be reused to launch new activity.
                 && !task.isClearingToReuseTask();
@@ -6104,10 +6092,7 @@ public final class ActivityRecord extends WindowToken {
             setVisibility(true);
             app.postPendingUiCleanMsg(true);
             if (reportToClient) {
-                mClientVisibilityDeferred = false;
                 makeActiveIfNeeded(starting);
-            } else {
-                mClientVisibilityDeferred = true;
             }
             // The activity may be waiting for stop, but that is no longer appropriate for it.
             mTaskSupervisor.mStoppingActivities.remove(this);
@@ -9501,40 +9486,16 @@ public final class ActivityRecord extends WindowToken {
             proto.write(PROC_ID, app.getPid());
         }
         proto.write(PIP_AUTO_ENTER_ENABLED, pictureInPictureArgs.isAutoEnterEnabled());
-        proto.write(IN_SIZE_COMPAT_MODE, inSizeCompatMode());
-        proto.write(MIN_ASPECT_RATIO, getMinAspectRatio());
         // Only record if max bounds sandboxing is applied, if the caller has the necessary
         // permission to access the device configs.
         proto.write(PROVIDES_MAX_BOUNDS, providesMaxBounds());
         proto.write(ENABLE_RECENTS_SCREENSHOT, mEnableRecentsScreenshot);
         proto.write(LAST_DROP_INPUT_MODE, mLastDropInputMode);
         proto.write(OVERRIDE_ORIENTATION, getOverrideOrientation());
-        proto.write(SHOULD_SEND_COMPAT_FAKE_FOCUS, shouldSendCompatFakeFocus());
-        final AppCompatCameraOverrides cameraOverrides =
-                mAppCompatController.getCameraOverrides();
-        proto.write(SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldForceRotateForCameraCompat());
-        proto.write(SHOULD_REFRESH_ACTIVITY_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldRefreshActivityForCameraCompat());
-        proto.write(SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldRefreshActivityViaPauseForCameraCompat());
-        final AppCompatAspectRatioOverrides aspectRatioOverrides =
-                mAppCompatController.getAspectRatioOverrides();
-        proto.write(SHOULD_OVERRIDE_MIN_ASPECT_RATIO,
-                aspectRatioOverrides.shouldOverrideMinAspectRatio());
-        proto.write(SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP,
-                mAppCompatController.getOrientationOverrides()
-                        .shouldIgnoreOrientationRequestLoop());
-        proto.write(SHOULD_OVERRIDE_FORCE_RESIZE_APP,
-                mAppCompatController.getResizeOverrides().shouldOverrideForceResizeApp());
-        proto.write(SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS,
-                aspectRatioOverrides.shouldEnableUserAspectRatioSettings());
-        proto.write(IS_USER_FULLSCREEN_OVERRIDE_ENABLED,
-                aspectRatioOverrides.isUserFullscreenOverrideEnabled());
         proto.write(REQUEST_OPEN_IN_BROWSER_EDUCATION_TIMESTAMP,
                 mRequestOpenInBrowserEducationTimestamp);
-        proto.write(SHOULD_ALLOW_SIMULATE_REQUESTED_ORIENTATION_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldApplyFreeformTreatmentForCameraCompat());
+
+        mAppCompatController.dumpDebug(proto);
     }
 
     @Override

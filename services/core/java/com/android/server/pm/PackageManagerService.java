@@ -4561,6 +4561,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         if (dexUseManager != null) {
             dexUseManager.systemReady();
         }
+
+        PackageMetrics.logInvalidationMetrics();
     }
 
     public PackageFreezer freezePackage(String packageName, @CanBeALL @UserIdInt int userId,
@@ -8493,5 +8495,13 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     @Nullable
     String getDeveloperVerificationPolicyDelegatePackageName() {
         return mDeveloperVerificationPolicyDelegatePackage;
+    }
+
+    /**
+     * @return The update-owner of the given package name as specified in the system config file.
+     */
+    @Nullable
+    public String getSystemAppUpdateOwnerPackageName(String packageName) {
+        return mInjector.getSystemConfig().getSystemAppUpdateOwnerPackageName(packageName);
     }
 }

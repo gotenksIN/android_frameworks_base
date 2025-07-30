@@ -2,13 +2,6 @@ package: "com.android.window.flags"
 container: "system"
 
 flag {
-  name: "nav_bar_transparent_by_default"
-  namespace: "windowing_frontend"
-  description: "Make nav bar color transparent by default when targeting SDK 35 or greater"
-  bug: "232195501"
-}
-
-flag {
     name: "apply_lifecycle_on_pip_change"
     namespace: "windowing_frontend"
     description: "Make pip activity lifecyle change with windowing mode"
@@ -54,6 +47,17 @@ flag {
   description: "Make contextual action bar edge-to-edge"
   bug: "379783298"
   is_fixed_read_only: true
+}
+
+flag {
+  name: "copy_compat_fields_of_window_insets"
+  namespace: "windowing_frontend"
+  description: "Copy mCompatInsetTypes and mCompatIgnoreVisibility from WindowInsets"
+  bug: "409469172"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -136,6 +140,17 @@ flag {
 }
 
 flag {
+  name: "do_not_force_wallpaper_for_freeform_task"
+  namespace: "windowing_frontend"
+  description: "Remove legacy condition to reduce overhead"
+  bug: "433694978"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "bg_priority_for_occluded_freeform_tasks"
   namespace: "windowing_frontend"
   description: "Background priority for occluded freeform tasks"
@@ -187,28 +202,6 @@ flag {
 }
 
 flag {
-  name: "get_dimmer_on_closing"
-  namespace: "windowing_frontend"
-  description: "Change check for when to ignore a closing task's dim"
-  bug: "329233513"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "use_tasks_dim_only"
-  namespace: "windowing_frontend"
-  description: "Only use the task's dim and reparent it to the display area when needed instead of coordinating multiple dimmers"
-  bug: "352522056"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "update_dims_when_window_shown"
   namespace: "windowing_frontend"
   description: "Check if we need to update dim layers when a new window draws the first frame"
@@ -230,11 +223,14 @@ flag {
 }
 
 flag {
-  name: "ensure_keyguard_does_transition_starting"
+  name: "ensure_keyguard_does_transition_starting_bug_fix"
   namespace: "windowing_frontend"
   description: "Ensure that keyguard is the one starting transitions, instead of delegating to Core"
   bug: "364930619"
   is_fixed_read_only: true
+  metadata {
+      purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -460,6 +456,16 @@ flag {
     description: "Trigger the removal of the starting window from the task in case the shared starting data is not attached to itself."
     bug: "405253899"
     is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "polish_close_wallpaper_includes_open_change"
+    namespace: "windowing_frontend"
+    description: "Record the initial z-order while collecting window containers, keep the wallpaper always at the bottom, and use a cross-fade animation when a close wallpaper transition includes an open target."
+    bug: "421436197"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

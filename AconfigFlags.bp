@@ -89,7 +89,7 @@ aconfig_declarations_group {
         "android.webkit.flags-aconfig-java",
         "android.widget.flags-aconfig-java",
         "android.xr.flags-aconfig-java-export",
-        "com.android.microxr.flags.flags-aconfig-java",
+        "com.android.microxr.flags-aconfig-java",
         "art_exported_aconfig_flags_lib",
         "backstage_power_flags_lib",
         "backup_flags_lib",
@@ -135,6 +135,7 @@ aconfig_declarations_group {
         "surfaceflinger_flags_java_lib",
         "telecom_flags_core_java_lib",
         "telephony_flags_core_java_lib",
+        "timezone_flags_core_java_lib",
         // !!! KEEP THIS LIST ALPHABETICAL !!!
     ],
 }
@@ -262,6 +263,20 @@ java_aconfig_library {
 cc_aconfig_library {
     name: "telephony_flags_c_lib",
     aconfig_declarations: "telephony_flags",
+}
+
+// Timezone
+aconfig_declarations {
+    name: "timezone_flags",
+    package: "android.timezone.flags",
+    container: "system",
+    srcs: ["core/java/android/timezone/flags/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "timezone_flags_core_java_lib",
+    aconfig_declarations: "timezone_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
 // Window
@@ -1060,6 +1075,7 @@ java_aconfig_library {
 // Multi user
 aconfig_declarations {
     name: "android.multiuser.flags-aconfig",
+    exportable: true,
     package: "android.multiuser",
     container: "system",
     srcs: ["core/java/android/content/pm/multiuser.aconfig"],
@@ -1069,6 +1085,18 @@ java_aconfig_library {
     name: "android.multiuser.flags-aconfig-java",
     aconfig_declarations: "android.multiuser.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "30",
+}
+
+java_aconfig_library {
+    name: "android.multiuser.flags-aconfig-java-export",
+    aconfig_declarations: "android.multiuser.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    mode: "exported",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.wifi",
+    ],
     min_sdk_version: "30",
 }
 
@@ -1095,15 +1123,15 @@ java_aconfig_library {
 
 // XR - Glasses
 aconfig_declarations {
-    name: "com.android.microxr.flags.flags-aconfig",
+    name: "com.android.microxr.flags-aconfig",
     container: "system",
-    package: "com.android.microxr.flags",
+    package: "com.android.microxr",
     srcs: ["core/java/android/content/pm/glasses.aconfig"],
 }
 
 java_aconfig_library {
-    name: "com.android.microxr.flags.flags-aconfig-java",
-    aconfig_declarations: "com.android.microxr.flags.flags-aconfig",
+    name: "com.android.microxr.flags-aconfig-java",
+    aconfig_declarations: "com.android.microxr.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
     apex_available: [
         "//apex_available:platform",

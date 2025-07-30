@@ -11,7 +11,7 @@ import static com.android.server.cpu.CpuAvailabilityMonitoringConfig.CPUSET_BACK
 
 import com.android.server.am.ProcessRecord;
 import com.android.server.am.ProcessList;
-import com.android.server.am.psc.ProcessStateRecord;
+import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.ServiceThread;
 import com.android.server.LocalServices;
 import com.android.server.cpu.CpuMonitorInternal;
@@ -436,7 +436,7 @@ public class ProcessFreezerManager {
         synchronized (mPidsSelfLocked) {
             for (int i = 0; i < mPidsSelfLocked.size(); i++) {
                 final ProcessRecord app = mPidsSelfLocked.valueAt(i);
-                final ProcessStateRecord state = app.mState;
+                final ProcessRecordInternal state = app;
                 if (state.getCurAdj() >= ProcessList.FOREGROUND_APP_ADJ) {
                     String appPackageName = app.info.packageName;
                     if (processName.equals(appPackageName)) {
@@ -667,7 +667,7 @@ public class ProcessFreezerManager {
 
     private void unFreezeProcess(ProcessRecord app) {
         final ProcessCachedOptimizerRecord opt = app.mOptRecord;
-        final ProcessStateRecord state = app.mState;
+        final ProcessRecordInternal state = app;
         int pid = app.getPid();
         int uid = app.uid;
         String processName = app.processName;
@@ -736,7 +736,7 @@ public class ProcessFreezerManager {
 
     private boolean freezeProcess(ProcessRecord app) {
         final ProcessCachedOptimizerRecord opt = app.mOptRecord;
-        final ProcessStateRecord state = app.mState;
+        final ProcessRecordInternal state = app;
         final ProcessServiceRecord psr = app.mServices;
         int pid = app.getPid();
         int uid = app.uid;

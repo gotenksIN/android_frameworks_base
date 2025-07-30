@@ -8089,6 +8089,13 @@
     <permission android:name="android.permission.MODIFY_THEME_OVERLAY"
                 android:protectionLevel="signature" />
 
+    <!-- Allows an app to update settings in ThemeService.
+         @FlaggedApi(android.server.Flags.FLAG_ENABLE_THEME_SERVICE)
+         @hide  <p>Not for use by third-party applications.</p> -->
+    <permission android:name="android.permission.UPDATE_THEME_SETTINGS"
+        android:featureFlag="android.server.enable_theme_service"
+        android:protectionLevel="signature" />
+
     <!-- Allows an instant app to create foreground services.
          <p>Protection level: signature|development|instant|appop -->
     <permission android:name="android.permission.INSTANT_APP_FOREGROUND_SERVICE"
@@ -8931,7 +8938,6 @@
     <!-- @SystemApi Allows an app to use the on-device intelligence service.
              <p>Protection level: signature|privileged
              @hide
-         @FlaggedApi("android.app.ondeviceintelligence.flags.enable_on_device_intelligence")
         -->
     <permission android:name="android.permission.USE_ON_DEVICE_INTELLIGENCE"
         android:protectionLevel="signature|privileged" />
@@ -8940,7 +8946,6 @@
     <!-- @SystemApi Allows an app to bind the on-device intelligence service.
              <p>Protection level: signature|privileged
              @hide
-         @FlaggedApi("android.app.ondeviceintelligence.flags.enable_on_device_intelligence")
         -->
     <permission android:name="android.permission.BIND_ON_DEVICE_INTELLIGENCE_SERVICE"
         android:protectionLevel="signature|privileged" />
@@ -8949,7 +8954,6 @@
     <!-- @SystemApi Allows an app to bind the on-device sandboxed service.
              <p>Protection level: signature|privileged
              @hide
-         @FlaggedApi("android.app.ondeviceintelligence.flags.enable_on_device_intelligence")
         -->
     <permission android:name="android.permission.BIND_ON_DEVICE_SANDBOXED_INFERENCE_SERVICE"
         android:protectionLevel="signature"/>

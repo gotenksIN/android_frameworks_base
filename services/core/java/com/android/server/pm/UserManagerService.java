@@ -1782,7 +1782,6 @@ public class UserManagerService extends IUserManager.Stub {
 
     private boolean isProfileHidden(int userId) {
         if (android.os.Flags.allowPrivateProfile()
-                && android.multiuser.Flags.enableHidingProfiles()
                 && android.multiuser.Flags.enablePrivateSpaceFeatures()) {
             return getUserPropertiesInternal(userId).getProfileApiVisibility()
                     == UserProperties.PROFILE_API_VISIBILITY_HIDDEN;
@@ -8772,13 +8771,8 @@ public class UserManagerService extends IUserManager.Stub {
             String errorMessage = (message != null ? (message + ": ") : "")
                     + restriction + " is enabled.";
             Slog.w(LOG_TAG, errorMessage);
-            if (android.multiuser.Flags.showDifferentCreationErrorForUnsupportedDevices()) {
-                throw new UserManager.CheckedUserOperationException(errorMessage,
-                    USER_OPERATION_ERROR_USER_RESTRICTED);
-            } else {
-                throw new UserManager.CheckedUserOperationException(errorMessage,
-                    USER_OPERATION_ERROR_UNKNOWN);
-            }
+            throw new UserManager.CheckedUserOperationException(errorMessage,
+                USER_OPERATION_ERROR_USER_RESTRICTED);
         }
     }
 

@@ -171,16 +171,6 @@ flag {
 }
 
 flag {
-    name: "notifications_hun_shared_animation_values"
-    namespace: "systemui"
-    description: "Adds a shared class for fetching HUN animation values."
-    bug: "393369891"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "notification_avalanche_throttle_hun"
     namespace: "systemui"
     description: "During notification avalanche, throttle HUNs showing in fast succession."
@@ -234,6 +224,13 @@ flag {
     name: "scene_container"
     namespace: "systemui"
     description: "Enables the scene container framework go/flexiglass."
+    bug: "283121968"
+}
+
+flag {
+    name: "scene_container_desktop"
+    namespace: "systemui"
+    description: "Desktop specific flag which enables the scene container framework go/flexiglass."
     bug: "283121968"
 }
 
@@ -825,20 +822,6 @@ flag {
 }
 
 flag {
-   name: "enable_contextual_tip_for_power_off"
-   namespace: "systemui"
-   description: "Enables on-screen contextual tip about how to power off or restart phone"
-   bug: "322891421"
-}
-
-flag {
-   name: "enable_contextual_tip_for_take_screenshot"
-   namespace: "systemui"
-   description: "Enables on-screen contextual tip about how to take screenshot."
-   bug: "322891421"
-}
-
-flag {
     name: "enable_contextual_tip_for_mute_volume"
     namespace: "systemui"
     description: "Enables the contextual tip for muting the volume."
@@ -857,23 +840,6 @@ flag {
    description: "Disables iOS switcher check which guard the tips designed only for iOS switchers."
    namespace: "systemui"
    bug: "322891421"
-}
-
-flag {
-   name: "enable_contextual_tips"
-   description: "Enables showing contextual tips."
-   namespace: "systemui"
-   bug: "322891421"
-}
-
-flag {
-   name: "contextual_tips_assistant_dismiss_fix"
-   namespace: "systemui"
-   description: "Improve assistant dismiss signal accuracy for contextual tips."
-   bug: "334759504"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -925,16 +891,6 @@ flag {
     namespace: "systemui"
     description: "Decide whether to update user switcher in background thread."
     bug: "322745650"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "notify_power_manager_user_activity_background"
-    namespace: "systemui"
-    description: "Decide whether to notify the user activity to power manager in the background thread."
-    bug: "325203885"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1348,16 +1304,6 @@ flag {
 }
 
 flag {
-  namespace: "systemui"
-  name: "register_content_observers_async"
-  description: "Use new Async API to register content observers"
-  bug: "316922634"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "msdl_feedback"
   namespace: "systemui"
   description: "Enables MSDL feedback in SysUI surfaces."
@@ -1447,16 +1393,6 @@ flag {
   namespace: "systemui"
   description: "Enables the shade window to move between displays"
   bug: "362719719"
-}
-
-flag {
-   name: "media_projection_request_attribution_fix"
-   namespace: "systemui"
-   description: "Ensure MediaProjection consent requests are properly attributed"
-   bug: "373581993"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -2186,6 +2122,16 @@ flag {
     namespace: "systemui"
     description: "Enable glanceable hub by default (this flag is intended to enable GH for DF only)."
     bug: "428215526"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_output_switcher_audio_sharing_button"
+    namespace: "cross_device_experiences"
+    description: "Enables audio sharing quick button in the output switcher."
+    bug: "423772889"
     metadata {
       purpose: PURPOSE_BUGFIX
     }

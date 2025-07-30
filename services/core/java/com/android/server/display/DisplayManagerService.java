@@ -522,7 +522,7 @@ public final class DisplayManagerService extends SystemService {
 
     private final Injector mInjector;
 
-    // The minimum brightness curve, which guarantess that any brightness curve that dips below it
+    // The minimum brightness curve, which guarantees that any brightness curve that dips below it
     // is rejected by the system.
     private final Curve mMinimumBrightnessCurve;
     private final Spline mMinimumBrightnessSpline;
@@ -704,9 +704,12 @@ public final class DisplayManagerService extends SystemService {
             final var backupManager = new BackupManager(mContext);
             Consumer<Pair<DisplayTopology, DisplayTopologyGraph>> topologyChangedCallback =
                     update -> {
-                        DisplayTopologyGraph graph = update.second;
-                        if (mInputManagerInternal != null && graph != null) {
-                            mInputManagerInternal.setDisplayTopology(graph);
+                        if (mInputManagerInternal != null) {
+                            Slog.d(TAG,
+                                    "Sending topology graph to Input Manager: " + update.second);
+                            mInputManagerInternal.setDisplayTopology(update.second);
+                        } else {
+                            Slog.w(TAG, "Not sending topology, mInputManagerInternal is null");
                         }
                         deliverTopologyUpdate(update.first);
                     };
@@ -858,6 +861,11 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncRoot) {
             mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
             mInputManagerInternal = LocalServices.getService(InputManagerInternal.class);
+            if (mDisplayTopologyCoordinator != null) {
+                DisplayTopologyGraph graph = mDisplayTopologyCoordinator.getTopology().getGraph();
+                Slog.d(TAG, "Sending topology graph to Input Manager: " + graph);
+                mInputManagerInternal.setDisplayTopology(graph);
+            }
             mActivityManagerInternal = LocalServices.getService(ActivityManagerInternal.class);
 
             ActivityManager activityManager = mContext.getSystemService(ActivityManager.class);
@@ -3704,16 +3712,6 @@ public final class DisplayManagerService extends SystemService {
                 mHandler.sendEmptyMessage(MSG_REQUEST_TRAVERSAL);
             }
         }
-    }
-
-    // Check if the target app is in cached mode
-    private boolean isUidCached(int uid) {
-        if (mActivityManagerInternal == null || uid < FIRST_APPLICATION_UID) {
-            return false;
-        }
-        int procState = mActivityManagerInternal.getUidProcessState(uid);
-        int importance = ActivityManager.RunningAppProcessInfo.procStateToImportance(procState);
-        return importance >= IMPORTANCE_CACHED;
     }
 
     // Runs on Handler thread.

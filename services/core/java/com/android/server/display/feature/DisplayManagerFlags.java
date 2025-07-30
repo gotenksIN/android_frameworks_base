@@ -76,10 +76,6 @@ public class DisplayManagerFlags {
             com.android.graphics.surfaceflinger.flags.Flags.FLAG_ENABLE_SMALL_AREA_DETECTION,
             com.android.graphics.surfaceflinger.flags.Flags::enableSmallAreaDetection);
 
-    private final FlagState mDisplayConfigErrorHalFlagState = new FlagState(
-            com.android.graphics.surfaceflinger.flags.Flags.FLAG_DISPLAY_CONFIG_ERROR_HAL,
-            com.android.graphics.surfaceflinger.flags.Flags::displayConfigErrorHal);
-
     private final FlagState mSyncedResolutionSwitch = new FlagState(
             com.android.graphics.surfaceflinger.flags.Flags.FLAG_SYNCED_RESOLUTION_SWITCH,
             com.android.graphics.surfaceflinger.flags.Flags::syncedResolutionSwitch
@@ -270,6 +266,11 @@ public class DisplayManagerFlags {
             Flags::enableOnDisplayAddedInObserver
     );
 
+    private final FlagState mIsLoggingForDisplayEventsEnabled = new FlagState(
+            Flags.FLAG_ENABLE_LOGGING_FOR_DISPLAY_EVENTS,
+            Flags::enableLoggingForDisplayEvents
+    );
+
     /** Returns whether power throttling clamper is enabled on not. */
     public boolean isPowerThrottlingClamperEnabled() {
         return mPowerThrottlingClamperFlagState.isEnabled();
@@ -327,10 +328,6 @@ public class DisplayManagerFlags {
 
     public boolean isSmallAreaDetectionEnabled() {
         return mSmallAreaDetectionFlagState.isEnabled();
-    }
-
-    public boolean isDisplayConfigErrorHalEnabled() {
-        return mDisplayConfigErrorHalFlagState.isEnabled();
     }
 
     public boolean isSyncedResolutionSwitchEnabled() {
@@ -551,6 +548,10 @@ public class DisplayManagerFlags {
         return mIsOnDisplayAddedInObserverEnabled.isEnabled();
     }
 
+    public boolean isDisplayEventsLoggingEnabled() {
+        return mIsLoggingForDisplayEventsEnabled.isEnabled();
+    }
+
     /**
      * dumps all flagstates
      * @param pw printWriter
@@ -567,7 +568,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mPowerThrottlingClamperFlagState);
         pw.println(" " + mEvenDimmerFlagState);
         pw.println(" " + mSmallAreaDetectionFlagState);
-        pw.println(" " + mDisplayConfigErrorHalFlagState);
         pw.println(" " + mSyncedResolutionSwitch);
         pw.println(" " + mBrightnessWearBedtimeModeClamperFlagState);
         pw.println(" " + mAutoBrightnessModesFlagState);
@@ -606,6 +606,7 @@ public class DisplayManagerFlags {
         pw.println(" " + mEnsureColorFadeWhenTurningOn);
         pw.println(" " + mIsOnDisplayAddedInObserverEnabled);
         pw.println(" " + mEnableUpdatedDisplayConnectionDialogFlagState);
+        pw.println(" " + mIsLoggingForDisplayEventsEnabled);
     }
 
     private static class FlagState {

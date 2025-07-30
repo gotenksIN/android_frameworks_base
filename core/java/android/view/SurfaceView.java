@@ -1468,6 +1468,13 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     /**
      * @hide
      */
+    public SurfaceControl getRenderingSurfaceControl() {
+        return mBlastSurfaceControl;
+    }
+
+    /**
+     * @hide
+     */
     public String getName() {
         ViewRootImpl viewRoot = getViewRootImpl();
         String viewRootName = viewRoot == null ? "detached" : viewRoot.getTitle().toString();

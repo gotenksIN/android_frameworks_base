@@ -25,6 +25,7 @@ import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_NOSENSOR;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.os.Build.VERSION_CODES.P;
 import static android.os.Build.VERSION_CODES.Q;
@@ -1066,18 +1067,13 @@ public class DisplayContentTests extends WindowTestsBase {
                 .setDisplay(dc)
                 .setCreateActivity(true)
                 .build();
-        doReturn(true).when(rootTask).isVisible();
 
         final Task freeformRootTask = new TaskBuilder(mSupervisor)
                 .setDisplay(dc)
                 .setCreateActivity(true)
                 .setWindowingMode(WINDOWING_MODE_FREEFORM)
                 .build();
-        doReturn(true).when(freeformRootTask).isVisible();
         freeformRootTask.getTopChild().setBounds(100, 100, 300, 400);
-
-        assertTrue(dc.getDefaultTaskDisplayArea().isRootTaskVisible(WINDOWING_MODE_FREEFORM));
-
         freeformRootTask.getTopNonFinishingActivity().setOrientation(SCREEN_ORIENTATION_LANDSCAPE);
         rootTask.getTopNonFinishingActivity().setOrientation(SCREEN_ORIENTATION_PORTRAIT);
         assertEquals(SCREEN_ORIENTATION_PORTRAIT, dc.getOrientation());
@@ -1149,6 +1145,12 @@ public class DisplayContentTests extends WindowTestsBase {
         activity.setRequestedOrientation(newOrientation);
 
         assertEquals("The display should be rotated.", 1, dc.getRotation() % 2);
+
+        dc.setIgnoreOrientationRequest(true);
+        activity.setRequestedOrientation(SCREEN_ORIENTATION_SENSOR);
+
+        assertEquals("Sensor orientation must be respected with ignore-orientation-request",
+                SCREEN_ORIENTATION_SENSOR, dc.getLastOrientation());
     }
 
     @Test
@@ -2702,7 +2704,7 @@ public class DisplayContentTests extends WindowTestsBase {
         assertTrue(keyguardShowing.getAsBoolean());
         assertFalse(keyguardGoingAway.getAsBoolean());
         assertFalse(appVisible.getAsBoolean());
-        if (Flags.ensureKeyguardDoesTransitionStarting()) {
+        if (Flags.ensureKeyguardDoesTransitionStartingBugFix()) {
             assertThat(transitions.mLastTransit).isNull();
         } else {
             if (Flags.aodTransition()) {
@@ -2719,7 +2721,7 @@ public class DisplayContentTests extends WindowTestsBase {
         assertTrue(keyguardGoingAway.getAsBoolean());
         assertTrue(appVisible.getAsBoolean());
 
-        if (Flags.ensureKeyguardDoesTransitionStarting()) {
+        if (Flags.ensureKeyguardDoesTransitionStartingBugFix()) {
             // Transition will be created due to sleep token updates. But no keyguard transition
             // should be there when the transition is not initiated from the system UI.
             assertThat(transitions.mLastTransit).flags()
@@ -2765,7 +2767,7 @@ public class DisplayContentTests extends WindowTestsBase {
         keyguard.setKeyguardShown(displayId, true /* keyguard */, true /* aod */);
         assertFalse(keyguardGoingAway.getAsBoolean());
         assertFalse(appVisible.getAsBoolean());
-        if (!Flags.ensureKeyguardDoesTransitionStarting()) {
+        if (!Flags.ensureKeyguardDoesTransitionStartingBugFix()) {
             if (Flags.aodTransition()) {
                 assertThat(transitions.mLastTransit).flags().contains(TRANSIT_FLAG_AOD_APPEARING);
             } else {
@@ -2782,7 +2784,7 @@ public class DisplayContentTests extends WindowTestsBase {
         assertTrue(keyguardGoingAway.getAsBoolean());
         assertTrue(appVisible.getAsBoolean());
 
-        if (!Flags.ensureKeyguardDoesTransitionStarting()) {
+        if (!Flags.ensureKeyguardDoesTransitionStartingBugFix()) {
             assertThat(transitions.mLastTransit).flags()
                     .containsExactly(TRANSIT_FLAG_KEYGUARD_GOING_AWAY);
         }
@@ -2800,7 +2802,7 @@ public class DisplayContentTests extends WindowTestsBase {
         assertFalse(keyguardGoingAway.getAsBoolean());
         assertFalse(appVisible.getAsBoolean());
 
-        if (Flags.ensureKeyguardDoesTransitionStarting()) {
+        if (Flags.ensureKeyguardDoesTransitionStartingBugFix()) {
             assertThat(transitions.mLastTransit).isNull();
         } else {
             assertThat(transitions.mLastTransit).flags()

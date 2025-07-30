@@ -4402,6 +4402,7 @@ public abstract class Context {
                 // @hide: POWER_WHITELIST_MANAGER,
                 DEVICE_POLICY_SERVICE,
                 UI_MODE_SERVICE,
+                // @hide: THEME_SERVICE,
                 DOWNLOAD_SERVICE,
                 NFC_SERVICE,
                 BLUETOOTH_SERVICE,
@@ -6400,6 +6401,18 @@ public abstract class Context {
     public static final String OVERLAY_SERVICE = "overlay";
 
     /**
+     * Use with {@link #getSystemService(String)} to retrieve a {@link ThemeManager} for theme
+     * management.
+     *
+     * @see #getSystemService(String)
+     * @see ThemeManager
+     * @hide
+     */
+    @FlaggedApi(android.server.Flags.FLAG_ENABLE_THEME_SERVICE)
+    public static final String THEME_SERVICE = "theme";
+
+
+    /**
      * Use with {@link #getSystemService(String)} to manage resources.
      *
      * @see #getSystemService(String)
@@ -6583,6 +6596,15 @@ public abstract class Context {
      * @hide
      */
     public static final String ATTESTATION_VERIFICATION_SERVICE = "attestation_verification";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve an
+     * {@link android.security.talisman.TalismanManager}.
+     * @see #getSystemService(String)
+     * @see android.security.talisman.TalismanManager
+     * @hide
+     */
+    public static final String TALISMAN_SERVICE = "talisman";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve an
@@ -6802,7 +6824,6 @@ public abstract class Context {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(android.app.ondeviceintelligence.flags.Flags.FLAG_ENABLE_ON_DEVICE_INTELLIGENCE)
     public static final String ON_DEVICE_INTELLIGENCE_SERVICE = "on_device_intelligence";
 
     /**
@@ -6860,7 +6881,6 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @see android.telephony.satellite.SatelliteManager
      */
-    @FlaggedApi(com.android.internal.telephony.flags.Flags.FLAG_SATELLITE_STATE_CHANGE_LISTENER)
     public static final String SATELLITE_SERVICE = "satellite";
 
     /**

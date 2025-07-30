@@ -50,6 +50,7 @@
     </style>
 
     <style name="Theme.MaterialAlertDialog" parent="@style/ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:background">@color/surfaceContainerHighColor</item>
         <item name="android:backgroundDimAmount">@dimen/alert_dialog_dim_amount</item>
         <item name="android:windowMinWidthMinor">@dimen/alert_dialog_min_width_minor</item>
         <item name="buttonBarStyle">@style/Widget.PackageInstaller.Material.ButtonBar</item>
@@ -57,11 +58,6 @@
         <item name="buttonBarNegativeButtonStyle">@style/Widget.PackageInstaller.Material.Button.Outlined</item>
         <item name="materialAlertDialogTitleTextStyle">@style/Widget.PackageInstaller.Material.WindowTitle</item>
         <item name="shapeAppearanceOverlay">@style/ShapeAppearance</item>
-    </style>
-
-    <style name="Theme.MaterialAlertDialog.Variant" parent="">
-        <item name="buttonBarPositiveButtonStyle">@style/Widget.PackageInstaller.Material.Button</item>
-        <item name="buttonBarNegativeButtonStyle">@style/Widget.PackageInstaller.Material.Button</item>
     </style>
 
     <style name="Theme.UninstallerActivity"

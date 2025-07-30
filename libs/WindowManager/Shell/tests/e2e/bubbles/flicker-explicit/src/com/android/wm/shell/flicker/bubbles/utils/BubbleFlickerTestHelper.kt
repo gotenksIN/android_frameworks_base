@@ -128,7 +128,7 @@ fun launchBubbleViaDragToBubbleBar(
 }
 
 /**
- * Collapses the bubble app [testApp] via back key
+ * Collapses the bubble app [testApp] via back key.
  *
  * @param testApp the bubble app to collapse
  * @param tapl the [LauncherInstrumentation]
@@ -139,11 +139,27 @@ fun collapseBubbleAppViaBackKey(
     tapl: LauncherInstrumentation,
     wmHelper: WindowManagerStateHelper,
 ) {
-    // Ensure Bubble is in expanded state.
     waitAndAssertBubbleAppInExpandedState(testApp, wmHelper)
 
     // Press back key to collapse bubble
     tapl.pressBack()
+
+    waitAndAssertBubbleAppInCollapseState(wmHelper)
+}
+
+/**
+ * Collapses the bubble app [testApp] via touching outside the bubble app.
+ *
+ * @param testApp the bubble app to collapse
+ * @param wmHelper the [WindowManagerStateHelper]
+ */
+fun collapseBubbleAppViaTouchOutside(
+    testApp: StandardAppHelper,
+    wmHelper: WindowManagerStateHelper,
+) {
+    waitAndAssertBubbleAppInExpandedState(testApp, wmHelper)
+
+    Root.get().expandedBubbleStack.closeByClickingOutside()
 
     waitAndAssertBubbleAppInCollapseState(wmHelper)
 }
@@ -210,8 +226,12 @@ fun dismissBubbleAppViaBubbleView(uiDevice: UiDevice, wmHelper: WindowManagerSta
     uiDevice.bubbleIcon?.run {
         drag(Point(uiDevice.displayWidth / 2, uiDevice.displayHeight), 1000)
     }
+}
 
-    // Wait for bubble gone.
+/**
+ * Waits and verifies the bubble (represented as bubble icon or bubble bar) is gone.
+ */
+fun waitAndVerifyBubbleGone(wmHelper: WindowManagerStateHelper) {
     wmHelper
         .StateSyncBuilder()
         .add(ConditionsFactory.isWMStateComplete())

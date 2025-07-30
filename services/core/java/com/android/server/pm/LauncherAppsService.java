@@ -523,10 +523,6 @@ public class LauncherAppsService extends SystemService {
         }
 
         private boolean isHiddenProfile(UserHandle targetUser) {
-            if (!Flags.enableLauncherAppsHiddenProfileChecks()) {
-                return false;
-            }
-
             try {
                 UserProperties properties = mUserManagerInternal
                         .getUserProperties(targetUser.getIdentifier());
@@ -595,8 +591,6 @@ public class LauncherAppsService extends SystemService {
 
         private boolean areHiddenApisChecksEnabled() {
             return android.os.Flags.allowPrivateProfile()
-                    && Flags.enableHidingProfiles()
-                    && Flags.enableLauncherAppsHiddenProfileChecks()
                     && Flags.enablePermissionToAccessHiddenProfiles()
                     && Flags.enablePrivateSpaceFeatures();
         }

@@ -36,9 +36,9 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.spy;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
-import static com.android.hardware.input.Flags.FLAG_HID_BLUETOOTH_WAKEUP;
 import static com.android.server.policy.PhoneWindowManager.EXTRA_TRIGGER_HUB;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_DREAM_OR_AWAKE_OR_SLEEP;
+import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_GO_TO_SLEEP;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_HUB_OR_DREAM_OR_SLEEP;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -85,6 +85,7 @@ import com.android.server.input.InputManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.keyguard.KeyguardServiceDelegate;
 import com.android.server.statusbar.StatusBarManagerInternal;
+import com.android.server.testutils.OffsettableClock;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.DisplayPolicy;
 import com.android.server.wm.DisplayRotation;
@@ -124,6 +125,7 @@ public class PhoneWindowManagerTests {
     public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
 
     @Mock private IBinder mInputToken;
+    private OffsettableClock mOffsettableClock;
 
     PhoneWindowManager mNonSpyPhoneWindowManager;
     PhoneWindowManager mPhoneWindowManager;
@@ -162,6 +164,8 @@ public class PhoneWindowManagerTests {
     public void setUp() {
         MockitoAnnotations.initMocks(this);
         when(mContext.getSystemService(Context.POWER_SERVICE)).thenReturn(mPowerManager);
+
+        mOffsettableClock = new OffsettableClock.Stopped();
 
         mNonSpyPhoneWindowManager = new PhoneWindowManager();
         mPhoneWindowManager = spy(mNonSpyPhoneWindowManager);
@@ -582,7 +586,6 @@ public class PhoneWindowManagerTests {
     }
 
     @Test
-    @EnableFlags(FLAG_HID_BLUETOOTH_WAKEUP)
     public void testBluetoothHidConnectionBroadcastCanWakeup() {
         when(mContext.getPackageManager()).thenReturn(mPackageManager);
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_PC)).thenReturn(true);
@@ -595,6 +598,60 @@ public class PhoneWindowManagerTests {
                                 intentFilter.matchAction(ACTION_CONNECTION_STATE_CHANGED)));
         captor.getValue().onReceive(mContext, intent);
         verify(mWindowWakeUpPolicy).wakeUpFromBluetooth();
+    }
+
+    @Test
+    public void powerPress_firstTapThenPowerPress_shouldIgnorePowerPress() {
+        final int tapGestureEventTimeMillis = 0;
+        final int suppressionDelayMillis = 400;
+        final int powerButtonPressEventTimeMillis = tapGestureEventTimeMillis
+                + suppressionDelayMillis - 1;
+        final int sleepDuration = 10_000;
+        PowerManager.WakeData wakeData = new PowerManager.WakeData(
+                tapGestureEventTimeMillis, PowerManager.WAKE_REASON_TAP, sleepDuration);
+        Settings.Global.putInt(mContext.getContentResolver(),
+                Settings.Global.POWER_BUTTON_SHORT_PRESS, SHORT_PRESS_POWER_GO_TO_SLEEP);
+        Settings.Global.putInt(mContext.getContentResolver(),
+                Settings.Global.POWER_BUTTON_SUPPRESSION_DELAY_AFTER_GESTURE_WAKE,
+                suppressionDelayMillis);
+
+        initPhoneWindowManager();
+        when(mPowerManagerInternal.getLastWakeup()).thenReturn(wakeData);
+        when(mDisplayPolicy.isAwake()).thenReturn(true);
+        mPhoneWindowManager.updateSettings(null);
+
+        mOffsettableClock.fastForward(powerButtonPressEventTimeMillis);
+        mPhoneWindowManager.powerPress(powerButtonPressEventTimeMillis, 1, DEFAULT_DISPLAY);
+
+        verify(mPowerManager, never()).goToSleep(powerButtonPressEventTimeMillis,
+                PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON, 0);
+    }
+
+    @Test
+    public void powerPress_firstTapThenPowerPress_shouldRespectPowerPress() {
+        final int tapGestureEventTimeMillis = 0;
+        final int suppressionDelayMillis = 400;
+        final int powerButtonPressEventTimeMillis = tapGestureEventTimeMillis
+                + suppressionDelayMillis + 1;
+        final int sleepDuration = 10_000;
+        PowerManager.WakeData wakeData = new PowerManager.WakeData(
+                tapGestureEventTimeMillis, PowerManager.WAKE_REASON_TAP, sleepDuration);
+        Settings.Global.putInt(mContext.getContentResolver(),
+                Settings.Global.POWER_BUTTON_SHORT_PRESS, SHORT_PRESS_POWER_GO_TO_SLEEP);
+        Settings.Global.putInt(mContext.getContentResolver(),
+                Settings.Global.POWER_BUTTON_SUPPRESSION_DELAY_AFTER_GESTURE_WAKE,
+                suppressionDelayMillis);
+
+        initPhoneWindowManager();
+        when(mPowerManagerInternal.getLastWakeup()).thenReturn(wakeData);
+        when(mDisplayPolicy.isAwake()).thenReturn(true);
+        mPhoneWindowManager.updateSettings(null);
+
+        mOffsettableClock.fastForward(powerButtonPressEventTimeMillis);
+        mPhoneWindowManager.powerPress(powerButtonPressEventTimeMillis, 1, DEFAULT_DISPLAY);
+
+        verify(mPowerManager, times(1)).goToSleep(powerButtonPressEventTimeMillis,
+                PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON, 0);
     }
 
     private void initNonSpyPhoneWindowManager() {
@@ -638,6 +695,10 @@ public class PhoneWindowManagerTests {
          */
         WindowWakeUpPolicy getWindowWakeUpPolicy() {
             return mWindowWakeUpPolicy;
+        }
+
+        long getUptimeMillis() {
+            return mOffsettableClock.now();
         }
     }
 }

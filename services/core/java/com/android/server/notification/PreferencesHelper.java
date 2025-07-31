@@ -547,8 +547,10 @@ public class PreferencesHelper implements RankingConfig {
     @NonNull
     private PackagePreferences getOrCreatePackagePreferencesLocked(String pkg, int uid) {
         Objects.requireNonNull(pkg);
-        Preconditions.checkArgument(uid != INVALID_UID,
-                "Valid uid required to get settings of %s", pkg);
+        if (Flags.preferencesThrowsOnInvalidUid()) {
+            Preconditions.checkArgument(uid != INVALID_UID,
+                    "Valid uid required to get settings of %s", pkg);
+        }
 
         // TODO (b/194833441): use permissionhelper instead of DEFAULT_IMPORTANCE
         return getOrCreatePackagePreferencesSupportingInvalidUidLocked(pkg,

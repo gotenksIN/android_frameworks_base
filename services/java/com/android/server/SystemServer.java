@@ -229,7 +229,6 @@ import com.android.server.pm.DynamicCodeLoggingService;
 import com.android.server.pm.HsumBootUserInitializer;
 import com.android.server.pm.Installer;
 import com.android.server.pm.LauncherAppsService;
-import com.android.server.pm.OtaDexoptService;
 import com.android.server.pm.PackageManagerService;
 import com.android.server.pm.ShortcutService;
 import com.android.server.pm.UserManagerService;
@@ -289,6 +288,7 @@ import com.android.server.testharness.TestHarnessModeService;
 import com.android.server.textclassifier.TextClassificationManagerService;
 import com.android.server.textservices.TextServicesManagerService;
 import com.android.server.texttospeech.TextToSpeechManagerService;
+import com.android.server.theming.ThemeManagerService;
 import com.android.server.timedetector.GnssTimeUpdateService;
 import com.android.server.timedetector.NetworkTimeUpdateService;
 import com.android.server.timedetector.TimeDetectorService;
@@ -1377,21 +1377,6 @@ public final class SystemServer implements Dumpable {
                             .BOOT_TIME_EVENT_ELAPSED_TIME__EVENT__PACKAGE_MANAGER_INIT_READY,
                     SystemClock.elapsedRealtime());
         }
-        // Manages A/B OTA dexopting. This is a bootstrap service as we need it to rename
-        // A/B artifacts after boot, before anything else might touch/need them.
-        boolean disableOtaDexopt = SystemProperties.getBoolean("config.disable_otadexopt", false);
-        if (!disableOtaDexopt) {
-            t.traceBegin("StartOtaDexOptService");
-            try {
-                Watchdog.getInstance().pauseWatchingCurrentThread("moveab");
-                OtaDexoptService.main(mSystemContext, mPackageManagerService);
-            } catch (Throwable e) {
-                reportWtf("starting OtaDexOptService", e);
-            } finally {
-                Watchdog.getInstance().resumeWatchingCurrentThread("moveab");
-                t.traceEnd();
-            }
-        }
 
         if (Build.IS_ARC) {
             t.traceBegin("StartArcSystemHealthService");
@@ -2479,6 +2464,10 @@ public final class SystemServer implements Dumpable {
                 Slog.i(TAG, "Wallpaper service disabled by config");
             }
 
+            t.traceBegin("StartThemeService");
+            mSystemServiceManager.startService(ThemeManagerService.class);
+            t.traceEnd();
+
             // WallpaperEffectsGeneration manager service
             if (deviceHasConfigString(context,
                 R.string.config_defaultWallpaperEffectsGenerationService)) {
@@ -3144,7 +3133,7 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(ClipboardService.class);
         t.traceEnd();
 
-        if (!isTv) {
+        if (!isTv && !isWatch) {
             // Selection toolbar service
             t.traceBegin("StartSelectionToolbarManagerService");
             mSystemServiceManager.startService(SelectionToolbarManagerService.class);

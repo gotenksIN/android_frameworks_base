@@ -16,7 +16,6 @@
 
 package com.android.systemui.notifications.ui.composable
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -80,6 +79,8 @@ constructor(
 
     override val userActions: Flow<Map<UserAction, UserActionResult>> = actionsViewModel.actions
 
+    override val alwaysCompose: Boolean = false
+
     override suspend fun activate(): Nothing {
         actionsViewModel.activate()
     }
@@ -124,54 +125,44 @@ constructor(
                 )
             },
         ) {
-            Box {
-                Column {
-                    if (isFullWidth) {
-                        val burnIn = rememberBurnIn(keyguardClockViewModel)
+            Column {
+                if (isFullWidth) {
+                    val burnIn = rememberBurnIn(keyguardClockViewModel)
 
-                        with(smallClockElement) {
-                            SmallClock(
-                                burnInParams = burnIn.parameters,
-                                onTopChanged = burnIn.onSmallClockTopChanged,
-                            )
-                        }
+                    with(smallClockElement) {
+                        SmallClock(
+                            burnInParams = burnIn.parameters,
+                            onTopChanged = burnIn.onSmallClockTopChanged,
+                        )
                     }
-
-                    MediaCarousel(
-                        isVisible = viewModel.showMedia,
-                        mediaHost = mediaHost.get(),
-                        carouselController = mediaCarouselController,
-                        usingCollapsedLandscapeMedia = usingCollapsedLandscapeMedia,
-                        modifier =
-                            Modifier.padding(
-                                top = notificationStackPadding,
-                                start = notificationStackPadding,
-                                end = notificationStackPadding,
-                            ),
-                    )
-
-                    NotificationScrollingStack(
-                        shadeSession = shadeSession,
-                        stackScrollView = stackScrollView.get(),
-                        viewModel = placeholderViewModel,
-                        jankMonitor = jankMonitor,
-                        maxScrimTop = { 0f },
-                        shouldPunchHoleBehindScrim = false,
-                        stackTopPadding = notificationStackPadding,
-                        stackBottomPadding = notificationStackPadding,
-                        shouldFillMaxSize = false,
-                        shouldShowScrim = false,
-                        supportNestedScrolling = false,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
-                // Communicates the bottom position of the drawable area within the shade to NSSL.
-                NotificationStackCutoffGuideline(
+
+                MediaCarousel(
+                    isVisible = viewModel.showMedia,
+                    mediaHost = mediaHost.get(),
+                    carouselController = mediaCarouselController,
+                    usingCollapsedLandscapeMedia = usingCollapsedLandscapeMedia,
+                    modifier =
+                        Modifier.padding(
+                            top = notificationStackPadding,
+                            start = notificationStackPadding,
+                            end = notificationStackPadding,
+                        ),
+                )
+
+                NotificationScrollingStack(
+                    shadeSession = shadeSession,
                     stackScrollView = stackScrollView.get(),
                     viewModel = placeholderViewModel,
-                    modifier =
-                        Modifier.align(Alignment.BottomCenter)
-                            .padding(bottom = notificationStackPadding),
+                    jankMonitor = jankMonitor,
+                    maxScrimTop = { 0f },
+                    shouldPunchHoleBehindScrim = false,
+                    stackTopPadding = notificationStackPadding,
+                    stackBottomPadding = notificationStackPadding,
+                    shouldFillMaxSize = false,
+                    shouldShowScrim = false,
+                    supportNestedScrolling = false,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

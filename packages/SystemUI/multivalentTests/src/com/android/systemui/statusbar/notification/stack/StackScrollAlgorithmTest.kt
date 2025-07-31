@@ -2,6 +2,7 @@ package com.android.systemui.statusbar.notification.stack
 
 import android.annotation.DimenRes
 import android.content.pm.PackageManager
+import android.graphics.RectF
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.FlagsParameterization
 import android.view.View
@@ -30,7 +31,6 @@ import com.android.systemui.statusbar.notification.footer.ui.view.FooterView
 import com.android.systemui.statusbar.notification.footer.ui.view.FooterView.FooterViewState
 import com.android.systemui.statusbar.notification.headsup.AvalancheController
 import com.android.systemui.statusbar.notification.headsup.HeadsUpAnimator
-import com.android.systemui.statusbar.notification.headsup.NotificationsHunSharedAnimationValues
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.row.ExpandableView
@@ -117,10 +117,7 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         @JvmStatic
         @Parameters(name = "{0}")
         fun getParams(): List<FlagsParameterization> {
-            return FlagsParameterization.allCombinationsOf(
-                    NotificationsHunSharedAnimationValues.FLAG_NAME
-                )
-                .andSceneContainer()
+            return FlagsParameterization.allCombinationsOf().andSceneContainer()
         }
     }
 
@@ -143,15 +140,9 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
 
         hostView.addView(notificationRow)
 
-        if (NotificationsHunSharedAnimationValues.isEnabled) {
-            headsUpAnimator = HeadsUpAnimator(context, kosmos.fakeSystemBarUtilsProxy)
-        }
+        headsUpAnimator = HeadsUpAnimator(context, kosmos.fakeSystemBarUtilsProxy)
         stackScrollAlgorithm =
-            StackScrollAlgorithm(
-                context,
-                hostView,
-                if (::headsUpAnimator.isInitialized) headsUpAnimator else null,
-            )
+            StackScrollAlgorithm(context, hostView, headsUpAnimator)
     }
 
     private fun isTv(): Boolean {
@@ -634,7 +625,7 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         fakeHunInShade(
             headsUpTop = headsUpTop,
             stackTop = 2600f, // stack scrolled below the screen
-            stackCutoff = 4000f,
+            stackBottom = 4000f,
             collapsedHeight = 100,
             intrinsicHeight = intrinsicHunHeight,
         )
@@ -753,11 +744,7 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         ambientState.setLayoutMinHeight(2500) // Mock the height of shade
         ambientState.stackY = 2500f // Scroll over the max translation
         stackScrollAlgorithm.setIsExpanded(true) // Mark the shade open
-        if (NotificationsHunSharedAnimationValues.isEnabled) {
-            headsUpAnimator.headsUpAppearHeightBottom = bottomOfScreen.toInt()
-        } else {
-            stackScrollAlgorithm.setHeadsUpAppearHeightBottom(bottomOfScreen.toInt())
-        }
+        headsUpAnimator.headsUpAppearHeightBottom = bottomOfScreen.toInt()
         whenever(notificationRow.mustStayOnScreen()).thenReturn(true)
         whenever(notificationRow.isHeadsUp).thenReturn(true)
         whenever(notificationRow.isAboveShelf).thenReturn(true)
@@ -773,9 +760,7 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         val topMargin = 100f
         ambientState.maxHeadsUpTranslation = 2000f
         ambientState.stackTopMargin = topMargin.toInt()
-        if (NotificationsHunSharedAnimationValues.isEnabled) {
-            headsUpAnimator.stackTopMargin = topMargin.toInt()
-        }
+        headsUpAnimator.stackTopMargin = topMargin.toInt()
         whenever(notificationRow.intrinsicHeight).thenReturn(100)
         whenever(notificationRow.isHeadsUpAnimatingAway).thenReturn(true)
 
@@ -785,17 +770,17 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(NotificationsHunSharedAnimationValues.FLAG_NAME, PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
     fun resetViewStates_hunAnimatingAway_noStatusBarChip_hunTranslatedToTopOfScreen() {
         val topMargin = 100f
         ambientState.maxHeadsUpTranslation = 2000f
         ambientState.stackTopMargin = topMargin.toInt()
-        headsUpAnimator?.stackTopMargin = topMargin.toInt()
+        headsUpAnimator.stackTopMargin = topMargin.toInt()
         whenever(notificationRow.intrinsicHeight).thenReturn(100)
 
         val statusBarHeight = 432
         kosmos.fakeSystemBarUtilsProxy.fakeStatusBarHeight = statusBarHeight
-        headsUpAnimator!!.updateResources(context)
+        headsUpAnimator.updateResources(context)
 
         whenever(notificationRow.isHeadsUpAnimatingAway).thenReturn(true)
         whenever(notificationRow.hasStatusBarChipDuringHeadsUpAnimation()).thenReturn(false)
@@ -806,17 +791,17 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(NotificationsHunSharedAnimationValues.FLAG_NAME, PromotedNotificationUi.FLAG_NAME)
+    @EnableFlags(PromotedNotificationUi.FLAG_NAME)
     fun resetViewStates_hunAnimatingAway_withStatusBarChip_hunTranslatedToBottomOfStatusBar() {
         val topMargin = 100f
         ambientState.maxHeadsUpTranslation = 2000f
         ambientState.stackTopMargin = topMargin.toInt()
-        headsUpAnimator?.stackTopMargin = topMargin.toInt()
+        headsUpAnimator.stackTopMargin = topMargin.toInt()
         whenever(notificationRow.intrinsicHeight).thenReturn(100)
 
         val statusBarHeight = 432
         kosmos.fakeSystemBarUtilsProxy.fakeStatusBarHeight = statusBarHeight
-        headsUpAnimator!!.updateResources(context)
+        headsUpAnimator.updateResources(context)
 
         whenever(notificationRow.isHeadsUpAnimatingAway).thenReturn(true)
         whenever(notificationRow.hasStatusBarChipDuringHeadsUpAnimation()).thenReturn(true)
@@ -881,7 +866,7 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         val stackBottom = 2000f
         val stackHeight = stackBottom - stackTop
         ambientState.stackTop = stackTop
-        ambientState.stackCutoff = stackBottom
+        ambientState.drawBounds = RectF(0f, stackTop, 400f, stackBottom)
 
         stackScrollAlgorithm.resetViewStates(ambientState, /* speedBumpIndex= */ 0)
 
@@ -1116,7 +1101,7 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     fun resetViewStates_noSpaceForFooter_footerHidden_withSceneContainer() {
         ambientState.isShadeExpanded = true
         ambientState.stackTop = 0f
-        ambientState.stackCutoff = 100f
+        ambientState.drawBounds = RectF(0f, 0f, 400f, 100f)
         val footerView = mockFooterView(height = 200) // no space for the footer in the stack
         hostView.addView(footerView)
 
@@ -1899,17 +1884,13 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         headsUpTop: Float,
         headsUpBottom: Float = headsUpTop + intrinsicHeight, // assume all the space available
         stackTop: Float,
-        stackCutoff: Float = 2000f,
+        stackBottom: Float = 2000f,
         fullStackHeight: Float = 3000f,
     ) {
         ambientState.headsUpTop = headsUpTop
-        if (NotificationsHunSharedAnimationValues.isEnabled) {
-            headsUpAnimator.headsUpAppearHeightBottom = headsUpBottom.roundToInt()
-        } else {
-            ambientState.headsUpBottom = headsUpBottom
-        }
+        headsUpAnimator.headsUpAppearHeightBottom = headsUpBottom.roundToInt()
         ambientState.stackTop = stackTop
-        ambientState.stackCutoff = stackCutoff
+        ambientState.drawBounds = RectF(0f, stackTop, 400f, stackBottom)
 
         // shade is fully open
         ambientState.expansionFraction = 1.0f

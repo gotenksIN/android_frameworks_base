@@ -62,6 +62,8 @@ import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_NO_CERTIFIC
 import static android.content.pm.PackageManager.INSTALL_STAGED;
 import static android.content.pm.PackageManager.INSTALL_SUCCEEDED;
 import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_ADB;
+import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_EMERGENCY;
+import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_TEST;
 import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_INCOMPLETE_NETWORK_UNAVAILABLE;
 import static android.os.Process.INVALID_UID;
 import static android.provider.DeviceConfig.NAMESPACE_PACKAGE_MANAGER_SERVICE;
@@ -3066,18 +3068,28 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             onSessionVerificationFailure(e.error, errorMsg, /* extras= */ null);
         }
         if (shouldUseVerificationService()) {
-            // Send the request to the verifier and wait for its response before the rest of
-            // the installation can proceed.
-            if (isMultiPackage()) {
+            final String packageName = getPackageName();
+            if (mDeveloperVerifierController.hasExperiments(packageName)) {
+                // This is a local testing environment. Use previously configured test results
+                // instead of doing the real verification.
+                mDeveloperVerifierController.startLocalExperiment(
+                        packageName, mDeveloperVerifierCallback);
+                synchronized (mMetrics) {
+                    mMetrics.onDeveloperVerificationBypassed(
+                            DEVELOPER_VERIFICATION_BYPASSED_REASON_TEST);
+                }
+            } else if (isMultiPackage()) {
                 // TODO(b/360129657) perform developer verification on each children session before
                 // moving on to the next installation stage.
                 resumeVerify();
             } else { // Not a parent session
+                // Send the request to the verifier and wait for its response before the rest of
+                // the installation can proceed.
                 final var infoPair = getSigningInfoAndDeclaredLibraries();
                 final SigningInfo signingInfo = infoPair.first;
                 final List<SharedLibraryInfo> declaredLibraries = infoPair.second;
                 if (!mDeveloperVerifierController.startVerificationSession(
-                        mPm::snapshotComputer, userId, sessionId, getPackageName(),
+                        mPm::snapshotComputer, userId, sessionId, packageName,
                         Uri.fromFile(stageDir), signingInfo,
                         declaredLibraries, mCurrentVerificationPolicy.get(),
                         /* extensionParams= */ params.extensionParams,
@@ -3125,17 +3137,62 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 return false;
             }
         }
+        return true;
+    }
+
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    boolean shouldAllowDeveloperVerificationEmergencyBypass(String packageName, Computer snapshot) {
         final String verifierPackageName = mDeveloperVerifierController.getVerifierPackageName();
-        synchronized (mLock) {
-            if (TextUtils.equals(verifierPackageName, mPackageName)) {
-                // The verifier itself is being updated. Skip.
-                // TODO(b/360129657): log bypass reason and this bypass should only happen if the
-                // current verifier cannot be connected or isn't responding.
-                Slog.w(TAG, "Skipping verification service because the verifier is being updated");
+        if (verifierPackageName == null) {
+            // Impossible condition. The verifier must exist because otherwise we wouldn't get
+            // here. Added to prevent lint warnings.
+            return false;
+        }
+        if (packageName == null) {
+            return false;
+        }
+        PackageStateInternal ps = snapshot.getPackageStateInternal(packageName, Process.SYSTEM_UID);
+        if (ps == null || !ps.isSystem()) {
+            // The app being installed must be a system app to be considered a critical app for
+            // the emergency bypass.
+            return false;
+        }
+        // Check if app being installed is the verifier itself.
+        if (TextUtils.equals(verifierPackageName, packageName)) {
+            Slog.d(TAG, "Bypassing developer verification because the verifier is being updated");
+            return true;
+        }
+        // Check if app being installed is the sysconfig-specified update-owner of the verifier.
+        final String updateOwnerPackageName = mPm.getSystemAppUpdateOwnerPackageName(
+                verifierPackageName);
+        if (updateOwnerPackageName == null) {
+            // No sysconfig-specified update-owner for the verifier. No need to check further.
+            return false;
+        }
+        if (TextUtils.equals(updateOwnerPackageName, packageName)) {
+            Slog.d(TAG, "Bypassing verification service because the sysconfig-specified "
+                    + "update owner of the verifier is being updated");
+            return true;
+        }
+        // Check if app being installed is the emergency installer of the sysconfig-specified
+        // update-owner of the verifier.
+        if (isEmergencyInstallerEnabled(updateOwnerPackageName, snapshot, userId, ps.getAppId())) {
+            final PackageStateInternal psUpdateOwner = snapshot.getPackageStateInternal(
+                    updateOwnerPackageName, Process.SYSTEM_UID);
+            if (psUpdateOwner == null || psUpdateOwner.getPkg() == null) {
+                // Impossible condition, because the if clause above already checked this.
+                // Added to prevent lint warnings.
                 return false;
             }
+            String emergencyInstallerPackageName = psUpdateOwner.getPkg().getEmergencyInstaller();
+            if (emergencyInstallerPackageName != null
+                    && TextUtils.equals(emergencyInstallerPackageName, packageName)) {
+                Slog.d(TAG, "Bypassing verification service because the "
+                        + "emergency installer of the verifier's update owner is being updated");
+                return true;
+            }
         }
-        return true;
+        return false;
     }
 
     private void retryDeveloperVerificationSession(Supplier<Computer> snapshotSupplier) {
@@ -3263,7 +3320,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
          * Called by the session itself when the verifier cannot be connected because of infeasible
          * reasons such as it's not installed on the target user.
          */
-        private void onConnectionInfeasible() {
+        public void onConnectionInfeasible() {
             mHandler.post(() -> {
                 mDeveloperVerificationStatusInternal.setInternalStatus(
                         DeveloperVerificationStatusInternal.STATUS_INFEASIBLE);
@@ -3273,6 +3330,17 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 if (mCurrentVerificationPolicy.get()
                         != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
                     // Continue with the rest of the verification and installation.
+                    resumeVerify();
+                    return;
+                }
+                if (shouldAllowDeveloperVerificationEmergencyBypass(
+                        getPackageName(), mPm.snapshotComputer())) {
+                    // Bypass verification when critical package is being updated and the verifier
+                    // cannot be connected.
+                    synchronized (mMetrics) {
+                        mMetrics.onDeveloperVerificationBypassed(
+                                DEVELOPER_VERIFICATION_BYPASSED_REASON_EMERGENCY);
+                    }
                     resumeVerify();
                     return;
                 }
@@ -3299,6 +3367,17 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 if (mCurrentVerificationPolicy.get()
                         != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
                     // Continue with the rest of the verification and installation.
+                    resumeVerify();
+                    return;
+                }
+                if (shouldAllowDeveloperVerificationEmergencyBypass(
+                        getPackageName(), mPm.snapshotComputer())) {
+                    // Bypass verification when critical package is being updated and the verifier
+                    // cannot be connected.
+                    synchronized (mMetrics) {
+                        mMetrics.onDeveloperVerificationBypassed(
+                                DEVELOPER_VERIFICATION_BYPASSED_REASON_EMERGENCY);
+                    }
                     resumeVerify();
                     return;
                 }
@@ -3336,6 +3415,17 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 if (mCurrentVerificationPolicy.get()
                         != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
                     // Continue with the rest of the verification and installation.
+                    resumeVerify();
+                    return;
+                }
+                if (shouldAllowDeveloperVerificationEmergencyBypass(
+                        getPackageName(), mPm.snapshotComputer())) {
+                    // Bypass verification when critical package is being updated and the verifier
+                    // has timed out.
+                    synchronized (mMetrics) {
+                        mMetrics.onDeveloperVerificationBypassed(
+                                DEVELOPER_VERIFICATION_BYPASSED_REASON_EMERGENCY);
+                    }
                     resumeVerify();
                     return;
                 }

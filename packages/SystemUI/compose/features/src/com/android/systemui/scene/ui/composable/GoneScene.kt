@@ -16,6 +16,7 @@
 
 package com.android.systemui.scene.ui.composable
 
+import android.graphics.RectF
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -66,6 +67,8 @@ constructor(
 
     override val userActions: Flow<Map<UserAction, UserActionResult>> = actionsViewModel.actions
 
+    override val alwaysCompose: Boolean = false
+
     override suspend fun onActivated(): Nothing {
         actionsViewModel.activate()
     }
@@ -91,7 +94,7 @@ constructor(
                 notificationStackScrolLView.get().apply {
                     // use -headsUpInset to allow HUN translation outside bounds for snoozing
                     setStackTop(-headsUpInset)
-                    setStackCutoff(0f)
+                    setDrawBounds(RectF())
                 }
             }
         }

@@ -116,7 +116,6 @@ import com.android.systemui.statusbar.notification.headsup.HeadsUpAnimationEvent
 import com.android.systemui.statusbar.notification.headsup.HeadsUpAnimator;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpTouchHelper;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpUtil;
-import com.android.systemui.statusbar.notification.headsup.NotificationsHunSharedAnimationValues;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
@@ -141,6 +140,8 @@ import com.android.systemui.util.DumpUtilsKt;
 import com.android.systemui.util.ListenerSet;
 
 import com.google.errorprone.annotations.CompileTimeConstant;
+
+import org.jetbrains.annotations.NotNull;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -233,7 +234,6 @@ public class NotificationStackScrollLayout
     private String mLastInitViewDumpString;
     private long mLastInitViewElapsedRealtime;
 
-    @Nullable
     private final HeadsUpAnimator mHeadsUpAnimator;
     /**
      * The algorithm which calculates the properties for our children
@@ -683,11 +683,7 @@ public class NotificationStackScrollLayout
         mExpandHelper.setEventSource(this);
         mExpandHelper.setScrollAdapter(mScrollAdapter);
 
-        if (NotificationsHunSharedAnimationValues.isEnabled()) {
-            mHeadsUpAnimator = new HeadsUpAnimator(context, /* systemBarUtilsProxy= */ null);
-        } else {
-            mHeadsUpAnimator = null;
-        }
+        mHeadsUpAnimator = new HeadsUpAnimator(context, /* systemBarUtilsProxy= */ null);
         mStackScrollAlgorithm =  new StackScrollAlgorithm(context, this, mHeadsUpAnimator);
         mStateAnimator = new StackStateAnimator(context, this, mHeadsUpAnimator);
         setOutlineProvider(mOutlineProvider);
@@ -837,6 +833,8 @@ public class NotificationStackScrollLayout
             drawDebugInfo(canvas, y, Color.BLUE,
                     /* label= */ "getStackTop() + getIntrinsicStackHeight() = " + y);
 
+            drawDebugInfo(canvas, mAmbientState.getDrawBounds(), Color.YELLOW, "drawBounds");
+
             return; // the rest of the fields are not important in Flexiglass
         }
 
@@ -886,6 +884,13 @@ public class NotificationStackScrollLayout
         canvas.drawLine(/* startX= */ 0, /* startY= */ y, /* stopX= */ getWidth(), /* stopY= */ y,
                 mDebugPaint);
         canvas.drawText(label, /* x= */ 0, /* y= */ computeDebugYTextPosition(y), mDebugPaint);
+    }
+
+    private void drawDebugInfo(Canvas canvas, RectF rect, int color, String label) {
+        mDebugPaint.setColor(color);
+        canvas.drawRect(rect, mDebugPaint);
+        canvas.drawText(label, /* x= */ 0, /* y= */ computeDebugYTextPosition((int) rect.top),
+                mDebugPaint);
     }
 
     private int computeDebugYTextPosition(int lineY) {
@@ -1268,10 +1273,10 @@ public class NotificationStackScrollLayout
     }
 
     @Override
-    public void setStackCutoff(float stackCutoff) {
+    public void setDrawBounds(@NotNull RectF drawBounds) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        if (mAmbientState.getStackCutoff() != stackCutoff) {
-            mAmbientState.setStackCutoff(stackCutoff);
+        if (mAmbientState.getDrawBounds() != drawBounds) {
+            mAmbientState.setDrawBounds(drawBounds);
             updateStackEndHeightAndStackHeight(mAmbientState.getExpansionFraction());
             requestChildrenUpdate();
         }
@@ -1289,12 +1294,7 @@ public class NotificationStackScrollLayout
     @Override
     public void setHeadsUpBottom(float headsUpBottom) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        if (NotificationsHunSharedAnimationValues.isEnabled()) {
-            mHeadsUpAnimator.setHeadsUpAppearHeightBottom(Math.round(headsUpBottom));
-        } else if (mAmbientState.getHeadsUpBottom() != headsUpBottom) {
-            mAmbientState.setHeadsUpBottom(headsUpBottom);
-            mStateAnimator.setHeadsUpAppearHeightBottom(Math.round(headsUpBottom));
-        }
+        mHeadsUpAnimator.setHeadsUpAppearHeightBottom(Math.round(headsUpBottom));
     }
 
     @Override
@@ -5334,14 +5334,8 @@ public class NotificationStackScrollLayout
         SceneContainerFlag.assertInLegacyMode();
         mAmbientState.setMaxHeadsUpTranslation(height - bottomBarHeight);
 
-        if (NotificationsHunSharedAnimationValues.isEnabled()) {
-            mHeadsUpAnimator.setHeadsUpAppearHeightBottom(height);
-            mHeadsUpAnimator.setStackTopMargin(mAmbientState.getStackTopMargin());
-        } else {
-            mStackScrollAlgorithm.setHeadsUpAppearHeightBottom(height);
-            mStateAnimator.setHeadsUpAppearHeightBottom(height);
-            mStateAnimator.setStackTopMargin(mAmbientState.getStackTopMargin());
-        }
+        mHeadsUpAnimator.setHeadsUpAppearHeightBottom(height);
+        mHeadsUpAnimator.setStackTopMargin(mAmbientState.getStackTopMargin());
 
         requestChildrenUpdate();
     }

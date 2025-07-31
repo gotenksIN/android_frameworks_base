@@ -115,6 +115,8 @@ import static android.os.UserHandle.USER_ALL;
 import static android.os.UserHandle.USER_NULL;
 import static android.os.UserHandle.USER_SYSTEM;
 import static android.os.UserHandle.getUserHandleForUid;
+import static android.security.Flags.secureLockDevice;
+import static android.security.Flags.secureLockdown;
 import static android.service.notification.Adjustment.KEY_SUMMARIZATION;
 import static android.service.notification.Adjustment.KEY_TYPE;
 import static android.service.notification.Adjustment.KEY_UNCLASSIFY;
@@ -411,6 +413,7 @@ import com.android.server.notification.toast.ToastRecord;
 import com.android.server.pm.PackageManagerService;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
+import com.android.server.security.authenticationpolicy.SecureLockDeviceServiceInternal;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.utils.Slogf;
@@ -685,6 +688,7 @@ public class NotificationManagerService extends SystemService {
     private PermissionManager mPermissionManager;
     private PermissionPolicyInternal mPermissionPolicyInternal;
 
+    @Nullable private SecureLockDeviceServiceInternal mSecureLockDeviceService;
     // Can be null for wear
     @Nullable StatusBarManagerInternal mStatusBar;
     private DisplayManager mDisplayManager;
@@ -2610,9 +2614,12 @@ public class NotificationManagerService extends SystemService {
 
         @Override
         public synchronized void onStrongAuthRequiredChanged(int userId) {
+            boolean userInSecureLockDevice = false;
+            if (secureLockDevice() && mSecureLockDeviceService != null) {
+                userInSecureLockDevice = mSecureLockDeviceService.isSecureLockDeviceEnabled();
+            }
             boolean userInLockDownModeNext = containsFlag(getStrongAuthForUser(userId),
-                    STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN);
-
+                    STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN) || userInSecureLockDevice;
             // Nothing happens if the lockdown mode of userId keeps the same.
             if (userInLockDownModeNext == isInLockDownMode(userId)) {
                 return;
@@ -2630,7 +2637,6 @@ public class NotificationManagerService extends SystemService {
             if (userInLockDownModeNext) {
                 cancelNotificationsWhenEnterLockDownMode(userId);
             }
-
             mUserInLockDownMode.put(userId, userInLockDownModeNext);
 
             if (!userInLockDownModeNext) {
@@ -3480,7 +3486,12 @@ public class NotificationManagerService extends SystemService {
 
     @VisibleForTesting
     void onBootPhase(int phase, Looper mainLooper) {
-        if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
+        if (phase == SystemService.PHASE_LOCK_SETTINGS_READY) {
+            if (secureLockdown()) {
+                mSecureLockDeviceService =
+                        LocalServices.getService(SecureLockDeviceServiceInternal.class);
+            }
+        } else if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
             mDisplayManager = getContext().getSystemService(DisplayManager.class);
             mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
             mZenModeHelper.onSystemReady();
@@ -12531,7 +12542,7 @@ public class NotificationManagerService extends SystemService {
 
         private static final String ATT_TYPES = "types";
         private static final String TAG_DENIED = android.app.Flags.nmSummarizationOnboardingUi()
-                ? "denied_adjustment_keys"
+                ? "denied_adjustment_keys-temp"  // TODO: b/433554352 - restore tag for launch
                 : "user_denied_adjustments";
         private static final String TAG_DENIED_KEY = "adjustment";
         private static final String ATT_DENIED_KEY = "key";
@@ -12540,7 +12551,8 @@ public class NotificationManagerService extends SystemService {
         private static final String ATT_NAS_UNSUPPORTED = "unsupported_adjustments";
         private static final String ATT_USER_ID = "user";
         // for classification only, but named a bit more generally in case this ever gets expanded
-        private static final String TAG_SET_BY_USERS = "adjustment_pref_set_by_users";
+        // TODO: b/433554352 - restore tag for launch
+        private static final String TAG_SET_BY_USERS = "adjustment_pref_set_by_users-temp";
         private static final String ATT_USER_LIST = "users";
 
         private final Object mLock = new Object();
@@ -12772,7 +12784,9 @@ public class NotificationManagerService extends SystemService {
             Set<String> denied = new HashSet<>();
             if (android.app.Flags.nmSummarizationOnboardingUi()) {
                 if (!mDeniedAdjustments.containsKey(userId)) {
-                    mDeniedAdjustments.put(userId, new ArraySet<>(List.of(KEY_SUMMARIZATION)));
+                    // TODO: b/433554352 - restore denying summarization by default for launch
+                    // mDeniedAdjustments.put(userId, new ArraySet<>(List.of(KEY_SUMMARIZATION)));
+                    mDeniedAdjustments.put(userId, new ArraySet<>());
                 }
                 denied.addAll(mDeniedAdjustments.get(userId));
             } else {
@@ -15012,15 +15026,22 @@ public class NotificationManagerService extends SystemService {
             List<UserHandle> users = mUm.getUserHandles(/* excludeDying */ true);
             mNonBlockableDefaultApps = new ArrayMap<>();
             for (int i = 0; i < NON_BLOCKABLE_DEFAULT_ROLES.length; i++) {
+                String role = NON_BLOCKABLE_DEFAULT_ROLES[i];
                 final ArrayMap<Integer, ArraySet<String>> userToApprovedList = new ArrayMap<>();
-                mNonBlockableDefaultApps.put(NON_BLOCKABLE_DEFAULT_ROLES[i], userToApprovedList);
+                mNonBlockableDefaultApps.put(role, userToApprovedList);
                 for (int j = 0; j < users.size(); j++) {
-                    Integer userId = users.get(j).getIdentifier();
+                    int userId = users.get(j).getIdentifier();
                     ArraySet<String> approvedForUserId = new ArraySet<>(mRm.getRoleHoldersAsUser(
-                            NON_BLOCKABLE_DEFAULT_ROLES[i], UserHandle.of(userId)));
+                            role, UserHandle.of(userId)));
                     ArraySet<Pair<String, Integer>> approvedAppUids = new ArraySet<>();
                     for (String pkg : approvedForUserId) {
-                        approvedAppUids.add(new Pair(pkg, getUidForPackage(pkg, userId)));
+                        int uid = getUidForPackage(pkg, userId);
+                        if (uid != INVALID_UID) {
+                            approvedAppUids.add(new Pair<>(pkg, uid));
+                        } else {
+                            Slog.e(TAG, "init: Invalid package for role " + role
+                                    + " (user " + userId + "): " + pkg);
+                        }
                     }
                     userToApprovedList.put(userId, approvedForUserId);
                     mPreferencesHelper.updateDefaultApps(userId, null, approvedAppUids);
@@ -15090,8 +15111,13 @@ public class NotificationManagerService extends SystemService {
             }
             for (String nowApproved : roleHolders) {
                 if (!previouslyApproved.contains(nowApproved)) {
-                    toAdd.add(new Pair(nowApproved,
-                            getUidForPackage(nowApproved, user.getIdentifier())));
+                    int uid = getUidForPackage(nowApproved, user.getIdentifier());
+                    if (uid != INVALID_UID) {
+                        toAdd.add(new Pair<>(nowApproved, uid));
+                    } else {
+                        Slog.e(TAG, "onRoleHoldersChanged: Invalid package for role " + roleName
+                                + " (user " + user.getIdentifier() + "): " + nowApproved);
+                    }
                 }
             }
 
@@ -15131,10 +15157,12 @@ public class NotificationManagerService extends SystemService {
                 UserHandle user = users[i];
                 for (String pkg : mRm.getRoleHoldersAsUser(RoleManager.ROLE_BROWSER, user)) {
                     int uid = getUidForPackage(pkg, user.getIdentifier());
-                    if (uid != -1) {
+                    if (uid != INVALID_UID) {
                         newUids.add(uid);
                     } else {
-                        Slog.e(TAG, "Bad uid (-1) for browser package " + pkg);
+                        Slog.e(TAG, "updateTrampoline: Invalid package for role "
+                                + RoleManager.ROLE_BROWSER + " (user " + user.getIdentifier()
+                                + "): " + pkg);
                     }
                 }
             }
@@ -15147,7 +15175,7 @@ public class NotificationManagerService extends SystemService {
             } catch (RemoteException e) {
                 Slog.e(TAG, "role manager has bad default " + pkg + " " + userId);
             }
-            return -1;
+            return INVALID_UID;
         }
     }
 

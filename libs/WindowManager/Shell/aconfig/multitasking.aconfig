@@ -21,6 +21,13 @@ flag {
 }
 
 flag {
+    name: "enable_pip2_on_tv"
+    namespace: "multitasking"
+    description: "Enables the new implementation of PiP (PiP2) on TV"
+    bug: "403347147"
+}
+
+flag {
     name: "enable_new_bubble_animations"
     namespace: "multitasking"
     description: "Enables new animations for expand and collapse for bubbles"
@@ -251,6 +258,16 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where clicking the rotation button would open the bubble."
     bug: "424165276"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "split_disable_child_task_bounds"
+    namespace: "multitasking"
+    description: "Fixes a bug where split task can keep bounds from previous multitasking mode."
+    bug: "427245857"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

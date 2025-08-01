@@ -18,6 +18,7 @@ package android.app;
 
 import static android.annotation.Dimension.DP;
 import static android.app.Flags.FLAG_NM_SUMMARIZATION;
+import static android.app.Flags.FLAG_NM_SUMMARIZATION_ALL;
 import static android.app.Flags.FLAG_NOTIFICATION_IS_ANIMATED_ACTION_API;
 import static android.app.Flags.FLAG_HIDE_STATUS_BAR_NOTIFICATION;
 import static android.app.Flags.notificationsRedesignTemplates;
@@ -1248,6 +1249,12 @@ public class Notification implements Parcelable
      */
     public static final String EXTRA_CONTAINS_SUMMARIZATION
             = "android.app.extra.contains_summarization";
+
+    /**
+     * @hide
+     */
+    public static final String EXTRA_APP_SUMMARIZATION
+            = "android.app.extra.app_summarization";
 
     /**
      * {@link #extras} key: this is the title of the notification,
@@ -4541,7 +4548,7 @@ public class Notification implements Parcelable
     }
 
     /**
-     * The small icon representing this notification in the status bar and content view.
+     * The small icon representing this notification in the status bar.
      *
      * @return the small icon representing this notification
      *
@@ -4847,6 +4854,22 @@ public class Notification implements Parcelable
             return this;
         }
 
+        /**
+         * Sets the text that was computationally summarized from other sources, if applicable. The
+         * OS may choose to display this content instead of the original notification content on
+         * some surfaces and may add styling to indicate to the user that this was computationally
+         * generated.
+         */
+        @FlaggedApi(FLAG_NM_SUMMARIZATION_ALL)
+        @NonNull
+        public Builder setSummarizedContent(@Nullable CharSequence summarizedContent) {
+            mN.extras.putCharSequence(EXTRA_APP_SUMMARIZATION, summarizedContent);
+            if (Flags.nmSummarization()) {
+                setHasSummarizedContent(!TextUtils.isEmpty(summarizedContent));
+            }
+            return this;
+        }
+
         private ContrastColorUtil getColorUtil() {
             if (mColorUtil == null) {
                 mColorUtil = ContrastColorUtil.getInstance(mContext);
@@ -5089,8 +5112,7 @@ public class Notification implements Parcelable
 
         /**
          * Set the small icon, which will be used to represent the notification in the
-         * status bar and content view (unless overridden there by a
-         * {@link #setLargeIcon(Bitmap) large icon}).
+         * status bar.
          *
          * @param icon an Icon object to use
          * @see Notification#icon
@@ -5471,8 +5493,8 @@ public class Notification implements Parcelable
          * Add a large icon to the notification content view.
          *
          * <p>In the platform template, this image will be shown either on the right of the
-         * notification, with an aspect ratio of up to 16:9, or (when the notification is grouped)
-         * on the left in place of the {@link #setSmallIcon(Icon) small icon}.
+         * notification, with an aspect ratio of up to 16:9, or on the left when the notification
+         * is grouped.
          */
         @NonNull
         public Builder setLargeIcon(Bitmap b) {
@@ -5483,8 +5505,8 @@ public class Notification implements Parcelable
          * Add a large icon to the notification content view.
          *
          * <p>In the platform template, this image will be shown either on the right of the
-         * notification, with an aspect ratio of up to 16:9, or (when the notification is grouped)
-         * on the left in place of the {@link #setSmallIcon(Icon) small icon}.
+         * notification, with an aspect ratio of up to 16:9, or on the left when the notification
+         * is grouped.
          */
         @NonNull
         public Builder setLargeIcon(Icon icon) {
@@ -6197,14 +6219,21 @@ public class Notification implements Parcelable
             updateExpanderAlignment(contentView, p, hasSecondLine);
             setHeaderlessVerticalMargins(contentView, p, hasSecondLine);
 
-            // Update margins to leave space for the top line (but not for headerless views like
-            // HUNS, which use a different layout that already accounts for that). Templates that
-            // have content that will be displayed under the small icon also use a different margin.
-            if (Flags.notificationsRedesignTemplates() && !p.mHeaderless) {
+            if (notificationsRedesignTemplates() && !p.mHeaderless) {
+                // Update margins to leave space for the top line (but not for headerless views like
+                // HUNS, which use a different layout that already accounts for that). Templates
+                // that have content that will be displayed under the small icon also use a
+                // different margin.
                 int margin = getContentMarginTop(mContext,
                         R.dimen.notification_2025_content_margin_top);
                 contentView.setViewLayoutMargin(R.id.notification_main_column,
                         RemoteViews.MARGIN_TOP, margin, COMPLEX_UNIT_PX);
+
+                // Use a slightly larger text margin for expanded text with the redesign
+                int textMarginForLargeIcon = mContext.getResources().getDimensionPixelSize(
+                        R.dimen.notification_2025_text_margin_top);
+                contentView.setViewLayoutMargin(p.mTextViewId, RemoteViews.MARGIN_TOP,
+                        textMarginForLargeIcon, COMPLEX_UNIT_PX);
             }
 
             return contentView;
@@ -8375,11 +8404,23 @@ public class Notification implements Parcelable
     }
 
     /**
-     * Returns whether this notification contains computationally summarized text.
+     * Returns whether this notification contains computationally summarized text. The
+     * OS may choose to display this content instead of the original notification content on
+     * some surfaces and may add styling to indicate to the user that this was computationally
+     * generated.
      */
     @FlaggedApi(FLAG_NM_SUMMARIZATION)
     public boolean hasSummarizedContent() {
         return extras != null && extras.getBoolean(EXTRA_CONTAINS_SUMMARIZATION);
+    }
+
+    /**
+     * Returns app provided computationally summarized text that represents the content of the
+     * notification.
+     */
+    @FlaggedApi(FLAG_NM_SUMMARIZATION_ALL)
+    public @Nullable CharSequence getSummarizedContent() {
+        return extras != null ? extras.getCharSequence(EXTRA_APP_SUMMARIZATION) : null;
     }
 
     /**

@@ -373,10 +373,10 @@ interface IAudioService {
     oneway void setCsd(float csd);
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
-    oneway void forceUseFrameworkMel(boolean useFrameworkMel);
+    void forceUseFrameworkMel(boolean useFrameworkMel);
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
-    oneway void forceComputeCsdOnAllDevices(boolean computeCsdOnAllDevices);
+    void forceComputeCsdOnAllDevices(boolean computeCsdOnAllDevices);
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
     boolean isCsdEnabled();
@@ -760,6 +760,9 @@ interface IAudioService {
 
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     List<AudioFocusInfo> getFocusStack();
+
+    @EnforcePermission("QUERY_AUDIO_STATE")
+    boolean hasAudioFocus(String packageName);
 
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     oneway void sendFocusLossAndUpdate(in AudioFocusInfo focusLoser, in IAudioPolicyCallback apcb);

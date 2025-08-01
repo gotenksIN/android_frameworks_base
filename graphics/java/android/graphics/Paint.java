@@ -753,7 +753,13 @@ public class Paint {
         setTextLocales(LocaleList.getAdjustedDefault());
         resetElegantTextHeight();
         mFontFeatureSettings = null;
-        mFontVariationSettings = null;
+        if (com.android.text.flags.Flags.fixPaintResetInconsistency()) {
+            setFontVariationSettings(null);
+            setFontVariationOverride(null);
+            setTypeface(null);
+        } else {
+            mFontVariationSettings = null;
+        }
 
         mShadowLayerRadius = 0.0f;
         mShadowLayerDx = 0.0f;
@@ -1590,7 +1596,7 @@ public class Paint {
      * @return         typeface
      */
     public Typeface setTypeface(Typeface typeface) {
-        final long typefaceNative = typeface == null ? 0 : typeface.native_instance;
+        final long typefaceNative = typeface == null ? 0 : typeface.getNativeInstance();
         nSetTypeface(mNativePaint, typefaceNative);
         mTypeface = typeface;
         return typeface;

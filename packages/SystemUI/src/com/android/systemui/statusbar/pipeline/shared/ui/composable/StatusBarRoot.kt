@@ -61,9 +61,11 @@ import com.android.systemui.statusbar.chips.ui.compose.OngoingActivityChips
 import com.android.systemui.statusbar.core.NewStatusBarIcons
 import com.android.systemui.statusbar.core.RudimentaryBattery
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
+import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.featurepods.popups.StatusBarPopupChips
 import com.android.systemui.statusbar.featurepods.popups.ui.compose.StatusBarPopupChipsContainer
+import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.ConnectedDisplaysStatusBarNotificationIconViewStore
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerStatusBarViewBinder
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerViewBinder
@@ -80,6 +82,7 @@ import com.android.systemui.statusbar.pipeline.battery.ui.composable.ShowPercent
 import com.android.systemui.statusbar.pipeline.battery.ui.composable.UnifiedBattery
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarIconBlockListBinder
+import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarTouchExclusionRegionBinder
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinder
 import com.android.systemui.statusbar.pipeline.shared.ui.view.SystemStatusIconsLayoutHelper
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel
@@ -179,6 +182,16 @@ fun StatusBarRoot(
         } else {
             null
         }
+    val appHandlesViewModel =
+        rememberViewModel("AppHandleBounds") {
+            statusBarViewModel.appHandlesViewModelFactory.create(displayId)
+        }
+
+    // Let the DesktopStatusBar compose all the UI if [isDesktopStatusBarEnabled] is true.
+    if (StatusBarForDesktop.isEnabled && statusBarViewModel.isDesktopStatusBarEnabled) {
+        DesktopStatusBar(viewModel = statusBarViewModel)
+        return
+    }
 
     AndroidView(
         factory = { context ->
@@ -191,10 +204,15 @@ fun StatusBarRoot(
                     phoneStatusBarView = phoneStatusBarView,
                     statusBarViewModel = statusBarViewModel,
                     iconViewStore = iconViewStore,
-                    displayId = displayId,
+                    appHandlesViewModel = appHandlesViewModel,
                     context = context,
                 )
             }
+
+            HomeStatusBarTouchExclusionRegionBinder.bind(
+                phoneStatusBarView,
+                appHandlesViewModel.touchableExclusionRegion,
+            )
 
             if (StatusBarChipsModernization.isEnabled) {
                 // Make sure the primary chip is hidden when StatusBarChipsModernization is
@@ -322,7 +340,7 @@ private fun addStartSideChipsComposable(
     phoneStatusBarView: PhoneStatusBarView,
     statusBarViewModel: HomeStatusBarViewModel,
     iconViewStore: NotificationIconContainerViewBinder.IconViewStore?,
-    displayId: Int,
+    appHandlesViewModel: AppHandlesViewModel,
     context: Context,
 ) {
     val startSideExceptHeadsUp =
@@ -343,7 +361,6 @@ private fun addStartSideChipsComposable(
                 val statusBarBoundsViewModel =
                     rememberViewModel("HomeStatusBar.Bounds") {
                         statusBarViewModel.statusBarBoundsViewModelFactory.create(
-                            displayId = displayId,
                             startSideContainerView = startSideContainerView,
                             clockView = clockView,
                         )
@@ -353,14 +370,14 @@ private fun addStartSideChipsComposable(
 
                 val chipsMaxWidth: Dp =
                     remember(
-                        statusBarBoundsViewModel.appHandleBounds,
+                        appHandlesViewModel.appHandleBounds,
                         statusBarBoundsViewModel.startSideContainerBounds,
                         statusBarBoundsViewModel.clockBounds,
                         isRtl,
                         density,
                     ) {
                         chipsMaxWidth(
-                            appHandles = statusBarBoundsViewModel.appHandleBounds,
+                            appHandles = appHandlesViewModel.appHandleBounds,
                             startSideContainerBounds =
                                 statusBarBoundsViewModel.startSideContainerBounds,
                             clockBounds = statusBarBoundsViewModel.clockBounds,

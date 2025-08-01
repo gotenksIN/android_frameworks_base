@@ -589,3 +589,17 @@ flag {
     description: "Limit the number of sensor privacy listeners allowed per uid"
     bug: "400358935"
 }
+
+flag {
+    name: "deprecate_default_permission_pregrant_policy"
+    namespace: "permissions"
+    description: "Add support for deprecating unused Default Permission Pregrant Policy"
+    bug: "420985100"
+}
+
+flag {
+    name: "app_ops_cell_reporting"
+    namespace: "permissions"
+    description: "This flags app ops cell reporting tied to ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION"
+    bug: "420985100"
+}

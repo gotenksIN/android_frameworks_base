@@ -70,6 +70,7 @@ import com.android.internal.app.procstats.ProcessStats;
 import com.android.internal.os.Zygote;
 import com.android.server.FgThread;
 import com.android.server.am.OomAdjusterImpl.ProcessRecordNode;
+import com.android.server.am.ProcessCachedOptimizerRecord.ShouldNotFreezeReason;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.wm.WindowProcessController;
@@ -1019,8 +1020,9 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         return mInstr;
     }
 
+    @Override
     @GuardedBy(anyOf = {"mService", "mProcLock"})
-    boolean hasActiveInstrumentation() {
+    public boolean hasActiveInstrumentation() {
         return mInstr != null;
     }
 
@@ -1209,6 +1211,28 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                 false/* default */);
     }
 
+    @Override
+    public boolean hasAboveClient() {
+        return mServices.hasAboveClient();
+    }
+
+
+    @Override
+    public boolean shouldNotFreeze() {
+        return mOptRecord.shouldNotFreeze();
+    }
+
+    @Override
+    public boolean setShouldNotFreeze(boolean shouldNotFreeze, boolean dryRun,
+            @ShouldNotFreezeReason int reason, int adjSeq) {
+        return mOptRecord.setShouldNotFreeze(shouldNotFreeze, dryRun, reason, adjSeq);
+    }
+
+    @Override
+    public @ShouldNotFreezeReason int shouldNotFreezeReason() {
+        return mOptRecord.shouldNotFreezeReason();
+    }
+
     boolean hasActivitiesOrRecentTasks() {
         return mWindowProcessController.hasActivitiesOrRecentTasks();
     }
@@ -1317,7 +1341,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     void killLocked(String reason, String description, @Reason int reasonCode,
             @SubReason int subReason, boolean noisy, boolean asyncKPG) {
         if (!mKilledByAm) {
-            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "kill");
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                        "kill/" + processName + "/" + reasonCode + "/" + subReason);
+            }
             if (reasonCode == ApplicationExitInfo.REASON_ANR
                     && mErrorState.getAnrAnnotation() != null) {
                 description = description + ": " + mErrorState.getAnrAnnotation();

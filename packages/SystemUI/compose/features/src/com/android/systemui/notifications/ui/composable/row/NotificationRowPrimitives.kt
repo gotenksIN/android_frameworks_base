@@ -56,6 +56,7 @@ object NotificationRowPrimitives {
         val PillBackground = ElementKey("PillBackground", contentPicker = LowestZIndexContentPicker)
         val NotificationIconBackground = ElementKey("NotificationIconBackground")
         val Chevron = ElementKey("Chevron")
+        val ExpandedNumber = ElementKey("ExpandedNumber")
     }
 
     object Values {
@@ -65,14 +66,19 @@ object NotificationRowPrimitives {
 
 /** The Icon displayed at the start of any notification row. */
 @Composable
-fun BundleIcon(@DrawableRes drawable: Int?, modifier: Modifier = Modifier) {
+fun BundleIcon(@DrawableRes drawable: Int?, collapsed: Boolean, modifier: Modifier = Modifier) {
     val iconBackground = notificationProtectionColor()
-    Box(modifier = modifier.size(40.dp).background(color = iconBackground, shape = CircleShape)) {
+    Box(
+        modifier =
+            modifier
+                .size(if (collapsed) 40.dp else 24.dp)
+                .background(color = iconBackground, shape = CircleShape)
+    ) {
         if (drawable == null) return@Box
         Image(
             painter = painterResource(drawable),
             contentDescription = null,
-            modifier = Modifier.padding(10.dp).fillMaxSize(),
+            modifier = Modifier.fillMaxSize(.5f).align(Alignment.Center),
             contentScale = ContentScale.Fit,
             colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
         )
@@ -88,22 +94,29 @@ fun ContentScope.ExpansionControl(
     modifier: Modifier = Modifier,
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface
+    val shouldShowNumber = numberToShow != null
     Box(modifier = modifier) {
         // The background is a shared Element and therefore can't be the parent of a different
         // shared Element (the chevron), otherwise the child can't be animated.
         PillBackground(modifier = Modifier.matchParentSize())
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(vertical = 2.dp, horizontal = 6.dp),
+            modifier =
+                Modifier.padding(
+                    top = 2.dp,
+                    bottom = 2.dp,
+                    start = 6.dp,
+                    end = if (shouldShowNumber) 4.dp else 6.dp,
+                ),
         ) {
             val iconSizeDp = with(LocalDensity.current) { 16.sp.toDp() }
 
-            if (numberToShow != null) {
+            if (shouldShowNumber) {
                 Text(
                     text = numberToShow.toString(),
                     style = MaterialTheme.typography.labelSmallEmphasized,
                     color = textColor,
-                    modifier = Modifier.padding(end = 2.dp),
+                    modifier = Modifier.element(NotificationRowPrimitives.Elements.ExpandedNumber),
                 )
             }
             Chevron(collapsed = collapsed, modifier = Modifier.size(iconSizeDp), color = textColor)

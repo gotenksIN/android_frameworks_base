@@ -16,12 +16,20 @@
 
 package com.android.packageinstaller.v2.ui.fragments;
 
+import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED;
+import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_ABORT;
+import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY;
+import static android.content.pm.PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_DEVELOPER_BLOCKED;
+import static android.content.pm.PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE;
+import static android.content.pm.PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN;
+
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
 import android.content.pm.ResolveInfo;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.method.ScrollingMovementMethod;
@@ -65,8 +73,13 @@ public class InstallationFragment extends DialogFragment {
     private TextView mAppLabelTextView = null;
     private View mAppSnippet = null;
     private TextView mCustomMessageTextView = null;
+    private View mCustomViewPanel = null;
     private ProgressBar mProgressBar = null;
+    private ProgressBar mIndeterminateProgressBar = null;
     private View mTitleTemplate = null;
+    private View mMoreDetailsClickableLayout = null;
+    private View mMoreDetailsExpandedLayout = null;
+    private boolean mIsMoreDetailsExpanded = false;
 
     @Override
     public void onAttach(@NonNull Context context) {
@@ -87,8 +100,14 @@ public class InstallationFragment extends DialogFragment {
         mAppSnippet = dialogView.requireViewById(R.id.app_snippet);
         mAppIcon = dialogView.requireViewById(R.id.app_icon);
         mAppLabelTextView = dialogView.requireViewById(R.id.app_label);
+        mCustomViewPanel = dialogView.requireViewById(R.id.custom_view_panel);
+        mIndeterminateProgressBar = dialogView.requireViewById(R.id.indeterminate_progress_bar);
         mProgressBar = dialogView.requireViewById(R.id.progress_bar);
         mCustomMessageTextView = dialogView.requireViewById(R.id.custom_message);
+        mMoreDetailsClickableLayout = dialogView.requireViewById(
+                R.id.more_details_clickable_layout);
+        mMoreDetailsExpandedLayout = dialogView.requireViewById(
+                R.id.more_details_expanded_layout);
 
         String title = getString(R.string.title_install_staging);
         mDialog = UiUtil.getAlertDialog(requireContext(), title, dialogView,
@@ -149,12 +168,24 @@ public class InstallationFragment extends DialogFragment {
 
         // Get the current install stage
         final InstallStage installStage = getCurrentInstallStage();
+        this.setCancelable(true);
 
         // show the title and reset the paddings of the custom message textview
         if (mTitleTemplate != null) {
             mTitleTemplate.setVisibility(View.VISIBLE);
             mCustomMessageTextView.setPadding(0, 0, 0, 0);
         }
+        // hide the more details layout by default
+        mMoreDetailsClickableLayout.setVisibility(View.GONE);
+        mMoreDetailsExpandedLayout.setVisibility(View.GONE);
+
+        // Reset the paddings of the custom view panel
+        final int paddingHorizontal = mCustomViewPanel.getPaddingStart();
+        final int paddingTop = mCustomViewPanel.getPaddingTop();
+        final int paddingBottom =
+                getResources().getDimensionPixelOffset(R.dimen.alert_dialog_inner_padding);
+        mCustomViewPanel.setPadding(paddingHorizontal, paddingTop,
+                paddingHorizontal, paddingBottom);
 
         switch (installStage.getStageCode()) {
             case InstallStage.STAGE_ABORTED -> {
@@ -176,11 +207,15 @@ public class InstallationFragment extends DialogFragment {
                 updateUserActionRequiredUI(mDialog, (InstallUserActionRequired) installStage);
             }
         }
+
+        UiUtil.updateButtonBarLayoutIfNeeded(requireContext(), mDialog);
     }
 
     private void updateInstallAbortedUI(Dialog dialog, InstallAborted installStage) {
-        mProgressBar.setVisibility(View.GONE);
         mAppSnippet.setVisibility(View.GONE);
+        mIndeterminateProgressBar.setVisibility(View.GONE);
+        mProgressBar.setVisibility(View.GONE);
+
         mCustomMessageTextView.setVisibility(View.VISIBLE);
 
         // Set the message
@@ -206,15 +241,14 @@ public class InstallationFragment extends DialogFragment {
                         installStage.getActivityResultCode(), installStage.getResultIntent());
             });
         }
-
-        // Cancelable is false
-        this.setCancelable(false);
     }
 
     private void updateInstallFailedUI(Dialog dialog, InstallFailed installStage) {
+        mIndeterminateProgressBar.setVisibility(View.GONE);
+        mProgressBar.setVisibility(View.GONE);
+
         mAppSnippet.setVisibility(View.VISIBLE);
         mCustomMessageTextView.setVisibility(View.VISIBLE);
-        mProgressBar.setVisibility(View.GONE);
 
         Log.i(LOG_TAG, "Installation status code: " + installStage.getLegacyCode());
 
@@ -281,19 +315,25 @@ public class InstallationFragment extends DialogFragment {
                 mInstallActionListener.onNegativeResponse(installStage.getStageCode());
             });
         }
-
-        this.setCancelable(true);
     }
 
     private void updateInstallInstallingUI(Dialog dialog, InstallInstalling installStage) {
-        mProgressBar.setVisibility(View.VISIBLE);
-        mAppSnippet.setVisibility(View.VISIBLE);
         mCustomMessageTextView.setVisibility(View.GONE);
+        mProgressBar.setVisibility(View.GONE);
+
+        mAppSnippet.setVisibility(View.VISIBLE);
+        mIndeterminateProgressBar.setVisibility(View.VISIBLE);
+
+        // Update the padding of the custom view panel
+        final int paddingHorizontal = mCustomViewPanel.getPaddingStart();
+        final int paddingTop = mCustomViewPanel.getPaddingTop();
+        final int paddingBottom = 0;
+        mCustomViewPanel.setPadding(paddingHorizontal, paddingTop,
+                paddingHorizontal, paddingBottom);
 
         // Set the app icon, label and progress bar
         mAppIcon.setImageDrawable(installStage.getAppIcon());
         mAppLabelTextView.setText(installStage.getAppLabel());
-        mProgressBar.setIndeterminate(true);
 
         // Set the title
         final int titleResId = installStage.isAppUpdating()
@@ -315,16 +355,16 @@ public class InstallationFragment extends DialogFragment {
     }
 
     private void updateInstallStagingUI(@NonNull Dialog dialog) {
-        mProgressBar.setVisibility(View.VISIBLE);
         mAppSnippet.setVisibility(View.GONE);
         mCustomMessageTextView.setVisibility(View.GONE);
+        mIndeterminateProgressBar.setVisibility(View.GONE);
+
+        mProgressBar.setVisibility(View.VISIBLE);
 
         // Set the title
         dialog.setTitle(R.string.title_install_staging);
 
         // Set the progress bar
-        mProgressBar.setIndeterminate(false);
-        mProgressBar.setMax(100);
         mProgressBar.setProgress(0);
 
         // Hide the positive button
@@ -348,9 +388,11 @@ public class InstallationFragment extends DialogFragment {
     }
 
     private void updateInstallSuccessUI(Dialog dialog, InstallSuccess installStage) {
-        mProgressBar.setVisibility(View.GONE);
-        mAppSnippet.setVisibility(View.VISIBLE);
         mCustomMessageTextView.setVisibility(View.GONE);
+        mIndeterminateProgressBar.setVisibility(View.GONE);
+        mProgressBar.setVisibility(View.GONE);
+
+        mAppSnippet.setVisibility(View.VISIBLE);
 
         // Set the app icon and label
         mAppIcon.setImageDrawable(installStage.getAppIcon());
@@ -398,8 +440,6 @@ public class InstallationFragment extends DialogFragment {
                 mInstallActionListener.onNegativeResponse(installStage.getStageCode());
             });
         }
-
-        this.setCancelable(true);
     }
 
     private void updateUserActionRequiredUI(Dialog dialog, InstallUserActionRequired installStage) {
@@ -410,16 +450,20 @@ public class InstallationFragment extends DialogFragment {
             case InstallUserActionRequired.USER_ACTION_REASON_UNKNOWN_SOURCE -> {
                 updateUnknownSourceUI(dialog, installStage);
             }
-
             case InstallUserActionRequired.USER_ACTION_REASON_ANONYMOUS_SOURCE -> {
                 updateAnonymousSourceUI(dialog, installStage);
+            }
+            case InstallUserActionRequired.USER_ACTION_REASON_VERIFICATION_CONFIRMATION -> {
+                updateVerificationConfirmationUI(dialog, installStage);
             }
         }
     }
 
     private void updateUnknownSourceUI(Dialog dialog, InstallUserActionRequired installStage) {
-        mAppSnippet.setVisibility(View.VISIBLE);
+        mIndeterminateProgressBar.setVisibility(View.GONE);
         mProgressBar.setVisibility(View.GONE);
+
+        mAppSnippet.setVisibility(View.VISIBLE);
         mCustomMessageTextView.setVisibility(View.VISIBLE);
 
         // Set the app icon and label
@@ -453,13 +497,13 @@ public class InstallationFragment extends DialogFragment {
                 mInstallActionListener.onNegativeResponse(installStage.getStageCode());
             });
         }
-
-        this.setCancelable(true);
     }
 
     private void updateAnonymousSourceUI(Dialog dialog, InstallUserActionRequired installStage) {
         mAppSnippet.setVisibility(View.GONE);
+        mIndeterminateProgressBar.setVisibility(View.GONE);
         mProgressBar.setVisibility(View.GONE);
+
         mCustomMessageTextView.setVisibility(View.VISIBLE);
 
         // Hide the title and set the message
@@ -499,15 +543,15 @@ public class InstallationFragment extends DialogFragment {
                 mInstallActionListener.onNegativeResponse(installStage.getStageCode());
             });
         }
-
-        this.setCancelable(true);
     }
 
     private void updateInstallConfirmationUI(Dialog dialog,
             InstallUserActionRequired installStage) {
-        mAppSnippet.setVisibility(View.VISIBLE);
-        mProgressBar.setVisibility(View.GONE);
         mCustomMessageTextView.setVisibility(View.GONE);
+        mIndeterminateProgressBar.setVisibility(View.GONE);
+        mProgressBar.setVisibility(View.GONE);
+
+        mAppSnippet.setVisibility(View.VISIBLE);
 
         // Set the app icon and label
         mAppIcon.setImageDrawable(installStage.getAppIcon());
@@ -571,8 +615,6 @@ public class InstallationFragment extends DialogFragment {
                 mInstallActionListener.onNegativeResponse(installStage.getStageCode());
             });
         }
-
-        this.setCancelable(true);
     }
 
     /**
@@ -582,5 +624,125 @@ public class InstallationFragment extends DialogFragment {
         if (mProgressBar != null) {
             mProgressBar.setProgress(progress);
         }
+    }
+
+    private void updateVerificationConfirmationUI(Dialog dialog,
+            InstallUserActionRequired installStage) {
+        mAppSnippet.setVisibility(View.VISIBLE);
+        mCustomMessageTextView.setVisibility(View.VISIBLE);
+        mIndeterminateProgressBar.setVisibility(View.GONE);
+        mProgressBar.setVisibility(View.GONE);
+
+        mAppIcon.setImageDrawable(installStage.getAppIcon());
+        mAppLabelTextView.setText(installStage.getAppLabel());
+
+        TextView installWithoutVerifyingTextView = dialog.requireViewById(
+                R.id.install_without_verifying_text);
+
+        PackageInstaller.DeveloperVerificationUserConfirmationInfo verificationInfo =
+                installStage.getVerificationInfo();
+        assert verificationInfo != null;
+
+        // Set title and main message
+        int titleResId = getVerificationConfirmationTitleResourceId(installStage.getActionReason());
+        int msgResId = getVerificationConfirmationMessageResourceId(installStage.getActionReason());
+        dialog.setTitle(titleResId);
+        mCustomMessageTextView.setText(
+                Html.fromHtml(getString(msgResId), Html.FROM_HTML_MODE_LEGACY));
+        // Set positive button
+        Button positiveButton = UiUtil.getAlertDialogPositiveButton(dialog);
+        if (positiveButton != null) {
+            positiveButton.setVisibility(View.VISIBLE);
+            positiveButton.setText(R.string.ok);
+            positiveButton.setFilterTouchesWhenObscured(true);
+            UiUtil.applyOutlinedButtonStyle(requireContext(), positiveButton);
+            positiveButton.setOnClickListener(view -> {
+                mInstallActionListener.setVerificationUserResponse(
+                               DEVELOPER_VERIFICATION_USER_RESPONSE_ABORT);
+            });
+        }
+        // Set cancel action
+        mDialog.setCanceledOnTouchOutside(true);
+        mDialog.setOnCancelListener(view -> {
+            mInstallActionListener.setVerificationUserResponse(
+                    DEVELOPER_VERIFICATION_USER_RESPONSE_ABORT);
+        });
+        // Hide negative button
+        Button negativeButton = UiUtil.getAlertDialogNegativeButton(dialog);
+        if (negativeButton != null) {
+            negativeButton.setVisibility(View.GONE);
+        }
+
+        if (isVerificationBypassAllowed(verificationInfo)) {
+            if (!mIsMoreDetailsExpanded) {
+                mMoreDetailsClickableLayout.setVisibility(View.VISIBLE);
+                mMoreDetailsExpandedLayout.setVisibility(View.GONE);
+                // The color of the arrow is the same as the text color
+                TextView textView = dialog.requireViewById(R.id.more_details_text);
+                int textColor = textView.getCurrentTextColor();
+                ImageView imageView = dialog.requireViewById(R.id.keyboard_arrow_down);
+                imageView.setColorFilter(textColor);
+            }
+
+            mMoreDetailsClickableLayout.setOnClickListener(v -> {
+                mIsMoreDetailsExpanded = true;
+                mMoreDetailsClickableLayout.setVisibility(View.GONE);
+                mMoreDetailsExpandedLayout.setVisibility(View.VISIBLE);
+                installWithoutVerifyingTextView.setTypeface(
+                        installWithoutVerifyingTextView.getTypeface(), Typeface.BOLD);
+                installWithoutVerifyingTextView.setOnClickListener(v1 -> {
+                    mInstallActionListener.setVerificationUserResponse(
+                            DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY);
+                });
+            });
+        }
+    }
+
+    private int getVerificationConfirmationTitleResourceId(int userActionNeededReason) {
+        return switch (userActionNeededReason) {
+            case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN ->
+                    R.string.cannot_install_verification_unavailable_title;
+
+            case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE ->
+                    R.string.cannot_install_verification_no_internet_title;
+
+            default -> R.string.cannot_install_app_blocked_title;
+        };
+    }
+
+    private int getVerificationConfirmationMessageResourceId(int userActionNeededReason) {
+        return switch (userActionNeededReason) {
+            case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN ->
+                    R.string.cannot_install_verification_unavailable_summary;
+
+            case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE ->
+                    R.string.cannot_install_verification_no_internet_summary;
+
+            default -> R.string.cannot_install_app_blocked_summary;
+        };
+    }
+
+    /**
+     * Returns whether the user can choose to bypass the verification result and force installation,
+     * based on the verification policy and the reason for user action.
+     */
+    public static boolean isVerificationBypassAllowed(
+            PackageInstaller.DeveloperVerificationUserConfirmationInfo verificationInfo) {
+        int userActionNeededReason = verificationInfo.getUserActionNeededReason();
+        int verificationPolicy = verificationInfo.getVerificationPolicy();
+
+        return switch (userActionNeededReason) {
+            case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_DEVELOPER_BLOCKED -> false;
+
+            case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE,
+                 DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN ->
+                // Only disallow bypass if policy is closed.
+                    verificationPolicy != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED;
+
+            default -> {
+                Log.e(LOG_TAG, "Unknown user action needed reason: " + userActionNeededReason);
+                yield false;
+            }
+        };
     }
 }

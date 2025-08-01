@@ -1369,7 +1369,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, "Making running remote anim: " + app);
             }
-        } else if (app.getActiveInstrumentation() != null) {
+        } else if (app.hasActiveInstrumentation()) {
             // Don't want to kill running instrumentation.
             adj = FOREGROUND_APP_ADJ;
             schedGroup = SCHED_GROUP_DEFAULT;
@@ -1915,7 +1915,7 @@ public class OomAdjusterImpl extends OomAdjuster {
     @GuardedBy({"mService", "mProcLock"})
     @Override
     public boolean computeServiceHostOomAdjLSP(ConnectionRecord cr, ProcessRecord app,
-            ProcessRecord client, long now, boolean dryRun) {
+            ProcessRecordInternal client, long now, boolean dryRun) {
         if (app.isPendingFinishAttach()) {
             // We've set the attaching process state in the computeInitialOomAdjLSP. Skip it here.
             return false;
@@ -1951,11 +1951,10 @@ public class OomAdjusterImpl extends OomAdjuster {
                     && !cstate.isBackgroundRestricted()));
         }
 
-        if (client.mOptRecord.shouldNotFreeze()) {
+        if (client.shouldNotFreeze()) {
             // Propagate the shouldNotFreeze flag down the bindings.
-            if (app.mOptRecord.setShouldNotFreeze(true, dryRun,
-                    app.mOptRecord.shouldNotFreezeReason()
-                            | client.mOptRecord.shouldNotFreezeReason(), mAdjSeq)) {
+            if (app.setShouldNotFreeze(true, dryRun,
+                    app.shouldNotFreezeReason() | client.shouldNotFreezeReason(), mAdjSeq)) {
                 if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
                     // Do nothing, capability updated check will handle the dryrun output.
                 } else {
@@ -2024,8 +2023,8 @@ public class OomAdjusterImpl extends OomAdjuster {
             if (cr.hasFlag(Context.BIND_ALLOW_OOM_MANAGEMENT)) {
                 // Similar to BIND_WAIVE_PRIORITY, keep it unfrozen.
                 if (clientAdj < CACHED_APP_MIN_ADJ) {
-                    if (app.mOptRecord.setShouldNotFreeze(true, dryRun,
-                            app.mOptRecord.shouldNotFreezeReason()
+                    if (app.setShouldNotFreeze(true, dryRun,
+                            app.shouldNotFreezeReason()
                                     | SHOULD_NOT_FREEZE_REASON_BINDER_ALLOW_OOM_MANAGEMENT,
                             mAdjSeq)) {
                         if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
@@ -2269,8 +2268,8 @@ public class OomAdjusterImpl extends OomAdjuster {
             // bound by an unfrozen app via a WPRI binding has to remain
             // unfrozen.
             if (clientAdj < CACHED_APP_MIN_ADJ) {
-                if (app.mOptRecord.setShouldNotFreeze(true, dryRun,
-                        app.mOptRecord.shouldNotFreezeReason()
+                if (app.setShouldNotFreeze(true, dryRun,
+                        app.shouldNotFreezeReason()
                                 | ProcessCachedOptimizerRecord
                                 .SHOULD_NOT_FREEZE_REASON_BIND_WAIVE_PRIORITY, mAdjSeq)) {
                     if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
@@ -2413,11 +2412,10 @@ public class OomAdjusterImpl extends OomAdjuster {
             // we are going to consider it empty.
             clientProcState = PROCESS_STATE_CACHED_EMPTY;
         }
-        if (client.mOptRecord.shouldNotFreeze()) {
+        if (client.shouldNotFreeze()) {
             // Propagate the shouldNotFreeze flag down the bindings.
-            if (app.mOptRecord.setShouldNotFreeze(true, dryRun,
-                    app.mOptRecord.shouldNotFreezeReason()
-                            | client.mOptRecord.shouldNotFreezeReason(), mAdjSeq)) {
+            if (app.setShouldNotFreeze(true, dryRun,
+                    app.shouldNotFreezeReason() | client.shouldNotFreezeReason(), mAdjSeq)) {
                 if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
                     // Do nothing, capability updated check will handle the dryrun output.
                 } else {

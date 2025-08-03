@@ -3302,6 +3302,14 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
+    void reportOomAdjMessageLocked(String msg) {
+        synchronized (mOomAdjObserverLock) {
+            if (mCurOomAdjObserver != null) {
+                mUiHandler.obtainMessage(DISPATCH_OOM_ADJ_OBSERVER_MSG, msg).sendToTarget();
+            }
+        }
+    }
+
     /**
      * @deprecated use {@link #startActivityWithFeature} instead
      */

@@ -12515,7 +12515,7 @@ public final class Settings {
          * backup_finished_notification_receivers  (String[])
          * </pre>
          *
-         * backup_finished_notification_receivers uses ":" as delimeter for values.
+         * backup_finished_notification_receivers uses ":" as delimiter for values.
          *
          * <p>
          * Type: string

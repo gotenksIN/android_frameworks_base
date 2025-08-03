@@ -1674,48 +1674,6 @@ public class QuotaControllerTest {
         JobStatus job = createJobStatus("testGetMaxJobExecutionTimeLocked", 0);
         //noinspection deprecation
         JobStatus jobDefIWF;
-        mSetFlagsRule.disableFlags(android.app.job.Flags.FLAG_IGNORE_IMPORTANT_WHILE_FOREGROUND);
-        jobDefIWF = createJobStatus("testGetMaxJobExecutionTimeLocked_IWF",
-                createJobInfoBuilder(1)
-                        .setImportantWhileForeground(true)
-                        .setPriority(JobInfo.PRIORITY_DEFAULT)
-                        .build());
-
-        setStandbyBucket(RARE_INDEX, jobDefIWF);
-        setCharging();
-        synchronized (mQuotaController.mLock) {
-            assertEquals(JobSchedulerService.Constants.DEFAULT_RUNTIME_FREE_QUOTA_MAX_LIMIT_MS,
-                    mQuotaController.getMaxJobExecutionTimeMsLocked((jobDefIWF)));
-        }
-
-        setDischarging();
-        setProcessState(getProcessStateQuotaFreeThreshold());
-        synchronized (mQuotaController.mLock) {
-            assertEquals(JobSchedulerService.Constants.DEFAULT_RUNTIME_FREE_QUOTA_MAX_LIMIT_MS,
-                    mQuotaController.getMaxJobExecutionTimeMsLocked((jobDefIWF)));
-        }
-
-        // Top-started job
-        // Quota is enforced for top-started job after the process leaves TOP/BTOP state.
-        setProcessState(ActivityManager.PROCESS_STATE_TOP);
-        synchronized (mQuotaController.mLock) {
-            trackJobs(jobDefIWF);
-            mQuotaController.prepareForExecutionLocked(jobDefIWF);
-        }
-        setProcessState(ActivityManager.PROCESS_STATE_IMPORTANT_BACKGROUND);
-        synchronized (mQuotaController.mLock) {
-            assertEquals(timeUntilQuotaConsumedMs,
-                    mQuotaController.getMaxJobExecutionTimeMsLocked((jobDefIWF)));
-            mQuotaController.maybeStopTrackingJobLocked(jobDefIWF, null);
-        }
-
-        setProcessState(ActivityManager.PROCESS_STATE_RECEIVER);
-        synchronized (mQuotaController.mLock) {
-            assertEquals(timeUntilQuotaConsumedMs,
-                    mQuotaController.getMaxJobExecutionTimeMsLocked(jobDefIWF));
-        }
-
-        mSetFlagsRule.enableFlags(android.app.job.Flags.FLAG_IGNORE_IMPORTANT_WHILE_FOREGROUND);
         jobDefIWF = createJobStatus("testGetMaxJobExecutionTimeLocked_IWF",
                 createJobInfoBuilder(1)
                         .setImportantWhileForeground(true)
@@ -2084,8 +2042,7 @@ public class QuotaControllerTest {
 
 
     @Test
-    @EnableFlags({Flags.FLAG_ADJUST_QUOTA_DEFAULT_CONSTANTS,
-            Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER})
+    @EnableFlags(Flags.FLAG_ADJUST_QUOTA_DEFAULT_CONSTANTS)
     public void testGetTimeUntilQuotaConsumedLocked_Installer_Tuning() {
         PackageInfo pi = new PackageInfo();
         pi.packageName = SOURCE_PACKAGE;
@@ -3822,7 +3779,6 @@ public class QuotaControllerTest {
         assertEquals(84 * SECOND_IN_MILLIS, mQuotaController.getEJGracePeriodTempAllowlistMs());
         assertEquals(83 * SECOND_IN_MILLIS, mQuotaController.getEJGracePeriodTopAppMs());
 
-        mSetFlagsRule.enableFlags(Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER);
         setDeviceConfigLong(QcConstants.KEY_ALLOWED_TIME_PER_PERIOD_ADDITION_INSTALLER_MS,
                 6 * MINUTE_IN_MILLIS);
         assertEquals(6 * MINUTE_IN_MILLIS,
@@ -3930,12 +3886,10 @@ public class QuotaControllerTest {
         assertEquals(0, mQuotaController.getEJGracePeriodTempAllowlistMs());
         assertEquals(0, mQuotaController.getEJGracePeriodTopAppMs());
 
-        mSetFlagsRule.enableFlags(Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER);
         setDeviceConfigLong(QcConstants.KEY_ALLOWED_TIME_PER_PERIOD_ADDITION_INSTALLER_MS,
                 -MINUTE_IN_MILLIS);
         assertEquals(0,
                 mQuotaController.getAllowedTimePeriodAdditionInstallerMs());
-        mSetFlagsRule.disableFlags(Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER);
 
         // Invalid configurations.
         // In_QUOTA_BUFFER should never be greater than ALLOWED_TIME_PER_PERIOD
@@ -3955,14 +3909,12 @@ public class QuotaControllerTest {
         assertTrue(mQuotaController.getAllowedTimePeriodAdditionInstallerMs()
                 <= mQuotaController.getAllowedTimePerPeriodMs()[FREQUENT_INDEX]);
 
-        mSetFlagsRule.enableFlags(Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER);
         // ALLOWED_TIME_PER_PERIOD_ADDITION_INSTALLER should never be greater than
         // ALLOWED_TIME_PER_PERIOD.
         setDeviceConfigLong(QcConstants.KEY_ALLOWED_TIME_PER_PERIOD_ADDITION_INSTALLER_MS,
                  15 * MINUTE_IN_MILLIS);
         assertTrue(mQuotaController.getInQuotaBufferMs()
                 <= mQuotaController.getAllowedTimePerPeriodMs()[EXEMPTED_INDEX]);
-        mSetFlagsRule.disableFlags(Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER);
 
         // Test larger than a day. Controller should cap at one day.
         setDeviceConfigLong(QcConstants.KEY_ALLOWED_TIME_PER_PERIOD_EXEMPTED_MS,
@@ -4043,11 +3995,9 @@ public class QuotaControllerTest {
         assertEquals(HOUR_IN_MILLIS, mQuotaController.getEJGracePeriodTempAllowlistMs());
         assertEquals(HOUR_IN_MILLIS, mQuotaController.getEJGracePeriodTopAppMs());
 
-        mSetFlagsRule.enableFlags(Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER);
         setDeviceConfigLong(QcConstants.KEY_ALLOWED_TIME_PER_PERIOD_ADDITION_INSTALLER_MS,
                 25 * HOUR_IN_MILLIS);
         assertEquals(0, mQuotaController.getAllowedTimePeriodAdditionInstallerMs());
-        mSetFlagsRule.disableFlags(Flags.FLAG_ADDITIONAL_QUOTA_FOR_SYSTEM_INSTALLER);
     }
 
     /** Tests that TimingSessions aren't saved when the device is charging. */

@@ -27,10 +27,9 @@ import com.android.wm.shell.Flags
 import com.android.wm.shell.Utils
 import com.android.wm.shell.flicker.bubbles.testcase.EnterBubbleTestCases
 import com.android.wm.shell.flicker.bubbles.utils.ApplyPerParameterRule
+import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerTestHelper.launchBubbleViaDragToBubbleBar
 import com.android.wm.shell.flicker.bubbles.utils.FlickerPropertyInitializer
 import com.android.wm.shell.flicker.bubbles.utils.RecordTraceWithTransitionRule
-import com.android.wm.shell.flicker.bubbles.utils.launchBubbleViaDragToBubbleBar
-import com.android.wm.shell.flicker.bubbles.utils.setUpBeforeTransition
 import com.android.wm.shell.flicker.utils.SplitScreenUtils
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -39,7 +38,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestRule
 import org.junit.runners.MethodSorters
-import org.junit.runners.Parameterized
 
 /**
  * Test entering bubble via dragging the [testApp] icon from task bar to bubble bar location.
@@ -69,18 +67,11 @@ class EnterBubbleViaDragToBubbleBarTest(navBar: NavBar) : BubbleFlickerTestBase(
     companion object : FlickerPropertyInitializer() {
         private val recordTraceWithTransitionRule = RecordTraceWithTransitionRule(
             setUpBeforeTransition = {
-                setUpBeforeTransition(instrumentation, wmHelper)
                 SplitScreenUtils.createShortcutOnHotseatIfNotExist(tapl, testApp.appName)
             },
             transition = { launchBubbleViaDragToBubbleBar(testApp, tapl, wmHelper) },
             tearDownAfterTransition = { testApp.exit(wmHelper) }
         )
-
-        // TODO(b/428566420): LauncherInstrumentation doesn't support to drag to bubble bar on 3
-        //  button nav mode.
-        @Parameterized.Parameters(name = "{0}")
-        @JvmStatic
-        fun data(): List<NavBar> = listOf(NavBar.MODE_GESTURAL)
     }
 
     @get:Rule

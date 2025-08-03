@@ -7150,8 +7150,7 @@ public class AudioService extends IAudioService.Stub
                     + ", uid=" + uid + ", caller=" + callingPackage + ")");
         }
 
-        if (mContext.checkCallingPermission(
-                MODIFY_AUDIO_SETTINGS_PRIVILEGED) != PackageManager.PERMISSION_GRANTED) {
+        if (!hasAudioSettingsPrivilegedOrAudioRoutingPermission(/*withSelf=*/false)) {
             if (mode == MODE_ASSISTANT_CONVERSATION) {
                 Log.w(TAG,
                         "MODIFY_AUDIO_SETTINGS_PRIVILEGED Permission Denial for "
@@ -8587,6 +8586,19 @@ public class AudioService extends IAudioService.Stub
         return mContext.checkPermission(MODIFY_AUDIO_SETTINGS, pid, uid)
                 == PackageManager.PERMISSION_GRANTED
                 || mContext.checkPermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED, pid, uid)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasAudioSettingsPrivilegedOrAudioRoutingPermission(boolean withSelf) {
+        if (withSelf) {
+            return mContext.checkCallingOrSelfPermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
+                    == PackageManager.PERMISSION_GRANTED
+                    || mContext.checkCallingOrSelfPermission(MODIFY_AUDIO_ROUTING)
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+        return mContext.checkCallingPermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
+                == PackageManager.PERMISSION_GRANTED
+                || mContext.checkCallingPermission(MODIFY_AUDIO_ROUTING)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
@@ -12096,10 +12108,7 @@ public class AudioService extends IAudioService.Stub
 
         // does caller have system privileges to bypass HardeningEnforcer
         boolean permissionOverridesCheck = false;
-        if ((mContext.checkCallingOrSelfPermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
-                == PackageManager.PERMISSION_GRANTED)
-                || (mContext.checkCallingOrSelfPermission(MODIFY_AUDIO_ROUTING)
-                == PackageManager.PERMISSION_GRANTED)) {
+        if (hasAudioSettingsPrivilegedOrAudioRoutingPermission(/*withSelf=*/true)) {
             permissionOverridesCheck = true;
         } else if (uid < UserHandle.AID_APP_START) {
             permissionOverridesCheck = true;
@@ -14700,6 +14709,21 @@ public class AudioService extends IAudioService.Stub
         super.getFocusStack_enforcePermission();
 
         return mMediaFocusControl.getFocusStack();
+    }
+
+    /**
+     * Checks if a given package currently holds any type of audio focus.
+     * <p>This method considers all forms of audio focus, including traditional exclusive/transient
+     * focus from the main focus stack and concurrent focus when multi-audio focus is enabled.
+     *
+     * @param packageName The package name to check for audio focus.
+     * @return {@code true} if the package holds any audio focus, {@code false} otherwise.
+     */
+    @android.annotation.EnforcePermission(QUERY_AUDIO_STATE)
+    public boolean hasAudioFocus(String packageName) {
+        super.hasAudioFocus_enforcePermission();
+
+        return mMediaFocusControl.hasAudioFocus(packageName);
     }
 
     /**

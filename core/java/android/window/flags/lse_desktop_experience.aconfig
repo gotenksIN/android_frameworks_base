@@ -115,6 +115,16 @@ flag {
 }
 
 flag {
+    name: "enable_auto_restart_on_display_move"
+    namespace: "lse_desktop_experience"
+    description: "Automatically restarts apps upon display move to fix density issues"
+    bug: "427878712"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_backup_and_restore_display_window_settings"
     namespace: "lse_desktop_experience"
     description: "Enables backup and restore for display window settings."
@@ -412,6 +422,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables desktop-first policy in DesktopModeLaunchParamsModifier."
     bug: "427828063"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_first_top_fullscreen_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fix desktop-first policy for the case where any fullscreen app is focused."
+    bug: "431066262"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -801,6 +821,16 @@ flag {
 }
 
 flag {
+    name: "enable_drag_end_stable_bounds_reset"
+    namespace: "lse_desktop_experience"
+    description: "Enables bugfix handling stale stable bounds when drag ends."
+    bug: "421180735"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_drag_resize_set_up_in_bg_thread"
     namespace: "lse_desktop_experience"
     description: "Enables setting up the drag-resize input listener in a bg thread"
@@ -1161,6 +1191,16 @@ flag {
 }
 
 flag {
+    name: "enable_remove_status_bar_input_layer"
+    namespace: "lse_desktop_experience"
+    description: "Removes app handle bounds from the status bar's touchable region so that input is sent directly to the app handle."
+    bug: "412444139"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_request_fullscreen_bugfix"
     namespace: "lse_desktop_experience"
     description: "Fixes split to fullscreen restoration using the Activity#requestFullscreenMode API"
@@ -1509,6 +1549,17 @@ flag {
     description: "Forces incompatible tasks opening in desktop to be fullscreen via the desktop /n"
                  "mode launch params modifier."
     bug: "423860499"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "ignore_current_params_in_desktop_launch_params"
+    namespace: "lse_desktop_experience"
+    description: "Ignore the current params when resolving desktop specific launch params in the /n"
+                 "desktop mode launch params modifier."
+    bug: "419222219"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

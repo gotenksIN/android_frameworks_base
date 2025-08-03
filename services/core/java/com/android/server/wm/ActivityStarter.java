@@ -1992,8 +1992,7 @@ class ActivityStarter {
             // To prevent interruption of the user's current focus, if a launch request
             // originates from activities within the same visible task, the task should not be
             // moved to the front, or an unfocused Task could be moved to top unexpectedly.
-            if (com.android.window.flags.Flags.fixMovingUnfocusedTask() && !avoidMoveToFront()
-                    && sourceRecord != null && sourceRecord.getTask() == targetTask
+            if (!avoidMoveToFront() && sourceRecord != null && sourceRecord.getTask() == targetTask
                     && targetTask.isVisible() && targetTask.inMultiWindowMode()) {
                 mCanMoveToFrontCode = MOVE_TO_FRONT_AVOID_VISIBLE_MULTI_WINDOW;
             }
@@ -2054,11 +2053,9 @@ class ActivityStarter {
                     ? mSourceRecord.getTask() : null;
             setNewTask(taskToAffiliate);
         } else if (mAddingToTask) {
-            if (com.android.window.flags.Flags.fixLayoutRestoredTask()) {
-                // Layout the task to ensure the Task is in correct bounds.
-                mSupervisor.getLaunchParamsController().layoutTask(targetTask,
-                        mStartActivity.info.windowLayout, mStartActivity, mSourceRecord, options);
-            }
+            // Layout the task to ensure the Task is in correct bounds.
+            mSupervisor.getLaunchParamsController().layoutTask(targetTask,
+                    mStartActivity.info.windowLayout, mStartActivity, mSourceRecord, options);
             addOrReparentStartingActivity(targetTask, "adding to task");
         }
 

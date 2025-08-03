@@ -138,6 +138,9 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Du zeichnest momentan deinen gesamten Bildschirm auf"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Du zeichnest momentan Inhalte der App <xliff:g id="APP_NAME">%1$s</xliff:g> auf"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Aufzeichnung beenden"</string>
+    <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Audio des Geräts aufnehmen"</string>
+    <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Ton über Mikrofon aufnehmen"</string>
+    <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Berührungen anzeigen"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"App zum Aufnehmen auswählen"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="4255912593013592954">"Screenshot im Vollbildmodus erstellen"</string>
     <string name="screen_capture_region_selection_button" msgid="4437546351856914639">"Ausgewählten Bereich aufnehmen"</string>
@@ -711,9 +714,13 @@
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"Einige Einstellungen auf deinem Gerät, z. B. Tageslimits und Ruhezeit, können nur mit einer PIN geändert werden."</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"Durch TrustAgent entsperrt"</string>
-    <string name="kg_prompt_after_adaptive_auth_lock" msgid="2587481497846342760">"Das Gerät wurde aufgrund zu vieler Authentifizierungsversuche gesperrt"</string>
-    <string name="keyguard_indication_after_adaptive_auth_lock" msgid="2323400645470712787">"Gerät gesperrt\nAuthentifizierung fehlgeschlagen"</string>
+    <!-- no translation found for kg_prompt_after_adaptive_auth_lock (6065186971000690782) -->
+    <skip />
+    <!-- no translation found for keyguard_indication_after_adaptive_auth_lock (5240600662061340872) -->
+    <skip />
     <string name="keyguard_indication_after_watch_disconnected" msgid="8133476870585660478">"Von deiner Smartwatch gesperrt"</string>
+    <!-- no translation found for keyguard_indication_after_secure_lock_device (4358906300665255820) -->
+    <skip />
     <string name="zen_mode_and_condition" msgid="5043165189511223718">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
     <string name="accessibility_volume_settings" msgid="1458961116951564784">"Toneinstellungen"</string>
     <string name="volume_odi_captions_tip" msgid="8825655463280990941">"Medien autom. untertiteln"</string>
@@ -853,8 +860,7 @@
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Newsletter, empfohlene Medien und mehr"</string>
     <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Aktivieren"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Deine längeren Unterhaltungen können jetzt zusammengefasst werden, damit du schnell einen Überblick bekommst"</string>
-    <!-- no translation found for notification_onboarding_bundles_message (4612908213178622912) -->
-    <skip />
+    <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"Über den Benachrichtigungsorganisator werden Benachrichtigungen mit niedrigerer Priorität gruppiert und stummgeschaltet. In den Einstellungen kannst du weitere Kategorien hinzufügen."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# Benachrichtigung}other{# Benachrichtigungen}}"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"Fertig"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Anwenden"</string>
@@ -1056,6 +1062,10 @@
     <string name="qs_edit" msgid="5583565172803472437">"Bearbeiten"</string>
     <string name="qs_edit_tiles" msgid="2105215324060865035">"Kacheln bearbeiten"</string>
     <string name="qs_edit_mode_tooltip" msgid="4164112885539479781">"Größe der Schnelleinstellungen-Kacheln anpassen"</string>
+    <!-- no translation found for qs_edit_settings (3243175290660574156) -->
+    <skip />
+    <!-- no translation found for qs_edit_menu_content_description (4420651071119623791) -->
+    <skip />
     <string name="tuner_time" msgid="2450785840990529997">"Uhrzeit"</string>
   <string-array name="clock_options">
     <item msgid="3986445361435142273">"Stunden, Minuten und Sekunden anzeigen"</item>
@@ -1101,8 +1111,7 @@
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Die Aktion "<annotation id="action_key_icon">"Symbol"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ist die Tastenkombination zum Verwenden von <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_magnifier_intro" msgid="627023269951856071">"Dadurch kannst du schnell auf dem Display heranzoomen, um Inhalte zu vergrößern."</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g> ist ein Screenreader, mit dem du dir Text vorlesen lassen kannst. Das kann Nutzern helfen, die den Bildschirm nur schlecht oder gar nicht sehen können."</string>
-    <!-- no translation found for accessibility_key_gesture_dialog_va_intro (4709198503441288289) -->
-    <skip />
+    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"Mit <xliff:g id="ID_1">%1$s</xliff:g> kannst du dein Gerät per Sprachbefehl steuern."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"Aktivieren"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Sperrbildschirm"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Wird heruntergefahren…"</string>
@@ -1509,7 +1518,12 @@
     <string name="connected_display_dialog_dual_display_stop_warning" msgid="4174707498892447947">"Dein inneres Display wird gespiegelt. Das Frontdisplay wird ausgeschaltet."</string>
     <string name="mirror_display" msgid="2515262008898122928">"Bildschirm spiegeln"</string>
     <string name="dismiss_dialog" msgid="2195508495854675882">"Schließen"</string>
+    <string name="connected_display_dialog_title" msgid="307028192512988669">"Mit externem Display verbinden"</string>
+    <string name="remember_choice" msgid="2063510191006325221">"Nicht mehr fragen"</string>
+    <string name="start_desktop_mode" msgid="5459815912537830841">"Desktop"</string>
+    <string name="start_mirroring" msgid="3611044878130481882">"Spiegeln"</string>
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"Bildschirm verbunden"</string>
+    <string name="connected_display_extended_mode_text" msgid="2457269692913653696">"Mit externem Display verbunden"</string>
     <string name="privacy_dialog_title" msgid="5201413527644766025">"Mikrofon, Kamera &amp; Standort"</string>
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"Kürzliche App-Nutzung"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"Kürzliche Zugriffe ansehen"</string>

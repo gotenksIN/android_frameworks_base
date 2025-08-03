@@ -38,6 +38,7 @@ import com.android.systemui.media.remedia.shared.model.MediaColorScheme
 import com.android.systemui.media.remedia.shared.model.MediaSessionState
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.notification.collection.provider.VisualStabilityProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -53,6 +54,7 @@ class MediaViewModel
 constructor(
     private val interactor: MediaInteractor,
     private val falsingSystem: MediaFalsingSystem,
+    val visualStabilityProvider: VisualStabilityProvider,
     @Assisted private val context: Context,
     @Assisted private val carouselVisibility: MediaCarouselVisibility,
 ) : ExclusiveActivatable() {
@@ -66,6 +68,12 @@ constructor(
     /** The index of the currently-selected card. */
     private var selectedCardIndex: Int by mutableIntStateOf(0)
         private set
+
+    /** The index of the currently visible card across different locations of media carousel */
+    val currentIndex: Int by derivedStateOf { interactor.currentCarouselIndex }
+
+    /** Whether media carousel should scroll to the first card in the list after composition */
+    val scrollToFirst: Boolean by derivedStateOf { interactor.shouldScrollToFirst }
 
     /** The current list of cards to show in the UI. */
     val cards: List<MediaCardViewModel> by derivedStateOf {
@@ -305,9 +313,16 @@ constructor(
     fun onCardSelected(cardIndex: Int) {
         check(cardIndex >= 0 && cardIndex < cards.size)
         selectedCardIndex = cardIndex
+        interactor.storeCurrentCarouselIndex(selectedCardIndex)
+    }
+
+    /** Notifies that the carousel is reordered and first card is now visible on screen. */
+    fun onScrollToFirstCard() {
+        interactor.resetScrollToFirst()
     }
 
     override suspend fun onActivated(): Nothing {
+        visualStabilityProvider.addPersistentReorderingAllowedListener { interactor.reorderMedia() }
         awaitCancellation()
     }
 

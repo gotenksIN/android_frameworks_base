@@ -138,6 +138,9 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Você está gravando a tela inteira"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Você está gravando o app <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Parar gravação"</string>
+    <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Gravar áudio do dispositivo"</string>
+    <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Gravar microfone"</string>
+    <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Mostrar toques"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Escolha um app para gravar"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="4255912593013592954">"Capturar a tela inteira"</string>
     <string name="screen_capture_region_selection_button" msgid="4437546351856914639">"Capturar área selecionada"</string>
@@ -711,9 +714,13 @@
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"Alguns controles do dispositivo, como limites diários e períodos de descanso, só podem ser mudados com um PIN."</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"Desbloqueado pelo TrustAgent"</string>
-    <string name="kg_prompt_after_adaptive_auth_lock" msgid="2587481497846342760">"O dispositivo foi bloqueado devido a muitas tentativas de autenticação"</string>
-    <string name="keyguard_indication_after_adaptive_auth_lock" msgid="2323400645470712787">"Dispositivo bloqueado\nA autenticação falhou"</string>
+    <!-- no translation found for kg_prompt_after_adaptive_auth_lock (6065186971000690782) -->
+    <skip />
+    <!-- no translation found for keyguard_indication_after_adaptive_auth_lock (5240600662061340872) -->
+    <skip />
     <string name="keyguard_indication_after_watch_disconnected" msgid="8133476870585660478">"Bloqueado pelo relógio"</string>
+    <!-- no translation found for keyguard_indication_after_secure_lock_device (4358906300665255820) -->
+    <skip />
     <string name="zen_mode_and_condition" msgid="5043165189511223718">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
     <string name="accessibility_volume_settings" msgid="1458961116951564784">"Configurações de som"</string>
     <string name="volume_odi_captions_tip" msgid="8825655463280990941">"Transcrição automática"</string>
@@ -853,8 +860,7 @@
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Newsletters, mídia recomendada e muito mais"</string>
     <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Ativar"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Agora, você pode receber resumos das suas conversas mais longas"</string>
-    <!-- no translation found for notification_onboarding_bundles_message (4612908213178622912) -->
-    <skip />
+    <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"O Organizador agrupa e silencia notificações de prioridade mais baixa. Adicione mais categorias nas Configurações."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# notificação}one{# notificação}many{# de notificações}other{# notificações}}"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"Ok"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Aplicar"</string>
@@ -1056,6 +1062,10 @@
     <string name="qs_edit" msgid="5583565172803472437">"Editar"</string>
     <string name="qs_edit_tiles" msgid="2105215324060865035">"Editar blocos"</string>
     <string name="qs_edit_mode_tooltip" msgid="4164112885539479781">"Redimensionar blocos \"Configurações rápidas\""</string>
+    <!-- no translation found for qs_edit_settings (3243175290660574156) -->
+    <skip />
+    <!-- no translation found for qs_edit_menu_content_description (4420651071119623791) -->
+    <skip />
     <string name="tuner_time" msgid="2450785840990529997">"Horas"</string>
   <string-array name="clock_options">
     <item msgid="3986445361435142273">"Mostrar horas, minutos e segundos"</item>
@@ -1101,8 +1111,7 @@
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"A ação "<annotation id="action_key_icon">"ícone"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> é o atalho do teclado para usar a <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_magnifier_intro" msgid="627023269951856071">"Isso permite que você aumente o zoom rapidamente na tela para ampliar o conteúdo."</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"O <xliff:g id="ID_1">%1$s</xliff:g> é um leitor de tela que permite ouvir itens falados em voz alta. Ele pode ser útil para pessoas com dificuldade de ver a tela."</string>
-    <!-- no translation found for accessibility_key_gesture_dialog_va_intro (4709198503441288289) -->
-    <skip />
+    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"Com o <xliff:g id="ID_1">%1$s</xliff:g>, você controla o dispositivo por comando de voz."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"Ativar"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Tela de bloqueio"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Desligando…"</string>
@@ -1509,7 +1518,12 @@
     <string name="connected_display_dialog_dual_display_stop_warning" msgid="4174707498892447947">"Seu display interno será espelhado. O display frontal será desligado."</string>
     <string name="mirror_display" msgid="2515262008898122928">"Espelhar tela"</string>
     <string name="dismiss_dialog" msgid="2195508495854675882">"Dispensar"</string>
+    <string name="connected_display_dialog_title" msgid="307028192512988669">"Conectar à tela externa"</string>
+    <string name="remember_choice" msgid="2063510191006325221">"Não perguntar de novo"</string>
+    <string name="start_desktop_mode" msgid="5459815912537830841">"Computador"</string>
+    <string name="start_mirroring" msgid="3611044878130481882">"Espelhar"</string>
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"Tela conectada"</string>
+    <string name="connected_display_extended_mode_text" msgid="2457269692913653696">"Conectado à tela externa"</string>
     <string name="privacy_dialog_title" msgid="5201413527644766025">"Microfone, câmera e localização"</string>
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"Uso recente do app"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"Consultar acessos recentes"</string>

@@ -138,6 +138,9 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"현재 전체 화면을 녹화 중입니다."</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"현재 <xliff:g id="APP_NAME">%1$s</xliff:g>의 콘텐츠를 녹화 중입니다."</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"녹화 중지"</string>
+    <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"기기 오디오 녹음"</string>
+    <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"마이크 녹음"</string>
+    <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"터치한 항목 표시"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"녹화할 앱 선택"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="4255912593013592954">"전체 화면 캡처"</string>
     <string name="screen_capture_region_selection_button" msgid="4437546351856914639">"선택한 영역 캡처"</string>
@@ -711,9 +714,13 @@
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"일일 한도 및 다운타임과 같은 기기의 일부 제어 기능은 PIN을 사용해서만 변경할 수 있습니다."</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"TrustAgent가 잠금 해제함"</string>
-    <string name="kg_prompt_after_adaptive_auth_lock" msgid="2587481497846342760">"인증 시도 횟수가 너무 많아 기기가 잠겼습니다."</string>
-    <string name="keyguard_indication_after_adaptive_auth_lock" msgid="2323400645470712787">"기기 잠김\n인증에 실패함"</string>
+    <!-- no translation found for kg_prompt_after_adaptive_auth_lock (6065186971000690782) -->
+    <skip />
+    <!-- no translation found for keyguard_indication_after_adaptive_auth_lock (5240600662061340872) -->
+    <skip />
     <string name="keyguard_indication_after_watch_disconnected" msgid="8133476870585660478">"워치로 잠금"</string>
+    <!-- no translation found for keyguard_indication_after_secure_lock_device (4358906300665255820) -->
+    <skip />
     <string name="zen_mode_and_condition" msgid="5043165189511223718">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
     <string name="accessibility_volume_settings" msgid="1458961116951564784">"소리 설정"</string>
     <string name="volume_odi_captions_tip" msgid="8825655463280990941">"미디어 자막 자동 생성"</string>
@@ -853,8 +860,7 @@
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"뉴스레터, 추천 미디어 등"</string>
     <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"사용"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"이제 긴 대화를 요약하여 빠르게 내용을 확인할 수 있습니다."</string>
-    <!-- no translation found for notification_onboarding_bundles_message (4612908213178622912) -->
-    <skip />
+    <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"알림 정리 도구는 우선순위가 낮은 알림을 번들로 묶고 무음 처리합니다. 설정에서 더 많은 카테고리를 추가하세요."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{알림 #개}other{알림 #개}}"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"완료"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"적용"</string>
@@ -1056,6 +1062,10 @@
     <string name="qs_edit" msgid="5583565172803472437">"수정"</string>
     <string name="qs_edit_tiles" msgid="2105215324060865035">"타일 수정"</string>
     <string name="qs_edit_mode_tooltip" msgid="4164112885539479781">"빠른 설정 타일 크기 조절"</string>
+    <!-- no translation found for qs_edit_settings (3243175290660574156) -->
+    <skip />
+    <!-- no translation found for qs_edit_menu_content_description (4420651071119623791) -->
+    <skip />
     <string name="tuner_time" msgid="2450785840990529997">"시간"</string>
   <string-array name="clock_options">
     <item msgid="3986445361435142273">"시간, 분, 초 표시"</item>
@@ -1101,8 +1111,7 @@
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"작업 "<annotation id="action_key_icon">"아이콘"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> 키는 <xliff:g id="ID_3">^3</xliff:g> 기능을 사용할 수 있는 단축키입니다. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_magnifier_intro" msgid="627023269951856071">"이를 통해 화면을 빠르게 확대하여 콘텐츠를 더 크게 표시할 수 있습니다."</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g>은 항목을 소리 내어 읽어 주는 스크린 리더입니다. 이 기능은 화면을 보기 어려운 사용자에게 도움을 줄 수 있습니다."</string>
-    <!-- no translation found for accessibility_key_gesture_dialog_va_intro (4709198503441288289) -->
-    <skip />
+    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"<xliff:g id="ID_1">%1$s</xliff:g>를 사용하면 핸즈프리로 기기를 제어할 수 있습니다."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"사용 설정"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"잠금 화면"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"종료 중…"</string>
@@ -1509,7 +1518,12 @@
     <string name="connected_display_dialog_dual_display_stop_warning" msgid="4174707498892447947">"내부 디스플레이가 미러링됩니다. 전면 디스플레이는 꺼집니다."</string>
     <string name="mirror_display" msgid="2515262008898122928">"디스플레이 미러링"</string>
     <string name="dismiss_dialog" msgid="2195508495854675882">"닫기"</string>
+    <string name="connected_display_dialog_title" msgid="307028192512988669">"외부 디스플레이에 연결"</string>
+    <string name="remember_choice" msgid="2063510191006325221">"다시 묻지 않음"</string>
+    <string name="start_desktop_mode" msgid="5459815912537830841">"데스크톱"</string>
+    <string name="start_mirroring" msgid="3611044878130481882">"미러링"</string>
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"디스플레이 연결됨"</string>
+    <string name="connected_display_extended_mode_text" msgid="2457269692913653696">"외부 디스플레이에 연결됨"</string>
     <string name="privacy_dialog_title" msgid="5201413527644766025">"마이크, 카메라, 위치"</string>
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"최근 앱 사용"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"최근 액세스 보기"</string>

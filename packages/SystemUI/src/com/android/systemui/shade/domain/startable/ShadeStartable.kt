@@ -46,6 +46,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -76,6 +77,7 @@ constructor(
     override fun start() {
         hydrateShadeLayoutWidth()
         hydrateFullWidth()
+        hydrateLargeScreen()
         hydrateShadeExpansionStateManager()
         logTouchesTo(touchLog)
         scrimShadeTransitionController.init()
@@ -112,23 +114,35 @@ constructor(
 
     private fun hydrateShadeLayoutWidth() {
         applicationScope.launch {
-            // TODO(b/354926927): `isShadeLayoutWide` should be deprecated in SceneContainer.
-            if (SceneContainerFlag.isEnabled) {
-                    shadeDisplayStateInteractor.isWideScreen
-                } else {
-                    configurationRepository.onAnyConfigurationChange
-                        // Force initial collection.
-                        .onStart { emit(Unit) }
-                        .map {
-                            // The configuration for 'shouldUseSplitNotificationShade' dictates the
-                            // width of the shade in split-shade mode.
-                            splitShadeStateController.shouldUseSplitNotificationShade(
-                                context.resources
-                            )
-                        }
-                        .distinctUntilChanged()
+            // TODO(b/354926927): Move this decision to the shadeModeInteractor. It should expose
+            //  isFullWidthShade instead of isShadeLayoutWide, and isDualShadeSettingEnabled()
+            //  should become private again.
+            val shadeModeInteractor = shadeModeInteractorProvider.get()
+            shadeModeInteractor.isDualShadeSettingEnabled
+                .flatMapLatest { isDualShadeEnabled ->
+                    if (isDualShadeEnabled) {
+                        shadeDisplayStateInteractor.isWideScreen
+                    } else {
+                        configurationRepository.onAnyConfigurationChange
+                            // Force initial collection.
+                            .onStart { emit(Unit) }
+                            .map {
+                                // The configuration for 'shouldUseSplitNotificationShade' dictates
+                                // the width of the shade in split-shade mode.
+                                splitShadeStateController.shouldUseSplitNotificationShade(
+                                    context.resources
+                                )
+                            }
+                            .distinctUntilChanged()
+                    }
                 }
                 .collect(shadeRepository::setShadeLayoutWide)
+        }
+    }
+
+    private fun hydrateLargeScreen() {
+        applicationScope.launch {
+            shadeDisplayStateInteractor.isLargeScreen.collect(shadeRepository::setLargeScreen)
         }
     }
 

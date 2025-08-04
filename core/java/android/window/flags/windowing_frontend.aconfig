@@ -83,14 +83,6 @@ flag {
 }
 
 flag {
-    name: "wallpaper_offset_async"
-    namespace: "windowing_frontend"
-    description: "Do not synchronise the wallpaper offset"
-    bug: "293248754"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "remove_activity_starter_dream_callback"
     namespace: "windowing_frontend"
     description: "Avoid a race with DreamManagerService callbacks for isDreaming by checking Activity state directly"
@@ -413,6 +405,16 @@ flag {
 }
 
 flag {
+    name: "predictive_back_intercept_transition"
+    namespace: "windowing_frontend"
+    description: "Allows back gesture to intercept a running transition."
+    bug: "426448018"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "current_animator_scale_uses_shared_memory"
     namespace: "wear_system_health"
     description: "WindowManagerService.getCurrentAnimatorScale() reads the animator scale from shared memory"
@@ -486,4 +488,14 @@ flag {
     namespace: "windowing_frontend"
     description: "Use a fallback transition-player while sysui is starting or crashed."
     bug: "365884835"
+}
+
+flag {
+    name: "update_task_crop_in_sync"
+    namespace: "windowing_frontend"
+    description: "Fixes a bug where we fail to update task crops during transitions"
+    bug: "410684072"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

@@ -136,8 +136,7 @@ class TextFileFilterPolicyBuilder(
     private val parser = TextFileFilterPolicyParser()
 
     private val subclassFilter = SubclassFilter(classes, fallback)
-    private val packageFilter = PackageFilter(subclassFilter)
-    private val imf = InMemoryOutputFilter(classes, packageFilter)
+    private val imf = InMemoryOutputFilter(classes, subclassFilter)
     private var aidlPolicy: FilterPolicyWithReason? = null
     private var featureFlagsPolicy: FilterPolicyWithReason? = null
     private var syspropsPolicy: FilterPolicyWithReason? = null
@@ -184,9 +183,8 @@ class TextFileFilterPolicyBuilder(
             if (policy.policy == FilterPolicy.AnnotationAllowed) {
                 throw ParseException("${FilterPolicy.AnnotationAllowed.policyStringOrPrefix}" +
                         " on `package` isn't supported yet.")
-                return
             }
-            packageFilter.addPolicy(name, policy)
+            imf.setPolicyForPackage(name, policy)
         }
 
         override fun onRename(pattern: Pattern, prefix: String) {
@@ -282,7 +280,7 @@ class TextFileFilterPolicyBuilder(
                 className,
                 targetName,
                 methodDesc,
-                FilterPolicy.Keep.withReason(reasonWithComment(parser.currentInlineCommend))
+                FilterPolicy.Keep.withReason(reasonWithComment(parser.currentInlineComment))
             )
             // Set up the rename.
             imf.setRenameTo(className, targetName, methodDesc, methodName)
@@ -296,7 +294,7 @@ class TextFileFilterPolicyBuilder(
         ) {
             // Keep the source method, because the target method may call it.
             imf.setPolicyForMethod(className, methodName, methodDesc,
-                FilterPolicy.Keep.withReason(reasonWithComment(parser.currentInlineCommend)))
+                FilterPolicy.Keep.withReason(reasonWithComment(parser.currentInlineComment)))
             imf.setMethodCallReplaceSpec(replaceSpec)
         }
     }
@@ -327,7 +325,7 @@ class TextFileFilterPolicyParser {
         private set
 
     /** Inline comment in the current line */
-    var currentInlineCommend = ""
+    var currentInlineComment = ""
         private set
 
     /**
@@ -351,7 +349,7 @@ class TextFileFilterPolicyParser {
                     if (line.isEmpty()) {
                         continue
                     }
-                    currentInlineCommend = getInlineComment(currentLineText)
+                    currentInlineComment = getInlineComment(currentLineText)
                     parseLine(line)
                 }
                 finishLastClass()
@@ -428,6 +426,7 @@ class TextFileFilterPolicyParser {
             "kc", FilterPolicy.KeepClass.policyStringOrPrefix -> FilterPolicy.KeepClass
             "i", FilterPolicy.Ignore.policyStringOrPrefix -> FilterPolicy.Ignore
             "rdr", FilterPolicy.Redirect.policyStringOrPrefix -> FilterPolicy.Redirect
+            "exp", FilterPolicy.Experimental.policyStringOrPrefix -> FilterPolicy.Experimental
             FilterPolicy.AnnotationAllowed.policyStringOrPrefix -> FilterPolicy.AnnotationAllowed
             else -> {
                 if (s.startsWith(FilterPolicy.Substitute.policyStringOrPrefix)) {
@@ -461,7 +460,7 @@ class TextFileFilterPolicyParser {
         if (!policy.isUsableWithClasses) {
             throw ParseException("Package can't have policy '$policy'")
         }
-        processor.onPackage(name, policy.withReason(reasonWithComment(currentInlineCommend)))
+        processor.onPackage(name, policy.withReason(reasonWithComment(currentInlineComment)))
     }
 
     private fun parseClass(fields: Array<String>) {
@@ -527,7 +526,8 @@ class TextFileFilterPolicyParser {
                     if (superClass == null) {
                         currentClassName = className
                         processor.onClassStart(className)
-                        processor.onSimpleClassPolicy(className, policy.withReason(reasonWithComment(currentInlineCommend)))
+                        processor.onSimpleClassPolicy(className,
+                            policy.withReason(reasonWithComment(currentInlineComment)))
                     } else {
                         processor.onSubClassPolicy(
                             superClass,
@@ -605,7 +605,8 @@ class TextFileFilterPolicyParser {
         }
 
         // TODO: Duplicate check, etc
-        processor.onField(currentClassName!!, name, policy.withReason(reasonWithComment(currentInlineCommend)))
+        processor.onField(currentClassName!!, name,
+            policy.withReason(reasonWithComment(currentInlineComment)))
     }
 
     private fun parseMethod(fields: Array<String>) {
@@ -631,7 +632,7 @@ class TextFileFilterPolicyParser {
 
         val className = currentClassName!!
 
-        val policyWithReason = policy.withReason(reasonWithComment(currentInlineCommend))
+        val policyWithReason = policy.withReason(reasonWithComment(currentInlineComment))
         if (policy != FilterPolicy.Substitute) {
             processor.onSimpleMethodPolicy(className, methodName, signature, policyWithReason)
         } else {

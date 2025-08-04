@@ -2628,6 +2628,66 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         return nativeOpenAccessory();
     }
 
+    /**
+     * opens the currently attached USB accessory to read from.
+     *
+     * @param accessory accessory to be opened.
+     * @param permissions UsbUserPermissionManager to check permissions.
+     * @param pid Pid of the caller
+     * @param uid Uid of the caller
+     */
+    public ParcelFileDescriptor openAccessoryForInputStream(
+            UsbAccessory accessory, UsbUserPermissionManager permissions, int pid, int uid) {
+        UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
+        if (currentAccessory == null) {
+            throw new IllegalArgumentException("no accessory attached");
+        }
+        if (!currentAccessory.equals(accessory)) {
+            String error =
+                    accessory.toString() + " does not match current accessory " + currentAccessory;
+            throw new IllegalArgumentException(error);
+        }
+        permissions.checkPermission(accessory, pid, uid);
+        return nativeOpenAccessoryForInputStream();
+    }
+
+    /**
+     * opens the currently attached USB accessory to write to.
+     *
+     * @param accessory accessory to be opened.
+     * @param permissions UsbUserPermissionManager to check permissions.
+     * @param pid Pid of the caller
+     * @param uid Uid of the caller
+     */
+    public ParcelFileDescriptor openAccessoryForOutputStream(
+            UsbAccessory accessory, UsbUserPermissionManager permissions, int pid, int uid) {
+        UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
+        if (currentAccessory == null) {
+            throw new IllegalArgumentException("no accessory attached");
+        }
+        if (!currentAccessory.equals(accessory)) {
+            String error =
+                    accessory.toString() + " does not match current accessory " + currentAccessory;
+            throw new IllegalArgumentException(error);
+        }
+        permissions.checkPermission(accessory, pid, uid);
+        return nativeOpenAccessoryForOutputStream();
+    }
+
+    public int getMaxPacketSize(UsbAccessory accessory) {
+        UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
+        if (currentAccessory == null) {
+            throw new IllegalArgumentException("no accessory attached");
+        }
+        if (!currentAccessory.equals(accessory)) {
+            String error =
+                    accessory.toString() + " does not match current accessory " + currentAccessory;
+            throw new IllegalArgumentException(error);
+        }
+
+        return nativeGetMaxPacketSize();
+    }
+
     public long getCurrentFunctions() {
         return mHandler.getEnabledFunctions();
     }
@@ -2790,7 +2850,13 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
     private native String[] nativeGetAccessoryStringsFromFfs();
 
+    private native int nativeGetMaxPacketSize();
+
     private native ParcelFileDescriptor nativeOpenAccessory();
+
+    private native ParcelFileDescriptor nativeOpenAccessoryForInputStream();
+
+    private native ParcelFileDescriptor nativeOpenAccessoryForOutputStream();
 
     private native String nativeWaitAndGetProperty(String propName);
 

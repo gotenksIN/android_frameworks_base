@@ -36,6 +36,7 @@ import com.android.systemui.statusbar.notification.row.icon.AppIconProvider
 import com.android.systemui.util.icuMessageFormat
 import com.android.systemui.util.time.SystemClock
 import com.android.systemui.utils.coroutines.flow.mapLatestConflated
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -44,7 +45,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /** Provides functionality for UI to interact with a Notification Bundle. */
 @BundleRowScope
@@ -76,6 +76,14 @@ constructor(
                 context.resources,
                 R.string.notification_bundle_header_counter,
                 numberOfChildren ?: 0,
+            )
+
+    val headerContentDescription: String
+        get() =
+            context.resources.getString(
+                R.string.notification_bundle_header_joined_description,
+                context.resources.getString(titleText),
+                numberOfChildrenContentDescription,
             )
 
     private var sceneTargetJob: Job? = null
@@ -146,14 +154,16 @@ constructor(
     fun setTargetScene(scene: SceneKey) {
         sceneTargetJob?.cancel()
 
-        sceneTargetJob = scope.launch {
-            state?.setTargetScene(scene, composeScope!!)
+        sceneTargetJob =
+            scope.launch {
+                state?.setTargetScene(scene, composeScope!!)
 
-            // [setTargetScene] does not immediately update [currentScene] so we must check [scene]
-            if (scene == BundleHeader.Scenes.Collapsed) {
-                repository.lastCollapseTime = systemClock.uptimeMillis()
+                // [setTargetScene] does not immediately update [currentScene] so we must check
+                // [scene]
+                if (scene == BundleHeader.Scenes.Collapsed) {
+                    repository.lastCollapseTime = systemClock.uptimeMillis()
+                }
             }
-        }
     }
 
     private fun fetchAppIcon(appData: AppData): Drawable? {

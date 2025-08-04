@@ -55,10 +55,10 @@
       "name": "FunctionalTestsDesktopMode-FocusAppFromTaskbarTest"
     },
     {
-      "name": "FunctionalTestsDesktopMode-MoveToNextDisplayTest"
+      "name": "FunctionalTestsDesktopMode-FocusAppFromTaskbarOverflowTest"
     },
     {
-      "name": "FunctionalTestsDesktopMode-OpenAppWithExternalDisplayConnectedTest"
+      "name": "FunctionalTestsDesktopMode-MoveToNextDisplayTest"
     },
     {
       "name": "FunctionalTestsDesktopMode-OpenTrampolineAppInDesktopModeTaskLimitTest"
@@ -80,6 +80,12 @@
     },
     {
       "name": "FunctionalTestsDesktopMode-UnminimizeAppFromTaskbarTest"
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-externaldisplay-MaximizeAppWindowWithDragToTopDragZoneInDesktopFirstTest"
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-externaldisplay-OpenAppWithExternalDisplayConnectedTest"
     },
     {
       "name": "FunctionalTestsDesktopMode-fundamentals-CloseAllAppsViaAppHeaderExitTest"
@@ -170,9 +176,6 @@
     },
     {
       "name": "FunctionalTestsDesktopMode-maximize-MaximizeAppWindowTest"
-    },
-    {
-      "name": "FunctionalTestsDesktopMode-maximize-MaximizeAppWindowWithDragToTopDragZoneInDesktopFirstTest"
     },
     {
       "name": "FunctionalTestsDesktopMode-mediaprojection-StartAppMediaProjectionResizeAndDragTest"

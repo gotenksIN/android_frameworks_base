@@ -1521,6 +1521,15 @@ public class Process {
     }
 
     /** @hide */
+    public static final native long getMemAvailable();
+
+    /** @hide */
+    public static final native long getMemFree();
+
+    /**
+     * This function returns available memory. Use getMemAvailable instead.
+     * @hide
+     */
     @UnsupportedAppUsage
     public static final native long getFreeMemory();
 

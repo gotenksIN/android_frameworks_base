@@ -16,7 +16,6 @@
 
 package com.android.server.display;
 
-import static android.Manifest.permission.ACCESS_COMPUTER_CONTROL;
 import static android.Manifest.permission.ADD_ALWAYS_UNLOCKED_DISPLAY;
 import static android.Manifest.permission.ADD_TRUSTED_DISPLAY;
 import static android.Manifest.permission.CAPTURE_SECURE_VIDEO_OUTPUT;
@@ -310,6 +309,8 @@ public final class DisplayManagerService extends SystemService {
     private InputManagerInternal mInputManagerInternal;
     private ActivityManagerInternal mActivityManagerInternal;
     private final UidImportanceListener mUidImportanceListener = new UidImportanceListener();
+
+    private final DisplayFrameworkStatsLogger mStatsLogger = new DisplayFrameworkStatsLogger();
 
     @Nullable
     private IMediaProjectionManager mProjectionService;
@@ -1861,10 +1862,11 @@ public final class DisplayManagerService extends SystemService {
 
     private int createVirtualDisplayInternal(VirtualDisplayConfig virtualDisplayConfig,
             IVirtualDisplayCallback callback, IMediaProjection projection,
-            IVirtualDevice virtualDevice, DisplayWindowPolicyController dwpc, String packageName) {
+            IVirtualDevice virtualDevice, DisplayWindowPolicyController dwpc, String packageName,
+            int ownerUid) {
         final int callingUid = Binder.getCallingUid();
-        if (!validatePackageName(callingUid, packageName)) {
-            throw new SecurityException("packageName must match the calling uid");
+        if (!validatePackageName(ownerUid, packageName)) {
+            throw new SecurityException("packageName must match the owner uid");
         }
         if (callback == null) {
             throw new IllegalArgumentException("appToken must not be null");
@@ -1985,8 +1987,7 @@ public final class DisplayManagerService extends SystemService {
 
         if (callingUid != Process.SYSTEM_UID && (flags & VIRTUAL_DISPLAY_FLAG_TRUSTED) != 0) {
 // QTI_BEGIN: 2024-03-28: Core: Revert PhoneLink in framework/base
-            if (!checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")
-                    && !checkCallingPermission(ACCESS_COMPUTER_CONTROL, "createVirtualDisplay()")) {
+            if (!checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")) {
 // QTI_END: 2024-03-28: Core: Revert PhoneLink in framework/base
                 EventLog.writeEvent(0x534e4554, "162627132", callingUid,
                         "Attempt to create a trusted display without holding permission!");
@@ -2006,8 +2007,7 @@ public final class DisplayManagerService extends SystemService {
 
         if (callingUid != Process.SYSTEM_UID
                 && (flags & VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP) != 0) {
-            if (!(checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")
-                    || checkCallingPermission(ACCESS_COMPUTER_CONTROL, "createVirtualDisplay()"))) {
+            if (!checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")) {
                 throw new SecurityException("Requires ADD_TRUSTED_DISPLAY permission to "
                         + "create a virtual display which is not in the default DisplayGroup.");
             }
@@ -2023,9 +2023,7 @@ public final class DisplayManagerService extends SystemService {
 
         if (callingUid != Process.SYSTEM_UID
                 && (flags & VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED) != 0) {
-            if (!(checkCallingPermission(ADD_ALWAYS_UNLOCKED_DISPLAY, "createVirtualDisplay()")
-                     || checkCallingPermission(ACCESS_COMPUTER_CONTROL,
-                    "createVirtualDisplay()"))) {
+            if (!checkCallingPermission(ADD_ALWAYS_UNLOCKED_DISPLAY, "createVirtualDisplay()")) {
                 throw new SecurityException(
                         "Requires ADD_ALWAYS_UNLOCKED_DISPLAY permission to "
                                 + "create an always unlocked virtual display.");
@@ -2071,7 +2069,7 @@ public final class DisplayManagerService extends SystemService {
         try {
             final int displayId;
             final String displayUniqueId = VirtualDisplayAdapter.generateDisplayUniqueId(
-                    packageName, callingUid, virtualDisplayConfig);
+                    packageName, ownerUid, virtualDisplayConfig);
 
             boolean shouldClearDisplayWindowSettings = false;
             if (virtualDisplayConfig.isHomeSupported()) {
@@ -2105,7 +2103,7 @@ public final class DisplayManagerService extends SystemService {
                         createVirtualDisplayLocked(
                                 callback,
                                 projection,
-                                callingUid,
+                                ownerUid,
                                 packageName,
                                 displayUniqueId,
                                 virtualDevice,
@@ -2138,7 +2136,7 @@ public final class DisplayManagerService extends SystemService {
                         if (projection.isRecordingOverlay()) {
                             // Record an overlay session.
                             session = ContentRecordingSession.createOverlaySession(
-                                    virtualDisplayConfig.getDisplayIdToMirror(), callingUid);
+                                    virtualDisplayConfig.getDisplayIdToMirror(), ownerUid);
                         } else {
                             // Record a particular display.
                             session = ContentRecordingSession.createDisplaySession(
@@ -3740,11 +3738,23 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        // Map that maps a uid to the number of times it was notified
+        SparseIntArray notifiedUids = new SparseIntArray();
+
         // After releasing the lock, send the notifications out.
         for (int i = 0; i < mTempCallbacks.size(); i++) {
             CallbackRecord callbackRecord = mTempCallbacks.get(i);
-            callbackRecord.notifyDisplayEventAsync(displayId, event);
+            boolean notified = callbackRecord.notifyDisplayEventAsync(displayId, event);
+            if (notified) {
+                int uid = callbackRecord.mUid;
+                notifiedUids.put(uid, notifiedUids.get(uid, 0) + 1);
+            }
         }
+
+        if (mFlags.isDisplayEventsLoggingEnabled()) {
+            mStatsLogger.logDisplayEvent(event, notifiedUids);
+        }
+
         mTempCallbacks.clear();
     }
 
@@ -4537,9 +4547,9 @@ public final class DisplayManagerService extends SystemService {
         }
 
         /**
-         * @return {@code false} if RemoteException happens; otherwise {@code true} for
-         * success.  This returns true even if the event was deferred because the remote client is
-         * cached or frozen.
+         * @return {@code true} if the notification was processed (sent, queued).
+         * Returns {@code false} if the notification was not sent e.g. because client is
+         * not registered for this event.
          */
         public boolean notifyDisplayEventAsync(int displayId, @DisplayEvent int event) {
             if (!shouldSendDisplayEvent(event)) {
@@ -4555,7 +4565,7 @@ public final class DisplayManagerService extends SystemService {
                                     + ",uid" + mUid);
                 }
                 // The client is not interested in this event, so do nothing.
-                return true;
+                return false;
             }
 
             synchronized (mCallback) {
@@ -4575,7 +4585,7 @@ public final class DisplayManagerService extends SystemService {
 
             if (!shouldReceiveRefreshRateWithChangeUpdate(event)) {
                 // The client is not visible to the user and is not a system service, so do nothing.
-                return true;
+                return false;
             }
 
             try {
@@ -5087,7 +5097,7 @@ public final class DisplayManagerService extends SystemService {
                 IVirtualDisplayCallback callback, IMediaProjection projection,
                 String packageName) {
             return createVirtualDisplayInternal(virtualDisplayConfig, callback, projection,
-                    null, null, packageName);
+                    null, null, packageName, Binder.getCallingUid());
         }
 
         @Override // Binder call
@@ -5807,9 +5817,9 @@ public final class DisplayManagerService extends SystemService {
         @Override
         public int createVirtualDisplay(VirtualDisplayConfig config,
                 IVirtualDisplayCallback callback, IVirtualDevice virtualDevice,
-                DisplayWindowPolicyController dwpc, String packageName) {
+                DisplayWindowPolicyController dwpc, String packageName, int ownerUid) {
             return createVirtualDisplayInternal(config, callback, null, virtualDevice, dwpc,
-                    packageName);
+                    packageName, ownerUid);
         }
 
         @Override

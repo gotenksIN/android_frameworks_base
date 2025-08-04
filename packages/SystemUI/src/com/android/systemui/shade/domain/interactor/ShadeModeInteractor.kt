@@ -70,6 +70,9 @@ interface ShadeModeInteractor {
     /** Convenience shortcut for querying whether the current [shadeMode] is [ShadeMode.Split]. */
     val isSplitShade: Boolean
         get() = shadeMode.value is ShadeMode.Split
+
+    /** Whether the user has enabled the Dual Shade setting. */
+    val isDualShadeSettingEnabled: Flow<Boolean>
 }
 
 class ShadeModeInteractorImpl
@@ -78,12 +81,12 @@ constructor(
     @Background applicationScope: CoroutineScope,
     @Background backgroundDispatcher: CoroutineDispatcher,
     @ShadeDisplayAware private val context: Context,
-    private val repository: ShadeRepository,
+    repository: ShadeRepository,
     secureSettingsRepository: SecureSettingsRepository,
     @SceneFrameworkTableLog private val tableLogBuffer: TableLogBuffer,
 ) : ShadeModeInteractor {
 
-    private val isDualShadeEnabled: Flow<Boolean> =
+    override val isDualShadeSettingEnabled: Flow<Boolean> =
         if (SceneContainerFlag.isEnabled) {
             secureSettingsRepository
                 .boolSetting(Settings.Secure.DUAL_SHADE, defaultValue = DUAL_SHADE_ENABLED_DEFAULT)
@@ -92,32 +95,46 @@ constructor(
             flowOf(false)
         }
 
+    private val isSplitShadeEnabled: Boolean =
+        !SceneContainerFlag.isEnabled ||
+            !context.resources.getBoolean(R.bool.config_disableSplitShade)
+
+    private val isLargeScreen: StateFlow<Boolean> = repository.isLargeScreen
+
     override val isShadeLayoutWide: StateFlow<Boolean> = repository.isShadeLayoutWide
 
     private val shadeModeInitialValue: ShadeMode
         get() =
             determineShadeMode(
                 isDualShadeEnabled = DUAL_SHADE_ENABLED_DEFAULT,
-                isShadeLayoutWide = repository.isShadeLayoutWide.value,
+                isShadeLayoutWide = isShadeLayoutWide.value,
+                isLargeScreen = isLargeScreen.value,
             )
 
     override val shadeMode: StateFlow<ShadeMode> =
-        combine(isDualShadeEnabled, repository.isShadeLayoutWide, ::determineShadeMode)
+        combine(isDualShadeSettingEnabled, isShadeLayoutWide, isLargeScreen, ::determineShadeMode)
             .logDiffsForTable(tableLogBuffer = tableLogBuffer, initialValue = shadeModeInitialValue)
             .stateIn(applicationScope, SharingStarted.Eagerly, initialValue = shadeModeInitialValue)
 
     private fun determineShadeMode(
         isDualShadeEnabled: Boolean,
         isShadeLayoutWide: Boolean,
+        isLargeScreen: Boolean,
     ): ShadeMode {
         return when {
+            // Case 1: Legacy shade (pre-scene container).
+            !SceneContainerFlag.isEnabled ->
+                if (isShadeLayoutWide) ShadeMode.Split else ShadeMode.Single
+
+            // Case 2: The Dual Shade setting has been enabled by the user.
             isDualShadeEnabled -> ShadeMode.Dual
-            isShadeLayoutWide ->
-                if (context.resources.getBoolean(R.bool.config_disableSplitShade)) {
-                    ShadeMode.Dual
-                } else {
-                    ShadeMode.Split
-                }
+
+            // Case 3: Large screen in landscape orientation, with Dual Shade setting disabled.
+            isLargeScreen && isShadeLayoutWide ->
+                if (isSplitShadeEnabled) ShadeMode.Split else ShadeMode.Dual
+
+            // Case 4: Phone (in any orientation) or large screen in portrait, with Dual Shade
+            // setting disabled.
             else -> ShadeMode.Single
         }
     }
@@ -133,4 +150,6 @@ class ShadeModeInteractorEmptyImpl @Inject constructor() : ShadeModeInteractor {
     override val shadeMode: StateFlow<ShadeMode> = MutableStateFlow(ShadeMode.Single)
 
     override val isShadeLayoutWide: StateFlow<Boolean> = MutableStateFlow(false)
+
+    override val isDualShadeSettingEnabled: Flow<Boolean> = flowOf(false)
 }

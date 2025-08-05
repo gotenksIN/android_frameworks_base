@@ -140,18 +140,11 @@ class AnrHelper {
          }
 // QTI_END: 2023-03-04: Data: when app hit anr, system should show ANR dialog
 
-        Future<File> firstPidDumpPromise = mEarlyDumpExecutor.submit(() -> {
-            // the class AnrLatencyTracker is not generally thread safe but the values
-            // recorded/touched by the Temporary dump thread(s) are all volatile/atomic.
-            File tracesFile = StackTracesDumpHelper.dumpStackTracesTempFile(anrProcess.mPid,
-                    timeoutRecord.mLatencyTracker);
-            mTempDumpedPids.remove(anrProcess.mPid);
-            return tracesFile;
-        });
-
+// QTI_BEGIN: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
         appNotResponding(new AnrRecord(anrProcess, activityShortComponentName, aInfo,
                    parentShortComponentName, parentProcess, aboveSystem, timeoutRecord,
-                   isContinuousAnr, firstPidDumpPromise));
+                   isContinuousAnr, null));
+// QTI_END: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
     }
 
@@ -167,19 +160,13 @@ class AnrHelper {
         }
 // QTI_END: 2023-03-04: Data: when app hit anr, system should show ANR dialog
 
-        Future<File> firstPidDumpPromise = mEarlyDumpExecutor.submit(() -> {
-            // the class AnrLatencyTracker is not generally thread safe but the values
-            // recorded/touched by the Temporary dump thread(s) are all volatile/atomic.
-            File tracesFile = StackTracesDumpHelper.dumpStackTracesTempFile(anrProcess.mPid,
-                    timeoutRecord.mLatencyTracker);
-            mTempDumpedPids.remove(anrProcess.mPid);
-            return tracesFile;
-        });
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
         AnrRecord anrRecord = new AnrRecord(anrProcess, activityShortComponentName, aInfo,
 // QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
                 parentShortComponentName, parentProcess, aboveSystem, timeoutRecord,
-                isContinuousAnr, firstPidDumpPromise);
+                isContinuousAnr, null);
+// QTI_END: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
         Message msg = Message.obtain();
         msg.what = APP_NOT_RESPONDING_DEFER_MSG;
@@ -240,7 +227,9 @@ class AnrHelper {
                     mTempDumpedPids.remove(incomingPid);
                     return tracesFile;
                 });
-
+// QTI_BEGIN: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
+                anrRecord.setFirstPidFilePromise(firstPidDumpPromise);
+// QTI_END: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
 // QTI_BEGIN: 2023-03-04: Data: when app hit anr, system should show ANR dialog
                 mAnrRecords.add(anrRecord);
 // QTI_END: 2023-03-04: Data: when app hit anr, system should show ANR dialog
@@ -362,7 +351,9 @@ class AnrHelper {
         final boolean mAboveSystem;
         final long mTimestamp = SystemClock.uptimeMillis();
         final boolean mIsContinuousAnr;
-        final Future<File> mFirstPidFilePromise;
+// QTI_BEGIN: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
+        Future<File> mFirstPidFilePromise;
+// QTI_END: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
         AnrRecord(ProcessRecord anrProcess, String activityShortComponentName,
                 ApplicationInfo aInfo, String parentShortComponentName,
                 WindowProcessController parentProcess, boolean aboveSystem,
@@ -380,6 +371,12 @@ class AnrHelper {
             mIsContinuousAnr = isContinuousAnr;
             mFirstPidFilePromise = firstPidFilePromise;
         }
+
+// QTI_BEGIN: 2025-07-17: Android_UI: Temp anr was requested twice while ANR
+	void setFirstPidFilePromise(Future<File> firstPidFilePromise){
+	    mFirstPidFilePromise = firstPidFilePromise;
+	}
+// QTI_END 2025-07-17: Android_UI: Temp anr was requested twice while ANR
 
         void appNotResponding(boolean onlyDumpSelf) {
             try {

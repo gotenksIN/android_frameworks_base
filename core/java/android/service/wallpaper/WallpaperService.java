@@ -31,9 +31,7 @@ import static android.view.View.SYSTEM_UI_FLAG_VISIBLE;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
 import static android.view.flags.Flags.disableDrawWakeLock;
 
-import static com.android.window.flags.Flags.FLAG_OFFLOAD_COLOR_EXTRACTION;
 import static com.android.window.flags.Flags.alwaysSeqIdLayout;
-import static com.android.window.flags.Flags.offloadColorExtraction;
 
 import android.animation.AnimationHandler;
 import android.animation.Animator;
@@ -244,7 +242,6 @@ public abstract class WallpaperService extends Service {
         int y;
         int z;
         Bundle extras;
-        boolean sync;
     }
 
     /**
@@ -367,7 +364,6 @@ public abstract class WallpaperService extends Service {
         private Bitmap mLastScreenshot;
         private boolean mResetWindowPages;
 
-        boolean mPendingSync;
         MotionEvent mPendingMove;
         boolean mIsInAmbientMode;
 
@@ -536,16 +532,13 @@ public abstract class WallpaperService extends Service {
 
             @Override
             public void dispatchWallpaperOffsets(float x, float y, float xStep, float yStep,
-                    float zoom, boolean sync) {
+                    float zoom) {
                 synchronized (mLock) {
                     if (DEBUG) Log.v(TAG, "Dispatch wallpaper offsets: " + x + ", " + y);
                     mPendingXOffset = x;
                     mPendingYOffset = y;
                     mPendingXOffsetStep = xStep;
                     mPendingYOffsetStep = yStep;
-                    if (sync) {
-                        mPendingSync = true;
-                    }
                     if (!mOffsetMessageEnqueued) {
                         mOffsetMessageEnqueued = true;
                         Message msg = mCaller.obtainMessage(MSG_WALLPAPER_OFFSETS);
@@ -558,7 +551,7 @@ public abstract class WallpaperService extends Service {
 
             @Override
             public void dispatchWallpaperCommand(String action, int x, int y,
-                    int z, Bundle extras, boolean sync) {
+                    int z, Bundle extras) {
                 synchronized (mLock) {
                     if (DEBUG) Log.v(TAG, "Dispatch wallpaper command: " + x + ", " + y);
                     WallpaperCommand cmd = new WallpaperCommand();
@@ -567,7 +560,6 @@ public abstract class WallpaperService extends Service {
                     cmd.y = y;
                     cmd.z = z;
                     cmd.extras = extras;
-                    cmd.sync = sync;
                     Message msg = mCaller.obtainMessage(MSG_WALLPAPER_COMMAND);
                     msg.obj = cmd;
                     mCaller.sendMessage(msg);
@@ -886,7 +878,6 @@ public abstract class WallpaperService extends Service {
          * wallpaper colors based on the new dim, and call {@link #notifyColorsChanged()}.
          * @hide
          */
-        @FlaggedApi(FLAG_OFFLOAD_COLOR_EXTRACTION)
         public void onDimAmountChanged(float dimAmount) {
         }
 
@@ -1126,7 +1117,7 @@ public abstract class WallpaperService extends Service {
 
             // after the dim changes, allow colors to be immediately recomputed
             mLastColorInvalidation = 0;
-            if (offloadColorExtraction()) onDimAmountChanged(mWallpaperDimAmount);
+            onDimAmountChanged(mWallpaperDimAmount);
         }
 
         /**
@@ -1183,7 +1174,6 @@ public abstract class WallpaperService extends Service {
                         out.print(" mPendingXOffsetStep="); out.println(mPendingXOffsetStep);
                 out.print(prefix); out.print("mOffsetMessageEnqueued=");
                         out.print(mOffsetMessageEnqueued);
-                        out.print(" mPendingSync="); out.println(mPendingSync);
                 if (mPendingMove != null) {
                     out.print(prefix); out.print("mPendingMove="); out.println(mPendingMove);
                 }
@@ -1829,14 +1819,11 @@ public abstract class WallpaperService extends Service {
             float yOffset;
             float xOffsetStep;
             float yOffsetStep;
-            boolean sync;
             synchronized (mLock) {
                 xOffset = mPendingXOffset;
                 yOffset = mPendingYOffset;
                 xOffsetStep = mPendingXOffsetStep;
                 yOffsetStep = mPendingYOffsetStep;
-                sync = mPendingSync;
-                mPendingSync = false;
                 mOffsetMessageEnqueued = false;
             }
 
@@ -1851,14 +1838,6 @@ public abstract class WallpaperService extends Service {
                     onOffsetsChanged(xOffset, yOffset, xOffsetStep, yOffsetStep, xPixels, yPixels);
                 } else {
                     mOffsetsChanged = true;
-                }
-            }
-
-            if (sync) {
-                try {
-                    if (DEBUG) Log.v(TAG, "Reporting offsets change complete");
-                    mSession.wallpaperOffsetsComplete(mWindow.asBinder());
-                } catch (RemoteException e) {
                 }
             }
 
@@ -2220,16 +2199,9 @@ public abstract class WallpaperService extends Service {
                     updateFrozenState(/* frozenRequested= */ !COMMAND_UNFREEZE.equals(cmd.action));
                 }
                 result = onCommand(cmd.action, cmd.x, cmd.y, cmd.z,
-                        cmd.extras, cmd.sync);
+                        cmd.extras, false);
             } else {
                 result = null;
-            }
-            if (cmd.sync) {
-                try {
-                    if (DEBUG) Log.v(TAG, "Reporting command complete");
-                    mSession.wallpaperCommandComplete(mWindow.asBinder(), result);
-                } catch (RemoteException e) {
-                }
             }
         }
 
@@ -2636,7 +2608,7 @@ public abstract class WallpaperService extends Service {
         public void dispatchWallpaperCommand(String action, int x, int y,
                 int z, Bundle extras) {
             if (mEngine != null) {
-                mEngine.mWindow.dispatchWallpaperCommand(action, x, y, z, extras, false);
+                mEngine.mWindow.dispatchWallpaperCommand(action, x, y, z, extras);
             }
         }
 

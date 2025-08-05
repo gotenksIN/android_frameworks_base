@@ -99,8 +99,6 @@
   <java-symbol type="id" name="find" />
   <java-symbol type="id" name="fullscreenArea" />
   <java-symbol type="id" name="group_divider" />
-  <java-symbol type="id" name="hard_keyboard_section" />
-  <java-symbol type="id" name="hard_keyboard_switch" />
   <java-symbol type="id" name="headers" />
   <java-symbol type="id" name="hour" />
   <java-symbol type="id" name="icon" />
@@ -838,6 +836,7 @@
   <java-symbol type="string" name="lockscreen_return_to_call" />
   <java-symbol type="string" name="long_press_power_to_turn_off_tv_toast" />
   <java-symbol type="integer" name="config_turnOffTvToastSuppressionDelayMs" />
+  <java-symbol type="integer" name="config_turnOffTvToastPostDelayMs" />
   <java-symbol type="string" name="low_memory" />
   <java-symbol type="string" name="mic_access_off_toast" />
   <java-symbol type="string" name="mic_access_on_toast" />
@@ -1659,12 +1658,10 @@
   <java-symbol type="layout" name="icon_menu_layout" />
   <java-symbol type="layout" name="input_method" />
   <java-symbol type="layout" name="input_method_extract_view" />
-  <java-symbol type="layout" name="input_method_switch_item" />
   <java-symbol type="layout" name="input_method_switch_item_divider" />
   <java-symbol type="layout" name="input_method_switch_item_header" />
   <java-symbol type="layout" name="input_method_switch_item_new" />
   <java-symbol type="layout" name="input_method_switch_dialog_new" />
-  <java-symbol type="layout" name="input_method_switch_dialog_title" />
   <java-symbol type="layout" name="js_prompt" />
   <java-symbol type="layout" name="list_content_simple" />
   <java-symbol type="layout" name="list_menu_item_checkbox" />
@@ -2341,7 +2338,6 @@
   <java-symbol type="string" name="factorytest_no_action" />
   <java-symbol type="string" name="factorytest_not_system" />
   <java-symbol type="string" name="factorytest_reboot" />
-  <java-symbol type="string" name="hardware" />
   <java-symbol type="string" name="heavy_weight_notification" />
   <java-symbol type="string" name="heavy_weight_notification_detail" />
   <java-symbol type="string" name="image_wallpaper_component" />
@@ -2684,7 +2680,6 @@
   <java-symbol type="dimen" name="input_method_nav_key_button_ripple_max_width" />
   <java-symbol type="dimen" name="input_method_navigation_bar_height" />
   <java-symbol type="drawable" name="ic_ime_nav_back" />
-  <java-symbol type="drawable" name="ic_ime_switcher" />
   <java-symbol type="drawable" name="ic_ime_switcher_new" />
   <java-symbol type="id" name="input_method_nav_back" />
   <java-symbol type="id" name="input_method_nav_buttons" />
@@ -6333,6 +6328,11 @@
   <java-symbol type="string" name="proximity_provider_service_class_name" />
 
   <java-symbol type="string" name="exit_toast_on_long_press_escape" />
+
+
+  <!-- For partial sleep wake locks. -->
+  <java-symbol type="bool" name="config_allowPartialSleepWakeLocks" />
+  <java-symbol type="integer" name="config_maximumPartialSleepWakeLockDuration" />
 
   <!-- For App Functions -->
   <java-symbol type="array" name="config_appFunctionDeviceSettingsPackages" />

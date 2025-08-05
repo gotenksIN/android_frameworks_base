@@ -2081,7 +2081,9 @@ final class DevicePolicyEngine {
      */
     void removePoliciesForAdmins(@UserIdInt int userId, List<String> packageNames) {
         synchronized (mLock) {
-            for (PolicyState<?> policyState : mGlobalPolicies.values()) {
+            Set<PolicyKey> globalPolicies = new HashSet<>(mGlobalPolicies.keySet());
+            for (PolicyKey policy : globalPolicies) {
+                PolicyState<?> policyState = mGlobalPolicies.get(policy);
                 for (EnforcingAdmin admin : policyState.getPoliciesSetByAdmins().keySet()) {
                     if (packageNames.contains(admin.getPackageName())
                             && admin.getUserId() == userId) {
@@ -2105,7 +2107,10 @@ final class DevicePolicyEngine {
     void removeLocalPoliciesForSystemEntities(@UserIdInt int userId, List<String> systemEntities) {
         synchronized (mLock) {
             removeLocalPoliciesForAdminsLocked(
-                    userId, admin -> systemEntities.contains(admin.getSystemEntity()));
+                    userId,
+                    admin ->
+                            admin.isSystemAuthority()
+                                    && systemEntities.contains(admin.getSystemEntity()));
         }
     }
 
@@ -2116,7 +2121,9 @@ final class DevicePolicyEngine {
     void removeLocalPoliciesForAdminsLocked(
             @UserIdInt int userId, Predicate<EnforcingAdmin> adminPredicate) {
         if (mLocalPolicies.containsKey(userId)) {
-            for (PolicyState<?> policyState : mLocalPolicies.get(userId).values()) {
+            Set<PolicyKey> localPolicies = new HashSet<>(mLocalPolicies.get(userId).keySet());
+            for (PolicyKey policy : localPolicies) {
+                PolicyState<?> policyState = mLocalPolicies.get(userId).get(policy);
                 for (EnforcingAdmin admin : policyState.getPoliciesSetByAdmins().keySet()) {
                     if (adminPredicate.test(admin)) {
                         CompletableFuture<Integer> unused =

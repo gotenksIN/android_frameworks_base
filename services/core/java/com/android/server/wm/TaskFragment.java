@@ -18,6 +18,8 @@ package com.android.server.wm;
 
 import static android.Manifest.permission.EMBED_ANY_APP_IN_UNTRUSTED_MODE;
 import static android.Manifest.permission.MANAGE_ACTIVITY_TASKS;
+import static android.app.ActivityManager.LOCK_TASK_MODE_LOCKED;
+import static android.app.ActivityManager.LOCK_TASK_MODE_PINNED;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
@@ -51,6 +53,7 @@ import static android.view.Display.INVALID_DISPLAY;
 import static android.view.Surface.ROTATION_270;
 import static android.view.Surface.ROTATION_90;
 import static android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+import static android.window.DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_STATES;
 import static com.android.server.wm.ActivityRecord.State.PAUSED;
@@ -202,6 +205,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     final ActivityTaskSupervisor mTaskSupervisor;
     final RootWindowContainer mRootWindowContainer;
     private final TaskFragmentOrganizerController mTaskFragmentOrganizerController;
+    private final LockTaskController mLockTaskController;
 
 // QTI_BEGIN: 2021-11-22: Performance: perf: Refactor Animation Boost
     public BoostFramework mPerf = null;
@@ -466,6 +470,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mRelativeEmbeddedBounds = isEmbedded ? new Rect() : null;
         mTaskFragmentOrganizerController =
                 mAtmService.mWindowOrganizerController.mTaskFragmentOrganizerController;
+        mLockTaskController = mAtmService.getLockTaskController();
         mFragmentToken = fragmentToken;
         mRemoteToken = new RemoteToken(this);
     }
@@ -1324,6 +1329,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return TASK_FRAGMENT_VISIBILITY_VISIBLE;
         }
 
+        if (thisTask != null && !isPermittedInLockTask(thisTask)) {
+            return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+        }
+
         boolean gotTranslucentFullscreen = false;
         boolean gotTranslucentAdjacent = false;
         boolean shouldBeVisible = true;
@@ -1462,6 +1471,34 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     private boolean isTopActivityLaunchedBehind() {
         final ActivityRecord top = topRunningActivity();
         return top != null && top.mLaunchTaskBehind;
+    }
+
+    /**
+     * Checks if a task is allowed to run in the lock task mode.
+     *
+     * <p>Returns {@code true} if {@link ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX} flag is not
+     * enabled.
+     *
+     * <p>Returns {@code true} if the device is not currently in lock task.
+     *
+     * <p>A task is permitted if it's a leaf task that is allowed by the lock task admin policy, or
+     * if any of its descendant leaf tasks are permitted by the policy.
+     *
+     * @param task The task to evaluate.
+     * @return {@code true} if the task is allowed to run, {@code false} otherwise.
+     */
+    private boolean isPermittedInLockTask(@NonNull Task task) {
+        if (!ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX.isTrue()) {
+            return true;
+        }
+        final int lockTaskState = mLockTaskController.getLockTaskModeState();
+        final boolean isInLockTask =
+                lockTaskState == LOCK_TASK_MODE_LOCKED || lockTaskState == LOCK_TASK_MODE_PINNED;
+        if (!isInLockTask) {
+            return true;
+        }
+        return task.forAllTasks(
+                leafTask -> !mLockTaskController.isLockTaskModeViolation(leafTask));
     }
 
     final void updateActivityVisibilities(@Nullable ActivityRecord starting,
@@ -2310,6 +2347,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (hostProcess != null) {
             hostProcess.addEmbeddedActivity(addingActivity);
         }
+
+        // Make sure the list of display UID allowlists is updated
+        // now that this record is in a new task fragment.
+        mRootWindowContainer.updateUIDsPresentOnDisplay();
     }
 
     @Override

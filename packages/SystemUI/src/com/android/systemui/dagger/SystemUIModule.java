@@ -85,6 +85,7 @@ import com.android.systemui.keyguard.ui.composable.LockscreenContent;
 import com.android.systemui.log.dagger.LogModule;
 import com.android.systemui.log.dagger.MonitorLog;
 import com.android.systemui.log.table.TableLogBuffer;
+import com.android.systemui.log.table.impl.TableLogBufferModule;
 import com.android.systemui.lowlight.dagger.LowLightModule;
 import com.android.systemui.lowlightclock.dagger.LowLightClockModule;
 import com.android.systemui.mediaprojection.MediaProjectionModule;
@@ -152,6 +153,7 @@ import com.android.systemui.statusbar.notification.row.dagger.NotificationRowCom
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.ConfigurationControllerModule;
 import com.android.systemui.statusbar.phone.LetterboxModule;
+import com.android.systemui.statusbar.pipeline.airplane.shared.impl.AirplaneModeSharedModule;
 import com.android.systemui.statusbar.pipeline.dagger.StatusBarPipelineModule;
 import com.android.systemui.statusbar.policy.DeviceStateRotationLockSettingController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
@@ -217,6 +219,7 @@ import javax.inject.Named;
         AmbientModule.class,
         AvControlsChipModule.class,
         AppOpsModule.class,
+        AirplaneModeSharedModule.class,
         AssistModule.class,
         AuthenticationModule.class,
         BiometricsModule.class,
@@ -294,6 +297,7 @@ import javax.inject.Named;
         SysUIConcurrencyModule.class,
         SysUICoroutinesModule.class,
         CommonSystemUIUnfoldModule.class,
+        TableLogBufferModule.class,
         TelephonyRepositoryModule.class,
         TemporaryDisplayModule.class,
         ShadeDisplayAwareModule.class,

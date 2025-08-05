@@ -16,10 +16,9 @@
 
 package com.android.systemui.screencapture.record.largescreen.domain.interactor
 
+import android.content.pm.UserInfo
 import android.graphics.Bitmap
 import android.graphics.Rect
-import android.os.UserHandle
-import android.view.Display.DEFAULT_DISPLAY
 import android.view.WindowManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
@@ -30,17 +29,17 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.screenshot.mockImageCapture
 import com.android.systemui.testKosmos
+import com.android.systemui.user.data.repository.fakeUserRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.isNull
-import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
@@ -53,7 +52,6 @@ class ScreenshotInteractorTest : SysuiTestCase() {
     private val testScope = kosmos.testScope
 
     @Mock private lateinit var mockBitmap: Bitmap
-    @Captor private lateinit var screenshotRequestCaptor: ArgumentCaptor<ScreenshotRequest>
 
     private val interactor: ScreenshotInteractor by lazy { kosmos.screenshotInteractor }
 
@@ -68,10 +66,11 @@ class ScreenshotInteractorTest : SysuiTestCase() {
             val displayId = 3
             interactor.takeFullscreenScreenshot(displayId)
 
+            val screenshotRequestCaptor = argumentCaptor<ScreenshotRequest>()
             verify(kosmos.mockScreenshotHelper, times(1))
                 .takeScreenshot(screenshotRequestCaptor.capture(), any(), isNull())
 
-            val capturedRequest = screenshotRequestCaptor.value
+            val capturedRequest = screenshotRequestCaptor.lastValue
             assertThat(capturedRequest.type).isEqualTo(WindowManager.TAKE_SCREENSHOT_FULLSCREEN)
             assertThat(capturedRequest.source)
                 .isEqualTo(WindowManager.ScreenshotSource.SCREENSHOT_SCREEN_CAPTURE_UI)
@@ -80,26 +79,33 @@ class ScreenshotInteractorTest : SysuiTestCase() {
     }
 
     @Test
-    fun takePartialScreenshot_makesCorrectRequestAndCallsScreenshotHelper() {
+    fun takePartialScreenshot_callsScreenshotHelper_withCorrectRequest() {
         testScope.runTest {
             val bounds = Rect(0, 0, 100, 100)
-            whenever(kosmos.mockImageCapture.captureDisplay(eq(DEFAULT_DISPLAY), eq(bounds)))
+            val displayId = 3
+            whenever(kosmos.mockImageCapture.captureDisplay(eq(displayId), eq(bounds)))
                 .thenReturn(mockBitmap)
 
-            interactor.takePartialScreenshot(bounds)
+            val mainUser = UserInfo(0, "primary user", UserInfo.FLAG_MAIN)
+            val secondaryUser = UserInfo(1, "secondary user", 0)
+            kosmos.fakeUserRepository.setUserInfos(listOf(mainUser, secondaryUser))
+            kosmos.fakeUserRepository.setSelectedUserInfo(secondaryUser)
 
+            interactor.takePartialScreenshot(bounds, displayId)
+
+            val screenshotRequestCaptor = argumentCaptor<ScreenshotRequest>()
             verify(kosmos.mockImageCapture, times(1)).captureDisplay(any(), eq(bounds))
             verify(kosmos.mockScreenshotHelper, times(1))
                 .takeScreenshot(screenshotRequestCaptor.capture(), any(), isNull())
 
-            val capturedRequest = screenshotRequestCaptor.value
+            val capturedRequest = screenshotRequestCaptor.lastValue
             assertThat(capturedRequest.type).isEqualTo(WindowManager.TAKE_SCREENSHOT_PROVIDED_IMAGE)
             assertThat(capturedRequest.source)
                 .isEqualTo(WindowManager.ScreenshotSource.SCREENSHOT_SCREEN_CAPTURE_UI)
             assertThat(capturedRequest.bitmap).isEqualTo(mockBitmap)
             assertThat(capturedRequest.boundsInScreen).isEqualTo(bounds)
-            assertThat(capturedRequest.displayId).isEqualTo(DEFAULT_DISPLAY)
-            assertThat(capturedRequest.userId).isEqualTo(UserHandle.USER_CURRENT)
+            assertThat(capturedRequest.displayId).isEqualTo(displayId)
+            assertThat(capturedRequest.userId).isEqualTo(secondaryUser.id)
         }
     }
 }

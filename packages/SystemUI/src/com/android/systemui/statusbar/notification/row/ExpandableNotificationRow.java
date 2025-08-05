@@ -3232,9 +3232,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
         mUserLocked = userLocked;
         mPrivateLayout.setUserExpanding(userLocked);
-        if (android.app.Flags.expandingPublicView()) {
-            mPublicLayout.setUserExpanding(userLocked);
-        }
+        mPublicLayout.setUserExpanding(userLocked);
         // This is intentionally not guarded with mIsSummaryWithChildren since we might have had
         // children but not anymore.
         if (mChildrenContainer != null) {
@@ -4378,6 +4376,13 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                                 .getString(R.string.notification_menu_snooze_action));
                 info.addAction(action);
             }
+        }
+
+        if (isBundle()) {
+            // Set a content description explicitly for the bundle header because we can't
+            // otherwise merge accessibility information across the ViewGroup/ComposeView boundary.
+            NotificationChildrenContainer childrenContainer = getChildrenContainerNonNull();
+            info.setContentDescription(childrenContainer.getBundleHeaderDescription());
         }
     }
 

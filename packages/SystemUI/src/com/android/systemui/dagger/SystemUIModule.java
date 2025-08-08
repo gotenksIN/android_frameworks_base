@@ -109,6 +109,7 @@ import com.android.systemui.qs.tiles.impl.qr.ui.model.QRCodeScannerModule;
 import com.android.systemui.recents.Recents;
 import com.android.systemui.recordissue.RecordIssueModule;
 import com.android.systemui.retail.RetailModeModule;
+import com.android.systemui.rotation.impl.RotationModule;
 import com.android.systemui.rotationlock.DeviceStateAutoRotateModule.BoundsDeviceStateAutoRotateModule;
 import com.android.systemui.scene.shared.model.SceneContainerConfig;
 import com.android.systemui.scene.shared.model.SceneDataSource;
@@ -153,6 +154,7 @@ import com.android.systemui.statusbar.notification.row.dagger.NotificationRowCom
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.ConfigurationControllerModule;
 import com.android.systemui.statusbar.phone.LetterboxModule;
+import com.android.systemui.statusbar.pipeline.airplane.data.repository.impl.AirplaneModeDataLayerModule;
 import com.android.systemui.statusbar.pipeline.airplane.shared.impl.AirplaneModeSharedModule;
 import com.android.systemui.statusbar.pipeline.dagger.StatusBarPipelineModule;
 import com.android.systemui.statusbar.policy.DeviceStateRotationLockSettingController;
@@ -219,6 +221,7 @@ import javax.inject.Named;
         AmbientModule.class,
         AvControlsChipModule.class,
         AppOpsModule.class,
+        AirplaneModeDataLayerModule.class,
         AirplaneModeSharedModule.class,
         AssistModule.class,
         AuthenticationModule.class,
@@ -274,6 +277,7 @@ import javax.inject.Named;
         RecordIssueModule.class,
         ReferenceModule.class,
         RetailModeModule.class,
+        RotationModule.class,
         ScreenBrightnessModule.class,
         ScreenshotModule.class,
         SecureLockDeviceModule.class,

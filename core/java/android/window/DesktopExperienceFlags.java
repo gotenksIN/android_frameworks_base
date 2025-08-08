@@ -84,6 +84,8 @@ public enum DesktopExperienceFlags {
     ENABLE_CAMERA_COMPAT_EXTERNAL_DISPLAY_ROTATION_BUGFIX(
             Flags::enableCameraCompatExternalDisplayRotationBugfix, false,
             Flags.FLAG_ENABLE_CAMERA_COMPAT_EXTERNAL_DISPLAY_ROTATION_BUGFIX),
+    ENABLE_CLEAR_REUSABLE_SCVH_ON_RELEASE(Flags::clearReusableScvhOnRelease, false,
+            Flags.FLAG_CLEAR_REUSABLE_SCVH_ON_RELEASE),
     ENABLE_CONNECTED_DISPLAYS_DND(Flags::enableConnectedDisplaysDnd, true,
             Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_DND),
     ENABLE_CONNECTED_DISPLAYS_PIP(Flags::enableConnectedDisplaysPip, true,
@@ -306,6 +308,9 @@ public enum DesktopExperienceFlags {
     RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS(
             Flags::respectFullscreenActivityOptionInDesktopLaunchParams, true,
             Flags.FLAG_RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS),
+    SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_TOAST(
+            Flags::showBiometricPromptSecondaryDisplayToast, true,
+            Flags.FLAG_SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_TOAST),
     SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT(
             Flags::skipDeactivationOfDeskWithNothingInFront, true,
             Flags.FLAG_SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT),
@@ -487,12 +492,23 @@ public enum DesktopExperienceFlags {
 
     /** Returns whether the toggle is overridden by the relevant system property.. */
     private static boolean isToggleOverriddenBySystem() {
-        // We never override if display content mode management is enabled or
-        // if the desktop experience dev option is not enabled in the build.
-        if (enableDisplayContentModeManagement() || !Flags.showDesktopExperienceDevOption()) {
+        // We never override if display content mode management is enabled (except when desktop
+        // mode dev option is enabled on the device, which indicates that the device only supports
+        // desktop mode) or if the desktop experience dev option is not enabled in the build.
+        if ((enableDisplayContentModeManagement() && (!isDesktopModeDevOptionSupported()))
+                || !Flags.showDesktopExperienceDevOption()) {
             return false;
         }
         return SystemProperties.getBoolean(SYSTEM_PROPERTY_NAME, false);
+    }
+
+    private static boolean isDesktopModeDevOptionSupported() {
+        Context context = getApplicationContext();
+        if (context == null) {
+            return false;
+        }
+
+        return context.getResources().getBoolean(R.bool.config_isDesktopModeDevOptionSupported);
     }
 }
 

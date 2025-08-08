@@ -74,6 +74,7 @@ import android.view.WindowManager
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.view.WindowManager.TRANSIT_CLOSE
 import android.view.WindowManager.TRANSIT_OPEN
+import android.view.WindowManager.TRANSIT_START_LOCK_TASK_MODE
 import android.view.WindowManager.TRANSIT_TO_BACK
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.widget.Toast
@@ -219,6 +220,7 @@ import org.mockito.kotlin.argThat
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.mockito.quality.Strictness
@@ -319,6 +321,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     private val DEFAULT_USER_ID = 0
     private val DEFAULT_USER_WORK_PROFILE_ID = 100
+    private val SECONDARY_USER_ID = 11
 
     private val SECONDARY_DISPLAY_ID = 1
     private val DISPLAY_DIMENSION_SHORT = 1600
@@ -448,7 +451,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         whenever(userProfileContexts[anyInt()]).thenReturn(context)
         whenever(userProfileContexts.getOrCreate(anyInt())).thenReturn(context)
         whenever(freeformTaskTransitionStarter.startPipTransition(any())).thenReturn(Binder())
-        whenever(rootTaskDisplayAreaOrganizer.displayIds).thenReturn(intArrayOf(DEFAULT_DISPLAY))
+        whenever(rootTaskDisplayAreaOrganizer.displayIds)
+            .thenReturn(intArrayOf(DEFAULT_DISPLAY, SECONDARY_DISPLAY_ID))
 
         controller = createController()
         controller.setSplitScreenController(splitScreenController)
@@ -2071,6 +2075,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     fun moveToDesktop_displayNotSupported_doesNothing() {
         val spyController = spy(controller)
         desktopState.overrideDesktopModeSupportPerDisplay[DEFAULT_DISPLAY] = false
+        desktopState.overrideDesktopModeSupportPerDisplay[SECONDARY_DISPLAY_ID] = false
         val task = setUpFullscreenTask()
         spyController.moveTaskToDefaultDeskAndActivate(task.taskId, transitionSource = UNKNOWN)
         verify(spyController, times(0))
@@ -4183,6 +4188,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.ActivateDeskWithTask(
                     token = transition,
+                    userId = taskRepository.userId,
                     displayId = SECOND_DISPLAY,
                     deskId = targetDeskId,
                     enterTaskId = task.taskId,
@@ -4221,7 +4227,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     token = transition,
+                    userId = taskRepository.userId,
                     deskId = sourceDeskId,
+                    switchingUser = false,
                     exitReason = ExitReason.TASK_MOVED_FROM_DESK,
                 )
             )
@@ -4652,7 +4660,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     transition,
+                    userId = taskRepository.userId,
                     deskId = 0,
+                    switchingUser = false,
                     exitReason = ExitReason.TASK_FINISHED,
                 )
             )
@@ -4780,7 +4790,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     token = transition,
+                    userId = taskRepository.userId,
                     deskId = 0,
+                    switchingUser = false,
                     exitReason = ExitReason.TASK_MINIMIZED,
                 )
             )
@@ -4917,7 +4929,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     transition,
+                    userId = taskRepository.userId,
                     deskId,
+                    switchingUser = false,
                     exitReason = ExitReason.TASK_MINIMIZED,
                 )
             )
@@ -5333,7 +5347,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     transition,
+                    userId = taskRepository.userId,
                     deskId = 0,
+                    switchingUser = false,
                     exitReason = ExitReason.FULLSCREEN_LAUNCH,
                 )
             )
@@ -5729,6 +5745,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.ActivateDeskWithTask(
                     token = transition,
+                    userId = taskRepository.userId,
                     displayId = DEFAULT_DISPLAY,
                     deskId = deskId,
                     enterTaskId = fullscreenTask.taskId,
@@ -6333,7 +6350,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         desksTransitionsObserver.addPendingTransition(
             DeskTransition.DeactivateDesk(
                 transition,
+                userId = taskRepository.userId,
                 deskId = 0,
+                switchingUser = false,
                 exitReason = ExitReason.UNKNOWN_EXIT,
             )
         )
@@ -6576,7 +6595,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     transition,
+                    userId = taskRepository.userId,
                     deskId,
+                    switchingUser = false,
                     exitReason = ExitReason.FULLSCREEN_LAUNCH,
                 )
             )
@@ -7175,7 +7196,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     token = transition,
+                    userId = taskRepository.userId,
                     deskId = 0,
+                    switchingUser = false,
                     exitReason = ExitReason.TASK_FINISHED,
                 )
             )
@@ -7379,7 +7402,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     token = transition,
+                    userId = taskRepository.userId,
                     deskId = 0,
+                    switchingUser = false,
                     exitReason = ExitReason.TASK_FINISHED,
                 )
             )
@@ -7428,6 +7453,27 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                         this.deskId == 0
                 }
             )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX)
+    fun handleRequest_lockTaskMode_freeformTask_movesTaskToFullscreen() {
+        val freeformTask = setUpFreeformTask()
+        val homeTask = setUpHomeTask()
+        val transition = createTransition(task = freeformTask, type = TRANSIT_START_LOCK_TASK_MODE)
+
+        val wct = controller.handleRequest(Binder(), transition)
+
+        assertNotNull(wct) { "Should handle request" }
+
+        // Check for moving to fullscreen
+        assertThat(wct.changes[freeformTask.token.asBinder()]?.windowingMode)
+            .isEqualTo(WINDOWING_MODE_UNDEFINED)
+        assertThat(findBoundsChange(wct, freeformTask)).isEqualTo(Rect())
+        // Check for home task reorder
+        wct.assertReorder(homeTask, toTop = true)
+        // Check for task reorder
+        wct.assertReorder(freeformTask, toTop = true)
     }
 
     @Test
@@ -10488,7 +10534,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     token = transition,
+                    userId = taskRepository.userId,
                     deskId = 0,
+                    switchingUser = false,
                     exitReason = ExitReason.RETURN_HOME_OR_OVERVIEW,
                 )
             )
@@ -10717,66 +10765,17 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION,
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
     )
-    fun onDisplayDisconnect_desktopModeNotSupported_reparentsDeskTasks_focusedTaskToTop() {
+    fun onDisplayDisconnect_desktopModeNotSupported_reparentsDeskTasks_focusedTaskToBottom() {
         val defaultDisplayTask = setUpFullscreenTask()
         val transition = Binder()
         taskRepository.addDesk(SECOND_DISPLAY, DISCONNECTED_DESK_ID)
         val secondDisplayTask = setUpFreeformTask(SECOND_DISPLAY)
         val tda = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
-
         val wct =
             performDisplayDisconnectTransition(
                 transition = transition,
                 desktopSupportedOnDefaultDisplay = false,
                 taskOnSecondDisplayHasFocus = true,
-                defaultDisplayTask = defaultDisplayTask,
-                secondDisplayTask = secondDisplayTask,
-            )
-
-        assertThat(wct).isNotNull()
-        wct.assertHop(
-            ReparentPredicate(
-                token = secondDisplayTask.token,
-                parentToken = tda.token,
-                toTop = true,
-            )
-        )
-        verify(desksOrganizer).removeDesk(any(), eq(DISCONNECTED_DESK_ID), any())
-        verify(desksTransitionsObserver)
-            .addPendingTransition(
-                argThat {
-                    this is DeskTransition.RemoveDesk &&
-                        this.token == transition &&
-                        this.displayId == SECOND_DISPLAY &&
-                        this.deskId == DISCONNECTED_DESK_ID
-                }
-            )
-        verify(desksTransitionsObserver)
-            .addPendingTransition(
-                argThat {
-                    this is DeskTransition.RemoveDisplay &&
-                        this.token == transition &&
-                        this.displayId == SECOND_DISPLAY
-                }
-            )
-    }
-
-    @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION,
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-    )
-    fun onDisplayDisconnect_desktopModeNotSupported_reparentsDeskTasks_nonFocusedTaskToBottom() {
-        val defaultDisplayTask = setUpFullscreenTask()
-        val transition = Binder()
-        taskRepository.addDesk(SECOND_DISPLAY, DISCONNECTED_DESK_ID)
-        val secondDisplayTask = setUpFreeformTask(SECOND_DISPLAY)
-        val tda = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
-        val wct =
-            performDisplayDisconnectTransition(
-                transition = transition,
-                desktopSupportedOnDefaultDisplay = false,
-                taskOnSecondDisplayHasFocus = false,
                 defaultDisplayTask = defaultDisplayTask,
                 secondDisplayTask = secondDisplayTask,
             )
@@ -11148,6 +11147,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.ActivateDesk(
                     token = transition,
+                    userId = taskRepository.userId,
                     displayId = DEFAULT_DISPLAY,
                     deskId = inactiveDesk,
                     enterReason = EnterReason.APP_FREEFORM_INTENT,
@@ -11291,7 +11291,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     transition,
+                    userId = taskRepository.userId,
                     deskId,
+                    switchingUser = false,
                     exitReason = ExitReason.RETURN_HOME_OR_OVERVIEW,
                 )
             )
@@ -11570,6 +11572,96 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         val finalBounds = findBoundsChange(wct, task)
         assertThat(finalBounds).isEqualTo(requestedBounds)
         verify(desksOrganizer).activateDesk(wct, targetDeskId)
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_APPLY_DESK_ACTIVATION_ON_USER_SWITCH,
+    )
+    fun handleRequest_userSwitch() {
+        val previousUser = DEFAULT_USER_ID
+        val newUser = SECONDARY_USER_ID
+        userRepositories.getProfile(DEFAULT_USER_ID).apply {
+            addDesk(displayId = DEFAULT_DISPLAY, deskId = 5)
+            setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 5)
+        }
+        userRepositories.getProfile(SECONDARY_USER_ID).apply {
+            addDesk(displayId = DEFAULT_DISPLAY, deskId = 110005)
+            setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 110005)
+        }
+
+        val wct =
+            controller.handleRequest(
+                Binder(),
+                createTransition(
+                    task = null,
+                    userChange =
+                        TransitionRequestInfo.UserChange(
+                            /* previousUserId = */ previousUser,
+                            /* newUserId = */ newUser,
+                        ),
+                ),
+            )
+
+        assertNotNull(wct, "should handle request")
+        val inOrder = inOrder(desksOrganizer)
+        inOrder
+            .verify(desksOrganizer)
+            .deactivateDesk(wct = eq(wct), deskId = eq(5), skipReorder = any())
+        inOrder
+            .verify(desksOrganizer)
+            .activateDesk(wct = eq(wct), deskId = eq(110005), skipReorder = any())
+    }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_APPLY_DESK_ACTIVATION_ON_USER_SWITCH,
+    )
+    fun handleRequest_userSwitch_multipleDisplays() {
+        val previousUser = DEFAULT_USER_ID
+        val newUser = SECONDARY_USER_ID
+        userRepositories.getProfile(DEFAULT_USER_ID).apply {
+            addDesk(displayId = DEFAULT_DISPLAY, deskId = 5)
+            setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 5)
+            addDesk(displayId = SECONDARY_DISPLAY_ID, deskId = 6)
+            setActiveDesk(displayId = SECONDARY_DISPLAY_ID, deskId = 6)
+        }
+        userRepositories.getProfile(SECONDARY_USER_ID).apply {
+            addDesk(displayId = DEFAULT_DISPLAY, deskId = 110005)
+            setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = 110005)
+            addDesk(displayId = SECONDARY_DISPLAY_ID, deskId = 110006)
+            setActiveDesk(displayId = SECONDARY_DISPLAY_ID, deskId = 110006)
+        }
+
+        val wct =
+            controller.handleRequest(
+                Binder(),
+                createTransition(
+                    task = null,
+                    userChange =
+                        TransitionRequestInfo.UserChange(
+                            /* previousUserId = */ previousUser,
+                            /* newUserId = */ newUser,
+                        ),
+                ),
+            )
+
+        assertNotNull(wct, "should handle request")
+        val inOrder = inOrder(desksOrganizer)
+        inOrder
+            .verify(desksOrganizer)
+            .deactivateDesk(wct = eq(wct), deskId = eq(5), skipReorder = any())
+        inOrder
+            .verify(desksOrganizer)
+            .deactivateDesk(wct = eq(wct), deskId = eq(6), skipReorder = any())
+        inOrder
+            .verify(desksOrganizer)
+            .activateDesk(wct = eq(wct), deskId = eq(110005), skipReorder = any())
+        inOrder
+            .verify(desksOrganizer)
+            .activateDesk(wct = eq(wct), deskId = eq(110006), skipReorder = any())
     }
 
     private class RunOnStartTransitionCallback : ((IBinder) -> Unit) {
@@ -11963,8 +12055,11 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     private fun createTransition(
         task: RunningTaskInfo?,
         @WindowManager.TransitionType type: Int = TRANSIT_OPEN,
+        userChange: TransitionRequestInfo.UserChange? = null,
     ): TransitionRequestInfo {
-        return TransitionRequestInfo(type, task, /* remoteTransition= */ null)
+        return TransitionRequestInfo(type, task, /* remoteTransition= */ null).apply {
+            userChange?.let { setUserChange(it) }
+        }
     }
 
     private fun createTaskMoveTransition(

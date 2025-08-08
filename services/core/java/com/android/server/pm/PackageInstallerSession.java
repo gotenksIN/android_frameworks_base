@@ -223,13 +223,11 @@ import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.Preconditions;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
-import com.android.server.IoThread;
 import com.android.server.LocalServices;
 import com.android.server.Watchdog;
 import com.android.server.art.ArtManagedInstallFileHelper;
 import com.android.server.art.model.ValidationResult;
 import com.android.server.pm.Installer.InstallerException;
-import com.android.server.pm.dex.DexManager;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
 import com.android.server.pm.verify.developer.DeveloperVerificationStatusInternal;
@@ -260,6 +258,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -3225,7 +3224,19 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     private void runExtractNativeLibraries() {
-        IoThread.getHandler().post(() -> {
+        // We create a new thread for this operation instead of using the shared `IoThread`
+        // because native library extraction can be a long-running I/O-intensive task.
+        // Using a dedicated thread prevents blocking other critical system operations that
+        // rely on the `IoThread`.
+        final Executor highPriorityExecutor = runnable -> {
+            Thread t = new Thread(() -> {
+                android.os.Process.setThreadPriority(
+                        android.os.Process.THREAD_PRIORITY_FOREGROUND);
+                runnable.run();
+            }, "extractNativeLibraries");
+            t.start();
+        };
+        CompletableFuture.runAsync(() -> {
             try {
                 synchronized (mMetrics) {
                     mMetrics.onNativeLibExtractionStarted();
@@ -3255,7 +3266,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     mMetrics.onNativeLibExtractionFinished();
                 }
             }
-        });
+        }, highPriorityExecutor);
     }
 
     /**
@@ -4635,7 +4646,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         if (packageLite.isUseEmbeddedDex()) {
             for (File file : mResolvedStagedFiles) {
                 if (file.getName().endsWith(".apk")
-                        && !DexManager.auditUncompressedDexInApk(file.getPath())) {
+                        && !DexOptHelper.checkUncompressedDexInApk(file.getPath())) {
                     throw new PackageManagerException(INSTALL_FAILED_INVALID_APK,
                             "Some dex are not uncompressed and aligned correctly for "
                             + mPackageName);
@@ -5908,13 +5919,15 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         sendUpdateToRemoteStatusReceiver(returnCode, msg, extras,
                 /* forPreapproval= */ isPreapprovalRequested() && !isCommitted());
 
+        final String packageName;
         synchronized (mLock) {
             mFinalStatus = returnCode;
             mFinalMessage = msg;
+            packageName = getPackageName();
         }
         synchronized (mMetrics) {
             mMetrics.onInternalInstallationFinished();
-            mMetrics.onSessionFinished(returnCode);
+            mMetrics.onSessionFinished(returnCode, packageName);
         }
 
         final boolean success = (returnCode == INSTALL_SUCCEEDED);

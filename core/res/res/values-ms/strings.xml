@@ -79,10 +79,14 @@
     <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"Amaran ini dipaparkan kerana apl ini boleh dinyahpepijat dan sedang diuji pada masa ini. Jika anda bukan pembangun, sila laporkan perkara ini kepada pembangun dan minta apl yang tidak boleh dinyahpepijat. &lt;br&gt;&lt;br&gt; Apl ini tidak serasi untuk 16 KB. Semakan penjajaran APK dan ELF gagal. Sila ikut langkah pada &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;. &lt;br&gt;&lt;br&gt; Pustaka yang berikut tidak sejajar dengan 16 KB: &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"Jangan Tunjukkan Lagi"</string>
     <string name="page_size_compat_title" msgid="6497719153872572204">"Keserasian Apl Android"</string>
-    <string name="page_size_compat_elf_not_aligned" msgid="7940806102874132630">"&amp;#8226; %1$s : Segmen PEMUATAN tidak sejajar"</string>
-    <string name="page_size_compat_apk_not_aligned" msgid="8927901100655245528">"&amp;#8226; %1$s : Pustaka yang tidak dimampatkan tidak sejajar"</string>
-    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="1010371834741548905">"&amp;#8226; %1$s : Segmen PEMUATAN dan pustaka yang tidak dimampatkan tidak sejajar"</string>
-    <string name="page_size_compat_unknown" msgid="3254222165646410528">"&amp;#8226; %1$s : Ralat tidak diketahui"</string>
+    <!-- no translation found for page_size_compat_elf_not_aligned (4404128993555194313) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_not_aligned (1434875607880657092) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_and_elf_not_aligned (7140216083697701972) -->
+    <skip />
+    <!-- no translation found for page_size_compat_unknown (5183026525148169891) -->
+    <skip />
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"Perkhidmatan yang tidak diuntukkan."</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"Anda tidak boleh mengubah tetapan ID pemanggil."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"Data ditukar kepada <xliff:g id="CARRIERDISPLAY">%s</xliff:g>"</string>
@@ -300,8 +304,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"Bantu"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"Bantuan Suara"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"Kunci semua"</string>
-    <!-- no translation found for global_action_unrestricted_lock (7933224393323064116) -->
-    <skip />
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"Kunci"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"Balas"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"Pemberitahuan baharu"</string>
@@ -693,6 +696,10 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"Sahkan diri anda"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Gunakan biometrik anda untuk meneruskan"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Gunakan biometrik atau kunci skrin anda untuk meneruskan pengesahan"</string>
+    <!-- no translation found for biometric_dialog_secondary_display_toast (256544327174107086) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_secondary_display_toast (2855203015454795660) -->
+    <skip />
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Perkakasan biometrik tidak tersedia"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Pengesahan dibatalkan"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Tidak dikenali"</string>
@@ -892,9 +899,9 @@
     <string name="policydesc_watchLogin_secondaryUser" product="automotive" msgid="7180857406058327941">"Memantau bilangan kata laluan tidak betul yang ditaip semasa membuka kunci skrin dan mengunci sistem maklumat hibur atau memadam semua data profil ini jika terlalu banyak kata laluan yang tidak betul ditaip."</string>
     <string name="policydesc_watchLogin_secondaryUser" product="default" msgid="9177645136475155924">"Pantau bilangan kata laluan tidak betul yang ditaip semasa membuka kunci skrin dan kunci telefon atau padam semua data pengguna ini jika terlalu banyak kata laluan yang tidak betul ditaip."</string>
     <string name="policylab_resetPassword" msgid="214556238645096520">"Tukar kunci skrin"</string>
-    <string name="policydesc_resetPassword" msgid="4626419138439341851">"Tukar kunci skrin."</string>
+    <string name="policydesc_resetPassword" msgid="4626419138439341851">"Menukar kunci skrin."</string>
     <string name="policylab_forceLock" msgid="7360335502968476434">"Kunci skrin"</string>
-    <string name="policydesc_forceLock" msgid="1008844760853899693">"Kawal cara dan masa skrin dikunci."</string>
+    <string name="policydesc_forceLock" msgid="1008844760853899693">"Mengawal cara dan masa skrin dikunci."</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"Padamkan semua data"</string>
     <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Memadamkan data tablet tanpa amaran dengan melakukan tetapan semula data kilang."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"Padamkan data peranti Android TV anda tanpa amaran dengan melaksanakan tetapan semula data kilang."</string>
@@ -915,7 +922,7 @@
     <string name="policylab_disableCamera" msgid="5749486347810162018">"Lumpuhkan kamera"</string>
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"Menghalang penggunaan semua kamera peranti."</string>
     <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Lumpuhkan beberapa ciri kunci skrin"</string>
-    <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Halang penggunaan sesetengah ciri kunci skrin."</string>
+    <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Menghalang penggunaan sesetengah ciri kunci skrin."</string>
     <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"Tekan lama kekunci Esc untuk menutup apl ini"</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"Rumah"</item>
@@ -1484,8 +1491,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"TOLAK"</string>
     <string name="select_input_method" msgid="3971267998568587025">"Pilih kaedah input"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"Tetapan Bahasa"</string>
-    <string name="show_ime" msgid="6406112007347443383">"Pastikannya pada skrin, semasa papan kekunci fizikal aktif"</string>
-    <string name="hardware" msgid="3611039921284836033">"Guna papan kekunci pada skrin"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"Konfigurasikan <xliff:g id="DEVICE_NAME">%s</xliff:g>"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"Konfigurasikan papan kekunci fizikal"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"Ketik untuk memilih bahasa dan reka letak"</string>

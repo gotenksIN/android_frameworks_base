@@ -60,29 +60,17 @@ import android.os.UserManager;
 import android.provider.Settings;
 import android.service.adb.AdbDebuggingManagerProto;
 import android.text.TextUtils;
-import android.util.AtomicFile;
 import android.util.Base64;
 import android.util.Slog;
-import android.util.Xml;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.util.FrameworkStatsLog;
-import com.android.internal.util.XmlUtils;
 import com.android.internal.util.dump.DualDumpOutputStream;
-import com.android.modules.utils.TypedXmlPullParser;
-import com.android.modules.utils.TypedXmlSerializer;
 import com.android.server.FgThread;
 
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -1335,35 +1323,6 @@ public class AdbDebuggingManager {
         return mUserKeyFile;
     }
 
-    private void writeKeys(Iterable<String> keys) {
-        if (mUserKeyFile == null) {
-            return;
-        }
-
-        AtomicFile atomicKeyFile = new AtomicFile(mUserKeyFile);
-        // Note: Do not use a try-with-resources with the FileOutputStream, because AtomicFile
-        // requires that it's cleaned up with AtomicFile.failWrite();
-        FileOutputStream fo = null;
-        try {
-            fo = atomicKeyFile.startWrite();
-            for (String key : keys) {
-                fo.write(key.getBytes());
-                fo.write('\n');
-            }
-            atomicKeyFile.finishWrite(fo);
-        } catch (IOException ex) {
-            Slog.e(TAG, "Error writing keys: " + ex);
-            atomicKeyFile.failWrite(fo);
-            return;
-        }
-
-        FileUtils.setPermissions(
-                mUserKeyFile.toString(),
-                FileUtils.S_IRUSR | FileUtils.S_IWUSR | FileUtils.S_IRGRP,
-                -1,
-                -1);
-    }
-
     /**
      * When {@code enabled} is {@code true}, this allows ADB debugging and starts the ADB handler
      * thread. When {@code enabled} is {@code false}, this disallows ADB debugging for the
@@ -1539,23 +1498,22 @@ public class AdbDebuggingManager {
      * ADB_ALLOWED_CONNECTION_TIME setting.
      */
     class AdbKeyStore {
-        private AtomicFile mAtomicKeyFile;
-
         private final Set<String> mSystemKeys;
-        private final Map<String, Long> mKeyMap = new HashMap<>();
-        private final List<String> mTrustedNetworks = new ArrayList<>();
+        private AdbAuthorizationStore.Entries mAuthEntries;
 
-        private static final int KEYSTORE_VERSION = 1;
-        private static final int MAX_SUPPORTED_KEYSTORE_VERSION = 1;
-        private static final String XML_KEYSTORE_START_TAG = "keyStore";
-        private static final String XML_ATTRIBUTE_VERSION = "version";
-        private static final String XML_TAG_ADB_KEY = "adbKey";
-        private static final String XML_ATTRIBUTE_KEY = "key";
-        private static final String XML_ATTRIBUTE_LAST_CONNECTION = "lastConnection";
-        // A list of trusted networks a device can always wirelessly debug on (always allow).
-        // TODO: Move trusted networks list into a different file?
-        private static final String XML_TAG_WIFI_ACCESS_POINT = "wifiAP";
-        private static final String XML_ATTRIBUTE_WIFI_BSSID = "bssid";
+        /**
+         * Manages the list of keys that adbd always allows to connect, regardless of last
+         * connection-time.
+         *
+         * <p>This list of keys along with #{mSystemKeys} represents the source of truth for adbd.
+         */
+        private final AdbdKeyStoreStorage mAdbKeyUser;
+
+        /**
+         * Manages the list of temporary keys, including their last connection time, and the list of
+         * trusted networks.
+         */
+        private final AdbAuthorizationStore mAuthStore;
 
         private static final String SYSTEM_KEY_FILE = "/adb_keys";
 
@@ -1574,24 +1532,32 @@ public class AdbDebuggingManager {
          * map are added to the map (for backwards compatibility).
          */
         AdbKeyStore() {
-            initKeyFile();
-            readTempKeysFile();
-            mSystemKeys = getSystemKeysFromFile(SYSTEM_KEY_FILE);
-            addExistingUserKeysToKeyStore();
+            mAdbKeyUser = new AdbdKeyStoreStorage(mUserKeyFile);
+            mAuthStore = new AdbAuthorizationStore(mTempKeysFile);
+            mAuthEntries = mAuthStore.load();
+
+            // The system keystore handles keys pre-loaded into the read-only system partition at
+            // /adb_keys. Unlike the user keystore (/data/misc/adb/adb_keys), these
+            // system keys are considered permanently trusted, are not subject to expiration, and
+            // cannot be modified by the user.
+            AdbdKeyStoreStorage systemKeyStore = new AdbdKeyStoreStorage(
+                    new File(SYSTEM_KEY_FILE));
+            mSystemKeys = systemKeyStore.loadKeys();
+            copyUserKeysToTempAuthorizationStore();
         }
 
         public void reloadKeyMap() {
-            readTempKeysFile();
+            mAuthEntries = mAuthStore.load();
         }
 
         public void addTrustedNetwork(String bssid) {
-            mTrustedNetworks.add(bssid);
+            mAuthEntries.trustedNetworks().add(bssid);
             sendPersistKeyStoreMessage();
         }
 
         public Map<String, PairDevice> getPairedDevices() {
             Map<String, PairDevice> pairedDevices = new HashMap<String, PairDevice>();
-            for (Map.Entry<String, Long> keyEntry : mKeyMap.entrySet()) {
+            for (Map.Entry<String, Long> keyEntry : mAuthEntries.keys().entrySet()) {
                 String fingerprints = getFingerprints(keyEntry.getKey());
                 String hostname = "nouser@nohostname";
                 String[] args = keyEntry.getKey().split("\\s+");
@@ -1608,7 +1574,7 @@ public class AdbDebuggingManager {
         }
 
         public String findKeyFromFingerprint(String fingerprint) {
-            for (Map.Entry<String, Long> entry : mKeyMap.entrySet()) {
+            for (Map.Entry<String, Long> entry : mAuthEntries.keys().entrySet()) {
                 String f = getFingerprints(entry.getKey());
                 if (fingerprint.equals(f)) {
                     return entry.getKey();
@@ -1618,42 +1584,17 @@ public class AdbDebuggingManager {
         }
 
         public void removeKey(String key) {
-            if (mKeyMap.containsKey(key)) {
-                mKeyMap.remove(key);
+            if (mAuthEntries.keys().containsKey(key)) {
+                mAuthEntries.keys().remove(key);
                 sendPersistKeyStoreMessage();
             }
         }
 
-        /** Initializes the key file that will be used to persist the adb grants. */
-        private void initKeyFile() {
-            // mTempKeysFile can be null if the adb file cannot be obtained
-            if (mTempKeysFile != null) {
-                mAtomicKeyFile = new AtomicFile(mTempKeysFile);
-            }
-        }
-
-        private Set<String> getSystemKeysFromFile(String fileName) {
-            Set<String> systemKeys = new HashSet<>();
-            File systemKeyFile = new File(fileName);
-            if (systemKeyFile.exists()) {
-                try (BufferedReader in = new BufferedReader(new FileReader(systemKeyFile))) {
-                    String key;
-                    while ((key = in.readLine()) != null) {
-                        key = key.trim();
-                        if (key.length() > 0) {
-                            systemKeys.add(key);
-                        }
-                    }
-                } catch (IOException e) {
-                    Slog.e(TAG, "Caught an exception reading " + fileName + ": " + e);
-                }
-            }
-            return systemKeys;
-        }
-
-        /** Returns whether there are any 'always allowed' keys in the keystore. */
+        /**
+         * Returns whether there are any 'always allowed' keys in the keystore.
+         */
         public boolean isEmpty() {
-            return mKeyMap.isEmpty();
+            return mAuthEntries.keys().isEmpty();
         }
 
         /**
@@ -1667,111 +1608,21 @@ public class AdbDebuggingManager {
         }
 
         /**
-         * Update the key map and the trusted networks list with values parsed from the temp keys
-         * file.
+         * Copies keys from the user key file to the temp authorization store. This ensures that
+         * keys that were previously authorized before the introduction of the keystore are still
+         * authorized.
          */
-        private void readTempKeysFile() {
-            mKeyMap.clear();
-            mTrustedNetworks.clear();
-            if (mAtomicKeyFile == null) {
-                initKeyFile();
-                if (mAtomicKeyFile == null) {
-                    Slog.e(
-                            TAG,
-                            "Unable to obtain the key file, " + mTempKeysFile + ", for reading");
-                    return;
-                }
-            }
-            if (!mAtomicKeyFile.exists()) {
-                return;
-            }
-            try (FileInputStream keyStream = mAtomicKeyFile.openRead()) {
-                TypedXmlPullParser parser;
-                try {
-                    parser = Xml.resolvePullParser(keyStream);
-                    XmlUtils.beginDocument(parser, XML_KEYSTORE_START_TAG);
-
-                    int keystoreVersion = parser.getAttributeInt(null, XML_ATTRIBUTE_VERSION);
-                    if (keystoreVersion > MAX_SUPPORTED_KEYSTORE_VERSION) {
-                        Slog.e(
-                                TAG,
-                                "Keystore version="
-                                        + keystoreVersion
-                                        + " not supported (max_supported="
-                                        + MAX_SUPPORTED_KEYSTORE_VERSION
-                                        + ")");
-                        return;
-                    }
-                } catch (XmlPullParserException e) {
-                    // This could be because the XML document doesn't start with
-                    // XML_KEYSTORE_START_TAG. Try again, instead just starting the document with
-                    // the adbKey tag (the old format).
-                    parser = Xml.resolvePullParser(keyStream);
-                }
-                readKeyStoreContents(parser);
-            } catch (IOException e) {
-                Slog.e(TAG, "Caught an IOException parsing the XML key file: ", e);
-            } catch (XmlPullParserException e) {
-                Slog.e(TAG, "Caught XmlPullParserException parsing the XML key file: ", e);
-            }
-        }
-
-        private void readKeyStoreContents(TypedXmlPullParser parser)
-                throws XmlPullParserException, IOException {
-            // This parser is very forgiving. For backwards-compatibility, we simply iterate through
-            // all the tags in the file, skipping over anything that's not an <adbKey> tag or a
-            // <wifiAP> tag. Invalid tags (such as ones that don't have a valid "lastConnection"
-            // attribute) are simply ignored.
-            while ((parser.next()) != XmlPullParser.END_DOCUMENT) {
-                String tagName = parser.getName();
-                if (XML_TAG_ADB_KEY.equals(tagName)) {
-                    addAdbKeyToKeyMap(parser);
-                } else if (XML_TAG_WIFI_ACCESS_POINT.equals(tagName)) {
-                    addTrustedNetworkToTrustedNetworks(parser);
-                } else {
-                    Slog.w(TAG, "Ignoring tag '" + tagName + "'. Not recognized.");
-                }
-                XmlUtils.skipCurrentTag(parser);
-            }
-        }
-
-        private void addAdbKeyToKeyMap(TypedXmlPullParser parser) {
-            String key = parser.getAttributeValue(null, XML_ATTRIBUTE_KEY);
-            try {
-                long connectionTime = parser.getAttributeLong(null, XML_ATTRIBUTE_LAST_CONNECTION);
-                mKeyMap.put(key, connectionTime);
-            } catch (XmlPullParserException e) {
-                Slog.e(TAG, "Error reading adbKey attributes", e);
-            }
-        }
-
-        private void addTrustedNetworkToTrustedNetworks(TypedXmlPullParser parser) {
-            String bssid = parser.getAttributeValue(null, XML_ATTRIBUTE_WIFI_BSSID);
-            mTrustedNetworks.add(bssid);
-        }
-
-        /**
-         * Updates the keystore with keys that were previously set to be always allowed before the
-         * connection time of keys was tracked.
-         */
-        private void addExistingUserKeysToKeyStore() {
-            if (mUserKeyFile == null || !mUserKeyFile.exists()) {
-                return;
-            }
+        private void copyUserKeysToTempAuthorizationStore() {
+            Set<String> keys = mAdbKeyUser.loadKeys();
             boolean mapUpdated = false;
-            try (BufferedReader in = new BufferedReader(new FileReader(mUserKeyFile))) {
-                String key;
-                while ((key = in.readLine()) != null) {
+            for (String key : keys) {
+                if (!mAuthEntries.keys().containsKey(key)) {
                     // if the keystore does not contain the key from the user key file then add
                     // it to the Map with the current system time to prevent it from expiring
                     // immediately if the user is actively using this key.
-                    if (!mKeyMap.containsKey(key)) {
-                        mKeyMap.put(key, mTicker.currentTimeMillis());
-                        mapUpdated = true;
-                    }
+                    mAuthEntries.keys().put(key, mTicker.currentTimeMillis());
+                    mapUpdated = true;
                 }
-            } catch (IOException e) {
-                Slog.e(TAG, "Caught an exception reading " + mUserKeyFile + ": " + e);
             }
             if (mapUpdated) {
                 sendPersistKeyStoreMessage();
@@ -1783,47 +1634,12 @@ public class AdbDebuggingManager {
             // if there is nothing in the key map then ensure any keys left in the keystore files
             // are deleted as well.
             filterOutOldKeys();
-            if (mKeyMap.isEmpty() && mTrustedNetworks.isEmpty()) {
+            if (mAuthEntries.isEmpty()) {
                 deleteKeyStore();
                 return;
             }
-            if (mAtomicKeyFile == null) {
-                initKeyFile();
-                if (mAtomicKeyFile == null) {
-                    Slog.e(
-                            TAG,
-                            "Unable to obtain the key file, " + mTempKeysFile + ", for writing");
-                    return;
-                }
-            }
-            FileOutputStream keyStream = null;
-            try {
-                keyStream = mAtomicKeyFile.startWrite();
-                TypedXmlSerializer serializer = Xml.resolveSerializer(keyStream);
-                serializer.startDocument(null, true);
-
-                serializer.startTag(null, XML_KEYSTORE_START_TAG);
-                serializer.attributeInt(null, XML_ATTRIBUTE_VERSION, KEYSTORE_VERSION);
-                for (Map.Entry<String, Long> keyEntry : mKeyMap.entrySet()) {
-                    serializer.startTag(null, XML_TAG_ADB_KEY);
-                    serializer.attribute(null, XML_ATTRIBUTE_KEY, keyEntry.getKey());
-                    serializer.attributeLong(
-                            null, XML_ATTRIBUTE_LAST_CONNECTION, keyEntry.getValue());
-                    serializer.endTag(null, XML_TAG_ADB_KEY);
-                }
-                for (String bssid : mTrustedNetworks) {
-                    serializer.startTag(null, XML_TAG_WIFI_ACCESS_POINT);
-                    serializer.attribute(null, XML_ATTRIBUTE_WIFI_BSSID, bssid);
-                    serializer.endTag(null, XML_TAG_WIFI_ACCESS_POINT);
-                }
-                serializer.endTag(null, XML_KEYSTORE_START_TAG);
-                serializer.endDocument();
-                mAtomicKeyFile.finishWrite(keyStream);
-            } catch (IOException e) {
-                Slog.e(TAG, "Caught an exception writing the key map: ", e);
-                mAtomicKeyFile.failWrite(keyStream);
-            }
-            writeKeys(mKeyMap.keySet());
+            mAuthStore.save(mAuthEntries);
+            mAdbKeyUser.saveKeys(mAuthEntries.keys().keySet());
         }
 
         private boolean filterOutOldKeys() {
@@ -1833,7 +1649,8 @@ public class AdbDebuggingManager {
             }
             boolean keysDeleted = false;
             long systemTime = mTicker.currentTimeMillis();
-            Iterator<Map.Entry<String, Long>> keyMapIterator = mKeyMap.entrySet().iterator();
+            Iterator<Map.Entry<String, Long>> keyMapIterator =
+                    mAuthEntries.keys().entrySet().iterator();
             while (keyMapIterator.hasNext()) {
                 Map.Entry<String, Long> keyEntry = keyMapIterator.next();
                 long connectionTime = keyEntry.getValue();
@@ -1845,7 +1662,7 @@ public class AdbDebuggingManager {
             // if any keys were deleted then the key file should be rewritten with the active keys
             // to prevent authorizing a key that is now beyond the allowed window.
             if (keysDeleted) {
-                writeKeys(mKeyMap.keySet());
+                mAdbKeyUser.saveKeys(mAuthEntries.keys().keySet());
             }
             return keysDeleted;
         }
@@ -1862,7 +1679,8 @@ public class AdbDebuggingManager {
                 return minExpiration;
             }
             long systemTime = mTicker.currentTimeMillis();
-            Iterator<Map.Entry<String, Long>> keyMapIterator = mKeyMap.entrySet().iterator();
+            Iterator<Map.Entry<String, Long>> keyMapIterator =
+                    mAuthEntries.keys().entrySet().iterator();
             while (keyMapIterator.hasNext()) {
                 Map.Entry<String, Long> keyEntry = keyMapIterator.next();
                 long connectionTime = keyEntry.getValue();
@@ -1878,15 +1696,9 @@ public class AdbDebuggingManager {
 
         /** Removes all of the entries in the key map and deletes the key file. */
         public void deleteKeyStore() {
-            mKeyMap.clear();
-            mTrustedNetworks.clear();
-            if (mUserKeyFile != null) {
-                mUserKeyFile.delete();
-            }
-            if (mAtomicKeyFile == null) {
-                return;
-            }
-            mAtomicKeyFile.delete();
+            mAuthEntries.clear();
+            mAuthStore.delete();
+            mAdbKeyUser.delete();
         }
 
         /**
@@ -1894,7 +1706,7 @@ public class AdbDebuggingManager {
          * NO_PREVIOUS_CONNECTION} if the specified key does not have an active adb grant.
          */
         public long getLastConnectionTime(String key) {
-            return mKeyMap.getOrDefault(key, NO_PREVIOUS_CONNECTION);
+            return mAuthEntries.keys().getOrDefault(key, NO_PREVIOUS_CONNECTION);
         }
 
         /** Sets the time of the last connection for the specified key to the provided time. */
@@ -1911,7 +1723,9 @@ public class AdbDebuggingManager {
         void setLastConnectionTime(String key, long connectionTime, boolean force) {
             // Do not set the connection time to a value that is earlier than what was previously
             // stored as the last connection time unless force is set.
-            if (mKeyMap.containsKey(key) && mKeyMap.get(key) >= connectionTime && !force) {
+            if (mAuthEntries.keys().containsKey(key)
+                    && mAuthEntries.keys().get(key) >= connectionTime
+                    && !force) {
                 return;
             }
             // System keys are always allowed so there's no need to keep track of their connection
@@ -1919,7 +1733,7 @@ public class AdbDebuggingManager {
             if (mSystemKeys.contains(key)) {
                 return;
             }
-            mKeyMap.put(key, connectionTime);
+            mAuthEntries.keys().put(key, connectionTime);
         }
 
         /**
@@ -1961,7 +1775,7 @@ public class AdbDebuggingManager {
          * option to 'Always allow'.
          */
         public boolean isTrustedNetwork(String bssid) {
-            return mTrustedNetworks.contains(bssid);
+            return mAuthEntries.trustedNetworks().contains(bssid);
         }
     }
 

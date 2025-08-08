@@ -129,6 +129,7 @@ import android.util.Pair;
 import android.util.Slog;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
+import android.window.DesktopExperienceFlags;
 import android.window.IDisplayAreaOrganizerController;
 import android.window.IMultitaskingController;
 import android.window.ITaskFragmentOrganizer;
@@ -399,7 +400,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 final Transition.ReadyCondition wctApplied;
                 if (t != null) {
                     wctApplied = new Transition.ReadyCondition("start WCT applied",
-                            true /* newTrackerOnly */);
+                            !Flags.migrateBasicLegacyReady());
                     transition.mReadyTracker.add(wctApplied);
                 } else {
                     wctApplied = null;
@@ -558,6 +559,10 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 return;
             }
 
+            // Currently, application of wct can span multiple looper loops (ie. waitAsyncStart),
+            // so need a condition to ensure that it finishes applying.
+            final Transition.ReadyCondition wctApplied = new Transition.ReadyCondition(
+                    "TF WCT Applied", !Flags.migrateBasicLegacyReady());
             if (mService.mWindowManager.mSyncEngine.hasActiveSync()
                     && !shouldApplyIndependently) {
                 // Although there is an active sync, we want to apply the transaction now.
@@ -573,8 +578,11 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                             "TaskFragmentTransaction changes are not collected in transition"
                                     + " because there is an ongoing sync for"
                                     + " applySyncTransaction().");
+                } else {
+                    chain.getTransition().mReadyTracker.add(wctApplied);
                 }
                 applyTransaction(wct, -1 /* syncId */, chain, caller);
+                wctApplied.meet();
                 mService.mChainTracker.end();
                 return;
             }
@@ -587,6 +595,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     return;
                 }
                 final ActionChain chain = mService.mChainTracker.start("tfTransact", transition);
+                transition.mReadyTracker.add(wctApplied);
                 final int effects = applyTransaction(wct, -1 /* syncId */, chain, caller, deferred);
                 mService.mChainTracker.end();
                 if (effects == TRANSACT_EFFECTS_NONE && transition.mParticipants.isEmpty()
@@ -596,6 +605,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     transition.abort();
                     return;
                 }
+                wctApplied.meet();
                 mTransitionController.requestStartTransition(transition, null /* startTask */,
                         remoteTransition, null /* displayChange */);
                 setAllReadyIfNeeded(transition, wct);
@@ -1313,15 +1323,17 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     Slog.e(TAG, "Attempt to operate on detached container: " + wc);
                     break;
                 }
-                // There is no use case to ask the reparent operation in lock-task mode now, so keep
-                // skipping this operation as usual.
-                if (isInLockTaskMode && type == HIERARCHY_OP_TYPE_REPARENT) {
-                    Slog.w(TAG, "Skip applying hierarchy operation " + hop
-                            + " while in lock task mode");
-                    break;
-                }
-                if (isLockTaskModeViolation(wc.getParent(), wc.asTask(), isInLockTaskMode)) {
-                    break;
+                if (!DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX.isTrue()) {
+                    // There is no use case to ask the reparent operation in lock-task mode now,
+                    // so keep skipping this operation as usual.
+                    if (isInLockTaskMode && type == HIERARCHY_OP_TYPE_REPARENT) {
+                        Slog.w(TAG, "Skip applying hierarchy operation " + hop
+                                + " while in lock task mode");
+                        break;
+                    }
+                    if (isLockTaskModeViolation(wc.getParent(), wc.asTask(), isInLockTaskMode)) {
+                        break;
+                    }
                 }
                 if (syncId >= 0) {
                     addToSyncSet(syncId, wc);

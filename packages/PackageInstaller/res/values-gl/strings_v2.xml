@@ -60,7 +60,7 @@
     <string name="message_update_owner_change" product="default" msgid="8415571223941666411">"Esta aplicación adoita recibir actualizacións de &lt;b&gt;<xliff:g id="EXISTING_UPDATE_OWNER">%1$s</xliff:g>&lt;/b&gt;. Se actualizas a aplicación a partir dunha fonte diferente, é posible que recibas as futuras actualizacións de calquera fonte no teléfono. As funcións da aplicación poden cambiar."</string>
     <string name="message_external_source_blocked" product="tablet" msgid="1404860482919177902">"Por cuestións de seguranza, na túa tableta non se permite instalar aplicacións descoñecidas procedentes desta fonte. Podes cambiar esta opción en Configuración."</string>
     <string name="message_external_source_blocked" product="tv" msgid="1394622045008552842">"Por cuestións de seguranza, na túa televisión non se permite instalar aplicacións descoñecidas procedentes desta fonte. Podes cambiar esta opción en Configuración."</string>
-    <string name="message_external_source_blocked" product="watch" msgid="1532513823566863443">"Por cuestións de seguranza, na teu reloxo non se permite instalar aplicacións descoñecidas procedentes desta fonte. Podes cambiar esta opción en Configuración."</string>
+    <string name="message_external_source_blocked" product="watch" msgid="1532513823566863443">"Por cuestións de seguranza, no teu reloxo non se permite instalar aplicacións descoñecidas procedentes desta fonte. Podes cambiar esta opción en Configuración."</string>
     <string name="message_external_source_blocked" product="default" msgid="2781541659935183726">"Por cuestións de seguranza, no teu teléfono non se permite instalar aplicacións descoñecidas procedentes desta fonte. Podes cambiar esta opción en Configuración."</string>
     <string name="message_anonymous_source_warning" product="default" msgid="4012873091955414109">"O teu teléfono e os teus datos persoais son máis vulnerables aos ataques de aplicacións descoñecidas. Ao instalar esta aplicación, aceptas que es responsable de calquera dano que se poida producir no teléfono ou da perda de datos que se poida derivar do seu uso."</string>
     <string name="message_anonymous_source_warning" product="tablet" msgid="5167072167473447125">"A túa tableta e os teus datos persoais son máis vulnerables aos ataques de aplicacións descoñecidas. Ao instalar esta aplicación, aceptas que es responsable de calquera dano que se poida producir na tableta ou da perda de datos que se poida derivar do seu uso."</string>
@@ -96,19 +96,29 @@
     <string name="message_restore_error_installer_absent" msgid="8492838251989389724">"Para restaurar esta aplicación, tes que instalar <xliff:g id="INSTALLER_NAME">%1$s</xliff:g>"</string>
     <string name="message_restore_error_generic" msgid="5903850636679929406">"Produciuse un problema ao restaurar esta aplicación"</string>
     <string name="message_uninstall_activity" msgid="3263352475743590167">"<xliff:g id="ACTIVITY_NAME">%1$s</xliff:g> forma parte da seguinte aplicación: <xliff:g id="APP_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for cannot_install_app_blocked_summary (8433096420067308800) -->
+    <string name="cannot_install_app_blocked_summary" msgid="8433096420067308800">"&lt;p&gt;Bloqueouse esta aplicación. Para axudarche a protexer o dispositivo e os datos, só se poden instalar aplicacións de programadores verificados.&lt;/p&gt; &lt;p&gt;&lt;a href=&gt;Obtén máis información sobre a verificación de programadores&lt;/a&gt;&lt;/p&gt;"</string>
+    <!-- no translation found for cannot_update_app_blocked_summary (5003390308880649930) -->
     <skip />
-    <!-- no translation found for cannot_install_verification_no_internet_summary (8948259713332887857) -->
+    <string name="cannot_install_verification_no_internet_summary" msgid="8948259713332887857">"&lt;p&gt;Non se instalou esta aplicación. É posible que as aplicacións de programadores sen verificar non sexan seguras.&lt;/p&gt; &lt;p&gt;Requírese conexión a Internet para realizar a verificación. Comproba que o teu dispositivo teña conexión a Internet e tenta de novo instalar a aplicación. &lt;/p&gt; &lt;p&gt;&lt;a href=&gt;Obtén máis información sobre a verificación de programadores&lt;/a&gt;&lt;p&gt;"</string>
+    <!-- no translation found for cannot_update_verification_no_internet_summary (2970654650180690063) -->
     <skip />
-    <!-- no translation found for cannot_install_verification_unavailable_summary (343815915687716571) -->
+    <string name="cannot_install_verification_unavailable_summary" msgid="343815915687716571">"&lt;p&gt;Produciuse un problema ao verificar o programador desta aplicación. Non se instalou a aplicación porque as aplicacións de programadores sen verificar pode que non sexan seguras.&lt;/p&gt; &lt;p&gt;&lt;a href=&gt;Obtén máis información sobre a verificación de programadores&lt;/a&gt;&lt;/p&gt;"</string>
+    <!-- no translation found for cannot_update_verification_unavailable_summary (7697174533040472480) -->
     <skip />
-    <!-- no translation found for install_without_verifying_summary (9056694084349761546) -->
+    <!-- no translation found for cannot_install_verification_unavailable_fail_closed_summary (3178396108551754329) -->
     <skip />
-    <!-- no translation found for cannot_install_app_blocked_title (6372444121824751694) -->
+    <!-- no translation found for cannot_update_verification_unavailable_fail_closed_summary (2057697870682373917) -->
     <skip />
-    <!-- no translation found for cannot_install_verification_no_internet_title (2862046642298119581) -->
+    <!-- no translation found for more_details_expanded_install_summary (3545896392881608712) -->
     <skip />
-    <!-- no translation found for cannot_install_verification_unavailable_title (2038093442302309120) -->
+    <!-- no translation found for more_details_expanded_update_summary (2239162864839036480) -->
+    <skip />
+    <string name="cannot_install_app_blocked_title" msgid="6372444121824751694">"Programador da aplicación sen verificar"</string>
+    <string name="cannot_install_verification_no_internet_title" msgid="2862046642298119581">"Sen Internet, non se pode verificar o programador da aplicación"</string>
+    <string name="cannot_install_verification_unavailable_title" msgid="2038093442302309120">"Non se puido verificar o programador da aplicación"</string>
+    <!-- no translation found for install_without_verifying (5359680595440741626) -->
+    <skip />
+    <!-- no translation found for update_without_verifying (2841466981431484179) -->
     <skip />
     <string name="button_install" msgid="7434013176505680162">"Instalar"</string>
     <string name="button_update" msgid="3046719350226327526">"Actualizar"</string>

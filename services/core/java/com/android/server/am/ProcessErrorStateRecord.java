@@ -569,7 +569,7 @@ class ProcessErrorStateRecord {
                 isSilentAnr ? null : processCpuTracker, isSilentAnr ? null : lastPids,
                 nativePidsFuture, tracesFileException, firstPidEndOffset, annotation,
                 criticalEventLog, memoryHeaders, auxiliaryTaskExecutor, firstPidFilePromise,
-                latencyTracker);
+                latencyTracker, timeoutRecord);
 
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
         long dueTime = SystemClock.uptimeMillis()

@@ -79,10 +79,14 @@
     <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"Peringatan ini ditampilkan karena aplikasi ini dapat di-debug dan saat ini sedang diuji. Jika Anda bukan developer, laporkan hal ini kepada developer dan minta versi aplikasi yang tidak dapat di-debug. &lt;br&gt;&lt;br&gt; Aplikasi ini tidak kompatibel dengan ukuran halaman 16 KB. Pemeriksaan keselarasan APK dan ELF gagal. Ikuti langkah-langkah di &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;. &lt;br&gt;&lt;br&gt; Library berikut tidak selaras dengan ukuran halaman 16 KB: &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"Jangan Tampilkan Lagi"</string>
     <string name="page_size_compat_title" msgid="6497719153872572204">"Kompatibilitas Aplikasi Android"</string>
-    <string name="page_size_compat_elf_not_aligned" msgid="7940806102874132630">"&amp;#8226; %1$s : segmen LOAD tidak selaras"</string>
-    <string name="page_size_compat_apk_not_aligned" msgid="8927901100655245528">"&amp;#8226; %1$s : Library yang tidak dikompresi tidak selaras"</string>
-    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="1010371834741548905">"&amp;#8226; %1$s : Segmen LOAD dan library yang tidak dikompresi tidak selaras"</string>
-    <string name="page_size_compat_unknown" msgid="3254222165646410528">"&amp;#8226; %1$s : Error tidak diketahui"</string>
+    <!-- no translation found for page_size_compat_elf_not_aligned (4404128993555194313) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_not_aligned (1434875607880657092) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_and_elf_not_aligned (7140216083697701972) -->
+    <skip />
+    <!-- no translation found for page_size_compat_unknown (5183026525148169891) -->
+    <skip />
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"Layanan tidak diperlengkapi."</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"Anda tidak dapat mengubah setelan ID penelepon."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"Mengalihkan data seluler ke <xliff:g id="CARRIERDISPLAY">%s</xliff:g>"</string>
@@ -300,8 +304,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"Bantuan"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"Bantuan Suara"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"Kunci total"</string>
-    <!-- no translation found for global_action_unrestricted_lock (7933224393323064116) -->
-    <skip />
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"Kunci"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"Balas"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"Notifikasi baru"</string>
@@ -693,6 +696,10 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"Verifikasi diri Anda"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Gunakan biometrik untuk melanjutkan"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Gunakan biometrik atau kunci layar untuk melanjutkan"</string>
+    <!-- no translation found for biometric_dialog_secondary_display_toast (256544327174107086) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_secondary_display_toast (2855203015454795660) -->
+    <skip />
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Hardware biometrik tidak tersedia"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Autentikasi dibatalkan"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Tidak dikenali"</string>
@@ -894,7 +901,7 @@
     <string name="policylab_resetPassword" msgid="214556238645096520">"Mengubah kunci layar"</string>
     <string name="policydesc_resetPassword" msgid="4626419138439341851">"Mengubah kunci layar."</string>
     <string name="policylab_forceLock" msgid="7360335502968476434">"Mengunci layar"</string>
-    <string name="policydesc_forceLock" msgid="1008844760853899693">"Mengontrol cara dan kapan layar mengunci."</string>
+    <string name="policydesc_forceLock" msgid="1008844760853899693">"Mengontrol cara dan waktu penguncian layar."</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"Menghapus semua data"</string>
     <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Menghapus data tablet tanpa peringatan dengan mereset ke setelan pabrik."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"Menghapus data perangkat Android TV tanpa peringatan dengan melakukan reset ke setelan pabrik."</string>
@@ -914,7 +921,7 @@
     <string name="policydesc_encryptedStorage" msgid="1102516950740375617">"Mengharuskan data apl yang disimpan untuk dienkripsi."</string>
     <string name="policylab_disableCamera" msgid="5749486347810162018">"Nonaktifkan kamera"</string>
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"Mencegah penggunaan semua kamera perangkat."</string>
-    <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Mematikan beberapa fitur kunci layar"</string>
+    <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Menonaktifkan fitur kunci layar"</string>
     <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Mencegah penggunaan beberapa fitur kunci layar."</string>
     <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"Tekan lama tombol Esc untuk menutup aplikasi ini"</string>
   <string-array name="phoneTypes">
@@ -1484,8 +1491,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"TOLAK"</string>
     <string name="select_input_method" msgid="3971267998568587025">"Pilih metode masukan"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"Setelan Bahasa"</string>
-    <string name="show_ime" msgid="6406112007347443383">"Biarkan di layar meski keyboard fisik aktif"</string>
-    <string name="hardware" msgid="3611039921284836033">"Gunakan keyboard virtual"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"Konfigurasi <xliff:g id="DEVICE_NAME">%s</xliff:g>"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"Konfigurasi keyboard fisik"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"Ketuk untuk memilih bahasa dan tata letak"</string>

@@ -65,6 +65,10 @@ class FakeHomeStatusBarViewModel(
 
     override fun onChipBoundsChanged(key: String, bounds: RectF) {}
 
+    override fun onQuickSettingsChipClicked() {}
+
+    override fun onNotificationIconChipClicked() {}
+
     override val ongoingActivityChipsLegacy =
         MutableStateFlow(MultipleOngoingActivityChipsModelLegacy())
 

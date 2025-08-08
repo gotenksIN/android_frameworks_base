@@ -228,7 +228,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      */
     int mMinHeight;
 
-    Dimmer mDimmer = new Dimmer(this);
+    final Dimmer mDimmer = new Dimmer(this);
 
     /** Apply the dim layer on the embedded TaskFragment. */
     static final int EMBEDDED_DIM_AREA_TASK_FRAGMENT = 0;
@@ -1305,6 +1305,33 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         final ActivityRecord r = topRunningActivity();
         return r != null ? r.isFocusable()
                 : (isFocusable() && getWindowConfiguration().canReceiveKeys());
+    }
+
+    /**
+     * Returns whether the activity launch by the source activity in this TaskFragment should be
+     * aborted. Currently only activity launches from a cross-uid embedded source within a finishing
+     * TaskFragment are aborted.
+     *
+     * @param source an activity in this TaskFragment that launches another activity.
+     */
+    boolean shouldAbortActivityLaunchOnFinishingTf(@NonNull ActivityRecord source) {
+        if (!Flags.activityEmbeddingAbortCrossUidLaunchInFinishingTaskFragment()) {
+            return false;
+        }
+        // If the source activity is a cross-uid embedded activity, the newly launched activity is
+        // always expected to be in the same TaskFragment. If this TaskFragment is being removed, we
+        // should not allow a new activity to be launched by the source, because it may be placed
+        // into a wrong TaskFragment due to current limitations in cross-uid activity launch
+        // tracking.
+        // TODO(b/293800510) Improve cross-uid activity launch tracking.
+        boolean abort = isEmbedded() && isRemovalRequested()
+                && mTaskFragmentOrganizerUid != INVALID_UID
+                && source.getUid() != mTaskFragmentOrganizerUid;
+        if (abort) {
+            Slog.w(TAG, "Activity launch aborted for cross-uid launch from " + source
+                    + " in a finishing TaskFragment");
+        }
+        return abort;
     }
 
     /**
@@ -3376,6 +3403,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         return forAllWindows(getDimBehindWindow, true);
     }
 
+    // It is replaced by WindowState#getDimController().
     @Deprecated
     @Override
     Dimmer getDimmer() {
@@ -3389,6 +3417,20 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     /** Bounds to be used for dimming, as well as touch related tests. */
     void getDimBounds(@NonNull Rect out) {
+        if (com.android.window.flags.Flags.removeGetDimmer()) {
+            if (mIsEmbedded && isDimmingOnParentTask()) {
+                // Return the task bounds if the dimmer is showing and should cover on the Task
+                // (not just on this embedded TaskFragment).
+                final Task task = getTask();
+                if (task != null && task.mDimmer.hasDimState()) {
+                    out.set(task.getBounds());
+                    return;
+                }
+            }
+            out.set(getBounds());
+            return;
+        }
+
         if (mDimmer.hasDimState()) {
             out.set(mDimmer.getDimBounds());
         } else {

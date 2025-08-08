@@ -141,7 +141,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.ServiceInfo;
 import android.net.NetworkPolicyManager;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.PowerManagerInternal;
 import android.os.Process;
 import android.os.RemoteException;
@@ -150,7 +149,6 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 // QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
 import android.os.Trace;
-import android.util.ArrayMap;
 import android.util.ArraySet;
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
 import android.util.BoostFramework;
@@ -168,6 +166,7 @@ import com.android.server.am.psc.ContentProviderConnectionInternal;
 import com.android.server.am.psc.PlatformCompatCache;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
 import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.ServiceRecordInternal;
 import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.wm.WindowProcessController;
 
@@ -844,7 +843,7 @@ public abstract class OomAdjuster {
         // Scan downstreams of the process record
         for (ProcessRecord pr = queue.poll(); pr != null; pr = queue.poll()) {
             processes.add(pr);
-            final UidRecord uidRec = pr.getUidRecord();
+            final UidRecordInternal uidRec = pr.getUidRecord();
             if (uidRec != null) {
                 uids.put(uidRec.getUid(), uidRec);
             }
@@ -903,13 +902,13 @@ public abstract class OomAdjuster {
             // If this process is a sandbox itself, also scan the app on whose behalf its running
             if (pr.isSdkSandbox) {
                 for (int is = psr.numberOfRunningServices() - 1; is >= 0; is--) {
-                    ServiceRecord s = psr.getRunningServiceAt(is);
-                    ArrayMap<IBinder, ArrayList<ConnectionRecord>> serviceConnections =
-                            s.getConnections();
-                    for (int conni = serviceConnections.size() - 1; conni >= 0; conni--) {
-                        ArrayList<ConnectionRecord> clist = serviceConnections.valueAt(conni);
+                    ServiceRecordInternal s = psr.getRunningServiceAt(is);
+                    for (int conni = s.getConnectionsSize() - 1; conni >= 0; conni--) {
+                        ArrayList<? extends ConnectionRecordInternal> clist =
+                                s.getConnectionAt(conni);
                         for (int i = clist.size() - 1; i >= 0; i--) {
-                            ConnectionRecord cr = clist.get(i);
+                            // TODO(b/425766486): Switch to use ConnectionRecordInternal.
+                            ConnectionRecord cr = (ConnectionRecord) clist.get(i);
                             ProcessRecord attributedApp = cr.binding.attributedClient;
                             if (attributedApp == null || attributedApp == pr
                                     || ((attributedApp.getMaxAdj() >= ProcessList.SYSTEM_ADJ)
@@ -1336,9 +1335,9 @@ public abstract class OomAdjuster {
 // QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                             + " serviceb = " + app.isServiceB() + " s = " + s + " sr.lastActivity = "
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-                            + sr.lastActivity + " packageName = " + sr.packageName
+                            + sr.getLastActivity() + " packageName = " + sr.packageName
                             + " processName = " + sr.processName);
-                    if (SystemClock.uptimeMillis() - sr.lastActivity
+                    if (SystemClock.uptimeMillis() - sr.getLastActivity()
                             < mMinBServiceAgingTime) {
                         if (DEBUG_OOM_ADJ) {
                             Slog.d(TAG,"Not aged enough!!!");
@@ -1346,10 +1345,10 @@ public abstract class OomAdjuster {
                         continue;
                     }
                     if (serviceLastActivity == 0) {
-                        serviceLastActivity = sr.lastActivity;
+                        serviceLastActivity = sr.getLastActivity();
                         selectedAppRecord = app;
-                    } else if (sr.lastActivity < serviceLastActivity) {
-                        serviceLastActivity = sr.lastActivity;
+                    } else if (sr.getLastActivity() < serviceLastActivity) {
+                        serviceLastActivity = sr.getLastActivity();
                         selectedAppRecord = app;
                     }
                 }

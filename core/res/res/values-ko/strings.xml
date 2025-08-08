@@ -79,10 +79,14 @@
     <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"이 앱은 현재 테스트 중인 디버그 가능 앱이므로 이 경고가 표시됩니다. 개발자가 아니라면 개발자에게 이 문제를 보고하고 디버그 불가능한 앱을 요청하세요. &lt;br&gt;&lt;br&gt; 이 앱은 16KB와 호환되지 않습니다. APK 및 ELF 정렬 검사에 실패했습니다. &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;의 단계를 따르세요. &lt;br&gt;&lt;br&gt; 다음 라이브러리가 16KB로 정렬되지 않았습니다. &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"다시 표시 안함"</string>
     <string name="page_size_compat_title" msgid="6497719153872572204">"Android 앱 호환성"</string>
-    <string name="page_size_compat_elf_not_aligned" msgid="7940806102874132630">"&amp;#8226; %1$s: LOAD 세그먼트가 정렬되지 않음"</string>
-    <string name="page_size_compat_apk_not_aligned" msgid="8927901100655245528">"&amp;#8226; %1$s: 압축되지 않은 라이브러리가 정렬되지 않음"</string>
-    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="1010371834741548905">"&amp;#8226; %1$s: LOAD 세그먼트와 압축되지 않은 라이브러리가 정렬되지 않음"</string>
-    <string name="page_size_compat_unknown" msgid="3254222165646410528">"&amp;#8226; %1$s: 알 수 없는 오류"</string>
+    <!-- no translation found for page_size_compat_elf_not_aligned (4404128993555194313) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_not_aligned (1434875607880657092) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_and_elf_not_aligned (7140216083697701972) -->
+    <skip />
+    <!-- no translation found for page_size_compat_unknown (5183026525148169891) -->
+    <skip />
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"서비스가 준비되지 않았습니다."</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"발신자 번호 설정을 변경할 수 없습니다."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"<xliff:g id="CARRIERDISPLAY">%s</xliff:g> 이동통신사로 데이터가 변경됨"</string>
@@ -300,8 +304,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"지원"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"음성 지원"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"잠금"</string>
-    <!-- no translation found for global_action_unrestricted_lock (7933224393323064116) -->
-    <skip />
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"잠금"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"답장"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"새 알림"</string>
@@ -693,6 +696,10 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"본인 확인"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"생체 인식을 사용하여 계속하세요"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"계속하려면 생체 인식이나 화면 잠금을 사용하세요"</string>
+    <!-- no translation found for biometric_dialog_secondary_display_toast (256544327174107086) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_secondary_display_toast (2855203015454795660) -->
+    <skip />
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"생체 인식 하드웨어를 사용할 수 없음"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"인증이 취소되었습니다."</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"인식할 수 없음"</string>
@@ -1269,7 +1276,7 @@
     <string name="whichApplication" msgid="5432266899591255759">"작업을 수행할 때 사용하는 애플리케이션"</string>
     <string name="whichApplicationNamed" msgid="6969946041713975681">"%1$s을(를) 사용하여 작업 완료"</string>
     <string name="whichApplicationLabel" msgid="7852182961472531728">"작업 완료"</string>
-    <string name="whichViewApplication" msgid="5733194231473132945">"연결 프로그램"</string>
+    <string name="whichViewApplication" msgid="5733194231473132945">"연결 앱"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"%1$s(으)로 열기"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"열기"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"<xliff:g id="HOST">%1$s</xliff:g> 링크를 열 때 사용할 앱"</string>
@@ -1484,8 +1491,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"거부"</string>
     <string name="select_input_method" msgid="3971267998568587025">"입력 방법 선택"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"언어 설정"</string>
-    <string name="show_ime" msgid="6406112007347443383">"물리적 키보드가 활성 상태인 경우 화면에 켜 둠"</string>
-    <string name="hardware" msgid="3611039921284836033">"터치 키보드 사용"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"<xliff:g id="DEVICE_NAME">%s</xliff:g> 설정"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"실제 키보드 설정"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"탭하여 언어와 레이아웃을 선택하세요."</string>
@@ -2125,7 +2130,7 @@
     <string name="unpin_specific_target" msgid="3859828252160908146">"<xliff:g id="LABEL">%1$s</xliff:g> 고정 해제"</string>
     <string name="app_info" msgid="6113278084877079851">"앱 정보"</string>
     <string name="shortcut_group_a11y_title" msgid="2992150163811583865">"직접 공유 타겟"</string>
-    <string name="suggested_apps_group_a11y_title" msgid="2804876567839501831">"앱 제안"</string>
+    <string name="suggested_apps_group_a11y_title" msgid="2804876567839501831">"앱 추천"</string>
     <string name="all_apps_group_a11y_title" msgid="7020352520224108745">"앱 목록"</string>
     <string name="negative_duration" msgid="1938335096972945232">"−<xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="demo_starting_message" msgid="6577581216125805905">"데모 시작 중..."</string>

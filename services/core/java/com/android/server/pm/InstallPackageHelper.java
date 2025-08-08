@@ -52,7 +52,6 @@ import static android.os.storage.StorageManager.FLAG_STORAGE_DE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_EXTERNAL;
 
 import static com.android.server.pm.InitAppsHelper.ScanParams;
-import static com.android.server.pm.InstructionSets.getAppDexInstructionSets;
 import static com.android.server.pm.PackageManagerException.INTERNAL_ERROR_ARCHIVE_NO_INSTALLER_TITLE;
 import static com.android.server.pm.PackageManagerService.APP_METADATA_FILE_NAME;
 import static com.android.server.pm.PackageManagerService.DEBUG_COMPRESSION;
@@ -184,7 +183,6 @@ import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.server.EventLogTags;
 import com.android.server.criticalevents.CriticalEventLog;
-import com.android.server.pm.dex.DexManager;
 import com.android.server.pm.parsing.PackageCacher;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
 import com.android.server.pm.permission.Permission;
@@ -246,7 +244,6 @@ final class InstallPackageHelper {
     private final DeletePackageHelper mDeletePackageHelper;
     private final IncrementalManager mIncrementalManager;
     private final ApexManager mApexManager;
-    private final DexManager mDexManager;
     private final Context mContext;
     private final PackageAbiHelper mPackageAbiHelper;
     private final SharedLibrariesImpl mSharedLibraries;
@@ -289,7 +286,6 @@ final class InstallPackageHelper {
         mDeletePackageHelper = deletePackageHelper;
         mIncrementalManager = pm.mInjector.getIncrementalManager();
         mApexManager = pm.mInjector.getApexManager();
-        mDexManager = pm.mInjector.getDexManager();
         mContext = pm.mInjector.getContext();
         mPackageAbiHelper = pm.mInjector.getAbiHelper();
         mSharedLibraries = pm.mInjector.getSharedLibrariesImpl();
@@ -1261,7 +1257,7 @@ final class InstallPackageHelper {
             request.setKeepArtProfile(true);
 
             CompletableFuture<Void> future =
-                    DexOptHelper.performDexoptIfNeededAsync(request, mDexManager);
+                    mPm.getDexOptHelper().performDexoptIfNeededAsync(request);
             completableFutures.add(future);
             request.onWaitDexoptStarted();
         }
@@ -2515,12 +2511,8 @@ final class InstallPackageHelper {
                         // We didn't need to disable the .apk as a current system package,
                         // which means we are replacing another update that is already
                         // installed.  We need to make sure to delete the older one's .apk.
-                        installRequest.getRemovedInfo().mArgs = new CleanUpArgs(
-                                packageName,
-                                oldPackage.getPath(),
-                                getAppDexInstructionSets(
-                                        deletedPkgSetting.getPrimaryCpuAbi(),
-                                        deletedPkgSetting.getSecondaryCpuAbi()));
+                        installRequest.getRemovedInfo().mArgs =
+                                new CleanUpArgs(packageName, oldPackage.getPath());
                     } else {
                         installRequest.getRemovedInfo().mArgs = null;
                     }
@@ -2885,11 +2877,6 @@ final class InstallPackageHelper {
                 }
                 incrementalStorages.add(storage);
             }
-
-            if (installRequest.isInstallReplace() && pkg != null) {
-                mDexManager.notifyPackageUpdated(packageName,
-                        pkg.getBaseApkPath(), pkg.getSplitCodePaths());
-            }
         }
         PackageManagerServiceUtils.waitForNativeBinariesExtractionForIncremental(
                 incrementalStorages);
@@ -3151,8 +3138,7 @@ final class InstallPackageHelper {
             request.setReturnMessage("Package was removed before install could complete.");
 
             // Remove the update failed package's older resources safely now
-            mRemovePackageHelper.cleanUpResources(packageName, request.getOldCodeFile(),
-                    request.getOldInstructionSet());
+            mRemovePackageHelper.cleanUpResources(packageName, request.getOldCodeFile());
             mPm.notifyInstallObserver(request);
             return;
         }
@@ -3241,8 +3227,7 @@ final class InstallPackageHelper {
                                 packageName, pkgSetting.getPath(), pkgSetting.getOldPaths());
                     }
                 } else {
-                    mRemovePackageHelper.cleanUpResources(packageName, args.getCodeFile(),
-                            args.getInstructionSets());
+                    mRemovePackageHelper.cleanUpResources(packageName, args.getCodeFile());
                 }
             } else {
                 // Force a gc to clear up things. Ask for a background one, it's fine to go on
@@ -3250,21 +3235,7 @@ final class InstallPackageHelper {
                 VMRuntime.getRuntime().requestConcurrentGC();
             }
 
-            if (!archived) {
-                // Notify DexManager that the package was installed for new users.
-                // The updated users should already be indexed and the package code paths
-                // should not change.
-                // Don't notify the manager for ephemeral apps as they are not expected to
-                // survive long enough to benefit of background optimizations.
-                for (int userId : firstUserIds) {
-                    PackageInfo info = snapshot.getPackageInfo(packageName, /*flags*/ 0, userId);
-                    // There's a race currently where some install events may interleave with an
-                    // uninstall. This can lead to package info being null (b/36642664).
-                    if (info != null) {
-                        mDexManager.notifyPackageInstalled(info, userId);
-                    }
-                }
-            } else {
+            if (archived) {
                 // Now send PACKAGE_REMOVED + EXTRA_REPLACING broadcast.
                 final PackageRemovedInfo info = new PackageRemovedInfo();
                 info.mRemovedPackage = packageName;
@@ -3444,8 +3415,6 @@ final class InstallPackageHelper {
             mAppDataHelper.clearAppDataLIF(pkg, UserHandle.USER_ALL,
                     FLAG_STORAGE_DE | FLAG_STORAGE_CE | FLAG_STORAGE_EXTERNAL
                             | Installer.FLAG_CLEAR_CODE_CACHE_ONLY);
-            mDexManager.notifyPackageUpdated(pkg.getPackageName(),
-                    pkg.getBaseApkPath(), pkg.getSplitCodePaths());
         }
         return true;
     }
@@ -4723,10 +4692,8 @@ final class InstallPackageHelper {
                             + "; " + pkgSetting.getPathString()
                             + " --> " + parsedPackage.getPath());
 
-            mRemovePackageHelper.cleanUpResources(pkgSetting.getPackageName(),
-                    new File(pkgSetting.getPathString()),
-                    getAppDexInstructionSets(pkgSetting.getPrimaryCpuAbiLegacy(),
-                            pkgSetting.getSecondaryCpuAbiLegacy()));
+            mRemovePackageHelper.cleanUpResources(
+                    pkgSetting.getPackageName(), new File(pkgSetting.getPathString()));
             synchronized (mPm.mLock) {
                 mPm.mSettings.enableSystemPackageLPw(pkgSetting.getPackageName());
             }
@@ -4829,10 +4796,8 @@ final class InstallPackageHelper {
                                 + parsedPackage.getLongVersionCode()
                                 + "; " + pkgSetting.getPathString() + " --> "
                                 + parsedPackage.getPath());
-                mRemovePackageHelper.cleanUpResources(pkgSetting.getPackageName(),
-                        new File(pkgSetting.getPathString()),
-                        getAppDexInstructionSets(
-                                pkgSetting.getPrimaryCpuAbiLegacy(), pkgSetting.getSecondaryCpuAbiLegacy()));
+                mRemovePackageHelper.cleanUpResources(
+                        pkgSetting.getPackageName(), new File(pkgSetting.getPathString()));
             } else {
                 // The application on /system is older than the application on /data. Hide
                 // the application on /system and the version on /data will be scanned later

@@ -2102,7 +2102,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         transitionController.deferTransitionReady();
         final Transition.ReadyCondition pipChangesApplied =
-                new Transition.ReadyCondition("movedToPip", true /* newTrackerOnly */);
+                new Transition.ReadyCondition("movedToPip", !Flags.migrateBasicLegacyReady());
         transitionController.waitFor(pipChangesApplied);
         mService.deferWindowLayout();
         boolean localVisibilityDeferred = false;

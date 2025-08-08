@@ -30,6 +30,7 @@ import static android.view.WindowInsets.Type.statusBars;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 
 import static com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_ENTER_MODE_APP_HANDLE_MENU;
+import static com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_MOVE_FROM_SPLIT_SCREEN;
 import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.InputMethod;
 import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.MinimizeReason;
 import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger;
@@ -82,6 +83,7 @@ import android.view.ViewRootImpl;
 import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
 import android.window.TaskSnapshot;
+import android.window.TaskSnapshotManager;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
@@ -879,8 +881,14 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             return;
         }
         final WindowContainerTransaction wct = new WindowContainerTransaction();
-        mInteractionJankMonitor.begin(decoration.getTaskSurface(), mContext, mMainHandler,
-                CUJ_DESKTOP_MODE_ENTER_MODE_APP_HANDLE_MENU);
+        if (decoration.getTaskInfo().configuration.windowConfiguration.getWindowingMode()
+                == WINDOWING_MODE_MULTI_WINDOW) {
+            mInteractionJankMonitor.begin(decoration.getTaskSurface(), mContext, mMainHandler,
+                    CUJ_DESKTOP_MODE_MOVE_FROM_SPLIT_SCREEN);
+        } else {
+            mInteractionJankMonitor.begin(decoration.getTaskSurface(), mContext, mMainHandler,
+                    CUJ_DESKTOP_MODE_ENTER_MODE_APP_HANDLE_MENU);
+        }
         mLatencyTracker.onActionStart(LatencyTracker.ACTION_DESKTOP_MODE_ENTER_APP_HANDLE_MENU);
         // App sometimes draws before the insets from WindowDecoration#relayout have
         // been added, so they must be added here
@@ -996,11 +1004,21 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             }
             // TODO(b/337903443): Fix this returning null for freeform tasks.
             try {
-                TaskSnapshot screenshot = activityTaskManagerService
-                        .getTaskSnapshot(info.taskId, false);
-                if (screenshot == null) {
+                TaskSnapshot screenshot;
+                if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
+                    screenshot = TaskSnapshotManager.getInstance().getTaskSnapshot(
+                            info.taskId, TaskSnapshotManager.RESOLUTION_HIGH);
+                    if (screenshot == null) {
+                        screenshot = TaskSnapshotManager.getInstance().takeTaskSnapshot(
+                                info.taskId, false /* updateCache */);
+                    }
+                } else {
                     screenshot = activityTaskManagerService
-                            .takeTaskSnapshot(info.taskId, false);
+                            .getTaskSnapshot(info.taskId, false);
+                    if (screenshot == null) {
+                        screenshot = activityTaskManagerService
+                                .takeTaskSnapshot(info.taskId, false);
+                    }
                 }
                 snapshotList.add(new Pair(info.taskId, screenshot));
             } catch (RemoteException e) {

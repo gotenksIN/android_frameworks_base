@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.LayoutAwareModifierNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
@@ -59,6 +60,7 @@ import com.android.compose.animation.scene.content.Content
 import com.android.compose.animation.scene.content.Overlay
 import com.android.compose.animation.scene.content.Scene
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.modifiers.thenIf
 import com.android.compose.ui.util.lerp
 import kotlinx.coroutines.CoroutineScope
 
@@ -483,6 +485,7 @@ internal class SceneTransitionLayoutImpl(
                 .then(
                     LayoutElement(layoutImpl = this, transitionState = this.state.transitionState)
                 )
+                .thenIf(implicitTestTags) { Modifier.testTag(SceneTransitionLayoutRootContentTag) }
         ) {
             LookaheadScope {
                 if (_lookaheadScope == null) {
@@ -508,7 +511,12 @@ internal class SceneTransitionLayoutImpl(
     @Composable
     private fun Scenes() {
         scenesToCompose().fastForEach { (scene, isInvisible) ->
-            key(scene.key) { scene.Content(isInvisible = isInvisible) }
+            key(scene.key) {
+                scene.Content(
+                    isInvisible = isInvisible,
+                    modifier = Modifier.then(ContentElement(scene.zIndex, isInvisible)),
+                )
+            }
         }
     }
 
@@ -736,3 +744,5 @@ private class ContentNode(var zIndex: Float, var isInvisible: Boolean) :
         }
     }
 }
+
+internal const val SceneTransitionLayoutRootContentTag = "SceneTransitionLayoutRootContent"

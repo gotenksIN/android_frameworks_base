@@ -746,6 +746,16 @@ flag {
 }
 
 flag {
+    name: "screenshot_force_shutter_sound"
+    namespace: "systemui"
+    description: "Force screenshot sound when camera sound is forced and camera is open"
+    bug: "411503333"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "screenshot_action_dismiss_system_windows"
     namespace: "systemui"
     description: "Dismiss existing system windows when starting action from screenshot UI"
@@ -1260,6 +1270,16 @@ flag {
 }
 
 flag {
+    name:"media_carousel_arrows"
+    namespace: "systemui"
+    description: "Show arrow buttons to page the media carousel"
+    bug: "383974508"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   namespace: "systemui"
   name: "enable_view_capture_tracing"
   description: "Enables view capture tracing in System UI."
@@ -1735,15 +1755,6 @@ flag {
     }
 }
 
-flag {
-    name: "skip_hide_sensitive_notif_animation"
-    namespace: "systemui"
-    description: "Skip hide sensitive notification animation when the showing layout is not changed."
-    bug: "390624334"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
 
 flag {
     name: "lockscreen_font"
@@ -1983,15 +1994,6 @@ flag {
     bug: "418243972"
 }
 
-flag {
-    name: "dream_preview_tap_dismiss"
-    namespace: "systemui"
-    description: "Dismisses dream in preview on tap"
-    bug: "416412668"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     name: "hub_blurred_by_shade_fix"
@@ -2126,3 +2128,13 @@ flag {
       purpose: PURPOSE_BUGFIX
     }
 }
+flag {
+    name: "dialog_anim_end_state_update"
+    namespace: "systemui"
+    description: "Continuously updating the endState of DialogTransitionAnimation to keep it in sync with tileShape if it gets changed during animation"
+    bug: "429189355"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+

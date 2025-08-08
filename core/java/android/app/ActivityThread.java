@@ -235,6 +235,7 @@ import android.window.SizeConfigurationBuckets;
 import android.window.SplashScreen;
 import android.window.SplashScreenView;
 import android.window.TaskFragmentTransaction;
+import android.window.TaskSnapshotManager;
 import android.window.WindowContextInfo;
 import android.window.WindowProviderService;
 import android.window.WindowTokenClientController;
@@ -263,8 +264,8 @@ import com.android.org.conscrypt.TrustedCertificateStore;
 import com.android.server.am.BitmapDumpProto;
 import com.android.server.am.MemInfoDumpProto;
 
-import dalvik.annotation.optimization.NeverInline;
 import dalvik.annotation.optimization.NeverCompile;
+import dalvik.annotation.optimization.NeverInline;
 import dalvik.system.AppSpecializationHooks;
 import dalvik.system.CloseGuard;
 import dalvik.system.VMDebug;
@@ -1916,6 +1917,11 @@ public final class ActivityThread extends ClientTransactionHandler
                 pw.println(" ");
                 pw.println(" Asset Allocations");
                 pw.print(assetAlloc);
+            }
+
+            // Task Snapshot
+            if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
+                TaskSnapshotManager.getInstance().dump(pw);
             }
 
             // Unreachable native memory

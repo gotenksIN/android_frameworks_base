@@ -95,9 +95,7 @@ import android.app.ActivityManager;
 import android.app.ActivityManagerInternal.OomAdjReason;
 import android.content.Context;
 import android.content.pm.ServiceInfo;
-import android.os.IBinder;
 import android.os.Trace;
-import android.util.ArrayMap;
 import android.util.ArraySet;
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
 import android.util.BoostFramework;
@@ -111,6 +109,7 @@ import com.android.server.am.psc.ActiveUidsInternal;
 import com.android.server.am.psc.ConnectionRecordInternal;
 import com.android.server.am.psc.ContentProviderConnectionInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.ServiceRecordInternal;
 import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
@@ -657,8 +656,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             // This process was updated in some way, mark that it was last calculated this sequence.
             app.setCompletedAdjSeq(mAdjSeq);
             if (uids != null) {
-                final UidRecord uidRec = app.getUidRecord();
-
+                final UidRecordInternal uidRec = app.getUidRecord();
                 if (uidRec != null) {
                     uids.put(uidRec.getUid(), uidRec);
                 }
@@ -1113,13 +1111,13 @@ public class OomAdjusterImpl extends OomAdjuster {
         final ProcessServiceRecord psr = app.mServices;
 
         for (int i = psr.numberOfRunningServices() - 1; i >= 0; i--) {
-            final ServiceRecord s = psr.getRunningServiceAt(i);
-            final ArrayMap<IBinder, ArrayList<ConnectionRecord>> serviceConnections =
-                    s.getConnections();
-            for (int j = serviceConnections.size() - 1; j >= 0; j--) {
-                final ArrayList<ConnectionRecord> clist = serviceConnections.valueAt(j);
+            final ServiceRecordInternal s = psr.getRunningServiceAt(i);
+            for (int j = s.getConnectionsSize() - 1; j >= 0; j--) {
+                final ArrayList<? extends ConnectionRecordInternal> clist =
+                        s.getConnectionAt(j);
                 for (int k = clist.size() - 1; k >= 0; k--) {
-                    final ConnectionRecord cr = clist.get(k);
+                    // TODO(b/425766486): Switch to use ConnectionRecordInternal.
+                    final ConnectionRecord cr = (ConnectionRecord) clist.get(k);
                     final ProcessRecord client;
                     if (app.isSdkSandbox && cr.binding.attributedClient != null) {
                         client = cr.binding.attributedClient;
@@ -1688,8 +1686,8 @@ public class OomAdjusterImpl extends OomAdjuster {
                         || schedGroup == SCHED_GROUP_BACKGROUND
                         || procState > PROCESS_STATE_TOP);
                 is--) {
-            ServiceRecord s = psr.getRunningServiceAt(is);
-            if (s.startRequested) {
+            ServiceRecordInternal s = psr.getRunningServiceAt(is);
+            if (s.isStartRequested()) {
                 state.setHasStartedServices(true);
                 if (procState > PROCESS_STATE_SERVICE) {
                     procState = PROCESS_STATE_SERVICE;
@@ -1699,7 +1697,7 @@ public class OomAdjusterImpl extends OomAdjuster {
                                 "Raise procstate to started service: " + app);
                     }
                 }
-                if (!s.mKeepWarming && state.getHasShownUi() && !isHomeProcess(app)) {
+                if (!s.isKeepWarming() && state.getHasShownUi() && !isHomeProcess(app)) {
                     // If this process has shown some UI, let it immediately
                     // go to the LRU list because it may be pretty heavy with
                     // UI stuff.  We'll tag it with a label just to help
@@ -1708,8 +1706,8 @@ public class OomAdjusterImpl extends OomAdjuster {
                         state.setAdjType("cch-started-ui-services");
                     }
                 } else {
-                    if (s.mKeepWarming
-                            || now < (s.lastActivity + mConstants.MAX_SERVICE_INACTIVITY)) {
+                    if (s.isKeepWarming()
+                            || now < (s.getLastActivity() + mConstants.MAX_SERVICE_INACTIVITY)) {
                         // This service has seen some activity within
                         // recent memory, so we will keep its process ahead
                         // of the background processes. This does not apply
@@ -1723,7 +1721,7 @@ public class OomAdjusterImpl extends OomAdjuster {
                                         "Raise adj to started service: " + app);
                             }
                             maybeSetProcessFollowUpUpdateLocked(app,
-                                    s.lastActivity + mConstants.MAX_SERVICE_INACTIVITY, now);
+                                    s.getLastActivity() + mConstants.MAX_SERVICE_INACTIVITY, now);
                         }
                     }
                     // If we have let the service slide into the background
@@ -1735,8 +1733,8 @@ public class OomAdjusterImpl extends OomAdjuster {
                 }
             }
 
-            if (s.isForeground) {
-                final int fgsType = s.foregroundServiceType;
+            if (s.isForeground()) {
+                final int fgsType = s.getForegroundServiceType();
                 if (s.isFgsAllowedWiu_forCapabilities()) {
                     capabilityFromFGS |=
                             (fgsType & FOREGROUND_SERVICE_TYPE_LOCATION)
@@ -2055,7 +2053,7 @@ public class OomAdjusterImpl extends OomAdjuster {
                     clientAdj = adj;
                     clientProcState = procState;
                 } else {
-                    if (now >= (cr.getServiceLastActivityTimeMillis()
+                    if (now >= (cr.getService().getLastActivity()
                             + mConstants.MAX_SERVICE_INACTIVITY)) {
                         // This service has not seen activity within
                         // recent memory, so allow it to drop to the
@@ -2249,7 +2247,7 @@ public class OomAdjusterImpl extends OomAdjuster {
                 app.setAdjTypeCode(ActivityManager.RunningAppProcessInfo.REASON_SERVICE_IN_USE);
                 app.setAdjSource(client);
                 app.setAdjSourceProcState(clientProcState);
-                app.setAdjTarget(cr.getServiceInstanceName());
+                app.setAdjTarget(cr.getService().instanceName);
                 if (reportDebugMsgs) {
                     reportOomAdjMessageLocked(TAG_OOM_ADJ, "Raise to " + adjType
                             + ": " + app + ", due to " + client
@@ -2314,7 +2312,7 @@ public class OomAdjusterImpl extends OomAdjuster {
                     app.setAdjTypeCode(ActivityManager.RunningAppProcessInfo.REASON_SERVICE_IN_USE);
                     app.setAdjSource(a);
                     app.setAdjSourceProcState(procState);
-                    app.setAdjTarget(cr.getServiceInstanceName());
+                    app.setAdjTarget(cr.getService().instanceName);
                     if (reportDebugMsgs) {
                         reportOomAdjMessageLocked(TAG_OOM_ADJ,
                                 "Raise to service w/activity: " + app);

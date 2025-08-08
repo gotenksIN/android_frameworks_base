@@ -79,10 +79,14 @@
     <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"由于当前正在测试的是可调试应用，因此系统会显示此警告。如果您不是开发者，请将此问题报告给开发者，并要求提供不可调试的应用。&lt;br&gt;&lt;br&gt;此应用不符合 16 KB 对齐要求。APK 和 ELF 文件对齐检查失败。请按照 &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; 中的步骤操作。&lt;br&gt;&lt;br&gt;以下库未进行 16 KB 对齐：&lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"不再显示"</string>
     <string name="page_size_compat_title" msgid="6497719153872572204">"Android 应用兼容性"</string>
-    <string name="page_size_compat_elf_not_aligned" msgid="7940806102874132630">"&amp;#8226; %1$s：加载段未对齐"</string>
-    <string name="page_size_compat_apk_not_aligned" msgid="8927901100655245528">"&amp;#8226; %1$s：未压缩的库未对齐"</string>
-    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="1010371834741548905">"&amp;#8226; %1$s：加载段和未压缩的库未对齐"</string>
-    <string name="page_size_compat_unknown" msgid="3254222165646410528">"&amp;#8226; %1$s：未知错误"</string>
+    <!-- no translation found for page_size_compat_elf_not_aligned (4404128993555194313) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_not_aligned (1434875607880657092) -->
+    <skip />
+    <!-- no translation found for page_size_compat_apk_and_elf_not_aligned (7140216083697701972) -->
+    <skip />
+    <!-- no translation found for page_size_compat_unknown (5183026525148169891) -->
+    <skip />
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"未提供服务。"</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"您无法更改来电显示设置。"</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"移动数据网络已切换至“<xliff:g id="CARRIERDISPLAY">%s</xliff:g>”"</string>
@@ -300,8 +304,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"助理"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"语音助理"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"锁定"</string>
-    <!-- no translation found for global_action_unrestricted_lock (7933224393323064116) -->
-    <skip />
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"锁定"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"回复"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"新通知"</string>
@@ -693,6 +696,10 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"验证是您本人在操作"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"使用生物识别验证身份才能继续"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"使用生物识别或屏幕锁定凭据验证身份，才能继续操作"</string>
+    <!-- no translation found for biometric_dialog_secondary_display_toast (256544327174107086) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_secondary_display_toast (2855203015454795660) -->
+    <skip />
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"生物识别硬件无法使用"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"身份验证已取消"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"无法识别"</string>
@@ -891,8 +898,8 @@
     <string name="policydesc_watchLogin_secondaryUser" product="tv" msgid="8965224107449407052">"监控用户在解锁屏幕时输错密码的次数；如果用户输错密码的次数超出上限，系统就会锁定 Android TV 设备或清空该用户的所有数据。"</string>
     <string name="policydesc_watchLogin_secondaryUser" product="automotive" msgid="7180857406058327941">"监控在解锁屏幕时输错密码的次数，并在输错次数过多时锁定信息娱乐系统或清除此个人资料的所有数据。"</string>
     <string name="policydesc_watchLogin_secondaryUser" product="default" msgid="9177645136475155924">"监控在解锁屏幕时输错密码的次数，并在输错次数过多时锁定手机或清空此用户的所有数据。"</string>
-    <string name="policylab_resetPassword" msgid="214556238645096520">"更改锁屏方式"</string>
-    <string name="policydesc_resetPassword" msgid="4626419138439341851">"更改锁屏方式。"</string>
+    <string name="policylab_resetPassword" msgid="214556238645096520">"更改屏锁"</string>
+    <string name="policydesc_resetPassword" msgid="4626419138439341851">"更改屏锁。"</string>
     <string name="policylab_forceLock" msgid="7360335502968476434">"锁定屏幕"</string>
     <string name="policydesc_forceLock" msgid="1008844760853899693">"控制锁屏的方式和时间。"</string>
     <string name="policylab_wipeData" msgid="1359485247727537311">"清除所有数据"</string>
@@ -914,8 +921,8 @@
     <string name="policydesc_encryptedStorage" msgid="1102516950740375617">"要求对存储的应用数据进行加密。"</string>
     <string name="policylab_disableCamera" msgid="5749486347810162018">"停用相机"</string>
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"禁止使用所有设备摄像头。"</string>
-    <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"停用屏幕锁定的部分功能"</string>
-    <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"禁止使用屏幕锁定的部分功能。"</string>
+    <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"停用部分屏锁功能"</string>
+    <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"禁止使用部分屏锁功能。"</string>
     <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"长按 Esc 键即可关闭此应用"</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"住宅"</item>
@@ -1484,8 +1491,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"拒绝"</string>
     <string name="select_input_method" msgid="3971267998568587025">"选择输入法"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"语言设置"</string>
-    <string name="show_ime" msgid="6406112007347443383">"连接到实体键盘时，在屏幕上显示一个虚拟键盘"</string>
-    <string name="hardware" msgid="3611039921284836033">"使用屏幕键盘"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"配置“<xliff:g id="DEVICE_NAME">%s</xliff:g>”"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"配置物理键盘"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"点按即可选择语言和布局"</string>
@@ -1986,8 +1991,8 @@
     <string name="confirm_battery_saver" msgid="5247976246208245754">"确定"</string>
     <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"在省电模式下，系统会启用深色主题，并限制或关闭后台活动、某些视觉效果、特定功能和部分网络连接。"</string>
     <string name="battery_saver_description" msgid="8518809702138617167">"在省电模式下，系统会启用深色主题，并限制或关闭后台活动、某些视觉效果、特定功能和部分网络连接。"</string>
-    <string name="data_saver_description" msgid="4995164271550590517">"省流模式会阻止部分应用在后台收发数据，以减少流量消耗。您正在使用的应用可以收发数据，但频率可能会降低。例如，图片可能需要点按才会显示。"</string>
-    <string name="data_saver_enable_title" msgid="7080620065745260137">"要开启省流模式吗？"</string>
+    <string name="data_saver_description" msgid="4995164271550590517">"流量节省模式会阻止部分应用在后台收发数据，以减少流量消耗。您正在使用的应用可以收发数据，但频率可能会降低。例如，图片可能需要点按才会显示。"</string>
+    <string name="data_saver_enable_title" msgid="7080620065745260137">"要开启流量节省模式吗？"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"开启"</string>
     <string name="zen_mode_duration_minutes_summary" msgid="4555514757230849789">"{count,plural, =1{1 分钟（直到 {formattedTime}）}other{# 分钟（直到 {formattedTime}）}}"</string>
     <string name="zen_mode_duration_minutes_summary_short" msgid="1187553788355486950">"{count,plural, =1{1 分钟（直到 {formattedTime}）}other{# 分钟（直到 {formattedTime}）}}"</string>

@@ -188,8 +188,6 @@ import static com.android.server.wm.ActivityTaskManagerService.DUMP_RECENTS_SHOR
 import static com.android.server.wm.ActivityTaskManagerService.DUMP_STARTER_CMD;
 import static com.android.server.wm.ActivityTaskManagerService.DUMP_TOP_RESUMED_ACTIVITY;
 import static com.android.server.wm.ActivityTaskManagerService.DUMP_VISIBLE_ACTIVITIES;
-import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_NONE;
-import static com.android.server.wm.ActivityTaskManagerService.relaunchReasonToString;
 import static com.android.systemui.shared.Flags.enableHomeDelay;
 
 import android.Manifest;
@@ -2545,6 +2543,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
                 .setLockObject(this)
                 .setTopProcessChangeCallback(this::updateTopAppListeners)
+                .setProcessLruUpdater(mProcessList)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
 
@@ -2950,12 +2949,12 @@ public class ActivityManagerService extends IActivityManager.Stub
     @GuardedBy("this")
     final void updateLruProcessLocked(ProcessRecord app, boolean activityChange,
             ProcessRecord client) {
-        mProcessList.updateLruProcessLocked(app, activityChange, client);
+        mProcessStateController.updateLruProcess(app, activityChange, client);
     }
 
     @GuardedBy("this")
     final void removeLruProcessLocked(ProcessRecord app) {
-        mProcessList.removeLruProcessLocked(app);
+        mProcessStateController.removeLruProcess(app);
     }
 
     @GuardedBy("this")
@@ -3616,6 +3615,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
 // QTI_END: 2021-09-23: Performance: BoostFramework: Replace PerfHint with PerfEvent.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                mUxPerf.perfHint(BoostFramework.VENDOR_HINT_UNPIN_FILE, app.processName, 0, 0);
             }
 
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -4801,6 +4801,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
 // QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
 // QTI_BEGIN: 2019-10-22: Performance: Perf: Boost UI thread during app launching
+            mUxPerf.perfHint(BoostFramework.VENDOR_HINT_PIN_FILE, app.processName, 0, 0);
         }
 
 // QTI_END: 2019-10-22: Performance: Perf: Boost UI thread during app launching
@@ -4966,7 +4967,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         preBindInfo.configuration,
                         app.getCompat(),
                         getCommonServicesLocked(app.isolated),
-                        mCoreSettingsObserver.getCoreSettingsLocked(),
+                        mCoreSettingsObserver.getCoreSettings(),
                         buildSerial,
                         autofillOptions,
                         contentCaptureOptions,
@@ -6790,7 +6791,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (psr != null && psr.hasForegroundServices()) {
             for (int s = psr.numberOfRunningServices() - 1; s >= 0; --s) {
                 final ServiceRecord sr = psr.getRunningServiceAt(s);
-                if (sr.isForeground && sr.mAllowUiJobScheduling) {
+                if (sr.isForeground() && sr.mAllowUiJobScheduling) {
                     return true;
                 }
             }
@@ -9548,13 +9549,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     processClassEnum, processName, uid, pid);
         }
 
-        final int relaunchReason = r == null ? RELAUNCH_REASON_NONE
-                        : r.getWindowProcessController().computeRelaunchReason();
-        final String relaunchReasonString = relaunchReasonToString(relaunchReason);
-        if (crashInfo.crashTag == null) {
-            crashInfo.crashTag = relaunchReasonString;
-        } else {
-            crashInfo.crashTag = crashInfo.crashTag + " " + relaunchReasonString;
+        final String crashTag = r != null ? r.getWindowProcessController().getCrashTag() : null;
+        if (crashTag != null) {
+            crashInfo.crashTag =
+                    crashInfo.crashTag == null ? crashTag : crashInfo.crashTag + " " + crashTag;
         }
 
         addErrorToDropBox(
@@ -15696,7 +15694,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             }
 
-            psr.setReportedForegroundServiceTypes(fgServiceTypes);
             mProcessList.enqueueProcessChangeItemLocked(proc.getPid(), proc.info.uid,
                     ProcessChangeItem.CHANGE_FOREGROUND_SERVICES, fgServiceTypes);
         }

@@ -706,9 +706,6 @@ class Task extends TaskFragment {
         mResizeMode = resizeMode;
         if (info != null) {
             setIntent(_intent, info);
-            if (!Flags.updateTaskMinDimensionsWithRootActivity()) {
-                setMinDimensions(info);
-            }
         } else {
             intent = _intent;
             mMinWidth = minWidth;
@@ -739,9 +736,6 @@ class Task extends TaskFragment {
         voiceSession = _voiceSession;
         voiceInteractor = _voiceInteractor;
         setIntent(activity, intent, info);
-        if (!Flags.updateTaskMinDimensionsWithRootActivity()) {
-            setMinDimensions(info);
-        }
         // Before we began to reuse a root task as the leaf task, we used to
         // create a leaf task in this case. Therefore now we won't send out the task created
         // notification when we decide to reuse it here, so we send out the notification below.
@@ -1075,10 +1069,8 @@ class Task extends TaskFragment {
             mResizeMode = info.resizeMode;
             shouldUpdateTaskDescription = true;
         }
-        if (Flags.updateTaskMinDimensionsWithRootActivity()) {
-            if (setMinDimensions(info)) {
-                shouldUpdateTaskDescription = true;
-            }
+        if (setMinDimensions(info)) {
+            shouldUpdateTaskDescription = true;
         }
         if (shouldUpdateTaskDescription) {
             updateTaskDescription();
@@ -1111,14 +1103,12 @@ class Task extends TaskFragment {
         }
         mMinWidth = minWidth;
         mMinHeight = minHeight;
-        if (Flags.updateTaskMinDimensionsWithRootActivity()) {
-            // Only update for pure TaskFragment.
-            forAllTaskFragments(tf -> {
-                if (tf.asTask() == null) {
-                    tf.setMinDimensions(minWidth, minHeight);
-                }
-            });
-        }
+        // Only update for pure TaskFragment.
+        forAllTaskFragments(tf -> {
+            if (tf.asTask() == null) {
+                tf.setMinDimensions(minWidth, minHeight);
+            }
+        });
         return true;
     }
 
@@ -3372,6 +3362,7 @@ class Task extends TaskFragment {
         return "Task=" + mTaskId + (mName != null ? "(" + mName + ")" : "");
     }
 
+    // It is replaced by WindowState#getDimController().
     @Deprecated
     @Override
     Dimmer getDimmer() {

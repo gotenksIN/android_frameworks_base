@@ -182,7 +182,7 @@ import java.util.function.Function;
 /**
  * Activity manager code dealing with processes.
  */
-public final class ProcessList {
+public final class ProcessList implements ProcessStateController.ProcessLruUpdater {
     static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessList" : TAG_AM;
 
     static final String TAG_PROCESS_OBSERVERS = TAG + POSTFIX_PROCESS_OBSERVERS;
@@ -3060,7 +3060,8 @@ public final class ProcessList {
     }
 
     @GuardedBy("mService")
-    void removeLruProcessLocked(ProcessRecord app) {
+    @Override
+    public void removeLruProcessLocked(ProcessRecord app) {
         int lrui = mLruProcesses.lastIndexOf(app);
         if (lrui >= 0) {
             synchronized (mProcLock) {
@@ -3369,7 +3370,7 @@ public final class ProcessList {
             mService.handleAppDiedLocked(app, pid, willRestart, allowRestart,
                     false /* fromBinderDied */);
             if (willRestart) {
-                removeLruProcessLocked(app);
+                mService.mProcessStateController.removeLruProcess(app);
                 mService.addAppLocked(app.info, null, false, null /* ABI override */,
                         ZYGOTE_POLICY_FLAG_EMPTY);
             }
@@ -4042,7 +4043,9 @@ public final class ProcessList {
     }
 
     @GuardedBy("mService")
-    void updateLruProcessLocked(ProcessRecord app, boolean activityChange, ProcessRecord client) {
+    @Override
+    public void updateLruProcessLocked(ProcessRecord app, boolean activityChange,
+            ProcessRecord client) {
         final ProcessServiceRecord psr = app.mServices;
         final boolean hasActivity = app.hasActivitiesOrRecentTasks() || psr.hasClientActivities()
                 || psr.isTreatedLikeActivity();
@@ -5656,7 +5659,7 @@ public final class ProcessList {
             app.setDyingPid(0);
             handlePrecedingAppDiedLocked(app);
             // Remove from the LRU list if it's still there.
-            removeLruProcessLocked(app);
+            mService.mProcessStateController.removeLruProcess(app);
             return true;
         }
         return false;
@@ -5732,7 +5735,7 @@ public final class ProcessList {
      */
     @GuardedBy("mService")
     long killAppIfBgRestrictedAndCachedIdleLocked(ProcessRecord app, long nowElapsed) {
-        final UidRecord uidRec = app.getUidRecord();
+        final UidRecordInternal uidRec = app.getUidRecord();
         final long lastCachedTime = app.getLastCachedTime();
         if (!mService.mConstants.mKillBgRestrictedAndCachedIdle
                 || app.isKilled() || app.getThread() == null || uidRec == null || !uidRec.isIdle()

@@ -148,7 +148,6 @@ import static android.view.WindowManager.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENAB
 import static android.view.WindowManager.PROPERTY_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING_STATE_SHARING;
 import static android.view.WindowManager.TRANSIT_RELAUNCH;
 import static android.view.WindowManager.hasWindowExtensionsEnabled;
-import static android.window.DesktopExperienceFlags.ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE;
 import static android.window.DesktopExperienceFlags.ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS;
 import static android.window.DesktopExperienceFlags.ENABLE_PIP_PARAMS_UPDATE_NOTIFICATION_BUGFIX;
 import static android.window.DesktopExperienceFlags.ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS;
@@ -9060,6 +9059,8 @@ public final class ActivityRecord extends WindowToken {
         // configuration.
         mAppCompatController.getSizeCompatModePolicy().clearSizeCompatMode();
         mAppCompatController.getDisplayCompatModePolicy().onProcessRestarted();
+        final boolean fullscreenOverrideChanged =
+                mAppCompatController.getAspectRatioOverrides().resetSystemFullscreenOverrideCache();
 
         if (!attachedToProcess()) {
             return;
@@ -9071,52 +9072,7 @@ public final class ActivityRecord extends WindowToken {
 // QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
         setState(RESTARTING_PROCESS, "restartActivityProcess");
 
-        if (mTransitionController.isShellTransitionsEnabled()) {
-            if (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
-                    && killInvisibleProcessOrPrepareForRestart()) {
-                return;
-            }
-            final Transition transition = new Transition(TRANSIT_RELAUNCH, 0 /* flags */,
-                    mTransitionController, mWmService.mSyncEngine);
-            mTransitionController.startCollectOrQueue(transition, (deferred) -> {
-                if (ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
-                        && killInvisibleProcessOrPrepareForRestart()) {
-                    transition.abort();
-                    return;
-                }
-                if (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
-                        && mState != RESTARTING_PROCESS) {
-                    transition.abort();
-                    return;
-                }
-                if (!attachedToProcess()) {
-                    transition.abort();
-                    return;
-                }
-                final ActionChain chain = mAtmService.mChainTracker.start(
-                        "restartProc", transition);
-                chain.collect(this);
-                // Make sure this will be a change in the transition.
-                transition.setKnownConfigChanges(this, CONFIG_WINDOW_CONFIGURATION);
-                mTransitionController.requestStartTransition(transition, task,
-                        null /* remoteTransition */, null /* displayChange */);
-                scheduleStopForRestartProcess();
-                mAtmService.mChainTracker.end();
-            });
-        } else {
-            if (killInvisibleProcessOrPrepareForRestart()) {
-                return;
-            }
-            scheduleStopForRestartProcess();
-        }
-    }
-
-    /**
-     * Returns {@code true} if the process is killed as the app is invisible. Otherwise, do some
-     * preparation to restart the process.
-     */
-    private boolean killInvisibleProcessOrPrepareForRestart() {
-        if (!mVisibleRequested || (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue() && mHaveState)) {
+        if (!mVisibleRequested || mHaveState) {
             // Kill its process immediately because the activity should be in background.
             // The activity state will be update to {@link #DESTROYED} in
             // {@link ActivityStack#cleanUp} when handling process died.
@@ -9131,11 +9087,9 @@ public final class ActivityRecord extends WindowToken {
                 }
                 mAtmService.mAmInternal.killProcess(wpc.mName, wpc.mUid, "resetConfig");
             });
-            return true;
+            return;
         }
 
-        final boolean fullscreenOverrideChanged =
-                mAppCompatController.getAspectRatioOverrides().resetSystemFullscreenOverrideCache();
         if (fullscreenOverrideChanged) {
             task.updateForceResizeOverridesIfNeeded(this);
         }
@@ -9147,7 +9101,28 @@ public final class ActivityRecord extends WindowToken {
         if (ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS.isTrue()) {
             mAtmService.resumeAppSwitches();
         }
-        return false;
+
+        if (mTransitionController.isShellTransitionsEnabled()) {
+            final Transition transition = new Transition(TRANSIT_RELAUNCH, 0 /* flags */,
+                    mTransitionController, mWmService.mSyncEngine);
+            mTransitionController.startCollectOrQueue(transition, (deferred) -> {
+                if (mState != RESTARTING_PROCESS || !attachedToProcess()) {
+                    transition.abort();
+                    return;
+                }
+                final ActionChain chain = mAtmService.mChainTracker.start(
+                        "restartProc", transition);
+                chain.collect(this);
+                // Make sure this will be a change in the transition.
+                transition.setKnownConfigChanges(this, CONFIG_WINDOW_CONFIGURATION);
+                mTransitionController.requestStartTransition(transition, task,
+                        null /* remoteTransition */, null /* displayChange */);
+                scheduleStopForRestartProcess();
+                mAtmService.mChainTracker.end();
+            });
+        } else {
+            scheduleStopForRestartProcess();
+        }
     }
 
     private void scheduleStopForRestartProcess() {

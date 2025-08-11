@@ -359,9 +359,9 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -1794,9 +1794,9 @@ public class WindowManagerService extends IWindowManager.Stub
             // UID, otherwise we allow unlimited duration. When a UID looses focus we
             // schedule hiding all of its toast windows.
             if (type == TYPE_TOAST) {
-// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 mAtmService.setToastWindow();
-// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 if (!displayContent.canAddToastWindowForUid(callingUid)) {
                     ProtoLog.w(WM_ERROR, "Adding more than one toast window for UID at a time.");
                     return WindowManagerGlobal.ADD_DUPLICATE_ADD;
@@ -2896,15 +2896,15 @@ public class WindowManagerService extends IWindowManager.Stub
 
     void finishDrawingWindow(Session session, IWindow client,
             @Nullable SurfaceControl.Transaction postDrawTransaction, int seqId) {
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         //unfreeze process if the first frame appeared
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
         if (freezer != null && freezer.useFreezerManager()) {
             freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
         }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
 
         if (postDrawTransaction != null) {
             postDrawTransaction.sanitize(Binder.getCallingPid(), Binder.getCallingUid());

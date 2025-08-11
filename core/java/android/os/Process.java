@@ -1167,7 +1167,6 @@ public class Process {
     public static final native void setProcessGroup(int pid, int group)
             throws IllegalArgumentException, SecurityException;
 
-// QTI_BEGIN: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
     /**
      * Sets the scheduling group for processes in the same cgroup.procs of uid and pid
      * @hide
@@ -1193,7 +1192,6 @@ public class Process {
     public static final native void setCgroupProcsProcessGroup(int uid, int pid, int group, boolean dex2oat_only)
             throws IllegalArgumentException, SecurityException;
 
-// QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
     /**
      * Freeze or unfreeze the specified process.
      *

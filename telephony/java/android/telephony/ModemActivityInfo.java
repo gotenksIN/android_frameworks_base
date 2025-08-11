@@ -561,9 +561,7 @@ public final class ModemActivityInfo implements Parcelable {
             }
             return isTxPowerValid
                     && isRxPowerValid
-// QTI_BEGIN: 2023-04-17: Telephony: Make empty modem activity info as valid
                     && ((getIdleTimeMillis() >= 0) && (getSleepTimeMillis() >= 0));
-// QTI_END: 2023-04-17: Telephony: Make empty modem activity info as valid
         }
     }
 

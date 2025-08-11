@@ -656,9 +656,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     /* UX perf event object */
     public static BoostFramework mUxPerf = new BoostFramework();
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
     public static boolean mForceStopKill = false;
-// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
 
     private static final DateTimeFormatter DROPBOX_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSZ");
@@ -1002,14 +1000,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
             ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.addPidLocked(app);
             }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1035,15 +1029,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
             ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.removePidLocked(pid, app);
                 freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);
             }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {
@@ -2607,9 +2597,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     Process.THREAD_GROUP_SYSTEM);
             Process.setThreadGroupAndCpuset(
                     mOomAdjuster.mCachedAppOptimizer.mCachedAppOptimizerThread.getThreadId(),
-// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
                     mOomAdjuster.mCachedAppOptimizer.mCompactionPriority);
-// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
         } catch (Exception e) {
             Slog.w(TAG, "Setting background thread cpuset failed");
         }
@@ -3332,9 +3320,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         return mActivityTaskManager.startActivityFromRecents(taskId, bOptions);
     }
 
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     public int startActivityAsUserEmpty(Bundle options) {
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         ArrayList<String> pApps = options.getStringArrayList("start_empty_apps");
         if (pApps != null && pApps.size() > 0) {
@@ -3577,11 +3565,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, app.processName, 0);
                 }
-// QTI_BEGIN: 2021-09-23: Performance: BoostFramework: Replace PerfHint with PerfEvent.
                 mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
-// QTI_END: 2021-09-23: Performance: BoostFramework: Replace PerfHint with PerfEvent.
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
                 mUxPerf.perfHint(BoostFramework.VENDOR_HINT_UNPIN_FILE, app.processName, 0, 0);
+// QTI_END: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -4461,15 +4449,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                         + " user=" + userId + ": " + reasonString);
             } else {
                 Slog.i(TAG, "Force stopping u" + userId + ": " + reasonString);
-// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             }
-// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
 
             mAppErrors.resetProcessCrashTime(packageName == null, appId, userId);
         }
-// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
         mForceStopKill = true;
-// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
 
         synchronized (mProcLock) {
             // Notify first that the package is stopped, so its process won't be restarted
@@ -4737,7 +4721,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         EventLogTags.writeAmProcBound(app.userId, pid, app.processName);
 
         if (mUxPerf != null && app.getHostingRecord() != null && app.getHostingRecord().isTopApp()) {
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
             if (mUxPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                 int pkgType = mUxPerf.perfGetFeedback(
                                     BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE, app.processName);
@@ -4748,12 +4731,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mUxPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName,
                     pid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
             }
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2019-10-22: Performance: Perf: Boost UI thread during app launching
+// QTI_BEGIN: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
             mUxPerf.perfHint(BoostFramework.VENDOR_HINT_PIN_FILE, app.processName, 0, 0);
+// QTI_END: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
         }
 
-// QTI_END: 2019-10-22: Performance: Perf: Boost UI thread during app launching
         synchronized (mProcLock) {
             mProcessStateController.setAttachingProcessStatesLSP(app);
             clearProcessForegroundLocked(app);
@@ -5398,19 +5380,19 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 String data, Bundle extras, boolean ordered,
                                 boolean sticky, int sendingUser) {
                             mBootCompletedTimestamp = SystemClock.uptimeMillis();
-// QTI_BEGIN: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_BEGIN: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                             // Defer the compaction as system is currently busy
-// QTI_END: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_END: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
                                     mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
-// QTI_BEGIN: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_BEGIN: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                                 }
                             }, mConstants.COMPACTION_DELAY_MS);
                             // Defer the full Pss collection as the system is really busy now.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
-// QTI_END: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_END: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                                     mAppProfiler.requestPssAllProcsLPr(
                                             SystemClock.uptimeMillis(), true, false);
                                 }
@@ -13782,15 +13764,12 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             app.setPid(0);
         }
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
 
         // Call Preferred App
         if (app != null) {
             ArrayList<ApplicationExitInfo> results = new ArrayList<ApplicationExitInfo>();
             mProcessList.mAppExitInfoTracker.getExitInfo(
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
                     app.processName, app.uid, app.getPid(), 0, results);
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
             if (results != null) {
                 boolean recentAppClose = false;
                 for (int i=0; i<results.size();i++) {
@@ -13803,13 +13782,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     }
                 }
                 if (recentAppClose) {
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
                     mTaskSupervisor.startPreferredApps();
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
                 }
             }
         }
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
         return false;
     }
 
@@ -16870,13 +16846,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
 
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         @Override
         public int startActivityAsUserEmpty(Bundle options) {
             return ActivityManagerService.this.startActivityAsUserEmpty(options);
         }
 
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         @Override
         public void onUserRemoved(int userId) {
             // Clean up UserController state

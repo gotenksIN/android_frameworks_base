@@ -21,9 +21,9 @@ import static android.service.autofill.FillRequest.FLAG_MANUAL_REQUEST;
 import static android.service.autofill.FillRequest.FLAG_PASSWORD_INPUT_TYPE;
 import static android.service.autofill.FillRequest.FLAG_PCC_DETECTION;
 import static android.service.autofill.FillRequest.FLAG_RESET_FILL_DIALOG_STATE;
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
 import static android.service.autofill.FillRequest.FLAG_SCREEN_HAS_CREDMAN_FIELD;
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
 import static android.service.autofill.FillRequest.FLAG_SUPPORTS_FILL_DIALOG;
 import static android.service.autofill.FillRequest.FLAG_VIEW_NOT_FOCUSED;
 import static android.service.autofill.FillRequest.FLAG_VIEW_REQUESTS_CREDMAN_SERVICE;
@@ -710,10 +710,10 @@ public final class AutofillManager {
     // Indicate whether to apply heuristic check on important views before trigger fill request
     private boolean mIsTriggerFillRequestOnFilteredImportantViewsEnabled;
 
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
     private final boolean mIsFillAndSaveDialogDisabledForCredentialManager;
 
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
     // Indicate whether to enable autofill for all view types
     private boolean mShouldEnableAutofillOnAllViewTypes;
 
@@ -951,10 +951,10 @@ public final class AutofillManager {
 
         mIsFillDialogEnabled = AutofillFeatureFlags.isFillDialogEnabled();
         mFillDialogEnabledHints = AutofillFeatureFlags.getFillDialogEnabledHints();
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
         mIsFillAndSaveDialogDisabledForCredentialManager =
         AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager();
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
         if (sDebug) {
             Log.d(TAG, "Fill dialog is enabled:" + mIsFillDialogEnabled
                     + ", hints=" + Arrays.toString(mFillDialogEnabledHints));
@@ -1654,17 +1654,17 @@ public final class AutofillManager {
                             + view.getAutofillId().toString());
                 }
                 isCredmanRequested = true;
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
             }
                 if (view.isCredential() && mIsFillAndSaveDialogDisabledForCredentialManager) {
                     if (sDebug) {
                        Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
                             + view.getAutofillId().toString());
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
                     }
                 mScreenHasCredmanField = true;
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
                 return;
             }
         }
@@ -1694,17 +1694,17 @@ public final class AutofillManager {
                             + v.getAutofillId().toString());
                 }
                 isCredmanRequested = true;
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
             }
             if (v.isCredential() && mIsFillAndSaveDialogDisabledForCredentialManager) {
                    if (sDebug) {
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
                     Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
                             + v.getAutofillId());
                    }
                 mScreenHasCredmanField = true;
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
                 return;
             }
         }
@@ -2039,7 +2039,7 @@ public final class AutofillManager {
             if (view instanceof TextView && ((TextView) view).isAnyPasswordInputType()) {
                 flags |= FLAG_PASSWORD_INPUT_TYPE;
             }
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
             // Update session when screen has credman field
             if (AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager()
                     && mScreenHasCredmanField) {
@@ -2048,7 +2048,7 @@ public final class AutofillManager {
                     Log.v(TAG, "updating session with flag screen has credman view");
                 }
             }
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
 
             flags |= getImeStateFlag(view);
 
@@ -2846,9 +2846,9 @@ public final class AutofillManager {
         mIsFillRequested.set(false);
         mShowAutofillDialogCalled = false;
         mFillDialogTriggerIds = null;
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
         mScreenHasCredmanField = false;
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
         mAllTrackedViews.clear();
         if (resetEnteredIds) {
             mEnteredIds = null;
@@ -4190,10 +4190,10 @@ public final class AutofillManager {
     private boolean shouldShowAutofillDialog(View view, AutofillId id) {
         if (!hasFillDialogUiFeature()
                 || mShowAutofillDialogCalled
-// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_BEGIN: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
                 || mFillDialogTriggerIds == null
                 || mScreenHasCredmanField) {
-// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module
+// QTI_END: 2024-12-03: SystemUI: Adding changes for Autofill test cases module: 1) Disabling check for view integrated based CredentialManager. 2) Suppress fill and save dialog for activities that have credman field. (Changes added from 24Q3-fs-release branch.) Bug:340821203 am: b4fa95fc88 am: b4fa95fc88
             return false;
         }
 

@@ -1,3 +1,4 @@
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /*
  * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
@@ -29,8 +30,11 @@
 
 package android.util;
 
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import android.app.ActivityThread;
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.content.Context;
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.database.ContentObserver;
@@ -40,14 +44,19 @@ import android.os.Binder;
 import android.os.Process;
 import android.os.SystemProperties;
 import android.provider.Settings;
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import android.util.Log;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
 import dalvik.system.PathClassLoader;
 
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import java.util.LinkedHashMap;
 import java.util.Map;
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
 /** @hide */
 public class BoostFramework {
@@ -56,12 +65,17 @@ public class BoostFramework {
     private static final String PERFORMANCE_JAR = "/system/framework/QPerformance.jar";
     private static final String PERFORMANCE_CLASS = "com.qualcomm.qti.Performance";
 
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     private static final String UXPERFORMANCE_JAR = "/system/framework/UxPerformance.jar";
     private static final String UXPERFORMANCE_CLASS = "com.qualcomm.qti.UxPerformance";
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     public  static final float PERF_HAL_V22 = 2.2f;
     public  static final float PERF_HAL_V23 = 2.3f;
     public static final int VENDOR_T_API_LEVEL = 33;
+// QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
     public static final int VENDOR_V_API_LEVEL = 202404;
+// QTI_END: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
     public final int board_first_api_lvl = SystemProperties.getInt("ro.board.first_api_level", 0);
     public final int board_api_lvl = SystemProperties.getInt("ro.board.api_level", 0);
     //key in privider settings global
@@ -78,13 +92,17 @@ public class BoostFramework {
     //Deprecated, will be removed soon.
     public static final String UI_PERF_PROC_PROP = "debug.ui.perfmode.process";
 
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     private static boolean sIsLoaded = false;
     private static Class<?> sPerfClass = null;
     private static Method sAcquireFunc = null;
     private static Method sPerfHintFunc = null;
     private static Method sReleaseFunc = null;
+// QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
     private static Method sPerfHintRelFunc = null;
+// QTI_END: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
     private static Method sReleaseHandlerFunc = null;
     private static Method sFeedbackFunc = null;
     private static Method sFeedbackFuncExtn = null;
@@ -96,6 +114,7 @@ public class BoostFramework {
     private static Method sPerfGetPerfHalVerFunc = null;
     private static Method sPerfSyncRequest = null;
 
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     private static Method sIOPStart = null;
     private static Method sIOPStop  = null;
     private static Method sUXEngineEvents  = null;
@@ -105,9 +124,15 @@ public class BoostFramework {
     private static Class<?> sUxPerfClass = null;
     private static Method sUxIOPStart = null;
 
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
     private Object mPerf = null;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     private Object mUxPerf = null;
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
     //perf hints
     public static final int VENDOR_HINT_SCROLL_BOOST = 0x00001080;
@@ -118,7 +143,10 @@ public class BoostFramework {
     public static final int VENDOR_HINT_TOUCH_BOOST = 0x00001085;
     public static final int VENDOR_HINT_MTP_BOOST = 0x00001086;
     public static final int VENDOR_HINT_DRAG_BOOST = 0x00001087;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2018-03-27: Core: framework/base: add parallel verifyV1
     public static final int VENDOR_HINT_PACKAGE_INSTALL_BOOST = 0x00001088;
+// QTI_END: 2018-03-27: Core: framework/base: add parallel verifyV1
     public static final int VENDOR_HINT_ROTATION_LATENCY_BOOST = 0x00001089;
     public static final int VENDOR_HINT_ROTATION_ANIM_BOOST = 0x00001090;
     public static final int VENDOR_HINT_PERFORMANCE_MODE = 0x00001091;
@@ -130,9 +158,11 @@ public class BoostFramework {
     public static final int VENDOR_HINT_SCENARIO_CPU = 0x000010AB;
     public static final int VENDOR_HINT_SCENARIO_CPU_GPU = 0x000010AC;
     public static final int VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE = 0x000010AD;
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     //perf events
     public static final int VENDOR_HINT_FIRST_DRAW = 0x00001042;
     public static final int VENDOR_HINT_TAP_EVENT = 0x00001043;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public static final int VENDOR_HINT_DRAG_START = 0x00001051;
     public static final int VENDOR_HINT_DRAG_END = 0x00001052;
     public static final int VENDOR_HINT_PIN_FILE = 0x0000105E;
@@ -147,16 +177,20 @@ public class BoostFramework {
     public static final int VENDOR_FEEDBACK_LAUNCH_END_POINT = 0x00001602;
     public static final int VENDOR_FEEDBACK_PA_FW = 0x00001604;
 
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     //UXE Events and Triggers
     public static final int UXE_TRIGGER = 1;
     public static final int UXE_EVENT_BINDAPP = 2;
     public static final int UXE_EVENT_DISPLAYED_ACT = 3;
     public static final int UXE_EVENT_KILL = 4;
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     public static final int UXE_EVENT_GAME  = 5;
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     public static final int UXE_EVENT_SUB_LAUNCH = 6;
     public static final int UXE_EVENT_PKG_UNINSTALL = 7;
     public static final int UXE_EVENT_PKG_INSTALL = 8;
 
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     //New Hints while porting IOP to Perf Hal.
     public static final int VENDOR_HINT_BINDAPP = 0x000010A0;
     public static final int VENDOR_HINT_WARM_LAUNCH = 0x000010A1; //SUB_LAUNCH
@@ -168,6 +202,7 @@ public class BoostFramework {
     public static final int MPCTLV3_GPU_IS_APP_FG = 0X42820000;
     public static final int MPCTLV3_GPU_IS_APP_BG = 0X42824000;
 
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public class Scroll {
         public static final int VERTICAL = 1;
         public static final int HORIZONTAL = 2;
@@ -179,6 +214,7 @@ public class BoostFramework {
         public static final int BOOST_V1 = 1;
         public static final int BOOST_V2 = 2;
         public static final int BOOST_V3 = 3;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         public static final int BOOST_GAME = 4;
         public static final int RESERVED_1 = 5;
         public static final int RESERVED_2 = 6;
@@ -186,21 +222,27 @@ public class BoostFramework {
         public static final int RESERVED_4 = 8;
         public static final int RESERVED_5 = 9;
         public static final int ACTIVITY_LAUNCH_BOOST = 10;
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         public static final int TYPE_SERVICE_START = 100;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         public static final int TYPE_START_PROC = 101;
         public static final int TYPE_START_APP_FROM_BG = 102;
         public static final int TYPE_ATTACH_APPLICATION = 103;
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     };
 
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public class PassPid {
         public static final int APP_PID = 4;
         public static final int RENDER_TID = 5;
     }
 
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public class Draw {
         public static final int EVENT_TYPE_V1 = 1;
     };
 
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public class WorkloadType {
         public static final int NOT_KNOWN = 0;
         public static final int APP = 1;
@@ -211,17 +253,21 @@ public class BoostFramework {
         public static final int APP_OF_INTEREST = 6;
     };
 
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
     public BoostFramework() {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         initFunctions();
 
         try {
             if (sPerfClass != null) {
                 mPerf = sPerfClass.newInstance();
             }
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             if (sUxPerfClass != null) {
                 mUxPerf = sUxPerfClass.newInstance();
             }
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         }
         catch(Exception e) {
             Log.e(TAG,"BoostFramework() : Exception_2 = " + e);
@@ -243,7 +289,9 @@ public class BoostFramework {
                 if (cons != null)
                     mPerf = cons.newInstance(context);
             }
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             if (sUxPerfClass != null) {
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 if (isTrusted) {
                     Constructor cons = sUxPerfClass.getConstructor(Context.class);
                     if (cons != null)
@@ -251,7 +299,9 @@ public class BoostFramework {
                 } else {
                     mUxPerf = sUxPerfClass.newInstance();
                 }
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             }
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         }
         catch(Exception e) {
             Log.e(TAG,"BoostFramework() : Exception_3 = " + e);
@@ -278,24 +328,38 @@ public class BoostFramework {
     }
 
     private void initFunctions () {
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         synchronized(BoostFramework.class) {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             if (sIsLoaded == false) {
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                 try {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                     sPerfClass = Class.forName(PERFORMANCE_CLASS);
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
                     Class[] argClasses = new Class[] {int.class, int[].class};
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                     sAcquireFunc = sPerfClass.getMethod("perfLockAcquire", argClasses);
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
                     argClasses = new Class[] {int.class, String.class, int.class, int.class};
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                     sPerfHintFunc = sPerfClass.getMethod("perfHint", argClasses);
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
                     argClasses = new Class[] {};
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                     sReleaseFunc = sPerfClass.getMethod("perfLockRelease", argClasses);
 
+// QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
                     argClasses = new Class[] {};
                     sPerfHintRelFunc = sPerfClass.getMethod("perfHintRelease", argClasses);
 
+// QTI_END: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                     argClasses = new Class[] {int.class};
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                     sReleaseHandlerFunc = sPerfClass.getDeclaredMethod("perfLockReleaseHandler", argClasses);
 
                     argClasses = new Class[] {int.class, String.class};
@@ -304,12 +368,14 @@ public class BoostFramework {
                     argClasses = new Class[] {int.class, String.class, int.class, int[].class};
                     sFeedbackFuncExtn = sPerfClass.getMethod("perfGetFeedbackExtn", argClasses);
 
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                     argClasses = new Class[] {int.class, String.class, String.class};
                     sIOPStart =   sPerfClass.getDeclaredMethod("perfIOPrefetchStart", argClasses);
 
                     argClasses = new Class[] {};
                     sIOPStop =  sPerfClass.getDeclaredMethod("perfIOPrefetchStop", argClasses);
 
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                     argClasses = new Class[] {String.class, String.class};
                     sPerfGetPropFunc = sPerfClass.getMethod("perfGetProp", argClasses);
 
@@ -339,8 +405,13 @@ public class BoostFramework {
                         sPerfGetPerfHalVerFunc = null;
                     }
 
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                     try {
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
                         argClasses = new Class[] {int.class, int.class, String.class, int.class, String.class};
+// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                         sUXEngineEvents =  sPerfClass.getDeclaredMethod("perfUXEngine_events",
                                                                           argClasses);
 
@@ -351,24 +422,34 @@ public class BoostFramework {
                         Log.i(TAG, "BoostFramework() : Exception_4 = PreferredApps not supported");
                     }
 
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                     sIsLoaded = true;
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                 }
                 catch(Exception e) {
                     Log.e(TAG,"BoostFramework() : Exception_1 = " + e);
                 }
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 // Load UXE Class now Adding new try/catch block to avoid
                 // any interference with Qperformance
                 try {
                     sUxPerfClass = Class.forName(UXPERFORMANCE_CLASS);
 
                     Class[] argUxClasses = new Class[] {int.class, String.class, String.class};
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
                     sUxIOPStart = sUxPerfClass.getDeclaredMethod("perfIOPrefetchStart", argUxClasses);
+// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
                     sUxIsLoaded = true;
                 }
                 catch(Exception e) {
                     Log.e(TAG,"BoostFramework() Ux Perf: Exception = " + e);
                 }
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             }
         }
     }
@@ -377,10 +458,12 @@ public class BoostFramework {
     public int perfLockAcquire(int duration, int... list) {
         int ret = -1;
         try {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             if (sAcquireFunc != null) {
                 Object retVal = sAcquireFunc.invoke(mPerf, duration, list);
                 ret = (int)retVal;
             }
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
         }
@@ -391,16 +474,20 @@ public class BoostFramework {
     public int perfLockRelease() {
         int ret = -1;
         try {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             if (sReleaseFunc != null) {
                 Object retVal = sReleaseFunc.invoke(mPerf);
                 ret = (int)retVal;
             }
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
         }
         return ret;
     }
 
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
 /** @hide */
     public int perfHintRelease() {
         int ret = -1;
@@ -415,14 +502,18 @@ public class BoostFramework {
         return ret;
     }
 
+// QTI_END: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
     public int perfLockReleaseHandler(int handle) {
         int ret = -1;
         try {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             if (sReleaseHandlerFunc != null) {
                 Object retVal = sReleaseHandlerFunc.invoke(mPerf, handle);
                 ret = (int)retVal;
             }
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
         }
@@ -443,11 +534,14 @@ public class BoostFramework {
     public int perfHint(int hint, String userDataStr, int userData1, int userData2) {
         int ret = -1;
         try {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             if (sPerfHintFunc != null) {
                 Object retVal = sPerfHintFunc.invoke(mPerf, hint, userDataStr, userData1, userData2);
                 ret = (int)retVal;
             }
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             Log.e(TAG,"Exception " + e);
         }
         return ret;
@@ -490,10 +584,13 @@ public class BoostFramework {
                 ret = (int)retVal;
             }
         } catch(Exception e) {
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             Log.e(TAG,"Exception " + e);
         }
         return ret;
     }
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
 /** @hide */
     public int perfIOPrefetchStart(int pid, String pkgName, String codePath) {
@@ -505,11 +602,15 @@ public class BoostFramework {
             Log.e(TAG, "Exception " + e);
         }
         try {
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
              Object retVal = sUxIOPStart.invoke(mUxPerf, pid, pkgName, codePath);
              ret = (int) retVal;
          } catch (Exception e) {
              Log.e(TAG, "Ux Perf Exception " + e);
          }
+// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
         return ret;
     }
@@ -528,18 +629,28 @@ public class BoostFramework {
 
 /** @hide */
     public int perfUXEngine_events(int opcode, int pid, String pkgName, int lat) {
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
         return perfUXEngine_events(opcode, pid, pkgName, lat, null);
      }
 
 /** @hide */
     public int perfUXEngine_events(int opcode, int pid, String pkgName, int lat, String codePath) {
+// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         int ret = -1;
         try {
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             if (sUXEngineEvents == null) {
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 return ret;
             }
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
 
             Object retVal = sUXEngineEvents.invoke(mPerf, opcode, pid, pkgName, lat,codePath);
+// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             ret = (int) retVal;
         } catch (Exception e) {
             Log.e(TAG, "Exception " + e);
@@ -552,7 +663,9 @@ public class BoostFramework {
     public String perfUXEngine_trigger(int opcode) {
         String ret = null;
         try {
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             if (sUXEngineTrigger == null) {
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 return ret;
             }
             Object retVal = sUXEngineTrigger.invoke(mPerf, opcode);
@@ -562,6 +675,7 @@ public class BoostFramework {
         }
         return ret;
     }
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
 /** @hide */
     public String perfSyncRequest(int opcode) {
@@ -1249,4 +1363,6 @@ public class BoostFramework {
         return false;
     }
     //UI PERF END
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 };
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.

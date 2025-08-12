@@ -3064,7 +3064,7 @@ public abstract class OomAdjuster {
             if (immediate && !opt.isFrozen()) {
                 // And it will be frozen immediately.
                 mCachedAppOptimizer.freezeAppAsyncAtEarliestLSP(app);
-            } else if (!opt.isFrozen() || !opt.isPendingFreeze()) {
+            } else if (!opt.isFrozen() && !opt.isPendingFreeze()) {
                 mCachedAppOptimizer.freezeAppAsyncLSP(app);
             }
         } else {

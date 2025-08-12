@@ -5272,7 +5272,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 try {
                     IUiModeManager uiModeService = IUiModeManager.Stub.asInterface(
                             ServiceManager.getService(Context.UI_MODE_SERVICE));
-                    mUiMode = uiModeService.getCurrentModeType();
+                    mUiMode = uiModeService.getCurrentModeType(DEFAULT_DISPLAY);
                 } catch (RemoteException e) {
                 }
             }
@@ -6227,7 +6227,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     ServiceManager.getService(Context.UI_MODE_SERVICE));
         }
         try {
-            mUiMode = mUiModeManager.getCurrentModeType();
+            // The uiMode on DEFAULT_DISPLAY is equivalent to the device-level uiMode.
+            // Per-display overrides of uiMode are disallowed on DEFAULT_DISPLAY.
+            mUiMode = mUiModeManager.getCurrentModeType(DEFAULT_DISPLAY);
         } catch (RemoteException e) {
         }
     }

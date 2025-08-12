@@ -2325,7 +2325,9 @@ public final class ActivityRecord extends WindowToken {
         final TaskSnapshot snapshot;
         if (Flags.reduceTaskSnapshotMemoryUsage()) {
             snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
-                    TaskSnapshotManager.RESOLUTION_HIGH);
+                    Flags.respectRequestedTaskSnapshotResolution()
+                            ? TaskSnapshotManager.RESOLUTION_ANY
+                            : TaskSnapshotManager.RESOLUTION_HIGH);
         } else {
             snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
                     false /* isLowResolution */);

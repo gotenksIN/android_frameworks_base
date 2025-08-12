@@ -679,12 +679,21 @@ filegroup {
 }
 
 filegroup {
-    name: "SystemUI-tests-multivalent",
+    name: "SystemUI-tests-multivalent-monolith",
     srcs: [
         "multivalentTests/src/**/*.kt",
         "multivalentTests/src/**/*.java",
     ],
     path: "multivalentTests/src",
+}
+
+filegroup {
+    name: "SystemUI-tests-multivalent-pods",
+    srcs: [
+        "pods/multivalentTests/src/**/*.kt",
+        "pods/multivalentTests/src/**/*.java",
+    ],
+    path: "pods/multivalentTests/src",
 }
 
 java_library {
@@ -815,7 +824,8 @@ android_library {
         ":SystemUI-application-srcs",
         ":SystemUI-core-srcs",
         ":ReleaseJavaFiles",
-        ":SystemUI-tests-multivalent",
+        ":SystemUI-tests-multivalent-monolith",
+        ":SystemUI-tests-multivalent-pods",
         ":SystemUI-tests-utils",
         "compose/features/src/**/*.kt",
         "compose/facade/enabled/src/**/*.kt",
@@ -949,7 +959,8 @@ android_robolectric_test {
         "tests/robolectric/src/**/*.kt",
         "tests/robolectric/src/**/*.java",
         ":SystemUI-tests-utils",
-        ":SystemUI-tests-multivalent",
+        ":SystemUI-tests-multivalent-monolith",
+        ":SystemUI-tests-multivalent-pods",
     ],
     defaults: ["systemui-non-platform-apis-defaults"],
     static_libs: [
@@ -980,7 +991,8 @@ android_robolectric_test {
         "tests/robolectric/src/**/*.kt",
         "tests/robolectric/src/**/*.java",
         ":SystemUI-tests-utils",
-        ":SystemUI-tests-multivalent",
+        ":SystemUI-tests-multivalent-monolith",
+        ":SystemUI-tests-multivalent-pods",
         ":SystemUI-tests-robofiles",
     ],
     exclude_srcs: [
@@ -1015,7 +1027,7 @@ filegroup {
         "multivalentTests/src/**/NotificationAlertsInteractorTest.kt",
         "multivalentTests/src/**/NotificationsKeyguardInteractorTest.kt",
         "multivalentTests/src/**/NotifPipelineChoreographerTest.kt",
-        "multivalentTests/src/**/KeyguardNotificationVisibilityProviderTest.java"
+        "multivalentTests/src/**/KeyguardNotificationVisibilityProviderTest.java",
     ],
 }
 
@@ -1025,7 +1037,8 @@ android_ravenwood_test {
     build_resources: true,
     srcs: [
         ":SystemUI-tests-utils",
-        ":SystemUI-tests-multivalent",
+        ":SystemUI-tests-multivalent-monolith",
+        ":SystemUI-tests-multivalent-pods",
     ],
     exclude_srcs: [
         // TODO(b/429013941): kapt is way too slow, so disable them for now.

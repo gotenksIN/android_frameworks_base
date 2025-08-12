@@ -144,6 +144,7 @@ import com.android.internal.widget.LockscreenCredential;
 import com.android.internal.widget.VerifyCredentialResponse;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
+import com.android.server.StorageManagerInternal;
 import com.android.server.SystemService;
 import com.android.server.locksettings.LockSettingsStorage.PersistentData;
 import com.android.server.locksettings.SyntheticPasswordManager.AuthenticationResult;
@@ -278,6 +279,7 @@ public class LockSettingsService extends ILockSettings.Stub {
     private final NotificationManager mNotificationManager;
     protected final UserManager mUserManager;
     private final IStorageManager mStorageManager;
+    private final StorageManagerInternal mStorageManagerInternal;
     private final IActivityManager mActivityManager;
     private final SyntheticPasswordManager mSpManager;
 
@@ -583,6 +585,10 @@ public class LockSettingsService extends ILockSettings.Stub {
             return null;
         }
 
+        public StorageManagerInternal getStorageManagerInternal() {
+            return LocalServices.getService(StorageManagerInternal.class);
+        }
+
         public SyntheticPasswordManager getSyntheticPasswordManager(LockSettingsStorage storage) {
             return new SyntheticPasswordManager(getContext(), storage, getUserManager(),
                     new PasswordSlotManager());
@@ -713,6 +719,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         mNotificationManager = injector.getNotificationManager();
         mUserManager = injector.getUserManager();
         mStorageManager = injector.getStorageManager();
+        mStorageManagerInternal = mInjector.getStorageManagerInternal();
         mStrongAuthTracker = injector.getStrongAuthTracker();
         mStrongAuthTracker.register(mStrongAuth);
         mGatekeeperPasswords = new LongSparseArray<>();
@@ -2212,8 +2219,8 @@ public class LockSettingsService extends ILockSettings.Stub {
         final long callingId = Binder.clearCallingIdentity();
         try {
 // QTI_END: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
-            mStorageManager.setCeStorageProtection(userId, secret);
-        } catch (RemoteException e) {
+            mStorageManagerInternal.setCeStorageProtection(userId, secret);
+        } catch (RuntimeException e) {
             throw new IllegalStateException("Failed to protect CE key for user " + userId, e);
 // QTI_BEGIN: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
         } finally {
@@ -2246,9 +2253,9 @@ public class LockSettingsService extends ILockSettings.Stub {
         final String userType = isUserSecure(userId) ? "secured" : "unsecured";
         final byte[] secret = sp.deriveFileBasedEncryptionKey();
         try {
-            mStorageManager.unlockCeStorage(userId, secret);
+            mStorageManagerInternal.unlockCeStorage(userId, secret);
             Slogf.i(TAG, "Unlocked CE storage for %s user %d", userType, userId);
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Slogf.wtf(TAG, e, "Failed to unlock CE storage for %s user %d", userType, userId);
         } finally {
             ArrayUtils.zeroize(secret);

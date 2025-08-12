@@ -3360,34 +3360,6 @@ class StorageManagerService extends IStorageManager.Stub
         }
     }
 
-    /* Only for use by LockSettingsService */
-    @android.annotation.EnforcePermission(android.Manifest.permission.STORAGE_INTERNAL)
-// QTI_BEGIN: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
-    @Override
-// QTI_END: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
-    public void setCeStorageProtection(@UserIdInt int userId, byte[] secret)
-            throws RemoteException {
-        super.setCeStorageProtection_enforcePermission();
-
-        mVold.setCeStorageProtection(userId, secret);
-// QTI_BEGIN: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
-    }
-
-// QTI_END: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
-    /* Only for use by LockSettingsService */
-    @android.annotation.EnforcePermission(android.Manifest.permission.STORAGE_INTERNAL)
-    @Override
-    public void unlockCeStorage(@UserIdInt int userId, byte[] secret) throws RemoteException {
-        super.unlockCeStorage_enforcePermission();
-
-        if (StorageManager.isFileEncrypted()) {
-            mVold.unlockCeStorage(userId, secret);
-        }
-        synchronized (mLock) {
-            mCeUnlockedUsers.append(userId);
-        }
-    }
-
     @android.annotation.EnforcePermission(android.Manifest.permission.STORAGE_INTERNAL)
     @Override
     public void lockCeStorage(int userId) {
@@ -5134,6 +5106,29 @@ class StorageManagerService extends IStorageManager.Stub
         public boolean isCeStoragePrepared(int userId) {
             synchronized (mLock) {
                 return mCeStoragePreparedUsers.contains(userId);
+            }
+        }
+
+        @Override
+        public void setCeStorageProtection(@UserIdInt int userId, byte[] secret) {
+            try {
+                mVold.setCeStorageProtection(userId, secret);
+            } catch (RemoteException e) {
+                e.rethrowAsRuntimeException();
+            }
+        }
+
+        @Override
+        public void unlockCeStorage(@UserIdInt int userId, byte[] secret) {
+            if (StorageManager.isFileEncrypted()) {
+                try {
+                    mVold.unlockCeStorage(userId, secret);
+                } catch (RemoteException e) {
+                    e.rethrowAsRuntimeException();
+                }
+            }
+            synchronized (mLock) {
+                mCeUnlockedUsers.append(userId);
             }
         }
 

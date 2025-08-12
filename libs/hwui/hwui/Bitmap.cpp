@@ -76,12 +76,10 @@ constexpr bool bitmap_ashmem_long_name() { return false; }
 }
 #endif
 
-/* QTI_BEGIN */
 #include <cutils/properties.h>
 #include <sys/types.h>
 #include <unistd.h>
 #define UI_PERFMODE "debug.ui.perfmode.enable"
-/* QTI_END */
 
 namespace android {
 
@@ -635,13 +633,11 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
         return false;
     }
 
-    /* QTI_BEGIN */
     bool ui_perf_enabled = false;
     int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
     if (ui_perfmode > 0 && ui_perfmode == getpid()) {
         ui_perf_enabled = true;
     }
-    /* QTI_END */
 
     switch (format) {
         case JavaCompressFormat::Jpeg: {
@@ -650,7 +646,6 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             return SkJpegEncoder::Encode(stream, bitmap.pixmap(), options);
         }
         case JavaCompressFormat::Png: {
-            /* QTI_BEGIN */
             if (ui_perf_enabled && bitmap.width() >= 1280
                                 && bitmap.height() >= 720) {
                 SkPngEncoder::Options options;
@@ -659,7 +654,6 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
                                        SkPngEncoder::FilterFlag::kAvg;
                 return SkPngEncoder::Encode(stream, bitmap.pixmap(), options);
             }
-            /* QTI_END */
             return SkPngEncoder::Encode(stream, bitmap.pixmap(), {});
             }
         case JavaCompressFormat::Webp: {
@@ -679,11 +673,9 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             options.fQuality = quality;
             options.fCompression = format == JavaCompressFormat::WebpLossy ?
                     SkWebpEncoder::Compression::kLossy : SkWebpEncoder::Compression::kLossless;
-            /* QTI_BEGIN */
             if (ui_perf_enabled) {
                 options.fCompression = SkWebpEncoder::Compression::kLossless;
             }
-            /* QTI_END */
             return SkWebpEncoder::Encode(stream, bitmap.pixmap(), options);
         }
     }

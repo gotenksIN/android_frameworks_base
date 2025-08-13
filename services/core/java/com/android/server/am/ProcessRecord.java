@@ -1390,13 +1390,13 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                     ux_perf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     ux_perf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, this.processName, 0);
                 }
-// QTI_BEGIN: 2021-09-23: Performance: BoostFramework: Replace PerfHint with PerfEvent.
+// QTI_BEGIN: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
                 ux_perf.perfEvent(BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
-// QTI_END: 2021-09-23: Performance: BoostFramework: Replace PerfHint with PerfEvent.
-// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
+// QTI_END: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
+// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
             } else {
                 mService.mForceStopKill = false;
-// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
+// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
